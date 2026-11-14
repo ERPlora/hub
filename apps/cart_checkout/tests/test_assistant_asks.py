@@ -16,12 +16,8 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    place_of_no_ask,
-)
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: Cart & Checkout's reads: its carts, their lines and the orders made from them.
 READS = {
@@ -174,7 +170,7 @@ def test_the_reported_cart_request_offers_its_tool_before_the_one_the_model_ran(
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert instead in tools  # positive control: the rival is offered to the owner too
     phrase = dict(REPORTED)[name]
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    offered = offered_to(tools, phrase)
     assert name in offered, offered
     if instead in offered:
         assert offered.index(name) < offered.index(instead), offered
@@ -189,7 +185,7 @@ NOT_EMPTYING = ("cart_checkout.cart.delete", "cart_checkout.item.remove")
 @pytest.mark.parametrize("instead", NOT_EMPTYING)
 def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting_it_or_a_line(catalog_of, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)["cart_checkout.cart.clear"]], "es")]
+    offered = offered_to(tools, dict(REPORTED)["cart_checkout.cart.clear"])
     assert "cart_checkout.cart.clear" in offered, offered
     assert instead in offered, offered  # positive control: the rival is offered too, so their order is measured
     assert offered.index("cart_checkout.cart.clear") < offered.index(instead), offered
@@ -205,7 +201,7 @@ def test_a_reported_change_of_a_line_is_offered_a_read_that_finds_the_line(catal
     """The person names the line by its product («el Café de QA-WEB-1»), the tool takes its id: the same turn offers a
     read of the cart that gives it, so the model finds the line instead of asking for its id."""
     tools = catalog_of(Membership.Role.OWNER, "es")
-    offered = [op.name for op in assistant.relevant(tools, [dict(REPORTED)[name]], "es")]
+    offered = offered_to(tools, dict(REPORTED)[name])
     assert name in offered, offered
     assert LINE_READS & set(offered), offered
 
@@ -237,5 +233,4 @@ BY_SYNONYM = [
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), BY_SYNONYM)
 def test_a_cart_named_by_the_shops_words_is_offered_among_the_first_ten(catalog_of, name, phrase):
-    place = place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=TOP)

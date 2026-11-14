@@ -3065,8 +3065,7 @@ Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte,
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas, los precios de tarifa y los grupos de suplementos de los productos; crear y borrar el clúster
 temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las opciones de menú de un producto
-que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como
-uno nuevo, hub#1459; los grupos de suplementos de un producto que vuelve como uno nuevo, hub#1457; los grupos de
+que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459; los grupos de
 suplementos de una categoría que vuelve, hub#1456; un grupo de suplementos borrado, hub#1458)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
@@ -3220,10 +3219,10 @@ Pasos:
       Los grupos de suplementos de los productos van también después de los productos: «Grupos de suplementos de
       productos: se crearon 2». Cada grupo que en la copia colgaba de un producto vivo allí y que el negocio ya no tiene
       enganchado a ese producto se vuelve a enganchar, como lo engancha la hoja del grupo, así que un producto eliminado
-      que vuelve pregunta otra vez en el TPV sus salsas, su punto o sus extras (MODIFIER-F10). No se repite uno cuyo
-      grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno que la hoja del grupo no acepta hoy
-      (su producto sigue eliminado, o el negocio borró el grupo) no vuelve y su motivo lo dice; los de un producto que
-      vuelve como uno nuevo, tampoco todavía (hub#1457).
+      que vuelve, el mismo o como uno nuevo, pregunta otra vez en el TPV sus salsas, su punto o sus extras
+      (MODIFIER-F10). No se repite uno cuyo grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno
+      que la hoja del grupo no acepta hoy (su producto sigue eliminado, o el negocio ya hizo otro a mano con su SKU, o
+      borró el grupo) no vuelve y su motivo lo dice.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso

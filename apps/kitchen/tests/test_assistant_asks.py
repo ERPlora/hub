@@ -19,15 +19,13 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
-A = Scope("host", "a")
 #: What only who runs the kitchen holds (``KitchenConfig.role_permissions``): cancelling or deleting a ticket, the
 #: stations and their routing, and the display's settings. An employee moves tickets and dishes, never these.
 NOT_THE_EMPLOYEES = {
@@ -92,9 +90,6 @@ REPORTED = [
     ),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Kitchen, the owner's and the employee's real phrases of the QA: the ones above and the ones
 #: the model got right, and the employee's requests of what only who runs the kitchen may do (``refused``).
 PROBES = [
@@ -145,31 +140,6 @@ OWN_WORDS = [
 ROOM = 2
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered_place(tools: dict[str, Operation], name: str, phrase: str, language: str) -> int | None:
-    """Where a turn that says ``phrase`` offers the tool ``name`` (1 the first), or ``None`` when it does not."""
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    return offered.index(name) + 1 if name in offered else None
-
-
-def place_of_no_ask(tools: dict[str, Operation], name: str, phrase: str, language: str) -> int | None:
-    """``offered_place`` of a tool the person holds for a ``phrase`` that is none of its asks in ``language``."""
-    assert name in tools  # positive control: the person holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    return offered_place(tools, name, phrase, language)
-
-
 def without_its_asks(tools: dict[str, Operation], name: str) -> dict[str, Operation]:
     """``tools`` with ``name`` saying no asks: how a turn ranks it by its name, its description and the Hub's words."""
     op = tools[name]
@@ -208,8 +178,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
-    place = place_of_no_ask(catalog_of(ROLES[role], "es"), name, phrase, "es")
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(ROLES[role], "es"), name, phrase, "es")
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -225,8 +194,7 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
         assert name not in tools
         assert name in catalog_of(Membership.Role.OWNER, probe["language"])  # positive control: it is a real tool
         return
-    place = place_of_no_ask(tools, name, phrase, probe["language"])
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, name, phrase, probe["language"])
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -234,8 +202,7 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
 def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(catalog_of, phrase, name):
     tools = catalog_of(ROLES["owner"], "es")
     assert nobodys_words(tools, phrase, "es")
-    place = place_of_no_ask(tools, name, phrase, "es")
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(tools, name, phrase, "es", room=TOP)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -243,8 +210,8 @@ def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(cat
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, language, name, phrase):
     tools = catalog_of(ROLES["owner"], language)
     assert nobodys_words(tools, phrase, language)
-    place = place_of_no_ask(tools, name, phrase, language)
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(tools, name, phrase, language, room=TOP)
+
     before = without_its_asks(tools, name)
     assert not shared.asks_of(before[name])  # positive control: the tool is ranked without its asks
     unasked = offered_place(before, name, phrase, language)

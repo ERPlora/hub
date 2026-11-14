@@ -34,10 +34,6 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/service/frontend/components/GrantVoidModal.vue': 1,
   'apps/service/frontend/components/PackageFormModal.vue': 9,
   'apps/service/frontend/components/ServiceFormModal.vue': 6,
-  'apps/tax/frontend/components/AliasCreateModal.vue': 3,
-  'apps/tax/frontend/components/CategoryCreateModal.vue': 3,
-  'apps/tax/frontend/components/RuleCreateModal.vue': 12,
-  'apps/tax/frontend/components/RuleEndModal.vue': 1,
 };
 
 /** Windows that take away themselves a refusal they paint apart, once the person changes what it is about, rather than

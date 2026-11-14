@@ -11,11 +11,8 @@ import pytest
 from live.operations import AI, registry
 
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    place_of_no_ask,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, place_of_no_ask
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: What only who runs the business does: an employee's assistant is never offered the printers' settings.
 NOT_THE_EMPLOYEES = {

@@ -11,15 +11,13 @@ import re
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
+from base.tests.test_assistant_asks import comparable, offered_to, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
-A = Scope("host", "a")
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
 
 #: The requests of hub#1087's QA (``tests/e2e/qa/probes/*-es-cash_register-2026-11-08.json``), as each role said them:
@@ -72,18 +70,6 @@ FIRST = {
 PROBE_ROLE = {OWNER: "owner", EMPLOYEE: "employee"}
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
 def test_cash_register_offers_at_least_19_tools():
     """Cash register's tools are at least 19 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {name for name, op in registry.items() if op.app_label == "cash_register" and isinstance(op.ai_spec(), AI)}
@@ -118,11 +104,7 @@ def test_the_hub_reads_an_arqueo_as_a_count_and_the_moneda_as_the_currency():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_cash_register_request_offers_its_existing_operation(catalog_of, role, name, phrase):
-    tools = catalog_of(role, language := "es")
-    assert name in tools  # positive control: the role holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get(language, ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered, (len(offered), offered[:10])
+    assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
 
 
 @pytest.mark.django_db
@@ -130,7 +112,7 @@ def test_the_reported_cash_register_request_offers_its_existing_operation(catalo
 def test_the_reported_request_is_offered_the_read_it_needs_first(catalog_of, role, name, phrase):
     tools = catalog_of(role, "es")
     assert FIRST[name] in tools  # positive control: the role holds the read
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    offered = offered_to(tools, phrase)
     assert FIRST[name] in offered, (len(offered), offered[:10])
 
 

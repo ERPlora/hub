@@ -10,15 +10,12 @@ import re
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import comparable, probe_phrases
-
-A = Scope("host", "a")
+from base.tests.test_assistant_asks import comparable, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1105's QA (``owner.es.reservation.*`` of ``tests/e2e/qa/probes/owner-es-reservation-*.json``),
 #: as the owner said them: each is offered its existing operation (among the ``MAX_TOOLS`` a turn offers, so the model
@@ -55,20 +52,6 @@ REPORTED = [
 ]
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(
-            scope=A, actor=user.username, permissions=permissions_for(user, A), language=language
-        )
-        return assistant.catalog(ctx)
-
-    return of
-
-
 def test_reservation_offers_at_least_29_tools():
     """Reservations' tools are at least 29 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
     tools = {
@@ -87,11 +70,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_reservation_request_offers_its_existing_operation(catalog_of, name, phrase):
-    tools = catalog_of(Membership.Role.OWNER, "es")
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered, (len(offered), offered[:10])
+    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
 
 
 #: What a description must never tell the model: the card of a write is the person's confirmation
