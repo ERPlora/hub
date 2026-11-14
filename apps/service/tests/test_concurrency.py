@@ -478,6 +478,9 @@ def cut_names(**names):
     ).exists()
 
 
+#: The recovery that brought back a category, and so the only one that puts back into it what the business kept.
+RECOVERY = actor_of(uuid.uuid7())
+
 TAX_GONE = (422, "service.tax_category_unknown", ["tax_category_key"])
 CATEGORY_GONE = (422, "service.category_unavailable", ["category_id"])
 WRITES = {
@@ -540,6 +543,18 @@ WRITES = {
         "colour",
         cut_names(category="colour"),
         {"operation": CATEGORY_GONE, "row": CATEGORY_GONE},
+    ),
+    "service.return_to_category names the category brought back": Write(
+        lambda w: run_as_platform(
+            "service.service.return_to_category",
+            {"service_id": str(w.cut.id), "category_id": str(w.colour.id)},
+            RECOVERY,
+        ),
+        'UPDATE "service_service" SET',
+        "colour",
+        cut_names(category="colour"),
+        {how: (404, "service.category_not_found", []) for how in ("operation", "row")},
+        setup=lambda w: Category.objects.filter(pk=w.colour.pk).update(created_by=RECOVERY),
     ),
     "category.create names its parent": Write(
         lambda w: run("service.category.create", {"name": "Highlights", "parent_id": str(w.colour.id)}),
