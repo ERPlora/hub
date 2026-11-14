@@ -3,7 +3,8 @@
 // server-side DataTable — Seq, Invoice, Date, Type (Registration / Cancellation), F., Issuer, Total, Environment and
 // Status (a coloured pill) —, the last sealed first, 50 a page, search «Search invoice, issuer or tax ID…» and the
 // filters behind the table's funnel (Date, Type, Total, Environment and Status on their columns, then the
-// invoice type and the correction; the total typed in euros). Beside its status, a registration the AEAT rejected (or
+// invoice type and the correction; the total typed in the business's money and read as every amount filter of the
+// Hub reads it). Beside its status, a registration the AEAT rejected (or
 // accepted with errors) says «Pending correction», or «Corrected» linking to the record that corrects it
 // (VERIFACTU-F24, hub#857). A row, or «View», opens its record;
 // «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser).
@@ -24,8 +25,8 @@ import { useRouter } from 'vue-router';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { backwardsDays, filterParams, filtersInUse, unreadableAmounts } from '../lib/filters';
-import { formatDate, formatMoney } from '../lib/format';
+import { backwardsDays, filterParams, filtersInUse, TOTAL_ENDS } from '../lib/filters';
+import { amountFilterErrors, formatDate, formatMoney, useBusinessMoney } from '../lib/format';
 import { ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES, statusTone } from '../lib/record';
 import type { RecordListIn, RecordRowOut } from '../operations';
 import { verifactuTabs } from '../tabs';
@@ -34,24 +35,25 @@ const router = useRouter();
 const t = useT();
 const locale = useLocale();
 
-/** The table's filters (its funnel), as typed: the total in euros. A filter not in use is absent. */
+/** The table's filters (its funnel), as typed: the total in the business's money. A filter not in use is absent. */
 const filters = ref<DataTableFilters>({});
+const money = useBusinessMoney();
 const table = useServerTable('verifactu.record.list', {
   sort: 'created_at',
   dir: 'desc',
   maxSearch: 120,
-  filters: (): Partial<RecordListIn> => filterParams(filters.value),
+  filters: (): Partial<RecordListIn> => filterParams(filters.value, money.value),
   // Only the filters that really apply narrow the list (a total it cannot read does not).
-  narrowed: () => filtersInUse(filters.value) > 0,
+  narrowed: () => filtersInUse(filters.value, money.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
 const blocked = computed(() => blockingError(error.value));
-/** What the server refused (a 422 of the list), a total it cannot read and a day «until» before its «from»,
- *  under each filter: the rows stay. */
+/** What the server refused (a 422 of the list), a total it cannot read (said as every amount filter of the Hub says
+ *  it) and a day «until» before its «from», under each filter: the rows stay. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...(error.value?.fields ?? {}),
-  ...Object.fromEntries(unreadableAmounts(filters.value).map((name) => [name, t('verifactu.filters.amountInvalid')])),
+  ...amountFilterErrors(filters.value, TOTAL_ENDS, { t, locale: locale.value, money: money.value }),
   ...Object.fromEntries(backwardsDays(filters.value).map((name) => [name, t('verifactu.filters.dateOrder')])),
 }));
 const tableError = computed(() => (status.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? error.value?.message : undefined));
@@ -84,7 +86,7 @@ const columns = computed<DataTableColumn<RecordRowOut>[]>(() => [
     align: 'right',
     width: 'minmax(6rem, 7rem)',
     format: (_, row) => formatMoney(row.total_amount, locale.value),
-    filter: { type: 'range', amount: true, keys: ['total_amount_from', 'total_amount_to'] },
+    filter: { type: 'range', amount: true, keys: [...TOTAL_ENDS] },
   },
   {
     key: 'environment',
