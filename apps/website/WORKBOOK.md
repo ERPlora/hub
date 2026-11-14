@@ -4,8 +4,7 @@ Alcance MVP: transversal (peluquería y restaurante: la página del negocio en s
 Estado de la app: completa (2026-10-23)
 Lo que no entra todavía: ver «Lo que queda fuera» y «Lo que NO hace, a propósito».
 
-> Manual de usuario y especificación de la app `website`. Nace en la ronda 2026-10-21 (PLAN §29, con su ampliación del
-> 2026-10-22): no es un porte del producto actual, que no tenía página pública por negocio. Cada flujo está `hecho`
+> Manual de usuario y especificación de la app `website` (PLAN §29). Cada flujo está `hecho`
 > con sus tests de servidor, de pantalla y de punta a punta en verde; dónde están, en «Para quien lo mantiene».
 
 ## Para qué sirve y para quién
@@ -108,7 +107,7 @@ dirección abre la app (para ver la página: el móvil o una ventana privada) y,
 la dirección aún lleva al acceso del equipo.
 
 ### La página pública
-La plantilla elegida con lo publicado, en la dirección del negocio (rediseño moderno del 2026-10-22): barra superior
+La plantilla elegida con lo publicado, en la dirección del negocio: barra superior
 fija y translúcida con el logotipo, el nombre, el menú de secciones (plegado en un móvil) y **Entrar** (botón de
 contorno redondeado); cabecera con la foto de portada (o, sin foto, un degradado suave de la paleta, nunca vacía), el
 título en letra grande, el lema y dos botones redondeados: **Escríbenos por WhatsApp** (o **Contáctanos**, a la
@@ -491,24 +490,22 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
   una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.
 
-- **Una fila por hub (andamiaje de la fase 1, PLAN §29)**: en la fase 1 las tablas las compartían todos los hubs,
-  así que `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro, `base.operations.hub_id`; sin clave foránea,
-  porque el registro vive en la BD de control). `Site.hub_id` es único: un hub tiene una sola web. Toda
-  operación lee y escribe solo la fila del hub de la petición (guardar, publicar, desconectar, subir, previsualizar,
+- **Una fila por hub (PLAN §29)**: `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro,
+  `base.operations.hub_id`; sin clave foránea, porque el registro vive en la BD de control). `Site.hub_id` es único:
+  un hub tiene una sola web. Toda operación lee y escribe solo la fila del hub de la petición (guardar, publicar, desconectar, subir, previsualizar,
   leer), y `/` y la API pública solo enseñan la web publicada de su propio hub: lo que publica un hub nunca sale en
   otro, y el equipo de un hub no lee ni cambia la web de otro. La primera escritura de un hub crea su fila
   (`get_or_create` y después `select_for_update`): dos primeras escrituras a la vez no fallan, la segunda espera a la
-  primera. Desde el corte S5 (hub#602) cada BD de hub guarda su única fila y la columna se queda, siempre con el
-  mismo valor; retirarla del estado es hub#689. Las
-  claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
+  primera. Cada BD de hub guarda su única fila, así que la columna lleva siempre el mismo valor; retirarla
+  del estado es hub#689. Las claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
-- **El catálogo, solo de una app activa** (APP-WEBSITE, 2026-10-22): `queries._source_on` pregunta a
+- **El catálogo, solo de una app activa**: `queries._source_on` pregunta a
   `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
   app instalada puede estar apagada en el negocio (BASE-F23), y una que nunca encendió no tiene sus tablas. Con la fuente
   apagada, `read_catalog` y `website.catalog.categories` devuelven vacío, nunca un error, y el editor lista la fuente
   guardada sin dejar elegirla, con la nota `fields.sourceOff*` (`WebsitePage.test.ts`, «a catalog saved from an app
   that is off…»).
-- **El icono de la página** (APP-WEBSITE, 2026-10-22): `render._icon` escribe `<link rel="icon">` con el logotipo o,
+- **El icono de la página**: `render._icon` escribe `<link rel="icon">` con el logotipo o,
   sin él, la inicial en un SVG `data:` con los colores de la paleta (la inicial, escapada). Sin él, el navegador pedía
   `/favicon.ico` al hub, que es la SPA de `base` y le dejaba una cookie `csrftoken` al visitante: la página dejaba de
   ser «sin cookies» (lo cazó `website-flows.spec.ts`, WEBSITE-F10).
@@ -562,8 +559,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   (`public_media` de `apps.py`); el almacén guarda también documentos privados de otros módulos, que nunca salen por ahí;
   un nombre que es una carpeta en disco responde 404. Al guardar, cada imagen del contenido tiene que ser una subida de este hub y su URL la escribe el
   servidor.
-- **Reseñas de Google** (`reviews.py`, ronda 2026-10-22, decisión de Ioan: del servidor, sin JS de terceros, que la
-  CSP prohíbe): `reviews.parse` lee la entrada (Place ID `ChIJ…`; enlace de Google Maps con `place_id=`,
+- **Reseñas de Google** (`reviews.py`; del servidor, sin JS de terceros, que la CSP prohíbe): `reviews.parse` lee la entrada (Place ID `ChIJ…`; enlace de Google Maps con `place_id=`,
   `query_place_id=`, `q=place_id:` o `!19sChIJ…`; `/maps/place/<nombre>/@lat,lng`, `/maps/search/<texto>/`, `q=<texto>`
   o `query=<texto>`, que se buscan por nombre; enlace corto `maps.app.goo.gl` o `goo.gl/maps`) y `schemas` rechaza lo
   demás. `reviews.load` pregunta con `httpx` (5 s por llamada): el enlace corto se
@@ -590,9 +586,8 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 - **Migración 0004** (`0004_site_reviews_snapshot`, reversible): añade `Site.reviews_snapshot` (JSON, `{}` por defecto).
 - La subida va en base64 dentro del JSON de la operación (como el certificado de VeriFactu), con
   `accept_body_up_to(7 100 000)` en su ruta: una sola puerta para la SPA, las API keys y el asistente.
-- El QR es `qrcode` (la misma librería del QR de VeriFactu), corrección media y zona tranquila de cuatro módulos. No
-  `segno`, que nombraban PLAN §29 y el diseño de referencia: una sola librería de QR en el Hub (ronda CLOSE-WEBSITE de
-  PLAN-HUB).
+- El QR es `qrcode` (la misma librería del QR de VeriFactu: una sola librería de QR en el Hub), corrección media y
+  zona tranquila de cuatro módulos.
 - El admin del Hub (`hubs.erplora.com/admin`) es de solo lectura salvo `is_live` (desconectar una página por
   soporte): no se añade ni se borra nada desde allí, y esa escritura no deja aviso.
 - Asistente: las cinco operaciones que usa (`website.site.get`, `website.site.save`, `website.site.publish`,
@@ -617,7 +612,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `choices.py` da esos nombres con las palabras del editor en `en` y `es` (`tests/test_choices.py`). Sin permiso, de
   otro negocio o que ya no está: el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el
   trinquete de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta.
-- **Paletas** (`palettes.json` + `palettes.py`, ronda 2026-10-22): las ocho paletas, cada una con su juego claro y
+- **Paletas** (`palettes.json` + `palettes.py`): las ocho paletas, cada una con su juego claro y
   oscuro (principal, página, franjas, texto, enlaces y bordes) y el color secundario; el editor lee el mismo fichero.
   `tests/test_palettes.py` comprueba WCAG AA (4,5:1) en los dos modos para texto, texto atenuado, enlaces, botones y
   el color secundario; los dos colores del propietario sobre cualquier paleta (`custom`) se derivan en `palettes._derived` (fondo blanco y uno oscuro teñido
@@ -666,12 +661,11 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `{palette: "custom", custom}` pasa a `ocean` con los mismos dos colores (se pinta igual: la página sale de ellos sea
   cual sea la paleta) y los colores que una paleta guardaba para un «Tus colores» posterior se descartan (nunca se
   pintaron y ahora se pintarían). Borrador y publicado por igual.
-- **Escribir en el editor** (regresión de 2026-10-22): el grupo de secciones (`ion-accordion-group`) guarda las
-  abiertas en el estado de la página (`openSections`) y solo atiende a su propio `ionChange`. Antes llevaba un valor
-  fijo y Vue lo volvía a poner en cada pulsación: la sección abierta se plegaba, el campo perdía el foco y la página
-  saltaba. Lo cubren `WebsitePage.test.ts` («a section opened by hand stays open…») y la e2e, que escribe tecla a
+- **Escribir en el editor**: el grupo de secciones (`ion-accordion-group`) guarda las abiertas en el estado de la
+  página (`openSections`) y solo atiende a su propio `ionChange`; con un valor fijo, Vue lo vuelve a poner en cada
+  pulsación: la sección abierta se pliega, el campo pierde el foco y la página salta. Lo cubren `WebsitePage.test.ts` («a section opened by hand stays open…») y la e2e, que escribe tecla a
   tecla y cruza un autoguardado.
-- **Tests por flujo** (cierre de la migración, APP-WEBSITE): servidor en `apps/website/tests/` (un `test_<fichero>.py`
+- **Tests por flujo**: servidor en `apps/website/tests/` (un `test_<fichero>.py`
   por fichero), pantallas en `frontend/**/*.test.ts` y, de punta a punta, `tests/e2e/website-flows.spec.ts` (un test
   por flujo con su clave en el título, en 390, 834 y 1440 px, capturas `APP-WEBSITE-<clave>-<ancho>`) y
   `tests/e2e/website.spec.ts` (las cuatro plantillas en claro y oscuro, la paleta y la regresión de escribir tecla a
@@ -680,14 +674,6 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
 
 ## Lo que queda fuera
 
-- **Ya no están fuera** los dos arreglos de fuera de la app vistos al cerrarla (APP-WEBSITE):
-  - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`), hecho: en el host de un hub, `/favicon.ico`,
-    `/robots.txt` o cualquier ruta que nombra un fichero y no tiene URL propia recibe un 404 sin la SPA ni cookie
-    (antes, la SPA con 200 y `csrftoken`). Un buscador ya no lee HTML como `robots.txt`: el 404 es «sin reglas» y la
-    web sigue indexable. Detalle en «Para quien lo mantiene» de `base/WORKBOOK.md`.
-  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`), hecho en ERPlora/ui#44 (2026-10-30): en
-    `ImageUpload` la miniatura deja su hueco hasta el texto en los tres tamaños (logotipo, portada, Sobre nosotros
-    y galería).
 - **La fuente del catálogo apagada no se ve en la e2e**: ese caso de WEBSITE-F05 lo cubren pytest (servidor) y
   Vitest (editor), no Playwright.
 

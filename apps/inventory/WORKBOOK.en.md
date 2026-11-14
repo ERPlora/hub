@@ -1078,7 +1078,6 @@ WebP of up to 2 MB makes the file unreadable ("The file holds a photo that is no
 Involved: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
 ### INVENTORY-F34 Recover a deleted product
-<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1321 -->
 Status: done
 Actor: the ERPlora staff, when the business asks (in the business no screen undoes a deletion)
 Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)

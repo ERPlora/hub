@@ -589,7 +589,6 @@ If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
-<!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
 Status: not done — the Cash register does not tell yet what another app records (hub#1499)
 Vertical: common
 Actor: system, employee, manager

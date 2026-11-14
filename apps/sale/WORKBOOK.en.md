@@ -1354,7 +1354,6 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, "Add
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-<!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
 Status: not done — the Charge sheet does not paint other apps' steps yet, nor does the sale keep what was charged on top
 (hub#1497, hub#1500, hub#1502)
 Vertical: common
