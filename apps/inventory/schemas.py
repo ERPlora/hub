@@ -18,6 +18,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
+from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names
 
 T = TypeVar("T")
@@ -205,16 +206,6 @@ class ProductIdIn(Schema):
     business and in the business."""
 
     id: UUID = Field(title=T_PRODUCT, description="The product's id.")
-
-
-class ImageInCopyIn(Schema):
-    """The image a product showed in a separate copy of the business (BASE-F114)."""
-
-    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
-        "",
-        description="The image it showed in the copy: one of the shared library (catalog:<folder>/<name>) comes back "
-        "with it, a photo of its own does not (it was deleted with the product).",
-    )
 
 
 class ProductRestoreIn(ProductIdIn, ImageInCopyIn):

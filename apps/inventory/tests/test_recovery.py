@@ -33,7 +33,7 @@ from apps.inventory.schemas import CategoryRecoverIn, ProductCategoryIn, Product
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
 TAX = "test.general"
@@ -564,12 +564,18 @@ def test_the_app_declares_what_it_gives_back_its_categories_first_its_links_last
         None,
         "",
     )
+    assert [one.reads_since for one in (categories, products, links)] == [
+        "0001_initial",
+        "0005_product_image",
+        "0001_initial",
+    ]
+    # Its products are read with their image: a copy from before it is refused them (recover_copy_behind).
+    assert fields_held_since("inventory", "product", products.reads_since) >= set(queries.PRODUCT_FIELDS)
     assert [str(one.label) for one in (categories, products, links)] == [
         "Product categories",
         "Products",
         "Product links to categories",
     ]
-    assert categories.reads_since == products.reads_since == links.reads_since == "0001_initial"
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────
