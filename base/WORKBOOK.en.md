@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b4a9b0c8fac08330dea94675957a6994323c55ee4035148745788f362bd6e2e5 -->
+<!-- generated from WORKBOOK.md sha256:77c4ecc04ed1441275562a7ca6c03089de9692fe8ba612d558a020ca080a04b8 -->
 
 ## What it is for and who it is for
 
@@ -2934,8 +2934,8 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
-deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the group, tag or own field the business deleted after
-deleting a customer who comes back, hub#1356; the image of a product deleted before deleting left it, hub#1431; the page
+deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a
+product deleted before deleting left it, hub#1431; the page
 "Recover into the business…" naming the exception of what goes back into a recovered category, hub#1364; the image of a
 service brought back, hub#1429; the menu options of a product that comes back, hub#1343; the price list prices of a
 product that comes back as a new one, hub#1442, and its modifier groups, hub#1457; the modifier groups of a category
@@ -2995,8 +2995,10 @@ Steps:
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes, and with their
       groups, tags and own fields: the group, tag or field the business has with that name is that one, without making
       another, and one it no longer has is made again as it was (hub#1285); a value of a field the business deactivated
-      does not come back. A deleted card that comes back does not get back the group, tag or field the business deleted
-      afterwards (hub#1356). A card whose personal data was erased (GDPR) or one merged into another never
+      does not come back. A deleted card that comes back also gets back the group, tag or own field the business
+      deleted afterwards, just like the new card (hub#1356); what the business still has stays as it is, even if it took
+      the card out of a group or removed a value before deleting it, and a value it already has in a field the business
+      made again stays. A card whose personal data was erased (GDPR) or one merged into another never
       comes back, and one the business has already made again (the same name, phone and email) is not repeated. With
       Products, "Product categories: 1 created; Products: 1 restored, 1 created; Product links to categories: 1
       created" (the categories, the products and the links that came back, each with its own count): first each product category the business no longer has (it deleted or lost it) comes back as a new one,
@@ -3083,8 +3085,8 @@ Out: the business's database as it was at that moment; the one it had, kept 7 da
 business as it was, untouched; a separate database on its cluster with the data of that moment, closed to the
 application and kept 7 days; the notice `control.hub.restore_aside_requested` with who asked for it. When recovering: in
 the business, each deleted card it still held, live again with its card-recovered notice (`customer.customer.restored`),
-a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`) and those of
-its groups and tags set (`customer.customer.groups_changed`, `customer.customer.tags_changed`), each group, tag or own
+a new card for each customer it no longer had, with its card-created notice (`customer.customer.created`), and on both
+those of its groups and tags set (`customer.customer.groups_changed`, `customer.customer.tags_changed`), each group, tag or own
 field it lacked made again, with its notice (`customer.group.created`, `customer.tag.created`,
 `customer.field.created`, and `customer.group.updated` or `customer.tag.updated` if it was deactivated), a new
 product category for each one it lacked, with its category-created notice (`inventory.category.created`) and that of
@@ -3128,7 +3130,8 @@ product without a tax category or with one Taxes no longer has active, a service
 (`service.tax_category_unknown`), a time taken, a customer no longer there, a service the business no longer has
 nor made again) is counted "not created" with its reason,
 and the rest comes back; so is a deleted card that was merged into another or erased meanwhile
-("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed" and why
+("customer.customer_unavailable: …"), or with a value the field the business made again no longer accepts, which stays
+deleted ("customer.field_invalid_option: …"). If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The

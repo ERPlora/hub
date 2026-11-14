@@ -221,6 +221,13 @@ def named(model, name: str):
     return model.objects.filter(name__iexact=name.strip()).order_by("-is_active", "id").first()
 
 
+def lost_since_copy(model, items: list) -> list:
+    """Those of ``items``, groups, tags or custom fields of a card of a separate copy, the business deleted since: it
+    holds none of its ``model`` by their id there. One it still has, renamed or deactivated, is its own (hub#1356)."""
+    held = set(model.objects.filter(pk__in=[item.id for item in items if item.id]).values_list("pk", flat=True))
+    return [item for item in items if item.id not in held]
+
+
 def find_group(
     group_id: UUID | None, name: str | None, *, lock: bool = False
 ) -> CustomerGroup:
@@ -1020,9 +1027,9 @@ def cards_in_copy(conn) -> list[dict]:
 
 def recoverable_cards_in_copy(conn) -> list[dict]:
     """hub#1285: each card of ``cards_in_copy`` with what hung from it in the copy, as ``customer.customer.recover``
-    takes it (``CustomerRecoverIn``): its groups and its tags, active or not (a card keeps an inactive one), and its
-    values of the copy's active custom fields (an inactive field shows on no card and takes no value, CUSTOMER-F29),
-    each named as the copy named it, in the order its card shows them. The same connection and rule as
+    and ``customer.customer.restore`` take it (``HungInCopyIn``): its groups and its tags, active or not (a card keeps
+    an inactive one), and its values of the copy's active custom fields (an inactive field shows on no card and takes
+    no value, CUSTOMER-F29), each named as the copy named it and with its id there, in the order its card shows them. The same connection and rule as
     ``cards_in_copy``: its own SQL over the models' names, never the ORM."""
     cards = cards_in_copy(conn)
     if not cards:

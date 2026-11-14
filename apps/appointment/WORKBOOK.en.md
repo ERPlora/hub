@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:12866b34247c9f7a926e36e7c31da69487a928c48fe579e95ba339466ca4af99 -->
+<!-- generated from WORKBOOK.md sha256:cc00f2949d9ad8a74351027cb1668a34ed941274c1de05c1d37f16da00884882 -->
 
 ## What it is for and who it is for
 
@@ -391,9 +391,10 @@ Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
 2. Each change with its time on the business clock, who made it ("Requested by the customer" if it was
-   them) and what changed (from which professional or service to which, and the new time). A deleted appointment
-   that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted" and "Restored"
-   (APPOINTMENT-F11).
+   them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate copy;
+   an API key, by its name) and what changed (from which professional or service to which, and the new time). A
+   deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
+   and "Restored" (APPOINTMENT-F11).
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).

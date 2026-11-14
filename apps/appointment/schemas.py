@@ -614,8 +614,9 @@ class HistoryOut(Schema):
     id: UUID
     action: HistoryAction
     at: dt.datetime
-    actor: str = Field(description="Who did it (empty for the platform).")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark.")
     by_customer: bool
+    by_platform: bool = Field(description="No person did it: the platform (the system, an automation, a recovery).")
     reason: str
     old_value: dict
     new_value: dict

@@ -193,6 +193,24 @@ def test_carried_says_which_actors_are_passed_on(actor, carried):
     assert relay.carried(actor) is carried
 
 
+@pytest.mark.parametrize(
+    "actor, by_platform",
+    [
+        pytest.param("", True, id="no one"),
+        pytest.param("system", True, id="the system"),
+        pytest.param(recovery.actor_of(uuid.uuid7()), True, id="a recovery"),
+        pytest.param(f"{DECLARED}{uuid.uuid7()}", True, id="declared"),
+        pytest.param("Ana López", False, id="a person by name"),
+        pytest.param(PERSON, False, id="a person by id"),
+        pytest.param("API · Zapier", False, id="an API key"),
+        pytest.param("another_run:01a1cff9-afb1-777e-af7c-92ec1c30390e", False, id="undeclared"),
+        pytest.param("systems", False, id="only starts as the system"),
+    ],
+)
+def test_by_platform_says_which_actors_are_no_one_but_the_platform(actor, by_platform):
+    assert relay.by_platform(actor) is by_platform
+
+
 def test_a_declaration_the_check_refuses_passes_nothing_on(monkeypatch):
     """An empty prefix would pass on every actor, the system's and the business's people's: never used."""
     monkeypatch.setattr(apps.get_app_config("base"), relay.CARRIED_ACTORS, ["", DECLARED], raising=False)
