@@ -262,6 +262,30 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.field('time').value).toBe('10:00');
   });
 
+  // The customer is chosen in Customers' own search, in a window of its own: no field of the form is typed in, and its
+  // refusal is a line under the chooser. Choosing another customer takes that line away at once, and only it (hub#1448).
+  it('a refused customer’s line goes when another customer is chosen, before booking again; another field’s stays', async () => {
+    const s = await setup();
+    await fillNew(s);
+    const gone = 'That customer is no longer in the business.';
+    const time = 'That time does not exist.';
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { customer_id: gone, start: time } } });
+    await click(s.submit());
+    const said = () => s.field('customer').textContent ?? '';
+    expect(said()).toContain(gone);
+    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
+      customer_id: 'c2',
+      customer_name: 'Marta Gil',
+      customer_tax_id: '',
+      customer_address: '',
+      customer_country: '',
+    });
+    await settle();
+    expect(said()).not.toContain(gone);
+    expect(s.field('time').errorText).toBe(time);
+    expect(s.sent().filter((call) => call.path === '/api/appointment/appointments')).toHaveLength(1);
+  });
+
   // The day and the time are the device's own date and time pickers (never a
   // numeric keypad without «:» or «/»), and a time typed with the keyboard counts at once.
   it('the day and the time are the device’s pickers, and a typed time counts at once', async () => {

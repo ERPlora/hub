@@ -394,7 +394,9 @@ Si falla: debajo de cada campo: «Un horario necesita al menos un día de trabaj
 hora de inicio tiene que ser anterior a la de fin.», «El descanso necesita inicio y fin (o ninguno).»,
 «El descanso debe caer dentro del intervalo de trabajo.», «Cada día de la semana solo puede aparecer
 una vez.», «La vigencia del horario termina antes de empezar.»; «Ese miembro del personal no existe
-en este negocio.». Un turno que cruza la medianoche no se admite.
+en este negocio.». Un turno que cruza la medianoche no se admite. «Un horario necesita al menos un día de
+trabajo con horas.» sale encima de la semana y se quita en cuanto se cambia cualquier día (se marca o se
+desmarca, o se escribe una hora), sin volver a guardar (hub#1448).
 Implicados: ninguno
 
 ### STAFF-F14 Editar un horario
