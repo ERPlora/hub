@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eba0094c844134731a6d8dfe16b4be6b43f27c2dd4927bf0aad30d9a39b6705a -->
+<!-- generated from WORKBOOK.md sha256:cb7556dddfc0a3236c72e93d3a616738b5317e094f2af3341cf71ed36e26a062 -->
 
 ## What it is for and who it is for
 
@@ -39,7 +39,7 @@ on it.
   issues no tax document; it covers service lines, not amounts; the expiry counts from the purchase; what
   was sold keeps the terms it was sold with; giving or correcting is a separate movement with a reason;
   only a voucher that has not been used is voided.
-- Decisions of the current product that rule here: ADR-0386 (a voucher covers lines; a gift card,
+- Decisions that rule here: ADR-0386 (a voucher covers lines; a gift card,
   amounts), ADR-0390 (ownership is born when it is sold, the clock starts at the purchase and it is not
   transferred) and ADR-0085 (VAT is linked through the tax category of Taxes).
 
@@ -1127,5 +1127,4 @@ with the session of whoever sells, as it does with Inventory.
 | Give sessions back when voiding or refunding a sale | yes | yes | yes | no | `service.return_session` |
 | Settings | yes | yes | no | no | `service.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee: what they had (view, spend and grant) the employee has.
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
