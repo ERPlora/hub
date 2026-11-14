@@ -3255,7 +3255,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 - `base/live.py`: cada consulta se re-ejecuta tras los eventos de `refresh_on` de su gancho más
   `base.hub.state_applied` (la foto del SaaS puede encender o apagar apps). Escribir en el hub B no avisa
   al A (test de dos hubs en `base/tests/test_queries_home.py`).
-- Campana por reloj (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): un contador cuya cifra cambia porque pasa el
+- Campana por reloj: un contador cuya cifra cambia porque pasa el
   tiempo, sin evento (un trabajo que lleva un minuto en cola sin dispositivo vivo), lo dice su módulo en
   `bell_refresh_every` de su `LiveAppConfig` (clave del contador → segundos; la forma de `scheduled_tasks` y
   `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home.py`) exige claves de su propio `bell` y
@@ -3330,7 +3330,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   lo teclea una persona y va al estilo de la barra, así que cualquier otra cosa (un nombre CSS, `var(…)`, `url(…)`)
   pinta como sin `map.color`. Una barra negativa no lleva color: su rojo gana, porque una alarma pesa más que la
   categoría (las barras de datos de Excel con su relleno de negativo, el formato condicional de Power BI sobre los
-  colores de categoría, los umbrales de Grafana sobre su color fijo; FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR).
+  colores de categoría, los umbrales de Grafana sobre su color fijo).
   Un color claro casi no se ve sobre la pista gris: el contraste es el del color que eligió quien lo tecleó. Un
   `chart` no pinta `map.color`.
 - Un panel `timeline` dice cuándo pasó cada entrada con `formatMoment` de `base/frontend/lib/home.ts` (`Intl`, en
@@ -3359,14 +3359,12 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   mismo `/api/live` de la pantalla. Montadas al llegar su trozo, con un equipo lento (la CPU de la pestaña ×6)
   llegarían más de 150 ms después que las de la pantalla y reabrirían el flujo (`net::ERR_ABORTED`). Se precargan con el cargador del propio componente de Vue: otro `import()` de un módulo ya cargado se
   resuelve en otra tarea, cuando el flujo ya ha abierto. Lo comprueban `frontend/main.chrome.test.ts`, `frontend/main.chrome-wait.test.ts` y
-  `tests/e2e/base-home.spec.ts` («when base's chrome arrives late»: cada pieza llega un segundo tarde)
-  (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY).
+  `tests/e2e/base-home.spec.ts` («when base's chrome arrives late»: cada pieza llega un segundo tarde).
 - La SPA responde toda ruta sin URL propia en Django, salvo la que nombra un fichero (`base.spa.NOT_A_FILE`: el
   último segmento lleva extensión, con barra final o sin ella, como `/robots.txt`, `/favicon.ico` o
   `/wp-login.php`): esa no es ruta de la SPA (`spa_route` en `config/urls.py`) y recibe el 404 llano de Django, sin
-  la SPA y sin cookie, con sesión o sin ella y acepte lo que acepte (FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE). Antes
-  recibía la SPA con 200 y `csrftoken`: la web pública perdía el «sin cookies» y un buscador leía HTML como
-  `robots.txt`. Un 404 en `robots.txt` es «sin reglas» (RFC 9309), así que la web de `/` sigue indexable. Es la regla
+  la SPA y sin cookie, con sesión o sin ella y acepte lo que acepte. Así la
+  web pública sigue «sin cookies» y un buscador no lee HTML como `robots.txt`. Un 404 en `robots.txt` es «sin reglas» (RFC 9309), así que la web de `/` sigue indexable. Es la regla
   del punto de connect-history-api-fallback y de `{*path:nonfile}` de ASP.NET Core; ninguna ruta de la SPA lleva
   punto (sus parámetros son ids). Una navegación (sin extensión) sigue igual: con sesión, la SPA y su `csrftoken`;
   sin sesión y pidiendo HTML, el salto al login del SaaS; sin pedir HTML, la SPA; `/` con web publicada, la web
@@ -3399,11 +3397,10 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
   `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
-- Plantillas y Ajustes › Datos (BASE-F29–F38, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
+- Plantillas y Ajustes › Datos (BASE-F29–F38): `base/blueprint.py` (sin ORM) tiene el formato
   `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
   `data/<app>.<parte>.json`, más las fotos propias en `media/<nombre>`, WebP de 2 MB como mucho; 20 MB, 100 MB al
-  descomprimir y 1 000 entradas como mucho desde el 2026-10-30, para que quepan 300 fotos de 60 KB; antes 5 MB, 50 MB y
-  200; `BlueprintInvalid.reason`),
+  descomprimir y 1 000 entradas como mucho, para que quepan 300 fotos de 60 KB; `BlueprintInvalid.reason`),
   el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
   partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
   `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
@@ -3439,7 +3436,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `test_services_data.py`, `test_queries_data.py`; Vitest en `base/frontend/**`; e2e `tests/e2e/base-data.spec.ts`
   (vacía lo que trae una plantilla por las operaciones de cada app antes de empezar).
 
-- **Apps (APP-BASE-4: BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
+- **Apps (BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
   módulo con `premium = False` siempre lo tiene; uno con `premium = True` necesita su id en `modules[]` de la última
   foto (`Hub.state`, `source` `plan` o `purchase`, con `valid_until` leído contra el reloj) o el de un módulo que lo
   requiere (cierre por `requires`, que solo conoce el Hub); un slug sin módulo se ignora y queda en el log; un hub de
@@ -3492,7 +3489,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
   `base/tenancy/tests/test_limits.py`.
 - Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`;
-  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema (APP-BASE-7)» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
+  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
   en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
   «Mejorar plan» solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
@@ -3515,7 +3512,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
   `last_error` y `next_attempt_at` (1, 5 y 15 min, luego cada hora), y `base.app.retry` la vuelve a pedir (BASE-F21, F22;
-  S3, hub#601). Fuera de una operación (un `events.py`, el admin, una tarea) tocar un modelo de esa app da el mismo 404: el `TenantRouter`
+  hub#601). Fuera de una operación (un `events.py`, el admin, una tarea) tocar un modelo de esa app da el mismo 404: el `TenantRouter`
   lanza `AppNotCreated` antes de mandar SQL (hub#608). Lo decide `base.activation.has_tables`: lo que lista la fila que el
   contexto ya tiene pasa sin consulta ni caché; lo que no lista se pregunta a control por `base.apps_created:<host>`,
   olvidada con `activation.forget` y al acabar `ensure_schema`, porque esa fila puede ser de antes de crear las tablas. Una
@@ -3525,12 +3522,12 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   de las dos sale en el menú. El veto de VeriFactu está en su app (VERIFACTU-F32). Los ganchos `can_disable(ctx)` y `can_enable(ctx)` corren en `translation.override(ctx.language)`: un
   `gettext` a secas ya responde en el idioma de quien pide (gh:hub#2595). En Apps, la negativa (409 o cualquier otro
   fallo al cambiar) es un `InlineFeedback` `apps-refused` que se queda hasta cerrarlo o hasta el siguiente cambio,
-  nunca un toast (gh:hub#2594). Re-triados en FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS: F18, F19, F23–F25
-  `hecho` (e2e `tests/e2e/base-app-activation.spec.ts`, en español y en los 3 tamaños).
+  nunca un toast (gh:hub#2594). F18, F19 y F23–F25 los prueba la e2e
+  `tests/e2e/base-app-activation.spec.ts`, en español y en los 3 tamaños.
 
-- **Sistema (APP-BASE-7: BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
+- **Sistema (BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
   `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
-  «Datos y copias» de APP-BASE-2); a quien no
+  «Datos y copias» de Ajustes); a quien no
   administra no se le monta ningún componente que pida lo que el Hub le negaría (gh:hub#2519).
 - Consultas (`base/queries.py`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
   `shared`/`own` según `Hub.db_name`, `version` y `released_at` de `base/system.py`, que lee `APP_VERSION` y
@@ -3558,7 +3555,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   otra app). Una declaración que no es de la propia app (vacía, `system`, la de otra) la rechaza `base.E017` al
   arrancar y no se usa. Tests: `base/tests/test_relay_carried.py`.
 - Lo que una reacción o una tarea programada deja para después del COMMIT y espera a la red va por
-  `base.outbound.after_commit(fn, *args)` (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS): `THREADS` (4) hilos del
+  `base.outbound.after_commit(fn, *args)`: `THREADS` (4) hilos del
   worker en el contexto de BD de la operación que lo pidió (`base.tenancy.context.use_again`), `QUEUED` (1000) en
   espera, sin encolar dos veces lo que ya espera; `release()` suelta la conexión antes de esperar a la red; al parar, el
   worker da `OUTBOUND_GRACE_SECONDS` (15) a lo que corre y tira lo que espera. Un trabajo puede perderse: solo vale para
@@ -3583,7 +3580,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
   e2e: `tests/e2e/base-system.spec.ts` (tres tamaños, dos hubs, campana → `#events`).
 
-- **Ajustes del negocio (APP-BASE-6: BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
+- **Ajustes del negocio (BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
   viva con `base.hub.registered`): la fila del registro del ámbito, la que manda el SaaS por `PUT /internal/hubs/{id}`
   (nombre, país, zona e idioma, HUBS-F15), con la moneda del país (`base/business.py`: CLDR por Babel; sin país,
   `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/dashboard/businesses/<id>/settings` (vacío en una
@@ -3621,7 +3618,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   el reloj del despliegue es lo que llega a un registro fiscal, y cambia junto y con supervisión (hub#772): las fechas de
   la factura y las horas de VeriFactu, el día y el número de una venta y el «hoy» de Impuestos; hasta entonces lo congela
   `tests/test_guardrails_fiscal_clock.py`.
-- **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
+- **Acceso (BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
   `Credential` (por `username`: `pin_hash` argon2id y `badge_digest` = HMAC-SHA256 del número con
@@ -3735,8 +3732,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
   `base.queries.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
-  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app
-  (FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS). Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
+  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app.
+  Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A) y
   `tests/e2e/fix-base-plan-space-check.spec.ts` (el tope en español: Archivos y la web dicen la misma frase).
@@ -3755,7 +3752,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   miran, y no abre la base de datos de ningún hub. Sin `--delete` solo lista (prefijo, motivo, claves y bytes); con él
   borra cada uno con `delete_hub_files`, y un prefijo que falla no para a los demás y deja el comando en error. Corre como
   tarea suelta de la familia `worker`, la que borra del bucket. Test: `base/tests/test_delete_leftover_hub_files.py`.
-- **`/p/media/<hex>/<nombre>`** (`base/media.py`, FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES): sirve, desde el
+- **`/p/media/<hex>/<nombre>`** (`base/media.py`): sirve, desde el
   host de su hub y nunca el de otro, solo las carpetas del almacén que declara cada app en su `LiveAppConfig`:
   `public_media` (cualquiera; caché pública de un año: `website/img/`, las imágenes de la web) y `members_media` (solo una
   sesión de este hub, caché `private`: `whatsapp_inbox/samples/`, el archivo de la cabecera de una plantilla); las fotos de
@@ -3766,7 +3763,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   otra. Lo que no cumple no se sirve y `base.E010` lo dice al arrancar. Una app que guarde archivos para enseñarlos los
   declara ahí, sin tocar `base/`. Tests: `base/tests/test_media.py` (miembro, visitante, otro hub, app apagada, `..` y la
   carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
-- **Asistente** (APP-BASE-9, BASE-F92…F106): es **plataforma** dentro de `base/`, no un
+- **Asistente** (BASE-F92…F106): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. Las mecánicas que no dependen de la pasarela son de `live.assistant` (las mismas del panel
   del SaaS; `docs/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant.py` (sin ORM) las reexporta con
@@ -3795,7 +3792,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   exacta; sin clave, «Do this»): una app con una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
   `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`; antes que el de su acción va el
   verbo de la operación entera, `base.assistant.card.operations.<app>.<entidad>.<acción>`, para la que el de su acción
-  no dice lo que hace (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: `cart_checkout.cart.clear` vacía
+  no dice lo que hace (`cart_checkout.cart.clear` vacía
   el carrito, «Vaciar», mientras `kitchen.routing.clear` quita una ruta, «Quitar»; `cash_register.count.add` y
   `cash_register.movement.add` registran un arqueo y un movimiento, no añaden nada): lo comprueban
   `test_a_write_whose_actions_verb_does_not_say_what_it_does_is_named_by_its_own` y
@@ -3822,8 +3819,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   previa, en la que dé su lectura) y, dentro de un objeto o de una lista, igual: el servidor lo manda como dinero
   (`_Words.amount`: `{"kind": "money", "value": …, "money"?: …}`) y la pantalla lo escribe como el de arriba
   (`card.ts` del chat compartido, `isAmount` y `formatMoney` con `narrowSymbol`: un mismo símbolo en toda la tarjeta, «1,50 $» y
-  no «1,50 US$» al lado; `money_text` queda para correos, PDF y avisos, donde «US$» desambigua); las palabras de su descripción no cuentan (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS:
-  «in minor units» y «in whole cents» dejaban un precio como «1500»), ni su nombre (hub#917: un `…_cents` sin la marca
+  no «1,50 US$» al lado; `money_text` queda para correos, PDF y avisos, donde «US$» desambigua); las palabras de su descripción no cuentan
+  («in minor units», «in whole cents»), ni su nombre (hub#917: un `…_cents` sin la marca
   no es un importe, arriba, dentro de un objeto o en una lista; lo fijan
   `test_a_name_in_cents_alone_makes_no_amount_its_mark_does` y, en Automatizaciones,
   `test_each_datum_of_the_change_comes_as_the_chat_card_says_it`), `signed` exige la marca (`base.E005`, también a un
@@ -3935,8 +3932,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   puerta de ERPlora/saas#178 desplegada: sin ella contesta 503. Tests: `base/tests/test_queries_docs_search.py`,
   `test_assistant.py` (catálogo, `ALWAYS`, instrucciones, «Ayuda») y `test_api_assistant.py` (el turno, y que la
   pasarela se espera fuera de su transacción).
-- Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`, desde el
-  2026-10-30: el SaaS monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
+- Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`; el SaaS
+  monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
   `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
   y `AssistantButton`, montado por `createShell({ chrome: { topbar: TopbarChrome, background: BackgroundChrome } })`
   en `frontend/main.ts`. El Hub lo configura con `configureAssistant(HUB_ASSISTANT)` (`base/frontend/lib/assistant-hub.ts`:
@@ -3977,11 +3974,11 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `ctx` o sin callable, deja el detalle normal. `website.site.save` es el primer uso; su contrato está en
   `base/tests/test_assistant.py`.
 
-- Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
+- Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
   `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.list` (rutas `/api/people…`,
-  `/api/roles`). El PIN y la placa son los de APP-BASE-3 (`Credential`): mismo hash, mismos frenos.
+  `/api/roles`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
 - Llaves de API: `base.models.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
@@ -3994,8 +3991,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
-  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras
-  (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE): junto a `approvals`, la
+  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras:
+  junto a `approvals`, la
   app declara `approval_figures = {"<orden>": [_("… {campo} …"), …]}`, frases que se prueban en orden con huecos de
   la entrada de la orden: `{campo}` (texto o número), `{campo, percent}` (0–100, `format_percent`) y
   `{campo, money}` (unidades menores en la moneda del negocio, `business_currency`); gana la primera cuyos huecos se
@@ -4016,8 +4013,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (`base.approval.spend`, sin ruta, con la fila bloqueada), así que una orden que falla lo deja sin gastar, una que
   salió bien no se repite y de dos a la vez solo corre una (`base/tests/test_approval_spend.py`; excepción razonada
   en `tests/test_guardrails.py`, `APPROVAL_SPEND_REASON`).
-  Lo que la orden aprobada pide a otras apps por el camino va con ella (hub#250,
-  FIX-HUB-BASE-APPROVED-COMMAND-CROSS-APP-CALLS-USE-CALLER-PERMISSIONS): una app corre la operación de otra con
+  Lo que la orden aprobada pide a otras apps por el camino va con ella (hub#250):
+  una app corre la operación de otra con
   `base.operations.call(ctx, name, data, unavailable=…)` (la entrada se valida como en una ruta y lo que no valida es
   el 422 del que llama; la app ausente o apagada, su `unavailable`, o `UnknownOperation`/`AppInactive` sin él), que la
   corre con `approvals.consequence_context`: mientras corre la orden aprobada de esa petición (el `current_operation`
@@ -4045,7 +4042,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts` y `tests/e2e/base-api-keys.spec.ts` (crear, copiar, usar, rotar y revocar una
   llave en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
-- La QA maestra del Hub (BASE-F107 = BASE-G152, APP-BASE-10) es una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`,
+- La QA maestra del Hub (BASE-F107 = BASE-G152) es una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`,
   contra el SaaS de la pila
   (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
   proveedor de `tests/e2e/assistant-provider.ts`. Pide al SaaS su taxonomía (`seed_taxonomy`, que corre en cada
@@ -4071,7 +4068,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   internet desde la 1.1.34, pero falta probarlo en un dispositivo con una impresora de verdad), y de SERVICE-F14 la
   venta del bono en el
   TPV está en «Lo que queda fuera» de Servicios. La propina queda fuera (pm#100).
-- «Reportar un problema» (BASE-F108, FIX-HUB-BASE-REPORT-PROBLEM-MODAL): la entrada `report` del menú de usuario
+- «Reportar un problema» (BASE-F108): la entrada `report` del menú de usuario
   (`frontend/main.ts`) es una acción (`run` de `ShellUserMenuItem`, `packages/ui`) que abre `ReportProblemDialog.vue`
   (en `BackgroundChrome.vue`, con `lib/report-problem.ts`), el `ReportProblemModal` de `@erplora/ui/components`
   sobre `FormModal`. Sale con `account_url` (la sesión abierta con la cuenta; `base/spa.py` no incrusta

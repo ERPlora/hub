@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:328ded079baf8113c7c83d4b0d0d0eb0dd5e35873d5c77bf1a246a448096b3e3 -->
+<!-- generated from WORKBOOK.md sha256:7cbe30dab4c6551c2ff8653c6eb99a7c079161461fa9a0baff5d645071351b05 -->
 
 ## What it is for and who it is for
 
@@ -217,7 +217,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 
 | ID | Flow | Status |
 |---|---|---|
-| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
+| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing |
 | VERIFACTU-F02 | Upload the business's own certificate | done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Remove the own certificate | done — in the Hub |
 | VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done |
@@ -246,12 +246,12 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F29 | Continue the chain of another application (migration) | done |
 | VERIFACTU-F30 | Cancel a record sent by error | done |
 | VERIFACTU-F31 | Watch the submissions from the screens | done — also from the four Home panels |
-| VERIFACTU-F32 | Prevent turning the app off once on | done — VeriFactu's `can_disable` and 409 `base.app_vetoed` from `base.app.disable` (hub#267); in Spain it never goes off (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON) |
+| VERIFACTU-F32 | Prevent turning the app off once on | done — VeriFactu's `can_disable` and 409 `base.app_vetoed` from `base.app.disable` (hub#267); in Spain it never goes off |
 | VERIFACTU-F34 | Renew the own certificate | done — in the Hub (uploading the renewed one replaces the previous one) |
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
-Status: done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
+Status: done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
 Actor: administrator
 Screen: Hub: Apps
 Steps:
@@ -863,8 +863,7 @@ Involved: none
 
 ### VERIFACTU-F32 Prevent turning the app off once on
 Status: done — the platform asks when turning off (`base.app.disable`, hub#256) and VeriFactu answers with its
-`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); in Spain, once on, it never goes off
-(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), and Apps does not offer "Turn off" (hub#618)
+`can_disable` (hub#267); in Spain, once on, it never goes off, and Apps does not offer "Turn off" (hub#618)
 Actor: system
 Screen: Hub: Apps
 Steps:

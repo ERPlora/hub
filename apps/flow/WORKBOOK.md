@@ -1367,9 +1367,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:
   toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
-  se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`,
-  revisión 2026-10-30; ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
-  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). «Activas» son las
+  se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`;
+  ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
+  al guardar, al conceder y al ejecutar con el código `flow.high_risk`. «Activas» son las
   que `base.relay.active_apps(ctx.scope)` resuelve con los derechos del SaaS y `base.activation.off_apps`, la
   misma lectura que usa el relay y la guarda de operaciones; `queries.active_apps` solo descarta `flow` y
   devuelve sus configuraciones. Una acción de una app apagada después de guardarla deja la ejecución en
@@ -1380,7 +1380,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   sin negocio): una ejecución en curso que se reanuda con herramientas de otra app encendida nunca pierde lo que
   su app fijó (hub#447). El motor programado corre en el negocio de cada hub: el worker pasa
   `Scope("host", <slug>)` a `scheduler.run_due` (`base.worker._serve_hub`).
-- **La excepción «Que me lo pregunte»** (revisión 2026-10-30, FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION):
+- **La excepción «Que me lo pregunte»**:
   `queries.ASK_FIRST` (`reservation.reservation.cancel` y `appointment.appointment.cancel`, hub#634; nunca lo
   que se hace en persona, `asks_first`)
   entra en `ask_first_catalog`, sale en `flow.catalog.read` con `ask_first: true` (el editor no lo ofrece a
@@ -1397,8 +1397,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   del negocio), Square, Vagaro y Booksy (el cliente anula él mismo, con enlace y dentro de la política) y
   OpenTable/SevenRooms (anula el cliente o el equipo; la respuesta por SMS la atiende una persona). Devoluciones,
   borrados, VeriFactu y envíos a Hacienda no entran: mueven dinero o dejan un registro que no se deshace.
-- **Datos fijos de un paso `assistant`** (revisión 2026-10-30,
-  FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF): `AssistantStep.pinned`
+- **Datos fijos de un paso `assistant`**: `AssistantStep.pinned`
   (`{herramienta: {entrada: valor}}`, opcional; sin él el paso se guarda sin esa clave, `exclude_none`). Al guardar,
   `queries.pinned_problem` exige que la herramienta esté en `tools` y que la entrada sea de su `action_fields`, con
   valor (`steps.<n>.pinned`, `invalid_payload`); `_reads`/`_call_only` leen sus `{{…}}` como los del encargo. Al
@@ -1416,7 +1415,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   value»), LangChain (`InjectedToolArg`: fuera del esquema del modelo, puesto antes de la llamada), Intercom Fin
   (conectores sobre un atributo protegido), Salesforce Agentforce (input bindings), Merge (tool input overrides),
   Yeeflow y Beam («Custom value»/«static» frente a «fill with AI»): se oculta y se sobrescribe, nunca se rechaza.
-- **Los datos insertados en lo que lee una persona** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES):
+- **Los datos insertados en lo que lee una persona**:
   `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.words_for`
   es el de lo que lee una persona — el título y los detalles de un paso `ask` (`_ask` y «Probar») y los datos de
   `PERSON_PARAMS` (`whatsapp_inbox.message.notify`: `text` y `template`, en `map_params`) —: un `bool` como «Sí»/«No»
@@ -1447,7 +1446,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   audiencia en las etiquetas) dan el dato ya en palabras; Shopify Flow y Klaviyo (filtros `money`/`date` de Liquid),
   Zapier (paso Formatter), Make (`formatDate`, `formatNumber`) y n8n (expresiones) lo dejan crudo y piden un
   formateador. Gana lo más sencillo para quien escribe: en lo que lee una persona sale ya en palabras, sin sintaxis.
-- **Los datos del cambio que espera un sí** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES):
+- **Los datos del cambio que espera un sí**:
   `_propose` guarda en `Question.details` solo lo que dijo el asistente; `flow.question.list` añade `fields` con
   `queries.question_row`, que lee con `queries.proposal_of` la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
   la vez, la misma que hace `_make_proposal` tras el sí) y la pasa por `base.assistant.card` con el `ctx` de quien
@@ -1455,9 +1454,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   su marca `refers`, ejecutada como esa persona (si no puede leerlo, el dato no sale). La pantalla los pinta con
   `fieldLines` del chat compartido (`@erplora/ui/components`), como la tarjeta del chat, sin los vacíos y con la
   moneda de `base.business.get`. Una pregunta de «Preguntar antes a alguien» no trae `fields`.
-- **La acción del cambio que espera un sí** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION):
-  la tarjeta se titulaba siempre «El asistente quiere cambiar algo en «Reservas»», también al anular: quien aprobaba
-  no leía la acción. `queries.question_row` calcula al leer, con `ctx.language` de quien lee, el título
+- **La acción del cambio que espera un sí**: `queries.question_row` calcula al leer, con `ctx.language` de quien lee, el título
   (`ASSISTANT_WANTS`, que vive en `queries.py` y `_propose` sigue guardando en `Question.title` para los avisos) y
   `action`, con `queries.action_label` (el nombre del historial: `flow.actions.<op>` de `frontend/locale`; sin él,
   su verbo, su app y su cosa, nunca vacío ni el nombre de la operación); así lo dice también una pregunta guardada
@@ -1471,8 +1468,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   hacer antes de aprobar), el diálogo de herramientas de VS Code (el nombre de la herramienta) y Toast (la
   anulación pide al encargado su código): gana un título que dice quién pide y dónde, y la acción en la primera
   línea, que además no rompe los filtros de las specs de WhatsApp que leen ese título.
-- **Cada registro de la tarjeta del asistente, por su nombre** (revisión 2026-10-30,
-  FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS): cada id que nombra un registro en una escritura lleva su
+- **Cada registro de la tarjeta del asistente, por su nombre**: cada id que nombra un registro en una escritura lleva su
   marca `refers` (`names` de `base/schemas.py`; `base.E009` la comprueba al arrancar), a una lectura por id de
   flow ejecutada como quien confirma: la automatización (`FlowRefIn.id`, seis escrituras), `flow.flow.detail` por
   su `name`; el borrador (`DraftRefIn.id`, `CreateIn.draft_id`), `flow.draft.get` por su `name`; la ejecución
@@ -1495,10 +1491,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   llamada, nunca el paso (`reservation.reservation.create` busca o crea la ficha por teléfono con
   `card_keeper`, como lee Horarios con `reader`): `_step_context` no gana permisos de otras apps
   (`test_services_safety.py`).
-- **Una automatización y las citas «suyas»** (revisión 2026-11-03, FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL):
+- **Una automatización y las citas «suyas»**:
   reservar, mover, confirmar y editar una cita piden «las suyas» (`appointment.add_own_appointment`,
-  `appointment.change_own_appointment`), y el paso, que no es nadie del equipo, no tiene ficha: siempre salía
-  «You may only book your own appointments.» (`permission_denied`). La regla vive en Citas
+  `appointment.change_own_appointment`), y el paso, que no es nadie del equipo, no tiene ficha. La regla vive en Citas
   (`apps.appointment.queries.is_own`), la única app con permisos «propios», no aquí: quien no es una persona
   (`by_person`) toma lo concedido sobre «las suyas» para todo el equipo y se juzga como la clienta. `_step_context`
   no cambia: el techo sigue siendo `grants` (sin ellos no hay cita) y nada se eleva a «todos los permisos». Vale igual
@@ -1523,7 +1518,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Una sola ejecución por aviso**: se bloquea la fila de la automatización (`select_for_update`), se
   mira si ya hay ejecución con ese `trigger_key` (el id del aviso del outbox) y la restricción única
   `(flow, trigger_key)` lo respalda; dos entregas a la vez dan una ejecución.
-- **Una automatización borrada mientras se busca** (2026-10-17): `resolve_flow` la lee **una** vez por su
+- **Una automatización borrada mientras se busca**: `resolve_flow` la lee **una** vez por su
   id, siempre entre las no borradas: bloqueada en las escrituras y con su última ejecución en el detalle.
   Un borrado confirmado a la vez (el «Borrar» del negocio o el del admin) da lo que se leyó o «no existe»
   (404), nunca un 500 ni un cambio, una copia o una ejecución sobre la ya borrada; buscada por su nombre y
@@ -1649,8 +1644,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   aviso de la receta y a cuyo «Solo cuando…» le faltan **claves** del de hoy, se montara cuando se montara, recibe
   escritas solo esas (una clave que el dueño cambió se respeta) y los datos fijos de abajo. Las apps de este carril
   que traen recetas hoy: `appointment` y `online_booking`.
-- **El arreglo de seguridad de una receta llega solo** (revisión 2026-10-30,
-  FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE): `recipes.fixed_data(flow, steps)` suma a cada paso
+- **El arreglo de seguridad de una receta llega solo**: `recipes.fixed_data(flow, steps)` suma a cada paso
   `assistant` de una automatización con `recipe` el `pinned` que el paso del **mismo id** de la receta de hoy declara
   (`recipes._declared`: lo que declara la app activa, apartada o no; sin validar ni huella, así que vale también
   para una montada desde la versión de hoy), solo para las herramientas que ese paso sigue ofreciendo y solo las
@@ -1696,9 +1690,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   solo por su nombre propio, porque `live` no da el peso del verbo pedido: «activa X» a `flow.flow.set_enabled`,
   «renombra X» a `flow.flow.update` y «permite a X…» a `flow.flow.grant` (ERPlora/live#53; sus casos están marcados
   `xfail(strict=True)` y se desmarcan cuando entre el arreglo). Con «la automatización» en la frase sí se ofrecen.
-  Ninguna descripción manda confirmar antes: la tarjeta es la confirmación, y el «confirm it first» que llevaban
-  borrar, ejecutar, reanudar, restaurar una receta, contestar una pregunta y borrar un secreto hacía que el
-  asistente preguntara en el chat sin sacarla (hub#1175; lo guarda `tests/test_guardrails_assistant.py` para todo
+  Ninguna descripción manda confirmar antes: la tarjeta es la confirmación, y una descripción que lo pidiera haría
+  que el asistente preguntara en el chat sin sacarla (hub#1175; lo guarda `tests/test_guardrails_assistant.py` para todo
   el Hub). La respuesta a una pregunta es la que dio la persona, nunca la del asistente.
 - El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun`, `Draft` y `Question`; de `Secret`, solo
   ver el nombre y borrar (un valor no se escribe ni se lee desde el admin). Una escritura cruda del admin no

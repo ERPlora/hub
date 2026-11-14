@@ -838,9 +838,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    identificador (es su credencial, hub#2551): ni la cola ni la lista lo enseñan. `hello` lee las
    impresoras del dispositivo con `printing.device.get` y rechaza el que no tiene alta (`base`, hub#135) y el
    retirado (`retired: true`), este con cualquier sesión, también la de quien gestiona las impresoras, que solo
-   empareja un dispositivo nuevo; un `beat` del retirado contesta `refreshed: 0`
-   (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED).
-6. **Presencia** (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF):
+   empareja un dispositivo nuevo; un `beat` del retirado contesta `refreshed: 0`.
+6. **Presencia**:
    `PrintingConfig.print_presence = "printing.device.seen"` (`base.E006`). `/ws/print` la ejecuta en el `hello` y en
    cada `beat` de un dispositivo que imprime para alguna impresora, como mucho una vez cada `PRESENCE_SECONDS` (15 s),
    con el contexto de la sesión del dispositivo: por eso pide `printing.print`, que tiene el empleado (con
@@ -854,7 +853,7 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
    `tests/test_services.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
    `tests/test_integration_home.py`.
-7. **El cliente del canal en el dispositivo** (FIX-HUB-PRINTING-WS-PRINT-CLIENT-IN-PACKAGES-UI).
+7. **El cliente del canal en el dispositivo**.
    `frontend/components/PrintHost.vue` es la pieza de fondo de Impresión: una ruta de
    `frontend/routes.ts` con `meta.background`, que el shell de `@erplora/ui` deja fuera del router y monta junto al
    panel en todas las pantallas mientras hay sesión. Solo dentro de la app (con `window.__TAURI__.core.invoke`) sigue
