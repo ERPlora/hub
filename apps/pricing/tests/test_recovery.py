@@ -491,3 +491,24 @@ class TestPricesComeBack:
         assert [reason["reason"].split(":")[0] for reason in prices_given["reasons"]] == ["service.service_not_found"]
         with use_hub(hub):
             assert not PriceItem.objects.filter(service_id=by_hand).exists()
+
+    def test_with_services_turned_off_the_price_stays_out_and_says_why(self, recoveries, every_app_on):
+        from base import activation
+        from base.models import AppActivation
+
+        hub, haircut = self.a_priced_service(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.lost(hub, haircut)
+        with use_hub(hub):
+            AppActivation.objects.filter(host=hub.slug, app="service").update(state="off")
+            activation.forget(hub.slug)
+        row = recoveries.ask(copy, "pricing")
+
+        assert run() == 1
+
+        # Services cannot be asked which service stands for the copy's: the recovery goes on, and the add says why.
+        status, [result] = said(row)
+        assert (status, result["created"], result["not_created"], result["refused"]) == ("done", 0, 1, "")
+        assert [reason["reason"].split(":")[0] for reason in result["reasons"]] == ["pricing.services_unavailable"]
+        with use_hub(hub):
+            assert not PriceItem.objects.exists()
