@@ -17,7 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import atomic, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.combo import events
@@ -41,6 +41,7 @@ from apps.combo.schemas import (
     ComboImageUploadIn,
     ComboIn,
     ComboPatchIn,
+    ComboRecoverIn,
     ComboRefIn,
     DeletedOut,
     DroppedOut,
@@ -48,6 +49,7 @@ from apps.combo.schemas import (
     GroupIn,
     GroupOut,
     GroupPatchIn,
+    GroupRecoverIn,
     GroupRefIn,
     GroupReorderIn,
     OptionBulkIn,
@@ -86,7 +88,8 @@ REORDER_MISMATCH = _(
     "The new order has to list every one of them, once, and nothing else."
 )
 
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
+#: Run only by the platform (events.py, and the recovery from a separate copy): no role holds it, so no person and no
+#: API key reaches it.
 SYSTEM = "combo.system"
 
 
@@ -357,6 +360,28 @@ def delete_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
     return {"id": combo_id}
 
 
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114, COMBO-F15), for a
+# menu the business no longer has at all (withdrawing one deletes it with its courses and choices).
+@operation(
+    "combo.combo.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ComboRecoverIn,
+    output=ComboDetailOut,
+    ai=INTERNAL,
+)
+def recover_combo(ctx: OperationContext, data: ComboRecoverIn) -> dict:
+    """A menu of a separate copy made again by ``combo.combo.create``, with the image of the library it showed there
+    set as ``combo.combo.set_image`` sets it (a photo of its own does not come back: ``base.images.from_copy``). It
+    keeps which of the copy's it is made again for (``stands_for``), so its courses come back to it."""
+    made = create_combo(ctx, ComboIn.model_validate(data.model_dump(include=set(ComboIn.model_fields))))
+    Combo.objects.filter(pk=made.id).update(stands_for=data.stands_for)
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_combo(made.id, None, lock=True), image)
+    return load_detail(made.id, ctx.scope)
+
+
 # --- The menu's image (COMBO-F14, base.images) -------------------------------------------------------
 
 #: Where a menu's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
@@ -486,6 +511,25 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     _saved(group.save, lambda: _name_free(combo.id, data.name))
     _group_event(ctx, events.GROUP_CREATED, group)
     return _group_out(group.id)
+
+
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114, COMBO-F15), for a
+# course its menu no longer has (removing one deletes it with its choices).
+@operation(
+    "combo.group.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=GroupRecoverIn,
+    output=GroupOut,
+    ai=INTERNAL,
+)
+def recover_group(ctx: OperationContext, data: GroupRecoverIn) -> dict:
+    """A course of a separate copy added again by ``combo.group.create``, last in its menu. It keeps which of the
+    copy's it is made again for (``stands_for``), so its choices come back to it."""
+    made = create_group(ctx, GroupIn.model_validate(data.model_dump(include=set(GroupIn.model_fields))))
+    ChoiceGroup.objects.filter(pk=made.id).update(stands_for=data.stands_for)
+    return made
 
 
 @operation(
