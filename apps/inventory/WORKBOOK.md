@@ -6,10 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
-> verde. Parte del `WORKFLOW.md` del módulo Inventario del producto actual (`modules-workspace`,
-> `origin/main` `272e57f`, 08/10/2026). La app hace lo mismo y se ve igual; corrige los fallos que
-> ese documento tenía anotados (lista en [Cambios frente al producto actual](#cambios-frente-al-producto-actual))
-> y deja en [Dudas abiertas](#dudas-abiertas) lo que el producto todavía no ha decidido.
+> verde. Lo que el producto todavía no ha decidido está en [Dudas abiertas](#dudas-abiertas).
 
 ## Para qué sirve y para quién
 
@@ -74,7 +71,7 @@ pero no la cantidad restante en el TPV, que aquí no existe. Además:
 - **La foto del artículo en la baldosa del TPV y, sin foto, sus iniciales sobre un color**: Square (la
   imagen del artículo o, sin ella, su color y su abreviatura), Loyverse (imagen, o color y forma) y
   Shopify POS (la imagen del producto en la rejilla). La foto se elige de la librería de ERPlora o se
-  sube desde la ficha, y viaja en la copia del negocio, como en el producto actual.
+  sube desde la ficha, y viaja en la copia del negocio.
 
 ## Antes de empezar
 
@@ -1284,7 +1281,7 @@ API), no solo en la pantalla.
 ## Para quien lo mantiene
 Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
-- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): productos, los de poco
+- **Orden de las listas** (`base.ordering.list_order_for`): productos, los de poco
   stock, categorías y movimientos van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
   descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
@@ -1311,7 +1308,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   pone la pantalla con `set_image` (`base.images.from_copy`, la misma regla que Servicios: la de la librería, salvo una
   que la librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar
   el producto fuera). El
-  eliminado vuelve con la suya porque `inventory.product.delete` ya no le quita la de la librería, solo la foto propia;
+  eliminado vuelve con la suya porque `inventory.product.delete` no le quita la de la librería, solo la foto propia;
   al que se eliminó antes de eso, sin ninguna, `inventory.product.restore` le devuelve la de la copia en el mismo paso
   y con la misma regla (`ProductRestoreIn`: el `id` y la `image` del registro leído, que es lo que la plataforma le
   da de la copia, `base.tenancy.recovery._restore_input`). Uno que el negocio tiene vivo no cambia.
@@ -1331,11 +1328,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u
   otra anterior. Uno vivo es él mismo y no sale; uno hecho a mano con su SKU es del negocio y no hace de ninguno.
 
-## El servidor (fase de servidor, 2026-10-14)
+## El servidor
 
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
-  Las páginas (`frontend/`) son las del módulo viejo: Panel, Productos, Movimientos, Categorías y Ajustes.
+  Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada. Después llegaron las tres de la
@@ -1375,12 +1372,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Libro de movimientos**: `_move` escribe saldo y movimiento juntos con la fila del producto
   bloqueada; varios productos se bloquean por orden de id. El cruce del mínimo se decide una vez por
   operación sobre el total (también suelto + dentro de un menú).
-- **Inicio** (ronda PLAN-HUB 2026-10-21): `setup` y `widgets` de `apps.py`, los del `module.json` viejo (sin
-  `bell`). El paso `inventory.catalog` lee `active_products` de `inventory.stock.get_summary` (orden 30,
+- **Inicio**: `setup` y `widgets` de `apps.py` (sin `bell`). El paso `inventory.catalog` lee `active_products` de `inventory.stock.get_summary` (orden 30,
   `required`, permiso `inventory.add_product`, `events.PRODUCT_EVENTS`); los cuatro paneles leen
   `inventory.stock.get_summary` y `inventory.product.list_low_stock` (`limit` 5) con permiso
   `inventory.view_product` y `events.FIGURE_EVENTS`, las mismas que re-ejecutan el Panel (`live.py`). Ningún
-  panel fija moneda ni idioma (gh:inventory#123) ni categoría (gh:inventory#126); un KPI no repite su nombre en
+  panel fija moneda, idioma ni categoría; un KPI no repite su nombre en
   `options.label` (gh:hub#1105).
 - **Ventas**: `events.REACTIONS` lleva `sale.sale.completed` → `inventory.stock.apply_sale`,
   `sale.sale.voided` → `inventory.stock.restore_sale` y `sale.sale.refunded` →
@@ -1390,7 +1386,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   devuelto. Los tests usan el evento real de Ventas, importando `apps.sale` solo en los tests. Su permiso, `inventory.system`, no lo tiene ningún rol. La nota por venta
   (`SaleStock`: `moved`, `unmoved`, `voided`) hace que la venta baje una vez, que la anulación reponga
   una vez lo que dice el libro y que una anulación que llega antes deje la venta sin efecto. Los entrega
-  el relay del outbox del worker (`base/relay.py`, desde hub#105): `tests/test_relay.py` cobra, anula y
+  el relay del outbox del worker (`base/relay.py`): `tests/test_relay.py` cobra, anula y
   devuelve con las operaciones reales de Ventas (y Menús) y pasa un tick real del worker. La forma del evento de Ventas (`sale_id`, `items[]` con `product_id`, `quantity`,
   `is_service` y `components[]`) la fija el WORKBOOK de Ventas.
 - **Importar**: el servidor es la autoridad: recibe las celdas como texto ya mapeadas a nuestros
@@ -1433,24 +1429,15 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   navegador es una hoja solo para papel (`@media print`), hecha con el DOM.
 - **Avisos añadidos** a la lista del producto: `inventory.category.*` e `inventory.config.updated`, solo
   para refrescar las consultas vivas.
-- **Administrador de Django**: CRUD completo de todas las tablas para soporte (ronda 12, PLAN §17), el
+- **Administrador de Django**: CRUD completo de todas las tablas para soporte (PLAN §17), el
   libro incluido: es un segundo camino de escritura que avisa y no impide; ids y fechas automáticas se
   ven pero no se editan. Las pantallas, el asistente y la API siguen sin editar el libro.
 - **Pruebas que bloquean**: dos ventas de la última unidad, la misma venta dos veces, una venta y su
   anulación, y dos bajas del saldo entero, a la vez y en dos hilos (`test_services.py`). Con Impuestos
   real, sin dobles (`test_integration_tax.py`): categoría de fábrica y su tipo calculado, categoría
   desactivada rechazada por toda puerta, y textos fiscales leídos por sus alias.
-- **Categorías**: nacen con el icono `ion:cube-outline` y el color `#3880ff`, como en el módulo viejo.
-- **Roles**: el `cashier` viejo no existe; lo que tenía (ver productos, categorías y stock) es del
-  empleado (`hub_employee`).
-- **Del módulo viejo se queda fuera, a propósito**: almacenes (`inventory_location`) y variantes
-  (`inventory_product_variant`), que este WORKBOOK excluye; la imagen de la categoría (duda 6; la
-  foto del producto vuelve con F30 a F33); el SKU autogenerado `PROD-NNN` de su alta en lote (aquí el SKU es obligatorio,
-  INVENTORY-F09); desactivar una categoría (cambio 5); `inventory.products.unit_of` y
-  `inventory.products.stock_levels`, que eran lecturas internas de los handlers (aquí la unidad sale en
-  la ficha y en `inventory.unit.list`, y el saldo se lee dentro de la transacción).
-- **La foto del artículo (INVENTORY-F30 a F33, hechas el 2026-10-30; decisión de Ioan del 2026-10-30, encargo
-  `docs/plans/2026-10-30-blueprints-imagenes-prompt.md` de erplora-next)**:
+- **Categorías**: nacen con el icono `ion:cube-outline` y el color `#3880ff`.
+- **La foto del artículo (INVENTORY-F30 a F33)**:
   - `Product.image`: texto validado con una referencia lógica, nunca una URL (un `.blueprint.zip` es inmutable
     y una URL horneada se pudre si cambia el dominio, el bucket o la CDN): `catalog:<carpeta>/<nombre>` (la
     librería compartida, repo `ERPlora/blueprints`, `img/<carpeta>/<nombre>.webp`, con el manifiesto bilingüe
@@ -1465,9 +1452,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     productos: ≤ 2 MB, Pillow a WebP 512×512 recortada al centro, el espacio del plan con
     `base.files.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
     en `base`, `base.catalog_image.search` (consulta: título y `tags` del manifiesto en `es` y `en`; título en
-    el idioma del negocio). Reutilizan `inventory.product.updated`. Al hacerlas entran en «Lo que ofrece» y,
-    la de `base`, en «Lo que necesita de otras apps» (`tests/test_workbook.py` exige que esa tabla nombre
-    solo lo que el código llama, por eso no está ya).
+    el idioma del negocio). Reutilizan `inventory.product.updated`.
   - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs
     (`shared/catalog/…`, de solo lectura para los hubs) con caché inmutable, la misma vista genérica que
     `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por
@@ -1493,72 +1478,18 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     («ProductFormModal: photo»), `ProductDetailModal.test.ts`, `frontend/pages/ProductsPage.test.ts`, las baldosas
     en `apps/sale/frontend/components/pos/*Tile*.test.ts`, y en Chrome `tests/e2e/inventory-photo.spec.ts` (F30, F31
     y F32 a 390, 834 y 1440). F33: `base/tests/test_blueprint_images.py`.
-  - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip (como hub#1008 del producto
-    viejo) y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
-    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites desde el 2026-10-30
+  - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
+    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites
     (`base/tests/test_blueprint_images.py`): `MAX_FILE_BYTES` 20 MB, `MAX_INFLATED_BYTES` 100 MB, `MAX_ENTRIES` 1 000
-    y cada `media/` un WebP de `MAX_PHOTO_BYTES` 2 MB (motivo `bad_photo`); antes 5 MB, 50 MB y 200.
-  - Supersede la «una copia por paquete o por negocio» del producto viejo (ADR-0121, hub#1006, README de
-    `erplora-old/blueprints`): la librería es una sola copia para todos los hubs.
-  - Choque en la referencia: el `WORKFLOW.md` viejo de inventario dice «no hay campo de imagen» (F01) mientras
-    su esquema (`migrations/postgres/001_init.sql`) tiene `image TEXT` en producto y en categoría: la columna
-    existía y solo se llenaba por el asistente, la API o una plantilla.
-
-## Cambios frente al producto actual
-
-La app hace lo mismo que el módulo Inventario actual y se ve igual, salvo estos arreglos de fallos
-que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir su flujo.
-
-1. **La app comprueba en todas las puertas lo que antes solo comprobaba la pantalla**: que la
-   categoría fiscal existe en Impuestos (F01, F02), el escalón de la unidad en la recepción y el
-   recuento (F13, F14), los permisos de importar y de exportar (F09, F11) y que un servicio no se
-   recibe ni se cuenta (F13, F14).
-2. **El stock inicial deja movimiento «Inicial»**, venga del alta, de un CSV o de una plantilla
-   (F01, F09, F12, F16). Antes el saldo no se explicaba por el libro.
-3. **El producto y sus categorías se guardan juntos**: o todo o nada (F02, F08). Antes las
-   categorías se guardaban después, una a una.
-4. **La unidad de un producto con stock no se cambia** (F02, F26). Antes 3 unidades pasaban a ser
-   3 kg sin convertir.
-5. **Editar una categoría no borra lo que la pantalla no enseña** (descripción, icono, color, orden),
-   y **las categorías no se desactivan**: antes una categoría desactivada por la API desaparecía sin
-   forma de volver (F06).
-6. **Importar productos**: acepta coma o punto y coma (el CSV de Excel en español); el texto fiscal
-   se compara también con el nombre traducido; si Impuestos no puede guardar un texto o una
-   categoría, se dice en el informe (F09).
-7. **Importar categorías** da el mismo informe que la de productos, omite las que ya existen por
-   nombre y no deja categorías sin tipo en silencio (F10).
-8. **Exportar** baja todo el catálogo filtrado, con las cifras como se leen, todos los campos y las
-   cabeceras que la importación reconoce (F11). Antes bajaba solo la página, con cifras internas.
-9. **Todo movimiento avisa de stock cambiado**, así el Panel y los paneles del Inicio se refrescan
-   también tras una venta, una anulación o una recepción (F17, F21, F23).
-10. **El aviso de cruce de mínimo es exacto**: solo con lo que de verdad se movió, también al anular,
-    y ni se pierde ni se duplica con dos movimientos a la vez (F18, F21, F23).
-11. **La anulación repone bien llegue antes o después que la venta** (F23). Antes, si la venta se
-    reintentaba después de la anulación, el stock quedaba bajado por una venta anulada.
-12. **Todas las consultas y acciones están en la API y en el asistente** (F13, F15). Antes recibir y
-    dar de baja no estaban en la API pública.
-13. **Dar de baja stock pide el permiso de mover stock**, no el de cambiar productos (F15).
-14. **Una recepción con una línea mala se rechaza entera** diciendo qué línea falla (F13). Antes esa
-    línea no movía nada y no se avisaba.
-15. **Un SKU o un EAN-13 repetido se dice siempre con su mensaje** (F01). Antes dependía del texto
-    del error de la base de datos.
-16. **Cada pulsación de «Imprimir código de barras» saca una etiqueta**, y si ninguna impresora
-    tiene la función «Etiqueta» se dice (F25). Antes, por la cola, cada producto sacaba su etiqueta
-    una sola vez en toda su vida y sin aviso. Es lo que hacen Square y Shopify POS (imprimir
-    etiquetas bajo demanda).
-17. **Los avisos solo llevan los datos del flujo** (sección «Lo que avisa»). Antes copiaban también
-    la identidad fiscal del negocio y quién lanzó la acción.
-18. **La foto del artículo se pone desde la ficha** (F30, F31): antes la columna existía, pero la ficha no
-    tenía campo y cada paquete llevaba su propia copia de la imagen; ahora se elige de una librería común
-    (una sola copia para todos los negocios) o se sube a la carpeta del negocio, y viaja en la copia
-    exportada (F33).
+    y cada `media/` un WebP de `MAX_PHOTO_BYTES` 2 MB (motivo `bad_photo`).
+  - La librería es una sola copia para todos los hubs.
 
 ## Cobertura contra la referencia
 
 | Elemento de la referencia | Qué hará la app | Flujo |
 |---|---|---|
 | Ficha con nombre, SKU, precio, coste, categoría fiscal, código de barras y unidad | sí | F01, F02 |
-| Foto del artículo en la ficha, la lista y el TPV | sí: de la librería común o propia, con las iniciales si no hay (duda 6 resuelta el 2026-10-30) | F30, F31, F32 |
+| Foto del artículo en la ficha, la lista y el TPV | sí: de la librería común o propia, con las iniciales si no hay (duda 6) | F30, F31, F32 |
 | Fotos de los artículos en la copia o la plantilla exportada | sí: las propias dentro del archivo, las de la librería como referencia | F33 |
 | Precio por una cantidad distinta de la unidad (por 100 g, por kg con stock en g) | parcial: solo por el asistente o la API (duda 12) | F01, F26 |
 | Categoría fiscal obligatoria y existente al guardar | sí | F01, F02 |
@@ -1647,7 +1578,7 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
-  un flujo, cada una tiene su sustituto en uso y su clave `inventory:ui-…` en el registro de la migración.
+  un flujo y cada una tiene su sustituto en uso.
 
 ## Lo que NO hace, a propósito
 
@@ -1675,21 +1606,12 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
 1. Con «Permitir vender sin stock» apagado (el de fábrica), una venta que supera el saldo se cobra y
    el stock no baja nada, sin aviso (F21). ¿Debe el TPV avisar o impedir la venta, o la venta debe
    bajar a negativo igualmente y el ajuste solo gobernar el aviso?
-2. ~~¿Debe la devolución de una venta reponer stock, con una casilla «devolver al stock» por línea
-   como Square y Toast (F24, SALE-F31)?~~ Resuelta (2026-10-14): sí; Ventas dice qué líneas y cuántas
-   unidades vuelven y Inventario las repone (F24).
-3. ~~¿Hace falta una pantalla de baja con motivo (merma, rotura, consumo propio) o basta el recuento
-   (F15)?~~ Resuelta (2026-10-14): sí, la ventana «Baja» en la fila y la ficha de Productos, como
-   Square (ajustes con motivo «dañado», «perdido»), Odoo («Desechar»), Shopify y Lightspeed.
 4. El «Tipo de IVA / Impuesto» de una categoría no lo usa nadie (F06): ¿se quita, o los productos de
    la categoría deben heredarlo?
 5. El «Umbral de stock bajo» de Ajustes solo lo hereda un producto creado por el asistente o la API
    sin umbral (F19): ¿debe el formulario dejar el campo vacío para heredarlo, y debe un cambio del
    ajuste alcanzar a los productos que lo heredaron?
-6. ~~¿Entra en el MVP la foto del artículo en la ficha (F01)?~~ Resuelta (2026-10-30, decisión de
-   Ioan): sí, elegida de la librería común o subida, en el TPV y en la copia exportada (F30 a F33).
-   Sigue abierta la otra mitad: ¿entran el orden, el color, el icono y la imagen de las categorías en
-   el TPV (F06, F08)?
+6. ¿Entran el orden, el color, el icono y la imagen de las categorías en el TPV (F06, F08)?
 7. ¿Debe la etiqueta llevar el EAN-13 cuando lo hay, y el TPV buscar por código de barras (F25,
    F27)?
 8. ¿Debe un artículo poder volver a «Sigue el ajuste del hub» después de haber decidido (F20)?

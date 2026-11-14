@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aac570b2963a25c05f2c4c60c2d4ff73f3423cf1927f224fd7c05b9365a0be31 -->
+<!-- generated from WORKBOOK.md sha256:445f7a278f1b7b84574ff69079e27be9588e00f522c8e7679d5607430a56581d -->
 
 ## What it is for and who it is for
 
@@ -63,7 +63,7 @@ but not the quantity left on the till, which does not exist here. Also:
 - **The item's photo on the till's tile and, without a photo, its initials over a colour**: Square (the
   item's image or, without one, its colour and its abbreviation), Loyverse (image, or colour and shape)
   and Shopify POS (the product's image on the grid). The photo is chosen from ERPlora's library or
-  uploaded from the product's card, and it travels in the business's backup, as in the current product.
+  uploaded from the product's card, and it travels in the business's backup.
 
 ## Before you start
 
