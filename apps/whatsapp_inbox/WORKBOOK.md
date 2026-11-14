@@ -6,11 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
-> verde (servidor y páginas). Parte del `WORKFLOW.md` del módulo Bandeja de WhatsApp del producto
-> actual (`modules-workspace/modules/whatsapp_inbox`, `origin/main` `5ea1588`, v2.1.113) y de la app
-> `whatsapp_inbox` del SaaS actual (`saas`, `origin/develop`). Los números de flujo se conservan
-> (otras apps los citan); los nuevos empiezan en F32. F14–F26 (respuestas automáticas y reservas por
-> WhatsApp) vienen de `workflow/respuestas-automaticas.md` del mismo módulo.
+> verde (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -56,11 +52,10 @@ aparece en la conversación como mensaje del negocio (coexistencia de Meta).
 estados (abierta, pendiente, cerrada) donde un mensaje nuevo del cliente reabre la conversación
 (Zendesk), asignación a quien puede leer la bandeja con «Asignármela» que no pisa a otro (Shopify,
 Chakra), notas internas en el hilo (Fresha, Intercom, Front), la regla de Meta de las 24 horas
-hecha cumplir en el servidor y las plantillas gestionadas en la propia app (Odoo, WATI, Respond.io y el
-producto actual).
-**Por qué las demás no:** contestar solo desde el móvil (el producto actual) obliga a coger el
+hecha cumplir en el servidor y las plantillas gestionadas en la propia app (Odoo, WATI y Respond.io).
+**Por qué las demás no:** contestar solo desde el móvil obliga a coger el
 teléfono y deja la bandeja en solo lectura; dos estados (Shopify) no distinguen «espero al cliente»
-de «está hecho»; asignar tecleando un identificador (el producto actual) no lo usa nadie; mandar a
+de «está hecho»; asignar tecleando un identificador no lo usa nadie; mandar a
 WhatsApp Manager a crear las plantillas saca al dueño de la app para lo que hace a diario.
 
 ## Antes de empezar
@@ -1219,6 +1214,12 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 Mensajes recibidos y enviados: el admin los enseña en **solo lectura** (son lo que llevó WhatsApp; se
 corrigen borrando los datos de la conversación, nunca editando), con borrado para el staff.
 
+- **Columnas `host` que quedan en la BD**: los modelos no las tienen (migraciones `0011` y `0012`), pero las columnas,
+  sus datos y las dos guardas únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
+  `whatsapp_inbox_template_live_host_name_language_unique`) siguen en la BD; el código las deja vacías, así que siguen
+  guardando una fila de canal y una plantilla viva por nombre e idioma. Rehacer esas guardas sin `host` y borrar las
+  columnas es hub#1132.
+
 ### Reglas que no se rompen
 
 - **Nada espera a erplora.com dentro de una transacción.** `message.send` valida y guarda el mensaje
@@ -1388,9 +1389,8 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
 ```
 
 **Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema). Están
-montadas desde hub#127 (`base/internal.py`), probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP
-firmado con la bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama desde saas#63,
-probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
+montadas en `base/internal.py`, probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP firmado con la
+bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama, probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
 
 1. `POST /internal/whatsapp/inbound` → `whatsapp_inbox.message.receive`. Un mensaje del cliente o el eco
    de lo que el dueño escribió en el móvil, en vivo o del historial:
@@ -1450,7 +1450,7 @@ probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-
 
 **Las puertas que sirve el SaaS** (el Hub → erplora.com; `apps/whatsapp_inbox/gateway.py`, `httpx`, 5 s
 para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción). Existen en
-erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/internal.py`; su WORKBOOK,
+erplora.com, con su webhook de Meta (`saas/whatsapp/internal.py`; su WORKBOOK,
 «Contrato con el Hub», añade las 10–12):
 
 5. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/send`, con `Idempotency-Key: <client_message_id>`:
@@ -1577,7 +1577,7 @@ clic, `window.open` de `https://www.facebook.com/<graph_version>/dialog/oauth?cl
 Mientras corre, Meta manda a esta página por `postMessage`, desde `https://*.facebook.com`, la sesión
 (`WA_EMBEDDED_SIGNUP`: `FINISH*` con `waba_id`, `phone_number_id`, `business_id`; `CANCEL` o `ERROR` con su
 motivo); al terminar lleva el navegador a `redirect_uri` con `?code=…&state=…` (o `error`). **La vuelta en
-erplora.com** (hecha en saas#71; `PLAN-SAAS.md` §19, ronda 2026-10-30, «Alta embebida sin el SDK de Facebook»):
+erplora.com** (`PLAN-SAAS.md` §19, «Alta embebida sin el SDK de Facebook»):
 `GET /whatsapp/return`, pública, sin sesión ni BD, con COOP `unsafe-none` solo en esa vista, que hace
 `window.opener.postMessage({"type": "erplora.whatsapp.signup", "state", "code" | "error", "error_description"},
 "https://<slug>.erplora.com")` con el `slug` del `state` (ni reservados ni demos) y se cierra; y el canje del código
@@ -1589,13 +1589,13 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 
 ### Contrato con `base`
 
-- Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB; hecho desde hub#127,
+- Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB;
   `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (su slug: entra en su
   BD con `use_hub` y corre como `Scope("host", hub)`), comprueba que la app está activa (si no, 404 `app_inactive`) y
   ejecuta la operación con `system_context(scope)`, devolviendo su salida o el sobre de errores con su
   estado HTTP (422 para un cuerpo que no vale).
 - Al recibir la foto de estado con la clave `whatsapp` (puerta 4), se la pasa a
-  `whatsapp_inbox.channel.sync` con la versión de la foto (hecho desde hub#127).
+  `whatsapp_inbox.channel.sync` con la versión de la foto.
 - El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased/restored` a
   `apps.whatsapp_inbox.events.react` (`base/relay.py`); el worker ejecuta la tarea `resume_deliveries` de
   `apps.py` en cada negocio que sirve (`base.worker._serve_hub`), y el trabajo diferido de esta app corre en el
@@ -1674,10 +1674,9 @@ menciona la ficha, el teléfono con que reservar ni `on_behalf_of`. Lo prueban
 `tests/test_relay_auto_replies.py::test_the_answer_never_books_or_waitlists_on_another_guest_s_card_whatever_the_assistant_sends`,
 `tests/test_relay_auto_replies.py::test_the_answer_books_and_waitlists_only_with_the_number_that_writes_whatever_the_assistant_sends`
 y `tests/test_recipes.py::test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf`.
-La tarjeta de Ajustes enciende la respuesta y su aviso (F26). La receta cambió de huella al añadir la anulación, otra
-vez al fijar la ficha y otra al darle la lista ofrecida (F19): quien ya la tenía encendida la ve como versión nueva en Automatizaciones y la actualiza con F18
-(lo mismo que **Restaurar la de fábrica**, FLOW-F35); hasta entonces sigue con el encargo viejo, que pide la ficha al
-modelo.
+La tarjeta de Ajustes enciende la respuesta y su aviso (F26). Un negocio que la
+encendió con una versión anterior la ve como versión nueva en Automatizaciones y la actualiza con F18 (lo mismo que
+**Restaurar la de fábrica**, FLOW-F35); hasta entonces sigue con la anterior.
 
 Lo que falta, fuera de esta app:
 
@@ -1705,53 +1704,16 @@ tarjeta de Ajustes restaura el mutuo excluyente de cuando había dos (`rival`): 
 aviso, y si algo falla se deshace. Lo probado está en `tests/test_recipes.py` y `tests/test_relay_auto_replies.py` (tras
 el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointment-whatsapp.spec.ts`.
 
-### Contradicciones escritas, sin resolver
+### Decisiones de los planes
 
-- F24: el producto actual no creaba ficha a quien pedía mesa por WhatsApp («su ficha si ya existe (no se
-  crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
-  (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; la respuesta de
-  citas también la crea (F21, CUSTOMER-F26).
-- ~~Modo compartido de la tenencia (PLAN-DB, S1)~~ — **resuelta** por el corte S5 (hub#602): cada negocio tiene su
-  BD y no comparte nada. Mientras lo hubo, cada fila llevaba su negocio en `host` (`erase_host` en un número por
-  olvidar). hub#1053 lo saca de los modelos (migraciones `0011` y `0012`): las columnas, sus datos y las dos guardas
-  únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
-  `whatsapp_inbox_template_live_host_name_language_unique`) se quedan en la BD para el código de antes, que sigue
-  corriendo mientras el despliegue migra; el código nuevo las deja vacías, así que siguen guardando una fila de canal
-  y una plantilla viva por nombre e idioma. Rehacer esas guardas sin `host` y borrar las columnas es de un
-  despliegue posterior (hub#1132).
-
-Resueltas en los planes, y fuera de esta lista:
-
-- «WhatsApp sale del SaaS y el Hub llama a Meta»: la derogan las rondas 2026-10-21 de `PLAN-SAAS.md` §1.1 y de
-  `PLAN-HUB.md` §8 (APP-WHATSAPP, saas#63): WhatsApp se queda en erplora.com como única pasarela con Meta y el Hub
-  habla con él por `/internal` (puertas 1–12 de «Contrato con el SaaS»); la ronda 2026-10-30 de `PLAN-SAAS.md` §19
-  (cierre de `whatsapp`, saas#157) lo da por cerrado. El Hub nunca llama a Meta.
-- Dónde se crean las plantillas: en el Hub (Ajustes), y erplora.com solo las registra en Meta (puertas 8 y 9), por la
-  ronda 2026-10-21 de `PLAN-SAAS.md` §1.1 (APP-WHATSAPP_INBOX-1, hub#118; mercado: Odoo, WATI, Respond.io, Twilio,
-  Gupshup, AiSensy, Interakt y Zoko).
-- El cupo de WhatsApp lo cuenta y lo frena erplora.com, y el Hub solo enseña sus cifras: `PLAN-SAAS.md` §19 (ronda
-  2026-10-30), que resuelve para WhatsApp el «el Hub cuenta» de `PLAN-HUB.md` §8 (2026-10-15).
-- El aviso al 80 % del cupo (`PLAN-HUB.md` §8, 2026-10-15; señalado en `PLAN-SAAS.md` §19): se queda. F13 avisa desde el
-  80 % en la bandeja y en Ajustes, con las cifras de erplora.com, como el asistente (BASE-F104); decidido al migrar con
-  el mercado (WATI, respond.io, Gupshup, Zoko, Twilio, Odoo, Fresha y ActiveCampaign avisan antes de agotar el saldo o
-  el cupo; aquí el tope corta los envíos, sin paquetes ni exceso).
-
-### Cambios frente al producto actual
-
-| Producto actual | Aquí | Motivo |
-|---|---|---|
-| El Hub **sondea** a erplora.com (`/api/v1/hub/device/whatsapp/inbox`, `statuses`) | erplora.com **empuja** al Hub por `/internal` | Contrato SaaS ↔ Hub (el SaaS empuja tras el commit; PLAN-SAAS §2) |
-| La bandeja no contesta («Desde esta pantalla no se contesta») | Se contesta desde el Hub (F32, F33) | Mercado (ver «Referencia adoptada») |
-| Estados `active`/`closed`, solo el borrado cierra | Abierta / pendiente / cerrada, a mano; un mensaje nuevo reabre | Mercado (Zendesk, Fresha, Shopify) |
-| Asignar tecleando el identificador, solo el administrador | Selector del equipo + «Asignármela»; el responsable asigna | Mercado (Shopify, Chakra); el producto actual lo marcaba «parcial» |
-| Sin notas | Notas internas (F36) | Mercado (Fresha, Intercom, Front) |
-| «Necesita atención» lo ponían las recetas | Igual: la pone la respuesta automática cuando no puede contestar (F20), sale junto al nombre en la bandeja y la campana **Clientes de WhatsApp esperando respuesta** la cuenta | — |
-| La respuesta automática reservaba sola (paso `ai` con `policy: auto`) | El asistente propone y la reserva o el cambio esperan tu «Aprobar» en **Esperan tu respuesta** («Que me lo pregunte») | Lo que contesta va a un desconocido: el dueño ve antes cada cambio; mercado (Fresha, Booksy y Square confirman las citas que pide un cliente por mensaje) |
-| La app instalada avisaba cuando subía el contador de la campana (hub#2303) | Un aviso del dispositivo por cada mensaje de un cliente que queda sin contestar | Mercado (WhatsApp Business, Shopify Inbox, Square, Fresha avisan de cada mensaje); un aviso por subida del contador callaría al cliente que vuelve a escribir tras cerrarse sin respuesta |
-| Fotos y audio dentro del hilo, descargados por una puerta del Hub | Fotos y notas de voz dentro del hilo, servidas por erplora.com; vídeos y documentos con **Abrir el adjunto** | El Hub no guarda ni pasa archivos: erplora.com los sirve con la sesión de la persona y la CSP del Hub permite su origen (ver «Contrato con `base`») |
-| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31): el archivo de la cabecera se guarda en los archivos del negocio y erplora.com lo sube a Meta como muestra; la bandeja envía la plantilla con su archivo o el elegido (F33) | Mercado: WATI, respond.io, Twilio y WhatsApp Manager piden el archivo al enviar |
-| Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
-| `templates.list` y ajustes solo para el administrador | Elegir plantilla para enviar: quien contesta; Ajustes: propietario y administrador | Quien contesta necesita las plantillas |
+- WhatsApp se queda en erplora.com como única pasarela con Meta y el Hub habla con él por `/internal` (puertas 1–12
+  de «Contrato con el SaaS»): el Hub nunca llama a Meta (`PLAN-SAAS.md` §1.1 y §19, `PLAN-HUB.md` §8).
+- Las plantillas se crean en el Hub (Ajustes), y erplora.com solo las registra en Meta (puertas 8 y 9)
+  (`PLAN-SAAS.md` §1.1; mercado: Odoo, WATI, Respond.io, Twilio, Gupshup, AiSensy, Interakt y Zoko).
+- El cupo de WhatsApp lo cuenta y lo frena erplora.com, y el Hub solo enseña sus cifras (`PLAN-SAAS.md` §19).
+- El aviso al 80 % del cupo: F13 avisa desde el 80 % en la bandeja y en Ajustes, con las cifras de erplora.com, como
+  el asistente (BASE-F104); WATI, respond.io, Gupshup, Zoko, Twilio, Odoo, Fresha y ActiveCampaign avisan antes de
+  agotar el saldo o el cupo; aquí el tope corta los envíos, sin paquetes ni exceso.
 
 ### Lo que queda fuera
 
