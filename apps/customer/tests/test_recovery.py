@@ -468,7 +468,7 @@ class TestWhatHangsFromACardComesBack:
         with use_hub(hub):
             assert Customer.objects.live().filter(name="Luis Pérez").count() == 1
 
-    def test_a_value_its_field_no_longer_takes_leaves_the_card_out_with_why_and_nothing_of_it_made(
+    def test_a_value_its_field_no_longer_takes_does_not_keep_the_card_out_and_recoveries_notes_it_with_why(
         self, recoveries, every_app_on
     ):
         hub, luis, made, copy = self.luis_lost(recoveries, every_app_on)
@@ -478,19 +478,21 @@ class TestWhatHangsFromACardComesBack:
 
         run()
 
+        # Luis made again, counted once as made and once as noted: the note says, by his id in the copy, which field
+        # he came back without and why.
         [result] = fresh(asked).results
-        assert (result["created"], result["not_created"]) == (0, 1)
-        assert result["reasons"][0]["id"] == str(luis)
-        assert result["reasons"][0]["reason"].startswith("customer.field_invalid_option: ")
-        # All or nothing: neither Luis nor the tag his card would have made again.
-        with use_hub(hub):
-            assert not Customer.objects.live().filter(name="Luis Pérez").exists()
-        assert named(hub, CustomerTag) == []
+        [note] = result.pop("notes")
+        assert result == CUSTOMERS | {"created": 1, "noted": 1}
+        assert note["id"] == str(luis)
+        assert note["note"].startswith("customer.field_invalid_option: ") and '"Size"' in note["note"]
+        back = what_hangs(hub, the_new(hub, "Luis Pérez"))
+        assert [(name, value) for name, _, value in back["values"]] == [("Pet", "Luna")]
+        assert [(name, color) for name, _, color in back["tags"]] == [("Regular", "success")]
 
     def test_a_field_the_business_deactivated_or_made_required_since_does_not_keep_the_card_out(
         self, recoveries, every_app_on
     ):
-        hub, _luis, made, copy = self.luis_lost(recoveries, every_app_on)
+        hub, luis, made, copy = self.luis_lost(recoveries, every_app_on)
         # Pet deactivated: it shows on no card, so its value does not come back, and no second Pet is made.
         run_in(hub, "customer.field.update", id=made["pet"], is_active=False)
         # A field required since: a card is made without it, as the till makes one (CUSTOMER-F01).
@@ -499,7 +501,35 @@ class TestWhatHangsFromACardComesBack:
 
         run()
 
-        assert fresh(asked).results == [CUSTOMERS | {"created": 1}]
+        # Recoveries says Luis came back without his Pet, and why; the required field without a value is no note.
+        [result] = fresh(asked).results
+        [note] = result.pop("notes")
+        assert result == CUSTOMERS | {"created": 1, "noted": 1}
+        assert (note["id"], note["note"].startswith("customer.field_inactive: ")) == (str(luis), True)
         back = what_hangs(hub, the_new(hub, "Luis Pérez"))
         assert [(name, value) for name, _, value in back["values"]] == [("Size", "M")]
         assert named(hub, CustomField) == [("Allergies", True), ("Pet", False), ("Size", True)]
+
+    def test_a_card_the_business_deleted_comes_back_without_a_value_the_field_it_made_again_no_longer_takes_noted(
+        self, recoveries, every_app_on
+    ):
+        hub, ana, _luis, made = self.a_business(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        # Since the copy: Ana's card deleted, then Size deleted with its values and made again by hand without M.
+        run_in(hub, "customer.customer.delete", id=ana)
+        run_in(hub, "customer.field.delete", id=made["size"])
+        run_in(hub, "customer.field.create", name="Size", field_type="select", options=["S", "L"])
+        asked = recoveries.ask(copy)
+
+        run()
+
+        # The same card back, counted as restored and as noted, not kept deleted for one value.
+        [result] = fresh(asked).results
+        [note] = result.pop("notes")
+        assert result == CUSTOMERS | {"restored": 1, "noted": 1}
+        assert note["id"] == str(ana)
+        assert note["note"].startswith("customer.field_invalid_option: ") and '"Size"' in note["note"]
+        back = what_hangs(hub, ana)
+        assert [(name, value) for name, _, value in back["values"]] == [("Pet", "Luna")]
+        with use_hub(hub):
+            assert Customer.objects.live().filter(pk=ana).exists()

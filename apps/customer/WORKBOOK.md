@@ -956,11 +956,15 @@ su historia sigue en la otra ficha, o sus datos ya no existen («Este cliente ya
 si el negocio ya creó otra vez a la misma persona (el mismo nombre, teléfono y email, CUSTOMER-F12): se queda la que
 hizo. Una ficha que el negocio ya no tiene en absoluto se crea de nuevo (CUSTOMER-F01), con sus grupos, etiquetas y
 campos propios de la copia: el grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer
-otro, y el que ya no tiene se vuelve a crear como estaba (CUSTOMER-F06, CUSTOMER-F04, CUSTOMER-F29); un valor de un
-campo que el negocio desactivó no vuelve, y uno que su campo ya no admite deja fuera la ficha entera con su motivo.
-A una ficha eliminada que vuelve, lo que el negocio aún tiene se le queda como está, aunque la sacara de un grupo o le
-quitara un valor antes de eliminarla; un valor que ya tiene en un campo que el negocio volvió a crear se queda, uno de un
-campo que el negocio desactivó no vuelve, y uno que su campo ya no admite la deja eliminada, con su motivo (hub#1356).
+otro, y el que ya no tiene se vuelve a crear como estaba (CUSTOMER-F06, CUSTOMER-F04, CUSTOMER-F29). Un valor de un
+campo que el negocio desactivó, o que su campo ya no admite (ya no es una de sus opciones o ya no es de su tipo), no
+vuelve, pero no deja fuera la ficha: vuelve sin él, y Recuperaciones lo cuenta («Clientes: se crearon 2, 1 con notas»)
+y dice en «notas» de qué campo y por qué, sin el valor, que es del cliente («customer.field_inactive: volvió sin su
+valor del campo «Talla»: desactivado en Clientes», «customer.field_invalid_option: … ya no es una de sus opciones»)
+(hub#1438). A una ficha eliminada que vuelve, lo que el negocio aún tiene se le queda como está, aunque la sacara de un
+grupo o le quitara un valor antes de eliminarla; un valor que ya tiene en un campo que el negocio volvió a crear se
+queda, y uno de un campo que el negocio desactivó o que su campo ya no admite no vuelve: la ficha vuelve igual, sin él y
+con su nota (hub#1356, hub#1438).
 Sobre una ficha viva no falla: responde bien y vuelve a avisar. Lo que se cobró a su nombre mientras estuvo eliminada no se suma
 (CUSTOMER-F20).
 Implicados: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16,
@@ -1169,7 +1173,11 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   `customer.customer.create`, `customer.group.create`/`update`, `customer.tag.create`/`update`,
   `customer.field.create`, `set_groups` y `set_tags`, con lo del negocio del mismo nombre (`queries.named`, la misma
   regla que `set_groups` por nombre: el activo primero), y los valores con la comprobación de la ficha
-  (`_validated_field_values`) sin pedir los obligatorios, como el alta del TPV. Es UNA operación por ficha y no pasos
+  (`_validated_field_values`) sin pedir los obligatorios, como el alta del TPV; un valor de un campo desactivado o que
+  su campo ya no admite (`_why_left_out`, con `_field_problem`) no deja fuera la ficha: la salida de `recover` y de
+  `restore` (`CustomerRecoveredOut`, que mezcla `base.recovery.RecoveredOut`) lo dice en `left_out`
+  (`customer.field_inactive`, `customer.field_invalid_<forma>`, con el nombre del campo y nunca el valor) y la
+  plataforma lo anota en «notas» de Recuperaciones (hub#1438). Es UNA operación por ficha y no pasos
   del gancho detrás de la ficha porque la plataforma suma en «se crearon N» cada operación que acaba bien y porque,
   hecha la ficha, una creada por la recuperación no se distingue de una que el negocio rehízo a mano, que se queda
   como está. A una ficha eliminada, `customer.customer.restore` le devuelve lo que el negocio borró después (hub#1356):

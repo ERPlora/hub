@@ -65,6 +65,7 @@ from apps.customer.schemas import (
     CustomerDetailOut,
     CustomerIn,
     CustomerPatchIn,
+    CustomerRecoveredOut,
     CustomerRecoverIn,
     CustomerRefIn,
     CustomerRestoreIn,
@@ -108,6 +109,7 @@ from apps.customer.schemas import (
     TagRow,
 )
 from base.business import business_zone
+from base.recovery import LeftOut
 
 PHONE_INVALID = _(
     "This is not a valid phone number of its country: check the digits or write it with its "
@@ -121,6 +123,9 @@ FIELD_INVALID_OPTION = _("Choose one of the options.")
 FIELD_HAS_VALUES = _(
     "This field already has values on some cards: its type cannot change."
 )
+FIELD_INACTIVE_LEFT = _('came back without its value of the field "%(field)s": deactivated in Customers')
+FIELD_OPTION_LEFT = _('came back without its value of the field "%(field)s": no longer one of its options')
+FIELD_TYPE_LEFT = _('came back without its value of the field "%(field)s": no longer of its type')
 GROUP_NAME_TAKEN = _("There is already a group with that name. Choose another name.")
 TAG_NAME_TAKEN = _("There is already a tag with that name. Choose another name.")
 FIELD_NAME_TAKEN = _("There is already a field with that name. Choose another name.")
@@ -666,7 +671,7 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.restore",
     input=CustomerRestoreIn,
-    output=CustomerDetailOut,
+    output=CustomerRecoveredOut,
     ai=INTERNAL,
 )
 def restore_customer(ctx: OperationContext, data: CustomerRestoreIn) -> dict:
@@ -676,7 +681,8 @@ def restore_customer(ctx: OperationContext, data: CustomerRestoreIn) -> dict:
 
     hub#1356: what hung from it in the separate copy it comes back from and the business deleted since (``data``, each
     by its id there) hangs from it again, as from a card made again from the copy (``_hang_from_copy``); what the
-    business still has stays as it is, the card in it or not."""
+    business still has stays as it is, the card in it or not. A value that cannot come back does not keep the card
+    deleted: the output says it came back without it, and why (``left_out``)."""
     customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
     if customer.merged_into_id is not None or customer.erased_at is not None:
         raise NotFound(CUSTOMER_UNAVAILABLE, code=CUSTOMER_UNAVAILABLE_CODE)
@@ -685,14 +691,14 @@ def restore_customer(ctx: OperationContext, data: CustomerRestoreIn) -> dict:
         customer.is_active = True
         customer.save(update_fields=["deleted_at", "is_active", "updated_at"])
     record_event(ctx, events.CUSTOMER_RESTORED, {"id": str(customer.id)})
-    _hang_from_copy(
+    left_out = _hang_from_copy(
         ctx,
         customer,
         groups=lost_since_copy(CustomerGroup, data.groups),
         tags=lost_since_copy(CustomerTag, data.tags),
         field_values=lost_since_copy(CustomField, data.field_values),
     )
-    return load_detail(customer)
+    return load_detail(customer) | {"left_out": left_out}
 
 
 # Not an assistant tool, and declared by no app, as the restore: its one door is the recovery from a separate copy
@@ -703,16 +709,17 @@ def restore_customer(ctx: OperationContext, data: CustomerRestoreIn) -> dict:
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.restore",
     input=CustomerRecoverIn,
-    output=CustomerDetailOut,
+    output=CustomerRecoveredOut,
     ai=INTERNAL,
 )
 def recover_customer(ctx: OperationContext, data: CustomerRecoverIn) -> dict:
     """hub#1285: a card of a separate copy the business no longer has, made again by ``customer.customer.create`` with
-    what hung from it there (``_hang_from_copy``), all or nothing."""
+    what hung from it there (``_hang_from_copy``), all or nothing; the output says the values it came back without,
+    and why (``left_out``)."""
     made = create_customer(ctx, CustomerIn.model_validate(data.model_dump(include=set(CustomerIn.model_fields))))
     customer = Customer.objects.get(pk=made.id)
-    _hang_from_copy(ctx, customer, groups=data.groups, tags=data.tags, field_values=data.field_values)
-    return load_detail(customer)
+    left_out = _hang_from_copy(ctx, customer, groups=data.groups, tags=data.tags, field_values=data.field_values)
+    return load_detail(customer) | {"left_out": left_out}
 
 
 def _hang_from_copy(
@@ -722,28 +729,50 @@ def _hang_from_copy(
     groups: list[GroupOfCopyIn],
     tags: list[TagOfCopyIn],
     field_values: list[FieldValueOfCopyIn],
-) -> None:
+) -> list[LeftOut]:
     """What hung from ``customer`` in a separate copy hung from it again, each by the operation its screen uses: the
     card put in its groups and tags besides those it is in (``set_groups``, ``set_tags``), each the business's own of
     that name (``queries.named``, the active one first) or, if it has none, made again as the copy had it by the Groups
     or Tags screen's create (and deactivated if it was); its values of the custom fields as the card's screen checks
-    them (CUSTOMER-F04), each field the business's own of that name or one made again by the Fields screen's create. A
-    value of a field the business deactivated does not come back (it shows on no card), nor one of a field the card
-    holds a value of already; one its field no longer takes refuses it all, with why; a required field it has no value
-    of does not, as the till makes a card without one (CUSTOMER-F01)."""
+    them (CUSTOMER-F04), each field the business's own of that name or one made again by the Fields screen's create.
+    Neither a value of a field the business deactivated (it shows on no card) nor one its field no longer takes comes
+    back: the card comes back without it, and each is returned with why. One of a field the card holds a value of
+    already does not either, and is nothing left out: the card keeps its own. A required field it has no value of
+    does not keep it out, as the till makes a card without one (CUSTOMER-F01)."""
     for relation, items in (("groups", groups), ("tags", tags)):
         if items:
             _join_named(ctx, customer, relation, items)
     held = set(customer.field_values.values_list("field_id", flat=True))
     values = []
+    left_out = []
     for value in field_values:
         field = named(CustomField, value.name) or create_field(
             ctx, FieldIn.model_validate(value.model_dump(exclude={"id", "value"}))
         )
-        if field.is_active and field.id not in held:
+        if field.id in held:
+            continue
+        why = _why_left_out(field, value.value)
+        if why is None:
             values.append(FieldValueIn(field_id=field.id, value=value.value))
+        else:
+            left_out.append(why)
     if values:
         _apply_field_values(customer, _validated_field_values(customer, values, required=False))
+    return left_out
+
+
+def _why_left_out(field: CustomField, value: str) -> LeftOut | None:
+    """Why a card's ``value`` in a separate copy does not come back to ``field``: deactivated, or no longer one of its
+    options or of its type, said by the field's name and never by the value, which is the customer's own; ``None``
+    when it comes back."""
+    if not field.is_active:
+        return LeftOut(code="customer.field_inactive", message=FIELD_INACTIVE_LEFT % {"field": field.name})
+    problem = _field_problem(field, value)
+    if problem is None:
+        return None
+    code = problem[0]
+    said = FIELD_OPTION_LEFT if code == "customer.field_invalid_option" else FIELD_TYPE_LEFT
+    return LeftOut(code=code, message=said % {"field": field.name})
 
 
 def _join_named(ctx: OperationContext, customer: Customer, relation: str, items: list) -> None:

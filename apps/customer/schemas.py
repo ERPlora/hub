@@ -24,6 +24,7 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
+from base.recovery import RecoveredOut
 from base.relay import by_platform
 from base.schemas import names, unless_given
 
@@ -991,6 +992,10 @@ class CustomerDetailOut(CustomerRow):
     consent_date: datetime | None = Field(
         description="When the latest marketing consent in force was given."
     )
+
+
+class CustomerRecoveredOut(CustomerDetailOut, RecoveredOut):
+    """A card back from a separate copy, and the values of its custom fields it came back without, each with why."""
 
 
 class CustomerStatsOut(Schema):

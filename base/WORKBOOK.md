@@ -3064,7 +3064,7 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas y los precios de tarifa; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
-a un momento» de ERPlora/aws; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; la imagen de un
+a un momento» de ERPlora/aws; la imagen de un
 servicio recuperado, hub#1429; los grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343;
 los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
@@ -3120,7 +3120,8 @@ Pasos:
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
       grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer otro, y el que ya no tiene se
-      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó no vuelve. A una ficha
+      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó, o que su campo ya no
+      admite, no vuelve, y la ficha vuelve sin él, con su nota («Clientes: se crearon 2, 1 con notas»; hub#1438). A una ficha
       eliminada que vuelve le vuelven también el grupo, la etiqueta o el campo propio que el negocio borró después, igual
       que a la ficha nueva (hub#1356); lo que el negocio aún tiene se queda como está, aunque la sacara de un grupo o le
       quitara un valor antes de eliminarla, y un valor que ya tiene en un campo que el negocio volvió a crear se queda.
@@ -3134,8 +3135,9 @@ Pasos:
       que ya volvió a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios, que no sea ya una de la
       copia; la más antigua si hay dos) no se repite: se usa la suya, tal como está. Después, un producto que el negocio
       eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas, la que
-      acaba de volver si la tenía en la copia, su imagen de la librería y en Movimientos su historial entero, activo y a
-      la venta (INVENTORY-F34).
+      acaba de volver si la tenía en la copia, su imagen de la librería (la que tenía en la copia si lo eliminó antes de
+      que eliminar se la dejara y se quedó sin ninguna) y en Movimientos su historial entero, activo y a la venta
+      (INVENTORY-F34).
       Uno que el negocio ya no tiene vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre,
       SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
       desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
@@ -3252,12 +3254,11 @@ página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su result
 el negocio («Clientes: nada (app_inactive: …)»; en una app que devuelve varias cosas, cada una lo dice: «Categorías de
 servicios: nada (app_inactive: …); Servicios: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
-operación de crear no acepta hoy (un teléfono que ya no vale, un valor de un campo propio que su campo ya no admite, un producto sin categoría fiscal o con una que Impuestos
+operación de crear no acepta hoy (un teléfono que ya no vale, un producto sin categoría fiscal o con una que Impuestos
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
 una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
 motivo, y lo demás vuelve; también una ficha eliminada que
-entretanto se unió a otra o se borró («customer.customer_unavailable: …»), o con un valor que el campo que el negocio
-volvió a crear ya no admite, que sigue eliminada («customer.field_invalid_option: …»). Si la copia ya no está,
+entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
@@ -3268,7 +3269,7 @@ INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F
 SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
 PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
-hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1459, aws#77
+hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1459, aws#77
 
 ## Para quien lo mantiene
 
@@ -4215,7 +4216,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
   `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
   `restore`, la operación que devuelve lo que el negocio guarda eliminado, hub#1306, que recibe del registro leído lo
   que declara su entrada: el `id` y, si quiere devolverle lo que el negocio le quitó después, lo demás que nombre,
-  hub#1356; las de Citas e Inventario solo declaran el `id`); `base/` no nombra ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  hub#1356; la de Inventario, además, la imagen que el producto tenía en la copia, hub#1431; las de Citas, solo el `id`); `base/` no nombra ninguna. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
   sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
   demás siguen, cualquier otro rechazo para la app. Clientes responde con `recoverable_cards_in_copy`,
   `cards_deleted_in_business` con `customer.customer.restore`, que le devuelve lo que el negocio borró después

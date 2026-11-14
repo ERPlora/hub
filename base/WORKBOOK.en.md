@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:234577fd644c4a091fce90faaae6a9b5e2e07fe09198242088fc68419605c664 -->
+<!-- generated from WORKBOOK.md sha256:37b224c63744d647bdc23039120846feb43583bffc4771be2ce1d3e45790b10e -->
 
 ## What it is for and who it is for
 
@@ -2934,9 +2934,8 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments and the price list prices; making and deleting the temporary cluster is the
-procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a product deleted before deleting left it,
-hub#1431; the image of a service brought back, hub#1429; the modifier groups and the menu options of a product that comes
-back, hub#1343; the
+procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a service brought back, hub#1429; the
+modifier groups and the menu options of a product that comes back, hub#1343; the
 price list prices of a service that comes back as a new one, hub#1459)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
@@ -2993,8 +2992,9 @@ Steps:
       linked orders (CUSTOMER-F33). One the business no longer has comes back as a new card, created as the Customers
       screen creates it, with their name, contact, tax ID, address, dates, source, stage, channel and notes, and with their
       groups, tags and own fields: the group, tag or field the business has with that name is that one, without making
-      another, and one it no longer has is made again as it was (hub#1285); a value of a field the business deactivated
-      does not come back. A deleted card that comes back also gets back the group, tag or own field the business
+      another, and one it no longer has is made again as it was (hub#1285); a value of a field the business deactivated,
+      or one its field no longer accepts, does not come back, and the card comes back without it, with its note
+      ("Customers: 2 created, 1 with notes"; hub#1438). A deleted card that comes back also gets back the group, tag or own field the business
       deleted afterwards, just like the new card (hub#1356); what the business still has stays as it is, even if it took
       the card out of a group or removed a value before deleting it, and a value it already has in a field the business
       made again stays. A card whose personal data was erased (GDPR) or one merged into another never
@@ -3006,7 +3006,8 @@ Steps:
       one it has already made again (another live one with its name, case and spaces aside, that is not already one of
       the copy's; the oldest if there are two) is not repeated: its own is used, as it is. Then a product the business
       deleted and still holds comes back THE SAME and counts as restored, with its stock, its categories that are still
-      live, the one that just came back if it had it in the copy, its image of the library and its whole history in
+      live, the one that just came back if it had it in the copy, its image of the library (the one it had in the copy
+      if it was deleted before deleting left it and it was left without any) and its whole history in
       Movements, active and on sale (INVENTORY-F34). One the business no longer has comes back as a new one, created as the Products screen creates it,
       with its name, SKU, EAN-13, description, type, price, cost, units, threshold, stock control and tax category, active
       or inactive as it was and in its categories: the same one if the business still has it, and otherwise the one that
@@ -3125,14 +3126,12 @@ is made gives anything back."), and with nothing ticked the page asks again. Wha
 its result and the rest goes on: the app is turned off in the business ("Customers: nothing (app_inactive: …)"; in an app that gives back several
 things, each says so: "Service categories: nothing (app_inactive: …); Services: nothing (app_inactive: …)"), or the
 copy did not have it, lacks the migration its read needs or has one this code does not know (`recover_not_in_copy`,
-`recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a value of an own field its field no longer
-accepts, a
+`recover_copy_behind`, `recover_copy_ahead`). What the create operation does not accept today (a phone no longer valid, a
 product without a tax category or with one Taxes no longer has active, a service whose tax category was turned off
 (`service.tax_category_unknown`), a time taken, a customer no longer there, a service the business no longer has
 nor made again) is counted "not created" with its reason,
 and the rest comes back; so is a deleted card that was merged into another or erased meanwhile
-("customer.customer_unavailable: …"), or with a value the field the business made again no longer accepts, which stays
-deleted ("customer.field_invalid_option: …"). If the copy is gone, the recovery says "Failed" and why
+("customer.customer_unavailable: …"). If the copy is gone, the recovery says "Failed" and why
 ("recover_copy_unreadable: …"). While the business is being moved or restored, the recovery waits without doing anything.
 With the platform frozen for a database upgrade, the restore waits, with the business under maintenance, until it
 is unfrozen. With records from the test environment only, the chain is recovered afterwards (VERIFACTU-F28). The
@@ -3143,4 +3142,4 @@ INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F
 SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
 PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
-hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1459, aws#77
+hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1459, aws#77
