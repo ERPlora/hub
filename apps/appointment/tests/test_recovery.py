@@ -561,6 +561,11 @@ def recoveries(django_db_blocker, hub_databases):
 
 SERVICE_CATEGORIES = APPOINTMENTS | {"app": "service", "label": "Service categories"}
 SERVICES = APPOINTMENTS | {"app": "service", "label": "Services"}
+#: What Services put back into a category it brought back: nothing, each counted apart after its services.
+SERVICE_LINKS = [
+    APPOINTMENTS | {"app": "service", "label": "Service links to categories"},
+    APPOINTMENTS | {"app": "service", "label": "Subcategory links to categories"},
+]
 
 
 def services_of(salon: Salon) -> list[list]:
@@ -595,7 +600,7 @@ class TestTheServiceMadeAgain:
         assert run() == 1
 
         assert services_of(salon) == [[again]]
-        assert fresh(asked).results == [SERVICE_CATEGORIES, SERVICES, APPOINTMENTS | {"created": 1}, SERIES]
+        assert fresh(asked).results == [SERVICE_CATEGORIES, SERVICES, *SERVICE_LINKS, APPOINTMENTS | {"created": 1}, SERIES]
 
     def test_an_appointment_whose_service_is_brought_back_in_the_same_recovery_comes_back_with_it(
         self, recoveries, every_app_on
@@ -612,6 +617,7 @@ class TestTheServiceMadeAgain:
         assert fresh(asked).results == [
             SERVICE_CATEGORIES,
             SERVICES | {"created": 1},
+            *SERVICE_LINKS,
             APPOINTMENTS | {"created": 1},
             SERIES,
         ]

@@ -48,6 +48,12 @@ msgstr "Categorías"
 msgid "Service categories"
 msgstr "Categorías de servicios"
 
+msgid "Service links to categories"
+msgstr "Enlaces de servicios a categorías"
+
+msgid "Subcategory links to categories"
+msgstr "Enlaces de subcategorías a categorías"
+
 msgid "Packages"
 msgstr "Bonos y paquetes"
 
@@ -485,6 +491,13 @@ msgstr "volvió sin la subcategoría %(category)s: se movió a otro sitio despu�
 #, python-format
 msgid "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
 msgstr "volvió sin la subcategoría %(category)s: colgaría de una de sus propias subcategorías"
+
+msgid ""
+"the category %(category)s came back in an earlier recovery: what goes in it "
+"is the business's to decide"
+msgstr ""
+"la categoría %(category)s volvió en una recuperación anterior: lo que va en "
+"ella lo decide el negocio"
 
 msgid "This voucher was voided: it can no longer be used."
 msgstr "Este bono está anulado: ya no se puede usar."

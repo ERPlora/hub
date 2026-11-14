@@ -4,6 +4,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { refusedWithTheSameWords, SAME_WORDS, SAME_WORDS_ES } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionToggle, ionValue, mountPrinting } from '../__tests__/mount-printing';
 import type { DeviceOut, PrinterOut } from '../operations';
 import DeviceModal from './DeviceModal.vue';
@@ -32,8 +33,8 @@ const COUNTER: DeviceOut = {
   this_device: true,
 };
 
-async function setup(device: DeviceOut | null = null, printers: PrinterOut[] = [TILL, KITCHEN]) {
-  const m = await mountPrinting(DeviceModal, { props: { open: true, device, printers } });
+async function setup(device: DeviceOut | null = null, printers: PrinterOut[] = [TILL, KITCHEN], locale: 'en' | 'es' = 'en') {
+  const m = await mountPrinting(DeviceModal, { props: { open: true, device, printers }, locale });
   const field = (name: string) => m.inDoc(`printing-device-${name}`);
   const submit = () => click(m.inDoc('printing-device-submit'));
   return { ...m, field, submit };
@@ -104,6 +105,65 @@ describe('DeviceModal', () => {
     await s.submit();
     expect(s.find('printing-device-printers-error').text()).toBe('Choose active printers of this business.');
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+});
+
+describe('DeviceModal: a refused field, corrected, loses its mark without saving again (hub#1470)', () => {
+  /** The window with a name and the till ticked, its «Save» refused for the name and the printers with the same words. */
+  async function refused(locale: 'en' | 'es' = 'en') {
+    const s = await setup(null, [TILL, KITCHEN], locale);
+    await ionValue(s.field('name'), 'Counter till', 'ionInput');
+    await ionToggle(s.field('printer-p1'), true);
+    s.answer(422, refusedWithTheSameWords(['name', 'printers'], locale === 'es' ? SAME_WORDS_ES : SAME_WORDS));
+    await s.submit();
+    return s;
+  }
+
+  const nameMarks = (s: Awaited<ReturnType<typeof setup>>) => ['ion-invalid', 'ion-touched'].map((mark) => !!s.field('name')?.classList.contains(mark));
+  const printersNotice = (s: Awaited<ReturnType<typeof setup>>) => s.inDoc('printing-device-printers-error')?.textContent?.trim() ?? '';
+
+  it('both refused are said: the name marked as Ionic shows a refusal, the printers under their list', async () => {
+    const s = await refused();
+    expect(prop(s.field('name'), 'errorText')).toBe(SAME_WORDS);
+    expect(nameMarks(s)).toEqual([true, true]);
+    expect(printersNotice(s)).toBe(SAME_WORDS);
+  });
+
+  it('the name typed again alone loses its mark; the printers keep their notice', async () => {
+    const s = await refused();
+    s.field('name')?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(s.field('name'), 'Counter till 2', 'ionInput');
+    expect(prop(s.field('name'), 'errorText') ?? '').toBe('');
+    expect(nameMarks(s)).toEqual([false, false]);
+    expect(printersNotice(s)).toBe(SAME_WORDS);
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('a printer ticked alone takes the printers’ notice away; the name keeps its mark', async () => {
+    const s = await refused();
+    await ionToggle(s.field('printer-p2'), true);
+    expect(s.inDoc('printing-device-printers-error')).toBeNull();
+    expect(prop(s.field('name'), 'errorText')).toBe(SAME_WORDS);
+    expect(nameMarks(s)).toEqual([true, true]);
+  });
+
+  it('in Spanish too: a printer ticked takes «Revisa este campo.» away from the printers alone', async () => {
+    const s = await refused('es');
+    expect(s.inDoc('printing-device-cancel')?.textContent?.trim()).toBe('Cancelar');
+    await ionToggle(s.field('printer-p2'), true);
+    expect(s.inDoc('printing-device-printers-error')).toBeNull();
+    expect(prop(s.field('name'), 'errorText')).toBe(SAME_WORDS_ES);
+  });
+
+  it('an empty name: typing one takes «Type its name.» and its mark away', async () => {
+    const s = await setup();
+    await s.submit();
+    expect(prop(s.field('name'), 'errorText')).toBe('Type its name.');
+    await ionValue(s.field('name'), 'Counter till', 'ionInput');
+    expect(prop(s.field('name'), 'errorText') ?? '').toBe('');
+    expect(nameMarks(s)).toEqual([false, false]);
+    expect(s.find('printing-device-printers-error').text()).toBe('Choose the printers this device reaches.');
+    expect(s.sent()).toEqual([]);
   });
 });
 

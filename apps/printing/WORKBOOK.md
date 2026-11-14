@@ -301,7 +301,8 @@ Si falla: el campo marcado con el motivo: «Ya hay una impresora con ese nombre.
 nombre de red válidos (por ejemplo 192.168.1.100).», «El puerto va de 1 a 65535.», «Escribe la MAC
 como AA:BB:CC:DD:EE:FF.», «Escribe el nombre de la cola de impresión tal como lo da el sistema (sin
 espacios, barras ni #).», «La impresora del sistema imprime páginas A4: dale la función Recibo.». Sin
-nombre, «Ponle un nombre a la impresora.».
+nombre, «Ponle un nombre a la impresora.». Cada aviso sale debajo de su campo y se quita en cuanto se cambia ese
+campo, sin volver a pulsar «Guardar»; el de otro campo se queda hasta que se cambia el suyo (hub#1470).
 Implicados: PRINTING-F04, PRINTING-F05
 
 ### PRINTING-F04 Asignar qué sale por cada impresora
@@ -624,8 +625,9 @@ trabajos de una impresora que el dispositivo no tiene se rechaza («Este disposi
 Confirmar dos veces es una confirmación. Una confirmación tardía del mismo dispositivo (una impresora lenta con
 copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el papel salió y no se imprime otra
 vez. Una confirmación o un fallo de otro dispositivo, o de una entrega que no es la suya, se rechaza y no cambia
-nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y solo se da de alta desde el propio
-dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
+nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y el aviso se quita en cuanto se cambia
+ese campo (se escribe el nombre, se marca una impresora), sin volver a pulsar «Guardar»; el del otro se queda hasta
+que se cambia el suyo (hub#1470). Solo se da de alta desde el propio dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
 cualquiera se haría pasar por la caja.
 Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14
 

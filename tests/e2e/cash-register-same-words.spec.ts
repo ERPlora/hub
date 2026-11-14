@@ -3,13 +3,12 @@
 // drawer has) and in «Open session» (the float this business requires), both refused by the server, and in a shift's
 // «Movement», refused in the browser for three fields with the same words, at 390, 834 and 1440, and once more in
 // Spanish, whose session the fleet's visual sweep reads. Nothing is created.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { dialog } from './inventory-helpers';
-import { stamp, VIEWPORTS } from './sale-helpers';
-import { expectMarked, expectUnmarked, refuseWithTheSameWords } from './same-words-helpers';
-import { ownerPage } from './service-helpers';
+import { stamp } from './sale-helpers';
+import { expectMarked, expectUnmarked, refuseWithTheSameWords, testEachSameWordsCase } from './same-words-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const DRAWER = `E2E1470 Bar ${stamp()}`;
@@ -57,14 +56,6 @@ test.afterAll(async ({ browser }) => {
   }
   psql(`delete from cash_register_register where name like '${DRAWER}%'`);
 });
-
-/** The owner on `path` at `size`, in English or in Spanish (whose session the visual sweep reads). */
-async function ownerAt(browser: Browser, path: string, size: { width: number; height: number }, language: Language) {
-  if (language === 'en') return ownerPage(browser, path, size);
-  const signed = await signedInSpanish(browser, size, path);
-  await saveSessionForTheSweep(signed.context);
-  return signed;
-}
 
 /** `field` (an Ionic field's host) typed again: what it held and `more`. */
 async function typeMore(field: Locator, more: string): Promise<void> {
@@ -146,32 +137,17 @@ async function movementOneByOne(page: Page, language: Language, label: string): 
   expect(psql(`select count(*) from cash_register_movement where session_id = '${session}'`)).toBe('0');
 }
 
-const CASES: { language: Language; size: { label: string; width: number; height: number } }[] = [
-  ...VIEWPORTS.map((size) => ({ language: 'en' as const, size })),
-  { language: 'es', size: { label: 'es-1440', width: 1440, height: 900 } },
-];
+testEachSameWordsCase(
+  ({ size }) => `hub#1470 CASH_REGISTER-F02 at ${size.label}: a drawer name another drawer has loses its mark once typed again`,
+  '/cash_register/settings',
+  (page, { language, size }) => drawerNameTaken(page, language, size.label),
+);
 
-for (const { language, size } of CASES) {
-  test(`hub#1470 CASH_REGISTER-F02 at ${size.label}: a drawer name another drawer has loses its mark once typed again`, async ({ browser }) => {
-    const { context, page } = await ownerAt(browser, '/cash_register/settings', size, language);
-    try {
-      await drawerNameTaken(page, language, size.label);
-    } finally {
-      await context.close();
-    }
-  });
-}
-
-for (const { language, size } of CASES) {
-  test(`hub#1470 CASH_REGISTER-F03 at ${size.label}: the float the business requires loses its mark once typed`, async ({ browser }) => {
-    const { context, page } = await ownerAt(browser, '/cash_register/sessions', size, language);
-    try {
-      await floatRequired(page, language, size.label);
-    } finally {
-      await context.close();
-    }
-  });
-}
+testEachSameWordsCase(
+  ({ size }) => `hub#1470 CASH_REGISTER-F03 at ${size.label}: the float the business requires loses its mark once typed`,
+  '/cash_register/sessions',
+  (page, { language, size }) => floatRequired(page, language, size.label),
+);
 
 test.describe('with a shift open', () => {
   test.beforeAll(async ({ browser }) => {
@@ -183,14 +159,9 @@ test.describe('with a shift open', () => {
     await context.close();
   });
 
-  for (const { language, size } of CASES) {
-    test(`hub#1470 CASH_REGISTER-F05 at ${size.label}: three fields refused with the same words, each corrected loses only its own`, async ({ browser }) => {
-      const { context, page } = await ownerAt(browser, '/cash_register/sessions', size, language);
-      try {
-        await movementOneByOne(page, language, size.label);
-      } finally {
-        await context.close();
-      }
-    });
-  }
+  testEachSameWordsCase(
+    ({ size }) => `hub#1470 CASH_REGISTER-F05 at ${size.label}: three fields refused with the same words, each corrected loses only its own`,
+    '/cash_register/sessions',
+    (page, { language, size }) => movementOneByOne(page, language, size.label),
+  );
 });

@@ -793,6 +793,23 @@ class CategoryRecoveredOut(CategoryOut, RecoveredOut):
     """A category made again from a separate copy, and what of what it had inside it there it came back without."""
 
 
+class ServiceLinkIn(In):
+    """A service the business kept, and the category a recovery brought back for the one it was in."""
+
+    service_id: UUID = Field(description="The service, the same in the copy and in the business.")
+    category_id: UUID = Field(description="The category brought back.")
+
+
+class SubcategoryLinkIn(In):
+    """A subcategory the business kept, and the category a recovery brought back for the one it hung from."""
+
+    category_id: UUID = Field(description="The subcategory, the same in the copy and in the business.")
+    parent_id: UUID = Field(description="The category brought back.")
+    stands_for: UUID = Field(
+        description="The category of the copy it hung from, which the business may still hold deleted."
+    )
+
+
 class AssignmentOut(Schema):
     id: UUID
     service_id: UUID

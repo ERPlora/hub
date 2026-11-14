@@ -2,7 +2,7 @@
 // shows. FormModal takes the mark away from the refused field a person corrects, told by its `name`; the specs refuse
 // in the browser (`page.route`), so nothing is created, and read the mark as Ionic paints it (`ion-invalid` and the
 // words under the field). Shared by form-modal-picker-same-words.spec.ts and by the specs of each app's windows, which
-// declare their tests with `testTheMarksGoOneByOne`.
+// declare their tests with `testTheMarksGoOneByOne`, or walk a window of their own with `testEachSameWordsCase`.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
@@ -108,6 +108,34 @@ export function testTheMarksGoOneByOne(windows: readonly SameWordsWindow[]): voi
         await saveSessionForTheSweep(context);
         await correctOneByOne(page, window, 'Revisa este campo.', 'es-1440');
         await expect(page.locator(`ion-modal[data-testid=${window.testid}] [data-testid=${window.testid}-cancel]`)).toHaveText('Cancelar');
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
+/** A window's test in its own shape: the language it runs in, and its size. */
+export interface SameWordsCase {
+  language: 'en' | 'es';
+  size: { label: string; width: number; height: number };
+}
+
+/** 390, 834 and 1440 in English, and 1440 once more in Spanish, whose session the fleet's visual sweep reads. */
+const SAME_WORDS_CASES: readonly SameWordsCase[] = [
+  ...VIEWPORTS.map((size) => ({ language: 'en' as const, size })),
+  { language: 'es', size: { label: 'es-1440', width: 1440, height: 900 } },
+];
+
+/** One test per case of `SAME_WORDS_CASES`, titled by `title`: the owner on `path`, at its size and in its language,
+ *  goes through `body`, and its context closes. */
+export function testEachSameWordsCase(title: (c: SameWordsCase) => string, path: string, body: (page: Page, c: SameWordsCase) => Promise<void>): void {
+  for (const c of SAME_WORDS_CASES) {
+    test(title(c), async ({ browser }) => {
+      const { context, page } = c.language === 'en' ? await ownerPage(browser, path, c.size) : await signedInSpanish(browser, c.size, path);
+      try {
+        if (c.language === 'es') await saveSessionForTheSweep(context);
+        await body(page, c);
       } finally {
         await context.close();
       }
