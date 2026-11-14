@@ -16,6 +16,7 @@ from live.assistant import asks_of
 from live.operations import registry
 
 from base import assistant
+from base.tests.test_assistant_asks import offered_to
 
 from .conftest import ctx_for
 
@@ -101,7 +102,7 @@ QA_PROBES = [
 def offered(role: str, language: str, name: str, phrase: str) -> list[str]:
     tools = assistant.catalog(ctx_for(role, language=language))
     assert name in tools  # positive control: the role holds the tool, so its place is known
-    return [op.name for op in assistant.relevant(tools, [phrase], language)]
+    return offered_to(tools, phrase, language)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
