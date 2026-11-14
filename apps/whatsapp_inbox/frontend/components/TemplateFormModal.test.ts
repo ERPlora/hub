@@ -154,6 +154,48 @@ describe('TemplateFormModal: a new template (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('button-add').disabled).toBe(false);
   });
 
+  // The buttons are refused as a whole (too many links, quick replies apart) on a line of their own above them: any
+  // change to the buttons takes that line away at once, and only it (hub#1448).
+  describe('a refusal of the buttons as a whole goes with any change to them, before sending again', () => {
+    const KINDS = 'At most 2 link buttons and 1 call button.';
+    const NAME = 'There is already a template with this name in that language.';
+
+    async function refusedButtons(fields: Record<string, string> = { buttons: KINDS }) {
+      const s = await setup();
+      await s.type('name', 'promo_otono');
+      await s.type('body', '¡Oferta de otoño!');
+      for (const n of [0, 1, 2]) {
+        await click(s.field('button-add'));
+        await s.choose(`button-${n}-type`, 'URL');
+        await s.type(`button-${n}-text`, `Ver ${n}`);
+        await s.type(`button-${n}-url`, `https://peluqueria.test/${n}`);
+      }
+      s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+      await click(s.submit());
+      await flush();
+      const said = () => s.field('button-add').closest('section')?.textContent ?? '';
+      return { ...s, said };
+    }
+
+    it.each([
+      ['another type', (s: Awaited<ReturnType<typeof refusedButtons>>) => s.choose('button-2-type', 'QUICK_REPLY')],
+      ['removing one', (s: Awaited<ReturnType<typeof refusedButtons>>) => click(s.field('button-2-remove'))],
+      ['typing a button’s text', (s: Awaited<ReturnType<typeof refusedButtons>>) => s.type('button-0-text', 'Ver más')],
+    ])('%s', async (_, change) => {
+      const s = await refusedButtons();
+      expect(s.said()).toContain(KINDS);
+      await change(s);
+      expect(s.said()).not.toContain(KINDS);
+      expect(s.sent()).toHaveLength(1);
+    });
+
+    it('another field’s refusal stays under it', async () => {
+      const s = await refusedButtons({ name: NAME, buttons: KINDS });
+      await click(s.field('button-2-remove'));
+      expect([s.field('name').errorText, s.said().includes(KINDS)]).toEqual([NAME, false]);
+    });
+  });
+
   it('a refusal stays in the dialog: a field under it, the rest on top; what was typed stays', async () => {
     const s = await setup();
     await s.type('name', 'recordatorio');
@@ -365,6 +407,27 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     await flush();
     await settle();
     expect(s.field('header-file-error').textContent).toContain(message);
+  });
+
+  // The window takes the file's refusal away itself once another file is kept; no field of the form is typed in
+  // (hub#1448).
+  it('a refusal of the template’s file goes once another file is kept, before sending again', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'IMAGE');
+    await s.type('name', 'promo_otono');
+    await s.type('body', 'Hola');
+    s.answer(201, SAMPLE);
+    await pick(s, photo());
+    const message = 'Meta did not take this photo: choose another.';
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { header_sample: message } } });
+    await click(s.submit());
+    await flush();
+    await settle();
+    expect(s.field('header-file-error').textContent).toContain(message);
+    s.answer(201, { ...SAMPLE, id: 's2' });
+    await pick(s, photo());
+    expect(s.field('header-file-error')).toBeNull();
+    expect(s.sent().filter((call) => call.path === '/api/whatsapp_inbox/templates')).toHaveLength(1);
   });
 
   it('the photo just kept shows its thumbnail next to its name', async () => {

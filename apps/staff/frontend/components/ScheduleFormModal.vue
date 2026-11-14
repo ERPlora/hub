@@ -11,6 +11,7 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
@@ -73,8 +74,12 @@ watch(
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
+/** A week without working days is refused on top of the week: a change to the week takes it away. */
+const weekChanged = useGroupChange('weekGroup');
+
 function setDay(weekday: number, change: Partial<WeekRow>): void {
   form.value = { ...form.value, week: form.value.week.map((day) => (day.weekday === weekday ? { ...day, ...change } : day)) };
+  weekChanged();
 }
 
 async function save(): Promise<void> {
@@ -172,7 +177,11 @@ const HOURS = [
         >
           {{ $t('staff.schedules.form.isDefault') }}
         </ion-checkbox>
-        <fieldset class="staff-week">
+        <fieldset
+          ref="weekGroup"
+          name="days"
+          class="staff-week"
+        >
           <legend class="staff-week__legend">
             {{ $t('staff.schedules.form.week') }}
           </legend>
