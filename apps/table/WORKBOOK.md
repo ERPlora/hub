@@ -972,7 +972,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   sentar no dicen reserva: gastan todas. Una reserva sentada más de una hora antes de su hora no gasta
   nada (su retención aún no pinta la mesa): Reservas la suelta tras sentarla, con `table.hold.release`
   en la misma operación (`apps/reservation/services.py`, el `seat` de RESERVATION-F11).
-- **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega a `events.REACTIONS`
+- **Relay del outbox** (`base/relay.py`, en el worker): entrega a `events.REACTIONS`
   lo de Ventas (`sale.order.completed`/`voided` → `table.session.close_by_order`) y lo de Clientes
   (`customer.customer.erased` → `table.hold.forget_customer`, que anota `table.table.held` por retención
   para repintar el plano). Además, las lecturas tratan como cerrada una cuenta de mesa abierta **o

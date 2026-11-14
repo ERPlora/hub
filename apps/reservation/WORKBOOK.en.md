@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a40b8053aa080f073a48cd6c7376d00a1e5c39a881dcb385316e6fc8ed097693 -->
+<!-- generated from WORKBOOK.md sha256:8385341398e44c45b13a72a246e1027b74800e488556576ab0dabf2838b8ec9e -->
 
 ## What it is for and who it is for
 
@@ -50,8 +50,8 @@ sources, is in "Market research", at the end of this manual.
   were added; when there is room it becomes a reservation in one tap. The market separates the door queue
   (with an estimated wait and SMS) from the list for full days; without messaging, here it is one list for
   both things (see "What is left out").
-- **The phone is required out of the box on the reservation** (question 7), and always the same (the
-  current product did not ask for it until any setting was saved); the email, not. The waitlist asks for
+- **The phone is required out of the box on the reservation** (question 7), and always the same; the
+  email, not. The waitlist asks for
   nothing but the name: the phone only serves to call.
 - **The booking rules are for the customer who books by themselves** (question 8): minimum and maximum
   guests, minimum notice, maximum days and the full slot bind the reservations made online or through

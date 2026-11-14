@@ -1240,8 +1240,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - **Cada entrega corre en un hilo propio del proceso** (`base.outbound`: 4 a la vez, hasta 1000 en cola),
   en el contexto de BD de la operación que la pidió (su `use_hub`), nunca en
   el bucle que hizo el COMMIT: ni la petición, ni el relay del outbox de todos los hubs, ni las tareas
-  programadas del worker esperan a erplora.com (hasta 20 s por llamada) (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY,
-  `tests/test_outbound.py`). Un trabajo que se pierde (cola llena, el worker que se para en un despliegue)
+  programadas del worker esperan a erplora.com (hasta 20 s por llamada) (`tests/test_outbound.py`). Un trabajo que se pierde (cola llena, el worker que se para en un despliegue)
   lo recupera el barrido, que lo entrega con la misma clave. La tarea del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
   `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. El
@@ -1305,7 +1304,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   (`header_sample`) por el nombre con que se eligió, con la lectura `template_sample.detail` (marca `refers`
   de `A_SAMPLE` en `schemas.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
   automatización sin persona delante, lo deja fuera, nunca por su id
-  (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED; `tests/test_integration_assistant.py`).
+  (`tests/test_integration_assistant.py`).
 - **La misma tarjeta nombra el registro que toca cada escritura** (hub#571) con las marcas `refers` de
   `schemas.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
   `ConversationRefIn` y de `SendIn`) por su `display_name` con `conversation.detail`; la ficha que se une
@@ -1390,7 +1389,8 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
 
 **Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema). Están
 montadas en `base/internal.py`, probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP firmado con la
-bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama, probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
+bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama, probado de punta a punta con su
+número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
 
 1. `POST /internal/whatsapp/inbound` → `whatsapp_inbox.message.receive`. Un mensaje del cliente o el eco
    de lo que el dueño escribió en el móvil, en vivo o del historial:
@@ -1605,11 +1605,11 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   «esperando respuesta» (`AWAITING_REPLY` de `queries.py`: abierta y con el último mensaje del cliente o
   `needs_attention`); se refresca con `AWAITING_REPLY_EVENTS` de `events.py`, que incluye
   `conversation.flagged`.
-- Los avisos del dispositivo (`notices` de `apps.py`, hub#2303) leen `whatsapp_inbox.conversation.notices`: una
+- Los avisos del dispositivo (`notices` de `apps.py`) leen `whatsapp_inbox.conversation.notices`: una
   fila por conversación esperando respuesta con `at` = el último mensaje del cliente (`last_inbound_at`), así que
   el dispositivo, que cuenta cada par (`id`, `at`) una vez, avisa de nuevo cuando el cliente vuelve a escribir.
   Con ellos, quien puede leer la bandeja figura en `sources` de `base.notice.list` y la app instalada le pide
-  permiso para avisar aunque el negocio solo use WhatsApp (hub#2306).
+  permiso para avisar aunque el negocio solo use WhatsApp.
 - Las fotos y las notas de voz del hilo (F06) se cargan de erplora.com: la CSP del Hub permite su origen en
   `img-src` y `media-src` (`config/settings.py`, hub#147), y erplora.com las sirve a quien tiene su sesión
   (`<slug>.erplora.com` y `erplora.com` son un mismo sitio, así que la cookie viaja).

@@ -538,7 +538,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 
 - **Iconos propios** (`ion:bag-check-outline` y `ion:checkmark-done-outline`) y las
   **piezas compartidas** que la app lleva copiadas (tabla de servidor viva, lector de importes): pedidos
-  en `UI-REQUESTS.md`, sin llegar a `@erplora/ui` al cerrar la app.
+  en `UI-REQUESTS.md`, sin llegar a `@erplora/ui`.
 
 ## Lo que NO hace, a propósito
 

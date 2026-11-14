@@ -56,8 +56,8 @@ dudas se resolvieron así; la investigación, con sus fuentes, está en
   apuntó; cuando hay sitio se convierte en reserva con un toque. El mercado separa la cola de la puerta
   (con espera estimada y SMS) de la lista para días llenos; sin mensajería, aquí es una lista para las
   dos cosas (ver «Lo que queda fuera»).
-- **El teléfono es obligatorio de fábrica en la reserva** (duda 7), y siempre el mismo (el producto
-  actual no lo pedía hasta que se guardaba cualquier ajuste); el correo, no. La lista de espera no pide
+- **El teléfono es obligatorio de fábrica en la reserva** (duda 7), y siempre el mismo; el correo,
+  no. La lista de espera no pide
   nada más que el nombre: el teléfono solo sirve para llamar.
 - **Las reglas de reserva son del cliente que reserva solo** (duda 8): comensales mínimos y máximos,
   antelación mínima, días máximos y la franja llena atan a las reservas por internet o por WhatsApp. El

@@ -656,11 +656,10 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `base.operations.business_currency(ctx.scope)` (BASE-F50), que lee `base.business.get` como la plataforma
   (el registro de este hub, nunca una llamada a erplora.com) y en el hub propio de ERPlora, sin negocio en
   erplora.com, contesta la del país de su emisor (`PLATFORM_ISSUER_COUNTRY`). Tarifas no guarda copia propia
-  de esa pregunta (FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY). Una tarifa
+  de esa pregunta. Una tarifa
   sin divisa se guarda en la del negocio; el `default="EUR"` de la columna se queda (una columna no sabe el
   negocio) y nada guardado se reescribe. La pantalla la lee con `useBusinessMoney` de `base` (los decimales
-  del servidor, nunca los de `Intl`; mientras no contesta, un importe es «—» y no se puede «Hacer general»)
-  (FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY).
+  del servidor, nunca los de `Intl`; mientras no contesta, un importe es «—» y no se puede «Hacer general»).
 - El «hoy» es el del reloj del negocio (`base.business.business_zone`, hub#771), también el día de un `when`;
   `pricing.price.resolve` toma `when` y los tests nunca leen el reloj real.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones: `high` en

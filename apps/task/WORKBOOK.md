@@ -508,7 +508,7 @@ cliente o a un compañero).
   nunca en círculo. Si la persona ya se borró, la escritura responde «no existe» en su campo, nunca 500.
 - Las listas ordenan por su columna con los vacíos al final y desempatan por `id` en la misma dirección
   (`base.ordering.list_order_for`, como Ventas, Caja e Inventario): la fila tocada no salta
-  y las páginas no repiten ni pierden filas (hub#2352).
+  y las páginas no repiten ni pierden filas.
 - El «hoy» es `business_today` (`base.business.business_zone`, hub#779); las páginas calculan «vencida» y «vence hoy»
   en esa misma zona (`useBusinessZone`), para que la pantalla y el filtro «Vencidas» no se contradigan.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al

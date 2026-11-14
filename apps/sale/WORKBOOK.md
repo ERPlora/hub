@@ -1747,8 +1747,8 @@ es una línea.
   (`PreviewOut`) lo dice a su lado, `limits_currency`, y marca los dos como dinero en esa moneda
   (`IN_LIMITS_CURRENCY`: `money` y `currency_in`), para que quien los lea (Automatizaciones, FLOW-F11) no los tome por
   la moneda del negocio (hub#926).
-- **Moneda** (FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja, Facturas e Inventario en hub#273): la del
-  negocio la da `base.business.get` desde el registro de este hub (la de su país, APP-BASE-6), nunca preguntando a
+- **Moneda** (como Caja, Facturas e Inventario, hub#273): la del
+  negocio la da `base.business.get` desde el registro de este hub (la de su país), nunca preguntando a
   erplora.com, y Ventas la pregunta a `base` como Inventario, Facturas y Tarifas:
   `base.operations.business_currency(ctx.scope)` (BASE-F50), que la lee como la plataforma (una API key solo trae
   los permisos de lo que cobra) y en el hub propio de ERPlora (sin negocio registrado en erplora.com) contesta la
@@ -1820,7 +1820,7 @@ es una línea.
   `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y
   `tests/e2e/sale-speak-microphone.spec.ts` (el micrófono denegado: Chrome lo bloquea con una opción de
   lanzamiento, así que va en un fichero propio).
-- **El atrás del sistema** (FIX-HUB-SALE-POS-MORE-MENU-ANDROID-BACK-GOES-HOME; BASE-F05, hub#302): las hojas de Ionic
+- **El atrás del sistema** (BASE-F05, hub#302): las hojas de Ionic
   (`ion-modal`, como `PosSheet`) las cierra la shell; las capas propias del TPV, que la shell no ve —el menú ⋮
   (`ScreenMenu.vue`), «Cuentas abiertas» (`OpenChecksPopover`, abierto desde `PosCart.vue`) y el cajón de la cuenta
   del móvil (`PosPage.vue`, solo con la disposición del móvil: en columna no es una capa)— contestan al contrato

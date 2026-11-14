@@ -752,8 +752,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   (`RefundPayment` de las devoluciones desde la apertura). Al cerrar, esas líneas se copian en
   `Movement` (con su clave de origen, única por tipo: un pago de venta se copia una vez como venta y
   una como anulación; un pago de devolución, una vez) y la sesión cerrada solo lee sus copias: un
-  turno cerrado nunca cambia. Así no depende del relay del outbox (que el worker reparte desde el
-  2026-10-21, `base/relay.py`: Caja no declara `REACTIONS`) y no pierde nada si un aviso no llega.
+  turno cerrado nunca cambia. Así no depende del relay del outbox (que reparte el worker,
+  `base/relay.py`: Caja no declara `REACTIONS`) y no pierde nada si un aviso no llega.
   Si una línea ya está copiada se mira por su origen (`sale_payment_id`,
   `refund_payment_id`, `sale_id`: los índices únicos parciales de `Movement`). Lo que no cayó en ninguna
   sesión (`queries.unassigned_window`: con la caja cerrada, lo de después del corte de una sesión

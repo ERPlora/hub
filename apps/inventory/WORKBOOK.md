@@ -1406,7 +1406,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
   agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
   el resto, inactivos o agotados) y `list_for_sale`; la cifra de cada categoría cuenta los activos,
-  agotados incluidos (lo que enseña el TPV, FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS); `include_sold_out=true`
+  agotados incluidos (lo que enseña el TPV); `include_sold_out=true`
   hace que `is_active` sea solo el interruptor (la rejilla, el buscador y el «Todos» del TPV, que enseñan
   lo agotado en gris (SALE-F07), y los selectores de Menús, que configuran y no venden); `status=sold_out` filtra la marca y la fila lleva `is_sold_out`. Menús lee
   `Product.is_sold_out` directamente (`requires`): estado `product_sold_out` y 409 `combo.option_sold_out`. `inventory.product.set_sold_out`
