@@ -14,8 +14,9 @@
 // it, with her own minutes and price, never to the one Staff terminated since, whom Recoveries names with why; the
 // deleted product's price in a price list comes back too, put again by Price Lists' add, the modifier group it asked
 // for, linked again by Modifiers' attach, as the modifier group its category asked for is to the category brought back
-// (that group, which the business deleted with its option, made again first by Modifiers with its option), and its
-// choice in a menu, offered again by Menus' create with its supplement.
+// (that group, which the business deleted with its option, made again first by Modifiers with its option), and the
+// menu it was offered in, which the business withdrew with its course: made again by Menus with that course and its
+// choice of the product, with its supplement.
 // At each size: two cards in a group, the second with a tag and a custom field's value, two products in their own
 // category asking for a modifier group of its own, the first priced in a price list of its own, asking for a modifier
 // group of its own and offered as a main in a menu of its own, a service in its own category with a subcategory,
@@ -23,7 +24,7 @@
 // made; in Hubs, «Restore to a separate copy…»
 // asks a copy of `a` from a temporary cluster (the stack's own server) and the worker's pass makes it; the first card,
 // the first product (its price, its group and its choice taken away, as the relay hands its deletion to Price Lists,
-// Modifiers and Menus),
+// Modifiers and Menus, and then the menu withdrawn with its course),
 // the products' category (its group taken away too, and then that group deleted with its option), the
 // service's category and the appointment are deleted in `a`, the second professional is terminated, the second
 // card, the tag and the service are gone from it; then Separate copies › tick the copy › «Recover into the business…» ›
@@ -32,12 +33,14 @@
 // categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
 // «Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes; Service links to categories:
 // 1 created; Subcategory links to categories: 1 created» (the kept service and subcategory) and «Appointments: 1
-// restored; Repeating appointments: 0 created» (its series did not change), «Price list prices: 1 created», «Menu
-// choices of products: 1 created» and «Modifier groups: 1 created; Modifier groups of categories: 1 created; Modifier
-// groups of products: 1 created», and its page notes that the service category came back without the service moved
+// restored; Repeating appointments: 0 created» (its series did not change), «Price list prices: 1 created», «Menus:
+// 1 created; Menu courses: 1 created; Menu choices of products: 1 created» and «Modifier groups: 1 created; Modifier
+// groups of categories: 1 created; Modifier groups of products: 1 created», and its page notes that the service
+// category came back without the service moved
 // since and the service without the terminated professional, and why; and `a` has the same card live
 // again in its group, the second one again in that group with its tag and its value, the same product live again in
-// its category back under a new id with its price in its price list, asking for its group and offered in its menu, the
+// its category back under a new id with its price in its price list, asking for its group and offered in its menu,
+// made again with its course under new ids, the
 // category asking for its own group, made again with its option, the kept product in it
 // again, the same appointment (its number, its history
 // ending in «restored») live again, and the service category and the service live again under new ids, the service in
@@ -281,6 +284,8 @@ for (const { label, viewport } of SIZES) {
     inA('pricing.catalog.forget_product', { id: product });
     inA('modifier.link.drop_product', { id: product });
     inA('combo.option.drop_product', { id: product });
+    // And the menu it was offered in, withdrawn with its course.
+    inA('combo.combo.delete', { id: menu });
     inA('inventory.category.delete', { id: shelf });
     inA('modifier.link.drop_category', { id: shelf });
     // And the group the category asked for, deleted by Modifiers with its option.
@@ -297,6 +302,7 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select count(*) from modifier_modifierlink where category_id = '${shelf}'`)).toBe('0');
     expect(psql(`select count(*) from modifier_modifieroption where group_id = '${extras}'`)).toBe('0');
     expect(psql(`select count(*) from combo_choiceoption where product_id = '${product}'`)).toBe('0');
+    expect(psql(`select count(*) from combo_choicegroup where combo_id = '${menu}'`)).toBe('0');
     expect(psql(`select count(*) from inventory_productcategory where product_id = '${kept}'`)).toBe('0');
     // The second card gone from the business altogether, with what hung from it (a lost database, or the Hub admin's
     // «Delete»), and the tag deleted by Customers' own operation.
@@ -357,7 +363,7 @@ for (const { label, viewport } of SIZES) {
     );
     await expect(recovered).toContainText('Appointments: 1 restored; Repeating appointments: 0 created');
     await expect(recovered).toContainText('Price list prices: 1 created');
-    await expect(recovered).toContainText('Menu choices of products: 1 created');
+    await expect(recovered).toContainText('Menus: 1 created; Menu courses: 1 created; Menu choices of products: 1 created');
     await expect(recovered).toContainText(
       'Modifier groups: 1 created; Modifier groups of categories: 1 created; Modifier groups of products: 1 created',
     );
@@ -391,8 +397,13 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select price from pricing_priceitem where product_id = '${product}' and price_list_id = '${priceList}'`)).toBe('900');
     // And asking for its modifier group again, linked by Modifiers' attach after Inventory brought the product back.
     expect(psql(`select group_id from modifier_modifierlink where product_id = '${product}'`)).toBe(sauces);
-    // And offered again as a main of its menu, with its supplement, by Menus' create after Inventory brought it back.
-    expect(psql(`select group_id || '|' || price_delta from combo_choiceoption where product_id = '${product}'`)).toBe(`${mains}|150`);
+    // And offered again as a main of its menu, with its supplement, by Menus' create after Inventory brought it back:
+    // in the course Menus made again for the copy's, in the menu it made again for the one the business withdrew.
+    const offeredAgain =
+      "select g.name || '|' || o.price_delta || '|' || g.stands_for || '|' || c.stands_for from combo_choiceoption o " +
+      'join combo_choicegroup g on g.id = o.group_id join combo_combo c on c.id = g.combo_id ' +
+      `where o.product_id = '${product}'`;
+    expect(psql(offeredAgain)).toBe(`Mains|150|${mains}|${menu}`);
     // In its category, back before it: a new one, made by Categories' create, with its colour; the deleted one stays
     // deleted.
     const shelfBack = psql(`select id from inventory_category where name = '${name}' and not is_deleted`);

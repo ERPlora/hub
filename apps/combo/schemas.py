@@ -28,6 +28,7 @@ from pydantic import (
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
 from base.images import MAX_UPLOAD_BASE64
+from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names, unless_given
 
 T = TypeVar("T")
@@ -359,6 +360,13 @@ class ComboIn(In):
     )
 
 
+class ComboRecoverIn(ComboIn, ImageInCopyIn):
+    """A menu of a separate copy the business no longer has: what ``combo.combo.create`` takes and the image it showed
+    there."""
+
+    stands_for: UUID = Field(description="The menu of the copy it is made again for, by its id there.")
+
+
 class ComboPatchIn(ComboRefIn):
     """Only the fields sent change."""
 
@@ -398,6 +406,12 @@ class GroupIn(_ComboOfIn):
     def _menu_named(self):
         _named(self.combo_id, self.combo, SAY_WHICH_MENU)
         return self
+
+
+class GroupRecoverIn(GroupIn):
+    """A course of a separate copy its menu no longer has: what ``combo.group.create`` takes."""
+
+    stands_for: UUID = Field(description="The course of the copy it is made again for, by its id there.")
 
 
 class GroupPatchIn(GroupRefIn):

@@ -156,7 +156,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | COMBO-F12 | Marcar una elección como agotada | hecho |
 | COMBO-F13 | Cuando un producto deja el catálogo | hecho |
 | COMBO-F14 | La foto del menú | hecho |
-| COMBO-F15 | Recuperar las elecciones de un producto desde una copia aparte | hecho |
+| COMBO-F15 | Recuperar los menús, sus platos y sus elecciones desde una copia aparte | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
 <!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
@@ -245,7 +245,7 @@ Si falla: el diálogo dice por qué y sigue abierto; un menú que ya no existe, 
 este negocio.». Una cuenta abierta que ya lo llevaba lo cobra como se pidió (COMBO-F08). Por el asistente, un nombre
 que vale para varios menús o para ninguno no saca tarjeta, y si antes del «sí» otro menú encaja mejor con lo dicho no
 se retira nada y sale la tarjeta nueva (BASE-F97).
-Implicados: SALE-F12
+Implicados: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Montar los platos de un menú
 <!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f05 -->
@@ -273,7 +273,7 @@ asistente, al cambiar o retirar un plato dicho por su nombre, un nombre que vale
 saca tarjeta, y si antes del «sí» otro plato u otro menú encaja mejor con lo dicho no se toca nada y sale la tarjeta
 nueva (BASE-F97). Al añadir u ordenar platos de un menú dicho por su nombre, el «sí» vale solo para el menú que enseñó
 la tarjeta.
-Implicados: ninguno
+Implicados: COMBO-F15
 
 ### COMBO-F06 Elegir los productos de cada plato y su suplemento
 <!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f06 -->
@@ -521,39 +521,56 @@ plan incluye <espacio>.» o «No se pudo guardar la foto. Inténtalo de nuevo.»
 foto no carga, enseña sus iniciales.
 Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
-### COMBO-F15 Recuperar las elecciones de un producto desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 gh:hub#1473 -->
+### COMBO-F15 Recuperar los menús, sus platos y sus elecciones desde una copia aparte
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 gh:hub#1473 gh:hub#1474 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
-Pantalla: ninguna de Menús: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Elecciones de menú de
-productos** marcado (lo está, como todo lo que se puede traer)
+Pantalla: ninguna de Menús: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Menús, Platos de
+menú, Elecciones de menú de productos** marcado (lo está, como todo lo que se puede traer)
 Pasos:
-1. El personal recupera desde una copia aparte con **Elecciones de menú de productos** marcado. Menús va siempre después
-   de Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando se le devuelven
-   sus elecciones.
-2. Cada elección que en la copia ofrecía un producto vivo en ella y que el negocio ya no tiene se vuelve a añadir a su
-   plato, como la añade el constructor del menú (COMBO-F06): con su suplemento y, si en la copia estaba agotada, agotada
-   (COMBO-F12). Entra al final del plato, en el orden que tenía en la copia. Un producto que el negocio ya no tenía en
-   absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01): sus elecciones se añaden a ese, el que la
-   recuperación hizo con su SKU.
-3. Recuperaciones lo cuenta aparte: «Elecciones de menú de productos: se crearon 2».
+1. El personal recupera desde una copia aparte con **Menús, Platos de menú, Elecciones de menú de productos** marcado.
+   Menús va siempre después de Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo
+   cuando se le devuelven sus elecciones.
+2. Primero, cada menú que la copia tiene y el negocio ya no (lo retiró con sus platos y sus elecciones, COMBO-F04)
+   vuelve como uno nuevo, creado como lo crea la pantalla de Menús (COMBO-F02): con su nombre, su nombre de cocina, su
+   precio cerrado, cómo se vende (en el local o para llevar), su categoría fiscal, su orden y a la venta o no, como
+   estaba, y con la imagen de la librería que tenía (COMBO-F14). Su foto propia no vuelve: se borró al retirarlo, y la
+   copia es de la base de datos, no de los ficheros.
+3. Después, cada plato que la copia tiene y su menú ya no (el menú acaba de volver, o el negocio retiró el plato,
+   COMBO-F05) se vuelve a añadir a su menú como lo añade el constructor: con su nombre, sus elecciones mínimas y máximas
+   y si se puede repetir la misma, al final del menú y en el orden que tenía en la copia.
+4. Al final, cada elección que en la copia ofrecía un producto vivo en ella y que el negocio ya no tiene se vuelve a
+   añadir a su plato, el mismo o el que acaba de volver por él, como la añade el constructor del menú (COMBO-F06): con
+   su suplemento y, si en la copia estaba agotada, agotada (COMBO-F12). Entra al final del plato, en el orden que tenía
+   en la copia. Un producto que el negocio ya no tenía en absoluto vuelve como uno nuevo, con otro identificador
+   (INVENTORY-F01): sus elecciones se añaden a ese, el que la recuperación hizo con su SKU.
+5. Recuperaciones lo cuenta aparte: «Menús: se creó 1; Platos de menú: se crearon 2; Elecciones de menú de productos:
+   se crearon 3».
 Entra: la copia aparte y lo que el negocio tiene hoy.
-Sale: una elección por cada una que faltaba, con su aviso de elección nueva (`combo.option.created`) hecho por la
-recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más. El constructor del menú y el catálogo de
-menús del TPV abiertos ven al momento el producto que vuelve, como vieron que se eliminaba, y el TPV vuelve a ofrecer
-el plato en su menú.
-Si falla: una elección que el negocio aún tiene se queda como está, aunque después le cambiara el producto, y no se
-repite una cuyo producto el negocio ya volvió a ofrecer en ese plato: se queda la suya, con su suplemento, y pedirlo otra
-vez no añade nada dos veces. Una elección que el negocio quitó a mano después de la copia también vuelve, como todo lo
-que el negocio ya no tiene (BASE-F114). Lo que el constructor no acepta hoy no vuelve y Recuperaciones dice por qué, por
-el identificador de la elección en la copia: un producto que sigue eliminado o que el negocio ya no tiene (no se
-recuperó Productos, o el negocio ya hizo otro a mano con su SKU, que se queda con las elecciones que él le dio)
-(«invalid_field: …»), desactivado o que ya no se vende por unidades (`combo.product_inactive`,
-`combo.product_not_by_unit`), un plato lleno (`combo.too_many_options`), o un menú o un plato que el negocio retiró
-después («not_found: …»); un menú o un plato retirado no se recupera desde la copia (hub#1474). El producto que hizo una
-recuperación se reconoce por su SKU la hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve
-a ofrecer en sus platos las elecciones que el negocio le quitó después, como todo lo que ya no tiene.
-Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
+Sale: un menú por cada uno que faltaba, con su aviso de menú nuevo (`combo.combo.created`, y el de menú cambiado,
+`combo.combo.updated`, si vuelve con su imagen), un plato por cada uno que faltaba, con su aviso de plato nuevo
+(`combo.group.created`), y una elección por cada una que faltaba, con su aviso de elección nueva (`combo.option.created`),
+todos hechos por la recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más. El menú y el plato que
+vuelven recuerdan por cuál de la copia se hicieron. El constructor del menú y el catálogo de menús del TPV abiertos ven al
+momento lo que vuelve, y el TPV vuelve a ofrecer el menú en cuanto tiene algo que ofrecer (COMBO-F07).
+Si falla: lo que el negocio aún tiene se queda como está: un menú o un plato que conserva, aunque lo renombrara, y una
+elección que aún tiene, aunque después le cambiara el producto. No se repite un menú que el negocio volvió a crear a mano
+con su nombre (sin distinguir mayúsculas ni espacios; dos menús se pueden llamar igual, así que cada uno hecho a mano vale
+por uno de la copia), ni un plato con su nombre en su menú (sin distinguir mayúsculas), ni una elección cuyo producto el
+negocio ya volvió a ofrecer en ese plato: se quedan los suyos, tal como los dejó. Lo que vuelve se reconoce después
+aunque se renombre, así que pedirlo otra vez no añade nada dos veces. Lo que en la copia colgaba de un menú o de un plato
+que el negocio volvió a crear a mano no se le añade, y Recuperaciones dice por qué, por su identificador en la copia
+(«not_found: Ese menú no existe en este negocio.», «not_found: Ese plato no existe en este menú.»). Una elección que el
+negocio quitó a mano después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
+pantalla de Menús o el constructor no aceptan hoy no vuelve y Recuperaciones dice por qué: un menú cuya categoría fiscal
+ya no está activa en Impuestos («invalid_field: …»; sus platos y sus elecciones, «not_found: …»), un menú que ya tiene 20
+platos (`combo.too_many_groups`), un producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos,
+o el negocio ya hizo otro a mano con su SKU, que se queda con las elecciones que él le dio) («invalid_field: …»),
+desactivado o que ya no se vende por unidades (`combo.product_inactive`, `combo.product_not_by_unit`) o un plato lleno
+(`combo.too_many_options`). El producto que hizo una recuperación se reconoce por su SKU la hiciera esta u otra anterior:
+pedida otra vez desde una copia anterior, le vuelve a ofrecer en sus platos las elecciones que el negocio le quitó
+después, como todo lo que ya no tiene.
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, COMBO-F02, COMBO-F04, COMBO-F05, COMBO-F06, COMBO-F12, COMBO-F13, COMBO-F14
 
 ## Servicios: lo que entra y lo que sale
 
@@ -625,10 +642,10 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 
 | Aviso | Cuándo | Qué lleva | Servicio |
 |---|---|---|---|
-| Menú nuevo | Crear un menú | `id`, `name` | `combo.combo.created` |
+| Menú nuevo | Crear un menú (o al recuperarlo desde una copia aparte) | `id`, `name` | `combo.combo.created` |
 | Menú cambiado | Guardar con algún cambio | `id`, `name` | `combo.combo.updated` |
 | Menú retirado | Retirar | `id`, `name` | `combo.combo.deleted` |
-| Plato nuevo, cambiado o retirado | Crear, guardar con cambios o retirar un plato | `id`, `combo_id` | `combo.group.created`, `.updated`, `.deleted` |
+| Plato nuevo, cambiado o retirado | Crear (o recuperarlo desde una copia aparte), guardar con cambios o retirar un plato | `id`, `combo_id` | `combo.group.created`, `.updated`, `.deleted` |
 | Platos reordenados | Cambiar el orden | `combo_id` | `combo.group.reordered` |
 | Elección nueva, cambiada o quitada | Añadir (una o varias, o al recuperarla desde una copia aparte), guardar con cambios, agotar o quitar; quitar por producto eliminado lleva `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
 | Elecciones reordenadas | Cambiar el orden | `group_id`, `combo_id` | `combo.option.reordered` |
@@ -651,7 +668,7 @@ producto recuperado no reacciona: sus elecciones vuelven desde la copia (F15).
 | Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
 | Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
 | Plataforma | La librería de imágenes: buscarla y nombrar por su título la imagen que se pone a un menú | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
-| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué elecciones devuelve | F15 | `recoverable_from_copy` de `apps.py` |
+| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué menús, platos y elecciones devuelve | F15 | `recoverable_from_copy` de `apps.py` |
 
 ### Contrato con Ventas
 
@@ -722,20 +739,34 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `tests/test_relay.py`) y
   `Combo.tax_category` FK a `tax.TaxCategory` (`PROTECT`; Impuestos nunca borra una categoría). La
   migración depende de `inventory 0001` y `tax 0005`.
-- **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Menu choices
-  of products». `queries.options_in_copy` lee con su propio SQL las `ChoiceOption` de la copia de un producto no borrado
-  allí, plato a plato en su orden, con el SKU del producto allí, y `queries.options_not_in_business` pone cada una en el
-  producto que hace de él en el negocio (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas y
-  Suplementos: el mismo mientras vive; si no, el vivo con su SKU que hizo una recuperación, `base.recovery.brought_back`;
-  uno hecho a mano con su SKU no recibe nada) y deja las que el negocio no tiene ni por id (una elección puede cambiar de
-  producto, nunca de plato) ni por sitio (plato y producto, el índice único `combo_option_product_unique`); la plataforma las crea con `combo.option.create` como la recuperación
-  (`copy_recovery:<id>`), y lo que `create` rechaza sale «sin crear» con su motivo. A `inventory.product.restored` no
-  reacciona: `live.py` solo repinta con él. Pruebas: `tests/test_recovery.py`.
+- **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara tres cosas, en este orden,
+  cada una con su cuenta: «Menus», «Menu courses» y «Menu choices of products». Cada lectura de la copia va con su propio
+  SQL sobre los nombres del modelo (`queries.combos_in_copy` y `queries.groups_in_copy`, por `_rows_in_copy`;
+  `queries.options_in_copy`, con el SKU del producto allí). `reads_since` de los menús es `0002_combo_image` (leen la
+  imagen); los otros dos, `0001_initial`. El menú y el plato que se rehacen guardan por cuál de la copia se hicieron
+  (`Combo.stands_for` y `ChoiceGroup.stands_for`, migración `0003_stands_for`), y `queries._standing_for` da el del
+  negocio que hace de cada uno de la copia: el mismo mientras lo tiene; si no, el que una recuperación hizo por él (el
+  más antiguo); uno hecho a mano no hace de ninguno. `queries.combos_not_in_business` deja fuera el menú que el negocio
+  tiene o que una recuperación rehízo, y uno con su nombre hecho a mano (sin mayúsculas ni espacios; cada uno vale por
+  uno de la copia, el más antiguo primero); los crea `combo.combo.recover` (solo sistema, `INTERNAL`, sin ruta):
+  `combo.combo.create` y, con la imagen que deja `base.images.from_copy`, `_change_image`. `queries.groups_not_in_business`
+  pone cada plato en el menú que hace del suyo (el id de la copia si no hay ninguno, y `create` lo rechaza como
+  `not_found`) y deja fuera el que el negocio tiene, el que una recuperación rehízo y uno con su nombre en ese menú; los
+  añade `combo.group.recover` (solo sistema): `combo.group.create`, que bloquea el menú. `queries.options_not_in_business`
+  pone cada elección en el plato que hace del suyo y en el producto que hace del suyo
+  (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas y Suplementos: el mismo mientras vive; si
+  no, el vivo con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe
+  nada) y deja las que el negocio no tiene ni por id (una elección puede cambiar de producto, nunca de plato) ni por
+  sitio (plato y producto, el índice único `combo_option_product_unique`); la plataforma las crea con
+  `combo.option.create`. Todo corre como la recuperación (`copy_recovery:<id>`), y lo que `create` rechaza sale «sin
+  crear» con su motivo. A `inventory.product.restored` no reacciona: `live.py` solo repinta con él. Pruebas:
+  `tests/test_recovery.py` (y `tests/test_concurrency.py` para las dos operaciones nuevas).
 - Modelos: `Combo` (precio en céntimos ≥ 0; `supply_kind` `service` | `goods`; restricción: `service`
   ⇒ categoría fiscal), `ChoiceGroup` (`min_choices`, `max_choices` con 0 = sin límite y restricción
   `max = 0 o max ≥ min`, ambos ≤ 50; nombre único por menú, sin distinguir mayúsculas) y `ChoiceOption`
   (`price_delta` con signo, `is_available`; producto único por plato). UUIDv7, sin `hub_id`. Borrado
-  físico en cascada: las ventas llevan su copia.
+  físico en cascada: las ventas llevan su copia. `Combo.stands_for` y `ChoiceGroup.stands_for` solo los pone una
+  recuperación desde una copia aparte (F15).
 - **Orden**: un plato o una elección nuevos entran los últimos (`max + 1`); `reorder` recibe la lista
   entera de ids y la guarda en una transacción (rechaza una lista que no sea exactamente la del menú o
   el plato: `combo.reorder_mismatch`).
