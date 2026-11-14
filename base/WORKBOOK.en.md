@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1bd8c9b132bc6129982fa81cfda20ad93d06cff0bb494740fcfa2b99811565e2 -->
+<!-- generated from WORKBOOK.md sha256:72aa2a2096f7fbd7b276c6bf7fd8aaaebfdbee7f32631ca934932cacdcb6beac -->
 
 ## What it is for and who it is for
 
@@ -2936,9 +2936,9 @@ the customers that were lost, the deleted ones as they were, the products, the s
 appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
 deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a
 product deleted before deleting left it, hub#1431; the image of a service brought back, hub#1429; the menu options of a
-product that comes back, hub#1343; the price list prices of a product that comes back as a new one, hub#1442, and its
-modifier groups, hub#1457; the modifier groups of a category that comes back, hub#1456; a deleted modifier group,
-hub#1458)
+product that comes back, hub#1343; the price list prices of a service that comes back as a new one, hub#1459; the
+modifier groups of a product that comes back as a new one, hub#1457; the modifier groups of a category that comes back,
+hub#1456; a deleted modifier group, hub#1458)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3075,9 +3075,9 @@ Steps:
       repeating the same way on the same day at the same time) stays as it is.
       The price list prices always go after the products: "Price list prices: 2 created". Each price of the copy the
       business no longer has comes back to its price list, with its price and its "from quantity", put as the price
-      list's detail puts it, so a deleted product that comes back gets its prices back in the price lists it was in
-      (PRICING-F15). One whose place (the same price list, the same product or service and the same "from quantity")
-      the business has taken again is not repeated: the business's own stays. One the price list does not accept today
+      list's detail puts it, so a deleted product that comes back, the same or as a new one, gets its prices back in
+      the price lists it was in (PRICING-F15). One whose place (the same price list, the same product or service and
+      the same "from quantity") the business has taken again is not repeated: the business's own stays. One the price list does not accept today
       (deactivated, or its product still deleted) does not come back and its reason says so. The product's discount
       rules, which deleting it only switched off, are switched back on by themselves with it (PRICING-F14).
       The modifier groups of the products go after the products too: "Modifier groups of products: 2 created". Each
@@ -3085,7 +3085,8 @@ Steps:
       is linked again, as the group's sheet links it, so a deleted product that comes back asks again at the till for
       its sauces, its doneness or its extras (MODIFIER-F10). One whose group the business has linked to that product
       again is not repeated: the business's own stays. One the group's sheet does not accept today (its product still
-      deleted, or the business deleted the group) does not come back and its reason says so.
+      deleted, or the business deleted the group) does not come back and its reason says so; those of a product that
+      comes back as a new one, not yet either (hub#1457).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3154,4 +3155,4 @@ PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1456, hub#1457, hub#1458,
-aws#77
+hub#1459, aws#77

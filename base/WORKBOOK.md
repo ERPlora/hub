@@ -3066,9 +3066,9 @@ clientes que se perdieron, los eliminados tal como eran, los productos, los serv
 las citas periódicas, los precios de tarifa y los grupos de suplementos de los productos; crear y borrar el clúster
 temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; la imagen de un producto eliminado antes
 de que eliminar se la dejara, hub#1431; la imagen de un servicio recuperado, hub#1429; las opciones de menú de un
-producto que vuelve, hub#1343; los precios de tarifa de un producto que vuelve como uno nuevo, hub#1442, y sus grupos
-de suplementos, hub#1457; los grupos de suplementos de una categoría que vuelve, hub#1456; un grupo de suplementos
-borrado, hub#1458)
+producto que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459; los grupos de
+suplementos de un producto que vuelve como uno nuevo, hub#1457; los grupos de suplementos de una categoría que vuelve,
+hub#1456; un grupo de suplementos borrado, hub#1458)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3203,9 +3203,9 @@ Pasos:
       misma clienta, que se repite igual el mismo día a la misma hora) se queda como está.
       Los precios de tarifa van siempre después de los productos: «Precios de tarifa: se crearon 2». Cada precio de la
       copia que el negocio ya no tiene vuelve a su tarifa, con su precio y su «desde cantidad», puesto como lo pone el
-      detalle de la tarifa, así que un producto eliminado que vuelve recupera sus precios en las tarifas donde estaba
-      (PRICING-F15). No se repite uno cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde
-      cantidad») el negocio ya volvió a ocupar: se queda el suyo. Uno que la tarifa no acepta hoy (desactivada, o su
+      detalle de la tarifa, así que un producto eliminado que vuelve, el mismo o como uno nuevo, recupera sus precios en
+      las tarifas donde estaba (PRICING-F15). No se repite uno cuyo sitio (la misma tarifa, el mismo producto o
+      servicio y la misma «desde cantidad») el negocio ya volvió a ocupar: se queda el suyo. Uno que la tarifa no acepta hoy (desactivada, o su
       producto sigue eliminado) no vuelve y su motivo lo dice. Las reglas de descuento del producto, que eliminarlo solo
       apagó, se vuelven a encender solas con él (PRICING-F14).
       Los grupos de suplementos de los productos van también después de los productos: «Grupos de suplementos de
@@ -3213,7 +3213,8 @@ Pasos:
       enganchado a ese producto se vuelve a enganchar, como lo engancha la hoja del grupo, así que un producto eliminado
       que vuelve pregunta otra vez en el TPV sus salsas, su punto o sus extras (MODIFIER-F10). No se repite uno cuyo
       grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno que la hoja del grupo no acepta hoy
-      (su producto sigue eliminado, o el negocio borró el grupo) no vuelve y su motivo lo dice.
+      (su producto sigue eliminado, o el negocio borró el grupo) no vuelve y su motivo lo dice; los de un producto que
+      vuelve como uno nuevo, tampoco todavía (hub#1457).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3280,7 +3281,7 @@ PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1456, hub#1457, hub#1458,
-aws#77
+hub#1459, aws#77
 
 ## Para quien lo mantiene
 
