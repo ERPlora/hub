@@ -131,14 +131,23 @@ def a_span(span: dt.timedelta) -> str:
     return timesince(start, start + span)
 
 
+#: The actions that close each hub chosen while its database is copied: their page says for how long under each one.
+CLOSING_ACTIONS = ("move_to_cluster", "restore_from_a_copy")
+
+
 def closure_said(hub: Hub) -> str:
-    """How long a move can keep ``hub`` closed by the size of its database (``database_bytes``: ``None`` when it could
-    not be read), as the move's confirmation page says it under the hub."""
+    """How long a move or a restore can keep ``hub`` closed by the size of its database (``database_bytes``: ``None``
+    when it could not be read), as their confirmation page says it under the hub."""
     size = getattr(hub, "database_bytes", None)
     span = a_span(longest_closure(size))
     if size is None:
         return gettext("Size unknown: closed for up to %(span)s") % {"span": span}
     return gettext("%(size)s: closed for up to %(span)s") % {"size": filesizeformat(size), "span": span}
+
+
+def closed_for(hubs: list[Hub]) -> str:
+    """How long ``hubs`` can stay closed in all, copied one after another, as the staff is told."""
+    return a_span(sum((longest_closure(getattr(hub, "database_bytes", None)) for hub in hubs), dt.timedelta()))
 
 
 def move_said(when: str, count: int) -> str:
@@ -556,8 +565,7 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
             moved.append(hub)
 
         if self.ask_each(request, hubs, ask):
-            closed = a_span(sum((longest_closure(hub.database_bytes) for hub in moved), dt.timedelta()))
-            values = {"count": len(moved), "cluster": target.name, "closed": closed} | the_night()
+            values = {"count": len(moved), "cluster": target.name, "closed": closed_for(moved)} | the_night()
             self.message_user(request, move_said(when, len(moved)) % values, messages.SUCCESS)
         return None
 
@@ -596,19 +604,23 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
     def restore_from_a_copy(self, request: HttpRequest, queryset):
         """Choose the temporary cluster the hubs' copy is on and the moment it is of on a confirmation page, then ask
         each chosen hub to be put back as it was (``control.hub.restore``): the worker restores it, its host answering
-        503 «maintenance» meanwhile, or refuses it for its fiscal records, the reason in its ``last_error``."""
+        503 «maintenance» meanwhile, or refuses it for its fiscal records, the reason in its ``last_error``. The page
+        and what the staff is told say how long each can stay closed, by the size of its database."""
+        hubs = list(queryset)
+        self.attach_sizes(request, hubs)
         return self.from_a_copy(
             request,
-            queryset,
+            hubs,
             "restore_from_a_copy",
             gettext("Restore from a copy"),
             RESTORE_TEMPLATE,
             hub_restore,
             lambda asked: ngettext(
-                "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes "
-                "while it is restored. If it is refused, its page says why under «last error».",
-                "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
-                "minutes while it is restored. If one is refused, its page says why under «last error».",
+                "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed while it is "
+                "restored, for up to %(closed)s. If it is refused, its page says why under «last error».",
+                "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s, one after another: each "
+                "closed until its own restore ends, for up to %(closed)s in all. If one is refused, its page says why "
+                "under «last error».",
                 asked,
             ),
         )
@@ -636,28 +648,29 @@ class HubAdmin(AsksFirst, base_admin.HubAdmin):
 
     def from_a_copy(self, request: HttpRequest, hubs, action: str, title: str, template: str, operation, said):
         """The temporary cluster and the moment asked on ``action``'s confirmation page, then ``operation`` asked of
-        each hub with them; ``said(count)``: what the staff is told of those asked."""
+        each hub with them; ``said(count)``: what the staff is told of those asked (``closed``: how long all of them
+        can stay closed)."""
         form = RestoreFromACopyForm(request.POST if "apply" in request.POST else None)
         if not form.is_bound or not form.is_valid():
             return self.confirmation(request, hubs, form, action, title, template, kept_days=MOVED_COPY_DAYS)
         source, at = form.cleaned_data["cluster"], form.cleaned_data["at"]
         ctx = staff_context(request)
-        asked = self.ask_each(
-            request, hubs, lambda hub: operation(ctx, HubRestoreIn(hub=hub.pk, cluster=source.pk, at=at))
-        )
-        if asked:
-            self.message_user(
-                request,
-                said(asked) % {"count": asked, "cluster": source.name, "moment": utc(at)},
-                messages.SUCCESS,
-            )
+        asked: list[Hub] = []
+
+        def ask(hub: Hub) -> None:
+            operation(ctx, HubRestoreIn(hub=hub.pk, cluster=source.pk, at=at))
+            asked.append(hub)
+
+        if self.ask_each(request, hubs, ask):
+            values = {"count": len(asked), "cluster": source.name, "moment": utc(at), "closed": closed_for(asked)}
+            self.message_user(request, said(len(asked)) % values, messages.SUCCESS)
         return None
 
     def confirmation_row(self, hub: Hub) -> tuple:
         return hub.pk, hub.slug, hub.db_name
 
     def confirmation_note(self, hub: Hub, action: str) -> str:
-        return closure_said(hub) if action == "move_to_cluster" else ""
+        return closure_said(hub) if action in CLOSING_ACTIONS else ""
 
     def chosen_name(self, hub: Hub) -> str:
         return hub.slug

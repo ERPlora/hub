@@ -3074,14 +3074,16 @@ Pasos:
   1. Un negocio pide volver a cómo estaban sus datos en un momento de los últimos días. El personal crea un clúster
      temporal restaurado a ese momento y lo da de alta en Clústeres, cerrado a hubs nuevos.
   2. En Hubs elige el negocio (o varios del mismo clúster) y la acción «Restaurar desde una copia…».
-  3. La página de confirmación explica lo que va a pasar y pide el clúster temporal (solo salen los cerrados a hubs
-     nuevos) y el momento con su zona horaria («2026-11-09T14:30:00Z es UTC»). Pulsa **Restaurarlos**.
-  4. Sale «1 hub se restaurará desde <clúster> tal como estaba el 2026-11-09 14:30 UTC: cerrado unos minutos mientras se
-     restaura. Si se rechaza, su ficha dice por qué en «último error».». Mientras dura, la lista dice en la columna del
-     clúster de dónde viene la copia («<su clúster> ← <clúster temporal>»), y quien abre el negocio ve que está en
-     mantenimiento unos minutos.
-  5. Unos minutos después el sistema ha copiado la base del negocio desde el clúster temporal, ha guardado aparte la
-     que tenía y ha puesto la copia en su sitio. El negocio vuelve a abrirse con sus datos de ese momento y la flecha desaparece de la
+  3. La página de confirmación explica lo que va a pasar, dice debajo de cada negocio el tamaño de su base de datos y
+     hasta cuánto puede estar cerrado («476,8 MB: cerrado hasta 2 minutos»; varios se restauran uno tras otro) y pide
+     el clúster temporal (solo salen los cerrados a hubs nuevos) y el momento con su zona horaria
+     («2026-11-09T14:30:00Z es UTC»). Pulsa **Restaurarlos**.
+  4. Sale «1 hub se restaurará desde <clúster> tal como estaba el 2026-11-09 14:30 UTC: cerrado mientras se restaura,
+     hasta 2 minutos. Si se rechaza, su ficha dice por qué en «último error».» (con varios, el tiempo de todos). Mientras
+     dura, la lista dice en la columna del clúster de dónde viene la copia («<su clúster> ← <clúster temporal>»), y quien
+     abre el negocio ve que está en mantenimiento.
+  5. Cuando acaba, en ese tiempo como mucho, el sistema ha copiado la base del negocio desde el clúster temporal, ha
+     guardado aparte la que tenía y ha puesto la copia en su sitio. El negocio vuelve a abrirse con sus datos de ese momento y la flecha desaparece de la
      lista.
   En una copia aparte (hub#1213), para un negocio que factura con VeriFactu en producción o cuando solo se quiere
   recuperar lo perdido sin tocar lo demás:
@@ -4284,6 +4286,13 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
   tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
+- **Cuánto puede estar cerrado el negocio** (hub#1527): las páginas de «Mover a otro clúster…» y «Restaurar desde una
+  copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
+  petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.longest_closure`: las dos mitades de la copia a
+  `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un tamaño que
+  no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada uno se cierra
+  al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
+  `base/tenancy/tests/test_move_closure.py` y `control/tests/test_admin_closure.py`.
 - **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
   formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
   `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre

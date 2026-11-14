@@ -1,7 +1,8 @@
-"""«Move to cluster…» says how long each hub chosen can stay closed, by the size of its database: under each one on
-its confirmation page, and in what the staff is told once it is asked. The hubs move one after another, so what the
-staff is told of several is the time of all of them; a size that cannot be read is counted as the largest. Never «a few
-minutes» whatever the size: a large database keeps its business closed up to the copy's time limit.
+"""«Move to cluster…» and «Restore from a copy…» say how long each hub chosen can stay closed, by the size of its
+database: under each one on their confirmation page, and in what the staff is told once it is asked. The hubs are
+copied one after another, so what the staff is told of several is the time of all of them; a size that cannot be
+read is counted as the largest. Never «a few minutes» whatever the size: a large database keeps its business closed
+up to the copy's time limit. «Restore to a separate copy…» closes nothing, and says nothing of it.
 """
 
 import datetime as dt
@@ -15,7 +16,7 @@ from live.errors import OperationError
 from base.tenancy import move
 from control import queries
 from control.models import Hub
-from control.tests.test_admin import HUBS, PLATFORM, a_cluster, nothing_kept, root  # noqa: F401
+from control.tests.test_admin import AT_MOMENT, HUBS, MOMENT, PLATFORM, a_cluster, nothing_kept, root  # noqa: F401
 
 pytestmark = pytest.mark.django_db
 MB = 1000 * 1000
@@ -48,8 +49,8 @@ def a_hub(sizes: dict, slug: str, size: int, **fields) -> Hub:
     return hub
 
 
-def choose(client, *hubs, language: str = "en", **more) -> str:
-    data = {"action": "move_to_cluster", "_selected_action": [str(hub.pk) for hub in hubs]} | more
+def choose(client, *hubs, language: str = "en", action: str = "move_to_cluster", **more) -> str:
+    data = {"action": action, "_selected_action": [str(hub.pk) for hub in hubs]} | more
     response = client.post(HUBS, data, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE=language, follow=True)
     return plain(response.content.decode())
 
@@ -106,14 +107,8 @@ class TestItsPage:
         assert notes(html) == ["465.7 GB: closed for up to 1 hour"]
         assert "if its copy runs past 1 hour, it is stopped and undone" in html
 
-    def test_the_other_confirmation_pages_say_nothing_under_their_rows(self, client, root, sizes):
-        hub = a_hub(sizes, "acme", LARGE)
-
-        html = plain(
-            client.post(
-                HUBS, {"action": "restore_from_a_copy", "_selected_action": [str(hub.pk)]}, HTTP_HOST=PLATFORM
-            ).content.decode()
-        )
+    def test_a_separate_copy_closes_nothing_and_says_nothing_under_its_rows(self, client, root, sizes):
+        html = choose(client, a_hub(sizes, "acme", LARGE), action="restore_aside")
 
         assert notes(html) == []
 
@@ -190,3 +185,48 @@ class TestInSpanish:
             "abiertos hasta entonces y cerrados mientras se mueven uno tras otro, hasta 1 hora, 8 minutos en total."
         )
         assert told(one).endswith("abierto hasta entonces y cerrado mientras se mueve, hasta 1 hora, 7 minutos.")
+
+
+class TestRestoreFromACopy:
+    """Restoring a hub closes it while its database is replaced, as a move does: its page and its notice say for how
+    long by its size. The sizes stay within what a restore copies today (``RESTORE_MAX_BYTES``)."""
+
+    MEDIUM = 500 * MB
+
+    @pytest.fixture
+    def temporary(self):
+        return a_cluster(name="restore-1", host="restore-1.example", is_open=False)
+
+    def test_its_page_says_under_each_hub_how_long_it_can_stay_closed(self, client, root, sizes, temporary):
+        small, medium = a_hub(sizes, "acme", SMALL), a_hub(sizes, "bistro", self.MEDIUM)
+
+        html = choose(client, small, medium, action="restore_from_a_copy")
+
+        assert notes(html) == ["95.4 MB: closed for up to 1 minute", "476.8 MB: closed for up to 2 minutes"]
+        assert "restored one after another" in html and "a few minutes" not in html
+
+    def test_what_the_staff_is_told_adds_them_up(self, client, root, sizes, temporary):
+        small, medium = a_hub(sizes, "acme", SMALL), a_hub(sizes, "bistro", self.MEDIUM)
+        asked = {"action": "restore_from_a_copy", "apply": "yes", "cluster": str(temporary.pk), "at": MOMENT}
+
+        html = choose(client, small, medium, **asked)
+
+        assert told(html) == (
+            "2 hubs will be restored from restore-1 as they were at 2026-11-09 14:30 UTC, one after another: each "
+            "closed until its own restore ends, for up to 3 minutes in all. If one is refused, its page says why "
+            "under «last error»."
+        )
+        assert Hub.objects.get(pk=small.pk).restore_point == AT_MOMENT
+
+    def test_one_hub_in_spanish(self, client, root, sizes, temporary):
+        asked = {"action": "restore_from_a_copy", "apply": "yes", "cluster": str(temporary.pk), "at": MOMENT}
+
+        page = choose(client, a_hub(sizes, "corner", self.MEDIUM), action="restore_from_a_copy", language="es")
+        html = choose(client, a_hub(sizes, "acme", self.MEDIUM), language="es", **asked)
+
+        assert notes(page) == ["476,8 MB: cerrado hasta 2 minutos"]
+        assert "se restauran uno tras otro" in page and "unos minutos" not in page
+        assert told(html) == (
+            "1 hub se restaurará desde restore-1 tal como estaba el 2026-11-09 14:30 UTC: cerrado mientras se "
+            "restaura, hasta 2 minutos. Si se rechaza, su ficha dice por qué en «último error»."
+        )

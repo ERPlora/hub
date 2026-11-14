@@ -1327,20 +1327,9 @@ def test_the_separate_copy_speaks_spanish(client, root):
 
 def test_the_restore_speaks_spanish():
     from django.utils import translation
-    from django.utils.translation import ngettext
 
     with translation.override("es"):
         assert str(control_admin.HubAdmin.restore_from_a_copy.short_description) == "Restaurar desde una copia…"
-        assert ngettext(
-            "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes while "
-            "it is restored. If it is refused, its page says why under «last error».",
-            "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
-            "minutes while it is restored. If one is refused, its page says why under «last error».",
-            2,
-        ) % {"count": 2, "cluster": "r1", "moment": "2026-11-09 14:30 UTC"} == (
-            "2 hubs se restaurarán desde r1 tal como estaban el 2026-11-09 14:30 UTC: cada uno cerrado unos minutos "
-            "mientras se restaura. Si se rechaza alguno, su ficha dice por qué en «último error»."
-        )
 
 
 @pytest.mark.parametrize(

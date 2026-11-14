@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dde1cb8f6aed8edd95f764864953e18713d9915dea30e226c3b8a8400c53601a -->
+<!-- generated from WORKBOOK.md sha256:3a05680690516498d04d520b248cfaba05d62210cbb369f639e8abe1e0708e04 -->
 
 ## What it is for and who it is for
 
@@ -2945,15 +2945,16 @@ Steps:
   1. A business asks to go back to how its data was at a moment of the last few days. The staff makes a temporary
      cluster restored to that moment and registers it in Clusters, closed to new hubs.
   2. In Hubs they choose the business (or several of the same cluster) and the action "Restore from a copy…".
-  3. The confirmation page explains what is going to happen and asks for the temporary cluster (only the ones closed to
-     new hubs are offered) and the moment with its time zone ("2026-11-09T14:30:00Z is UTC"). They press **Restore
-     them**.
-  4. "1 hub will be restored from <cluster> as it was at 2026-11-09 14:30 UTC: closed for a few minutes while it is
-     restored. If it is refused, its page says why under «last error»." appears. Meanwhile the list says in the cluster
-     column where the copy comes from ("<its cluster> ← <temporary cluster>"), and whoever opens the business sees it is
-     under maintenance for a few minutes.
-  5. A few minutes later the system has copied the business's database from the temporary cluster, kept aside the one
-     it had and put the copy in its place. The business opens again with its data of that moment and the arrow leaves
+  3. The confirmation page explains what is going to happen, says under each business the size of its database and
+     how long it can stay closed ("476.8 MB: closed for up to 2 minutes"; several are restored one after another) and
+     asks for the temporary cluster (only the ones closed to new hubs are offered) and the moment with its time zone
+     ("2026-11-09T14:30:00Z is UTC"). They press **Restore them**.
+  4. "1 hub will be restored from <cluster> as it was at 2026-11-09 14:30 UTC: closed while it is restored, for up to 2
+     minutes. If it is refused, its page says why under «last error»." appears (with several, the time of all of them).
+     Meanwhile the list says in the cluster column where the copy comes from ("<its cluster> ← <temporary cluster>"),
+     and whoever opens the business sees it is under maintenance.
+  5. When it ends, within that time at most, the system has copied the business's database from the temporary
+     cluster, kept aside the one it had and put the copy in its place. The business opens again with its data of that moment and the arrow leaves
      the list.
   To a separate copy (hub#1213), for a business that invoices with VeriFactu in production or when only what was lost
   is wanted back without touching the rest:
