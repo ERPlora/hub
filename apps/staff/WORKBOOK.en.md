@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df540680227702cbaa10d19b34a2ba4410f7b7018917f5742444dec95e05d6fb -->
+<!-- generated from WORKBOOK.md sha256:d968f005cc514ce8e62b1932c3102876f06d1a09f9bdeea34d4bfeed5e37da27 -->
 
 ## What it is for and who it is for
 
@@ -365,7 +365,8 @@ If it fails: under each field: "A schedule needs at least one working day with h
 must be before the end time.", "The break needs a start and an end, or neither.", "The break must fall
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
-accepted.
+accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
+as soon as any day changes (ticked, unticked, or an hour typed), without saving again (hub#1448).
 Involved: none
 
 ### STAFF-F14 Edit a schedule
