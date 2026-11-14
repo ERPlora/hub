@@ -74,6 +74,12 @@ def test_the_reactions_to_inventory_have_no_route():
     assert not bound & {"modifier.link.drop_product", "modifier.link.drop_category"}
 
 
+def test_making_a_group_again_from_a_copy_has_no_route():
+    # Only the platform makes again a group the business no longer has, from a separate copy (BASE-F114, MODIFIER-F10).
+    bound = {operation for _, _, operation in ROUTES}
+    assert "modifier.group.recover" not in bound
+
+
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
