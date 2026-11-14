@@ -287,11 +287,10 @@ def assert_its_asks_bring(tools: dict[str, Operation], name: str, phrase: str, l
     assert comparable(phrase) not in probe_phrases(), "it is a probe of layer 2"
     said = [ask for asks in shared.asks_of(tools[name]).values() for ask in asks if alike(ask, phrase)]
     assert not said, ("it is an ask but for a word at most", said)
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    place = offered.index(name) + 1 if name in offered else None
-    assert name in offered[:TOP], ("its asks do not bring it", place, offered[:TOP])
-    unasked = [op.name for op in assistant.relevant(without_its_asks(tools, name), [phrase], language)]
-    assert name not in unasked[:TOP], ("it comes without its asks", unasked.index(name) + 1)
+    offered = offered_to(tools, phrase, language)
+    assert name in offered[:TOP], ("its asks do not bring it", place_in(offered, name), offered[:TOP])
+    unasked = offered_to(without_its_asks(tools, name), phrase, language)
+    assert name not in unasked[:TOP], ("it comes without its asks", place_in(unasked, name))
 
 
 def near_copies(asks: dict[str, tuple[str, ...]], probes: Iterable[dict]) -> list[tuple[str, str, str]]:
@@ -490,11 +489,8 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_platform_request_offers_its_existing_operation(context_of, name, phrase):
-    tools = assistant.catalog(context_of(Membership.Role.OWNER, "es"))
-    assert name in tools
-    assert phrase not in shared.asks_of(tools[name])["es"]
-    offered = [op.name for op in assistant.relevant(tools, [phrase], "es")]
-    assert name in offered
+    assert place_of_no_ask(assistant.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase) is not None
+
 
 
 #: A phrase of some tools, each with the tool it asks for: reads and writes, both languages, and words only the Hub's
