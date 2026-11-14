@@ -868,17 +868,28 @@ class AskedFromATemporaryCluster:
         assert refused.value.code == "control.restore_point_ahead"
         assert set(refused.value.fields) == {"at"}
 
-    def test_a_copy_missing_or_too_large_is_refused(self, admin_ctx, small, monkeypatch):
+    def test_a_copy_missing_is_refused(self, admin_ctx, monkeypatch):
         from control import queries
 
         hub = self.a_hub()
-        for sizes, code in (({}, "control.restore_copy_missing"), (None, "control.hub_too_large")):
-            found = sizes if sizes is not None else {hub.db_name: services.RESTORE_MAX_BYTES + 1}
-            monkeypatch.setattr(queries, "measure", lambda cluster, names, found=found: found)
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, self.temporary(name=f"t-{code}", host=f"{code}.example"))
-            assert refused.value.code == code
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {})
+
+        with pytest.raises(Conflict) as refused:
+            self.ask(admin_ctx, hub, self.temporary())
+
+        assert refused.value.code == "control.restore_copy_missing"
         assert self.nothing_asked(hub)
+
+    def test_a_copy_of_any_size_is_asked(self, admin_ctx, monkeypatch):
+        # The copy goes through the dumps bucket, never the worker's disk: tens of GiB are asked as 5 MB are.
+        from control import queries
+
+        hub = self.a_hub()
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {names[0]: 40 * 1024**3})
+
+        self.ask(admin_ctx, hub, self.temporary())
+
+        assert not self.nothing_asked(hub)
 
     def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
         from control.schemas import HubRestoreIn

@@ -4,7 +4,8 @@
 gives each test a bucket of its own on it and points ``base.tenancy.dumps`` there (``HUB_DUMPS_BUCKET``,
 ``HUB_DUMPS_ENDPOINT_URL``), with throwaway credentials: the shell's AWS session is never signed with (a red diff would
 print it, as saas's presign tests once did). :func:`hub_files_bucket` does the same for the hub file store
-(``storages["hub_files"]``), versioned as prod's. Its objects are read back with :func:`objects` and :func:`body`;
+(``storages["hub_files"]``), versioned as prod's. Its objects are read back with :func:`objects` and :func:`body`
+(:func:`nothing_kept`: nor an upload left unfinished);
 :func:`keep_files` and :func:`spy_on_the_purge` serve what purges a demo and what purges a business alike.
 """
 
@@ -143,3 +144,8 @@ def objects(endpoint: str, bucket: str) -> dict[str, int]:
 
 def body(endpoint: str, bucket: str, key: str) -> bytes:
     return client(endpoint).get_object(Bucket=bucket, Key=key)["Body"].read()
+
+
+def nothing_kept(endpoint: str, bucket: str) -> bool:
+    """No object and no unfinished upload in ``bucket``."""
+    return objects(endpoint, bucket) == {} and not client(endpoint).list_multipart_uploads(Bucket=bucket).get("Uploads")

@@ -411,9 +411,6 @@ msgstr "Este hub se está restaurando desde una copia."
 msgid "The hub's database is not on that cluster: there is no copy to restore it from."
 msgstr "La base de datos del hub no está en ese clúster: no hay copia desde la que restaurarla."
 
-msgid "This hub's database is too large to restore with a copy."
-msgstr "La base de datos de este hub es demasiado grande para restaurarla con una copia."
-
 msgid "Only a ready hub with a database of its own is restored."
 msgstr "Solo se restaura un hub listo con base de datos propia."
 

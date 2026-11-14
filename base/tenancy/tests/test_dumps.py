@@ -27,7 +27,16 @@ from psycopg.conninfo import conninfo_to_dict
 from base.tenancy import dumps
 from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import make_cluster, make_hub, opened_at  # noqa: F401 (fixtures)
-from base.tenancy.tests.s3 import aws_test_credentials, body, client, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
+from base.tenancy.tests.s3 import (  # noqa: F401
+    aws_test_credentials,
+    body,
+    client,
+    dumps_bucket,
+    moto_s3,
+    no_dumps_bucket,
+    nothing_kept,
+    objects,
+)
 from control.models import Hub, HubDump
 
 pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback")]
@@ -326,11 +335,6 @@ def gone(pid_file: str) -> bool:
     except ProcessLookupError:
         return True
     return False
-
-
-def nothing_kept(moto_s3, bucket) -> bool:
-    """No object and no unfinished upload in ``bucket``."""
-    return objects(moto_s3, bucket) == {} and not client(moto_s3).list_multipart_uploads(Bucket=bucket).get("Uploads")
 
 
 def test_a_database_is_streamed_to_its_key_never_through_a_file(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
