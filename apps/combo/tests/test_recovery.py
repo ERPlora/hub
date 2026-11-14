@@ -22,7 +22,7 @@ from apps.inventory.models import Product
 from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
-from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
+from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 
 from .conftest import make_combo, make_group, make_option, make_product
 
@@ -111,6 +111,12 @@ def test_the_app_declares_its_choices_offered_again_by_the_menu_builders_create(
         "",
     )
     assert (str(choices.label), choices.reads_since) == ("Menu choices of products", "0001_initial")
+    # What the read names is in a copy at that migration: the choice's columns, and the product's it joins (Inventory's
+    # 0001_initial, which Menus' first migration depends on), never a column a later migration adds.
+    assert {"id", "group", "product", "price_delta", "is_available", "sort_order"} <= fields_held_since(
+        "combo", "choiceoption", choices.reads_since
+    )
+    assert {"id", "is_deleted"} <= fields_held_since("inventory", "product", "0001_initial")
 
 
 # ── End to end: the business's own database and its copy ────────────────────────────────────────────────────────────
