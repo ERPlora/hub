@@ -4152,8 +4152,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 - **Un negocio de cualquier tamaño se restaura o se copia aparte** (hub#1524): la copia del clúster temporal pasa por el
   bucket de volcados como la de un traslado, nunca por el disco del worker: `pg_dump` la sube según la hace
   (`move._dump_to_bucket`) y `pg_restore` la lee desde allí por su entrada (`move._restore_from_bucket`), así que
-  `control.hub.restore` y `control.hub.restore_aside` ya no rechazan por tamaño (se fue el tope de 512 MiB,
-  `RESTORE_MAX_BYTES`, y su 409 `control.hub_too_large`; solo comprueban que la copia está en el clúster temporal). La
+  `control.hub.restore` y `control.hub.restore_aside` no miran el tamaño: solo comprueban que la copia está en el
+  clúster temporal. La
   restauración en su sitio vuelca a `<hex>/<AAAAMMDDTHHMMSSZ>-restore.dump` antes de cerrar el negocio, así que sin
   bucket no se cierra nada y acaba con `restore_dump_failed` en `Hub.last_error`; la copia aparte vuelca a
   `<hex del hub>/<AAAAMMDDTHHMMSSZ>-aside-<hex de la fila>.dump` (lleva el arriendo de su fila y no el del hub, así que
