@@ -181,6 +181,66 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
       expect(s.inDoc('staff-schedule-form-week-error')).toBeNull();
     });
   });
+
+  // A day's refusal is a line under that day: the server names it by the day's position among those sent
+  // (`days.<i>.<field>`), and any change the person makes to that day takes its line away at once (hub#1460).
+  describe('a refused day: a change to that day takes its reason away before saving again, and only its own', () => {
+    const ORDER = 'The start time must be before the end time.';
+    const PAIR = 'A break needs both a start and an end (or neither).';
+    const INSIDE = 'The break must fall within the working hours.';
+
+    /** Monday is left out, so Wednesday is the second day sent (`days.1`) and Thursday the third (`days.2`). */
+    async function refusedDays(fields: Record<string, string> = { 'days.1.end_time': ORDER, 'days.2.break_end': PAIR }) {
+      const s = await setup();
+      await ionChecked(s.day(0, 'working'), false);
+      s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+      await click(s.save());
+      return s;
+    }
+    const reason = (s: Awaited<ReturnType<typeof refusedDays>>, weekday: number) =>
+      s.inDoc(`staff-schedule-form-day-${weekday}-error`)?.textContent?.trim() ?? null;
+    /** Typing in a field as a browser does: the native `input` bubbles up from the field, then Ionic says the value. */
+    async function typeIn(field: Element | null, value: string): Promise<void> {
+      field?.dispatchEvent(new Event('input', { bubbles: true }));
+      await ionValue(field, value, 'ionInput');
+    }
+
+    it.each([
+      ['typing the refused hour', (s: Awaited<ReturnType<typeof refusedDays>>) => typeIn(s.day(2, 'end'), '19:00')],
+      ['typing another of its hours', (s: Awaited<ReturnType<typeof refusedDays>>) => typeIn(s.day(2, 'start'), '08:00')],
+      ['typing its break', (s: Awaited<ReturnType<typeof refusedDays>>) => typeIn(s.day(2, 'break_end'), '14:30')],
+      ['unticking it', (s: Awaited<ReturnType<typeof refusedDays>>) => ionChecked(s.day(2, 'working'), false)],
+    ])('%s', async (_, change) => {
+      const s = await refusedDays();
+      expect([reason(s, 2), reason(s, 3)]).toEqual([ORDER, PAIR]);
+      await change(s);
+      expect([reason(s, 2), reason(s, 3)]).toEqual([null, PAIR]);
+      expect(s.sent()).toHaveLength(1);
+    });
+
+    it('a change to another day, or to a field off the week, leaves it', async () => {
+      const s = await refusedDays();
+      await ionChecked(s.day(0, 'working'), true);
+      await typeIn(s.day(4, 'end'), '17:00');
+      await typeIn(s.field('name'), 'Winter');
+      expect([reason(s, 0), reason(s, 2), reason(s, 3), reason(s, 4)]).toEqual([null, ORDER, PAIR, null]);
+    });
+
+    it('a day refused for two things says the first, and a change to it takes the day’s line away whole', async () => {
+      const s = await refusedDays({ 'days.1.break_end': INSIDE, 'days.1.end_time': ORDER });
+      expect(reason(s, 2)).toBe(INSIDE);
+      await typeIn(s.day(2, 'break_start'), '13:30');
+      expect(reason(s, 2)).toBeNull();
+    });
+
+    it('a new try says every reason again', async () => {
+      const s = await refusedDays();
+      await typeIn(s.day(2, 'end'), '19:00');
+      s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { 'days.1.end_time': ORDER } } });
+      await click(s.save());
+      expect([reason(s, 2), reason(s, 3)]).toEqual([ORDER, null]);
+    });
+  });
 });
 
 describe('ScheduleFormModal: Edit · {name} (STAFF-F14)', () => {
@@ -211,6 +271,15 @@ describe('ScheduleFormModal: Edit · {name} (STAFF-F14)', () => {
         days: [{ weekday: 1, start_time: '08:00', end_time: '15:00', break_start: null, break_end: null }],
       },
     });
+  });
+
+  it('a refused day’s reason goes as soon as that day is changed, as when creating one', async () => {
+    const s = await setup(SUMMER);
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { 'days.0.end_time': 'The start time must be before the end time.' } } });
+    await click(s.save());
+    expect(s.inDoc('staff-schedule-form-day-1-error')?.textContent).toContain('The start time must be before the end time.');
+    await ionChecked(s.day(1, 'working'), false);
+    expect(s.inDoc('staff-schedule-form-day-1-error')).toBeNull();
   });
 
   it('speaks Spanish', async () => {
