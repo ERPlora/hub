@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d53bba385c1c8874a9a3b314e16d93525362f08ee5f9d424eed61800ba8eb1ad -->
+<!-- generated from WORKBOOK.md sha256:58019a998c48a3783b0309e52e9d66dbc783c2b5042b76a03144d8799be721a6 -->
 
 ## What it is for and who it is for
 
@@ -220,7 +220,8 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, the 
 empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their
 field; the one of the name, the kitchen ticket name, the supplement, the tax category or the order goes as soon as
-that field is corrected, even if another one says the same (hub#888). An option with its own tax category is charged on a separate line, which cannot be worth zero or
+that field is corrected, even if another one says the same (hub#888), and the one of "Chosen by default" as soon as
+that switch is changed, without saving again (hub#1437). An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more
 than zero.". A group holds up to 100 options. Through the assistant, when changing or removing an option, a group
 said by its name that fits several or none brings up no card, and if before the "yes" another group fits better what

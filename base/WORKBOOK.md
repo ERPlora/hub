@@ -3062,12 +3062,13 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
-clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas y
-las citas periódicas; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de
-ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
+clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
+las citas periódicas y los precios de tarifa; crear y borrar el clúster temporal es el procedimiento «Devolver un negocio
+a un momento» de ERPlora/aws; el grupo, la etiqueta o el campo propio que el negocio borró después de eliminar un cliente que
 vuelve, hub#1356; la imagen de un producto eliminado antes de que eliminar se la dejara, hub#1431; que la página
 «Recuperar en el negocio…» nombre la excepción de lo que vuelve a una categoría recuperada, hub#1364; la imagen de un
-servicio recuperado, hub#1429)
+servicio recuperado, hub#1429; los grupos de suplementos y las opciones de menú de un producto que vuelve, hub#1343;
+los precios de tarifa de un producto que vuelve como uno nuevo, hub#1442)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3103,10 +3104,11 @@ Pasos:
      nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
-     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios** y **Citas, Citas
-     periódicas**). Pulsa **Recuperar**.
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios**, **Citas, Citas
+     periódicas** y **Precios de tarifa**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas, Citas periódicas a su negocio en unos minutos: Recuperaciones dice cómo
+      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa a su negocio en unos minutos:
+      Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
   11. Unos minutos después dice «Hecha» y qué volvió, cada cosa aparte y con su nombre: «Clientes: se restauró 1, se
@@ -3187,6 +3189,13 @@ Pasos:
       fechas de su ventana que aún caben: ninguna en la que ya volvió una cita. Si su clienta ya no está o su profesional
       o uno de sus servicios ya no se reservan, no vuelve y su motivo lo dice; una que el negocio volvió a crear (la
       misma clienta, que se repite igual el mismo día a la misma hora) se queda como está.
+      Los precios de tarifa van siempre después de los productos: «Precios de tarifa: se crearon 2». Cada precio de la
+      copia que el negocio ya no tiene vuelve a su tarifa, con su precio y su «desde cantidad», puesto como lo pone el
+      detalle de la tarifa, así que un producto eliminado que vuelve recupera sus precios en las tarifas donde estaba
+      (PRICING-F15). No se repite uno cuyo sitio (la misma tarifa, el mismo producto o servicio y la misma «desde
+      cantidad») el negocio ya volvió a ocupar: se queda el suyo. Uno que la tarifa no acepta hoy (desactivada, o su
+      producto sigue eliminado) no vuelve y su motivo lo dice. Las reglas de descuento del producto, que eliminarlo solo
+      apagó, se vuelven a encender solas con él (PRICING-F14).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3207,12 +3216,14 @@ un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado
 profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, cada cita borrada que aún
 guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), una cita nueva por cada
 una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), cada cita periódica borrada que
-aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), y una cita periódica
+aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), una cita periódica
 nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
-reserva, y nada más. Cada uno
+reserva, y un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
+y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
-solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación), y lo
+solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación;
+Tarifas vuelve a encender las reglas del producto que vuelve, `pricing.rule.activated`), y lo
 que graba al hacerlo lleva la misma marca, así que tampoco arranca ninguna, ni de primera ni de segunda mano (la
 conversación enlazada otra vez no arranca «se vincula una conversación de WhatsApp a un cliente»; hub#1365). La
 copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
@@ -3243,10 +3254,10 @@ mantenimiento, hasta que se descongela. Con registros solo del entorno de prueba
 Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
-SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, FLOW-F21,
-WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284, hub#1285, hub#1306, hub#1307, hub#1319,
-hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1355, hub#1356, hub#1365, hub#1373, hub#1375,
-hub#1429, hub#1431, aws#77
+SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
+PRICING-F14, PRICING-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257, hub#1282, hub#1283, hub#1284,
+hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
+hub#1355, hub#1356, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, aws#77
 
 ## Para quien lo mantiene
 

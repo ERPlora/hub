@@ -24,6 +24,9 @@ msgstr "Tarifas por grupo de clientes, con fechas y tramos por cantidad, y descu
 msgid "Price Lists keeps other prices for your products and services: a list for wholesale customers, one for your VIP group, a summer list between two dates, or a lower price from ten units on. It also keeps automatic discount rules, such as 10 % on a category, an amount off each unit, buy two and get one free, or a discount by quantity. Given a product or a service, a customer, a quantity and a day, it says which price applies, from which list, which rule takes how much off and what is left: always the lowest price and the best single discount for the customer."
 msgstr "Tarifas guarda otros precios para tus productos y servicios: una tarifa para mayoristas, otra para tu grupo VIP, una de verano entre dos fechas o un precio más bajo a partir de diez unidades. También guarda reglas de descuento automáticas, como un 10 % en una categoría, un importe menos por unidad, compra dos y llévate uno gratis o un descuento por cantidad. Con un producto o un servicio, un cliente, una cantidad y un día, dice qué precio le toca, de qué tarifa sale, qué regla le quita cuánto y cuánto queda: siempre el precio más bajo y el mejor descuento para el cliente."
 
+msgid "Price list prices"
+msgstr "Precios de tarifa"
+
 msgid "created at"
 msgstr "creado el"
 
