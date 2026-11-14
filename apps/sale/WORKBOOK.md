@@ -7,11 +7,7 @@ su paso al cobro (SALE-F39, no hecho).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Ventas / TPV del producto actual
-> (`modules-workspace/modules/sales`, `origin/main` `c6cf4af`, v2.16.169) y de sus ficheros
-> `workflow/*.md`. La app hace lo mismo y se ve igual; los números de flujo se conservan
-> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Todos los flujos están hechos; lo que no
-> entra está en «Lo que queda fuera», con su issue.
+> (servidor y páginas). Lo que no entra está en «Lo que queda fuera», con su issue.
 
 ## Para qué sirve y para quién
 
@@ -112,8 +108,8 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Ventas / TPV se abre desde el menú **Ventas / TPV** y tiene cinco entradas: **Vender**, **Ventas**,
-**Notas rápidas**, **Secciones** y **Ajustes**. «Secciones» es lo que el producto actual llamaba
-«Departamentos»: la palabra corta cabe en la barra de pestañas de un móvil con las cinco a la vista.
+**Notas rápidas**, **Secciones** y **Ajustes**. «Secciones» son los departamentos del TPV: la
+palabra corta cabe en la barra de pestañas de un móvil con las cinco a la vista.
 
 ### Vender
 Se abre a pantalla completa de la aplicación; el menú ⋮ de la tira de categorías tiene «Pantalla
@@ -1043,7 +1039,7 @@ Pasos:
    estado, pago, fecha o total, u ordena.
 4. Toca una fila para ver su documento (SALE-F29). La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
-5. Las cifras de hoy también están en el **Inicio**, en el tablero, como en el producto actual: «Ventas
+5. Las cifras de hoy también están en el **Inicio**, en el tablero: «Ventas
    hoy» y «Tiques hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
    hoy) y «Actividad reciente» (las ocho últimas ventas, la más nueva arriba, con su número y su
    cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
@@ -1308,7 +1304,7 @@ Implicados: ninguno
 Estado: hecho
 Vertical: común
 Actor: responsable, asistente
-Pantalla: ninguna (asistente o API), como el producto actual
+Pantalla: ninguna (asistente o API)
 Pasos:
 1. Pide al asistente que añada el medio y di de qué tipo es («añade Bizum como forma de pago, de tipo
    otro»): sin tipo se crea como efectivo.
@@ -1564,8 +1560,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Ver las cifras | sí | sí | sí | no | `sale.view_reports` |
 | Ajustes, secciones y notas rápidas | sí | sí | sí | no | `sale.manage_settings` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado.
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 Lo que el empleado no puede hacer en el TPV lo pide en su propio dispositivo y lo aprueba un responsable
 con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para esa misma petición: anular
@@ -1590,7 +1585,7 @@ es una línea.
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.
-- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): en Ventas, Secciones y Notas
+- **Orden de las listas** (`base.ordering.list_order`): en Ventas, Secciones y Notas
   rápidas, la columna elegida y sus desempates van todos en la dirección de la lista, así que la descendente es la
   ascendente leída al revés, empates incluidos. Las secciones desempatan por nombre e `id`; las notas, por texto e
   `id`; las ventas, por `id`.
@@ -1633,7 +1628,7 @@ es una línea.
   unidad del precio) ÷ `price_quantity`, una sola vez a mitad hacia arriba. Una línea libre lleva el
   importe que se teclea y la categoría de su sección (`Department`; o una categoría de Impuestos) y exige
   `sale.sell_open_price` por cualquier vía.
-- **La valoración** (`pricing.py`, la misma para la previsión y el cobro) es la del producto actual:
+- **La valoración** (`pricing.py`, la misma para la previsión y el cobro):
   descuento efectivo de línea y de cuenta, `exacto = precio × (1 − ef) × cantidad`, importe a mitad
   hacia arriba; invitación a 0 (y su coste a `gift_total`); el importe fijo de la cuenta se reparte por
   peso (bruto con IVA incluido, base sin él) con resto mayor y empate a la línea anterior; y el cierre
@@ -1758,20 +1753,20 @@ es una línea.
   `base.operations.business_currency(ctx.scope)` (BASE-F50), que la lee como la plataforma (una API key solo trae
   los permisos de lo que cobra) y en el hub propio de ERPlora (sin negocio registrado en erplora.com) contesta la
   del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como sus facturas. Ventas no guarda copia propia de esa
-  pregunta (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY): `queries.business_currency(ctx)` es una línea que la
+  pregunta: `queries.business_currency(ctx)` es una línea que la
   devuelve, y queda como la respuesta de Ventas que usa Caja (`requires = ["sale"]`) para contar en la moneda con
-  la que cobra una venta ahora. `Sale.currency` se guarda al cobrar y ya no tiene valor por
+  la que cobra una venta ahora. `Sale.currency` se guarda al cobrar y no tiene valor por
   defecto (migración `0011`, sin datos); lo cobrado se pinta, se avisa (`money_text(cents, currency)`) y se imprime
   con la suya. `SaleOut`, `SaleRow` y `sale.refund.options` llevan `currency` y `currency_decimals` (los de
   `babel`, nunca los de Intl, que le da 0 al forinto); el TPV, `useBusinessMoney()` de `base`, y mientras el
   negocio no contesta un importe es «—» (`formatMoney` sin moneda, y `signedMoney` para el que lleva signo),
   nunca en euros ni con dos decimales supuestos (hub#936). Los teclados (`PayKeypad`, `PosNumpad`)
   desactivan la coma en una moneda sin decimales.
-- **El impuesto del territorio no es de Ventas** (TAX-F11; ronda 2026-10-17 de PLAN-HUB): lo publica solo
+- **El impuesto del territorio no es de Ventas** (TAX-F11): lo publica solo
   `tax.settings.get` (`tax_kind`). Las pantallas lo nombran con `useTaxName()` de Impuestos
   (`apps/tax/frontend/composables/useTaxName.ts`) y el 409 `sale.tax_category_missing` con
-  `TAX_KIND_NAMES` de `apps/tax/schemas.py`; Ventas no tiene operación propia que lo repita (la fachada
-  `sale.sale.tax_kind` se borró, y `test_api.py` vigila que no vuelva). En los tests de la SPA, `mount-sale`
+  `TAX_KIND_NAMES` de `apps/tax/schemas.py`; Ventas no tiene operación propia que lo repita
+  (`test_api.py` vigila que no haya una `sale.sale.tax_kind`). En los tests de la SPA, `mount-sale`
   carga el catálogo de Impuestos y `taxSettings(familia)` da la respuesta de `tax.settings.get`.
 - **La cifra del impuesto de un periodo** (SALE-F28): `sale.sale.stats` devuelve `tax_kind`, de
   `declared_tax_kind()` en `queries.py`: los `tax_type` distintos de `Sale.tax_breakdown` de las ventas
@@ -1783,7 +1778,14 @@ es una línea.
   Impuestos mientras las cifras no llegan, fallan o el periodo no tiene ventas.
 - **Medios de pago**: los de fábrica (`cash`, `card`) guardan su nombre en inglés y se traducen al
   leerlos mientras no se renombren. Los ajustes «Permitir efectivo / tarjeta / transferencia» los
-  aplica el servidor (si dejan sin ninguno, valen todos los activos).
+  aplica el servidor (si dejan sin ninguno, valen todos los activos). Un nombre repetido de medio de pago se
+  rechaza.
+- **Ajustes por campos**: `sale.settings.update` guarda solo lo que se manda; lo que no se manda no cambia.
+- **Millares**: los importes agrupan los millares desde cuatro cifras (hub#1090): «1.234,56 €» en español,
+  también en los avisos del servidor (el tope del efectivo y del tique, el margen de precio de un servicio, lo que
+  queda por devolver con un medio). Lo que se teclea (cobro, cantidades, devolución) nunca se agrupa.
+- **El tique dice «Descuento de <importe>, ya aplicado…»** con todos los descuentos de la venta (de línea y de
+  cuenta), porque la venta guarda uno solo.
 - **Avisos**: cada escritura anota su aviso en el outbox, en su transacción. El de venta cobrada lleva
   lo que esperan las reacciones de Inventario (`inventory.stock.apply_sale`: `sale_id`, `items[]` con
   `product_id`, `quantity`, `is_service`, `components`) y de Clientes (`customer.purchase.record`:
@@ -1792,7 +1794,7 @@ es una línea.
   el aviso real a esas reacciones reales.
 - **Administrador de Django**, solo en `hubs.erplora.com` (PLAN §17–§18). CRUD completo en lo abierto
   (formas de pago, ajustes, departamentos, notas rápidas, cuentas abiertas y sus líneas). Lo cobrado es
-  documento fiscal (PLAN-HUB §3.2, ronda 2026-10-20): ventas, sus líneas y cobros, el contador del día,
+  documento fiscal (PLAN-HUB §3.2): ventas, sus líneas y cobros, el contador del día,
   devoluciones y sus líneas y cobros se ven enteros, sin «Añadir» ni «Eliminar»; solo cambian las notas de
   la venta y de la devolución. Una venta se corrige con su anulación o sus devoluciones, como en caja
   (`tests/test_admin.py`). Lo que guarda no pasa por las operaciones ni deja aviso.
@@ -1802,9 +1804,9 @@ es una línea.
   «Importe a devolver» para `allocations`, «Línea», «Bono», «Cuenta de origen») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
   `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
-- **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`, FIX-SALE-POS-NO-SPEAK-KEY; PLAN §30 punto 4,
-  PLAN-HUB §8 ronda 2026-10-22b): sin operación propia ni dictado propio; usa el del asistente de la plataforma,
-  `useDictation` del chat compartido de `@erplora/ui/components` (PLAN-HUB §18, FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION): una
+- **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`; PLAN §30 punto 4,
+  PLAN-HUB §8): sin operación propia ni dictado propio; usa el del asistente de la plataforma,
+  `useDictation` del chat compartido de `@erplora/ui/components` (PLAN-HUB §18): una
   grabación por pulsación, dos minutos, hasta 2 MB por `base.assistant.transcribe`, el texto a `state.draft` del
   asistente y su panel abierto, y la grabación tirada al salir del TPV. La tecla solo dice cada motivo de `onProblem`
   con su texto, `sale.pos.speak.<motivo>` (`denied`, `deniedInApp` en la app instalada —los ajustes del dispositivo,
@@ -1847,14 +1849,13 @@ es una línea.
   y `base.business.get`) se lee como la plataforma, porque quien vende lo imprime aunque no pueda leer Facturación; sin
   esa app, o apagada, el papel sale con la cabecera del recibo (SALE-F29). Ventas no lleva regla de permisos propia. Mesas (que
   requiere Ventas) solo desde la pantalla «Elegir mesa», también por el nombre de sus operaciones
-  (`useLive`/`useCommand`), sin importar nada de `apps/table`. Todo señalado para una ronda nueva de
-  PLAN-HUB (este WORKBOOK no edita los planes).
-- **Aprobación con el PIN de un responsable** (BASE-F84, FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL): `apps.py`
+  (`useLive`/`useCommand`), sin importar nada de `apps/table`.
+- **Aprobación con el PIN de un responsable** (BASE-F84): `apps.py`
   `approvals` nombra toda orden del TPV cuyo permiso no tiene el empleado (`sale.sale.void`, `.refund`,
   `.complete_over_limit`, `sale.order.void_line`, `.void_ordered`, `.add_open_line`,
   `.set_discount_over_limit`, `.set_line_discount_over_limit`; mercado: Square, Toast, Lightspeed,
   Shopify «Approval required», Odoo, LS Central, Clover, StoreHub). `approval_figures`
-  (FIX-HUB-SALE-APPROVAL-WITHOUT-FIGURE-DECLARATION; sales#398, sales#403, hub#2180) dice lo aprobado con la cifra de esa
+  dice lo aprobado con la cifra de esa
   misma petición, como Square, Toast y Lightspeed («Discount 50% requires manager»): el porcentaje de
   `.set_line_discount_over_limit`; el porcentaje, el importe o los dos de `.set_discount_over_limit` y de
   `.complete_over_limit` (solo la venta sin cuenta los trae en la entrada: cobrar una cuenta dice la frase fija); el
@@ -1881,109 +1882,6 @@ es una línea.
   del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, que hub#772 mueve entero. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
-### Cambios frente al producto actual
-
-1. **El permiso de precio libre se exige por cualquier vía**, también al abrir la cuenta o al cobrar
-   líneas sueltas (antes solo lo pedía la puerta de la pantalla).
-2. **El límite del tique (3.000 €) lo aplica el servidor**, no solo la pantalla.
-3. **«Permitir efectivo / tarjeta / transferencia» los aplica el servidor** al cobrar.
-4. **Una línea sin categoría fiscal se rechaza siempre**: ya no se acepta un tipo de IVA declarado por
-   el cliente (era la salida de bonos y servicios sin categoría, que llegan con Servicios).
-5. **«Ingresos» resta lo devuelto** y una venta devuelta entera ya no desaparece de las cifras: cuenta
-   como tique con su ingreso neto (antes una devolución parcial no restaba y la total borraba la
-   venta).
-6. **Cobrar una cuenta comprueba su versión**: la pantalla manda la que leyó; cualquier cambio entre la
-   previsión y el cobro lo rechaza (antes se comparaba línea a línea; el resultado para la persona es
-   el mismo).
-7. **Anular una cuenta ya cobrada se rechaza** (antes contestaba bien y avisaba igual); anularla dos
-   veces no avisa la segunda.
-8. **Los ajustes se guardan por campos** (lo que no se manda no cambia; antes lo que faltaba volvía al
-   de fábrica).
-9. **Un nombre repetido de medio de pago se rechaza** (antes nacían dos «Bizum»).
-10. **Cada línea cobrada queda atada a su venta**, también en el cobro que cierra la cuenta.
-11. **Referencias humanas**: producto por SKU o nombre, cliente por nombre o teléfono, venta por número,
-    medio de pago por nombre o tipo, sección y nota por nombre (409 `*_ambiguous` si casan
-    varios).
-12. **El cajero** es un empleado: monta la cuenta y cobra.
-13. **Las cifras del panel de inicio** («Ventas hoy», «Tiques hoy», «Ventas últimos 7 días»,
-    «Actividad reciente») vuelven al tablero del Inicio, como en el producto actual (ronda PLAN-HUB
-    2026-10-21, que deroga el «no tienen dónde pintarse» anterior): son los `widgets` del
-    `LiveAppConfig` sobre `sale.sale.today`, `sale.sale.last_7_days` y `sale.sale.list` (ocho, la más
-    reciente primero), con el `refresh_on` de los eventos con que `live.py` re-ejecuta cada consulta. Las
-    dos de hoy salen de entrada. Lo que cambia: el gráfico es de barras simples, sin las opciones del
-    viejo que el tablero de `base` aún no tiene (`chartType`, `seriesName`, `gridlines`, `height`), y dos
-    iconos esperan en `UI-REQUESTS.md`. Ni pasos de «Termina de configurar tu negocio» ni contadores de la
-    campana: el módulo viejo no los tenía.
-14. **«Descuentos» de la venta cuenta todos los descuentos**, también los de línea (antes solo el de la
-    cuenta); las invitaciones van aparte, a coste.
-15. **El IVA se cierra una vez por clave fiscal** con el cálculo de Impuestos (antes, por perfil de
-    tipos): dos categorías de la misma clave son un solo redondeo, el mismo que hace la factura; dos
-    claves del mismo tipo (un 0 % sujeto y un exento) son dos filas.
-16. **«Precios con IVA incluido»** (antes «… por defecto»): el servidor aplica el ajuste a toda venta;
-    no hay elección por venta, así que «por defecto» ya no describía nada (contradicción entre la UI
-    vieja y este manual, resuelta a favor del manual).
-17. **El tique dice «Descuento de <importe>, ya aplicado…»** con todos los descuentos de la venta (de
-    línea y de cuenta), porque la venta guarda uno solo (ver 14).
-18. **El límite del efectivo cuenta la cuenta entera** en los cobros por partes (antes cada cobro iba
-    por separado y se saltaba el límite partiendo la cuenta, sales#502).
-19. **Una clave de intento repetida para otro cobro se rechaza** (antes devolvía la otra venta como si
-    fuera la misma).
-20. **Con «Repartir el cobro», el botón dice «Cobrar <importe> con <forma de pago>»** (antes decía «con
-    tarjeta» también con Bizum o transferencia).
-21. **El servidor comprueba el bono de una línea pagada con bono** (antes la daba por pagada si el cobro
-    lo decía, sin preguntar a Servicios, sales#539): la marca la pone `sale.order.apply_voucher` tras
-    reservar la sesión, vive en la línea de la cuenta (no en la pantalla) y el cobro gasta la sesión en
-    la misma operación. Dividir o juntar cuentas lleva la sesión con su línea (sales#540).
-22. **Se devuelve solo la sesión de un bono, sin dinero** (antes había que devolver algo de dinero a la
-    vez, sales#512, y en un tique a 0,00 € no se podía, sales#531).
-23. **Una línea pagada con bono no se cambia** (cantidad, invitación, descuento) sin deshacer antes el
-    bono (antes la pantalla lo permitía y la sesión se quedaba cubriendo otra cosa).
-24. **Cobrar a otra clienta que la del bono se rechaza** (antes la línea se cobraba a su precio y la
-    sesión volvía al bono sin avisar).
-25. **El documento fiscal nace en el mismo cobro** (antes, Facturación lo emitía al oír la venta): el
-    tique, la factura y las rectificativas se numeran en la transacción de la venta, la anulación o la
-    devolución, y el papel imprime su número.
-26. **La caja cerrada no cobra en efectivo** y lo dice el propio cobro (antes, Caja tapaba la pantalla
-    Vender): con tarjeta se sigue cobrando.
-27. **Una venta con devoluciones, aunque sean sin dinero** (solo la sesión de un bono), ya no ofrece
-    «Anular» (antes la fila lo ofrecía y el servidor lo rechazaba).
-28. **Una cita tiene una sola cuenta abierta**: cobrarla dos veces vuelve a la misma.
-29. **El servicio se cobra al precio de la profesional** o al reservado en la cita (antes, siempre al
-    del catálogo).
-30. **Una cuenta vacía la elimina quien monta cuentas** (antes pedía siempre el permiso de anular): un
-    grupo que se va sin pedir no obliga a llamar a un responsable.
-31. **La factura a una ficha con empresa sale a nombre de la empresa** (antes, con el nombre de la
-    persona y el CIF de la empresa: un NombreRazon que no casaba con el NIF).
-32. **El país del destinatario es un código ISO de verdad** (antes valían dos letras cualesquiera, y
-    Facturación rechazaba después «UK»).
-33. **Un documento fiscal pendiente se ve y se emite** («Documento pendiente», «Emitir ahora»; antes no
-    había forma de saberlo ni de emitirlo hasta que llegara el relay).
-34. **Cada línea declara la misma base que su línea de la factura** (antes la cuota se repartía por
-    peso y la base salía de restar; Facturación reparte la base: el total cuadraba, la línea no).
-35. **«Elegir mesa» busca en el servidor** en vez de las pestañas de zona del producto actual (cada
-    baldosa dice su zona) y una mesa ocupada no se toca (antes abría su cuenta).
-36. **Lo vendido por cada profesional resta lo devuelto** (ver 5), a quien vendió lo que vuelve (antes
-    una devolución parcial no restaba y la total borraba la venta, así que la suma de las profesionales
-    no cuadraba con los «Ingresos» del día).
-37. **Los importes agrupan los millares desde cuatro cifras** (hub#1090): «1.234,56 €» en español, también
-    en los avisos del servidor (el tope del efectivo y del tique, el margen de precio de un servicio, lo que
-    queda por devolver con un medio), que antes decían «1000.00 €». Lo que se teclea (cobro, cantidades,
-    devolución) nunca se agrupa.
-38. **Tecla «Hablar» nueva** (el TPV viejo no tenía voz): sin permiso o sin micrófono no sale, como el
-    micrófono del asistente; sin conexión sale apagada y explica por qué al pulsarla, para que la tira no
-    salte cuando la red parpadea. Mercado (2026-10-24): Shopify POS apaga sin conexión las extensiones que
-    la necesitan (hilo de community.shopify.dev sobre las funciones sin conexión de las extensiones del TPV); el dictado
-    de Microsoft 365 sale gris sin internet y no existe sin suscripción; el dictado de Google Docs y los
-    micrófonos de Odoo (módulos `pits_voice_to_text_chatter`, `kg_voice_chatter`) solo salen en
-    navegadores que pueden; Gboard y el teclado de Apple quitan el micrófono sin permiso de voz; Square y
-    Toast IQ (texto) y Lightspeed AI (conversacional) no tienen tecla de voz en el TPV.
-39. **La moneda sale del país del negocio** (el hub viejo la fijaba en su configuración, y sales#380: el botón
-    del descuento en importe pintaba siempre «€»): el TPV, Ventas, el tique y las devoluciones van en la moneda
-    del negocio o en la de su venta, con sus decimales (el yen sin céntimos, también en el teclado).
-40. **La sesión de bono gastada fuera del cobro cuenta en la producción de quien la hizo** (hub#770; el producto
-    actual no la contaba para nadie): Ventas la guarda aparte, porque no tiene línea, como guarda en la línea la del
-    cobro.
-
 ### Lo que NO hace, a propósito
 
 - No guarda mesas ni clientes en la cuenta: el enlace cuenta–cliente es de Clientes y el de
@@ -1996,11 +1894,11 @@ es una línea.
   tiene comensal por línea ni cursos con retención.
 - No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV enseña en gris
   con «Agotado» lo que Inventario tiene agotado y no deja pedirlo (`sale.product_sold_out`), pero cobra lo
-  que ya estaba pedido (SALE-F07, INVENTORY-F29; el «86» del QA viejo, SALE-G05, queda cubierto así).
+  que ya estaba pedido (SALE-F07, INVENTORY-F29).
 - No reabre una venta cobrada ni cambia su tipo de documento.
 - No reprecia una cuenta abierta: si el catálogo cambia, la cuenta conserva el precio con que se
   pidió.
-- No edita, desactiva ni borra medios de pago (como el producto actual).
+- No edita, desactiva ni borra medios de pago.
 
 ### Lo que queda fuera
 
@@ -2010,12 +1908,11 @@ es una línea.
 - **Enlazar a su venta un bono concedido sin decirla** (SERVICE-F14, hub#786): su línea sigue contando para quien
   lo vendió y sus sesiones, para nadie.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
-  devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
-  actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea
-  necesita una categoría fiscal que un bono del catálogo no tiene. Mientras, se cobra a precio libre y
+  devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): toda línea necesita una categoría fiscal que
+  un bono del catálogo no tiene. Mientras, se cobra a precio libre y
   se concede en Servicios.
 - **El hueco de la devolución con el saldo del bono** («Quedan N sesiones · M tras esta devolución» y
-  el aviso de bono caducado del producto actual): la línea dice qué bono recibe la sesión; el saldo se
+  el aviso de bono caducado): la línea dice qué bono recibe la sesión; el saldo se
   ve en **Bonos vendidos** de Servicios.
 - **«Elegir mesa» en el TPV, lo que no entra** (F19): preguntar los comensales al sentar (se sientan
   con los de la reserva o las plazas de la mesa y se corrigen en Mesas, TABLE-F14); trasladar, fusionar
@@ -2023,15 +1920,6 @@ es una línea.
   sentada devuelve «Esa cuenta ya está en la mesa N.»); abrir la cuenta de una mesa ocupada tocándola
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
-
-- **Cobrar con propina** (SALE-G06): ya no es «fuera del MVP». Es la app nueva Propinas (`tip`, su
-  `WORKBOOK.md`), con el paso del cobro que pinta Ventas (SALE-F39), las dos `no hecho`; el código va por las
-  issues hijas de hub#562. Mientras, la propina en efectivo se anota en Caja como «Entrada» (CASH_REGISTER-F05).
-
-### Dudas abiertas
-
-1. Anular un tique ya remitido a la AEAT: lo decidió Facturación (INVOICE-F07): la anulación emite la
-   rectificativa R5 del tique entero, en la misma operación; el registro de VeriFactu es de su app.
-2. El PIN del encargado sobre el dispositivo del empleado (elevación) es de la plataforma (BASE-F84) y
-   Ventas lo usa desde FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (F09, F14, F18, F20, F30, F31); el diálogo
-   ya dice la cifra del descuento que aprueba (F14).
+- **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
+  (SALE-F39), las dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
+  anota en Caja como «Entrada» (CASH_REGISTER-F05).
