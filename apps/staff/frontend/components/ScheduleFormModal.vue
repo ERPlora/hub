@@ -12,6 +12,7 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
 import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
@@ -185,7 +186,7 @@ const HOURS = [
         >
           {{ $t('staff.schedules.form.isDefault') }}
         </ion-checkbox>
-        <fieldset
+        <FieldGroup
           ref="weekGroup"
           name="days"
           class="staff-week"
@@ -256,7 +257,7 @@ const HOURS = [
               {{ dayReason(fieldErrors, day.weekday) }}
             </p>
           </div>
-        </fieldset>
+        </FieldGroup>
       </div>
     </template>
   </FormModal>
@@ -275,9 +276,6 @@ const HOURS = [
 .staff-week {
   display: grid;
   gap: 10px;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 .staff-week__legend {
   padding: 0;

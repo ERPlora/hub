@@ -15,6 +15,7 @@ import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
 import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
@@ -350,11 +351,10 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           {{ $t('appointment.form.charged') }}
         </InlineFeedback>
-        <fieldset
+        <FieldGroup
           v-if="!editing"
           ref="customerGroup"
           name="customer"
-          class="appointment-form__customer"
           data-testid="appointment-form-customer"
         >
           <span class="appointment-form__label">{{ $t('appointment.form.customer') }}</span>
@@ -366,7 +366,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             v-if="fieldErrors.customer"
             class="appointment-form__error"
           >{{ fieldErrors.customer }}</small>
-        </fieldset>
+        </FieldGroup>
         <div class="appointment-form__services">
           <ServicesField
             v-model="services"
@@ -549,12 +549,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.7fr);
   gap: 10px;
-}
-.appointment-form__customer {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 .appointment-form__label {
   display: block;
