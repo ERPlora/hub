@@ -6,10 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `table`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Mesas del producto actual
-> (`modules-workspace/modules/tables`, `origin/main` `905eb76`, v2.2.64) y de sus `workflow/*.md`.
-> Los números de flujo se conservan (`TABLES-Fnn` → `TABLE-Fnn`) porque otras apps los citan. Lo que
-> cambia frente al producto actual lo dice «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -43,11 +40,11 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 - **Pedir los comensales al sentar, transferir y juntar cuentas, sacar una mesa del servicio** y la
   lista de cuentas cerradas con su importe (Toast y Lightspeed).
 - **Una mesa con su cuenta abierta no se libera a mano**: se cobra, se pasa a otra mesa o se elimina
-  la cuenta (Toast, Square, Lightspeed y Odoo; tables#124 del producto actual).
+  la cuenta (Toast, Square, Lightspeed y Odoo).
 - **Sentar en una mesa reservada está permitido y gasta la reserva; superar el aforo avisa pero no
   impide.**
-- **La mesa reservada se pinta Reservada solo cerca de la hora de su reserva** (decisión de mercado
-  de la duda 1 del producto actual). Antes de eso la mesa sigue Disponible y enseña la próxima reserva
+- **La mesa reservada se pinta Reservada solo cerca de la hora de su reserva** (decisión de mercado).
+  Antes de eso la mesa sigue Disponible y enseña la próxima reserva
   con su hora. Así lo hacen:
 
   | Producto | Cómo lo resuelve | Fuente |
@@ -62,10 +59,10 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   | Tabit | Desde la mesa se ven sus próximas reservas | [support-us.tabit.cloud](https://support-us.tabit.cloud/hc/en-us/article_attachments/4408025435794) |
 
   **Gana:** Reservada desde **60 minutos antes** de la hora de la reserva hasta que acaba su ventana;
-  antes, la mesa sigue Disponible con «Ana · 21:00». **Por qué no lo de antes** (Reservada desde que
-  se confirma, aunque sea dentro de una semana): bloqueaba la mesa todo el servicio y un grupo sentado
-  a mediodía «gastaba» la reserva de la noche.
-- **Una mesa o una zona desactivada sale del servicio** (decisión de la duda 7): no se pinta en el
+  antes, la mesa sigue Disponible con «Ana · 21:00». **Por qué no desde que se confirma** (aunque sea
+  dentro de una semana): bloquearía la mesa todo el servicio y un grupo sentado a mediodía «gastaría» la
+  reserva de la noche.
+- **Una mesa o una zona desactivada sale del servicio** (decisión de mercado): no se pinta en el
   plano de servicio ni se puede sentar; sigue en «Editar plano», en **Mesas** y en **Zonas**, como
   [Lightspeed — desactivar una mesa](https://k-series-support.lightspeedhq.com/hc/articles/1260804656729),
   [Toast — quitar una mesa del área de servicio](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
@@ -344,7 +341,7 @@ Implicados: TABLE-F01, TABLE-F04
 ### TABLE-F07 Crear muchas mesas de golpe
 Estado: hecho
 Actor: responsable, asistente
-Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
+Pantalla: asistente y API
 Pasos:
 1. Pide al asistente «crea 12 mesas en la Terraza, de la T1 a la T12, para 4».
 2. Se crean de una vez (de 1 a 100), numeradas con el prefijo y el número inicial que se digan (1 si
@@ -748,7 +745,7 @@ Implicados: TABLE-F09, TABLE-F25
 ### TABLE-F30 Retener o soltar una mesa a mano
 Estado: hecho
 Actor: responsable, empleado, asistente
-Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
+Pantalla: asistente y API
 Pasos:
 1. Pide al asistente apartar una mesa («guarda la 6 para Pedro de 21:00 a 23:00, 4 personas»).
 2. Desde una hora antes la mesa sale Reservada, con el nombre y la hora; pedirlo otra vez con la misma
@@ -939,8 +936,8 @@ como los de cualquier app.
 | Ver ajustes | sí | sí | sí | sí | `table.view_settings` |
 | Cambiar ajustes | sí | sí | no | no | `table.manage_settings` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado. Sentar, dividir y juntar piden además «Montar la cuenta» de
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+Sentar, dividir y juntar piden además «Montar la cuenta» de
 Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ## Para quien lo mantiene
@@ -982,7 +979,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   aparcada** cuya `sale.Order` está `completed` o `voided`, con la hora de cierre de la cuenta, y las
   escrituras, antes de nada, cierran esas cuentas (`settle`): el plano no espera al relay. Una cuenta que
   acaba aparcada se cierra sin mesa (restricción `table_session_table_by_status`).
-- **Reservas no es una reacción** (ronda 2026-10-21 APP-TABLE de `PLAN-HUB.md`): la llamada dentro de la operación
+- **Reservas no es una reacción**: la llamada dentro de la operación
   de Reservas es la única vía; sus avisos `reservation.reservation.status_changed` y `updated` no se
   escuchan, porque entregados después re-aplicarían una reserva vieja
   (`test_integration_relay.py::test_a_party_seated_long_before_its_time_is_not_held_again_by_a_late_confirmation`).
@@ -1020,67 +1017,23 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   solo lleva el permiso de su operación, así que caían siempre con `permission_denied`. El asistente, con
   una persona delante, las hace sin pedir confirmación (`risk: normal`). Mesas sigue sin ampliar los
   permisos de nadie.
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): zonas, mesas, cuentas de mesa,
+- **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
+- **Administrador de Django con CRUD completo** (PLAN §17): zonas, mesas, cuentas de mesa,
   recorrido, retenciones y ajustes; ids y fechas en solo lectura. Lo que guarda no pasa por las
   operaciones ni deja aviso.
-- **Tarea programada**: `expire_table_holds` (`table.hold.expire`, cada hora, en UTC, `collapse`); hecho — la
-  corre el worker (`base/scheduler.py`, 2026-10-15), en cada negocio y con su ámbito (`base.worker._serve_hub`).
-
-### Cambios frente al producto actual
-
-1. **Se sienta también desde el plano de sala** (modo Servicio), además de desde «Elegir mesa» del TPV,
-   y sentar abre ya la cuenta de Ventas con el título de la mesa (antes se sentaba solo desde el TPV y
-   la cuenta nacía con el primer artículo).
-2. **El plano es vivo** (antes no cambiaba al sentar ni al cobrar).
-3. **Juntar y dividir hacen las dos partes en una sola operación** (antes Mesas juntaba o dividía y
-   luego el TPV movía las líneas; si fallaba, quedaban desparejadas).
-4. **El estado de la mesa se calcula** y el campo «Estado» de «Editar mesa» solo ofrece Disponible o
-   Bloqueada (antes dejaba poner Ocupada o Reservada a mano sin ninguna cuenta).
-5. **Reservada solo desde una hora antes** de la reserva, y sentar antes no la gasta (duda 1, por
-   mercado); la retención vence a su hora exacta (antes 1–2 horas tarde, TABLES-F29).
-6. **Mesas y zonas desactivadas salen del servicio** (duda 7, por mercado).
-7. **El número de mesa es único en su zona por cualquier puerta** (duda 6; antes solo lo comprobaba el
-   plano) y el nombre de zona, también.
-8. **Dos camareros a la vez sobre la misma mesa dejan una sola cuenta** (antes podían entrar las dos).
-9. **Eliminar la cuenta en Ventas libera la mesa** (TABLES-F20, antes no hecho).
-10. **Cerrar una mesa con su cuenta vacía la cierra** sin pedir a un responsable que anule la cuenta.
-11. **Volver a sentar una cuenta aparcada tiene pantalla** (Sesiones) y comprueba que la mesa está
-    libre (antes aceptaba una mesa ocupada, bloqueada, borrada o de otro negocio).
-12. **Borrar una cuenta del historial tiene pantalla** (Sesiones, solo el administrador).
-13. **Con dos cuentas en una mesa, se elige cuál** al cobrar, transferir, fusionar o corregir (antes se
-    cogía una sin elegir).
-14. **Una zona con mesas (activas o no) no se borra** (antes las desactivadas se quedaban sin zona).
-15. **El rojo no puede ser menor que el ámbar** en los ajustes.
-16. **Lo cobrado se lee de Ventas** en vez de apuntarlo en un libro propio: mismo resultado, sin
-    avisos que perder.
-17. **El camarero se copia al sentar** (su nombre, como Caja guarda quién abre), en vez de buscarlo en
-    la lista de personas cada vez que se pinta.
-18. **El cliente de la mesa** (TABLE-F32) es nuevo: el producto actual solo lo ponía desde el TPV.
-19. **El repaso de retenciones** corre cada hora y solo avisa si caducó alguna (antes cada 15 minutos
-    y avisaba siempre).
-20. **Una cuenta trasladada conserva su hora de llegada** (antes el traslado ponía el reloj a cero).
-21. **La lista Mesas edita y borra por fila** (antes solo se editaba y borraba en el plano) y borrar
-    una mesa pide confirmación (antes no la pedía).
-22. **Una división se deshace fusionando** las dos cuentas de la misma mesa (antes no se podía).
-23. **Una cuenta aparcada que Ventas cobra o anula se cierra** (antes se quedaba «Aparcada» para
-    siempre).
-24. **Fusionar no pierde lo cobrado** por la cuenta de origen antes de juntarla.
-25. **Los importes van en la moneda del negocio** (la de su país, con los decimales que cuenta el
-    servidor; lo cobrado, en la moneda en que se cobró, que no se reescribe; mientras el negocio no
-    contesta, un importe es «—»): el producto actual los pintaba siempre en euros
-    (`table-business-currency`).
-26. **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
-    `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
+- **Tarea programada**: `expire_table_holds` (`table.hold.expire`, cada hora, en UTC, `collapse`): la
+  corre el worker (`base/scheduler.py`), en cada negocio y con su ámbito (`base.worker._serve_hub`).
 
 ### Lo que NO hace, a propósito
 
 - No sabe qué se ha pedido: líneas, importes y cocina son de Ventas y Cocina.
 - No impide sentar más comensales que el aforo: avisa.
 - No toma reservas: eso es Reservas; Mesas solo aparta la mesa en el plano.
-- No tiene asiento por comensal, cursos, estado «por limpiar» (duda 2) ni mesas físicas unidas con
-  aforo sumado (duda 3): no entran en el MVP, como en el producto actual.
+- No tiene asiento por comensal, cursos, estado «por limpiar» ni mesas físicas unidas con
+  aforo sumado: no entran en el MVP.
 - No guarda planos distintos por turno.
-- No deja elegir ni cambiar el camarero de una cuenta (duda 8): es quien la sienta.
+- No deja elegir ni cambiar el camarero de una cuenta: es quien la sienta.
 
 ### Lo que queda fuera
 
@@ -1088,12 +1041,4 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
-  `ion:grid-outline` (también en el paso «Tus mesas» del Inicio, que en el producto actual llevaba el del
-  plano) y el plano `ion:apps-outline`.
-
-Las dudas del producto actual quedan cerradas: la 1, la 6 y la 7, por mercado («Referencia adoptada» y
-«Cambios frente al producto actual»); la 4 ya estaba resuelta (tables#124, TABLE-F21); la 5, con pantalla
-(Volver a sentar, elegir la cuenta de una mesa dividida y deshacer una división fusionando). La 2 («por
-limpiar»), la 3 (mesas unidas con el aforo sumado) y la 8 (elegir o cambiar el camarero), con los planos
-por turno (pm#121), se decidieron al cerrar la app (2026-10-21) como fuera de esta versión, igual que en
-el producto actual: están en «Fuera por ahora» (`## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`).
+  `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.
