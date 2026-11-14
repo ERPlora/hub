@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5e9894f1d59f42227e6f44b037308412ea38ffa06eccc56d9ce71fff6fc64ed5 -->
+<!-- generated from WORKBOOK.md sha256:f19fb46b9605da18a233cf912dc9a00b63674c27dfb24ef1115db05917e3f321 -->
 
 ## What it is for and who it is for
 
@@ -2933,10 +2933,10 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
-appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
-deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the menu options
-of a product that comes back, hub#1343; the price list prices of a service that comes back as a new one, hub#1459; the
-modifier groups of a category that comes back, hub#1456; a deleted modifier group, hub#1458)
+appointments, the repeating appointments, the price list prices and the modifier groups of the categories and of the
+products; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of
+ERPlora/aws; the menu options of a product that comes back, hub#1343; the price list prices of a service that comes
+back as a new one, hub#1459; a deleted modifier group, hub#1458)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2976,11 +2976,11 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services**, **Appointments, Repeating appointments**, **Price list prices** and **Modifier groups of products**).
-     They press **Recover**.
+     Services**, **Appointments, Repeating appointments**, **Price list prices** and **Modifier groups of categories,
+     Modifier groups of products**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments, Repeating appointments, Price list prices, Modifier groups of products into its
-      business within a few minutes: Recoveries says how it went." appears.
+      categories, Services, Appointments, Repeating appointments, Price list prices, Modifier groups of categories,
+      Modifier groups of products into its business within a few minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3087,7 +3087,12 @@ Steps:
       one, asks again at the till for its sauces, its doneness or its extras (MODIFIER-F10). One whose group the
       business has linked to that product again is not repeated: the business's own stays. One the group's sheet does
       not accept today (its product still deleted, or the business already made another one by hand with its SKU, or it
-      deleted the group) does not come back and its reason says so.
+      deleted the group) does not come back and its reason says so. Just before them go, counted apart, the modifier
+      groups of the categories: "Modifier groups of categories: 2 created". Each group that in the copy hung from a
+      category live there and that the business no longer has linked to it is linked again the same way: to the same
+      category if the business kept it, or to the one the recovery brought back for it with its name, so its products
+      ask for it again at the till. A category still deleted, or one the business made again by hand, stays without
+      it, and its reason says so.
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3113,8 +3118,8 @@ it no longer had, with its appointment-created notice (`appointment.appointment.
 appointment it still held, active again with its series-recovered notice (`appointment.recurring.restored`), a new
 repeating appointment for each one it no longer had, with its series-created notice (`appointment.recurring.created`)
 and that of each appointment it books, a price list price for each one it lacked, with its price-put notice
-(`pricing.price_item.added`), and a modifier group linked to a product for each one it lacked, with its link-made notice
-(`modifier.link.attached`), and nothing else. Each of
+(`pricing.price_item.added`), and a modifier group linked to a category or a product for each one it lacked, with its
+link-made notice (`modifier.link.attached`), and nothing else. Each of
 those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
 automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
 brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the

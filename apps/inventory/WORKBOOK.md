@@ -460,11 +460,12 @@ categoría. Recuperaciones cuenta aparte esos enlaces («Enlaces de productos a 
 conserva, aunque la haya renombrado o le haya quitado productos, es la misma: no se repite ni se rellena; tampoco una
 que volvió a crear con su nombre (sin distinguir mayúsculas ni espacios): se usa la suya, tal como está, y solo entran
 en ella los productos que se crean de nuevo. Un producto eliminado que vuelve (INVENTORY-F34) no entra en la que el
-negocio rehízo a mano.
+negocio rehízo a mano. La categoría que vuelve recupera también sus grupos de suplementos, si se recupera también
+Suplementos (MODIFIER-F10); la que el negocio rehízo a mano se queda con los que él le enganchó.
 Si la recuperación se pide otra vez desde una copia anterior a la categoría que trajo, esa categoría sigue contando
 como traída: los productos vivos que el negocio le quitó después vuelven a ella.
 Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla.
-Implicados: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34
+Implicados: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Agrupar productos en categorías para el TPV
 <!-- origen: wf:restaurante-dia#rec_restaurante-f03 fi:modules/inventory#query-inventory-product_categories old:inventory/workflow/catalogo.md#inventory-f08 -->

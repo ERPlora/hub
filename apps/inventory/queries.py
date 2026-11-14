@@ -1145,7 +1145,7 @@ def products_in_copy(conn) -> list[dict]:
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []
     read = ("id", *PRODUCT_FIELDS, "tax_category")
-    copy_categories = dict(conn.execute(_live_in_copy(Category, ("id", "name"))).fetchall())
+    copy_categories = category_names_in_copy(conn)
     products = [
         dict(zip(read, row, strict=True)) | {"category_ids": [], "copy_categories": copy_categories}
         for row in conn.execute(_live_in_copy(Product, read))
@@ -1163,11 +1163,17 @@ def product_links_in_copy(conn) -> list[dict]:
     ``conn`` is the copy's direct, read-only connection: it is read by its own SQL over the models' names."""
     if conn.execute("SELECT to_regclass(%s)", [ProductCategory._meta.db_table]).fetchone()[0] is None:
         return []
-    copy_categories = dict(conn.execute(_live_in_copy(Category, ("id", "name"))).fetchall())
+    copy_categories = category_names_in_copy(conn)
     return [
         {"id": link_id, "product_id": product_id, "category_id": category_id, "copy_categories": copy_categories}
         for link_id, product_id, category_id in conn.execute(_live_links_in_copy())
     ]
+
+
+def category_names_in_copy(conn) -> dict[UUID, str]:
+    """The live categories of a separate copy of the business by id, with their name there: what pairs each with the
+    business's (``categories_standing_for``). ``conn`` is the copy's direct, read-only connection."""
+    return dict(conn.execute(_live_in_copy(Category, ("id", "name"))).fetchall())
 
 
 def _live_in_copy(model, read: tuple[str, ...]) -> sql.Composed:
@@ -1251,22 +1257,33 @@ def product_links_not_in_business(links: list[dict]) -> list[dict]:
     hand, stays as the business has it, and a product's other categories are never touched."""
     if not links:
         return []
-    held = _categories_held(links[0]["copy_categories"])
-    stand_ins = {there: here for there, here in held.items() if there != here}
-    back = {
-        pk
-        for pk, created_by in Category.objects.filter(pk__in=stand_ins.values()).values_list("pk", "created_by")
-        if brought_back(created_by)
-    }
-    wanted = [(one, stand_ins[one["category_id"]]) for one in links if stand_ins.get(one["category_id"]) in back]
+    standing = categories_standing_for(links[0]["copy_categories"])
+    wanted = [(one, standing[one["category_id"]]) for one in links if one["category_id"] in standing]
     asked = {one["product_id"] for one, _here in wanted}
     live = set(Product.objects.filter(pk__in=asked, is_deleted=False).values_list("pk", flat=True))
+    back = set(standing.values())
     linked = set(ProductCategory.objects.filter(product__in=asked, category__in=back).values_list("product", "category"))
     return [
         {"id": one["id"], "product_id": one["product_id"], "category_id": here}
         for one, here in wanted
         if one["product_id"] in live and (one["product_id"], here) not in linked
     ]
+
+
+def categories_standing_for(copy: dict[UUID, str]) -> dict[UUID, UUID]:
+    """The business's category that stands for each of a separate copy's it no longer holds live, as ``{id there: id
+    here}``: the live one with its name that a recovery brought back (``brought_back``), paired as the categories' part
+    pairs them (``_categories_held``), which is why ``copy`` is every live category of the copy, by name
+    (``category_names_in_copy``). One the business made again by hand is its own, set up as it chose: it stands for
+    none. A category still live here is itself, and is not in the result. For the apps whose records hang from a
+    category to give each back to the category it is now."""
+    stand_ins = {there: here for there, here in _categories_held(copy).items() if there != here}
+    back = {
+        pk
+        for pk, created_by in Category.objects.filter(pk__in=stand_ins.values()).values_list("pk", "created_by")
+        if brought_back(created_by)
+    }
+    return {there: here for there, here in stand_ins.items() if here in back}
 
 
 def _same_name(name: str) -> str:
