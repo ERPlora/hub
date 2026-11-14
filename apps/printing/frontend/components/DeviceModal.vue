@@ -7,7 +7,7 @@
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonCheckbox, IonInput, IonNote } from '@ionic/vue';
+import { IonCheckbox, IonNote } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
@@ -15,6 +15,7 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 import { useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut, PrinterOut } from '../operations';
+import PrintingNameField from './PrintingNameField.vue';
 
 // `printers`: the business's active printers, the ones a device may print for.
 const props = defineProps<{ device: DeviceOut | null; printers: readonly Pick<PrinterOut, 'id' | 'name' | 'usage'>[] }>();
@@ -101,19 +102,13 @@ const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.v
         >
           {{ $t('printing.devices.modal.hint') }}
         </p>
-        <ion-input
+        <PrintingNameField
+          v-model="name"
           data-testid="printing-device-name"
           name="name"
           :label="$t('printing.devices.modal.name')"
           :placeholder="$t('printing.devices.modal.namePlaceholder')"
-          label-placement="stacked"
-          fill="outline"
-          mode="md"
-          :maxlength="100"
-          :value="name"
           :error-text="nameError(fieldErrors)"
-          :class="{ 'ion-invalid': !!nameError(fieldErrors), 'ion-touched': !!nameError(fieldErrors) }"
-          @ion-input="name = String($event.detail.value ?? '')"
         />
         <fieldset class="printing-device__printers">
           <legend>{{ $t('printing.devices.modal.printers') }}</legend>
