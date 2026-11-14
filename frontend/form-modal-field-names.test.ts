@@ -38,11 +38,8 @@ const STILL_UNNAMED: Record<string, number> = {
 };
 
 /** What is left of the raw reads of a window's refusal in windows that do not take `fieldErrors`, by file: it only goes
- *  down. */
-const STILL_READ_RAW: Record<string, number> = {
-  'apps/printing/frontend/components/DeviceModal.vue': 1,
-  'apps/printing/frontend/components/PrinterModal.vue': 1,
-};
+ *  down, and nothing is left, so a raw read fails. */
+const STILL_READ_RAW: Record<string, number> = {};
 
 /** Windows that take away themselves a refusal they paint apart, once the person changes what it is about, rather than
  *  through FormModal hearing a control of its name: by file, those keys. This guard cannot see that; the window's own

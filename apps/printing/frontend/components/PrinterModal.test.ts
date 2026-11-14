@@ -4,7 +4,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, ionToggle, ionValue, mountPrinting } from '../__tests__/mount-printing';
+import { itTellsTheCorrectedFieldApart, refusedWithTheSameWords } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { click, ionToggle, ionValue, mountPrinting, settle } from '../__tests__/mount-printing';
 import type { PrinterDraft } from '../lib/discovery';
 import type { PrinterOut } from '../operations';
 import PrinterModal from './PrinterModal.vue';
@@ -32,8 +33,8 @@ const TILL = {
   is_active: true,
 } as PrinterOut;
 
-async function setup(printer: PrinterOut | null = null, draft: PrinterDraft | null = null) {
-  const m = await mountPrinting(PrinterModal, { props: { open: true, printer, draft } });
+async function setup(printer: PrinterOut | null = null, draft: PrinterDraft | null = null, locale: 'en' | 'es' = 'en') {
+  const m = await mountPrinting(PrinterModal, { props: { open: true, printer, draft }, locale });
   const field = (name: string) => m.inDoc(`printing-printer-${name}`);
   const submit = () => click(m.inDoc('printing-printer-submit'));
   return { ...m, field, submit };
@@ -138,6 +139,64 @@ describe('PrinterModal', () => {
     s.answer(422, { error: { code: 'invalid_payload', message, fields: { address: message } } });
     await s.submit();
     expect(prop(s.field('address'), 'errorText')).toBe(message);
+  });
+});
+
+describe('PrinterModal: a refused field, corrected, loses its mark without saving again (hub#1470)', () => {
+  const TAKEN = 'There is already a printer with that name.';
+  const KEYS = ['name', 'address', 'port', 'usage'];
+
+  /** The window with a network printer filled in, its «Save» answered with `refusal`. */
+  async function refused(refusal: object, locale: 'en' | 'es' = 'en', status = 422) {
+    const s = await setup(null, null, locale);
+    await ionValue(s.field('name'), 'Till', 'ionInput');
+    await ionValue(s.field('address'), '192.168.1.50', 'ionInput');
+    s.answer(status, refusal);
+    return s;
+  }
+
+  const marks = (field: Element | null) => ['ion-invalid', 'ion-touched'].map((mark) => !!field?.classList.contains(mark));
+
+  it('a taken name: typing another one takes its mark and the notice away, before «Save» is pressed again', async () => {
+    const s = await refused({ error: { code: 'printing.printer_exists', message: TAKEN, fields: { name: TAKEN } } }, 'en', 409);
+    await s.submit();
+    expect(prop(s.field('name'), 'errorText')).toBe(TAKEN);
+    expect(s.inDoc('printing-printer-error')?.textContent).toContain(TAKEN);
+    s.field('name')?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(s.field('name'), 'Front till', 'ionInput');
+    expect(prop(s.field('name'), 'errorText') ?? '').toBe('');
+    expect(marks(s.field('name'))).toEqual([false, false]);
+    expect(s.inDoc('printing-printer-error')).toBeNull();
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('an empty name: typing one takes «Give the printer a name.» and its mark away', async () => {
+    const s = await setup();
+    await s.submit();
+    expect(prop(s.field('name'), 'errorText')).toBe('Give the printer a name.');
+    expect(marks(s.field('name'))).toEqual([true, true]);
+    await ionValue(s.field('name'), 'Till', 'ionInput');
+    expect(prop(s.field('name'), 'errorText') ?? '').toBe('');
+    expect(marks(s.field('name'))).toEqual([false, false]);
+    expect(s.sent()).toEqual([]);
+  });
+
+  it.each(KEYS)('refused with the others, %s is marked as Ionic shows a refusal, and corrected alone loses its mark', async (key) => {
+    const s = await refused(refusedWithTheSameWords(KEYS));
+    await s.submit();
+    expect(KEYS.map((k) => marks(s.field(k)))).toEqual(KEYS.map(() => [true, true]));
+    const field = s.field(key);
+    if (key === 'usage') await ionValue(field, 'kitchen');
+    else {
+      field?.dispatchEvent(new Event('input', { bubbles: true }));
+      await ionValue(field, `${String(prop(field, 'value') ?? '')}1`, 'ionInput');
+    }
+    expect(KEYS.map((k) => marks(s.field(k)))).toEqual(KEYS.map((k) => (k === key ? [false, false] : [true, true])));
+  });
+
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await refused(refusal, locale);
+    return { field: s.field, send: s.submit, settle };
   });
 });
 

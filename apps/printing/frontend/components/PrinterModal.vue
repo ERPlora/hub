@@ -5,11 +5,12 @@
 // none for the system printer —, «Paper width» (80 or 58 mm, kept with it: the app prints 32 characters a
 // line for now, and the window says so; not for the system printer), «Role» (the
 // system printer prints receipts and A4 documents only) and «Active». «Save» adds it or saves it and says
-// so; a refusal is said at its field in the server's words (an address no printer can have, a taken name).
+// so; a refusal is said at its field in the server's words (an address no printer can have, a taken name) until the
+// person changes that field.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonInput, IonItem, IonLabel, IonNote, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
+import { IonInput, IonItem, IonLabel, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
@@ -66,6 +67,9 @@ watch(
   },
   { immediate: true },
 );
+watch(name, () => {
+  missing.value = false;
+});
 
 const isSystem = computed(() => kind.value === 'system');
 const isNetwork = computed(() => kind.value === 'network');
@@ -76,8 +80,8 @@ watch(isSystem, (system) => {
 
 const pending = computed(() => create.pending.value || update.pending.value);
 const error = computed<FormModalError | null>(() => refusal(create.error.value ?? update.error.value, t('printing.modal.failed')));
-const fieldError = (field: string) => error.value?.fields?.[field] ?? null;
-const nameError = computed(() => (missing.value ? t('printing.modal.required') : fieldError('name')));
+const nameError = (fieldErrors: Readonly<Record<string, string>>): string | undefined =>
+  missing.value ? t('printing.modal.required') : fieldErrors.name;
 
 function body() {
   const typedPort = Number.parseInt(port.value, 10);
@@ -124,142 +128,143 @@ const canDismiss = useUnsavedFormOnOpen(
     :error="error"
     @submit="confirm"
   >
-    <div class="printing-printer">
-      <ion-input
-        data-testid="printing-printer-name"
-        :label="$t('printing.modal.name')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        :maxlength="100"
-        :value="name"
-        :error-text="nameError ?? undefined"
-        :class="{ 'ion-invalid': !!nameError, 'ion-touched': !!nameError }"
-        @ion-input="name = String($event.detail.value ?? '')"
-      />
-      <ion-select
-        data-testid="printing-printer-kind"
-        :label="$t('printing.modal.kind')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        :value="kind"
-        @ion-change="kind = $event.detail.value as PrinterKind"
-      >
-        <ion-select-option
-          v-for="option in KINDS"
-          :key="option"
-          :value="option"
+    <template #default="{ fieldErrors }">
+      <div class="printing-printer">
+        <ion-input
+          data-testid="printing-printer-name"
+          name="name"
+          :label="$t('printing.modal.name')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          :maxlength="100"
+          :value="name"
+          :error-text="nameError(fieldErrors)"
+          :class="{ 'ion-invalid': !!nameError(fieldErrors), 'ion-touched': !!nameError(fieldErrors) }"
+          @ion-input="name = String($event.detail.value ?? '')"
+        />
+        <ion-select
+          data-testid="printing-printer-kind"
+          :label="$t('printing.modal.kind')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          interface="popover"
+          :value="kind"
+          @ion-change="kind = $event.detail.value as PrinterKind"
         >
-          {{ $t(`printing.kind.${option}`) }}
-        </ion-select-option>
-      </ion-select>
-      <p
-        v-if="isSystem"
-        class="printing-printer__hint"
-        data-testid="printing-printer-system-hint"
-      >
-        {{ $t('printing.modal.systemHint') }}
-      </p>
-      <div
-        v-else
-        class="printing-printer__address"
-      >
-        <ion-input
-          data-testid="printing-printer-address"
-          :label="t(ADDRESS_LABEL[kind as Exclude<PrinterKind, 'system'>])"
+          <ion-select-option
+            v-for="option in KINDS"
+            :key="option"
+            :value="option"
+          >
+            {{ $t(`printing.kind.${option}`) }}
+          </ion-select-option>
+        </ion-select>
+        <p
+          v-if="isSystem"
+          class="printing-printer__hint"
+          data-testid="printing-printer-system-hint"
+        >
+          {{ $t('printing.modal.systemHint') }}
+        </p>
+        <div
+          v-else
+          class="printing-printer__address"
+        >
+          <ion-input
+            data-testid="printing-printer-address"
+            name="address"
+            :label="t(ADDRESS_LABEL[kind as Exclude<PrinterKind, 'system'>])"
+            label-placement="stacked"
+            fill="outline"
+            mode="md"
+            :maxlength="255"
+            :value="address"
+            :helper-text="isNetwork ? $t('printing.modal.ipHint') : undefined"
+            :error-text="fieldErrors.address"
+            :class="{ 'ion-invalid': !!fieldErrors.address, 'ion-touched': !!fieldErrors.address }"
+            @ion-input="address = String($event.detail.value ?? '')"
+          />
+          <ion-input
+            v-if="isNetwork"
+            data-testid="printing-printer-port"
+            name="port"
+            class="printing-printer__port"
+            type="number"
+            inputmode="numeric"
+            :label="$t('printing.modal.port')"
+            label-placement="stacked"
+            fill="outline"
+            mode="md"
+            :min="1"
+            :max="65535"
+            :value="port"
+            :error-text="fieldErrors.port"
+            :class="{ 'ion-invalid': !!fieldErrors.port, 'ion-touched': !!fieldErrors.port }"
+            @ion-input="port = String($event.detail.value ?? '')"
+          />
+        </div>
+        <ion-select
+          v-if="!isSystem"
+          data-testid="printing-printer-paper"
+          :label="$t('printing.modal.paper')"
           label-placement="stacked"
           fill="outline"
           mode="md"
-          :maxlength="255"
-          :value="address"
-          :helper-text="isNetwork ? $t('printing.modal.ipHint') : undefined"
-          :error-text="fieldError('address') ?? undefined"
-          :class="{ 'ion-invalid': !!fieldError('address'), 'ion-touched': !!fieldError('address') }"
-          @ion-input="address = String($event.detail.value ?? '')"
-        />
-        <ion-input
-          v-if="isNetwork"
-          data-testid="printing-printer-port"
-          class="printing-printer__port"
-          type="number"
-          inputmode="numeric"
-          :label="$t('printing.modal.port')"
+          interface="popover"
+          :value="paper"
+          @ion-change="paper = Number($event.detail.value) as PaperWidth"
+        >
+          <ion-select-option
+            v-for="option in PAPERS"
+            :key="option"
+            :value="option"
+          >
+            {{ $t('printing.printers.paper', { n: option }) }}
+          </ion-select-option>
+        </ion-select>
+        <p
+          v-if="!isSystem"
+          class="printing-printer__hint"
+          data-testid="printing-printer-paper-hint"
+        >
+          {{ $t('printing.modal.paperHint') }}
+        </p>
+        <ion-select
+          data-testid="printing-printer-usage"
+          name="usage"
+          :label="$t('printing.modal.usage')"
           label-placement="stacked"
           fill="outline"
           mode="md"
-          :min="1"
-          :max="65535"
-          :value="port"
-          :error-text="fieldError('port') ?? undefined"
-          :class="{ 'ion-invalid': !!fieldError('port'), 'ion-touched': !!fieldError('port') }"
-          @ion-input="port = String($event.detail.value ?? '')"
-        />
+          interface="popover"
+          :value="usage"
+          :disabled="isSystem"
+          :error-text="fieldErrors.usage"
+          :class="{ 'ion-invalid': !!fieldErrors.usage, 'ion-touched': !!fieldErrors.usage }"
+          @ion-change="usage = $event.detail.value as Usage"
+        >
+          <ion-select-option
+            v-for="option in USAGES"
+            :key="option"
+            :value="option"
+          >
+            {{ $t(`printing.usage.${option}`) }}
+          </ion-select-option>
+        </ion-select>
+        <ion-item lines="none">
+          <ion-label>{{ $t('printing.modal.active') }}</ion-label>
+          <ion-toggle
+            slot="end"
+            data-testid="printing-printer-active"
+            :checked="active"
+            :aria-label="$t('printing.modal.active')"
+            @ion-change="active = !!$event.detail.checked"
+          />
+        </ion-item>
       </div>
-      <ion-select
-        v-if="!isSystem"
-        data-testid="printing-printer-paper"
-        :label="$t('printing.modal.paper')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        :value="paper"
-        @ion-change="paper = Number($event.detail.value) as PaperWidth"
-      >
-        <ion-select-option
-          v-for="option in PAPERS"
-          :key="option"
-          :value="option"
-        >
-          {{ $t('printing.printers.paper', { n: option }) }}
-        </ion-select-option>
-      </ion-select>
-      <p
-        v-if="!isSystem"
-        class="printing-printer__hint"
-        data-testid="printing-printer-paper-hint"
-      >
-        {{ $t('printing.modal.paperHint') }}
-      </p>
-      <ion-select
-        data-testid="printing-printer-usage"
-        :label="$t('printing.modal.usage')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        :value="usage"
-        :disabled="isSystem"
-        @ion-change="usage = $event.detail.value as Usage"
-      >
-        <ion-select-option
-          v-for="option in USAGES"
-          :key="option"
-          :value="option"
-        >
-          {{ $t(`printing.usage.${option}`) }}
-        </ion-select-option>
-      </ion-select>
-      <ion-note
-        v-if="fieldError('usage')"
-        color="danger"
-        data-testid="printing-printer-usage-error"
-      >
-        {{ fieldError('usage') }}
-      </ion-note>
-      <ion-item lines="none">
-        <ion-label>{{ $t('printing.modal.active') }}</ion-label>
-        <ion-toggle
-          slot="end"
-          data-testid="printing-printer-active"
-          :checked="active"
-          :aria-label="$t('printing.modal.active')"
-          @ion-change="active = !!$event.detail.checked"
-        />
-      </ion-item>
-    </div>
+    </template>
   </FormModal>
 </template>
 

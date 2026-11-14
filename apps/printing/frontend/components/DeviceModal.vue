@@ -2,7 +2,8 @@
 // «Print from this device» / «Edit device» (PRINTING-F18; the old hub's print host): the device's name
 // and the active printers it reaches, one check each. A new one is the device the page runs on (the SDK names it
 // to the server with X-Device-Id; its id is never shown); an edited one is any device of the list. «Save» says
-// so; what is missing is said before anything is sent, and a refusal at its field in the server's words.
+// so; what is missing is said before anything is sent, and a refusal at its field in the server's words, each until
+// the person changes that field.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -42,12 +43,14 @@ watch(
   },
   { immediate: true },
 );
+watch(name, () => {
+  missingName.value = false;
+});
 
 const pending = computed(() => register.pending.value || update.pending.value);
 const error = computed<FormModalError | null>(() => refusal(register.error.value ?? update.error.value, t('printing.devices.modal.failed')));
-const fieldError = (field: string) => error.value?.fields?.[field] ?? null;
-const nameError = computed(() => (missingName.value ? t('printing.devices.modal.required') : fieldError('name')));
-const printersError = computed(() => (missingPrinters.value ? t('printing.devices.modal.choosePrinters') : fieldError('printers')));
+const nameError = (fieldErrors: Readonly<Record<string, string>>): string | undefined =>
+  missingName.value ? t('printing.devices.modal.required') : fieldErrors.name;
 
 function toggle(id: string, on: boolean): void {
   const next = new Set(chosen.value);
@@ -90,57 +93,61 @@ const canDismiss = useUnsavedFormOnOpen('printing-device', () => ({ name: name.v
     :error="error"
     @submit="confirm"
   >
-    <div class="printing-device">
-      <p
-        class="printing-device__hint"
-        data-testid="printing-device-hint"
-      >
-        {{ $t('printing.devices.modal.hint') }}
-      </p>
-      <ion-input
-        data-testid="printing-device-name"
-        :label="$t('printing.devices.modal.name')"
-        :placeholder="$t('printing.devices.modal.namePlaceholder')"
-        label-placement="stacked"
-        fill="outline"
-        mode="md"
-        :maxlength="100"
-        :value="name"
-        :error-text="nameError ?? undefined"
-        :class="{ 'ion-invalid': !!nameError, 'ion-touched': !!nameError }"
-        @ion-input="name = String($event.detail.value ?? '')"
-      />
-      <fieldset class="printing-device__printers">
-        <legend>{{ $t('printing.devices.modal.printers') }}</legend>
+    <template #default="{ fieldErrors }">
+      <div class="printing-device">
         <p
-          v-if="printers.length === 0"
           class="printing-device__hint"
-          data-testid="printing-device-no-printers"
+          data-testid="printing-device-hint"
         >
-          {{ $t('printing.devices.modal.noPrinters') }}
+          {{ $t('printing.devices.modal.hint') }}
         </p>
-        <ion-checkbox
-          v-for="printer in printers"
-          :key="printer.id"
-          :data-testid="`printing-device-printer-${printer.id}`"
-          label-placement="end"
-          justify="start"
-          :checked="chosen.has(printer.id)"
-          @ion-change="toggle(printer.id, !!$event.detail.checked)"
-        >
-          <span :data-testid="`printing-device-printer-label-${printer.id}`">{{
-            $t('printing.devices.modal.printer', { name: printer.name, usage: $t(`printing.usage.${printer.usage}`) })
-          }}</span>
-        </ion-checkbox>
-        <ion-note
-          v-if="printersError"
-          color="danger"
-          data-testid="printing-device-printers-error"
-        >
-          {{ printersError }}
-        </ion-note>
-      </fieldset>
-    </div>
+        <ion-input
+          data-testid="printing-device-name"
+          name="name"
+          :label="$t('printing.devices.modal.name')"
+          :placeholder="$t('printing.devices.modal.namePlaceholder')"
+          label-placement="stacked"
+          fill="outline"
+          mode="md"
+          :maxlength="100"
+          :value="name"
+          :error-text="nameError(fieldErrors)"
+          :class="{ 'ion-invalid': !!nameError(fieldErrors), 'ion-touched': !!nameError(fieldErrors) }"
+          @ion-input="name = String($event.detail.value ?? '')"
+        />
+        <fieldset class="printing-device__printers">
+          <legend>{{ $t('printing.devices.modal.printers') }}</legend>
+          <p
+            v-if="printers.length === 0"
+            class="printing-device__hint"
+            data-testid="printing-device-no-printers"
+          >
+            {{ $t('printing.devices.modal.noPrinters') }}
+          </p>
+          <ion-checkbox
+            v-for="printer in printers"
+            :key="printer.id"
+            :data-testid="`printing-device-printer-${printer.id}`"
+            name="printers"
+            label-placement="end"
+            justify="start"
+            :checked="chosen.has(printer.id)"
+            @ion-change="toggle(printer.id, !!$event.detail.checked)"
+          >
+            <span :data-testid="`printing-device-printer-label-${printer.id}`">{{
+              $t('printing.devices.modal.printer', { name: printer.name, usage: $t(`printing.usage.${printer.usage}`) })
+            }}</span>
+          </ion-checkbox>
+          <ion-note
+            v-if="missingPrinters || fieldErrors.printers"
+            color="danger"
+            data-testid="printing-device-printers-error"
+          >
+            {{ missingPrinters ? $t('printing.devices.modal.choosePrinters') : fieldErrors.printers }}
+          </ion-note>
+        </fieldset>
+      </div>
+    </template>
   </FormModal>
 </template>
 
