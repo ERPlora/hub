@@ -141,6 +141,17 @@ ACCEPTED = {
     # The actions a line of an appointment's history may say are widened, dropped and added again in one migration
     # with ``restored``; every action the code of before writes still passes it.
     ("appointment", "0004_history_restored", "AddConstraint", "history.appointment_history_action"),
+    # The WhatsApp inbox's two unique guards without the business column, the step after the one that took that column
+    # out of the state (#1133): since then the code of before writes every channel and template with an empty host, so
+    # the old guards on it already held what it writes to one channel row and one live template per name and language,
+    # and no row it writes breaks these.
+    ("whatsapp_inbox", "0013_guards_without_host", "AddConstraint", "channel.whatsapp_inbox_channel_one_row"),
+    (
+        "whatsapp_inbox",
+        "0013_guards_without_host",
+        "AddConstraint",
+        "template.whatsapp_inbox_template_live_name_language_unique",
+    ),
     # The contract of the move to base.HubUser, a later deploy's, once no code from before the move runs (written here,
     # not applied): the old columns to control's users, which the move took out of the state and nobody writes any
     # more, leave the database through

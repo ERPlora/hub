@@ -1,8 +1,10 @@
-"""Each WhatsApp record lives only in its business's own database (hub#1053)."""
+"""Each WhatsApp record lives only in its business's own database (hub#1053), which keeps one channel row and one
+live template per name and language whatever old business column its rows kept."""
 
 import uuid
 
 import pytest
+from django.db import IntegrityError, connections, transaction
 from live.context import Scope
 from live.errors import NotFound
 from live.models import OutboxEvent
@@ -10,7 +12,7 @@ from live.models import OutboxEvent
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
 from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run, system, template
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests import hubs
 
 pytestmark = [
@@ -133,3 +135,53 @@ def test_a_card_recovered_in_one_business_claims_only_its_own_conversation(hub_a
     with use_hub(hub_b):
         assert not OutboxEvent.objects.filter(name=events.CUSTOMER_RESTORED).exists()
         assert Conversation.objects.get().customer_id is None
+
+
+def keep_business(row, host: str) -> None:
+    """Writes ``host`` on ``row`` in the database of the hub in use, as the shared tables left their rows: the business
+    column the models no longer name but each database still keeps."""
+    with connections[current_alias()].cursor() as cursor:
+        cursor.execute(f'UPDATE "{row._meta.db_table}" SET host = %s WHERE id = %s', [host, row.pk])
+
+
+def refused_by(guard: str, create) -> bool:
+    """Whether ``create`` is refused by the database guard called ``guard``, in the database of the hub in use."""
+    with pytest.raises(IntegrityError) as refused, transaction.atomic(using=current_alias()):
+        create()
+    return guard in str(refused.value)
+
+
+@pytest.mark.parametrize("host", ["a", ""], ids=["first-kept-its-business", "first-has-none"])
+def test_a_second_channel_row_is_refused_whatever_business_the_first_kept(hub_a, host):
+    with use_hub(hub_a):
+        keep_business(Channel.objects.create(phone_number="+34910000000"), host)
+
+        assert refused_by(
+            "whatsapp_inbox_channel_one_row", lambda: Channel.objects.create(phone_number="+34910000000")
+        )
+        assert Channel.objects.count() == 1
+
+
+@pytest.mark.parametrize("host", ["a", ""], ids=["first-kept-its-business", "first-has-none"])
+def test_a_second_live_template_of_a_name_and_language_is_refused_whatever_business_the_first_kept(hub_a, host):
+    with use_hub(hub_a):
+        keep_business(Template.objects.create(name="recordatorio", language="es"), host)
+        Template.objects.create(name="recordatorio", language="en")
+
+        assert refused_by(
+            "whatsapp_inbox_template_live_name_language_unique",
+            lambda: Template.objects.create(name="recordatorio", language="es"),
+        )
+        assert Template.objects.filter(name="recordatorio", language="es").count() == 1
+
+
+def test_the_number_and_the_template_of_another_business_never_clash(hub_a, hub_b):
+    for hub in (hub_a, hub_b):
+        with use_hub(hub):
+            Channel.objects.create(phone_number="+34910000000")
+            Template.objects.create(name="recordatorio", language="es")
+
+    for hub in (hub_a, hub_b):
+        with use_hub(hub):
+            assert list(Channel.objects.values_list("phone_number", flat=True)) == ["+34910000000"]
+            assert Template.objects.filter(name="recordatorio", language="es").count() == 1

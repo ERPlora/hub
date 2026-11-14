@@ -5,8 +5,9 @@ The one shared channel row cannot be told apart by business: going forward it is
 born from its next photo); going back leaves the newest-synced row as the one row again. The shared templates go
 forward unowned (no business lists them; the staff sees them in the admin) and, going back, keep one live copy per
 name and language: the newest-synced. A message or an erasure made before 0007 comes forward with no business (the
-worker resumes it as its own scope, as before); going back keeps the rows and drops the two columns. Every test leaves
-the database at the app's latest migration, whatever that is when it runs.
+worker resumes it as its own scope, as before); going back keeps the rows and drops the two columns. The two unique
+guards stop naming the business column (0013) and get it back going back; a database with two rows they no longer
+allow is left as it was. Every test leaves the database at the app's latest migration, whatever that is when it runs.
 """
 
 import datetime as dt
@@ -16,7 +17,7 @@ import io
 
 import pytest
 from django.core.management import call_command
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.db.migrations.executor import MigrationExecutor
 
 APP = "whatsapp_inbox"
@@ -192,3 +193,91 @@ def test_the_templates_with_a_file_header_the_hub_now_sends_are_marked_and_back_
     finally:
         migrate(latest())
 
+
+
+GUARDS_WITHOUT_HOST = [(APP, "0013_guards_without_host")]
+#: The unique guards of each table, other than its key and the save key (``submit_key``), as Postgres writes what each
+#: covers: before ``0013`` they name the old business column; after it, they do without it.
+GUARDS_WITH_HOST = {
+    "whatsapp_inbox_channel": {"whatsapp_inbox_channel_one_per_host": "(host)"},
+    "whatsapp_inbox_template": {
+        "whatsapp_inbox_template_live_host_name_language_unique": "(host, name, language) WHERE (deleted_at IS NULL)"
+    },
+}
+GUARDS_WITHOUT_HOSTS = {
+    "whatsapp_inbox_channel": {"whatsapp_inbox_channel_one_row": "((true))"},
+    "whatsapp_inbox_template": {
+        "whatsapp_inbox_template_live_name_language_unique": "(name, language) WHERE (deleted_at IS NULL)"
+    },
+}
+
+
+def unique_guards(table: str) -> dict[str, str]:
+    """The unique indexes of ``table`` but its key and the save key's, by name: what each covers."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT indexname, indexdef FROM pg_indexes"
+            " WHERE tablename = %s AND indexdef LIKE 'CREATE UNIQUE INDEX %%'",
+            [table],
+        )
+        return {
+            name: definition.split(" USING btree ", 1)[1]
+            for name, definition in cursor.fetchall()
+            if not name.endswith("_pkey") and name != "whatsapp_inbox_template_submit_key_unique"
+        }
+
+
+def keep_business(table: str, host: str) -> None:
+    """Every row of ``table`` with ``host`` as its business, as the shared tables left them (the models no longer
+    name it)."""
+    with connection.cursor() as cursor:
+        cursor.execute(f'UPDATE "{table}" SET host = %s', [host])
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_guards_stop_naming_the_business_and_come_back_with_it():
+    try:
+        old = migrate(NO_HOSTS)
+        assert {table: unique_guards(table) for table in GUARDS_WITH_HOST} == GUARDS_WITH_HOST
+        old.get_model(APP, "Channel").objects.create(phone_number="+34910000000")
+        old.get_model(APP, "Template").objects.create(name="recordatorio", language="es")
+        keep_business("whatsapp_inbox_channel", "a")
+        keep_business("whatsapp_inbox_template", "a")
+
+        new = migrate(GUARDS_WITHOUT_HOST)
+        assert {table: unique_guards(table) for table in GUARDS_WITHOUT_HOSTS} == GUARDS_WITHOUT_HOSTS
+        for _model, table, column in HOST_COLUMNS:
+            assert column in columns(table)  # a later deploy drops them
+        assert new.get_model(APP, "Channel").objects.count() == 1
+        assert new.get_model(APP, "Template").objects.count() == 1
+
+        migrate(NO_HOSTS)
+        assert {table: unique_guards(table) for table in GUARDS_WITH_HOST} == GUARDS_WITH_HOST
+
+        migrate(GUARDS_WITHOUT_HOST)
+        assert {table: unique_guards(table) for table in GUARDS_WITHOUT_HOSTS} == GUARDS_WITHOUT_HOSTS
+    finally:
+        migrate(latest())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_database_with_two_live_templates_of_one_name_under_two_businesses_is_left_as_it_was():
+    """The rows another business left (the cut's ``copy-all``) are never chosen between here: the migration fails, and
+    the database keeps its guards with the business column until they are put right."""
+    old = migrate(NO_HOSTS)
+    Template = old.get_model(APP, "Template")
+    try:
+        Template.objects.create(name="recordatorio", language="es")
+        keep_business("whatsapp_inbox_template", "b")
+        Template.objects.create(name="recordatorio", language="es")
+
+        with pytest.raises(IntegrityError) as refused:
+            migrate(GUARDS_WITHOUT_HOST)
+
+        assert "whatsapp_inbox_template_live_name_language_unique" in str(refused.value)
+        assert unique_guards("whatsapp_inbox_template") == GUARDS_WITH_HOST["whatsapp_inbox_template"]
+        assert unique_guards("whatsapp_inbox_channel") == GUARDS_WITH_HOST["whatsapp_inbox_channel"]
+        assert Template.objects.count() == 2
+    finally:
+        Template.objects.all().delete()
+        migrate(latest())
