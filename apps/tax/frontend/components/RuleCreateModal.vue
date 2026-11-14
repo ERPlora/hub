@@ -153,6 +153,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
       <div class="tax-form">
         <Combo
           testid="tax-rule-form-country_code"
+          name="country_code"
           :model-value="country"
           :options="countries"
           :label="$t('tax.rules.columns.country')"
@@ -162,6 +163,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         />
         <ion-input
           data-testid="tax-rule-form-region_code"
+          name="region_code"
           :value="form.region_code"
           :label="$t('tax.rules.columns.region')"
           :placeholder="$t('tax.rules.form.regionPlaceholder')"
@@ -177,6 +179,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         />
         <Combo
           testid="tax-rule-form-tax_category_key"
+          name="tax_category_key"
           :model-value="category"
           :search="searchCategories"
           :label="$t('tax.rules.columns.category')"
@@ -186,6 +189,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         />
         <ion-input
           data-testid="tax-rule-form-rate_pct"
+          name="rate_pct"
           type="number"
           inputmode="decimal"
           step="0.01"
@@ -205,6 +209,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         />
         <ion-select
           data-testid="tax-rule-form-tax_type"
+          name="tax_type"
           :value="form.tax_type"
           :label="$t('tax.rules.columns.type')"
           label-placement="floating"
@@ -225,6 +230,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         </ion-select>
         <ion-select
           data-testid="tax-rule-form-operation_class"
+          name="operation_class"
           :value="form.operation_class"
           :label="$t('tax.rules.columns.qualification')"
           label-placement="floating"
@@ -246,6 +252,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         <ion-input
           v-if="form.operation_class === 'exempt'"
           data-testid="tax-rule-form-exempt_reason"
+          name="exempt_reason"
           :value="form.exempt_reason"
           :label="$t('tax.rules.form.exemptReason')"
           :placeholder="$t('tax.rules.form.exemptReasonPlaceholder')"
@@ -259,6 +266,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         />
         <ion-input
           data-testid="tax-rule-form-regime_key"
+          name="regime_key"
           :value="form.regime_key"
           :label="$t('tax.rules.columns.regime')"
           :placeholder="$t('tax.rules.form.regimePlaceholder')"
@@ -273,6 +281,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         <div class="tax-form__pair">
           <ion-input
             data-testid="tax-rule-form-valid_from"
+            name="valid_from"
             type="date"
             :value="form.valid_from"
             :label="$t('tax.rules.columns.validFrom')"
@@ -285,6 +294,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
           />
           <ion-input
             data-testid="tax-rule-form-valid_to"
+            name="valid_to"
             type="date"
             :value="form.valid_to"
             :label="$t('tax.rules.columns.validTo')"
@@ -297,6 +307,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
           />
         </div>
         <ParentRuleSelect
+          name="parent_id"
           :model-value="form.parent_id"
           :country="form.country_code"
           :region="form.region_code"
@@ -307,6 +318,7 @@ const canDismiss = useUnsavedFormOnOpen('tax-rule-form', form, open);
         />
         <ion-input
           data-testid="tax-rule-form-component_label"
+          name="component_label"
           :value="form.component_label"
           :label="$t('tax.rules.form.componentLabel')"
           :placeholder="$t('tax.rules.form.componentLabelPlaceholder')"
