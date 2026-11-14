@@ -3067,8 +3067,7 @@ las citas periódicas, los precios de tarifa, los grupos de suplementos que el n
 grupos de suplementos de las categorías y de los productos y las elecciones de menú de los productos; crear y borrar el
 clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; los precios de tarifa de un
 servicio que vuelve como uno nuevo, hub#1459; una opción quitada de un grupo de suplementos que el negocio conserva,
-hub#1505; las elecciones de menú de un producto que vuelve como uno nuevo, hub#1473; un menú o un
-plato retirado, hub#1474)
+hub#1505; un menú o un plato retirado, hub#1474)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3241,11 +3240,10 @@ Pasos:
       Las elecciones de menú de los productos van también después de los productos: «Elecciones de menú de productos:
       se crearon 2». Cada elección que en la copia ofrecía un producto vivo allí y que el negocio ya no tiene se vuelve a
       añadir a su plato, como la añade el constructor del menú, con su suplemento y, si estaba agotada, agotada, así que
-      un producto eliminado que vuelve sale otra vez en sus menús del TPV (COMBO-F15). No se repite una que el negocio aún
-      tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese plato: se queda la
-      suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el negocio retiró el
-      menú o el plato) no vuelve y su motivo lo dice; las de un producto que vuelve como uno nuevo, tampoco todavía
-      (hub#1473).
+      un producto que vuelve, el mismo o como uno nuevo, sale otra vez en sus menús del TPV (COMBO-F15). No se repite una
+      que el negocio aún tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese
+      plato: se queda la suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el
+      negocio ya hizo otro a mano con su SKU, o retiró el menú o el plato) no vuelve y su motivo lo dice.
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso

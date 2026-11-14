@@ -134,7 +134,7 @@ zonas:
   «Atiende …» y «Falta el cliente». Cada línea: nombre, precio por unidad, marca de descuento o
   «Invitación», nota y profesional debajo; botones de descuento, nota, invitación y el selector de
   cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
-  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie: la fila «Descuento del ticket» si lo hay, «Total» (el que calcula el
+  este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie: la fila «Descuento del tique» si lo hay, «Total» (el que calcula el
   servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>». En el
   cajón del móvil la barra de arriba y el pie con «Cobrar» se quedan siempre a la vista, encima de la
   barra de pestañas, también en un teléfono de 320×568; lo de en medio (título, chips, pestañas y
@@ -184,11 +184,11 @@ de las filas. Se cierra tocando fuera, con Esc o con el botón atrás del móvil
 
 ### Cuenta (precuenta)
 Ventana «Cuenta» que abre la impresora del pie: el papel que se lleva a la mesa, con el aviso «Cuenta
-— no es una factura. El tiquet fiscal se entrega al cobrar.», y los botones de imprimir y cerrar.
+— no es una factura. El tique fiscal se entrega al cobrar.», y los botones de imprimir y cerrar.
 
 ### Ventas
-Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tickets», «Ingresos»,
-«Ticket medio», «IVA», «Descuentos», «Anuladas») y la tabla (Fecha, Número, Cliente, Pago, Estado,
+Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tiques», «Ingresos»,
+«Tique medio», «IVA», «Descuentos», «Anuladas») y la tabla (Fecha, Número, Cliente, Pago, Estado,
 Total) con el buscador «Buscar número o cliente…», filtros, vista tabla o tarjetas, 50 por página.
 Por fila: «Documento», «Reimprimir», «Anular» y «Devolver», cada una donde aplica; quien no tiene el
 permiso de anular o de devolver también las ve, y un responsable se lo aprueba con su PIN. Vacía: «Aún
@@ -196,7 +196,7 @@ no hay ventas.»; cargando: «Cargando…»; error: el aviso con «Reintentar».
 
 ### Documento de venta
 Ventana del tique de una venta: el papel tal como se imprime (título «Tique» o «Factura», el negocio con su NIF,
-el número que le dio Facturación —«Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»— o, sin
+el número que le dio Facturación —«Factura FACT-2026-000012», «Tique TICKET-2026-000031»— o, sin
 él, el de la venta, fecha, líneas, una fila de IVA por clave fiscal, total, forma de pago, entregado y
 cambio, pie), la ✕ y la impresora. Toda impresión desde **Ventas** sale con «DUPLICADO». Error:
 «Error cargando el documento».
@@ -675,11 +675,11 @@ Actor: empleado, responsable; por encima del máximo, el cajero con la aprobaci�
 Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Para una línea, toca su etiqueta de precio («Descuento en la línea»); para toda la cuenta, el botón
-   de etiqueta del pie («Descuento del ticket»).
+   de etiqueta del pie («Descuento del tique»).
 2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda del negocio
    («€», «zł»…).
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
-   la fila «Descuento del ticket −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
+   la fila «Descuento del tique −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
    importe fijo: un 10 % sobre 8,50 € dice «−0,85 €», nunca «−0,00 €». Lo calcula el servidor (la
    valoración del cobro, `ticket_discount_amount`) sobre las líneas ya con su propio descuento.
 4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
@@ -900,7 +900,7 @@ Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
 2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor de hoy, con la «Cabecera del
    recibo» debajo como añadido; sin emisor, como dice SALE-F29), las líneas, notas, descuentos, el
-   desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.». Con descuento en la
+   desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tique fiscal se entrega al cobrar.». Con descuento en la
    cuenta, la fila «Descuento» dice lo que quita (el mismo importe que el pie del TPV, SALE-F14): con
    precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
@@ -1059,7 +1059,7 @@ Pantalla: Ventas
 Pasos:
 1. Abre **Ventas / TPV → Ventas**. Arriba, el periodo («Hoy» por defecto, «7 días», «30 días»,
    «Todo»), contado en el día del negocio.
-2. Las cifras del periodo: «Tickets», «Ingresos», «Ticket medio», «IVA», «Descuentos» y «Anuladas».
+2. Las cifras del periodo: «Tiques», «Ingresos», «Tique medio», «IVA», «Descuentos» y «Anuladas».
    «Ingresos» ya resta lo devuelto. La cifra del impuesto lleva el nombre del impuesto con que se
    declararon las ventas del periodo: «IVA», «IGIC» si todas se cobraron con IGIC (Canarias) o «IPSI»
    (Ceuta y Melilla). Si en el periodo hay ventas de dos impuestos (porque el negocio cambió de
@@ -1072,7 +1072,7 @@ Pasos:
 4. Toca una fila para ver su documento (SALE-F29). La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
 5. Las cifras de hoy también están en el **Inicio**, en el tablero, como en el producto actual: «Ventas
-   hoy» y «Tickets hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
+   hoy» y «Tiques hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
    hoy) y «Actividad reciente» (las ocho últimas ventas, la más nueva arriba, con su número y su
    cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
    una venta, sin recargar. Quien no tiene permiso de informes solo puede poner «Actividad reciente».
@@ -1123,7 +1123,7 @@ Pasos:
    recibo» debajo como añadido, sin repetir lo que el emisor ya dice. Sin emisor configurado, la primera
    línea de la cabecera es el nombre y el resto el domicilio; sin cabecera, el nombre con el que se dio de
    alta el negocio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
-   dio Facturación en el cobro («Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»; sin
+   dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
    de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
    cambio, y el pie. Con **VeriFactu**, antes del pie va el QR fiscal: «QR tributario:» encima,
@@ -1944,7 +1944,7 @@ es una línea.
     medio de pago por nombre o tipo, sección y nota por nombre (409 `*_ambiguous` si casan
     varios).
 12. **El cajero** es un empleado: monta la cuenta y cobra.
-13. **Las cifras del panel de inicio** («Ventas hoy», «Tickets hoy», «Ventas últimos 7 días»,
+13. **Las cifras del panel de inicio** («Ventas hoy», «Tiques hoy», «Ventas últimos 7 días»,
     «Actividad reciente») vuelven al tablero del Inicio, como en el producto actual (ronda PLAN-HUB
     2026-10-21, que deroga el «no tienen dónde pintarse» anterior): son los `widgets` del
     `LiveAppConfig` sobre `sale.sale.today`, `sale.sale.last_7_days` y `sale.sale.list` (ocho, la más
