@@ -505,6 +505,23 @@ class TestChoicesComeBack:
         run_in(hub, "combo.option.drop_product", id=product)
         assert offered(hub) == []
 
+    def copied_then_withdrawn(self, recoveries, hub, courses):
+        """A copy of ``hub``, and then its menu withdrawn by the business with its courses and choices: the copy and the
+        menu's id."""
+        with use_hub(hub):
+            withdrawn = ChoiceGroup.objects.get(pk=courses["Mains"]).combo_id
+        copy = recoveries.copy_of(hub)
+        run_in(hub, "combo.combo.delete", id=withdrawn)
+        return copy, withdrawn
+
+    def nothing_comes_back_twice(self, recoveries, copy, hub, *asked: str) -> None:
+        """Asked again from ``copy``, nothing is made twice: each thing counts nothing and the two choices stay."""
+        again = recoveries.ask(copy, *asked)
+        assert run() == 1
+        before = [CATEGORIES, PRODUCTS, LINKS] if "inventory" in asked else []
+        assert said(again) == ("done", [*before, MENUS, COURSES, CHOICES])
+        assert len(offered(hub)) == 2
+
     def test_a_deleted_product_comes_back_offered_in_its_menus(self, recoveries, every_app_on):
         hub, burger, _ = self.a_business(recoveries, every_app_on)
         copy = recoveries.copy_of(hub)
@@ -524,10 +541,7 @@ class TestChoicesComeBack:
         [menu] = run_in(hub, "combo.combo.for_sale").rows
         assert [option.product_id for group in menu.groups for option in group.options] == [burger]
         # Asked again, nothing is offered twice.
-        again = recoveries.ask(copy, "inventory", "combo")
-        assert run() == 1
-        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, MENUS, COURSES, CHOICES])
-        assert len(offered(hub)) == 2
+        self.nothing_comes_back_twice(recoveries, copy, hub, "inventory", "combo")
 
     def test_a_product_gone_altogether_comes_back_as_a_new_one_offered_in_its_menus(self, recoveries, every_app_on):
         hub, burger, _ = self.a_business(recoveries, every_app_on)
@@ -549,10 +563,7 @@ class TestChoicesComeBack:
         [menu] = run_in(hub, "combo.combo.for_sale").rows
         assert [option.product_id for group in menu.groups for option in group.options] == [made]
         # Asked again, nothing is offered twice: its choices are in their place on the one made again.
-        again = recoveries.ask(copy, "inventory", "combo")
-        assert run() == 1
-        assert said(again) == ("done", [CATEGORIES, PRODUCTS, LINKS, MENUS, COURSES, CHOICES])
-        assert len(offered(hub)) == 2
+        self.nothing_comes_back_twice(recoveries, copy, hub, "inventory", "combo")
 
     def test_a_product_gone_the_business_made_again_by_hand_keeps_its_own_choices(self, recoveries, every_app_on):
         hub, burger, courses = self.a_business(recoveries, every_app_on)
@@ -624,17 +635,11 @@ class TestChoicesComeBack:
             True, courses["Sides"], 0, 1,
         )
         # Asked again, nothing comes back twice.
-        again = recoveries.ask(copy, "combo")
-        assert run() == 1
-        assert said(again) == ("done", [MENUS, COURSES, CHOICES])
-        assert len(offered(hub)) == 2
+        self.nothing_comes_back_twice(recoveries, copy, hub, "combo")
 
     def test_a_menu_the_business_withdrew_comes_back_with_its_courses_and_choices(self, recoveries, every_app_on):
         hub, burger, courses = self.a_business(recoveries, every_app_on)
-        with use_hub(hub):
-            withdrawn = ChoiceGroup.objects.get(pk=courses["Mains"]).combo_id
-        copy = recoveries.copy_of(hub)
-        run_in(hub, "combo.combo.delete", id=withdrawn)
+        copy, withdrawn = self.copied_then_withdrawn(recoveries, hub, courses)
         assert offered(hub) == []
         row = recoveries.ask(copy, "combo")
 
@@ -658,19 +663,13 @@ class TestChoicesComeBack:
         )
         # Asked again, nothing comes back twice, though the business renamed it.
         run_in(hub, "combo.combo.update", id=menu.id, name="Lunch menu")
-        again = recoveries.ask(copy, "combo")
-        assert run() == 1
-        assert said(again) == ("done", [MENUS, COURSES, CHOICES])
-        assert len(offered(hub)) == 2
+        self.nothing_comes_back_twice(recoveries, copy, hub, "combo")
 
     def test_a_menu_made_again_by_hand_keeps_its_own_and_what_hung_from_the_copys_says_why(
         self, recoveries, every_app_on
     ):
         hub, _, courses = self.a_business(recoveries, every_app_on)
-        with use_hub(hub):
-            withdrawn = ChoiceGroup.objects.get(pk=courses["Mains"]).combo_id
-        copy = recoveries.copy_of(hub)
-        run_in(hub, "combo.combo.delete", id=withdrawn)
+        copy, _ = self.copied_then_withdrawn(recoveries, hub, courses)
         own = run_in(hub, "combo.combo.create", name="Menu of the day", price=1500, tax_category_key=a_tax_key(hub)).id
         run_in(hub, "combo.group.create", combo_id=own, name="Mains")
         row = recoveries.ask(copy, "combo")
