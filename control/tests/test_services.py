@@ -245,6 +245,7 @@ class TestUpdate:
         "held_by",
         [
             "a hub on its way",
+            "a hub going to it in its night",
             "a hub restored from it",
             "a moved copy",
             "a leftover of an undone move",
@@ -259,6 +260,9 @@ class TestUpdate:
         hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
         if held_by == "a hub on its way":
             Hub.objects.filter(pk=hub.pk).update(moving_to=cluster)
+        elif held_by == "a hub going to it in its night":
+            tonight = timezone.now() + dt.timedelta(hours=12)
+            Hub.objects.filter(pk=hub.pk).update(move_scheduled_to=cluster, move_scheduled_for=tonight)
         elif held_by == "a hub restored from it":
             Hub.objects.filter(pk=hub.pk).update(restoring_from=cluster)
         elif held_by == "a moved copy":

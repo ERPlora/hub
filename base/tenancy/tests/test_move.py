@@ -253,6 +253,43 @@ class TestAMoveAskedForTheNight:
         assert (started.moving_to_id, started.move_scheduled_to_id) == (target.pk, None)
         assert started.move_scheduled_for is None
 
+    def test_the_place_it_was_keeping_on_a_cluster_with_one_left_is_its_own(self, moves):
+        target = moves.cluster(max_hubs=1)
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+
+        assert run(now) == 1
+
+        assert (fresh(hub).cluster_id, fresh(hub).last_error) == (target.pk, "")
+
+    def test_a_size_that_cannot_be_read_leaves_it_asked_and_the_next_pass_starts_it(self, moves, monkeypatch):
+        from control import queries
+
+        target = moves.cluster()
+        now = timezone.now()
+        hub = self.scheduled(moves, target, now, hour=3, due=dt.timedelta(minutes=1))
+        measure = queries.measure
+        reads = []
+
+        def unreachable_once(cluster, names):
+            reads.append(names)
+            if len(reads) == 1:
+                raise queries._unreachable(cluster, "the server is restarting")
+            return measure(cluster, names)
+
+        monkeypatch.setattr(queries, "measure", unreachable_once)
+
+        assert run(now) == 0
+
+        waiting = fresh(hub)
+        assert (waiting.moving_to_id, waiting.move_scheduled_to_id, waiting.last_error) == (None, target.pk, "")
+        assert waiting.move_scheduled_for == now - dt.timedelta(minutes=1)
+        with use_control():
+            assert not HubDue.objects.filter(pk=hub.pk).exists()
+
+        assert run(now) == 1
+        assert fresh(hub).cluster_id == target.pk
+
     def test_one_refused_when_its_night_comes_says_why_and_closes_nothing(self, moves):
         target = moves.cluster(is_open=False)
         now = timezone.now()

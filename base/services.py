@@ -1331,11 +1331,13 @@ def place_hub(hub_id: UUID) -> Hub:
             .values_list("cluster")
             .annotate(count=Count("pk"))
         )
-        # The hubs on their way to a cluster (``control.hub.move``) take their place there already.
-        for cluster_id, count in Hub.objects.filter(moving_to__in=clusters).values_list("moving_to").annotate(
-            count=Count("pk")
-        ):
-            placed[cluster_id] = placed.get(cluster_id, 0) + count
+        # The hubs on their way to a cluster (``control.hub.move``), now or in their night, take their place there
+        # already.
+        for coming in ("moving_to", "move_scheduled_to"):
+            for cluster_id, count in (
+                Hub.objects.filter(**{f"{coming}__in": clusters}).values_list(coming).annotate(count=Count("pk"))
+            ):
+                placed[cluster_id] = placed.get(cluster_id, 0) + count
         room = [
             cluster
             for cluster in clusters
