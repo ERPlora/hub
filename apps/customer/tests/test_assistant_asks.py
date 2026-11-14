@@ -16,6 +16,7 @@ from apps.customer.schemas import MergeIn
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_asks_bring, offered_to
+from base.tests.test_assistant_asks import english_words_test, said_in_spanish_too_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 from .conftest import ctx_for
@@ -90,6 +91,17 @@ def test_a_customers_orders_in_the_persons_own_words_reach_their_tool_by_its_ask
     catalog_of, role, language, name, phrase
 ):
     assert_its_asks_bring(catalog_of(role, language), name, phrase, language)
+
+
+#: What the owner says in English in words of their own for the order tool whose English words above its English
+#: asks do not lift (the Spanish asks say the same), neither an ask nor a probe of layer 2: here they do.
+OWN_WORDS_EN = [
+    ("customer.order.customer", "whose is this one?"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+#: The order tool whose English asks say nothing its Spanish asks or description do not: no English phrase depends
+#: on them, so what sees them change is that they keep saying nothing else.
+test_the_english_asks_that_say_nothing_new_keep_saying_nothing_new = said_in_spanish_too_test(["customer.order.list"])
 
 
 @pytest.mark.django_db

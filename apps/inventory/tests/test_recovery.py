@@ -567,6 +567,62 @@ def test_each_category_brought_back_gets_the_products_of_the_one_it_stands_for_t
 
 
 @pytest.mark.django_db
+def test_the_copy_gives_its_live_categories_by_id_with_their_names():
+    drinks, desserts = category("Drinks"), category("Desserts")
+    category("Old menu", is_deleted=True)
+
+    assert queries.category_names_in_copy(direct()) == {drinks.pk: "Drinks", desserts.pk: "Desserts"}
+
+
+@pytest.mark.django_db
+def test_a_category_no_longer_held_live_stands_for_the_one_a_recovery_brought_back_with_its_name():
+    # Held, but deleted; and gone altogether: each stands for the one a recovery made again with its name.
+    desserts = category("Desserts", is_deleted=True)
+    gone = uuid.uuid7()
+    desserts_back, specials_back = brought_back("Desserts"), brought_back(" specials ")
+
+    standing = queries.categories_standing_for({desserts.pk: "Desserts", gone: "Specials"})
+
+    assert standing == {desserts.pk: desserts_back.pk, gone: specials_back.pk}
+
+
+@pytest.mark.django_db
+def test_a_category_still_live_is_itself_and_one_made_again_by_hand_or_deleted_since_stands_for_none():
+    # Still live, renamed since, and its old name taken by one a recovery brought back: it is itself, by its id.
+    drinks = category("Beverages")
+    brought_back("Drinks")
+    # Made again by hand with its name: the business's own, set up as it chose.
+    category("Desserts", created_by="user:7")
+    # Brought back by a recovery, then deleted by the business.
+    brought_back("Specials", is_deleted=True)
+    copy = {drinks.pk: "Drinks", uuid.uuid7(): "Desserts", uuid.uuid7(): "Specials"}
+
+    assert queries.categories_standing_for(copy) == {}
+
+
+@pytest.mark.django_db
+def test_a_category_of_the_copy_brought_back_earlier_is_its_own_and_stands_for_no_other():
+    # Brought back by an earlier recovery before the copy was made, and kept: it is the copy's own, never the stand-in
+    # of another of the copy's with its name. The whole copy is given, so the pairing is the categories' part's.
+    lost = category("Specials", is_deleted=True)
+    earlier = brought_back("Specials")
+
+    assert queries.categories_standing_for({lost.pk: "Specials", earlier.pk: "Specials"}) == {}
+    # Read alone, the lost one would take it.
+    assert queries.categories_standing_for({lost.pk: "Specials"}) == {lost.pk: earlier.pk}
+
+
+@pytest.mark.django_db
+def test_each_category_brought_back_stands_for_one_of_the_copy_the_oldest_first():
+    lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
+    first_back, second_back = brought_back("Specials"), brought_back("specials")
+
+    standing = queries.categories_standing_for({also_lost.pk: "Specials", lost.pk: "Specials"})
+
+    assert standing == {lost.pk: first_back.pk, also_lost.pk: second_back.pk}
+
+
+@pytest.mark.django_db
 def test_with_nothing_read_nothing_is_lacking():
     # The platform asks what is lacking also when the copy gave nothing.
     assert queries.categories_not_in_business([]) == []
