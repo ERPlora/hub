@@ -19,6 +19,7 @@ import { useT } from '../composables/useT';
 import type { PrinterDraft } from '../lib/discovery';
 import { refusal } from '../lib/refusal';
 import type { PaperWidth, PrinterKind, PrinterOut, Usage } from '../operations';
+import PrintingNameField from './PrintingNameField.vue';
 
 // `draft`: a printer «Search printers» found (PRINTING-F02), for a new one: its name, connection, address
 // and paper come filled in; the person still checks them and gives it a role.
@@ -130,18 +131,12 @@ const canDismiss = useUnsavedFormOnOpen(
   >
     <template #default="{ fieldErrors }">
       <div class="printing-printer">
-        <ion-input
+        <PrintingNameField
+          v-model="name"
           data-testid="printing-printer-name"
           name="name"
           :label="$t('printing.modal.name')"
-          label-placement="stacked"
-          fill="outline"
-          mode="md"
-          :maxlength="100"
-          :value="name"
           :error-text="nameError(fieldErrors)"
-          :class="{ 'ion-invalid': !!nameError(fieldErrors), 'ion-touched': !!nameError(fieldErrors) }"
-          @ion-input="name = String($event.detail.value ?? '')"
         />
         <ion-select
           data-testid="printing-printer-kind"

@@ -59,6 +59,13 @@ describe('DeviceModal', () => {
     expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
   });
 
+  it('asks for the device’s name under its label, with an example of one, in English and in Spanish', async () => {
+    const en = (await setup()).field('name');
+    expect([prop(en, 'label'), prop(en, 'placeholder')]).toEqual(['Device name', 'Counter till']);
+    const es = (await setup(null, [TILL, KITCHEN], 'es')).field('name');
+    expect([prop(es, 'label'), prop(es, 'placeholder')]).toEqual(['Nombre del dispositivo', 'Caja del mostrador']);
+  });
+
   it('asks for a name and at least one printer before sending anything', async () => {
     const s = await setup();
     await s.submit();
