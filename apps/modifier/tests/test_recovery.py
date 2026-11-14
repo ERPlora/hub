@@ -145,7 +145,7 @@ def test_with_nothing_read_nothing_is_lacking():
 
 @pytest.mark.django_db
 def test_the_copy_gives_each_group_hung_from_a_live_category_with_what_its_attach_takes():
-    mains, drinks = make_category("Mains"), make_category("Drinks")
+    mains, drinks, bare = make_category("Mains"), make_category("Drinks"), make_category("Bare")
     sauces, extras = a_group("Sauces"), a_group("Extras")
     on_mains = hang(sauces, category=mains)
     extra_mains = hang(extras, category=mains)
@@ -159,8 +159,9 @@ def test_the_copy_gives_each_group_hung_from_a_live_category_with_what_its_attac
 
     read = queries.category_links_in_copy(direct())
 
-    # With the copy's live categories by name, to find the one a recovery brought back if the business lost it.
-    named = {mains.id: "Mains", drinks.id: "Drinks"}
+    # With every live category of the copy by name, one no group hangs from too: the pairing with the business's
+    # needs the whole copy, to tell one the copy also holds from the stand-in of another with its name.
+    named = {mains.id: "Mains", drinks.id: "Drinks", bare.id: "Bare"}
     assert read == [
         {"id": on_mains.id, "group_id": sauces.id, "category_id": mains.id, "copy_categories": named},
         {"id": extra_mains.id, "group_id": extras.id, "category_id": mains.id, "copy_categories": named},
