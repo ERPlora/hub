@@ -3122,7 +3122,8 @@ Pasos:
       Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
       contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
       grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer otro, y el que ya no tiene se
-      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó no vuelve. A una ficha
+      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó, o que su campo ya no
+      admite, no vuelve, y la ficha vuelve sin él, con su nota («Clientes: se crearon 2, 1 con notas»; hub#1438). A una ficha
       eliminada que vuelve le vuelven también el grupo, la etiqueta o el campo propio que el negocio borró después, igual
       que a la ficha nueva (hub#1356); lo que el negocio aún tiene se queda como está, aunque la sacara de un grupo o le
       quitara un valor antes de eliminarla, y un valor que ya tiene en un campo que el negocio volvió a crear se queda.
@@ -3263,12 +3264,11 @@ página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su result
 el negocio («Clientes: nada (app_inactive: …)»; en una app que devuelve varias cosas, cada una lo dice: «Categorías de
 servicios: nada (app_inactive: …); Servicios: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
 tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
-operación de crear no acepta hoy (un teléfono que ya no vale, un valor de un campo propio que su campo ya no admite, un producto sin categoría fiscal o con una que Impuestos
+operación de crear no acepta hoy (un teléfono que ya no vale, un producto sin categoría fiscal o con una que Impuestos
 ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
 una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
 motivo, y lo demás vuelve; también una ficha eliminada que
-entretanto se unió a otra o se borró («customer.customer_unavailable: …»), o con un valor que el campo que el negocio
-volvió a crear ya no admite, que sigue eliminada («customer.field_invalid_option: …»). Si la copia ya no está,
+entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
 la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
 restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
 mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
@@ -3280,8 +3280,8 @@ SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12,
 PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
-hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1442, hub#1456, hub#1457, hub#1458,
-hub#1459, aws#77
+hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
+hub#1458, hub#1459, aws#77
 
 ## Para quien lo mantiene
 

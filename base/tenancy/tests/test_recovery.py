@@ -811,7 +811,8 @@ def came_back_without(monkeypatch, operation: str, left_out) -> None:
 
     def saying_what_it_left(ctx, data):
         made = plain.model_validate(real(ctx, data))
-        return Recovered(**made.model_dump(), left_out=left_out(data))
+        # An output that mixes it in already, as Customers' does, says here what the test makes it say.
+        return Recovered(**(made.model_dump() | {"left_out": left_out(data)}))
 
     monkeypatch.setattr(op, "fn", saying_what_it_left)
     monkeypatch.setattr(op, "output", Recovered)
