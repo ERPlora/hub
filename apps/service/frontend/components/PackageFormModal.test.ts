@@ -229,6 +229,12 @@ describe('PackageFormModal: a refusal of the lines as a whole', () => {
     expect(s.sent()).toHaveLength(1);
   });
 
+  it('the lines are one group, named as their heading says', async () => {
+    const s = await setup();
+    const group = s.inDoc('service-package-form-add-line')?.closest('fieldset');
+    expect([group?.getAttribute('name'), group?.getAttribute('aria-label')]).toEqual(['items', 'Services included']);
+  });
+
   it('a change to the lines leaves another field’s refusal under it', async () => {
     const s = await refusedLines({ name: NAME_TAKEN, items: REPEATED });
     await ionValue(s.field('line-sessions-1'), '3', 'ionInput');

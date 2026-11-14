@@ -357,6 +357,7 @@ async function save(): Promise<void> {
           ref="itemsGroup"
           name="items"
           class="service-package-form__lines"
+          :aria-label="$t('service.packages.form.lines')"
         >
           <div
             v-for="(line, index) in form.lines"
