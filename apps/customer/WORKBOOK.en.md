@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bc03fa99b2758c49938bd944d82698022ad33950f8ead8b52bc4c2146f24c96a -->
+<!-- generated from WORKBOOK.md sha256:aaf13e67aca65776d9e0f9a90597a7a48b3112cd6d26e36f33aee11fbc7b8dc9 -->
 
 ## What it is for and who it is for
 
@@ -252,7 +252,9 @@ Steps:
 1. From **Customers**, tap the row.
 2. The card shows all its details (also internal notes, birthday, anniversary and custom fields, which
    in the current product were only seen when editing), its groups and tags, its consent per channel, the
-   activity (newest first, 50 per page), its purchases and the blocks of other apps.
+   activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
+   name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps.
 3. **← Back** returns to the list.
 In: the card and, apart, its activity, its purchases and its consent history.
 Out: nothing; read only. If another person changes it while it is open, the change is seen without

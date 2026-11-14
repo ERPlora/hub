@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:58019a998c48a3783b0309e52e9d66dbc783c2b5042b76a03144d8799be721a6 -->
+<!-- generated from WORKBOOK.md sha256:24a5ac72b16eda5fe7d5aec06d6284d7b79b662f91e1e52ac680785195457084 -->
 
 ## What it is for and who it is for
 
@@ -134,6 +134,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F07 | Charge the supplement: price and VAT | done |
 | MODIFIER-F08 | Have the supplement show on the kitchen ticket | done |
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
+| MODIFIER-F10 | Recover a product's modifier groups from a separate copy | done |
 
 ### MODIFIER-F01 Look up and search the groups
 Status: done
@@ -333,8 +334,37 @@ In: Inventory's notice (product deleted, category deleted).
 Out: the links removed. While the notice arrives, a link to something deleted is no longer seen in the
 group's sheet nor asked at the till.
 If it fails: repeating the notice changes nothing; the deletion of one business never removes the
-links of another.
-Involved: INVENTORY-F04, INVENTORY-F07
+links of another. If ERPlora's staff later recover the product from a separate copy, its groups come back with it
+(MODIFIER-F10).
+Involved: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
+
+### MODIFIER-F10 Recover a product's modifier groups from a separate copy
+Status: done
+Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
+Screen: none of Modifiers: in the Hubs admin, Separate copies › "Recover into the business…", with **Modifier groups
+of products** ticked (it is, like everything that can be brought back)
+Steps:
+1. The staff recover from a separate copy with **Modifier groups of products** ticked. Modifiers always goes after
+   Inventory, in whatever order it is asked: a deleted product that comes back is already live when its groups are
+   linked to it.
+2. Each group that in the copy hung from a product live in it and that the business no longer has linked to that
+   product is linked again, as the group's sheet links it (MODIFIER-F05): the product asks again at the till for its
+   sauces, its doneness or its extras.
+3. Recoveries counts it apart: "Modifier groups of products: 2 created".
+In: the separate copy and what the business has today.
+Out: a link for each one that was missing, with its link-made notice (`modifier.link.attached`) made by the recovery,
+so no automation starts (FLOW-F21); nothing else. The open screens of Modifiers, the till and Kitchen's routing see at
+once the product that comes back, as they saw it being deleted.
+If it fails: a link the business still has stays as it is, and one whose group the business has linked to that product
+again is not repeated: the business's own stays, and asking again links nothing twice. A group the business unlinked
+from a product by hand after the copy comes back too, like everything the business no longer has (BASE-F114). What the
+group's sheet does not accept today does not come back and Recoveries says why, by the link's identifier in the copy:
+a product that stays deleted (Products was not recovered, or the business already made another one with its SKU) or a
+group the business deleted afterwards ("not_found: …"); a deleted group is not recovered from the copy (hub#1458). A
+product the business no longer had at all comes back as a new one, with another identifier (INVENTORY-F01), and its
+groups in the copy do not come back with it (hub#1457). The groups linked to a category do not come back: not to a
+recovered category either (hub#1456).
+Involved: BASE-F114, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Services: what goes in and what comes out
 
@@ -393,7 +423,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Adds an option to a group | manage | F04 | `modifier.option.create` |
 | Changes an option (what is not sent stays) | manage | F04 | `modifier.option.update` |
 | Deletes an option | manage | F04 | `modifier.option.delete` |
-| Links a group to a product or a category | manage | F05 | `modifier.link.attach` |
+| Links a group to a product or a category | manage | F05, F10 | `modifier.link.attach` |
 | Unlinks a group from a product or a category | manage | F05 | `modifier.link.detach` |
 
 ### What it announces
@@ -402,7 +432,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 |---|---|---|---|
 | Group created, changed or deleted | F02, F03 | The group (`id`, `name`) | `modifier.group.created`, `.updated`, `.deleted` |
 | Option created, changed or deleted | F04 | The option, its group, its name and its supplement | `modifier.option.created`, `.updated`, `.deleted` |
-| Link made or removed | F05, F09 | The group and the product or the category | `modifier.link.attached`, `.detached` |
+| Link made or removed | F05, F09, F10 | The group and the product or the category | `modifier.link.attached`, `.detached` |
 
 ### What it reacts to
 
@@ -416,6 +446,8 @@ The groups, a group, the options, the links and the groups of a product can be f
 - **Inventory** (requirement): its products and categories, which each link points at, and the
   categories of each product, to know which groups it carries at the till.
 - **Taxes** (requirement): the own tax category of an option.
+- **From the platform**: the recovery from a separate copy (BASE-F114), to which Modifiers says which groups of
+  products it gives back (F10).
 
 ### Who uses it
 

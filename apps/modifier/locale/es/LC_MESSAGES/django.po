@@ -23,6 +23,9 @@ msgstr "Suplementos y elecciones de un plato: salsas, punto, extras, cada uno co
 msgid "Modifiers keeps the choices that go with what you sell: the doneness of the meat, an extra of cheese, the size, «no onion». Each group says how many options must be chosen and whether one can be repeated; each option carries its supplement, more, less or free, and can come chosen by default. One group serves many products and whole categories, and the till asks for it, charges the supplement at the catalog price and sends it to the kitchen with its own name."
 msgstr "Suplementos guarda las elecciones que acompañan a lo que vendes: el punto de la carne, un extra de queso, el tamaño, «sin cebolla». Cada grupo dice cuántas opciones hay que elegir y si una se puede repetir; cada opción lleva su suplemento, más, menos o gratis, y puede salir elegida por defecto. Un mismo grupo sirve a muchos productos y a categorías enteras, y el TPV lo pregunta, cobra el suplemento al precio del catálogo y lo manda a cocina con su propio nombre."
 
+msgid "Modifier groups of products"
+msgstr "Grupos de suplementos de productos"
+
 msgid "name"
 msgstr "nombre"
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9c3ba2579e0563126f3154fa449fc28a603e18f08dc6f04eb72f45b0bed92955 -->
+<!-- generated from WORKBOOK.md sha256:a186c1f4bf620e0c843c0f9d7cfade675497b291cc76249a4a92464105d74636 -->
 
 ## What it is for and who it is for
 
@@ -150,7 +150,8 @@ its dialog. The actions only show to whoever can manage stations (manager, admin
 ### History
 Menu **Kitchen → History**, title "Kitchen history". Table of what happened in the kitchen, latest first,
 50 per page (another size is chosen at the bottom): Action, Ticket (the number), Dish, Who (the person's
-name or, if they have none, their e-mail; "System" if Kitchen did it by itself), Notes and When (date and
+name or, if they have none, their e-mail, or the API key's; "System" if no person did it: Kitchen by
+itself or an automation), Notes and When (date and
 time of the business). Search box "Search ticket or notes…" (a piece of the number or words of the notes);
 action filter with the same words as the column ("Received", "Created", "Fired", "Ready", "Dish ready",
 "Dish recalled", "Dish voided", "Served", "Recalled", "Cancelled", "Rush", "Rush removed", "Reprinted",
@@ -665,7 +666,8 @@ Actor: employee, manager, administrator
 Screen: History
 Steps:
 1. Open **Kitchen → History**: what happened, on which ticket and with which dish, who (their name or, if
-   they have none, their e-mail), their notes and when, latest first.
+   they have none, their e-mail; "System" if it was no person: Kitchen by itself or an automation), their
+   notes and when, latest first.
 2. In "Search ticket or notes…", write a piece of the ticket's number or a few words of the notes; filter
    by action ("Received", "Cancelled"…).
 3. At the bottom, change page or choose how many entries to see (25, 50…).

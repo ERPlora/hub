@@ -13,6 +13,7 @@ from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.kitchen.models import Ticket
+from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
@@ -710,6 +711,33 @@ def test_the_history_names_who_did_it_by_their_name_never_their_session_id(clock
         ("started", "luis"),
         ("received", ""),
     ]
+
+
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it("luis", "luis"))
+def test_the_history_says_whether_a_person_or_the_platform_did_it(product, caller, who, by_platform):
+    """KITCHEN-F25: a person and an API key are named; the platform's own marks are kept, and the entry says the
+    platform did it, as what the kitchen does by itself (a round received)."""
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor=caller))
+
+    rows = run("kitchen.log.list", {}).rows
+
+    assert [(r.action, r.actor, r.by_platform) for r in rows] == [
+        ("started", who, by_platform),
+        ("received", "", True),
+    ]
+
+
+def test_a_person_named_like_a_mark_of_the_platform_is_still_a_person(product, django_user_model):
+    """KITCHEN-F25: whether the platform did it is read from who the entry saved, not from the name shown: someone
+    whose name reads as the system's mark is named, not taken for the platform."""
+    named_system = django_user_model.objects.create_user("saas:78", email="sys@example.com", first_name="system")
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor=named_system))
+
+    started = run("kitchen.log.list", {}).rows[0]
+
+    assert (started.action, started.actor, started.by_platform) == ("started", "system", False)
 
 
 def test_the_history_needs_its_permission():

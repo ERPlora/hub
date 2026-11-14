@@ -757,7 +757,8 @@ class LogOut(Schema):
     ticket_number: str = Field(description="The ticket's number.")
     item_name: str = Field(description="The dish, for an action on one dish.")
     station_name: str = Field(description="The station of that dish.")
-    actor: str = Field(description="Who did it (empty: the system).")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark (empty: the kitchen by itself).")
+    by_platform: bool = Field(description="No person did it: the platform (the kitchen by itself, an automation, a recovery).")
     notes: str = Field(description="Its notes (a reason).")
     created_at: dt.datetime = Field(description="When.")
 
