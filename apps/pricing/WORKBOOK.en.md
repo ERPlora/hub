@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0c9540c8e6a00c6badcf183b4e965883fc387471782581f4d485e46a0ac8e150 -->
+<!-- generated from WORKBOOK.md sha256:d6862e27e9201e1730d98745baf8cf3d2c70ec9fb6a8432ea9f3708a7dbf4030 -->
 
 ## What it is for and who it is for
 
@@ -470,7 +470,9 @@ Steps:
    Inventory, in whatever order it is asked: a deleted product that comes back is already live when its prices are
    put.
 2. Each price of the copy (of a product live in it or of a service) that the business no longer has comes back to its
-   price list, with its price and its "from quantity", put as the price list's detail puts it (PRICING-F07).
+   price list, with its price and its "from quantity", put as the price list's detail puts it (PRICING-F07). A product
+   the business no longer had at all comes back as a new one, with another identifier (INVENTORY-F01): its prices go to
+   that one, the one the recovery made with its SKU.
 3. Recoveries counts it apart: "Price list prices: 2 created".
 In: the separate copy and what the business has today.
 Out: a price for each one that was missing, with its price-put notice (`pricing.price_item.added`) made by the
@@ -479,11 +481,13 @@ If it fails: a price the business still has, even if it changed its amount or it
 one whose place (the same price list, the same product or service and the same "from quantity") the business has taken
 again, at whatever price, is not repeated: the business's own stays, and asking again puts nothing twice. A price the business removed by hand after the copy comes back too, like everything the business no longer has
 (BASE-F114). What the price list's detail does not accept today does not come back and Recoveries says why: a
-deactivated price list ("pricing.price_list_unavailable: …"), a product that stays deleted (Products was not recovered,
-or the business already made another one with its SKU: "not_found: …"), a service that is gone or Services turned off.
-A product the business no longer had at all comes back as a new one, with another identifier (INVENTORY-F01), and its
-prices in the copy do not come back with it (hub#1442).
-Involved: BASE-F114, INVENTORY-F34, PRICING-F07, PRICING-F14
+deactivated price list ("pricing.price_list_unavailable: …"), a product that stays deleted or that the business no
+longer has (Products was not recovered, or the business already made another one by hand with its SKU, which keeps the
+prices the business gave it: "not_found: …"), a service that is gone or Services turned off. The product a recovery made
+is known by its SKU whether this recovery or an earlier one made it: asked again from an earlier copy, it puts back on it
+the prices the business took off later, like everything the business no longer has. A service the business no longer
+had at all comes back as a new one and its prices in the copy do not come back with it (hub#1459).
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14
 
 ## Services: what goes in and what comes out
 
