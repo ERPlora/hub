@@ -131,7 +131,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CART_CHECKOUT-F14 | Borrar los datos personales de un cliente | hecho |
 
 ### CART_CHECKOUT-F01 Crear un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-create old:cart_checkout/WORKFLOW.md#cart_checkout-f01 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
@@ -151,7 +150,6 @@ existe; una caducidad que ya pasó. Lo tecleado se conserva. Sin permiso, se rec
 Implicados: ninguno
 
 ### CART_CHECKOUT-F02 Añadir una línea a un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-items-add-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f02 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -175,7 +173,6 @@ No se guarda nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F03 Cambiar la cantidad de una línea o quitarla
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-items-remove fi:modules/cart_checkout#command-cart_checkout-items-update-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f03 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -195,7 +192,6 @@ total por encima de lo que cabe en un carrito, debajo de la cantidad. No cambia 
 Implicados: ninguno
 
 ### CART_CHECKOUT-F04 Vaciar un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-clear-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f04 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -211,7 +207,6 @@ Si falla: carrito que no existe o que no está activo. No cambia nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F05 Abandonar un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-mark_abandoned old:cart_checkout/WORKFLOW.md#cart_checkout-f05 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
@@ -226,7 +221,6 @@ la tabla, y no cambia nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F06 Borrar un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-delete old:cart_checkout/WORKFLOW.md#cart_checkout-f06 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
@@ -242,7 +236,6 @@ Si falla: un carrito que no existe (o ya borrado) se rechaza; no cambia nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F07 Caducar los carritos vencidos
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-cleanup_expired-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f07 -->
 Estado: hecho
 Actor: sistema (tarea programada), administrador, asistente
 Pantalla: Carritos (el estado)
@@ -262,7 +255,6 @@ al día en ese momento.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F08 Iniciar el pedido desde un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-checkout-initiate-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f08 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -283,7 +275,6 @@ que no es un email. No se crea pedido, **no se gasta número** y no avisa.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F09 Marcar un pedido como pagado
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-mark_paid old:cart_checkout/WORKFLOW.md#cart_checkout-f09 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
@@ -300,7 +291,6 @@ empleado no puede.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F10 Registrar que el pago falló
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-fail old:cart_checkout/WORKFLOW.md#cart_checkout-f10 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
@@ -318,7 +308,6 @@ lo escrito.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F11 Completar un pedido
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-complete-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f11 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
@@ -332,7 +321,6 @@ Si falla: solo se completa un pedido Pagado; en otro estado se rechaza diciendo 
 Implicados: ninguno
 
 ### CART_CHECKOUT-F12 Consultar carritos, líneas y pedidos
-<!-- origen: fi:modules/cart_checkout#navigation fi:modules/cart_checkout#query-cart_checkout-carts-get fi:modules/cart_checkout#query-cart_checkout-carts-list fi:modules/cart_checkout#query-cart_checkout-items-list fi:modules/cart_checkout#query-cart_checkout-orders-get fi:modules/cart_checkout#query-cart_checkout-orders-list old:cart_checkout/WORKFLOW.md#cart_checkout-f12 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Carritos, Pedidos
@@ -354,7 +342,6 @@ se puede leer, lo que diría el campo de importe («Esto no es un importe. Escri
 Implicados: ninguno
 
 ### CART_CHECKOUT-F13 Avisar a otras apps de lo que ocurre
-<!-- origen: fi:modules/cart_checkout#events-emitidos-catalogo old:cart_checkout/WORKFLOW.md#cart_checkout-f13 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -371,7 +358,6 @@ Si falla: un cambio rechazado no deja ni el cambio ni el aviso.
 Implicados: FLOW-F21 (Automatizaciones arranca con cualquier aviso del negocio)
 
 ### CART_CHECKOUT-F14 Borrar los datos personales de un cliente
-<!-- origen: nuevo (el borrado de datos personales de Shopify y WooCommerce, «erase personal data»: el derecho de supresión del RGPD) -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente; el personal de la plataforma desde el admin
 Pantalla: asistente; admin del Hub (acción «Borrar los datos personales de sus clientes»)

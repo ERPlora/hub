@@ -221,7 +221,6 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
-<!-- origen: wf:restaurante-dia#rec_restaurante-f12 fi:modules/invoice#command-invoice-create_from_sale-handler-wasm-create_from_sale fi:modules/invoice#event-listen-sale-completed-invoice-create_from_sale old:invoice/workflow/emision.md#invoice-f01 qa:modules/invoice/simplified-receipt-vs-invoice wf:cadena-fiscal#rec_fiscal-f02 wf:peluqueria-dia#rec_peluqueria-f11 -->
 Estado: hecho — Ventas lo pide dentro del mismo cobro
 Actor: sistema
 Pantalla: ninguna
@@ -255,7 +254,6 @@ ya no existe no se factura. El techo de la simplificada (3.000 €) lo vigila Ve
 Implicados: SALE-F01, SALE-F04, TAX-F18, TAX-F19
 
 ### INVOICE-F02 La factura completa al cobrar a un cliente con NIF
-<!-- origen: fi:modules/invoice#command-invoice-create_from_sale-handler-wasm-create_from_sale qa:modules/invoice/simplified-receipt-vs-invoice old:invoice/workflow/emision.md#invoice-f02 wf:cadena-fiscal#rec_fiscal-f03 -->
 Estado: hecho — Ventas lo pide dentro del mismo cobro
 Actor: sistema
 Pantalla: ninguna
@@ -281,7 +279,6 @@ nombre y sin NIF (queda en el registro de la aplicación), para que nunca quede 
 Implicados: SALE-F04, CUSTOMER-F17
 
 ### INVOICE-F03 Emitir una factura a mano
-<!-- origen: fi:modules/invoice#command-invoice-create-handler-wasm-create_invoice old:invoice/workflow/emision.md#invoice-f03 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Facturas, Nueva factura manual
@@ -326,7 +323,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emiti
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
-<!-- origen: old-hub:HUB-F16 old-hub:HUB-F17 old:invoice/workflow/emision.md#invoice-f04 qa:modules/invoice/convert-receipt-to-invoice wf:cadena-fiscal#rec_fiscal-f10 -->
 Estado: descartado — la página pública donde el cliente escribe sus datos y el código del tique que la abre son de la plataforma y de Ventas; Facturación ya emite la factura completa que esa página pedirá, como en INVOICE-F05 (hub#500)
 Actor: cliente
 Pantalla: página pública de la plataforma (aún no existe)
@@ -340,7 +336,6 @@ Si falla: como en INVOICE-F05.
 Implicados: SALE-F29, INVOICE-F05
 
 ### INVOICE-F05 Pasar un tique a factura completa desde el mostrador
-<!-- origen: qa:modules/invoice/convert-receipt-to-invoice wf:cadena-fiscal#rec_fiscal-f10 old:invoice/workflow/emision.md#invoice-f05 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura, Factura completa
@@ -365,7 +360,6 @@ completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni ga
 Implicados: INVOICE-F04
 
 ### INVOICE-F06 Una venta cobrada que no se ha podido facturar
-<!-- origen: old:invoice/workflow/emision.md#invoice-f06 wf:cadena-fiscal#rec_fiscal-f09 old-hub:HUB-F52 old-hub:HUB-F55 -->
 Estado: hecho
 Actor: sistema, empleado, responsable, administrador, asistente
 Pantalla: ninguna
@@ -395,7 +389,6 @@ documento que ya salió no emite otro ni gasta número.
 Implicados: SALE-F01, SALE-F29
 
 ### INVOICE-F07 Anular una venta cobrada que ya tiene su tique
-<!-- origen: old:invoice/workflow/emision.md#invoice-f07 wf:cadena-fiscal#rec_fiscal-f13 -->
 Estado: hecho — Ventas la pide dentro de la misma anulación
 Actor: sistema
 Pantalla: ninguna
@@ -415,7 +408,6 @@ poder, la anulación sigue adelante y los dos quedan «pendientes», a la vista,
 Implicados: SALE-F30
 
 ### INVOICE-F08 Rectificar una factura a mano
-<!-- origen: fi:modules/invoice#command-invoice-rectify old:invoice/workflow/rectificacion.md#invoice-f08 qa:modules/invoice/corrective-invoice wf:cadena-fiscal#rec_fiscal-f12 -->
 Estado: hecho
 Actor: responsable, administrador, asistente
 Pantalla: Rectificar
@@ -462,7 +454,6 @@ confirmes, no se emite otra: sale «La factura ya está cancelada.».
 Implicados: SALE-F31
 
 ### INVOICE-F09 La rectificativa al devolver una venta entera
-<!-- origen: qa:modules/invoice/corrective-invoice old:invoice/workflow/rectificacion.md#invoice-f09 wf:cadena-fiscal#rec_fiscal-f11 -->
 Estado: hecho — Ventas la pide dentro de la misma devolución
 Actor: sistema
 Pantalla: ninguna
@@ -485,7 +476,6 @@ adelante y los dos quedan «pendientes», a la vista, hasta «Emitir ahora» (IN
 Implicados: SALE-F31
 
 ### INVOICE-F10 La rectificativa por diferencias al devolver parte de una venta
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f11 old:invoice/workflow/rectificacion.md#invoice-f10 -->
 Estado: hecho — Ventas la pide dentro de la misma devolución
 Actor: sistema
 Pantalla: ninguna
@@ -506,7 +496,6 @@ de la original.
 Implicados: SALE-F31
 
 ### INVOICE-F11 Numerar cada documento en su serie y su año
-<!-- origen: fi:modules/invoice_series#command-invoice_series-series-next_number-handler-wasm-get_next_number old:invoice/workflow/numeracion.md#invoice-f11 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -529,7 +518,6 @@ de otro año usa un formato sin el año).
 Implicados: ninguno
 
 ### INVOICE-F12 Crear una serie de numeración
-<!-- origen: fi:modules/invoice#command-invoice-series-create fi:modules/invoice#query-invoice-series-list fi:modules/invoice_series#command-invoice_series-series-create fi:modules/invoice_series#navigation-web-components fi:modules/invoice_series#query-invoice_series-series-list fi:modules/invoice_series#query-invoice_series-series-peek_next old:invoice/workflow/numeracion.md#invoice-f12 qa:modules/invoice/series-and-numbering -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Series
@@ -559,7 +547,6 @@ arriba en cuanto se cambia algo, y vuelven si el siguiente intento también se r
 Implicados: ninguno
 
 ### INVOICE-F13 Cambiar una serie
-<!-- origen: fi:modules/invoice#query-invoice-series-list fi:modules/invoice#command-invoice-series-update fi:modules/invoice_series#command-invoice_series-series-deactivate fi:modules/invoice_series#command-invoice_series-series-set_default-handler-wasm-set_as_default fi:modules/invoice_series#command-invoice_series-series-update fi:modules/invoice_series#query-invoice_series-series-get old:invoice/workflow/numeracion.md#invoice-f13 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Series
@@ -580,7 +567,6 @@ cambiar: el número forma parte de la cadena de VeriFactu. Crea una serie nueva 
 Implicados: ninguno
 
 ### INVOICE-F14 Saber si la numeración del año está preparada
-<!-- origen: old:invoice/workflow/numeracion.md#invoice-f14 -->
 Estado: hecho
 Actor: propietario, responsable, administrador, asistente
 Pantalla: Inicio, Series
@@ -603,7 +589,6 @@ Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente y r
 Implicados: ninguno
 
 ### INVOICE-F15 Comprobar que la numeración no tiene huecos
-<!-- origen: qa:modules/invoice/series-and-numbering fi:modules/invoice_series#query-invoice_series-allocations-list old:invoice/workflow/numeracion.md#invoice-f15 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, asistente
 Pantalla: ninguna (asistente o API)
@@ -620,7 +605,6 @@ saltó números, o uno que nunca se usó; antes del primer número de una serie 
 Implicados: ninguno
 
 ### INVOICE-F16 Buscar una factura
-<!-- origen: fi:modules/invoice#navigation-web-components fi:modules/invoice#query-invoice-list old:invoice/workflow/consulta.md#invoice-f16 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Facturas
@@ -641,7 +625,6 @@ en cualquier campo de importe del Hub y como en las demás listas (hub#1196: «1
 Implicados: ninguno
 
 ### INVOICE-F17 Ver una factura
-<!-- origen: fi:modules/invoice#query-invoice-get fi:modules/invoice#query-invoice-lines old:invoice/workflow/consulta.md#invoice-f17 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
@@ -663,7 +646,6 @@ AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
-<!-- origen: old:invoice/workflow/consulta.md#invoice-f18 qa:verticals/beauty/06-fiscal-and-printing -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Ficha de factura
@@ -691,7 +673,6 @@ aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora n
 Implicados: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Marcar una factura como pagada
-<!-- origen: fi:modules/invoice#command-invoice-mark_paid old:invoice/workflow/consulta.md#invoice-f19 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, asistente
 Pantalla: Facturas, Ficha de factura
@@ -713,7 +694,6 @@ facturas que nacen de una venta ya nacen pagadas y una rectificativa no se paga:
 Implicados: ninguno
 
 ### INVOICE-F20 Dar a otras apps la factura de una venta
-<!-- origen: fi:modules/invoice#query-invoice-by_source old:invoice/workflow/consulta.md#invoice-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -727,7 +707,6 @@ Si falla: si la factura aún no existe, contesta que no hay.
 Implicados: SALE-F29
 
 ### INVOICE-F21 Configurar el emisor
-<!-- origen: old-hub:HUB_SHELL-F164 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Inicio, Facturas, Series, Emisor
@@ -754,7 +733,6 @@ también se rechaza; un rechazo sin campo sale encima del formulario y se queda 
 Implicados: ninguno
 
 ### INVOICE-F22 Recibir el emisor de la cuenta de ERPlora
-<!-- origen: old-hub:HUB_SHELL-F164 -->
 Estado: descartado — la cuenta de ERPlora no manda la identidad fiscal del negocio con los datos del hub y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega (hub#501)
 Actor: sistema
 Pantalla: Emisor
@@ -769,7 +747,6 @@ Si falla: un emisor incompleto o con un NIF no válido se rechaza y queda el ant
 Implicados: ninguno
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
-<!-- origen: nuevo (PLAN-SAAS §4: las facturas de ERPlora las emite su propio hub de plataforma) -->
 Estado: hecho
 Actor: sistema (la cuenta de ERPlora)
 Pantalla: ninguna (nadie entra en el hub de plataforma)

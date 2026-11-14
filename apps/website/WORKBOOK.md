@@ -168,7 +168,6 @@ propietario, tal cual.
 | WEBSITE-F12 | Mostrar las reseñas de Google | hecho |
 
 ### WEBSITE-F01 Rellenar y guardar el borrador
-<!-- origen: nuevo (editor de secciones fijas con borrador y autoguardado, como Square Online, Wix, Squarespace y Shopify; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -190,7 +189,6 @@ la página web de este negocio: vuelve a subirla.».
 Implicados: WEBSITE-F02, WEBSITE-F03, WEBSITE-F04, WEBSITE-F11, WEBSITE-F12
 
 ### WEBSITE-F02 Elegir el diseño, la paleta y el fondo
-<!-- origen: nuevo (plantillas intercambiables sin perder el contenido y paletas claras y oscuras, como Squarespace, Wix y Square Online; ampliación de PLAN §29 del 2026-10-22) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -208,7 +206,6 @@ Si falla: un color mal escrito no se guarda y el campo lo dice:
 Implicados: WEBSITE-F01, WEBSITE-F06
 
 ### WEBSITE-F03 Mostrar u ocultar una sección
-<!-- origen: nuevo (secciones fijas que se ocultan en vez de borrarse, como las de Square Online y Wix; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -225,7 +222,6 @@ Si falla: como al guardar (WEBSITE-F01); ocultar nunca borra lo escrito.
 Implicados: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Subir una imagen
-<!-- origen: nuevo (imágenes en el almacén de ficheros del negocio, servidas desde su dirección; PLAN §29 y PLAN-HUB bloque 7) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, API
 Pantalla: Página web
@@ -248,7 +244,6 @@ antes no ocupa más y se acepta igual.
 Implicados: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Mostrar el catálogo
-<!-- origen: nuevo (el catálogo de la web sale de los productos y servicios del TPV, como en Square Online y Shopify; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -272,7 +267,6 @@ nunca un error; si las categorías no se pueden leer, «No se pudieron cargar la
 Implicados: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 Ver la vista previa
-<!-- origen: nuevo (vista previa real al lado del editor y en su pestaña en el móvil, como Squarespace, Wix y Shopify; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador
 Pantalla: Página web
@@ -289,7 +283,6 @@ previa**.
 Implicados: WEBSITE-F01, WEBSITE-F02, WEBSITE-F05, WEBSITE-F12
 
 ### WEBSITE-F07 Publicar
-<!-- origen: nuevo (borrador frente a lo publicado, con confirmación, como Square Online, Wix y Squarespace; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -306,7 +299,6 @@ Si falla: «No se pudo publicar la página web» y lo publicado sigue como estab
 Implicados: WEBSITE-F05, WEBSITE-F10, WEBSITE-F12
 
 ### WEBSITE-F08 Desconectar la página
-<!-- origen: nuevo (despublicar sin perder nada, como «Unpublish» de Wix y Square Online; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -322,7 +314,6 @@ Si falla: «No se pudo desconectar la página web» y la página sigue en línea
 Implicados: WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F09 Compartir la dirección y el QR
-<!-- origen: nuevo (QR para imprimir y enlace para copiar, como el QR de Square y el de Toast; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, responsable, API
 Pantalla: Compartir y QR
@@ -339,7 +330,6 @@ Si falla: si no se puede copiar, «No se pudo copiar el enlace: selecciónalo y 
 Implicados: WEBSITE-F07, WEBSITE-F10, BASE-F112 (dentro de la app)
 
 ### WEBSITE-F10 Visitar la página pública
-<!-- origen: nuevo (la web del negocio en su propia dirección, con «Entrar» para el equipo; PLAN §29, decisión de Ioan del 21/10) -->
 Estado: hecho (servidor, página pública y e2e)
 Actor: cualquiera, sin cuenta
 Pantalla: La página pública
@@ -360,7 +350,6 @@ misma página: **Entrar** lleva a su dirección de erplora.com y, sin página qu
 Implicados: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Mostrar una galería de fotos
-<!-- origen: nuevo (galería de trabajos del salón, como las de Fresha, Booksy y Square Online; ampliación de PLAN §29 del 2026-10-22) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente (ordenar o quitar fotos ya subidas), API
 Pantalla: Página web
@@ -378,7 +367,6 @@ página web de este negocio: vuelve a subirla.» bajo la galería.
 Implicados: WEBSITE-F04, WEBSITE-F10
 
 ### WEBSITE-F12 Mostrar las reseñas de Google
-<!-- origen: nuevo (valoración y reseñas del Perfil de Empresa de Google con «Escribir una reseña», como Fresha, Square Online y Wix; ampliación de PLAN §29 del 2026-10-22) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente (el enlace), API
 Pantalla: Página web

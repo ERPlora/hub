@@ -227,7 +227,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 fi:modules/tables#command-tables-zones-create fi:modules/tables#query-tables-zones-list old:tables/workflow/plano.md#tables-f01 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Zonas
@@ -246,7 +245,6 @@ otro diga lo mismo (hub#888). Un empleado no ve el «+»; si lo pide por la API,
 Implicados: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Añadir mesas
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-create old:tables/workflow/plano.md#tables-f02 old-hub:HUB_SHELL-F27 gh:tables#24 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Inicio, Plano de sala (Editar plano), Mesas
@@ -274,7 +272,6 @@ se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Colocar las mesas en el plano
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-move old:tables/workflow/plano.md#tables-f03 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano)
@@ -290,7 +287,6 @@ Si falla: «No se pudo guardar la posición» encima del plano; la mesa vuelve a
 Implicados: TABLE-F02, TABLE-F09
 
 ### TABLE-F04 Editar o borrar una mesa
-<!-- origen: fi:modules/tables#command-handler-wasm-tables-tables-delete-delete_table fi:modules/tables#command-tables-tables-update old:tables/workflow/plano.md#tables-f04 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -311,7 +307,6 @@ tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa.».
 Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Sacar una mesa del servicio (bloquearla) y devolverla
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan old:tables/workflow/plano.md#tables-f05 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -329,7 +324,6 @@ motivo.
 Implicados: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Renombrar o borrar una zona
-<!-- origen: fi:modules/tables#command-handler-wasm-tables-zones-delete-delete_zone fi:modules/tables#command-tables-zones-update fi:modules/tables#query-tables-zones-get old:tables/workflow/plano.md#tables-f06 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Zonas, Plano de sala (Editar plano)
@@ -348,7 +342,6 @@ otro diga lo mismo (hub#888).
 Implicados: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Crear muchas mesas de golpe
-<!-- origen: qa:modules/tables/floor-plan-zones-and-tables fi:modules/tables#command-handler-wasm-tables-tables-bulk_create-bulk_create_tables old:tables/workflow/plano.md#tables-f07 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
@@ -363,7 +356,6 @@ ninguna y se dice cuáles.
 Implicados: TABLE-F02
 
 ### TABLE-F08 Ajustar la sala: comensales al sentar y avisos de tiempo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 old:tables/workflow/plano.md#tables-f08 qa:modules/tables/seat-and-open-table -->
 Estado: hecho
 Actor: administrador
 Pantalla: Ajustes
@@ -384,7 +376,6 @@ intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente in
 Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala
-<!-- origen: wf:restaurante-dia#rec_restaurante-f05 qa:verticals/restaurant/04-floor-plan fi:modules/tables#query-tables-tables-list old:tables/workflow/servicio.md#tables-f09 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Plano de sala
@@ -404,7 +395,6 @@ Si falla: un fallo al cargar sale con «Reintentar».
 Implicados: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 qa:modules/reservations/waitlist-and-walk-in qa:modules/tables/seat-and-open-table fi:modules/tables#command-handler-wasm-tables-sessions-open-open_session fi:modules/tables#slot-provides_slots-sales-pos-order_context-erp-tables-pos-zones old:tables/workflow/servicio.md#tables-f10 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -429,7 +419,6 @@ no se sienta. Sentar se hace en la sala, con el grupo delante: una automatizaci�
 Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
 
 ### TABLE-F11 Volver a una mesa ocupada y cobrarla
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f08 qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f11 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -446,7 +435,6 @@ está abierta (se cobró, se anuló o no existe): el TPV sigue como estaba.».
 Implicados: TABLE-F18, SALE-F19
 
 ### TABLE-F12 Llevar a una mesa una cuenta que ya está abierta
-<!-- origen: old:tables/workflow/servicio.md#tables-f12 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Ventas → Vender («Elegir mesa», SALE-F19); asistente
@@ -472,7 +460,6 @@ hace con el grupo delante: una automatización no puede hacerlo.
 Implicados: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
 ### TABLE-F13 Quitar la mesa de una cuenta (aparcarla)
-<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f13 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio); también en Ventas → Vender, «Elegir mesa» → «Quitar de la mesa» (SALE-F19)
@@ -489,7 +476,6 @@ fusionado o aparcado.».
 Implicados: TABLE-F24, SALE-F19
 
 ### TABLE-F14 Corregir los comensales de una mesa ocupada
-<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f14 qa:modules/tables/move-and-merge-tables -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -505,7 +491,6 @@ TABLE-F13). Siempre al menos 1.
 Implicados: TABLE-F10, TABLE-F17
 
 ### TABLE-F15 Pasar la cuenta a otra mesa (transferir)
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:restaurante-dia#rec_restaurante-f10 qa:modules/tables/move-and-merge-tables fi:modules/tables#command-handler-wasm-tables-sessions-transfer-transfer_session old:tables/workflow/servicio.md#tables-f15 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -526,7 +511,6 @@ está libre; «Esa cuenta no está abierta…» si otro ya la movió.
 Implicados: TABLE-F28, SALE-F25
 
 ### TABLE-F16 Juntar las cuentas de dos mesas ocupadas (fusionar)
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:verticals/restaurant/04-floor-plan qa:modules/tables/move-and-merge-tables old:tables/workflow/servicio.md#tables-f16 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -549,7 +533,6 @@ o es la misma mesa sin otra cuenta.
 Implicados: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Dividir la cuenta de una mesa
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/split-bill old:tables/workflow/servicio.md#tables-f17 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -571,7 +554,6 @@ hacerlo.
 Implicados: TABLE-F16, TABLE-F18, SALE-F23, FLOW-F12
 
 ### TABLE-F18 Liberar la mesa al cobrar la cuenta entera
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/07-payment-and-fiscal wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f18 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ventas: Cobro
@@ -588,7 +570,6 @@ Si falla: nada que ver: el plano y Sesiones lo leen de Ventas en cada lectura.
 Implicados: TABLE-F17, TABLE-F22, SALE-F22
 
 ### TABLE-F19 Anular un cobro de una mesa
-<!-- origen: wf:restaurante-dia#rec_restaurante-f15 old:tables/workflow/cierre-e-historial.md#tables-f19 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ventas: Ventas
@@ -602,7 +583,6 @@ Si falla: como TABLE-F18.
 Implicados: TABLE-F22, SALE-F30
 
 ### TABLE-F20 Eliminar en Ventas la cuenta abierta de una mesa
-<!-- origen: qa:verticals/restaurant/08-incidents-voids-and-refunds wf:restaurante-dia#rec_restaurante-f14 old:tables/workflow/cierre-e-historial.md#tables-f20 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ventas: Cuentas abiertas
@@ -615,7 +595,6 @@ Si falla: como TABLE-F18.
 Implicados: TABLE-F21, SALE-F18
 
 ### TABLE-F21 Cerrar una mesa a mano
-<!-- origen: wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f21 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Sesiones, Plano de sala (Servicio)
@@ -636,7 +615,6 @@ dispositivo le cambió la cuenta); «Esa cuenta no está abierta…» (ya la cer
 Implicados: TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Consultar las cuentas de la sala (abiertas y cerradas)
-<!-- origen: wf:restaurante-dia#rec_restaurante-f16 fi:modules/tables#query-tables-sessions-list old:tables/workflow/cierre-e-historial.md#tables-f22 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Sesiones
@@ -652,7 +630,6 @@ Si falla: el error de la tabla con reintento. Las devoluciones no restan del «C
 Implicados: TABLE-F18, TABLE-F19, TABLE-F23
 
 ### TABLE-F23 Borrar una cuenta cerrada del historial
-<!-- origen: fi:modules/tables#command-handler-wasm-tables-sessions-delete-delete_session old:tables/workflow/cierre-e-historial.md#tables-f23 -->
 Estado: hecho
 Actor: administrador, asistente
 Pantalla: Sesiones; asistente
@@ -668,7 +645,6 @@ borrarla.».
 Implicados: TABLE-F22
 
 ### TABLE-F24 Volver a sentar una cuenta aparcada
-<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/cierre-e-historial.md#tables-f24 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Sesiones; también en Ventas → Vender, tocando una mesa en «Elegir mesa» con la cuenta en pantalla (SALE-F19)
@@ -685,7 +661,6 @@ una automatización no puede hacerlo.
 Implicados: TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
 
 ### TABLE-F25 Retener la mesa de una reserva confirmada
-<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f06 wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f25 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en el Plano de sala)
@@ -706,7 +681,6 @@ Si falla: una mesa borrada, desactivada o fuera de servicio no se retiene, y Res
 Implicados: RESERVATION-F07, TABLE-F09, TABLE-F28
 
 ### TABLE-F26 Mover o soltar la retención cuando cambia la reserva
-<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f26 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en el Plano de sala)
@@ -722,7 +696,6 @@ guarda el cambio y la reserva sigue retenida en la vieja.
 Implicados: RESERVATION-F08, TABLE-F25
 
 ### TABLE-F27 Soltar la mesa cuando la reserva se cancela o no se presenta
-<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f27 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en el Plano de sala)
@@ -737,7 +710,6 @@ Si falla: si se pide dos veces, no cambia nada.
 Implicados: RESERVATION-F09, RESERVATION-F10, RESERVATION-F20, TABLE-F25
 
 ### TABLE-F28 Gastar la retención al sentar a la reserva
-<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 old:tables/workflow/reservas.md#tables-f28 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -760,7 +732,6 @@ Si falla: los de TABLE-F10.
 Implicados: RESERVATION-F11, TABLE-F10, TABLE-F25
 
 ### TABLE-F29 Caducar las retenciones vencidas
-<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f29 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -775,7 +746,6 @@ Si falla: se repite en el siguiente repaso; si el hub estuvo parado, hace uno so
 Implicados: TABLE-F09, TABLE-F25
 
 ### TABLE-F30 Retener o soltar una mesa a mano
-<!-- origen: old:tables/workflow/reservas.md#tables-f30 -->
 Estado: hecho
 Actor: responsable, empleado, asistente
 Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
@@ -792,7 +762,6 @@ ya no está: se soltó, ha vencido, o esa reserva nunca llegó a retener una mes
 Implicados: TABLE-F09, TABLE-F28
 
 ### TABLE-F31 Olvidar el nombre de un cliente cuyos datos se borran (RGPD)
-<!-- origen: old:tables/workflow/reservas.md#tables-f31 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Plano de sala
@@ -808,7 +777,6 @@ Si falla: repetirlo no cambia nada; un aviso sin id no toca las retenciones sin 
 Implicados: CUSTOMER-F16, CUSTOMER-F13, RESERVATION-F22
 
 ### TABLE-F32 Poner o quitar el cliente de una mesa
-<!-- origen: gh:sales#569 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)

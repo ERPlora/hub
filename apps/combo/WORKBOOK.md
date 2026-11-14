@@ -159,7 +159,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | COMBO-F15 | Recuperar los menús, sus platos y sus elecciones desde una copia aparte | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
-<!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Menús
@@ -176,7 +175,6 @@ primero con el botón +.».
 Implicados: ninguno
 
 ### COMBO-F02 Crear un menú a precio cerrado
-<!-- origen: old:combos/WORKFLOW.md#combos-f02 qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -210,7 +208,6 @@ permiso de gestión no hay botón +.
 Implicados: TAX-F01
 
 ### COMBO-F03 Cambiar los datos de un menú, ponerlo o quitarlo de la venta
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -228,7 +225,6 @@ Si falla: los mismos avisos que el alta. Pasar a «en el local» sin tipo de IVA
 Implicados: SALE-F12
 
 ### COMBO-F04 Retirar un menú
-<!-- origen: old:combos/WORKFLOW.md#combos-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -248,7 +244,6 @@ se retira nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Montar los platos de un menú
-<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -276,7 +271,6 @@ la tarjeta.
 Implicados: COMBO-F15
 
 ### COMBO-F06 Elegir los productos de cada plato y su suplemento
-<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f03 old:combos/WORKFLOW.md#combos-f06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -319,7 +313,6 @@ menú, el plato y el producto que enseñó la tarjeta.
 Implicados: INVENTORY-F27
 
 ### COMBO-F07 Elegir un menú al vender
-<!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f07 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -348,7 +341,6 @@ también se ven y se venden.
 Implicados: SALE-F12, MODIFIER-F06
 
 ### COMBO-F08 Cobrar el menú: precio cerrado y suplementos
-<!-- origen: qa:modules/combos/set-menu-and-combos old:combos/WORKFLOW.md#combos-f08 wf:restaurante-dia#rec_restaurante-f11 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -375,7 +367,6 @@ Sin Menús activa, el TPV no ofrece menús y uno pedido por la API se rechaza.
 Implicados: SALE-F12
 
 ### COMBO-F09 Repartir el IVA de un menú
-<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F09 old:combos/WORKFLOW.md#combos-f09 wf:restaurante-dia#rec_restaurante-f12 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -413,7 +404,6 @@ categorías distintas, el menú no sale en el TPV.
 Implicados: SALE-F12, TAX-F19
 
 ### COMBO-F10 Bajar el stock de cada plato al cobrar
-<!-- origen: qa:modules/combos/set-menu-and-combos wf:restaurante-dia#rec_restaurante-f11 old:combos/WORKFLOW.md#combos-f10 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -434,7 +424,6 @@ solo (INVENTORY-F21).
 Implicados: INVENTORY-F22, INVENTORY-F23, INVENTORY-F24, SALE-F12
 
 ### COMBO-F11 Mandar el menú a cocina
-<!-- origen: qa:modules/combos/set-menu-and-combos old-hub:HUB_PERIPHERALS-F10 old:combos/WORKFLOW.md#combos-f11 wf:restaurante-dia#rec_restaurante-f07 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: ninguna (la comanda la pinta Cocina)
@@ -453,7 +442,6 @@ pedirlo), así que nunca llega a cocina a medias. Un plato que es un servicio no
 Implicados: KITCHEN-F06, KITCHEN-F08, SALE-F12, SALE-F20
 
 ### COMBO-F12 Marcar una elección como agotada
-<!-- origen: nuevo (mercado: Square y Lightspeed dejan marcar agotado lo que el menú ofrece, sin quitarlo; INVENTORY-F29) -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -472,7 +460,6 @@ en el TPV y el aviso del constructor lo dice. Una cuenta abierta con un plato ya
 Implicados: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 Cuando un producto deja el catálogo
-<!-- origen: old:combos/WORKFLOW.md#combos-f06 old:combos/WORKFLOW.md#combos-f09 -->
 Estado: hecho
 Actor: sistema, propietario, administrador, responsable, asistente
 Pantalla: Constructor del menú
@@ -496,7 +483,6 @@ solo; mientras, siguen marcadas y nadie las vende.
 Implicados: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 La foto del menú
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30, encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next: «si el menú del día lleva foto en el TPV, se decide con market-decision»). Mercado, 2026-10-30: el menú se vende en el TPV como un artículo más, con su foto: Odoo POS (un combo es un producto, con su imagen; https://www.odoo.com/documentation/19.0/applications/sales/point_of_sale/products.html, https://www.odoo.com/documentation/17.0/applications/sales/point_of_sale/combos.html), Lightspeed Restaurant (el combo tiene su campo «Image»; https://resto-support.lightspeedhq.com/hc/en-us/articles/6455698479899-Creating-and-managing-combos), Toast (el combo es un artículo del menú, que lleva imagen; https://support.toasttab.com/en/article/Adding-Images-to-Menu-Items-in-the-Menu, https://intercom.help/toast-central/en/articles/14726324-build-a-customizable-meal-combo), Shopify POS (el lote es un producto; https://changelog.shopify.com/posts/shopify-bundles-support-on-pos), Loyverse (artículo compuesto con su foto o color y forma; https://help.loyverse.com/help/how-add-items-loyverse-back-office), Square (artículos con foto en la rejilla; https://community.squareup.com/t5/Troubleshooting/Item-images-on-Square-Register-POS/m-p/683217), SumUp (catálogo con fotos y lotes de productos; https://www.sumup.com/en-ie/pos/faq/, https://www.sumup.com/en-gb/business-guide/bundle-products-create-custom-offers-with-sumup-pos/) y Clover (imagen del artículo; https://bypassmobile.zendesk.com/hc/en-us/articles/360043275151). La librería del producto viejo ya tenía menu_dia, menu_infantil, menu_hamburguesa y menu_kebab. Gana: el menú lleva foto, de la librería o propia, como el artículo (INVENTORY-F30, F31). -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Menús
@@ -522,7 +508,6 @@ foto no carga, enseña sus iniciales.
 Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
 ### COMBO-F15 Recuperar los menús, sus platos y sus elecciones desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 gh:hub#1473 gh:hub#1474 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Menús: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Menús, Platos de

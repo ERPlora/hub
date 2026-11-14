@@ -148,7 +148,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
-<!-- origen: old:modifiers/WORKFLOW.md#modifiers-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Suplementos
@@ -164,7 +163,6 @@ Si falla: el aviso de la tabla con «Reintentar»; sin grupos, «Todavía no hay
 Implicados: ninguno
 
 ### MODIFIER-F02 Crear un grupo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:modifiers/WORKFLOW.md#modifiers-f02 qa:modules/modifiers/required-modifiers-and-price -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Suplementos
@@ -186,7 +184,6 @@ mismo (hub#888). Lo escrito se queda.
 Implicados: ninguno
 
 ### MODIFIER-F03 Cambiar o borrar un grupo
-<!-- origen: old:modifiers/WORKFLOW.md#modifiers-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos
@@ -206,7 +203,6 @@ antes del «sí» otro grupo encaja mejor con lo dicho no se cambia ni se borra 
 Implicados: SALE-F11
 
 ### MODIFIER-F04 Añadir, cambiar o quitar las opciones de un grupo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
@@ -242,7 +238,6 @@ no se toca nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F11
 
 ### MODIFIER-F05 Enganchar un grupo a productos o categorías, y soltarlo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
@@ -264,7 +259,6 @@ producto o una categoría ya borrados tampoco saca tarjeta («Este grupo no se a
 Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
-<!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f17 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f06 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -289,7 +283,6 @@ Inténtalo de nuevo.» y no entra nada.
 Implicados: SALE-F11
 
 ### MODIFIER-F07 Cobrar el suplemento: precio y IVA
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old-hub:HUB_PERIPHERALS-F09 qa:modules/modifiers/required-modifiers-and-price old-hub:HUB_PERIPHERALS-F11 old:modifiers/WORKFLOW.md#modifiers-f07 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -318,7 +311,6 @@ medida: no admite una opción con suplemento.». La línea no entra.
 Implicados: SALE-F11
 
 ### MODIFIER-F08 Que el suplemento salga en la comanda de cocina
-<!-- origen: old-hub:HUB_PERIPHERALS-F10 wf:restaurante-dia#rec_restaurante-f07 old-hub:HUB_SHELL-F78 old-hub:HUB_SHELL-F72 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f08 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -334,7 +326,6 @@ Si falla: nada que no sea F07: si la valoración falla, la línea no entra.
 Implicados: KITCHEN-F07, SALE-F20
 
 ### MODIFIER-F09 Soltar los grupos de un producto o una categoría que se borra
-<!-- origen: nuevo (lo pide MODIFIER-F05: un enganche apunta a un producto o una categoría de Inventario, y esos se borran) -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -350,7 +341,6 @@ de ERPlora recupera después el producto desde una copia aparte, sus grupos vuel
 Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 
 ### MODIFIER-F10 Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 gh:hub#1457 gh:hub#1456 gh:hub#1458 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de

@@ -206,7 +206,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PRICING-F15 | Recuperar los precios de tarifa desde una copia aparte | hecho |
 
 ### PRICING-F01 Ver las tarifas
-<!-- origen: fi:modules/pricing#navigation-lists-erp-pricing-lists fi:modules/pricing#permission-pricing-view_pricing-manage_pricing-apply_pricing fi:modules/pricing#query-pricing-price_lists-list-expose_api old:pricing/WORKFLOW.md#pricing-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifas
@@ -219,7 +218,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: Clientes (el nombre del grupo)
 
 ### PRICING-F02 Crear una tarifa
-<!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-create-create_price_list fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated old:pricing/WORKFLOW.md#pricing-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -243,7 +241,6 @@ se apaga solo con un grupo o con otra divisa).
 Implicados: Clientes
 
 ### PRICING-F03 Editar una tarifa
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -258,7 +255,6 @@ hasta que se le quite o se le elija otro.
 Implicados: Clientes
 
 ### PRICING-F04 Elegir la tarifa general
-<!-- origen: fi:modules/pricing#command-interno-pricing-_unset_default-pricing-_insert_price_list -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -276,7 +272,6 @@ en un instante.» (409 `pricing.default_busy`, nunca un error del servidor).
 Implicados: ninguno
 
 ### PRICING-F05 Desactivar o reactivar una tarifa
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
@@ -291,7 +286,6 @@ desactivarla.», «Esa tarifa ya está desactivada.», «Esa tarifa ya está act
 Implicados: ninguno
 
 ### PRICING-F06 Ver los precios de una tarifa
-<!-- origen: fi:modules/pricing#query-pricing-price_lists-get-expose_api fi:modules/pricing#query-pricing-price_lists-items-expose_api -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifa (detalle)
@@ -306,7 +300,6 @@ Si falla: «Esta tarifa no existe» con **Volver**.
 Implicados: Inventario, Servicios
 
 ### PRICING-F07 Poner el precio de un producto o un servicio en una tarifa
-<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-price_lists-add_item old:pricing/WORKFLOW.md#pricing-f03 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
@@ -331,7 +324,6 @@ negocio.».
 Implicados: Inventario, Servicios
 
 ### PRICING-F08 Cambiar o quitar un precio
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifa (detalle)
@@ -348,7 +340,6 @@ está disponible…»): el detalle no ofrece **+** ni **Editar**, solo **Quitar*
 Implicados: ninguno
 
 ### PRICING-F09 Ver las reglas de descuento
-<!-- origen: fi:modules/pricing#query-pricing-rules-list-expose_api old:pricing/WORKFLOW.md#pricing-f04 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente
 Pantalla: Tarifas
@@ -361,7 +352,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: Inventario, Clientes
 
 ### PRICING-F10 Crear una regla de descuento
-<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-rules-create old:pricing/WORKFLOW.md#pricing-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -396,7 +386,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F11 Editar una regla
-<!-- origen: nuevo (Business Central, Shopify, Lightspeed y Odoo editan, desactivan y reactivan tarifas, precios y reglas; el producto actual no: «Cambios frente al producto actual») -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -409,7 +398,6 @@ Si falla: los mismos rechazos que al crear.
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F12 Desactivar o reactivar una regla
-<!-- origen: fi:modules/pricing#event-emitidos-price_list-created-price_item-added-rule-created-rule-deactivated fi:modules/pricing#command-pricing-rules-deactivate old:pricing/WORKFLOW.md#pricing-f06 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
@@ -424,7 +412,6 @@ antes de activarla.» (409 `pricing.rule_group_deleted`): sin grupo valdría par
 Implicados: Clientes
 
 ### PRICING-F13 Consultar el precio de una línea
-<!-- origen: fi:modules/pricing#command-wasm-pricing-price_lists-get_price-get_price old:pricing/WORKFLOW.md#pricing-f07 -->
 Estado: hecho (no tiene pantalla propia: lo pide quien vende o el asistente; Ventas aún no lo pide, ver «Contrato con Ventas»)
 Actor: sistema (Ventas), asistente, empleado por la API
 Pantalla: ninguna
@@ -458,7 +445,6 @@ cantidad que no es mayor que 0.
 Implicados: Inventario, Servicios, Clientes, Ventas
 
 ### PRICING-F14 Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio
-<!-- origen: nuevo (lo piden los borrados y cambios de Inventario, Clientes y Servicios sobre lo que señala una tarifa o una regla) -->
 Estado: hecho (no tiene pantalla: lo hace la app sola, unos segundos después del cambio de la otra)
 Actor: sistema
 Pantalla: ninguna
@@ -485,7 +471,6 @@ volvió a borrar antes de que llegue el aviso, no se activa ninguna.
 Implicados: Inventario, Clientes, Servicios, INVENTORY-F34, PRICING-F15
 
 ### PRICING-F15 Recuperar los precios de tarifa desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus precios de tarifa) gh:hub#1343 gh:hub#1442 gh:hub#1459 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Tarifas: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Precios de

@@ -229,7 +229,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SERVICE-F35 | Subir una foto propia del servicio | hecho |
 
 ### SERVICE-F01 Dar de alta un servicio
-<!-- origen: qa:verticals/beauty/01-services-professionals-and-schedules wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-services-create-sql-transaccional fi:modules/services#navigation fi:modules/services#permission-role_permissions fi:modules/services#query-services-services-list fi:modules/services#validation-declarativa-bloque-validates old:services/workflow/catalogo.md#services-f01 qa:modules/services/create-service-with-duration-and-price old-hub:HUB_SHELL-F27 gh:services#26 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Inicio, Servicios
@@ -265,7 +264,6 @@ Implicados: TAX-F01, BASE-F01, BASE-F114 (el personal de ERPlora recupera desde 
 perdieron, cada uno por esta misma alta)
 
 ### SERVICE-F02 Editar un servicio
-<!-- origen: fi:modules/services#command-services-services-update-sql-transaccional fi:modules/services#query-services-services-get old:services/workflow/catalogo.md#services-f02 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -281,7 +279,6 @@ negocio.». Un servicio cuya categoría se eliminó sale «Sin categoría» y se
 Implicados: SERVICE-F31
 
 ### SERVICE-F03 Poner un servicio a precio abierto
-<!-- origen: old:services/workflow/catalogo.md#services-f03 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -297,7 +294,6 @@ Si falla: una tarifa fuera de las cinco o un mínimo por encima del máximo se r
 Implicados: SALE-F09
 
 ### SERVICE-F04 Archivar un servicio
-<!-- origen: fi:modules/services#command-services-services-delete-sql-transaccional old:services/workflow/catalogo.md#services-f04 -->
 Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Servicios
@@ -320,7 +316,6 @@ archivar, y si Citas no contesta la confirmación sale sin esa línea.
 Implicados: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 Ver y restaurar los servicios archivados
-<!-- origen: old:services/workflow/catalogo.md#services-f05 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -336,7 +331,6 @@ ofrece Editar ni Archivar y tocarla no abre nada.
 Implicados: SERVICE-F04
 
 ### SERVICE-F06 Dar de alta muchos servicios de golpe
-<!-- origen: fi:modules/services#command-services-services-bulk_create-handler-wasm-bulk_create_services old:services/workflow/catalogo.md#services-f06 -->
 Estado: hecho (asistente y API; no hay importador en pantalla)
 Actor: responsable, asistente
 Pantalla: ninguna
@@ -353,7 +347,6 @@ de la cuarta línea).
 Implicados: SERVICE-F01, SERVICE-F11
 
 ### SERVICE-F07 Crear y editar categorías
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-categories-create-sql-transaccional fi:modules/services#command-services-categories-update-sql-transaccional fi:modules/services#query-services-categories-list old:services/workflow/catalogo.md#services-f07 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Categorías
@@ -375,7 +368,6 @@ Implicados: SERVICE-F01, SERVICE-F08, BASE-F114 (el personal de ERPlora recupera
 que el negocio ya no tiene, cada una por esta misma alta)
 
 ### SERVICE-F08 Eliminar una categoría
-<!-- origen: fi:modules/services#command-services-categories-delete-sql-transaccional old:services/workflow/catalogo.md#services-f08 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Categorías
@@ -396,7 +388,6 @@ queda como lo dejó, y Recuperaciones lo cuenta «sin crear» con su porqué. Si
 negocio y no se rellena: lo que le quitó después se queda fuera)
 
 ### SERVICE-F09 Vender un servicio en el TPV
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f09 old:services/workflow/catalogo.md#services-f09 -->
 Estado: hecho (lo hace Ventas, SALE-F38)
 Actor: empleado
 Pantalla: Ventas: Vender
@@ -411,7 +402,6 @@ Si falla: lo dice Ventas (SALE-F38).
 Implicados: SALE-F01, SALE-F38
 
 ### SERVICE-F10 Dar el catálogo a Citas, Ventas, Reservas online y Tarifas
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 fi:modules/services#event-emitidos old:services/workflow/catalogo.md#services-f10 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
@@ -428,7 +418,6 @@ Implicados: APPOINTMENT-F01, SALE-F01, ONLINE_BOOKING-F01, ONLINE_BOOKING-F07, P
 WHATSAPP_INBOX-F21
 
 ### SERVICE-F11 Cambiar los ajustes de Servicios
-<!-- origen: fi:modules/services#command-services-settings-update-sql-transaccional fi:modules/services#query-services-settings-get old:services/workflow/catalogo.md#services-f11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes de Servicios
@@ -450,7 +439,6 @@ también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (h
 Implicados: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Crear un bono
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 wf:peluqueria-dia#rec_peluqueria-f13 fi:modules/services#command-services-packages-create-handler-wasm-create_package fi:modules/services#query-services-package_items-list fi:modules/services#query-services-packages-list old:services/workflow/bonos.md#services-f12 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -478,7 +466,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el bot�
 Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono
-<!-- origen: fi:modules/services#command-services-packages-delete-sql-transaccional fi:modules/services#command-services-packages-update-sql-transaccional fi:modules/services#query-services-packages-get old:services/workflow/bonos.md#services-f13 -->
 Estado: hecho
 Actor: responsable (editar), propietario y administrador (eliminar)
 Pantalla: Bonos y paquetes
@@ -498,7 +485,6 @@ eliminó entretanto) o los de SERVICE-F12 debajo de su campo; al eliminar, el mo
 Implicados: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Vender un bono a una clienta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f14 -->
 Estado: hecho la concesión (asistente y API); la venta en el TPV, no (ver «Lo que queda fuera»)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
@@ -524,7 +510,6 @@ decirlo. Nada se concede.
 Implicados: CUSTOMER-F01, SALE-F28, SERVICE-F24
 
 ### SERVICE-F15 Consultar los bonos de una clienta
-<!-- origen: fi:modules/services#query-services-packages-balance old:services/workflow/bonos.md#services-f15 -->
 Estado: hecho (asistente y API)
 Actor: empleado, responsable, asistente
 Pantalla: asistente
@@ -539,7 +524,6 @@ la encuentra, lo dice.
 Implicados: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 Ver quién ha comprado un bono
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f16 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
@@ -556,7 +540,6 @@ cargar los bonos vendidos» con el motivo.
 Implicados: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Anular un bono vendido por error
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/bonos.md#services-f17 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -577,7 +560,6 @@ la anulación espera y recibe el motivo real.
 Implicados: SERVICE-F16, SALE-F28, SALE-F32
 
 ### SERVICE-F18 Regalar sesiones, alargar la caducidad o corregir el saldo
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/bonos.md#services-f18 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Bonos y paquetes
@@ -598,7 +580,6 @@ de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.». E
 Implicados: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 Ver los movimientos de un bono
-<!-- origen: old:services/workflow/bonos.md#services-f19 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes
@@ -615,7 +596,6 @@ movimientos» con el motivo.
 Implicados: SERVICE-F18, SERVICE-F21, SERVICE-F22
 
 ### SERVICE-F20 Un bono caduca
-<!-- origen: old:services/workflow/bonos.md#services-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -630,7 +610,6 @@ Si falla: nada falla al caducar; gastarlo después se rechaza con «Este bono ha
 Implicados: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Gastar una sesión fuera del cobro
-<!-- origen: fi:modules/services#command-services-packages-redeem-sql-transaccional fi:modules/services#query-services-packages-redeem_check old:services/workflow/bonos.md#services-f21 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Bonos y paquetes, asistente
@@ -675,7 +654,6 @@ gastan la última sesión a la vez van en fila y la segunda recibe el motivo rea
 Implicados: SERVICE-F16, SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pagar una línea con un bono
-<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f10 wf:peluqueria-dia#rec_peluqueria-f11 old:services/workflow/cobro-y-devolucion.md#services-f22 -->
 Estado: hecho (con Ventas, SALE-F27)
 Actor: empleado, responsable
 Pantalla: Ventas: Cobro
@@ -708,7 +686,6 @@ sesiones, el hueco no aparece.
 Implicados: SALE-F27, CUSTOMER-F17
 
 ### SERVICE-F23 Soltar la sesión si la línea o la cuenta desaparecen
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f23 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender, Cobro
@@ -725,7 +702,6 @@ la línea se quita igual y la sesión vuelve sola al cabo de un día (SERVICE-F2
 Implicados: SALE-F18, SALE-F20, SALE-F27
 
 ### SERVICE-F24 Dar por gastadas las sesiones al cobrar
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f24 -->
 Estado: hecho (conceder los bonos vendidos en el tique, no: ver «Lo que queda fuera»)
 Actor: empleado, responsable
 Pantalla: Ventas: Cobro
@@ -753,7 +729,6 @@ negocio, tampoco se cobra.
 Implicados: SALE-F01, SALE-F22, SALE-F27, SALE-F28
 
 ### SERVICE-F25 La sesión retenida que nadie cobra vuelve sola
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f25 -->
 Estado: hecho (al leer y con la tarea de cada hora)
 Actor: sistema
 Pantalla: ninguna
@@ -771,7 +746,6 @@ Si falla: si la tarea no corre, la sesión vuelve igual en cuanto pasa el plazo:
 Implicados: SALE-F17
 
 ### SERVICE-F26 Devolver la sesión al devolver la venta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/cobro-y-devolucion.md#services-f26 qa:verticals/beauty/08-edge-cases -->
 Estado: hecho (con Ventas, SALE-F32)
 Actor: responsable
 Pantalla: Ventas: Devolver
@@ -791,7 +765,6 @@ la devolución se rechaza entera.
 Implicados: SALE-F31, SALE-F32
 
 ### SERVICE-F27 Devolver la sesión al anular la venta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:peluqueria-dia#rec_peluqueria-f13 old:services/workflow/cobro-y-devolucion.md#services-f27 -->
 Estado: hecho (anular los bonos vendidos en ella, no: ver «Lo que queda fuera»)
 Actor: responsable
 Pantalla: Ventas: Anular venta
@@ -807,7 +780,6 @@ venta no se anula y se avisa en la ventana.
 Implicados: SALE-F30
 
 ### SERVICE-F28 Unir dos fichas: los bonos pasan a la que queda
-<!-- origen: old:services/workflow/fichas-de-clienta.md#services-f28 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -824,7 +796,6 @@ Si falla: repetir el aviso no cambia nada.
 Implicados: CUSTOMER-F13, SERVICE-F15, SERVICE-F22
 
 ### SERVICE-F29 Eliminar o anonimizar una ficha: sus bonos quedan sin cliente
-<!-- origen: old-hub:HUB-F250 old:services/workflow/fichas-de-clienta.md#services-f29 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -846,7 +817,6 @@ Si falla: repetir el aviso no cambia nada.
 Implicados: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescatar los bonos sin cliente
-<!-- origen: old:services/workflow/fichas-de-clienta.md#services-f30 -->
 Estado: hecho (la lista; un bono no se pasa a otra ficha)
 Actor: responsable
 Pantalla: Bonos y paquetes
@@ -863,7 +833,6 @@ cargar los bonos sin cliente.».
 Implicados: SERVICE-F29, SERVICE-F17
 
 ### SERVICE-F31 Asignar un profesional a un servicio
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 old:staff/workflow/disponibilidad.md#staff-f10 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
@@ -892,7 +861,6 @@ misma operación, a quien lo hacía y el negocio sigue teniendo de alta; a quien
 porqué)
 
 ### SERVICE-F32 Cambiar o quitar un profesional de un servicio
-<!-- origen: old:staff/workflow/disponibilidad.md#staff-f11 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
@@ -913,7 +881,6 @@ negocio, como **Asignar** (SERVICE-F31): el precio propio se lee en ella (hub#94
 Implicados: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Saber quién puede hacer un servicio
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 old:staff/workflow/disponibilidad.md#staff-f12 -->
 Estado: hecho
 Actor: sistema, asistente
 Pantalla: ninguna
@@ -929,7 +896,6 @@ Si falla: un servicio que no existe, «Ese servicio no existe en este negocio.»
 Implicados: SERVICE-F31, APPOINTMENT-F01
 
 ### SERVICE-F34 Elegir la imagen de un servicio desde la librería
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: los servicios de la plantilla de peluquería llevan una imagen de la librería compartida, carpetas beauty_hair/ y beauty_body/; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios
@@ -963,7 +929,6 @@ el asistente o la API.
 Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Subir una foto propia del servicio
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda sus fotos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
 Estado: hecho
 Actor: responsable
 Pantalla: Servicios

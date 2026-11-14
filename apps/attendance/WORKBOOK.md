@@ -125,7 +125,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | hecho (reacción por el relay del outbox) |
 
 ### ATTENDANCE-F01 Fichar la entrada al llegar y la salida al irse
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f01 qa:modules/attendance/clock-in-and-out gh:attendance#1 gh:attendance#11 gh:attendance#18 gh:hub#2553 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
@@ -151,7 +150,6 @@ salida sí se ficha); sin conexión, el error y «Reintentar».
 Implicados: STAFF-F03, ATTENDANCE-F05, ATTENDANCE-F11
 
 ### ATTENDANCE-F02 Hacer una pausa sin salir de la jornada
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f02 qa:modules/attendance/take-a-break -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
@@ -171,7 +169,6 @@ de 12 horas y está por revisar…».
 Implicados: ATTENDANCE-F01, ATTENDANCE-F05
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f03 qa:modules/attendance/clock-in-from-mobile-with-location gh:attendance#2 gh:hub#2552 gh:hub#2554 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
@@ -206,7 +203,6 @@ mostrador.
 Implicados: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 
 ### ATTENDANCE-F04 Ajustar la ubicación del local y cuándo se revisa una jornada olvidada
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f04 gh:attendance#4 gh:hub#2588 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
@@ -240,7 +236,6 @@ aviso rojo y los motivos de los campos del rechazo anterior, que no vuelven hast
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f05 gh:attendance#13 gh:attendance#15 gh:hub#2612 gh:hub#2681 -->
 Estado: hecho (servidor, tarea del worker y pantalla)
 Actor: sistema
 Pantalla: ninguna (la insignia «Por revisar» sale en Fichar y en Registros)
@@ -262,7 +257,6 @@ vuelve a fichar.
 Implicados: ATTENDANCE-F04, ATTENDANCE-F08
 
 ### ATTENDANCE-F06 Ver mis jornadas del mes y quién las corrigió
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f06 gh:attendance#8 -->
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquiera, para las suyas)
 Pantalla: Registros
@@ -279,7 +273,6 @@ Si falla: «No se han podido cargar las jornadas.» y «Reintentar».
 Implicados: ATTENDANCE-F09, ATTENDANCE-F10
 
 ### ATTENDANCE-F07 Ver las jornadas de todo el equipo
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f07 gh:attendance#10 gh:attendance#14 gh:attendance#6 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
@@ -296,7 +289,6 @@ Si falla: «No se han podido cargar las jornadas.» y «Reintentar».
 Implicados: STAFF-F06, ATTENDANCE-F08, ATTENDANCE-F09, ATTENDANCE-F10, ATTENDANCE-F11
 
 ### ATTENDANCE-F08 Corregir una jornada mal fichada, con su motivo
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f08 qa:modules/attendance/correct-a-workday gh:attendance#12 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
@@ -323,7 +315,6 @@ corregir.
 Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 Ver quién cambió una jornada, cuándo y por qué
-<!-- origen: qa:modules/attendance/correct-a-workday old:attendance/WORKFLOW.md#attendance-f09 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable; el empleado, de las suyas
 Pantalla: Registros
@@ -338,7 +329,6 @@ Si falla: «No se ha podido cargar el historial.».
 Implicados: ATTENDANCE-F08, ATTENDANCE-F13
 
 ### ATTENDANCE-F10 Sacar el mes en CSV para la gestoría o la Inspección
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f10 qa:modules/attendance/export-the-month-as-csv gh:attendance#3 gh:attendance#5 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos (el empleado, solo sus jornadas)
 Pantalla: Registros
@@ -357,7 +347,6 @@ nuevo.».
 Implicados: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (dentro de la app)
 
 ### ATTENDANCE-F11 Ver quién está fichado ahora
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f11 -->
 Estado: hecho (servidor, pantalla y panel del Inicio)
 Actor: propietario, administrador, responsable
 Pantalla: Registros («Fichados ahora») e Inicio
@@ -377,7 +366,6 @@ disponible» y los demás siguen.
 Implicados: ATTENDANCE-F01, ATTENDANCE-F02, ATTENDANCE-F08
 
 ### ATTENDANCE-F12 Fichar la entrada o la salida de otra persona
-<!-- origen: nuevo (Homebase, Deputy: el encargado ficha a alguien de su equipo) -->
 Estado: hecho (asistente y API)
 Actor: propietario, administrador, responsable
 Pantalla: ninguna (asistente y API)
@@ -397,7 +385,6 @@ varias, se dice cuáles y se pide que elija; si no existe, «Esa persona no exis
 Implicados: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Cerrar la jornada abierta de quien se da de baja
-<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
 Estado: hecho (reacción por el relay del outbox)
 Actor: sistema
 Pantalla: ninguna

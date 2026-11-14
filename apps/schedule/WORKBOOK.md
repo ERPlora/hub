@@ -176,7 +176,6 @@ atrás la cierra sin preguntar (BASE-F05).
 | SCHEDULE-F13 | Corregir un día especial o un cambio temporal | hecho (servidor y pantalla) |
 
 ### SCHEDULE-F01 Ver el horario de la semana
-<!-- origen: fi:modules/schedules#query-schedules-business_hours-list old:schedules/WORKFLOW.md#schedules-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Horario
@@ -192,7 +191,6 @@ horario.
 Implicados: ninguno
 
 ### SCHEDULE-F02 Fijar el horario de un día
-<!-- origen: qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules fi:modules/schedules#command-schedules-business_hours-set-handler-wasm-set_business_hours old:schedules/WORKFLOW.md#schedules-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horario
@@ -215,7 +213,6 @@ cerrado».
 Implicados: Citas y Reservas (leen el horario en la reserva siguiente)
 
 ### SCHEDULE-F03 Confirmar la semana por defecto
-<!-- origen: old-hub:HUB_SHELL-F31 old:schedules/WORKFLOW.md#schedules-f03 wf:peluqueria-dia#rec_peluqueria-f02 gh:schedules#42 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Inicio, Horario
@@ -241,7 +238,6 @@ ningún día guardado (no se llega desde la pantalla: el aviso solo sale cuando 
 Implicados: BASE-F01
 
 ### SCHEDULE-F04 Añadir un día especial
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 fi:modules/schedules#command-schedules-special_days-create-handler-wasm-create_special_day fi:modules/schedules#query-schedules-special_days-list old:schedules/WORKFLOW.md#schedules-f04 qa:modules/schedules/absences-and-holidays -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -263,7 +259,6 @@ solo espacios, bajo el nombre. Una fecha que tuvo un día especial borrado se pu
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F05 Añadir un cambio temporal
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 qa:modules/schedules/absences-and-holidays fi:modules/schedules#command-schedules-overrides-create-handler-wasm-create_override fi:modules/schedules#query-schedules-overrides-list old:schedules/WORKFLOW.md#schedules-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -284,7 +279,6 @@ tramos de SCHEDULE-F02.
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F06 Borrar un día especial o un cambio temporal
-<!-- origen: fi:modules/schedules#command-schedules-overrides-delete-sql-transaccional fi:modules/schedules#command-schedules-special_days-delete-sql-transaccional old:schedules/WORKFLOW.md#schedules-f06 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -304,7 +298,6 @@ id, su nombre o su fecha.» o «Di qué cambio temporal: su id, su motivo o una 
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F07 Cargar varios días especiales de golpe
-<!-- origen: fi:modules/schedules#command-schedules-bulk_create_special_days-handler-wasm-bulk_create_special_days old:schedules/WORKFLOW.md#schedules-f07 -->
 Estado: hecho (asistente y API, como el producto actual)
 Actor: asistente, API
 Pantalla: asistente
@@ -322,7 +315,6 @@ crear nada.
 Implicados: ninguno
 
 ### SCHEDULE-F08 Elegir con qué día empieza la semana
-<!-- origen: fi:modules/schedules#command-schedules-settings-save-sql-transaccional fi:modules/schedules#query-schedules-settings-get old:schedules/WORKFLOW.md#schedules-f08 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
@@ -338,7 +330,6 @@ Si falla: un valor fuera de 1–7 sale debajo del campo y no se guarda nada.
 Implicados: ninguno
 
 ### SCHEDULE-F09 Ver la zona horaria con la que se lee el horario
-<!-- origen: old-hub:HUB_SHELL-F157 wf:peluqueria-dia#rec_peluqueria-f02 old:schedules/WORKFLOW.md#schedules-f09 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Ajustes
@@ -353,7 +344,6 @@ Si falla: nada que fallar; la zona siempre la da el servidor.
 Implicados: ninguno
 
 ### SCHEDULE-F10 Preguntar si el negocio está abierto en un momento
-<!-- origen: fi:modules/schedules#command-schedules-is_open-handler-wasm-is_open-solo-lectura old:schedules/WORKFLOW.md#schedules-f10 -->
 Estado: hecho (asistente y API, como el producto actual)
 Actor: asistente, API
 Pantalla: ninguna
@@ -377,7 +367,6 @@ Si falla: un momento que no es una fecha y hora reales: «Esa fecha y hora no so
 Implicados: ninguno
 
 ### SCHEDULE-F11 Dar el horario de unos días a Citas
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 old:schedules/WORKFLOW.md#schedules-f11 -->
 Estado: hecho (lo leen Citas y Reservas)
 Actor: sistema (Citas y Reservas), asistente
 Pantalla: ninguna
@@ -396,7 +385,6 @@ días de una vez.» o, con una fecha fuera de 1900–2200, «Elige una fecha ent
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F12 Partir de una semana por defecto al activar
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 old-hub:HUB-F22 old:schedules/WORKFLOW.md#schedules-f12 -->
 Estado: hecho (al crear las tablas)
 Actor: sistema
 Pantalla: ninguna
@@ -413,7 +401,6 @@ Si falla: no hay pantalla; si no hubiera semana, Citas vería `no_hours`.
 Implicados: ninguno
 
 ### SCHEDULE-F13 Corregir un día especial o un cambio temporal
-<!-- origen: old:schedules/WORKFLOW.md#schedules-f04 old:schedules/WORKFLOW.md#schedules-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales

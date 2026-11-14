@@ -96,7 +96,6 @@ del formulario.
 | DEMO-F06 | Intentarlo sin permiso | hecho |
 
 ### DEMO-F01 Crear un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Elementos
@@ -112,7 +111,6 @@ guarda nada.
 Implicados: ninguno
 
 ### DEMO-F02 Editar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -131,7 +129,6 @@ borró): «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F03 Borrar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -146,7 +143,6 @@ Si falla: «Este elemento ya no existe» si otra persona lo borró antes.
 Implicados: ninguno
 
 ### DEMO-F04 Añadir una línea al instante (optimista e idempotente)
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -168,7 +164,6 @@ Si el elemento ya no existe: «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F05 Ver el cambio en otra tableta en menos de un segundo
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: cualquiera con permiso de ver
 Pantalla: Elementos y Ficha del elemento
@@ -184,7 +179,6 @@ completos. Lo hecho en `a` no avisa a las pantallas de `b` (ni al revés).
 Implicados: ninguno
 
 ### DEMO-F06 Intentarlo sin permiso
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: empleado
 Pantalla: Elementos y Ficha del elemento

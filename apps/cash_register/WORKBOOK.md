@@ -182,7 +182,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F18 | Ver las propinas en la caja | común | no hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
-<!-- origen: fi:modules/cash_register#command-cash_register-settings-update fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#navigation-settings fi:modules/cash_register#permission-role_permissions fi:modules/cash_register#query-cash_register-settings-get old:cash_register/WORKFLOW.md#cash_register-f01 -->
 Estado: hecho
 Vertical: común
 Actor: administrador
@@ -211,7 +210,6 @@ Inicio no le enseña el paso «Tu caja».
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 
 ### CASH_REGISTER-F02 Dar de alta, renombrar y desactivar un cajón
-<!-- origen: fi:modules/cash_register#command-cash_register-registers-create fi:modules/cash_register#query-cash_register-registers-list old:cash_register/WORKFLOW.md#cash_register-f02 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, asistente
@@ -230,7 +228,6 @@ cuanto se escribe en él, sin volver a pulsar «Guardar» (hub#1470).
 Implicados: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Abrir el turno de caja con el fondo inicial
-<!-- origen: fi:modules/cash_register#events-emitidos-catalogo fi:modules/cash_register#command-cash_register-session-open fi:modules/cash_register#query-cash_register-current_session old:cash_register/WORKFLOW.md#cash_register-f03 qa:modules/cash_register/open-register qa:modules/cash_register/shift-change wf:peluqueria-dia#rec_peluqueria-f01 wf:restaurante-dia#rec_restaurante-f01 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -260,7 +257,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir
 Implicados: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f01 wf:restaurante-dia#rec_restaurante-f01 old:cash_register/WORKFLOW.md#cash_register-f04 -->
 Estado: hecho — lo aplica Ventas al cobrar (SALE-F08): pregunta a Caja si la caja está abierta (ver
 «Contrato con Ventas»). Lo que se cobra en efectivo sin turno porque Caja estaba apagada o no
 respondió sale en «Cobros fuera de turno» (F17), sin perder nada.
@@ -279,7 +275,6 @@ aparece en F17.
 Implicados: SALE-F08
 
 ### CASH_REGISTER-F05 Registrar una entrada o una salida de efectivo
-<!-- origen: fi:modules/cash_register#command-cash_register-movement-add fi:modules/cash_register#query-cash_register-movements-list old:cash_register/WORKFLOW.md#cash_register-f05 qa:modules/cash_register/cash-count-and-movements -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -309,7 +304,6 @@ qué.
 Implicados: ninguno
 
 ### CASH_REGISTER-F06 Contar el cajón por billetes y monedas
-<!-- origen: qa:modules/cash_register/cash-count-and-movements fi:modules/cash_register#command-cash_register-count-add-handler-wasm fi:modules/cash_register#query-cash_register-counts-list old:cash_register/WORKFLOW.md#cash_register-f06 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -334,7 +328,6 @@ dice debajo del campo al salir de él (se lee como en F03) y «Registrar arqueo�
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Contar a ciegas: quién ve el efectivo esperado
-<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f07 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
@@ -359,7 +352,6 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F08 Revisar lo que queda pendiente antes de cerrar
-<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f08 wf:peluqueria-dia#rec_peluqueria-f16 wf:restaurante-dia#rec_restaurante-f16 -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -383,7 +375,6 @@ igual la confirmación; si no, se cierra con un solo clic.
 Implicados: SALE-F17, SALE-F18, KITCHEN-F31, PRINTING-F01
 
 ### CASH_REGISTER-F09 Cerrar el turno: esperado, contado y diferencia
-<!-- origen: fi:modules/cash_register#query-cash_register-current_session qa:modules/cash_register/shift-change wf:peluqueria-dia#rec_peluqueria-f16 wf:restaurante-dia#rec_restaurante-f16 fi:modules/cash_register#command-cash_register-session-close old:cash_register/WORKFLOW.md#cash_register-f09 qa:modules/cash_register/close-register-z-report -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador, asistente
@@ -431,7 +422,6 @@ real como fondo.
 Implicados: CASH_REGISTER-F06, F07, F08
 
 ### CASH_REGISTER-F10 Cerrar sola la caja olvidada al final del día
-<!-- origen: old:cash_register/WORKFLOW.md#cash_register-f10 -->
 Estado: hecho — el cierre se aplica al abrir la siguiente sesión, y el pase cada 5 minutos lo hace el Hub
 por su cuenta
 Vertical: común
@@ -456,7 +446,6 @@ cierra entonces).» (409 `cash_register.session_auto_close_due`).
 Implicados: CASH_REGISTER-F17
 
 ### CASH_REGISTER-F11 Consultar una sesión y revisar un descuadre
-<!-- origen: fi:modules/cash_register#query-cash_register-movements-list fi:modules/cash_register#query-cash_register-session-summary fi:modules/cash_register#query-cash_register-sessions-list old:cash_register/WORKFLOW.md#cash_register-f11 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -476,7 +465,6 @@ Si falla: «No se pudo cargar el detalle de la sesión» o el error de cada tabl
 Implicados: SALE-F28
 
 ### CASH_REGISTER-F12 Ver la caja en los paneles del inicio
-<!-- origen: fi:modules/cash_register#widget-cash_register-current_session-kpi fi:modules/cash_register#widget-cash_register-recent_sessions-bar-list old:cash_register/WORKFLOW.md#cash_register-f12 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -505,7 +493,6 @@ sesiones cerradas.» (en el Inicio, «Sin datos»).
 Implicados: CASH_REGISTER-F07, F09
 
 ### CASH_REGISTER-F13 Anotar en la caja cada cobro de una venta
-<!-- origen: fi:modules/cash_register#command-cash_register-record_sale-handler-wasm fi:modules/cash_register#event-listen-sale-completed-cash_register-record_sale old:cash_register/WORKFLOW.md#cash_register-f13 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -527,7 +514,6 @@ Si falla: sin sesión abierta, el cobro no se pierde: sale en F17.
 Implicados: SALE-F01, SALE-F02, SALE-F03, SALE-F15
 
 ### CASH_REGISTER-F14 Compensar en la caja una venta anulada
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 fi:modules/cash_register#command-cash_register-_reverse_sale-interno fi:modules/cash_register#event-listen-sale-voided-cash_register-_reverse_sale old:cash_register/WORKFLOW.md#cash_register-f14 wf:restaurante-dia#rec_restaurante-f15 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -545,7 +531,6 @@ emitido (SALE-F30).
 Implicados: SALE-F30
 
 ### CASH_REGISTER-F15 Anotar en la caja una devolución
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 old:cash_register/WORKFLOW.md#cash_register-f15 -->
 Estado: hecho
 Vertical: común
 Actor: sistema
@@ -561,7 +546,6 @@ Si falla: sin sesión abierta, la devolución sale en F17.
 Implicados: SALE-F31
 
 ### CASH_REGISTER-F16 Imprimir el informe de la sesión (X o Z)
-<!-- origen: qa:modules/cash_register/close-register-z-report old-hub:HUB_PERIPHERALS-F13 -->
 Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
@@ -590,7 +574,6 @@ cerrada sí.
 Implicados: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
-<!-- origen: nuevo (Caja de ERPlora: lo cobrado sin turno no se pierde) -->
 Estado: hecho
 Vertical: común
 Actor: empleado, responsable, administrador
@@ -612,7 +595,6 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-<!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
 Estado: no hecho — Caja todavía no distingue lo que apunta otra app (hub#1499)
 Vertical: común
 Actor: sistema, empleado, responsable

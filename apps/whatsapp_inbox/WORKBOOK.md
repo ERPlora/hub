@@ -205,7 +205,6 @@ cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás
 | WHATSAPP_INBOX-F38 | Saber a qué pregunta contesta lo que toca la clienta | hecho | comun |
 
 ### WHATSAPP_INBOX-F01 Conectar el número de WhatsApp del negocio
-<!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -231,7 +230,6 @@ conectar ningún número. Si erplora.com no confirma, en un momento **Tu número
 Implicados: erplora.com (la cuenta de WhatsApp Business del negocio), Meta
 
 ### WHATSAPP_INBOX-F02 Desconectar o volver a conectar el número
-<!-- origen: old-hub:HUB_SHELL-F171 old-hub:HUB_SHELL-F172 old-saas:SAAS_WHATSAPP_INBOX-F03 old-saas:SAAS_WHATSAPP_INBOX-F04 old-hub:HUB-F262 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f02 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Bandeja de entrada
@@ -253,7 +251,6 @@ sale («Hay que reconectar el número en Ajustes para enviar.») y un mensaje qu
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F07 old-saas:SAAS_WHATSAPP_INBOX-F10 fi:modules/whatsapp_inbox#command-sql-multi-stmt-whatsapp_inbox-messages-ingest old-hub:HUB-F263 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f03 wf:whatsapp-cita#rec_wa_cita-f02 wf:whatsapp-mesa#rec_wa_mesa-f02 -->
 Estado: hecho
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
@@ -274,7 +271,6 @@ es un número no se guarda.
 Implicados: erplora.com, Clientes (reconoce a la clienta, F04)
 
 ### WHATSAPP_INBOX-F04 Reconocer a la clienta por su número
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f03 wf:whatsapp-mesa#rec_wa_mesa-f03 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f04 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -297,7 +293,6 @@ Si falla: si dos fichas tienen el mismo número, no se une a ninguna y el mensaj
 Implicados: Clientes, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Leer una conversación
-<!-- origen: fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-get fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-list fi:modules/whatsapp_inbox#query-whatsapp_inbox-messages-list old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f05 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -318,7 +313,6 @@ dice (nunca «0 conversaciones»).
 Implicados: Clientes (el nombre de la ficha)
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F15 old-hub:HUB-F267 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f06 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -340,7 +334,6 @@ el adjunto**; si erplora.com ya no lo guarda, la pestaña lo dice.
 Implicados: erplora.com (guarda los adjuntos)
 
 ### WHATSAPP_INBOX-F07 Asignar una conversación a alguien del equipo
-<!-- origen: fi:modules/whatsapp_inbox#command-sql-declarativo-whatsapp_inbox-conversations-assign old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f07 -->
 Estado: hecho
 Actor: empleado (a sí mismo), responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -358,7 +351,6 @@ asignarla a otro («Solo puedes asignarte conversaciones a ti»). El responsable
 Implicados: el equipo del negocio (las personas con acceso a la bandeja)
 
 ### WHATSAPP_INBOX-F08 Contestar desde la app de WhatsApp Business del móvil
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F08 old-hub:HUB-F264 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f08 -->
 Estado: hecho
 Actor: propietario
 Pantalla: Bandeja de entrada
@@ -372,7 +364,6 @@ Si falla: si no llega, el hilo no lo enseña; el móvil lo sigue teniendo.
 Implicados: erplora.com, la app WhatsApp Business del móvil
 
 ### WHATSAPP_INBOX-F09 Ver quién espera respuesta
-<!-- origen: old-hub:HUB_SHELL-F61 old-hub:HUB_SHELL-F64 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f09 wf:whatsapp-cita#rec_wa_cita-f09 wf:whatsapp-mesa#rec_wa_mesa-f09 -->
 Estado: hecho
 Actor: todos
 Pantalla: Bandeja de entrada
@@ -393,7 +384,6 @@ Si falla: el motivo con **Reintentar**.
 Implicados: la campana de la barra superior, los avisos de la app instalada
 
 ### WHATSAPP_INBOX-F10 Borrar los datos de un número sin ficha
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F21 old-hub:HUB-F251 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f10 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Bandeja de entrada
@@ -416,7 +406,6 @@ cada 5 minutos; pulsarlo dos veces no borra nada más.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F11 Borrar los datos de una clienta desde su ficha
-<!-- origen: old-hub:HUB-F250 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f11 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se borra desde la ficha, en Clientes)
@@ -429,7 +418,6 @@ Si falla: el aviso se reintenta; repetirlo no cambia nada.
 Implicados: Clientes, erplora.com
 
 ### WHATSAPP_INBOX-F12 Unir dos fichas de la misma clienta
-<!-- origen: old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f12 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se une desde Clientes)
@@ -442,7 +430,6 @@ Si falla: el aviso se reintenta; repetirlo no cambia nada.
 Implicados: Clientes
 
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
-<!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
 Estado: hecho
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
@@ -475,7 +462,6 @@ entrar con la cuenta y sigue hasta los planes.
 Implicados: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -508,7 +494,6 @@ Implicados: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F33, FLOW-F34, 
 WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F22, WHATSAPP_INBOX-F23
 
 ### WHATSAPP_INBOX-F15 Activar «Reservar mesa»
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f15 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -541,7 +526,6 @@ Implicados: RESERVATION-F17, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F3
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F16 Decidir si las reservas por WhatsApp se confirman solas
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f16 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -565,7 +549,6 @@ Implicados: APPOINTMENT-F18, APPOINTMENT-F19, RESERVATION-F04, WHATSAPP_INBOX-F1
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F17 Desactivar una respuesta automática
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f17 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -581,7 +564,6 @@ Si falla: la tarjeta dice el motivo y se vuelve a pintar con lo que de verdad si
 Implicados: FLOW-F34, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F18 Actualizar una respuesta automática a su versión mejorada
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f18 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -599,7 +581,6 @@ Inténtalo otra vez.»; el aviso sigue mientras quede algo sin actualizar.
 Implicados: FLOW-F35, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F19 Elegir el hueco escribiendo en vez de tocando
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f19 -->
 Estado: hecho
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
@@ -617,7 +598,6 @@ Si falla: sin lista de las últimas 24 horas, o si lo escrito no señala una sol
 Implicados: APPOINTMENT-F02, RESERVATION-F05, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F38
 
 ### WHATSAPP_INBOX-F20 Cuando el asistente no puede contestar
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: WhatsApp: chat del cliente; Bandeja de entrada
@@ -638,7 +618,6 @@ Si falla: si la marca no se puede poner, la disculpa sale igual y el mensaje sig
 Implicados: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F21 La clienta pide cita por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f21 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -668,7 +647,6 @@ Implicados: APPOINTMENT-F02, APPOINTMENT-F18, CUSTOMER-F10, CUSTOMER-F26, FLOW-F
 WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 La clienta anula o mueve su cita por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f22 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -689,7 +667,6 @@ se mueve nada, no recibe respuesta y la conversación queda con «Necesita atenc
 Implicados: APPOINTMENT-F04, APPOINTMENT-F06, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F23 La clienta recibe el aviso cuando el salón confirma
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f23 -->
 Estado: hecho
 Actor: propietario, responsable, cliente
 Pantalla: Automatizaciones; WhatsApp: chat del cliente
@@ -722,7 +699,6 @@ Implicados: APPOINTMENT-F03, APPOINTMENT-F18, CUSTOMER-F11, FLOW-F31, FLOW-F33, 
 WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F24 El cliente pide mesa por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f24 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -752,7 +728,6 @@ Implicados: RESERVATION-F05, RESERVATION-F14, RESERVATION-F17, CUSTOMER-F10, FLO
 WHATSAPP_INBOX-F16, WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F25 El cliente anula o cambia su mesa por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f25 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -775,7 +750,6 @@ anula nada, no recibe respuesta y la conversación queda con «Necesita atenció
 Implicados: RESERVATION-F09, RESERVATION-F18, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F20, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F26 El cliente recibe el aviso cuando el restaurante confirma
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f26 -->
 Estado: hecho
 Actor: propietario, responsable, cliente
 Pantalla: Automatizaciones; Reservas; WhatsApp: chat del cliente
@@ -808,7 +782,6 @@ Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, FLOW-F33, WHATSAPP_INBOX
 WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -823,7 +796,6 @@ la última que mandó.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ajustes
@@ -843,7 +815,6 @@ Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de
 Implicados: erplora.com, WhatsApp Manager
 
 ### WHATSAPP_INBOX-F29 Crear una plantilla y mandarla a revisión
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f29 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
@@ -887,7 +858,6 @@ el mes gastado se puede crear igual.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F30 Editar una plantilla
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f30 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
@@ -912,7 +882,6 @@ demás, como en F29.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F31 Borrar una plantilla
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f31 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -932,7 +901,6 @@ se puede crear.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F32 Contestar desde la bandeja
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F12 old-hub:HUB-F266 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -957,7 +925,6 @@ del negocio, lo reintente quien lo reintente.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Enviar una plantilla
-<!-- origen: old-hub:HUB-F266 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -997,7 +964,6 @@ resto, como en F32.
 Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F09 -->
 Estado: hecho
 Actor: todos
 Pantalla: Bandeja de entrada
@@ -1017,7 +983,6 @@ Si falla: un estado de un mensaje que el Hub no conoce se ignora sin error.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F35 Cambiar el estado de una conversación
-<!-- origen: nuevo (Zendesk, Fresha y Shopify Inbox: abierta, pendiente y cerrada; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -1031,7 +996,6 @@ Si falla: el motivo dentro del panel; el estado no cambia.
 Implicados: ninguna otra app
 
 ### WHATSAPP_INBOX-F36 Dejar una nota interna
-<!-- origen: nuevo (Fresha, Intercom y Front: notas internas en el hilo; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -1045,7 +1009,6 @@ Si falla: el motivo en el panel; el empleado no borra la nota de otra persona.
 Implicados: ninguna otra app
 
 ### WHATSAPP_INBOX-F37 Unir la conversación a una ficha o crear la ficha
-<!-- origen: nuevo (Square, Fresha y Shopify Inbox: la conversación lleva a la ficha del cliente; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -1061,7 +1024,6 @@ Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
 Implicados: Clientes
 
 ### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
-<!-- origen: old-hub:HUB-F265 -->
 Estado: hecho
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada

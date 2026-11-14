@@ -231,7 +231,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | KITCHEN-F31 | Dar a Caja las comandas que siguen en marcha | hecho |
 
 ### KITCHEN-F01 Crear una estación
-<!-- origen: fi:modules/kitchen#command-kitchen-stations-create-update-sql fi:modules/kitchen#query-kitchen-stations-list old:kitchen/workflow/estaciones.md#kitchen-f01 wf:restaurante-dia#rec_restaurante-f02 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -251,7 +250,6 @@ Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
 
 ### KITCHEN-F02 Editar, renombrar o desactivar una estación
-<!-- origen: fi:modules/kitchen#command-kitchen-stations-create-update-sql old:kitchen/workflow/estaciones.md#kitchen-f02 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -269,7 +267,6 @@ dispositivo acaba de eliminar dice que ya no existe.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
 ### KITCHEN-F03 Eliminar una estación
-<!-- origen: fi:modules/kitchen#command-kitchen-stations-delete-handler-wasm-delete_station old:kitchen/workflow/estaciones.md#kitchen-f03 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -285,7 +282,6 @@ Pásalos antes a otra estación.», dentro del diálogo.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10
 
 ### KITCHEN-F04 Mandar productos y categorías a una estación (y quitarlos)
-<!-- origen: wf:restaurante-dia#rec_restaurante-f17 wf:restaurante-dia#rec_restaurante-f02 fi:modules/kitchen#command-kitchen-stations-set_routing-handler-wasm-set_routing old:kitchen/workflow/estaciones.md#kitchen-f04 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Estaciones
@@ -307,7 +303,6 @@ momento, el enrutado se rechaza igual o se guarda antes del borrado: nunca da er
 Implicados: KITCHEN-F01, KITCHEN-F05, KITCHEN-F08, INVENTORY-F04, INVENTORY-F06, INVENTORY-F07, INVENTORY-F27
 
 ### KITCHEN-F05 Recibir la ronda que envía el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 wf:restaurante-dia#rec_restaurante-f17 fi:modules/kitchen#command-kitchen-orders-create_from_sale-handler-wasm-create_order_from_sale fi:modules/kitchen#event-listen-sale-completed-kitchen-orders-create_from_sale old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f05 qa:modules/kitchen/kds-screen-and-courses qa:verticals/restaurant/06-service-orders-and-kitchen -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -333,7 +328,6 @@ aquí bloquea al camarero.
 Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18
 
 ### KITCHEN-F06 Un menú del día en la comanda
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f06 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
@@ -359,7 +353,6 @@ el menú cambie después.
 Implicados: SALE-F12, SALE-F20, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
 ### KITCHEN-F07 Notas de cada plato
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f07 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Pantalla
@@ -379,7 +372,6 @@ suplemento que se cobra en una línea aparte (otro IVA) sale igual bajo su plato
 Implicados: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 La comanda sale en papel en cada estación
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f08 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -401,7 +393,6 @@ impresora de cocina en Impresión.» (KITCHEN-F18).
 Implicados: KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F09, KITCHEN-F18, SALE-F20, PRINTING-F04, PRINTING-F10, PRINTING-F18
 
 ### KITCHEN-F09 Reimprimir una comanda
-<!-- origen: old:kitchen/workflow/llegada-de-la-comanda.md#kitchen-f09 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Comandas
@@ -416,7 +407,6 @@ Si falla: «No se pudo imprimir la comanda: <motivo>», con el motivo de Impresi
 Implicados: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 Ver el tablero de cocina
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 qa:modules/kitchen/kds-screen-and-courses qa:verticals/restaurant/06-service-orders-and-kitchen fi:modules/kitchen#query-kitchen-orders-items old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f10 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
@@ -440,7 +430,6 @@ permiso de cambiar comandas, la pantalla es de solo mirar: sin botones y los pla
 Implicados: KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F14, KITCHEN-F15, KITCHEN-F16, KITCHEN-F26
 
 ### KITCHEN-F11 Marcar platos listos
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 qa:verticals/restaurant/06-service-orders-and-kitchen fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f11 qa:modules/kitchen/mark-ready-and-pass -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla (también el asistente: «marca lista la mesa 4»)
@@ -459,7 +448,6 @@ Actualiza e inténtalo de nuevo.».
 Implicados: KITCHEN-F10, KITCHEN-F12, KITCHEN-F17, KITCHEN-F25
 
 ### KITCHEN-F12 Recuperar lo marcado por error
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status qa:modules/kitchen/mark-ready-and-pass old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f12 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
@@ -475,7 +463,6 @@ Si falla: una comanda Servida o Cancelada no se recupera.
 Implicados: KITCHEN-F10, KITCHEN-F11, KITCHEN-F16, KITCHEN-F21, KITCHEN-F25
 
 ### KITCHEN-F13 Entregar lo que está listo
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status qa:modules/kitchen/mark-ready-and-pass old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f13 wf:restaurante-dia#rec_restaurante-f08 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla, Comandas
@@ -489,7 +476,6 @@ Si falla: solo una comanda Lista se entrega.
 Implicados: KITCHEN-F11, KITCHEN-F21, KITCHEN-F27
 
 ### KITCHEN-F14 Marcar urgente una ronda desde la pantalla de cocina
-<!-- origen: old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f14 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla
@@ -508,7 +494,6 @@ cocina.»). Si el aviso no se imprime, la pantalla lo dice.
 Implicados: KITCHEN-F10, KITCHEN-F16, KITCHEN-F20, PRINTING-F10
 
 ### KITCHEN-F15 Ver cuánto queda por cocinar
-<!-- origen: fi:modules/kitchen#query-kitchen-stations-pending_counts old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f15 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla (también el asistente: «qué hay pendiente en plancha»)
@@ -522,7 +507,6 @@ Si falla: sin nada por hacer, «No queda nada por cocinar.».
 Implicados: KITCHEN-F10, KITCHEN-F29
 
 ### KITCHEN-F16 Sonar al entrar una comanda
-<!-- origen: old-hub:HUB_APP-F24 old-hub:HUB_APP-F26 old-hub:HUB_SHELL-F65 old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f16 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Pantalla
@@ -542,7 +526,6 @@ suena. Si Android aún no permite notificar, la app pide el permiso una vez; la 
 Implicados: KITCHEN-F05, KITCHEN-F10, KITCHEN-F12, KITCHEN-F14, KITCHEN-F26
 
 ### KITCHEN-F17 Imprimir el pase al marcar lista
-<!-- origen: qa:modules/kitchen/mark-ready-and-pass old:kitchen/workflow/pantalla-de-cocina.md#kitchen-f17 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -558,7 +541,6 @@ Si falla: la pantalla enseña «No se ha podido imprimir el pase. Revisa la impr
 Implicados: KITCHEN-F11, KITCHEN-F26, PRINTING-F10
 
 ### KITCHEN-F18 Enviar la ronda desde el TPV, normal o urgente
-<!-- origen: wf:restaurante-dia#rec_restaurante-f07 qa:modules/kitchen/kds-screen-and-courses qa:verticals/restaurant/06-service-orders-and-kitchen old:kitchen/workflow/tpv.md#kitchen-f18 qa:modules/sales/take-order-by-courses qa:verticals/restaurant/11-races-and-concurrency -->
 Estado: hecho
 Actor: empleado
 Pantalla: Ventas: Vender
@@ -583,7 +565,6 @@ enviar la comanda a cocina. Inténtalo de nuevo.». Sin Cocina activa, el TPV no
 Implicados: SALE-F20, KITCHEN-F05, KITCHEN-F08, KITCHEN-F09, KITCHEN-F19, PRINTING-F10
 
 ### KITCHEN-F19 Seguir las comandas de la cuenta desde el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f08 old:kitchen/workflow/tpv.md#kitchen-f19 -->
 Estado: hecho
 Actor: empleado
 Pantalla: Ventas: Vender (hoja «Comandas de la cuenta»)
@@ -602,7 +583,6 @@ Sin permiso de ver comandas, o sin Cocina activa, el TPV no enseña «Comandas �
 Implicados: SALE-F20, SALE-F24, KITCHEN-F05, KITCHEN-F20, KITCHEN-F28, KITCHEN-F29
 
 ### KITCHEN-F20 Marcar urgente una ronda desde el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f08 old:kitchen/workflow/tpv.md#kitchen-f20 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender (hoja «Comandas de la cuenta»)
@@ -624,7 +604,6 @@ cambiar comandas lo ve. Sin Cocina activa, el TPV no enseña nada de esto.
 Implicados: SALE-F20, KITCHEN-F14, KITCHEN-F19
 
 ### KITCHEN-F21 Mover una comanda desde la lista de Comandas
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-set_status-handler-wasm-update_order_status fi:modules/kitchen#command-kitchen-orders-update-sql fi:modules/kitchen#query-kitchen-orders-get fi:modules/kitchen#query-kitchen-orders-list old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f21 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Comandas
@@ -641,7 +620,6 @@ esta acción. Actualiza e inténtalo de nuevo.».
 Implicados: KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F19, KITCHEN-F22, KITCHEN-F23, KITCHEN-F25
 
 ### KITCHEN-F22 Cancelar una comanda
-<!-- origen: old-hub:HUB_SHELL-F78 old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f22 qa:modules/kitchen/void-visible-in-kitchen -->
 Estado: hecho
 Actor: responsable
 Pantalla: Comandas (también el asistente)
@@ -659,7 +637,6 @@ Si falla: una comanda Servida o Cancelada no se cancela. Una que nunca salió en
 Implicados: KITCHEN-F21, KITCHEN-F25, KITCHEN-F28, KITCHEN-F29, PRINTING-F10
 
 ### KITCHEN-F23 Crear una comanda a mano
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-create-handler-wasm-create_order old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f23 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Comandas
@@ -680,7 +657,6 @@ hub#888). Como no cuelga de ninguna cuenta, cobrar no la cierra.
 Implicados: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Borrar una comanda
-<!-- origen: fi:modules/kitchen#command-kitchen-orders-delete-handler-wasm-delete_order old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f24 -->
 Estado: hecho
 Actor: responsable
 Pantalla: asistente o API
@@ -696,7 +672,6 @@ lo mismo y no cambia nada.
 Implicados: KITCHEN-F22, KITCHEN-F23, KITCHEN-F25
 
 ### KITCHEN-F25 Consultar el historial de cocina
-<!-- origen: fi:modules/kitchen#command-kitchen-logs-create-sql fi:modules/kitchen#event-listen-kitchen-order-fired-ready-served-recalled-cancelled-kitchen-logs-create fi:modules/kitchen#query-kitchen-logs-list old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f25 -->
 Estado: hecho
 Actor: empleado, responsable, administrador
 Pantalla: Historial
@@ -716,7 +691,6 @@ permiso de ver el historial lee «No tienes permiso para ver esto.».
 Implicados: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29
 
 ### KITCHEN-F26 Ajustar la pantalla de cocina
-<!-- origen: fi:modules/kitchen#command-kitchen-settings-update-sql fi:modules/kitchen#query-kitchen-settings-get old:kitchen/workflow/comandas-historial-y-ajustes.md#kitchen-f26 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Ajustes
@@ -741,7 +715,6 @@ siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el si
 Implicados: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Cerrar las rondas al cobrar la cuenta entera
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 wf:restaurante-dia#rec_restaurante-f17 old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f27 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -763,7 +736,6 @@ sirve al cobrar aunque nadie lo haya marcado; lo cobrado antes de apagarlo se si
 Implicados: SALE-F01, SALE-F22, KITCHEN-F13, KITCHEN-F25, KITCHEN-F26
 
 ### KITCHEN-F28 Retirar las rondas de una cuenta eliminada o unida a otra
-<!-- origen: qa:verticals/restaurant/08-incidents-voids-and-refunds old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f28 wf:restaurante-dia#rec_restaurante-f10 wf:restaurante-dia#rec_restaurante-f14 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -781,7 +753,6 @@ en la cocina, y un aviso repetido tampoco: ninguna ronda se cancela dos veces.
 Implicados: SALE-F18, SALE-F24, KITCHEN-F19, KITCHEN-F22, KITCHEN-F25, KITCHEN-F27
 
 ### KITCHEN-F29 Anular un plato ya enviado con aviso a cocina
-<!-- origen: old-hub:HUB_SHELL-F78 qa:verticals/restaurant/08-incidents-voids-and-refunds qa:verticals/restaurant/06-service-orders-and-kitchen qa:modules/kitchen/void-visible-in-kitchen wf:restaurante-dia#rec_restaurante-f14 old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f29 qa:modules/sales/modify-order-after-sending -->
 Estado: hecho
 Actor: responsable (en el TPV)
 Pantalla: Ventas: Vender
@@ -798,7 +769,6 @@ Si falla: una ronda Servida o Cancelada no se toca.
 Implicados: SALE-F20, COMBO-F11, KITCHEN-F06, KITCHEN-F10, KITCHEN-F15, KITCHEN-F19, KITCHEN-F25
 
 ### KITCHEN-F30 Pasar las comandas de un cliente unido a otro
-<!-- origen: old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f30 -->
 Estado: descartado — la comanda no guarda cliente: unir dos fichas de cliente no toca Cocina
 Actor: nadie en Cocina (la unión la hace Clientes)
 Pantalla: ninguna
@@ -813,7 +783,6 @@ Si falla: no aplica: Cocina no hace nada que pueda fallar.
 Implicados: CUSTOMER-F13, SALE-F33
 
 ### KITCHEN-F31 Dar a Caja las comandas que siguen en marcha
-<!-- origen: wf:restaurante-dia#rec_restaurante-f16 old:kitchen/workflow/cierre-y-otros-modulos.md#kitchen-f31 qa:verticals/restaurant/09-register-closing-and-reports -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna

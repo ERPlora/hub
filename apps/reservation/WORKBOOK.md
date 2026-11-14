@@ -208,7 +208,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | RESERVATION-F23 | Elegir una mesa libre para la reserva | hecho |
 
 ### RESERVATION-F01 Crear y quitar franjas horarias
-<!-- origen: fi:modules/reservations#command-reservations-timeslots-create-sql-transaccional fi:modules/reservations#command-reservations-timeslots-delete-sql-transaccional fi:modules/reservations#query-reservations-timeslots-list old:reservations/workflow/disponibilidad.md#reservations-f01 qa:modules/reservations/create-reservation wf:whatsapp-mesa#rec_wa_mesa-f04 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Disponibilidad → Franjas horarias
@@ -224,7 +223,6 @@ motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo 
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Bloquear un día o unas horas
-<!-- origen: qa:modules/reservations/create-reservation wf:whatsapp-mesa#rec_wa_mesa-f04 fi:modules/reservations#command-reservations-blocked_dates-create-sql-transaccional fi:modules/reservations#command-reservations-blocked_dates-delete-sql-transaccional fi:modules/reservations#query-reservations-blocked_dates-list old:reservations/workflow/disponibilidad.md#reservations-f02 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Disponibilidad → Fechas bloqueadas
@@ -241,7 +239,6 @@ cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Ajustar las reglas de reserva
-<!-- origen: qa:modules/reservations/create-reservation fi:modules/reservations#command-reservations-settings-upsert-sql-transaccional fi:modules/reservations#query-reservations-settings-get old:reservations/workflow/disponibilidad.md#reservations-f03 qa:verticals/restaurant/05-reservations -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ajustes
@@ -258,7 +255,6 @@ si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta
 Implicados: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Elegir si las reservas se confirman solas
-<!-- origen: fi:modules/reservations#command-reservations-settings-upsert-sql-transaccional old:reservations/workflow/disponibilidad.md#reservations-f04 wf:whatsapp-mesa#rec_wa_mesa-f06 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ajustes
@@ -273,7 +269,6 @@ del botón y el interruptor vuelve a como estaba.
 Implicados: RESERVATION-F07, TABLE-F25
 
 ### RESERVATION-F05 Consultar cuánto queda libre en un día
-<!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f04 old:reservations/workflow/disponibilidad.md#reservations-f05 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Disponibilidad → Ocupación; Reservas (barra del día)
@@ -289,7 +284,6 @@ sección con «Reintentar».
 Implicados: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 
 ### RESERVATION-F06 Tomar una reserva a mano (teléfono o mostrador)
-<!-- origen: qa:verticals/restaurant/11-races-and-concurrency qa:modules/reservations/create-reservation qa:verticals/restaurant/05-reservations fi:modules/reservations#command-reservations-reservations-create-handler-wasm-create_reservation old:reservations/workflow/reservas.md#reservations-f06 wf:restaurante-dia#rec_restaurante-f04 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas → «Nueva reserva»
@@ -330,7 +324,6 @@ campo, aunque otro diga lo mismo (hub#888).
 Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirmar una reserva
-<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f06 wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status old:reservations/workflow/reservas.md#reservations-f07 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Reservas (fila → «Confirmar»)
@@ -346,7 +339,6 @@ mesa 5 (Terraza) no se puede reservar: está bloqueada o fuera de servicio.», y
 Implicados: TABLE-F25, RESERVATION-F19
 
 ### RESERVATION-F08 Modificar una reserva (día, hora, comensales, mesa)
-<!-- origen: qa:verticals/restaurant/05-reservations wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-update-sql-transaccional old:reservations/workflow/reservas.md#reservations-f08 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Editar», o tocar la fila)
@@ -371,7 +363,6 @@ notas.».
 Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18
 
 ### RESERVATION-F09 Cancelar una reserva
-<!-- origen: qa:verticals/restaurant/05-reservations wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status old:reservations/workflow/reservas.md#reservations-f09 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Cancelar»)
@@ -387,7 +378,6 @@ Si falla: desde otro estado: «Esta reserva está sentada: no se puede cancelar.
 Implicados: TABLE-F27, RESERVATION-F18
 
 ### RESERVATION-F10 Marcar que no se presentaron
-<!-- origen: qa:verticals/restaurant/05-reservations wf:restaurante-dia#rec_restaurante-f04 fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status old:reservations/workflow/reservas.md#reservations-f10 qa:modules/reservations/no-show-and-deposit wf:whatsapp-mesa#rec_wa_mesa-f10 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «No presentado»)
@@ -400,7 +390,6 @@ Si falla: desde otro estado: «Esta reserva está sentada: no se puede marcar co
 Implicados: TABLE-F27
 
 ### RESERVATION-F11 Sentar a la reserva
-<!-- origen: fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status wf:whatsapp-mesa#rec_wa_mesa-f10 old:reservations/workflow/reservas.md#reservations-f11 wf:restaurante-dia#rec_restaurante-f05 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Reservas (fila → «Sentar»)
@@ -425,7 +414,6 @@ hacerlo (se le pueden autorizar confirmar, cambiar, completar y la lista de espe
 Implicados: TABLE-F10, TABLE-F28, FLOW-F12
 
 ### RESERVATION-F12 Completar la reserva
-<!-- origen: fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status wf:whatsapp-mesa#rec_wa_mesa-f10 old:reservations/workflow/reservas.md#reservations-f12 wf:restaurante-dia#rec_restaurante-f13 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Reservas (fila → «Completar»)
@@ -438,7 +426,6 @@ Si falla: sin sentar antes: «Esta reserva está confirmada: no se puede complet
 Implicados: RESERVATION-F11
 
 ### RESERVATION-F13 Liberar las reservas pendientes que nadie confirmó
-<!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f06 old:reservations/workflow/reservas.md#reservations-f13 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Reservas (la lista del día, abierta: la ve sin recargar)
@@ -457,7 +444,6 @@ Si falla: una pasada que falla no cambia nada y la siguiente lo vuelve a intenta
 Implicados: RESERVATION-F03
 
 ### RESERVATION-F14 Apuntar en la lista de espera
-<!-- origen: qa:verticals/restaurant/05-reservations fi:modules/reservations#command-reservations-waitlist-create-sql-transaccional fi:modules/reservations#query-reservations-waitlist-list old:reservations/workflow/lista-de-espera.md#reservations-f14 qa:modules/reservations/waitlist-and-walk-in wf:whatsapp-mesa#rec_wa_mesa-f05 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera → «Añadir cliente»
@@ -475,7 +461,6 @@ un campo se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub
 Implicados: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Marcar contactado o quitar de la lista de espera
-<!-- origen: qa:modules/reservations/waitlist-and-walk-in fi:modules/reservations#command-reservations-waitlist-delete-sql-transaccional fi:modules/reservations#command-reservations-waitlist-update-handler-wasm-waitlist_update old:reservations/workflow/lista-de-espera.md#reservations-f15 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera (fila → «Contactado», «Quitar»)
@@ -489,7 +474,6 @@ Si falla: una entrada que ya no está: «Esa entrada de la lista de espera no ex
 Implicados: RESERVATION-F14
 
 ### RESERVATION-F16 Convertir una entrada de la lista de espera en reserva
-<!-- origen: qa:verticals/restaurant/05-reservations qa:modules/reservations/waitlist-and-walk-in fi:modules/reservations#command-reservations-waitlist-update-handler-wasm-waitlist_update old:reservations/workflow/lista-de-espera.md#reservations-f16 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera (fila → «Convertir»)
@@ -509,7 +493,6 @@ entrada ya se convirtió en reserva.».
 Implicados: RESERVATION-F06, RESERVATION-F14
 
 ### RESERVATION-F17 Reserva que llega por WhatsApp
-<!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f03 qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f05 old:reservations/workflow/whatsapp-y-clientes.md#reservations-f17 qa:modules/reservations/whatsapp-reservation -->
 Estado: hecho
 Actor: cliente, propietario, asistente
 Pantalla: Reservas; se activa en Bandeja de WhatsApp → Ajustes y se aprueba en Automatizaciones
@@ -537,7 +520,6 @@ Implicados: CUSTOMER-F10, RESERVATION-F04, RESERVATION-F19, WHATSAPP_INBOX-F15, 
 WHATSAPP_INBOX-F24
 
 ### RESERVATION-F18 Cambiar o anular la reserva por WhatsApp
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f18 wf:whatsapp-mesa#rec_wa_mesa-f08 -->
 Estado: hecho
 Actor: cliente, propietario, asistente
 Pantalla: Reservas; se aprueba en Automatizaciones
@@ -562,7 +544,6 @@ como estaba. Con «No» en «Esperan tu respuesta», o si nadie contesta en 72 h
 Implicados: RESERVATION-F08, RESERVATION-F09, RESERVATION-F17, WHATSAPP_INBOX-F25
 
 ### RESERVATION-F19 Avisar por WhatsApp cuando el restaurante confirma
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f19 wf:whatsapp-mesa#rec_wa_mesa-f07 -->
 Estado: hecho
 Actor: responsable, cliente
 Pantalla: Reservas
@@ -583,7 +564,6 @@ confirmada; el motivo queda en el historial de la automatización.
 Implicados: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 
 ### RESERVATION-F20 Borrar una reserva
-<!-- origen: fi:modules/reservations#command-reservations-reservations-delete-sql-transaccional old:reservations/workflow/reservas.md#reservations-f20 -->
 Estado: hecho
 Actor: administrador, propietario, asistente
 Pantalla: Reservas (fila → «Borrar»)
@@ -598,7 +578,6 @@ en este negocio.».
 Implicados: TABLE-F27
 
 ### RESERVATION-F21 Unir las reservas de dos fichas de cliente
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f21 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -613,7 +592,6 @@ Si falla: se reintenta solo; repetirlo no cambia nada.
 Implicados: CUSTOMER-F13
 
 ### RESERVATION-F22 Borrar los datos personales de un cliente (RGPD)
-<!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f22 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Reservas, Lista de espera
@@ -632,7 +610,6 @@ Si falla: se reintenta solo; repetirlo no cambia nada.
 Implicados: CUSTOMER-F16, TABLE-F31
 
 ### RESERVATION-F23 Elegir una mesa libre para la reserva
-<!-- origen: nuevo (el producto actual no elegía la mesa en el formulario: solo el asistente asignaba mesa) -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: formulario de reserva → Mesa

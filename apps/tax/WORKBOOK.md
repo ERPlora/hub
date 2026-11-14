@@ -176,7 +176,6 @@ atrás la cierra sin preguntar (BASE-F05).
 | TAX-F19 | Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios | hecho |
 
 ### TAX-F01 Ver las categorías fiscales
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/taxes#permission-role_permissions fi:modules/taxes#query-taxes-categories-list old:taxes/WORKFLOW.md#taxes-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Categorías
@@ -193,7 +192,6 @@ Implicados: COMBO-F02, INVENTORY-F01, INVENTORY-F02, INVENTORY-F05, INVENTORY-F0
 SALE-F35, SERVICE-F01
 
 ### TAX-F02 Crear una categoría fiscal propia
-<!-- origen: fi:modules/taxes#command-taxes-categories-create old:taxes/WORKFLOW.md#taxes-f02 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Categorías
@@ -212,7 +210,6 @@ Si falla: una clave con otra forma o un nombre vacío salen debajo de su campo; 
 Implicados: INVENTORY-F09
 
 ### TAX-F03 Ver y filtrar las reglas
-<!-- origen: fi:modules/taxes#query-taxes-rules-by_country fi:modules/taxes#query-taxes-rules-list old:taxes/WORKFLOW.md#taxes-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Reglas
@@ -228,7 +225,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: ninguno
 
 ### TAX-F04 Fijar el tipo de una categoría en un país o región
-<!-- origen: fi:modules/taxes#command-taxes-rules-create old:taxes/WORKFLOW.md#taxes-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -258,7 +254,6 @@ quizá desactivada: reactívala o empieza esta otro día.», en «Vigente desde�
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declarar una operación exenta, no sujeta o con inversión del sujeto pasivo
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f05 wf:cadena-fiscal#rec_fiscal-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -279,7 +274,6 @@ operación no lleva impuesto: su tipo tiene que ser 0 %.») y no se guarda nada.
 Implicados: INVOICE-F01
 
 ### TAX-F06 Añadir un recargo de equivalencia a un tipo
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -300,7 +294,6 @@ regla raíz. Un componente de un componente no existe: solo hay un nivel.
 Implicados: INVOICE-F01, SALE-F01
 
 ### TAX-F07 Cambiar un tipo a partir de una fecha
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f02 wf:cadena-fiscal#rec_fiscal-f10 old:taxes/WORKFLOW.md#taxes-f07 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -320,7 +313,6 @@ sin tipo: las ventas de esa categoría se rechazan hasta crear la siguiente.
 Implicados: INVOICE-F01, INVOICE-F04, SALE-F01
 
 ### TAX-F08 Desactivar y reactivar una regla
-<!-- origen: fi:modules/taxes#command-taxes-rules-deactivate old:taxes/WORKFLOW.md#taxes-f08 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -341,7 +333,6 @@ una que ahora se solapa con otra activa, el aviso de solape.
 Implicados: SALE-F01
 
 ### TAX-F09 Reparar una regla que cobra un tipo donde no toca
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f09 old:taxes/WORKFLOW.md#taxes-f09 -->
 Estado: descartado — en el producto actual servía para arreglar reglas guardadas antes de que se prohibieran; aquí ninguna puerta (pantalla, API, lote ni asistente) deja crear una regla que no cobra impuesto con un %, ni un componente con tipo bajo ella, así que no hay nada que reparar
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -356,7 +347,6 @@ Si falla: no aplica.
 Implicados: ninguno
 
 ### TAX-F10 Resolver reglas que se solapan
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f10 -->
 Estado: descartado — aquí ninguna puerta deja que dos reglas activas del mismo país, región y categoría estén vigentes el mismo día, tampoco si dos personas guardan a la vez: el solape se resuelve antes de guardar, con TAX-F07 o TAX-F08
 Actor: propietario, administrador, responsable
 Pantalla: Reglas
@@ -370,7 +360,6 @@ Si falla: no aplica.
 Implicados: ninguno
 
 ### TAX-F11 Montar un negocio de Canarias, Ceuta o Melilla
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f04 old:taxes/WORKFLOW.md#taxes-f11 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Ajustes y Reglas
@@ -406,7 +395,6 @@ territorio, pero no lo cambia.
 Implicados: INVOICE-F01, INVOICE-F03, SALE-F01
 
 ### TAX-F12 Crear varias reglas de golpe
-<!-- origen: fi:modules/taxes#command-handler-wasm-taxes-rules-bulk_create-bulk_create_rules old:taxes/WORKFLOW.md#taxes-f12 -->
 Estado: hecho
 Actor: propietario, administrador, responsable (por el asistente o por la API con su sesión; una llave de API no llega)
 Pantalla: ninguna (API)
@@ -423,7 +411,6 @@ lote: se crean de uno en uno (TAX-F06), porque necesitan su raíz ya guardada.
 Implicados: ninguno
 
 ### TAX-F13 Ver los alias de categoría
-<!-- origen: fi:modules/taxes#query-taxes-aliases-list old:taxes/WORKFLOW.md#taxes-f13 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Alias
@@ -436,7 +423,6 @@ Si falla: el aviso de la tabla con «Reintentar».
 Implicados: ninguno
 
 ### TAX-F14 Enseñar un alias de categoría a mano
-<!-- origen: fi:modules/taxes#command-taxes-aliases-create old:taxes/WORKFLOW.md#taxes-f14 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Alias
@@ -453,7 +439,6 @@ debajo de la Categoría. El motivo de un campo se quita en cuanto se corrige ese
 Implicados: INVENTORY-F09
 
 ### TAX-F15 Decir al importador de Inventario qué categoría es un texto
-<!-- origen: fi:modules/taxes#query-taxes-aliases-resolve old:taxes/WORKFLOW.md#taxes-f15 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -471,7 +456,6 @@ Si falla: un texto que no casa devuelve «nada», nunca una categoría parecida.
 Implicados: INVENTORY-F09, INVENTORY-F10
 
 ### TAX-F16 Sembrar el catálogo de fábrica al activar
-<!-- origen: qa:verticals/beauty/00-signup-and-blueprint-beauty qa:verticals/restaurant/00-signup-and-blueprint wf:alta#rec_alta-f08 old-hub:HUB-F22 fi:modules/taxes#seed-bloque old:taxes/WORKFLOW.md#taxes-f16 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -494,7 +478,6 @@ Si falla: nunca pisa una fila que ya existe ni duplica nada.
 Implicados: ninguno
 
 ### TAX-F17 Avisar de que faltan tipos para el país del negocio
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f17 wf:alta#rec_alta-f09 old-hub:HUB_SHELL-F27 gh:taxes#19 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Inicio, Categorías, Reglas y Alias
@@ -525,7 +508,6 @@ de IGIC también cuenta: un negocio que solo vende servicios exentos está bien 
 Implicados: BASE-F01
 
 ### TAX-F18 Calcular el impuesto de un importe
-<!-- origen: wf:cadena-fiscal#rec_fiscal-f04 fi:modules/taxes#command-handler-wasm-taxes-calculate-calculate_tax old-hub:HUB-F18 old:taxes/WORKFLOW.md#taxes-f18 qa:modules/taxes/vat-rates-and-breakdown -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario (por el asistente o por la API con su sesión; una llave de API no llega)
 Pantalla: ninguna (API)
@@ -549,7 +531,6 @@ debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin 
 Implicados: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
 
 ### TAX-F19 Entregar las reglas y las categorías a Ventas, Facturación, Inventario y Servicios
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices wf:cadena-fiscal#rec_fiscal-f02 qa:verticals/restaurant/07-payment-and-fiscal wf:cadena-fiscal#rec_fiscal-f01 fi:modules/taxes#event-emit-taxes-category-created-taxes-rule-created-taxes-rule-deactivated-taxes-alias-created-declarados-taxes-rule-created-taxes-rules-bulk_create-report-emitidos-por-el-wasm-bulk fi:modules/taxes#query-taxes-categories-get old:taxes/WORKFLOW.md#taxes-f19 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna

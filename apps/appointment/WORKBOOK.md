@@ -210,7 +210,6 @@ permite sobre ellas (reservar, mover, confirmar o editar) vale para las de cualq
 clienta reserva con quien quiera; lo que no se le permite, no lo hace (APPOINTMENT-F01 y F04).
 
 ### APPOINTMENT-F01 Reservar una cita desde la agenda
-<!-- origen: fi:modules/appointments#command-appointments-appointments-create-handler-wasm fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:appointments/workflow/agenda.md#appointments-f01 old:online_booking/WORKFLOW.md#online_booking-f01 qa:modules/appointments/chained-services qa:modules/appointments/create-appointment-without-overlap qa:modules/appointments/walk-in qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f03 wf:peluqueria-dia#rec_peluqueria-f06 -->
 Estado: hecho
 Actor: empleado (para sí), responsable, asistente
 Pantalla: Agenda
@@ -245,7 +244,6 @@ Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, 
 reserva; una borrada vuelve la misma, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 fi:modules/appointments#query-appointments-availability-check fi:modules/appointments#query-appointments-availability-slots old:appointments/workflow/agenda.md#appointments-f02 old:schedules/WORKFLOW.md#schedules-f11 qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules wf:whatsapp-cita#rec_wa_cita-f04 wf:whatsapp-cita#rec_wa_cita-f08 -->
 Estado: hecho
 Actor: empleado, asistente, clienta
 Pantalla: Agenda (alta y edición)
@@ -270,7 +268,6 @@ profesional. Puedes escribir una hora igualmente.».
 Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente
-<!-- origen: fi:modules/appointments#command-appointments-appointments-confirm old-hub:HUB_SHELL-F61 old:appointments/workflow/agenda.md#appointments-f03 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:peluqueria-dia#rec_peluqueria-f05 wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 wf:whatsapp-cita#rec_wa_cita-f07 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -286,7 +283,6 @@ Si falla: «Esta cita ya no se puede confirmar: ya no está pendiente.»; no se 
 Implicados: ninguno
 
 ### APPOINTMENT-F04 Mover una cita o cambiarle el profesional o los servicios
-<!-- origen: qa:modules/appointments/chained-services qa:verticals/beauty/03-appointments-and-whatsapp fi:modules/appointments#command-appointments-appointments-reschedule fi:modules/appointments#query-appointments-appointments-get old:appointments/workflow/agenda.md#appointments-f04 qa:modules/appointments/reschedule-appointment wf:peluqueria-dia#rec_peluqueria-f08 wf:peluqueria-dia#rec_peluqueria-f12 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -310,7 +306,6 @@ la clienta.
 Implicados: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancelar una cita desde la agenda
-<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f12 fi:modules/appointments#command-appointments-appointments-cancel old:appointments/workflow/agenda.md#appointments-f05 qa:modules/appointments/cancel-and-no-show -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -328,7 +323,6 @@ anúlala allí primero.» (`appointment.check_open`).
 Implicados: ninguno
 
 ### APPOINTMENT-F06 La clienta cancela o mueve su propia cita
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f08 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:peluqueria-dia#rec_peluqueria-f12 old:appointments/workflow/canales.md#appointments-f06 wf:whatsapp-cita#rec_wa_cita-f03 -->
 Estado: hecho
 Actor: clienta (a través de WhatsApp o la reserva online)
 Pantalla: ninguna
@@ -354,7 +348,6 @@ Si falla: `appointment.customer_cancellation_disabled`, `appointment.cancellatio
 Implicados: FLOW-F28, FLOW-F38
 
 ### APPOINTMENT-F07 Empezar el servicio
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 fi:modules/appointments#command-appointments-appointments-start old:appointments/workflow/agenda.md#appointments-f07 qa:modules/appointments/check-in-and-in-progress wf:whatsapp-cita#rec_wa_cita-f10 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -367,7 +360,6 @@ Si falla: «Esta cita no se puede iniciar en su estado actual.»
 Implicados: ninguno
 
 ### APPOINTMENT-F08 Completar la cita
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-complete old:appointments/workflow/agenda.md#appointments-f08 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -380,7 +372,6 @@ Si falla: «Esta cita no se puede completar en su estado actual.»
 Implicados: ninguno
 
 ### APPOINTMENT-F09 Marcar que la clienta no se presentó
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f12 qa:modules/appointments/cancel-and-no-show wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-no_show old:appointments/workflow/agenda.md#appointments-f09 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -395,7 +386,6 @@ con su cuenta abierta en el TPV, `appointment.check_open`.
 Implicados: ninguno
 
 ### APPOINTMENT-F10 Ver el historial de una cita
-<!-- origen: fi:modules/appointments#query-appointments-appointments-history old:appointments/workflow/agenda.md#appointments-f10 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -413,7 +403,6 @@ Si falla: «No se pudo cargar el historial de la cita.»
 Implicados: APPOINTMENT-F11, BASE-F114
 
 ### APPOINTMENT-F11 Borrar una cita
-<!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_delete-handler-wasm fi:modules/appointments#command-appointments-appointments-delete old:appointments/workflow/agenda.md#appointments-f11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Agenda
@@ -437,7 +426,6 @@ categoría, cuenta como el mismo), con las mismas condiciones.
 Implicados: APPOINTMENT-F10, BASE-F114
 
 ### APPOINTMENT-F12 Crear una cita periódica
-<!-- origen: fi:modules/appointments#command-appointments-recurring-create fi:modules/appointments#query-appointments-recurring-list old:appointments/workflow/periodicas.md#appointments-f12 -->
 Estado: hecho
 Actor: empleado (para sí), responsable, asistente
 Pantalla: Periódicas
@@ -457,7 +445,6 @@ tiene con esta misma creación, después de sus citas: no reserva ninguna fecha 
 misma, APPOINTMENT-F15)
 
 ### APPOINTMENT-F13 Reservar las citas de una serie
-<!-- origen: fi:modules/appointments#command-appointments-recurring-materialize-handler-wasm old:appointments/workflow/periodicas.md#appointments-f13 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Periódicas
@@ -481,7 +468,6 @@ cita periódica ya no tiene fechas que reservar.» (`appointment.recurring_ended
 Implicados: SCHEDULE-F11, STAFF-F16
 
 ### APPOINTMENT-F14 Editar una serie de esta cita en adelante
-<!-- origen: old:appointments/workflow/periodicas.md#appointments-f14 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas, Agenda
@@ -509,7 +495,6 @@ final no puede ser anterior al inicio.»).
 Implicados: ninguno
 
 ### APPOINTMENT-F15 Pausar, reactivar o borrar una serie
-<!-- origen: fi:modules/appointments#command-appointments-recurring-delete old:appointments/workflow/periodicas.md#appointments-f15 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas
@@ -531,7 +516,6 @@ está. La que el negocio ya no tiene se crea de nuevo como en APPOINTMENT-F12.
 Implicados: BASE-F114
 
 ### APPOINTMENT-F16 Bloquear tiempo en la agenda
-<!-- origen: fi:modules/appointments#command-appointments-blocked_times-create fi:modules/appointments#command-appointments-blocked_times-delete fi:modules/appointments#query-appointments-blocked_times-list old:appointments/workflow/canales.md#appointments-f16 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Agenda (lo pinta)
@@ -548,7 +532,6 @@ Si falla: «El final no puede ser anterior al inicio.»; quitar uno que ya no es
 Implicados: ninguno
 
 ### APPOINTMENT-F17 Cobrar la cita en el TPV
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-mark_converted fi:modules/appointments#event-listen-sales-sale-created_from_appointment-appointments-appointments-mark_converted old:appointments/workflow/agenda.md#appointments-f17 qa:modules/appointments/convert-appointment-to-sale qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 wf:peluqueria-dia#rec_peluqueria-f14 -->
 Estado: hecho
 Actor: responsable, empleado (sus propias citas), con permiso de vender en Venta
 Pantalla: Agenda
@@ -580,7 +563,6 @@ el de Venta.
 Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38
 
 ### APPOINTMENT-F18 Cita que reserva la clienta
-<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f06 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:whatsapp-cita#rec_wa_cita-f06 wf:whatsapp-cita#rec_wa_cita-f03 old:appointments/workflow/canales.md#appointments-f18 qa:modules/appointments/whatsapp-booking-edge-cases-and-races qa:modules/appointments/whatsapp-booking-without-a-human wf:whatsapp-cita#rec_wa_cita-f05 -->
 Estado: hecho
 Actor: clienta (WhatsApp, reserva online)
 Pantalla: ninguna
@@ -602,7 +584,6 @@ tomada (`appointment.slot_taken`); la automatización ofrece otra hora.
 Implicados: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Ajustar las reglas de reserva
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 fi:modules/appointments#command-appointments-settings-upsert fi:modules/appointments#query-appointments-settings-get fi:modules/appointments#settings-bloque old:appointments/workflow/agenda.md#appointments-f19 -->
 Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Ajustes
@@ -620,7 +601,6 @@ hasta el siguiente intento (hub#854).
 Implicados: ninguno
 
 ### APPOINTMENT-F20 Ver las citas de una clienta en su ficha
-<!-- origen: old:appointments/workflow/canales.md#appointments-f20 -->
 Estado: hecho
 Actor: quien ve la agenda
 Pantalla: Historial de visitas (ficha de Clientes)
@@ -634,7 +614,6 @@ Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este clien
 Implicados: CUSTOMER-F24
 
 ### APPOINTMENT-F21 Reservar varias citas de golpe (bono o curso)
-<!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_create-handler-wasm old:appointments/workflow/periodicas.md#appointments-f21 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: ninguna
@@ -647,7 +626,6 @@ Si falla: «{hora}: {motivo}» de la primera que no cabe; no se reserva ninguna.
 Implicados: ninguno
 
 ### APPOINTMENT-F22 Cambiar las notas o el contacto de una cita
-<!-- origen: fi:modules/appointments#command-appointments-appointments-update old-hub:HUB-F36 old:appointments/workflow/canales.md#appointments-f22 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda (Editar) y asistente
@@ -663,7 +641,6 @@ Si falla: el teléfono no válido se rechaza sin guardar nada; una cita que no e
 Implicados: CUSTOMER-F11
 
 ### APPOINTMENT-F23 Unir las citas al fusionar dos fichas de clienta
-<!-- origen: old:appointments/workflow/canales.md#appointments-f23 old:online_booking/WORKFLOW.md#online_booking-f09 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -677,7 +654,6 @@ Si falla: no se queda a medias (todo o nada) y se reintenta solo.
 Implicados: CUSTOMER-F13, ONLINE_BOOKING-F09
 
 ### APPOINTMENT-F24 Vaciar los datos de una clienta al borrarla
-<!-- origen: old-hub:HUB-F250 old:appointments/workflow/canales.md#appointments-f24 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -693,7 +669,6 @@ Si falla: no se queda a medias (todo o nada) y se reintenta solo.
 Implicados: CUSTOMER-F16, ONLINE_BOOKING-F12
 
 ### APPOINTMENT-F25 Un profesional se da de baja con citas futuras
-<!-- origen: nuevo (el mercado: Fresha, Square, Phorest, Mindbody y Timely piden reasignar las citas de quien se va; ver «Decisiones de mercado») -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -710,7 +685,6 @@ Si falla: no se queda a medias (todo o nada) y se reintenta solo.
 Implicados: STAFF-F06
 
 ### APPOINTMENT-F26 Un servicio se archiva con citas o series que lo usan
-<!-- origen: nuevo (el mercado: Fresha, Phorest, Acuity y TimeTap conservan lo reservado al archivar un servicio; ver «Decisiones de mercado») -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -728,7 +702,6 @@ Si falla: una reserva nueva con ese servicio se rechaza (`appointment.service_no
 Implicados: SERVICE-F04
 
 ### APPOINTMENT-F27 Ver la agenda de la semana
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 fi:modules/appointments#query-appointments-appointments-list qa:verticals/beauty/02-opening-and-daily-agenda -->
 Estado: hecho
 Actor: empleado (la suya), responsable
 Pantalla: Agenda (Por profesional · Semana)
@@ -743,7 +716,6 @@ Si falla: «No se han podido cargar los profesionales.» con **Reintentar**, en 
 Implicados: ninguno
 
 ### APPOINTMENT-F28 Recibir el aviso del sistema de una cita nueva o cancelada
-<!-- origen: old-hub:HUB_SHELL-F66 -->
 Estado: hecho
 Actor: empleado (las de su agenda), responsable
 Pantalla: Aviso del sistema y Agenda

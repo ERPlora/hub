@@ -170,7 +170,6 @@ la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin pr
 | TASK-F15 | Cuando alguien deja el equipo | hecho |
 
 ### TASK-F01 Crear una tarea
-<!-- origen: fi:modules/tasks#command-handler-wasm-tasks-tasks-create-create_task old:tasks/WORKFLOW.md#que-hay-hoy -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente, una automatización con permiso
 Pantalla: Tareas
@@ -193,7 +192,6 @@ está activa en el equipo.» o, por nombre, varias personas o proyectos que enca
 Implicados: Personal (la ficha del responsable)
 
 ### TASK-F02 Ver y buscar las tareas
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos; el empleado ve solo las suyas
 Pantalla: Tareas → Todas
@@ -209,7 +207,6 @@ Si falla: un filtro que no existe, «422».
 Implicados: Personal (el nombre del responsable)
 
 ### TASK-F03 Ver mis tareas
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-my -->
 Estado: hecho (servidor y pantalla)
 Actor: quien tiene ficha vinculada a su cuenta, asistente
 Pantalla: Tareas → Mis tareas
@@ -224,7 +221,6 @@ Si falla: nada propio.
 Implicados: Personal (mi ficha)
 
 ### TASK-F04 Abrir una tarea
-<!-- origen: fi:modules/tasks#query-tasks-tasks-get -->
 Estado: hecho (servidor y pantalla)
 Actor: quien la ve
 Pantalla: Tarea (hoja)
@@ -238,7 +234,6 @@ ve); varias tareas que encajan con el título: se dicen cuáles.
 Implicados: ninguno
 
 ### TASK-F05 Iniciar o cambiar el estado
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-update_status-update_status -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla (el empleado, las suyas)
 Pantalla: Tareas (acción **Iniciar**), Tarea (selector **Estado**)
@@ -254,7 +249,6 @@ quien ve todas las tareas pero solo puede cambiar las suyas, «Solo puedes cambi
 Implicados: ninguno
 
 ### TASK-F06 Completar una tarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-complete-complete_task -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tareas (acción **Completar**), Tarea (botón **Completar**)
@@ -270,7 +264,6 @@ se cambia el estado.
 Implicados: ninguno
 
 ### TASK-F07 Asignar, reasignar o desasignar
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-assign -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
@@ -287,7 +280,6 @@ equipo.», «No tienes ficha en Personal: no se te puede asignar.» (asignármel
 Implicados: Personal
 
 ### TASK-F08 Editar una tarea
-<!-- origen: nuevo (el producto actual no editaba una tarea) -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea → **Editar**
@@ -301,7 +293,6 @@ Si falla: los mismos rechazos que al crear.
 Implicados: ninguno
 
 ### TASK-F09 Añadir una subtarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-subtasks -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede crear tareas y ve la madre
 Pantalla: Tarea
@@ -315,7 +306,6 @@ Si falla: el motivo dentro de la hoja; el título tecleado se queda.
 Implicados: ninguno
 
 ### TASK-F10 Comentar una tarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-add_comment fi:modules/tasks#query-tasks-tasks-comments -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
@@ -329,7 +319,6 @@ Si falla: texto vacío; «Esa tarea no existe en este negocio.».
 Implicados: ninguno
 
 ### TASK-F11 Borrar una tarea
-<!-- origen: nuevo (el producto actual describía el borrado sin acción) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Tarea → **Borrar**
@@ -344,7 +333,6 @@ nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F12 Crear un proyecto
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-projects-create -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Proyectos
@@ -359,7 +347,6 @@ Si falla: «Ya hay un proyecto con ese código.» bajo el campo; un color que no
 Implicados: Personal (el dueño)
 
 ### TASK-F13 Abrir y cambiar un proyecto
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-projects-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos lo abren; lo cambian el propietario, el administrador y el responsable
 Pantalla: Proyecto (hoja)
@@ -375,7 +362,6 @@ vacío no se envía.
 Implicados: ninguno
 
 ### TASK-F14 Borrar un proyecto
-<!-- origen: nuevo (el producto actual no borraba proyectos) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Proyecto → **Borrar**
@@ -390,7 +376,6 @@ nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
-<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna

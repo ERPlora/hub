@@ -135,7 +135,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PAYMENT-F08 | Editar, desactivar y reactivar un método de pago | hecho |
 
 ### PAYMENT-F01 Crear un método de pago
-<!-- origen: fi:modules/payments#command-payments-methods-create old:payments/WORKFLOW.md#payments-f01 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
@@ -154,7 +153,6 @@ tipo fuera de la lista. Lo tecleado se conserva. Sin ningún método activo, «N
 Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F02 Registrar un pago
-<!-- origen: fi:modules/payments#command-wasm-payments-payments-create-create_payment old:payments/WORKFLOW.md#payments-f02 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -195,7 +193,6 @@ pago.») y no se guarda nada.
 Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
-<!-- origen: fi:modules/payments#command-payments-payments-approve old:payments/WORKFLOW.md#payments-f03 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -211,7 +208,6 @@ puede aprobar un pago en borrador; este está Aprobado.»), encima de la tabla.
 Implicados: FLOW-F21
 
 ### PAYMENT-F04 Marcar un pago como enviado y como completado
-<!-- origen: fi:modules/payments#command-payments-payments-mark_completed fi:modules/payments#command-payments-payments-mark_sent old:payments/WORKFLOW.md#payments-f04 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -228,7 +224,6 @@ completado un pago enviado; …»). Un pago completado o cancelado no ofrece má
 Implicados: FLOW-F21
 
 ### PAYMENT-F05 Cancelar un pago
-<!-- origen: fi:modules/payments#command-payments-payments-cancel old:payments/WORKFLOW.md#payments-f05 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -246,7 +241,6 @@ motivo escrito: no cambia nada y no avisa. Una aprobación no se deshace: se can
 Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
-<!-- origen: fi:modules/payments#navigation-list-erp-payments-list fi:modules/payments#query-payments-payments-get fi:modules/payments#query-payments-payments-list old:payments/WORKFLOW.md#payments-f06 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -266,7 +260,6 @@ Si falla: si la lista no carga, la tabla lo dice («No se han podido cargar los 
 Implicados: FLOW-F11
 
 ### PAYMENT-F07 Avisar de un pago completado
-<!-- origen: fi:modules/payments#event-emitidos-payment-created-approved-sent-completed-cancelled old:payments/WORKFLOW.md#payments-f07 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (la automatización se crea en **Automatizaciones**)
@@ -286,7 +279,6 @@ nada en otro. Esta app no escucha a ninguna otra.
 Implicados: FLOW-F21
 
 ### PAYMENT-F08 Editar, desactivar y reactivar un método de pago
-<!-- origen: old:payments/WORKFLOW.md#payments-f01 fi:modules/payments#query-payments-methods-list -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos

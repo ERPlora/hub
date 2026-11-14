@@ -125,7 +125,6 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f01 -->
 Estado: hecho (operaciones y vista previa; la página pública es de `base`)
 Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
 Pantalla: página pública de reservas (`base`); en desarrollo, la vista previa
@@ -169,7 +168,6 @@ intento (hub#854).
 Implicados: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirmar una reserva
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-confirm-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f02 qa:modules/online_booking/online-booking -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -184,7 +182,6 @@ reservas, se dicen cuáles y se pide el número.
 Implicados: APPOINTMENT-F03
 
 ### ONLINE_BOOKING-F03 Completar una reserva
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-complete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f03 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -197,7 +194,6 @@ Si falla: «Esta cita no se puede completar en su estado actual.»
 Implicados: APPOINTMENT-F08, APPOINTMENT-F17
 
 ### ONLINE_BOOKING-F04 Marcar que no se presentó
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-no_show-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f04 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -211,7 +207,6 @@ marcar como no presentada en su estado actual.»
 Implicados: APPOINTMENT-F09
 
 ### ONLINE_BOOKING-F05 Cancelar una reserva
-<!-- origen: qa:modules/online_booking/online-booking fi:modules/online_booking#command-online_booking-bookings-cancel-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f05 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -226,7 +221,6 @@ Si falla: «Esta cita ya no se puede cancelar en su estado actual.»; dentro del
 Implicados: APPOINTMENT-F05
 
 ### ONLINE_BOOKING-F06 Borrar una reserva
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-delete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f06 -->
 Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Reservas
@@ -240,7 +234,6 @@ Si falla: una cita en curso, completada o cobrada no se borra («Esta cita no se
 Implicados: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Configurar la página de reservas
-<!-- origen: fi:modules/online_booking#command-online_booking-settings-upsert-sql-transaccional fi:modules/online_booking#query-online_booking-settings-get old:online_booking/WORKFLOW.md#online_booking-f07 -->
 Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: Ajustes
@@ -261,7 +254,6 @@ siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el si
 Implicados: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 Ver y buscar las reservas
-<!-- origen: qa:modules/online_booking/online-booking fi:modules/online_booking#navigation-ui-bookings fi:modules/online_booking#query-online_booking-bookings-get fi:modules/online_booking#query-online_booking-bookings-list old:online_booking/WORKFLOW.md#online_booking-f08 -->
 Estado: hecho
 Actor: empleado (las de su agenda), responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -276,7 +268,6 @@ Si falla: «No se pudieron cargar las reservas» con **Reintentar**.
 Implicados: APPOINTMENT-F27
 
 ### ONLINE_BOOKING-F09 Seguir a la clienta cuando se fusionan dos fichas
-<!-- origen: old:online_booking/WORKFLOW.md#online_booking-f09 -->
 Estado: hecho (lo hace Citas; la bandeja lo refleja)
 Actor: sistema
 Pantalla: ninguna (se ve en Reservas)
@@ -291,7 +282,6 @@ Si falla: Citas no se queda a medias y el relay lo reintenta solo.
 Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
-<!-- origen: nuevo (el enlace personal de la confirmación, como Square, Treatwell, SimplyBook.me y Acuity) -->
 Estado: hecho (operación; la página es de `base`)
 Actor: clienta (sin sesión)
 Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
@@ -307,7 +297,6 @@ no es válido.».
 Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
-<!-- origen: nuevo (cancelar desde el enlace de la confirmación dentro de la política del negocio, como Square, Treatwell, SimplyBook.me y Acuity) -->
 Estado: hecho (operación; la página es de `base`)
 Actor: clienta (sin sesión)
 Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
@@ -323,7 +312,6 @@ puede cancelar online con N horas de antelación…»; una ya cancelada o comple
 Implicados: APPOINTMENT-F06, APPOINTMENT-F19
 
 ### ONLINE_BOOKING-F12 Borrar los datos de una clienta (RGPD)
-<!-- origen: old-hub:HUB-F250 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en Reservas)

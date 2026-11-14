@@ -194,7 +194,6 @@ Los servicios que hace cada profesional (STAFF-F10, F11 y F12 del producto actua
 Servicios: ver «Cambios frente al producto actual».
 
 ### STAFF-F01 Dar de alta a un profesional
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 old-hub:HUB_SHELL-F81 old-hub:HUB_SHELL-F82 fi:modules/staff#command-staff-members-create fi:modules/staff#permission-role_permissions fi:modules/staff#query-staff-members-list old-hub:HUB-F145 old:staff/workflow/ficha.md#staff-f01 qa:modules/staff/create-employee -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
@@ -224,7 +223,6 @@ motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar
 Implicados: BASE-F97
 
 ### STAFF-F02 Editar la ficha de un profesional
-<!-- origen: fi:modules/staff#command-staff-members-update fi:modules/staff#query-staff-members-get old:staff/workflow/ficha.md#staff-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
@@ -246,7 +244,6 @@ Resuélvelas primero.».
 Implicados: ninguno
 
 ### STAFF-F03 Vincular la ficha con una cuenta del negocio
-<!-- origen: old-hub:HUB_SHELL-F80 old-hub:HUB_SHELL-F84 old-hub:HUB_SHELL-F85 old-hub:HUB_SHELL-F88 old-hub:HUB-F146 old-hub:HUB-F148 old-hub:HUB-F149 old-hub:HUB-F158 old:staff/workflow/ficha.md#staff-f03 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Personal
@@ -266,7 +263,6 @@ tiene acceso a este negocio.».
 Implicados: ATTENDANCE-F01, TASK-F03
 
 ### STAFF-F04 Crear, editar y retirar un rol
-<!-- origen: fi:modules/staff#command-staff-roles-create fi:modules/staff#query-staff-roles-list old:staff/workflow/ficha.md#staff-f04 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Roles
@@ -284,7 +280,6 @@ Si falla: «Ya existe un rol con ese nombre.» (sin distinguir mayúsculas, `sta
 Implicados: ninguno
 
 ### STAFF-F05 Desactivar a un profesional
-<!-- origen: fi:modules/staff#command-handler-wasm-staff-members-deactivate-deactivate_staff_member old:staff/workflow/ficha.md#staff-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, asistente
 Pantalla: Personal
@@ -302,7 +297,6 @@ miembro del personal ya está inactivo.»; «Ese miembro del personal no existe 
 Implicados: ninguno
 
 ### STAFF-F06 Dar de baja a un profesional
-<!-- origen: fi:modules/staff#command-staff-members-delete old:staff/workflow/ficha.md#staff-f06 qa:modules/staff/offboard-employee -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador
 Pantalla: Personal
@@ -322,7 +316,6 @@ Si falla: «Ese miembro del personal no existe en este negocio.» si ya estaba d
 Implicados: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Dar de alta a varios profesionales de golpe
-<!-- origen: fi:modules/staff#command-handler-wasm-staff-members-bulk_create-bulk_create_staff_members old:staff/workflow/ficha.md#staff-f07 -->
 Estado: hecho (asistente y API, como el producto actual)
 Actor: asistente, API
 Pantalla: asistente
@@ -342,7 +335,6 @@ rechaza entero.
 Implicados: ninguno
 
 ### STAFF-F08 Ver mi propia ficha y mis ausencias
-<!-- origen: old:staff/workflow/ficha.md#staff-f08 -->
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquier persona con ficha vinculada), asistente
 Pantalla: Personal (vista propia) y Ausencias
@@ -357,7 +349,6 @@ Si falla: sin ficha o sin ausencias, vacío.
 Implicados: ninguno
 
 ### STAFF-F09 Dar el equipo a otras apps
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f04 old-hub:HUB_SHELL-F72 fi:modules/staff#event-emit-staff-member-created-updated-deactivated-terminated-staff-role-created-staff-time_off-created-status_changed-staff-schedule-created-staff-settings-updated old:staff/workflow/ficha.md#staff-f09 -->
 Estado: hecho (lo leen las otras apps)
 Actor: sistema
 Pantalla: ninguna
@@ -373,7 +364,6 @@ Si falla: cada app lo trata a su manera.
 Implicados: SALE-F16, APPOINTMENT-F01, SERVICE-F33, TASK-F07
 
 ### STAFF-F13 Crear el horario semanal de un profesional
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 qa:verticals/beauty/01-services-professionals-and-schedules fi:modules/staff#command-handler-wasm-staff-schedules-create-create_schedule fi:modules/staff#query-staff-schedules-list_for_member old:staff/workflow/disponibilidad.md#staff-f13 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horarios
@@ -402,7 +392,6 @@ guardar; los de los demás días se quedan hasta que se cambian (hub#1460).
 Implicados: ninguno
 
 ### STAFF-F14 Editar un horario
-<!-- origen: old:staff/workflow/disponibilidad.md#staff-f14 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Horarios
@@ -419,7 +408,6 @@ existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F15 Activar, desactivar o eliminar un horario
-<!-- origen: old:staff/workflow/disponibilidad.md#staff-f15 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Horarios
@@ -434,7 +422,6 @@ Si falla: «Ese horario no existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F16 Saber cuándo puede trabajar un profesional
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 wf:whatsapp-cita#rec_wa_cita-f04 old:staff/workflow/disponibilidad.md#staff-f16 -->
 Estado: hecho (lo lee Citas)
 Actor: sistema (Citas), asistente
 Pantalla: ninguna
@@ -452,7 +439,6 @@ al revés o de más de 731 días se rechaza en el campo.
 Implicados: APPOINTMENT-F01, APPOINTMENT-F02, APPOINTMENT-F04, APPOINTMENT-F13
 
 ### STAFF-F17 Registrar una ausencia
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 fi:modules/staff#command-handler-wasm-staff-time_off-create-create_time_off fi:modules/staff#query-staff-time_off-list old:staff/workflow/ausencias.md#staff-f17 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ausencias
@@ -473,7 +459,6 @@ canceladas no cuentan. «Ese miembro del personal no existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F18 Aprobar o rechazar una ausencia
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f03 fi:modules/staff#command-staff-time_off-set_status old:staff/workflow/ausencias.md#staff-f18 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ausencias
@@ -491,7 +476,6 @@ solicitud de ausencia no existe en este negocio.».
 Implicados: ninguno
 
 ### STAFF-F19 Cancelar una ausencia
-<!-- origen: old:staff/workflow/ausencias.md#staff-f19 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable; el empleado, solo la suya pendiente
 Pantalla: Ausencias
@@ -506,7 +490,6 @@ cancela): «Solo puedes cancelar tus propias solicitudes pendientes.».
 Implicados: ninguno
 
 ### STAFF-F20 Ver quién falta hoy
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 qa:verticals/beauty/02-opening-and-daily-agenda fi:modules/staff#query-staff-time_off-today old:staff/workflow/ausencias.md#staff-f20 fi:modules/staff#widget-staff-time_off_today-timeline -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Ausencias, Personal e Inicio
@@ -525,7 +508,6 @@ pudo cargar quién falta hoy» en su sitio (en el **Inicio**, «No disponible»)
 Implicados: ninguno
 
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/staff#query-staff-commissions-summary old:staff/workflow/pago-y-ajustes.md#staff-f21 qa:modules/staff/commission-per-professional qa:verticals/beauty/07-closing-per-professional -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Personal (columna Tarifa/h y formulario) y Comisiones
@@ -556,7 +538,6 @@ una vez.».
 Implicados: SALE-F16, SALE-F27, SALE-F28
 
 ### STAFF-F22 Cambiar los ajustes de Personal
-<!-- origen: old-hub:HUB_SHELL-F43 old-hub:HUB_SHELL-F44 fi:modules/staff#command-staff-settings-update fi:modules/staff#query-staff-settings-get fi:modules/staff#settings-bloque old:staff/workflow/pago-y-ajustes.md#staff-f22 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Ajustes de Personal
@@ -583,7 +564,6 @@ que no son los del negocio.
 Implicados: ninguno
 
 ### STAFF-F23 Ver las cifras de la plantilla y por rol
-<!-- origen: fi:modules/staff#query-staff-members-stats old:staff/workflow/pago-y-ajustes.md#staff-f23 fi:modules/staff#widget-staff-headcount-kpi fi:modules/staff#widget-staff-on_leave_today-stat fi:modules/staff#widget-staff-pending_time_off-kpi fi:modules/staff#widget-staff-by_role-bar-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Personal, Roles e Inicio
@@ -606,7 +586,6 @@ tabla sigue funcionando. Mientras llegan, cada cifra enseña «…».
 Implicados: ninguno
 
 ### STAFF-F24 Pedir mi propia ausencia
-<!-- origen: gh:staff#3 -->
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquier persona con ficha vinculada), asistente
 Pantalla: Ausencias

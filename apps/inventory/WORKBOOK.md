@@ -285,7 +285,6 @@ Escape y tocar fuera del panel (hub#1023).
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
 ### INVENTORY-F01 Dar de alta un producto
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices fi:modules/inventory#command-inventory-products-create old:inventory/workflow/catalogo.md#inventory-f01 qa:modules/inventory/create-product-with-vat wf:peluqueria-dia#rec_peluqueria-f04 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -336,7 +335,6 @@ los productos que el negocio ya no tiene en absoluto, cada uno por esta misma al
 INVENTORY-F34)
 
 ### INVENTORY-F02 Editar un producto
-<!-- origen: fi:modules/inventory#command-inventory-products-update fi:modules/inventory#query-inventory-products-get old:inventory/workflow/catalogo.md#inventory-f02 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -361,7 +359,6 @@ un producto con stock. Cuenta su stock a cero y cámbiala después.».
 Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F03 Activar y desactivar un producto
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:inventory/workflow/catalogo.md#inventory-f03 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -378,7 +375,6 @@ app). Sin permiso de cambio se ve «Sí»/«No» sin interruptor.
 Implicados: SALE-F01
 
 ### INVENTORY-F04 Eliminar un producto
-<!-- origen: fi:modules/inventory#command-inventory-products-delete old:inventory/workflow/catalogo.md#inventory-f04 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -397,7 +393,6 @@ Implicados: SALE-F01, BASE-F114, INVENTORY-F34 (desde una copia aparte, el perso
 eliminado: el mismo, con su stock y sus movimientos)
 
 ### INVENTORY-F05 Revisar los productos que no se pueden vender por falta de IVA
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/inventory/create-product-with-vat old:inventory/workflow/catalogo.md#inventory-f05 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -417,7 +412,6 @@ Si falla: los rechazos del formulario (INVENTORY-F02).
 Implicados: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Crear y editar una categoría
-<!-- origen: fi:modules/inventory#command-inventory-categories-create-update fi:modules/inventory#query-inventory-categories-list old:inventory/workflow/catalogo.md#inventory-f06 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
@@ -439,7 +433,6 @@ motivo.
 Implicados: KITCHEN-F04, SALE-F01, TAX-F01
 
 ### INVENTORY-F07 Eliminar una categoría
-<!-- origen: fi:modules/inventory#command-inventory-categories-delete old:inventory/workflow/catalogo.md#inventory-f07 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
@@ -468,7 +461,6 @@ Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla
 Implicados: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Agrupar productos en categorías para el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 fi:modules/inventory#query-inventory-product_categories old:inventory/workflow/catalogo.md#inventory-f08 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -489,7 +481,6 @@ categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Importar productos desde un CSV
-<!-- origen: qa:modules/inventory/create-product-with-vat fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-products-bulk_create-handler-wasm-bulk_create old:inventory/workflow/importar-y-exportar.md#inventory-f09 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Importar productos
@@ -532,7 +523,6 @@ estaba.».
 Implicados: TAX-F02, TAX-F14, TAX-F15
 
 ### INVENTORY-F10 Importar categorías desde un CSV
-<!-- origen: old:inventory/workflow/importar-y-exportar.md#inventory-f10 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
@@ -552,7 +542,6 @@ fiscal no reconocida: <texto>».
 Implicados: TAX-F15
 
 ### INVENTORY-F11 Exportar el catálogo a CSV
-<!-- origen: old:inventory/workflow/importar-y-exportar.md#inventory-f11 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -574,7 +563,6 @@ fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la impo
 Implicados: BASE-F112 (dentro de la app)
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
-<!-- origen: old-hub:HUB_SHELL-F26 old-hub:HUB-F235 old:inventory/workflow/importar-y-exportar.md#inventory-f12 wf:alta#rec_alta-f08 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -606,7 +594,6 @@ cargado se puede deshacer entero (BASE-F34).
 Implicados: BASE-F29, BASE-F31, BASE-F32, BASE-F34, BASE-F38, INVENTORY-F05, INVENTORY-F09, INVENTORY-F33
 
 ### INVENTORY-F13 Recibir mercancía
-<!-- origen: fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-stock-receive-handler-wasm-receive_stock old:inventory/workflow/stock.md#inventory-f13 qa:modules/inventory/waste-and-adjustment -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Recepción
@@ -636,7 +623,6 @@ falla: no entra ninguna.
 Implicados: ninguno
 
 ### INVENTORY-F14 Contar el stock de un producto
-<!-- origen: qa:modules/inventory/waste-and-adjustment fi:modules/inventory#command-inventory-stock-adjust old:inventory/workflow/stock.md#inventory-f14 qa:verticals/restaurant/08-incidents-voids-and-refunds -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Recuento
@@ -661,7 +647,6 @@ de la ventana, también el motivo de cualquier otro rechazo.
 Implicados: ninguno
 
 ### INVENTORY-F15 Dar de baja stock sin venta (merma, rotura, consumo propio)
-<!-- origen: qa:modules/inventory/waste-and-adjustment qa:verticals/restaurant/08-incidents-voids-and-refunds fi:modules/inventory#command-inventory-stock-decrease old:inventory/workflow/stock.md#inventory-f15 -->
 Estado: hecho
 Actor: administrador, responsable (pantalla); asistente
 Pantalla: ficha y tabla de Productos (ventana «Baja»); asistente
@@ -685,7 +670,6 @@ stock con «Este artículo no controla su stock: no hay nada que dar de baja.» 
 Implicados: ninguno
 
 ### INVENTORY-F16 Consultar el historial de movimientos
-<!-- origen: old:inventory/workflow/stock.md#inventory-f16 -->
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Movimientos
@@ -707,7 +691,6 @@ Implicados: INVOICE-F20, SALE-F28, INVENTORY-F34 (los movimientos de un producto
 siendo suyos: el historial no se parte en dos)
 
 ### INVENTORY-F17 Ver el panel y los productos con stock bajo
-<!-- origen: fi:modules/inventory#query-inventory-products-low_stock fi:modules/inventory#query-inventory-products-stats fi:modules/inventory#widget-inventory-low_stock_count-kpi-inventory-value-kpi-inventory-in_stock-stat-inventory-low_stock_products-bar-list old:inventory/workflow/stock.md#inventory-f17 -->
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Panel
@@ -732,7 +715,6 @@ ajustes. Los paneles del Inicio los ve quien puede ver los productos.
 Implicados: ninguno
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
-<!-- origen: old:inventory/workflow/stock.md#inventory-f18 qa:modules/inventory/stock-deduction-on-sale -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -755,7 +737,6 @@ aviso ni se pierde ni sale dos veces. Si el movimiento no llega a guardarse, tam
 Implicados: FLOW-F21
 
 ### INVENTORY-F19 Ajustar el inventario
-<!-- origen: fi:modules/inventory#command-inventory-settings-update fi:modules/inventory#query-inventory-settings-get old:inventory/workflow/stock.md#inventory-f19 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ajustes
@@ -787,7 +768,6 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 Implicados: SALE-F01
 
 ### INVENTORY-F20 Decidir qué artículos llevan control de stock
-<!-- origen: old:inventory/workflow/stock.md#inventory-f20 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -807,7 +787,6 @@ Si falla: los rechazos del formulario (INVENTORY-F01). Una vez decidido, el art�
 Implicados: SALE-F01
 
 ### INVENTORY-F21 Bajar el stock al cobrarse una venta
-<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/08-incidents-voids-and-refunds fi:modules/inventory#command-inventory-stock-decrease qa:modules/inventory/stock-deduction-on-sale fi:modules/inventory#command-inventory-stock-decrease_on_sale-handler-wasm-decrease_on_sale fi:modules/inventory#event-listen-sale-completed-inventory-stock-decrease_on_sale old-hub:HUB-F51 old:inventory/workflow/con-otros-modulos.md#inventory-f21 wf:restaurante-dia#rec_restaurante-f17 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -834,7 +813,6 @@ encendido, queda en negativo.
 Implicados: SALE-F01, SALE-F11, SALE-F15
 
 ### INVENTORY-F22 Bajar el stock de los componentes de un menú o un pack
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old:inventory/workflow/con-otros-modulos.md#inventory-f22 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -852,7 +830,6 @@ Si falla: como INVENTORY-F21.
 Implicados: COMBO-F10, SALE-F12
 
 ### INVENTORY-F23 Reponer el stock al anularse una venta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void qa:verticals/restaurant/08-incidents-voids-and-refunds qa:modules/inventory/stock-deduction-on-sale fi:modules/inventory#event-listen-sale-voided-inventory-_restock_on_void old:inventory/workflow/con-otros-modulos.md#inventory-f23 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -872,7 +849,6 @@ después ya no baja nada. Un artículo eliminado después de la venta no recuper
 Implicados: SALE-F30
 
 ### INVENTORY-F24 Reponer el stock de una devolución
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 qa:verticals/restaurant/08-incidents-voids-and-refunds qa:modules/inventory/stock-deduction-on-sale old:inventory/workflow/con-otros-modulos.md#inventory-f24 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -896,7 +872,6 @@ aviso de la devolución no los trae; si vuelven a la estantería, se cuentan (IN
 Implicados: SALE-F31
 
 ### INVENTORY-F25 Imprimir la etiqueta del código de barras
-<!-- origen: old-hub:HUB_PERIPHERALS-F12 old:inventory/workflow/con-otros-modulos.md#inventory-f25 -->
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
@@ -924,7 +899,6 @@ ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
 Implicados: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Vender al peso o por medida: unidades y escalón
-<!-- origen: qa:verticals/restaurant/03-menu-and-prices old:inventory/workflow/con-otros-modulos.md#inventory-f26 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -948,7 +922,6 @@ con stock no se cambia (INVENTORY-F02).
 Implicados: SALE-F10
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
-<!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 fi:modules/inventory#query-inventory-products-list old:inventory/workflow/con-otros-modulos.md#inventory-f27 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -977,7 +950,6 @@ reparto.
 Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
-<!-- origen: old-hub:HUB_SHELL-F27 old-hub:HUB_SHELL-F31 old:inventory/workflow/con-otros-modulos.md#inventory-f28 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Inicio: Termina de configurar tu negocio
@@ -993,7 +965,6 @@ recargar.
 Implicados: ninguno
 
 ### INVENTORY-F29 Marcar un artículo como agotado
-<!-- origen: qa:modules/sales/sold-out-item-86 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos; Ficha del producto
@@ -1020,7 +991,6 @@ acciones. Un artículo que ya no existe da «Este producto no existe en este hub
 Implicados: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Elegir la imagen de un artículo desde la librería
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: una librería de imágenes compartida por todos los negocios, con título y sinónimos en español y en inglés; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) old:inventory/WORKFLOW.md (Foto del artículo en la ficha, duda 6) -->
 Estado: hecho
 Actor: administrador, responsable, asistente
 Pantalla: Productos
@@ -1062,7 +1032,6 @@ asistente o la API.
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Subir una foto propia del artículo
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda las fotos de sus artículos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -1089,7 +1058,6 @@ plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
 ### INVENTORY-F32 La foto en la ficha del TPV
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30; hoy la baldosa del TPV pinta las iniciales sobre un degradado, SALE-F01) -->
 Estado: hecho
 Actor: empleado, cajero
 Pantalla: Ventas: Vender; Productos; Ficha del producto
@@ -1112,7 +1080,6 @@ sin aviso; el TPV vende igual.
 Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
 
 ### INVENTORY-F33 Las fotos viajan en el blueprint
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: las fotos propias viajan dentro del archivo exportado y las de la librería como referencia) gh:hub#1008 gh:hub#1006 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias
@@ -1140,7 +1107,6 @@ se pueda leer («El fichero trae una foto que no es una imagen WebP de hasta 2 M
 Implicados: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
 ### INVENTORY-F34 Recuperar un producto eliminado
-<!-- origen: nuevo (BASE-F114: recuperar desde una copia aparte lo que el negocio perdió) gh:hub#1321 -->
 Estado: hecho
 Actor: el personal de ERPlora, cuando el negocio lo pide (en el negocio ninguna pantalla deshace una eliminación)
 Pantalla: ninguna del negocio; el admin de Hubs › Copias aparte › «Recuperar en el negocio…» (BASE-F114)
