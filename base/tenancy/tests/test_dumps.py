@@ -408,10 +408,19 @@ def test_a_stream_that_runs_too_long_is_stopped_and_keeps_nothing(hub_a, dumps_b
     assert nothing_kept(moto_s3, dumps_bucket)
 
 
+@pytest.mark.parametrize(
+    "script",
+    [
+        "time.sleep(60)",
+        # Its output closed but still running: the end of the copy waits for it the same way.
+        "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); os.close(1); time.sleep(60)",
+    ],
+    ids=["before-any-output", "its-output-closed"],
+)
 def test_a_stream_is_stopped_when_the_worker_stops_and_keeps_nothing(
-    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, script
 ):
-    pid = a_pg_dump(tmp_path, monkeypatch, "time.sleep(60)")
+    pid = a_pg_dump(tmp_path, monkeypatch, script)
     asked = time.monotonic()
 
     with pytest.raises(dumps.DumpStopped):
@@ -527,18 +536,3 @@ def test_an_abort_that_fails_keeps_the_reason_of_the_failure(
     assert "the connection to the server was lost" in str(failed.value)
     assert "base.tenancy.dumps.abort_failed" in caplog.text
     assert objects(moto_s3, dumps_bucket) == {}
-
-
-def test_a_pg_dump_that_closes_its_output_but_does_not_end_is_still_stopped(
-    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path
-):
-    pid = a_pg_dump(
-        tmp_path, monkeypatch, "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); os.close(1); time.sleep(60)"
-    )
-    asked = time.monotonic()
-
-    with pytest.raises(dumps.DumpStopped):
-        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, cancelled=lambda: time.monotonic() - asked > 0.5)
-
-    assert time.monotonic() - asked < 10 and gone(pid)
-    assert nothing_kept(moto_s3, dumps_bucket)
