@@ -79,7 +79,8 @@ echo "uv unexpected $where $*" >> "$FAKE_CALLS"
 exit 2
 EOF
 # pnpm: `install`; `e2e <args>` logs its arguments, the commit it runs on, its environment and the fake servers
-# alive, leaves FAKE_RESULTS as its JSON report and exits with FAKE_E2E_EXIT.
+# alive, leaves FAKE_RESULTS as its JSON report and exits with FAKE_E2E_EXIT. FAKE_MAIN_MOVES=<remote> moves main
+# and fetches it meanwhile; with FAKE_E2E_NEVER_ENDS it then sleeps like specs that hang (its pid in $FAKE_PIDS).
 cat > "$root/bin/pnpm" <<'EOF'
 #!/usr/bin/env bash
 where="$(basename "$PWD")"
@@ -97,6 +98,14 @@ case "${1:-}" in
     done < "$FAKE_PIDS"
     mkdir -p "$E2E_OUTPUT_DIR"
     [ -z "${FAKE_RESULTS:-}" ] || cp "$FAKE_RESULTS" "$E2E_OUTPUT_DIR/results.json"
+    if [ -n "${FAKE_MAIN_MOVES:-}" ]; then
+      git -C "$FAKE_MAIN_MOVES" -c user.name=nightly -c user.email=nightly@example.com commit -q --allow-empty -m later
+      git -C "$HUB_REPO" fetch --quiet origin
+    fi
+    if [ -n "${FAKE_E2E_NEVER_ENDS:-}" ]; then
+      echo "$$" >> "$FAKE_PIDS"
+      exec sleep 120
+    fi
     exit "${FAKE_E2E_EXIT:-0}" ;;
 esac
 echo "pnpm unexpected $where $*" >> "$FAKE_CALLS"
@@ -179,15 +188,19 @@ night() {
     shift
   done
   [ $# -eq 0 ] || shift
+  status=0
+  run_script "$@" > "$root/out" 2>&1 || status=$?
+  cat "$FAKE_PIDS" >> "$root/all-pids"
+}
+# run_script <arguments>: nightly-e2e.sh with the caller's `settings`, on empty logs.
+run_script() {
   : > "$FAKE_CALLS"
   : > "$CALLS_LOG"
   : > "$BODIES_LOG"
   : > "$FAKE_PIDS"
-  status=0
   env PATH="$root/bin:$PATH" HOME="$home" HUB_REPO="$hub_clone" ERPLORA_ROOT="$root/erplora" GH_REPO=ERPlora/hub \
     NIGHTLY_START_SECONDS=5 FAKE_E2E_EXIT=1 FAKE_RESULTS="$red_report" \
-    ${settings[@]+"${settings[@]}"} bash "$here/nightly-e2e.sh" "$@" > "$root/out" 2>&1 || status=$?
-  cat "$FAKE_PIDS" >> "$root/all-pids"
+    ${settings[@]+"${settings[@]}"} bash "$here/nightly-e2e.sh" "$@"
 }
 
 # expect <name> <expected> <actual>
@@ -221,30 +234,30 @@ expect "it runs every spec once, from the night's Hub" 1 "$(calls_re '^e2e hub '
 expect "on the newest origin/main, fetched that night" 1 "$(calls "HEAD=$newest_main")"
 expect "the shared checkout's HEAD does not move" "$clone_head" "$(git -C "$hub_clone" rev-parse HEAD)"
 expect "with Playwright's global timeout" 1 "$(calls_re '^e2e hub args=--global-timeout=21600000 HEAD=')"
-expect "on its own stack: Hub port" 1 "$(calls 'E2E_HUB_PORT=39000 VITE_DEV_PORT=39005 SAAS_URL=http://localhost:39001 DB_NAME=hub_e2e_39000 E2E_SAAS_DB=saas_e2e_39001')"
+expect "on its own stack: Hub port" 1 "$(calls 'E2E_HUB_PORT=9770 VITE_DEV_PORT=9775 SAAS_URL=http://localhost:9771 DB_NAME=hub_e2e_9770 E2E_SAAS_DB=saas_e2e_9771')"
 expect "the SaaS's checkout and mail folder" 1 \
-  "$(calls "E2E_SAAS_DIR=$nightly/saas E2E_MAIL_DIR=$nightly/saas/.mail-39001 CI=1")"
+  "$(calls "E2E_SAAS_DIR=$nightly/saas E2E_MAIL_DIR=$nightly/saas/.mail-9771 CI=1")"
 expect "compose.yaml and the blueprints of erplora-next" 1 \
   "$(calls "COMPOSE_FILE=$root/erplora/compose.yaml CATALOG_DIR=$root/erplora/blueprints/img")"
 expect "its report in the night's own folder" 1 "$(calls_re "E2E_OUTPUT_DIR=$nightly/runs/[0-9-]+/test-results\$")"
 expect "the checkouts' .env goes with them" 1 "$(calls 'e2e sees .env LOCAL_SETTING=hub')"
 expect "both servers are up while it runs" 2 "$(calls 'e2e sees a server alive')"
-expect "the Hub's database is made with the stack's name" 1 "$(calls 'database hub DB_NAME=hub_e2e_39000 E2E_SAAS_PORT=')"
-expect "the SaaS's, without the Hub's DB_NAME" 1 "$(calls 'database saas DB_NAME= E2E_SAAS_PORT=39001')"
+expect "the Hub's database is made with the stack's name" 1 "$(calls 'database hub DB_NAME=hub_e2e_9770 E2E_SAAS_PORT=')"
+expect "the SaaS's, without the Hub's DB_NAME" 1 "$(calls 'database saas DB_NAME= E2E_SAAS_PORT=9771')"
 expect "the SaaS is seeded with the ids of a and b" 1 \
-  "$(calls 'seed saas tests/e2e/panel/whatsapp_hub_seed.py 0190-a 0190-b DB_NAME=saas_e2e_39001 HUB_INTERNAL_URL=http://127.0.0.1:39000')"
-expect "those ids come from the Hub's database" 1 "$(calls_re '^docker .* -d hub_e2e_39000 .*select id from base_hub')"
+  "$(calls 'seed saas tests/e2e/panel/whatsapp_hub_seed.py 0190-a 0190-b DB_NAME=saas_e2e_9771 HUB_INTERNAL_URL=http://127.0.0.1:9770')"
+expect "those ids come from the Hub's database" 1 "$(calls_re '^docker .* -d hub_e2e_9770 .*select id from base_hub')"
 expect "and with the fake assistant provider" 1 \
-  "$(calls 'seed saas tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:39002/v1 DB_NAME=saas_e2e_39001')"
+  "$(calls 'seed saas tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:9772/v1 DB_NAME=saas_e2e_9771')"
 expect "the SaaS runs as the e2e README says" 1 \
-  "$(calls "runserver saas 127.0.0.1:39001 DB_NAME=saas_e2e_39001 VITE_DEV_PORT=39006 SAAS_URL= HUB_INTERNAL_URL=http://localhost:39000 EMAIL_FILE_PATH=$nightly/saas/.mail-39001 ASSISTANT_SERVICE_PROVIDER=e2e-local E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h HUB_CALLBACK_TEMPLATE=http://{slug}.localhost:39000/auth/callback HUB_ADMIN_CALLBACK_URL=http://hubs.localhost:39000/auth/callback HTTPS_PROXY=http://127.0.0.1:39009")"
+  "$(calls "runserver saas 127.0.0.1:9771 DB_NAME=saas_e2e_9771 VITE_DEV_PORT=9776 SAAS_URL= HUB_INTERNAL_URL=http://localhost:9770 EMAIL_FILE_PATH=$nightly/saas/.mail-9771 ASSISTANT_SERVICE_PROVIDER=e2e-local E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h HUB_CALLBACK_TEMPLATE=http://{slug}.localhost:9770/auth/callback HUB_ADMIN_CALLBACK_URL=http://hubs.localhost:9770/auth/callback HTTPS_PROXY=http://127.0.0.1:9779")"
 expect "the Hub runs on its port and database" 1 \
-  "$(calls "runserver hub 127.0.0.1:39000 DB_NAME=hub_e2e_39000 VITE_DEV_PORT=39005 SAAS_URL=http://localhost:39001")"
+  "$(calls "runserver hub 127.0.0.1:9770 DB_NAME=hub_e2e_9770 VITE_DEV_PORT=9775 SAAS_URL=http://localhost:9771")"
 expect "the Hub's runserver sees the blueprints" 1 "$(calls_re "^runserver hub .*CATALOG_DIR=$root/erplora/blueprints/img\$")"
 expect "the servers are waited for before the specs" 1 \
   "$([ "$(line_of 'curl')" -lt "$(line_of 'e2e hub')" ] && echo 1 || echo 0)"
 expect "both databases are dropped before and after the night" 4 \
-  "$(calls_re '^drop (hub DB_NAME=hub_e2e_39000|saas DB_NAME= E2E_SAAS_PORT=39001)')"
+  "$(calls_re '^drop (hub DB_NAME=hub_e2e_9770|saas DB_NAME= E2E_SAAS_PORT=9771)')"
 expect "the first drops clear an earlier night before the databases are made" 1 \
   "$([ "$(line_of 'drop saas')" -lt "$(line_of 'database hub')" ] && echo 1 || echo 0)"
 expect "the last drops come after the specs" 1 \
@@ -331,6 +344,47 @@ mkdir -p "$nightly/runs/20200101-000000-1" "$nightly/runs/20200102-000000-1" "$n
 night NIGHTLY_KEEP_RUNS=2 FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
 expect "only the newest NIGHTLY_KEEP_RUNS nights are kept" 2 "$(find "$nightly/runs" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 expect "the night before this one is among them" present "$([ -d "$nightly/runs/20200103-000000-1" ] && echo present || echo absent)"
+
+# --- main moves while the specs run --------------------------------------------------------------------
+night FAKE_MAIN_MOVES="$root/remote/hub"
+expect "main moved and was fetched during the night" 0 \
+  "$([ "$(git -C "$hub_clone" rev-parse origin/main)" = "$newest_main" ] && echo 1 || echo 0)"
+expect "the issue still names the commit the specs ran on" 1 "$(grep -cF "(commit \`${newest_main:0:7}\`)" "$BODIES_LOG" || true)"
+
+# --- a night that is told to stop ------------------------------------------------------------------------
+settings=(FAKE_E2E_NEVER_ENDS=1)
+run_script > "$root/out" 2>&1 &
+waited_for=$!
+tries=0
+while [ "$(wc -l < "$FAKE_PIDS" | tr -d ' ')" -lt 3 ] && [ "$tries" -lt 150 ]; do
+  sleep 0.2
+  tries=$((tries + 1))
+done
+# The night's own pid, from its lock: $! is the subshell around it in bash 3.2.
+night_pid="$(cat "$nightly/lock/pid")"
+kill -TERM "$night_pid"
+tries=0
+while kill -0 "$night_pid" 2> /dev/null && [ "$tries" -lt 150 ]; do
+  sleep 0.2
+  tries=$((tries + 1))
+done
+kill -KILL "$night_pid" 2> /dev/null || true
+status=0
+wait "$waited_for" 2> /dev/null || status=$?
+cat "$FAKE_PIDS" >> "$root/all-pids"
+expect "a night told to stop (TERM) while the specs run ends without waiting for them (143)" 143 "$status"
+expect "its two servers and its specs were running" 3 "$(wc -l < "$FAKE_PIDS" | tr -d ' ')"
+expect "and none is left" 0 "$(alive_servers)"
+expect "its databases are dropped after the specs started" 1 \
+  "$([ "$(last_line_of 'drop saas')" -gt "$(line_of 'e2e hub')" ] && echo 1 || echo 0)"
+expect "its worktrees are removed" "1 1" "$(worktrees "$hub_clone") $(worktrees "$root/erplora/saas")"
+expect "and its lock released" absent "$([ -e "$nightly/lock" ] && echo present || echo absent)"
+
+# --- the night's folder is never a checkout of its own ---------------------------------------------------
+night NIGHTLY_DIR="$root/erplora"
+expect "a NIGHTLY_DIR whose hub/ is a checkout, not the night's worktree, is refused (2)" 2 "$status"
+expect "and that checkout is left as it was" "LOCAL_SETTING=hub" "$(cat "$hub_clone/.env" 2> /dev/null || echo gone)"
+expect "nothing runs" 0 "$(calls_re '^(uv|pnpm|node|e2e|runserver|database|drop) ')"
 
 # --- install-launchd ---------------------------------------------------------------------------------
 plist="$home/Library/LaunchAgents/com.erplora.hub.nightly-e2e.plist"

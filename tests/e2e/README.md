@@ -240,8 +240,8 @@ en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los plane
 mismo con su pasada.
 
 - **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub y del SaaS en
-  `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_39000` y
-  `saas_e2e_39001`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
+  `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
+  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
   `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
   (`NIGHTLY_MAX_MINUTES`, 360). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera.
 - **Pase lo que pase**, al acabar para lo que escucha en los puertos de la pila (también un `runserver` que una spec
@@ -251,13 +251,19 @@ mismo con su pasada.
 - **Lo que deja**: `~/.erplora/hub-nightly-e2e/runs/<noche>/`, con `night.log`, los registros de los dos `runserver` y
   `test-results/` (el `results.json`, las trazas y las capturas de cada fallo). Guarda las 7 últimas (`NIGHTLY_KEEP_RUNS`).
 - **Una noche a la vez**: si otra sigue viva, sale con 3 sin tocar nada.
+- **Pararla**: `kill <pid>` (el de `~/.erplora/hub-nightly-e2e/lock/pid`) o Ctrl-C. Durante las specs para en el acto y
+  limpia; en un paso anterior (dependencias, BD) limpia cuando ese paso termina. Tras un `kill -9` o un apagón no limpia
+  nadie: lo hace la noche siguiente al empezar. `NIGHTLY_DIR` no puede ser una carpeta cuyo `hub/` o `saas/` sea un
+  checkout: la noche borra esas dos carpetas a la fuerza, y se niega.
 - **Programarla**, una vez y desde el checkout principal del Hub (un worktree desaparece con su rama, y se niega):
   `bash .github/scripts/nightly-e2e.sh install-launchd [--at HH:MM]`, a las 02:17 si no se dice otra hora. El agente de
   launchd guarda el `PATH` de quien lo instala (uv, pnpm, node, docker y gh, con la sesión de GitHub abierta) y corre el
   script de ese checkout, que la flota pone al día. `uninstall-launchd` lo quita. Con el Mac dormido, launchd la lanza al
   despertar; con el Mac apagado, esa noche no hay pasada y nada lo dice.
 - **A mano**: `bash .github/scripts/nightly-e2e.sh --no-publish [--spec tests/e2e/<spec>]…` hace lo mismo sin escribir en
-  GitHub. Otros puertos, con `NIGHTLY_HUB_PORT` (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy
+  GitHub. Su pila va en el `9770`, por debajo de los puertos que la flota da a sus workers (`10000 + 10 × issue` en el
+  SaaS y `20000 + 10 × issue` en el Hub): en uno de esos, la noche pararía los servidores y borraría la BD del worker de
+  esa issue. Otros puertos, con `NIGHTLY_HUB_PORT` (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy
   de Meta en +9; sus BD, con esos números).
 
 ## La demo (`demo.spec.ts`)

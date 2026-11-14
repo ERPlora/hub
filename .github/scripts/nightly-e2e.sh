@@ -16,7 +16,7 @@
 #
 # Environment (default): NIGHTLY_DIR (~/.erplora/hub-nightly-e2e) · HUB_REPO (the clone this script is in) ·
 # ERPLORA_ROOT (the folder above it: compose.yaml, blueprints/) · SAAS_REPO ($ERPLORA_ROOT/saas) ·
-# NIGHTLY_HUB_PORT (39000; the SaaS on +1, the fake assistant provider on +2, the two Vites on +5 and +6, Meta's
+# NIGHTLY_HUB_PORT (9770, below the ports the fleet's workers take; the SaaS on +1, the fake assistant provider on +2, the two Vites on +5 and +6, Meta's
 # proxy on +9) · NIGHTLY_MAX_MINUTES (360, Playwright's global timeout) · NIGHTLY_START_SECONDS (300, for the
 # servers to answer) · NIGHTLY_KEEP_RUNS (7) · GH_REPO (ERPlora/hub).
 # Exit: 0 green · 1 red · 2 usage · 3 another night is running · 4 install-launchd without the script in HUB_REPO.
@@ -38,7 +38,7 @@ HUB_REPO="${HUB_REPO:-$(git -C "$here" rev-parse --show-toplevel)}"
 ERPLORA_ROOT="${ERPLORA_ROOT:-$(dirname "$HUB_REPO")}"
 SAAS_REPO="${SAAS_REPO:-$ERPLORA_ROOT/saas}"
 NIGHTLY_DIR="${NIGHTLY_DIR:-$HOME/.erplora/hub-nightly-e2e}"
-PORT="${NIGHTLY_HUB_PORT:-39000}"
+PORT="${NIGHTLY_HUB_PORT:-9770}"
 MAX_MINUTES="${NIGHTLY_MAX_MINUTES:-360}"
 START_SECONDS="${NIGHTLY_START_SECONDS:-300}"
 KEEP_RUNS="${NIGHTLY_KEEP_RUNS:-7}"
@@ -48,7 +48,9 @@ number NIGHTLY_HUB_PORT "$PORT"
 number NIGHTLY_MAX_MINUTES "$MAX_MINUTES"
 number NIGHTLY_START_SECONDS "$START_SECONDS"
 number NIGHTLY_KEEP_RUNS "$KEEP_RUNS"
-[ "$PORT" -ge 1024 ] && [ "$PORT" -le 65526 ] || usage_error "NIGHTLY_HUB_PORT must be a port from 1024 to 65526"
+if [ "$PORT" -lt 1024 ] || [ "$PORT" -gt 65526 ]; then
+  usage_error "NIGHTLY_HUB_PORT must be a port from 1024 to 65526"
+fi
 [ "$KEEP_RUNS" -ge 1 ] || usage_error "NIGHTLY_KEEP_RUNS must keep at least this night"
 
 cmd=night
@@ -132,6 +134,11 @@ if [ "$cmd" != night ]; then
 fi
 
 # ── one night ───────────────────────────────────────────────────────────────────────────────────────────
+# The night removes these two folders by force: they are its own worktrees (.git is a file) or nothing, never
+# a checkout somebody works in.
+for dir in "$NIGHTLY_DIR/hub" "$NIGHTLY_DIR/saas"; do
+  [ ! -d "$dir/.git" ] || usage_error "$dir is a checkout of its own, not a worktree of the night: choose another NIGHTLY_DIR"
+done
 mkdir -p "$NIGHTLY_DIR/runs"
 lock="$NIGHTLY_DIR/lock"
 if ! mkdir "$lock" 2> /dev/null; then
@@ -303,9 +310,15 @@ stop_stack() {
   return 0
 }
 
+# In a process group of their own and waited for: bash runs a trap only between commands, so a TERM during
+# specs in the foreground would wait hours for them; `wait` returns at once and the clean-up stops their group.
 run_specs() {
-  (cd "$hub_wt" && env "${hub_env[@]}" CI=1 E2E_OUTPUT_DIR="$run/test-results" \
-    pnpm e2e --global-timeout=$((MAX_MINUTES * 60000)) ${specs[@]+"${specs[@]}"})
+  set -m
+  (cd "$hub_wt" && exec env "${hub_env[@]}" CI=1 E2E_OUTPUT_DIR="$run/test-results" \
+    pnpm e2e --global-timeout=$((MAX_MINUTES * 60000)) ${specs[@]+"${specs[@]}"}) < /dev/null &
+  started+=("$!")
+  set +m
+  wait "$!"
 }
 
 # Never stops half way: a drop or a removal that fails is said here and tried again by the next night.
@@ -353,7 +366,8 @@ else
   failed_step="$current_step"
   say "failed: $failed_step"
 fi
-sha="$(git -C "$HUB_REPO" rev-parse origin/main 2> /dev/null || echo unknown)"
+# The commit the night ran on: main may have moved, and been fetched, while the specs ran.
+sha="$(git -C "$hub_wt" rev-parse HEAD 2> /dev/null || git -C "$HUB_REPO" rev-parse origin/main 2> /dev/null || echo unknown)"
 clean_up
 
 status=0
