@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ee90c528bd40b49ec91a52e82514f54aa1d1b348bb662dca4daa2f822e4d676e -->
+<!-- generated from WORKBOOK.md sha256:a08ab84b5dba9512dbacd06f5c84d52fd451f30ea82be729bbe736e3c362cee5 -->
 
 ## What it is for and who it is for
 
@@ -2933,11 +2933,12 @@ Involved: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APP
 ### BASE-F114 Put a business back as it was at a past moment from the Hub admin
 Status: done (the action and the restore, in its place or to a separate copy, and getting back from the separate copy
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
-appointments, the repeating appointments, the price list prices and the modifier groups of the products; making and
-deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the image of a
-service brought back, hub#1429; the menu options of a product that comes back, hub#1343; the price list prices of a
-service that comes back as a new one, hub#1459; the modifier groups of a product that comes back as a new one,
-hub#1457; the modifier groups of a category that comes back, hub#1456; a deleted modifier group, hub#1458)
+appointments, the repeating appointments, the price list prices and the modifier groups and the menu choices of the
+products; making and deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws;
+the image of a service brought back, hub#1429; the price list prices of a service that comes back as a new one,
+hub#1459; the modifier groups of a product that comes back as a new one, hub#1457; the modifier groups of a category
+that comes back, hub#1456; a deleted modifier group, hub#1458; the menu choices of a product that comes back as a new
+one, hub#1473; a removed menu or course, hub#1474)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -2977,11 +2978,11 @@ Steps:
      what comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told
      again of a booking they already had (hub#1307). Below, "What to bring back", with what can be brought ticked
      (today, **Customers**, **Product categories, Products, Product links to categories**, **Service categories,
-     Services**, **Appointments, Repeating appointments**, **Price list prices** and **Modifier groups of products**).
-     They press **Recover**.
+     Services**, **Appointments, Repeating appointments**, **Price list prices**, **Menu choices of products** and
+     **Modifier groups of products**). They press **Recover**.
   10. "1 separate copy will give back Customers, Product categories, Products, Product links to categories, Service
-      categories, Services, Appointments, Repeating appointments, Price list prices, Modifier groups of products into its
-      business within a few minutes: Recoveries says how it went." appears.
+      categories, Services, Appointments, Repeating appointments, Price list prices, Menu choices of products, Modifier
+      groups of products into its business within a few minutes: Recoveries says how it went." appears.
       In Recoveries they
       see it "Asked" with the copy, what
       was asked and when.
@@ -3088,6 +3089,14 @@ Steps:
       again is not repeated: the business's own stays. One the group's sheet does not accept today (its product still
       deleted, or the business deleted the group) does not come back and its reason says so; those of a product that
       comes back as a new one, not yet either (hub#1457).
+      The menu choices of the products go after the products too: "Menu choices of products: 2 created". Each choice
+      that in the copy offered a product live there and that the business no longer has is added again to its course,
+      as the menu builder adds it, with its supplement and, if it was sold out, sold out, so a deleted product that comes
+      back shows again in its menus at the till (COMBO-F15). One the business still has, even if it changed its
+      product, is not repeated, nor one whose product the business has offered in that course again: the business's own
+      stays. One the menu builder does not accept today (its product still deleted or deactivated, or the business
+      removed the menu or the course) does not come back and its reason says so; those of a product that comes back as
+      a new one, not yet either (hub#1473).
 In: the chosen businesses, the temporary cluster with their copy and the moment; to recover, the made separate copy and
 what to bring back.
 Out: the business's database as it was at that moment; the one it had, kept 7 days on its server; the notice
@@ -3113,8 +3122,9 @@ it no longer had, with its appointment-created notice (`appointment.appointment.
 appointment it still held, active again with its series-recovered notice (`appointment.recurring.restored`), a new
 repeating appointment for each one it no longer had, with its series-created notice (`appointment.recurring.created`)
 and that of each appointment it books, a price list price for each one it lacked, with its price-put notice
-(`pricing.price_item.added`), and a modifier group linked to a product for each one it lacked, with its link-made notice
-(`modifier.link.attached`), and nothing else. Each of
+(`pricing.price_item.added`), a modifier group linked to a product for each one it lacked, with its link-made notice
+(`modifier.link.attached`), and a menu choice for each one it lacked, with its new-choice notice
+(`combo.option.created`), and nothing else. Each of
 those notices says the recovery did it (its actor is `copy_recovery:<id>`, that of the row in Recoveries), so no
 automation of the business starts on them (FLOW-F21), whether of something created or of something recovered; what only
 brings the business's own data up to date with them goes on the same (the WhatsApp Inbox links its conversation to the
@@ -3150,8 +3160,9 @@ Involved: VERIFACTU-F28, BASE-F111 (the same waiting page as a move), CUSTOMER-F
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
 SERVICE-F31, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
-PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257,
+PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, COMBO-F06, COMBO-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198,
+hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
-hub#1458, hub#1459, aws#77
+hub#1458, hub#1459, hub#1473, hub#1474, aws#77
