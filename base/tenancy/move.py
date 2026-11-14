@@ -59,6 +59,7 @@ Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Ident
 import copy as copying
 import datetime as dt
 import logging
+import math
 import os
 import select
 import socket
@@ -93,6 +94,9 @@ RESTORE_TIMEOUT_SECONDS = dumps.DUMP_TIMEOUT_SECONDS
 #: The business is closed meanwhile, so a large one is moved at night (from 03:00 to 05:00 on its clock): both halves
 #: end before 07:00, and an hour takes tens of GiB even at 10 MB/s. The move can be cancelled at any time.
 COPY_TIMEOUT_SECONDS = 60 * 60
+#: The slowest a move's copy is counted to run, in bytes of the database a second: what the Hub admin tells the staff a
+#: business stays closed from (:func:`longest_closure`).
+COPY_SLOWEST_BYTES_PER_SECOND = 10 * 1000 * 1000
 #: The kind of a move's copy in the dumps bucket (``<hex>/<AAAAMMDDTHHMMSSZ>-move.dump``).
 MOVE_DUMP_KIND = "move"
 #: How many times the rename waits for a session that came back to the origin before it gives up.
@@ -114,6 +118,13 @@ class MoveFailed(RuntimeError):
 
 class MoveStopped(RuntimeError):
     """The worker is stopping: the move is left as it is for the next one to go on."""
+
+
+def longest_closure(size: int | None) -> dt.timedelta:
+    """How long a move can keep closed a business whose database is ``size`` bytes: both halves of its copy at the
+    slowest rate counted, each within its time limit, in whole minutes (one at least). A size not known: the limit."""
+    half = COPY_TIMEOUT_SECONDS if size is None else min(size / COPY_SLOWEST_BYTES_PER_SECOND, COPY_TIMEOUT_SECONDS)
+    return dt.timedelta(minutes=max(1, math.ceil(2 * half / 60)))
 
 
 def run_due(
