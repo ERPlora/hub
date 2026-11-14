@@ -1,13 +1,15 @@
 // flow: BASE-F114 (steps 6-11), CUSTOMER-F07, CUSTOMER-F33, CUSTOMER-F06, CUSTOMER-F04, INVENTORY-F01, INVENTORY-F04,
-// INVENTORY-F07, INVENTORY-F08, INVENTORY-F34, SERVICE-F01, SERVICE-F07, SERVICE-F31, APPOINTMENT-F11, PRICING-F14,
-// PRICING-F15: in the Hub
+// INVENTORY-F07, INVENTORY-F08, INVENTORY-F34, SERVICE-F01, SERVICE-F07, SERVICE-F08, SERVICE-F31, APPOINTMENT-F11,
+// PRICING-F14, PRICING-F15: in the Hub
 // admin, the ERPlora staff choose a separate copy of a business and bring back into it the customers, the products, the
 // services and the appointments it lost since, by their apps' own operations (never a copied row): a card, a product or
 // an appointment the business deleted and still holds comes back the same, with its history (the card with its group),
 // by Customers', Inventory's and Appointments' restore; a card it no longer has at all comes back as a new one with its
 // group (the business's own of that name), its tag (made again: the business deleted it) and its custom field's value;
 // a product category and a service category the business deleted come back as new ones, before what goes in them, the
-// product category with the product the business kept live put back in it by Inventory's link; and a service as a new
+// product category with the product the business kept live put back in it by Inventory's link, the service category
+// with the service the business kept without a category put back in it by Services, never the one it moved since,
+// which Recoveries names with why; and a service as a new
 // one, made by Services' create, into its category, and assigned by Services' assign to the professional who performed
 // it, with her own minutes and price, never to the one Staff terminated since, whom Recoveries names with why; the
 // deleted product's price in a price list comes back too, put again by Price Lists' add. At each size: two cards in a
@@ -21,9 +23,10 @@
 // Customers, Products, Services and Appointments ticked (with whatever else answers) › «Recover»; the worker's pass
 // brings them back; Recoveries says how each thing came back, apart: «Customers: 1 restored, 1 created», «Product
 // categories: 1 created; Products: 1 restored; Product links to categories: 1 created» (the kept product's link),
-// «Service categories: 1 created; Services: 1 created, 1 with notes» and «Appointments: 1 restored; Repeating
-// appointments: 0 created» (its series did not change) and «Price list prices: 1 created», and its page notes that the
-// service came back without the terminated professional, and why; and `a` has the same card live
+// «Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes» and «Appointments: 1 restored;
+// Repeating appointments: 0 created» (its series did not change) and «Price list prices: 1 created», and its page notes
+// that the service category came back without the service moved since and the service without the terminated
+// professional, and why; and `a` has the same card live
 // again in its group, the second one again in that group with its tag and its value, the same product live again in
 // its category back under a new id with its price in its price list, the kept product in it again, the same appointment (its number, its history
 // ending in «restored») live again, and the service category and the service live again under new ids, the service in
@@ -224,6 +227,9 @@ for (const { label, viewport } of SIZES) {
     const kept = aProduct(`Kept ${label} ${RUN}`, `KEPT-${label}-${RUN}`, shelf);
     const category = inA('service.category.create', { name, color: '#cc0066' });
     const service = aService(name, category);
+    // Kept by the business: deleting the category leaves them without one; the second it moves to another one.
+    const keptService = aService(`Kept ${label} ${RUN}`, category);
+    const movedService = aService(`Moved ${label} ${RUN}`, category);
     const professional = inA('staff.member.create', { first_name: 'Recovered', last_name: `${label} ${RUN}` });
     inA('service.assignment.assign', { service_id: service, member_id: professional, custom_duration: 50, custom_price: 2800 });
     // And one who performed it too and leaves the business before it comes back.
@@ -254,6 +260,8 @@ for (const { label, viewport } of SIZES) {
     inA('pricing.catalog.forget_product', { id: product });
     inA('inventory.category.delete', { id: shelf });
     inA('service.category.delete', { id: category });
+    const elsewhere = inA('service.category.create', { name: `Elsewhere ${label} ${RUN}` });
+    inA('service.service.update', { id: movedService, category_id: elsewhere });
     inA('appointment.appointment.delete', { id: appointment });
     inA('staff.member.terminate', { id: leaving });
     expect(psql(`select count(*) from customer_customer where email = '${email}' and deleted_at is null`)).toBe('0');
@@ -289,6 +297,8 @@ for (const { label, viewport } of SIZES) {
     await expect(page.locator('input[name="apps"][value="pricing"]')).toBeChecked();
     await expect(page.getByText('nothing is ever copied', { exact: false })).toBeVisible();
     await expect(page.getByText('comes back as it was, with its history', { exact: false })).toBeVisible();
+    // The one thing it touches of what the business has.
+    await expect(page.getByText('a category that comes back takes back what it had inside', { exact: false })).toBeVisible();
     await capture(page, `${KEY}-${label}-2-confirm`, { fullPage: true });
     await page.locator('input[type="submit"][value="Recover"]').click();
 
@@ -307,14 +317,16 @@ for (const { label, viewport } of SIZES) {
     await expect(recovered).toContainText(
       'Product categories: 1 created; Products: 1 restored; Product links to categories: 1 created',
     );
-    // The service came back without the professional Staff terminated: counted, and said on its page.
-    await expect(recovered).toContainText('Service categories: 1 created; Services: 1 created, 1 with notes');
+    // The service category came back without the service moved since, and the service without the professional Staff
+    // terminated: each counted, and said on its page.
+    await expect(recovered).toContainText('Service categories: 1 created, 1 with notes; Services: 1 created, 1 with notes');
     await expect(recovered).toContainText('Appointments: 1 restored; Repeating appointments: 0 created');
     await expect(recovered).toContainText('Price list prices: 1 created');
     await capture(page, `${KEY}-${label}-4-recoveries`, { fullPage: true });
     await recovered.locator('a').first().click();
     await expect(page.locator('.field-what .readonly')).toHaveText(/^(.+, )?Customers, (.+, )?Products, (.+, )?Services(, .+)?$/);
     await expect(page.locator('.field-notes .readonly li')).toHaveText([
+      `${category}: service.service_moved: came back without the service ${movedService}: moved to another category since`,
       `${service}: service.member_terminated: came back without the professional ${leaving}: terminated in Staff`,
     ]);
     await capture(page, `${KEY}-${label}-5-recovery`, { fullPage: true });
@@ -356,6 +368,9 @@ for (const { label, viewport } of SIZES) {
     expect(psql(`select color from service_category where id = '${back}'`)).toBe('#cc0066');
     expect(psql(`select category_id from service_service where name = '${name}'`)).toBe(back);
     expect(psql(`select is_deleted from service_category where id = '${category}'`)).toBe('t');
+    // The service the business kept, the same one, back in it; the one it moved since stays where it put it.
+    expect(psql(`select category_id from service_service where id = '${keptService}'`)).toBe(back);
+    expect(psql(`select category_id from service_service where id = '${movedService}'`)).toBe(elsewhere);
     // And performed again by the same professional, with her own minutes and price, by Services' assign.
     const performer = `select member_id, custom_duration, custom_price, is_active from service_assignment where service_id = (select id from service_service where name = '${name}')`;
     expect(psql(performer)).toBe(`${professional}|50|2800|t`);
