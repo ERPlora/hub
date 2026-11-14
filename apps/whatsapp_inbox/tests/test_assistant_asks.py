@@ -14,17 +14,10 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    PROBES,
-    TOP,
-    assert_its_asks_bring,
-    assert_reported_are_owner_probes,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    comparable,
-    offered_place,
-    place_of_no_ask,
-    probe_phrases,
-)
+from base.tests.test_assistant_asks import PROBES, TOP, assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1108's QA (``owner.es.whatsapp_inbox.*`` of ``owner-es-whatsapp_inbox-2026-11-08.json``), as the
 #: owner said them: before the inbox said its asks, none of these tools was among the ones a turn offers
@@ -47,11 +40,6 @@ REPORTED = [
         "cambia Recordatorio QA para que diga «Tu cita queda para {{1}}» y vuelve a enviarla a revisión",
     ),
 ]
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it (measured on this
-#: branch: the 17th at worst, ``message.send`` and ``template.update``; on main, without the inbox's asks, six were
-#: not offered at all and six more came between the 20th and the 33rd).
-WITH_ROOM = 20
 #: What the inbox's groups of ``base.assistant.SYNONYMS`` are for, in a turn: a request nobody wrote as an ask nor as
 #: a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without the group, the other
 #: writes of the Hub tie with ``template.create`` and win by name (the 11th), and ``message.list`` is the 15th.
@@ -145,11 +133,11 @@ def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message(
 def test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups(catalog_of, name, phrase, word):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert comparable(phrase) not in probe_phrases()
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= TOP, place
+    assert_offered_with_room(tools, name, phrase, room=TOP)
     without = tuple(group for group in assistant.SYNONYMS if word not in group)
-    unread = [op.name for op in shared.relevant(tools, [phrase], "es", **{**assistant.RANKING, "synonyms": without})]
-    assert name not in unread[:TOP]  # positive control: the group is what brings it
+    # positive control: the group is what brings it
+    assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
+
 
 
 def test_the_reported_requests_are_the_probes_of_layer_2():
@@ -159,8 +147,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_whatsapp_request_offers_its_existing_operation(catalog_of, name, phrase):
-    place = place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
 def test_layer_2_probes_every_whatsapp_tool():
@@ -176,8 +163,7 @@ def test_every_whatsapp_probe_of_layer_2_is_offered_its_tool_without_being_its_a
     """Not only the six the QA found unreachable: each request of the QA of the inbox, in the words it was said in and
     by the role that said it, is among the first ``WITH_ROOM`` tools a turn offers, so the model can choose it and an
     app that says its asks later cannot push it out unseen."""
-    place = place_of_no_ask(catalog_of(role, "es"), name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(catalog_of(role, "es"), name, phrase)
 
 
 def test_every_tool_of_the_inbox_has_its_own_words():

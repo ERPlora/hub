@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2ca0a28c409badf79f92ea61e2c3025590413d6229ab830b064af263f1bc9293 -->
+<!-- generated from WORKBOOK.md sha256:a1721a80e54ceb99a400b7cd8f7baeb492fa3a515a9733f19d116bfc6af22f19 -->
 
 ## What it is for and who it is for
 
@@ -920,7 +920,7 @@ says "The service has been saved, but the photo has not: That image is no longer
 another one." with "Retry", and the service keeps the photo it had (through the assistant or the API
 nothing is saved). Whoever may not edit services does not see "Photo", and the app refuses it through the
 assistant or the API too.
-Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Upload the service's own photo
 Status: done

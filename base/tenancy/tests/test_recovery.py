@@ -23,6 +23,7 @@ import uuid
 import pytest
 from django.apps import apps as django_apps
 from django.db import connections
+from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs
@@ -165,6 +166,12 @@ def run(now: dt.datetime = AT, **kwargs) -> int:
 
 def fresh(row: CopyRecovery) -> CopyRecovery:
     return CopyRecovery.objects.get(pk=row.pk)
+
+
+def fields_held_since(label: str, model: str, migration: str) -> set[str]:
+    """The fields ``model`` of the app ``label`` holds once ``migration`` is applied: what a read that names it as
+    its ``reads_since`` may read of a copy."""
+    return set(MigrationLoader(None).project_state((label, migration)).models[label, model].fields)
 
 
 def in_the_copy(copy: RestoredCopy, statement: str, params=()) -> list[tuple]:

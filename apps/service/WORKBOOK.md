@@ -957,7 +957,7 @@ la foto: el formulario dice «El servicio se ha guardado, pero la foto no: Esa i
 librería. Elige otra.» con «Reintentar», y el servicio se queda con la foto que tenía (por el asistente o
 la API no se guarda nada). Quien no puede editar servicios no ve «Foto», y la app lo rechaza también por
 el asistente o la API.
-Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Subir una foto propia del servicio
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda sus fotos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
@@ -1227,7 +1227,11 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   (`queries.services_not_in_business`), cada uno hecho otra vez por `service.service.recover` (solo el sistema, sin
   ruta ni herramienta del asistente), todo o nada: el servicio, por `service.service.create` con la clave de su
   categoría fiscal y su categoría aquí (`_category_held`): la misma si sigue viva, si no la viva con su nombre en la
-  copia (la que acaba de volver o una hecha a mano), si no ninguna; y cada profesional que lo hacía en la copia y el
+  copia (la que acaba de volver o una hecha a mano), si no ninguna; su imagen de la copia (`ServiceRecoverIn.image`,
+  de `base.recovery.ImageInCopyIn`), puesta como la pone `service.service.set_image` (SERVICE-F34) si
+  `base.images.from_copy` la deja: la de la librería, salvo una que la librería dice que ya no tiene; nunca una foto
+  propia; con la librería sin leer, tal como estaba, para no dejar el servicio fuera (hub#1429); y cada profesional
+  que lo hacía en la copia y el
   negocio sigue teniendo (no dado de baja, por su id: `staff.queries.live_members`), por `service.assignment.assign`
   con sus minutos y su precio propios, principal solo si el negocio no le ha dado otro servicio principal desde
   entonces, y apagado por `service.assignment.update` si lo estaba. Va en la misma operación, y no en una declaración
@@ -1240,9 +1244,10 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
   un solo servicio de la copia, el más antiguo por el más antiguo, y dos perdidos con el mismo nombre vuelven los dos.
   Es lo que usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio;
-  uno que la copia tenía archivado solo se empareja por su id. Lee desde
-  `0001_initial`; una migración que quite o renombre una de sus columnas cambia también `services_in_copy` y su
-  `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
+  uno que la copia tenía archivado solo se empareja por su id. Las categorías se leen desde
+  `0001_initial` y los servicios desde `0003_service_image`, la que les dio la imagen (a una copia anterior se le
+  niegan los servicios con `recover_copy_behind`); una migración que añada, quite o renombre una de las columnas que
+  se leen cambia también `services_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.
 - **Saldo de un bono vendido**: usos = los congelados + la suma de los ajustes; usadas = las sesiones
   entregadas más las reservadas cuyo plazo no ha vencido; quedan = usos − usadas (sin límite si los
   usos congelados son nulos); caduca = compra + vigencia congelada + días regalados. Se calcula al
@@ -1376,7 +1381,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **Lo que no vuelve con un servicio recuperado desde una copia aparte** (BASE-F114): su imagen (hub#1429).
 
 ## Lo que NO hace, a propósito
 

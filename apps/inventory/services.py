@@ -24,7 +24,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
@@ -425,13 +425,13 @@ def restore_product(ctx: OperationContext, data: ProductRestoreIn) -> dict:
     """INVENTORY-F34: a deleted product back in every list and in the till, the same product (deleting keeps it,
     INVENTORY-F04): its id, its codes, its categories, its stock and its image of the library, with every movement that
     hangs from it. One deleted before deleting kept that image has none: it gets back the one it showed in the copy,
-    as one made again does (``_library_image``). Active and on sale, as unarchiving does: the «sold out» it had was
-    another day's. Not while another live product holds its SKU or its EAN-13 (it was made again since). Repeating it
-    on a product already back answers well and announces again, as deleting does, and changes nothing of it."""
+    as one made again does (``base.images.from_copy``). Active and on sale, as unarchiving does: the «sold out» it had
+    was another day's. Not while another live product holds its SKU or its EAN-13 (it was made again since). Repeating
+    it on a product already back answers well and announces again, as deleting does, and changes nothing of it."""
     product = find_product(data.id, None, lock=True, rows=Product.objects.all())
     if product.is_deleted:
         product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out = False, None, True, False
-        product.image = product.image or _library_image(ctx, data.image)
+        product.image = product.image or images.from_copy(ctx, data.image)
         product.updated_by = _actor(ctx)
         _save(
             product,
@@ -493,26 +493,12 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
 )
 def recover_product(ctx: OperationContext, data: ProductRecoverIn) -> dict:
     """BASE-F114: a product of a separate copy made again as its screen makes it, all or nothing: the product by
-    ``inventory.product.create``, then the image of the library it showed there (INVENTORY-F30)."""
+    ``inventory.product.create``, then the image of the library it showed there (INVENTORY-F30), unless the library no
+    longer has it; never a photo of its own, deleted with the product (``base.images.from_copy``)."""
     made = create_product(ctx, ProductIn.model_validate(data.model_dump(include=set(ProductIn.model_fields))))
-    if image := _library_image(ctx, data.image):
+    if image := images.from_copy(ctx, data.image):
         _change_image(ctx, find_product(made.id, None), image)
     return load_product(made.id, ctx.scope)
-
-
-def _library_image(ctx: OperationContext, image: str) -> str:
-    """Of the image a product showed in a separate copy, what comes back with it: one of the library, unless the library
-    says it no longer has it (as a template or an import leaves it out, INVENTORY-F12, INVENTORY-F33); never a photo of
-    its own, deleted with the product (INVENTORY-F31). While the library cannot be read it comes back as the copy had
-    it: the product is never left out for it, the library never renames an image, and the screens show the initials of
-    one they cannot load."""
-    try:
-        images.check(ctx, image)
-    except InvalidPayload:  # a photo of its own, or one the library no longer has
-        return ""
-    except OperationError:  # the library cannot be read now (503 base.image_library_unavailable)
-        return image
-    return image
 
 
 # The product's image (base.images)

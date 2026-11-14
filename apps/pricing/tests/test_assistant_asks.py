@@ -13,16 +13,14 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
-from live import assistant as shared
-from live.context import OperationContext, Scope
-from live.operations import AI, Operation, registry
+from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, probe_phrases
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
-A = Scope("host", "a")
 #: Every write of Price lists is ``pricing.manage``, which an employee lacks (they only read the prices,
 #: ``pricing.view``): an employee's assistant is never offered one.
 NOT_THE_EMPLOYEES = {
@@ -71,9 +69,6 @@ CHOSEN_INSTEAD = [
     ("pricing.rule.activate", "base.app.enable"),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a request of the QA may bring its tool: half of them, so
-#: twenty tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Price lists, the owner's real phrases of the QA: the four above and the ones the model got
 #: right (or answered with an equivalent list).
 PROBES = json.loads(
@@ -109,38 +104,6 @@ OWN_WORDS = [
     ("pricing.catalog.get", "¿a qué grupo corresponde ese identificador de lo de Socios?"),
     ("pricing.price.resolve", "Nuria quiere dos cañas, ¿cuánto le cuestan a ella?"),
 ]
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered(tools: dict[str, Operation], phrase: str) -> list[str]:
-    """The tools a turn offers for ``phrase`` in Spanish, best first."""
-    return [op.name for op in assistant.relevant(tools, [phrase], "es")]
-
-
-def place_of(tools: dict[str, Operation], name: str, phrase: str) -> int | None:
-    """Where a turn offers ``name`` for ``phrase`` (1 is first, ``None`` out of the ``MAX_TOOLS``), a phrase that is
-    none of its asks: what it brings is the tool's name, description and other words, never the phrase itself."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for asks in shared.asks_of(tools[name]).values() for ask in asks}
-    names = offered(tools, phrase)
-    return names.index(name) + 1 if name in names else None
-
-
-def assert_offered_with_room(tools: dict[str, Operation], name: str, phrase: str) -> None:
-    """A request of the QA brings its tool into the first half of the ones a turn offers (``WITH_ROOM``)."""
-    place = place_of(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
 
 
 def test_price_lists_is_listed_so_layer_1_sweeps_every_ask_of_it():
@@ -185,7 +148,7 @@ def test_the_reported_pricing_request_offers_its_existing_operation(catalog_of, 
 def test_the_reported_request_to_bring_back_offers_its_tool_before_the_one_the_model_ran(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
     phrase = dict(REPORTED)[name]
-    names = offered(tools, phrase)
+    names = offered_to(tools, phrase)
     assert instead in tools  # positive control: what the model ran is a tool of the owner too
     assert name in names, names[:10]
     assert instead not in names or names.index(name) < names.index(instead), names[:10]

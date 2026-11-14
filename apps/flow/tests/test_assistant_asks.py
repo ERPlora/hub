@@ -14,15 +14,14 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live import assistant as shared
-from live.context import OperationContext, Scope
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
-from base.tests.test_assistant_asks import TOP, comparable, probe_phrases
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
-A = Scope("host", "a")
 #: The questions an automation asks a person (FLOW-F29): every role may be asked one, so every role holds these.
 THE_QUESTIONS = {"flow.question.list", "flow.question.get", "flow.question.answer"}
 #: Automations' assistant tools: its catalogue, its automations, their runs, the ready-made ones its apps bring, the
@@ -179,38 +178,12 @@ CAUGHT_ABOVE = {
 }
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``."""
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        user = make_user(f"asker-{role}", host=A.key, role=role)
-        ctx = OperationContext(scope=A, actor=user.username, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
-
-    return of
-
-
-def offered(tools: dict[str, Operation], phrase: str, synonyms=None) -> list[str]:
-    """The tools a turn offers for ``phrase`` in Spanish, as the Hub ranks them (``base.assistant.RANKING``), or with
-    ``synonyms`` instead of the Hub's."""
-    ranking = dict(assistant.RANKING) if synonyms is None else {**assistant.RANKING, "synonyms": synonyms}
-    return [op.name for op in shared.relevant(tools, [phrase], "es", **ranking)]
-
-
 def offered_without_its_asks(tools: dict[str, Operation], name: str, phrase: str) -> list[str]:
     """``offered`` with ``name`` saying no asks: how a turn ranked it by its name, its description and the Hub's words."""
     op = tools[name]
     bare = {**tools, name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})}
     assert not shared.asks_of(bare[name])  # positive control: the tool is ranked without its asks
-    return offered(bare, phrase)
-
-
-def offered_for_no_ask(tools: dict[str, Operation], name: str, phrase: str) -> list[str]:
-    """``offered`` for a ``phrase`` that is none of the Spanish asks of ``name``, a tool the person holds."""
-    assert name in tools  # positive control: the owner holds the tool, so its place is known
-    assert comparable(phrase) not in {comparable(ask) for ask in shared.asks_of(tools[name]).get("es", ())}
-    return offered(tools, phrase)
+    return offered_to(bare, phrase)
 
 
 def is_own_words(tools: dict[str, Operation], phrase: str) -> bool:
@@ -247,9 +220,9 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
-    names = offered_for_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
-    assert name in names, names[:10]
-    assert FINDS.get(name, name) in names, names[:10]
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert place_of_no_ask(tools, name, phrase) is not None
+    assert FINDS.get(name, name) in offered_to(tools, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -265,8 +238,7 @@ def test_every_probe_of_automations_offers_its_tool_without_being_one_of_its_ask
     """The owner's thirty phrases of layer 2, the ones the model answered right too: a tool of Automations that a new ask
     elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("flow", "owner", "es")
-    names = offered_for_no_ask(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
-    assert probe["tool"] in names, (len(names), names[:10])
+    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"]) is not None
 
 
 def test_the_hub_names_an_automation_its_runs_steps_questions_drafts_and_recipes():
@@ -312,8 +284,8 @@ def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name
     group = [group for group in assistant.SYNONYMS if member in group]
     assert len(group) == 1, member  # positive control: the group is the Hub's, and only one
     without = tuple(other for other in assistant.SYNONYMS if other is not group[0])
-    assert name in offered(tools, phrase)[:TOP]
-    assert name not in offered(tools, phrase, without)[:TOP]
+    assert name in offered_to(tools, phrase)[:TOP]
+    assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 
 #: Three asked naming «la automatización» and not only its own name: the thing they act on is named, so they come
@@ -331,7 +303,7 @@ def test_what_waits_for_live_is_offered_when_the_request_names_the_automation(ca
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert is_own_words(tools, phrase)
     assert {name for name, _ in NAMED} == AWAITS_LIVE  # positive control: the same three the probes wait for
-    assert name in offered(tools, phrase)[:TOP]
+    assert name in offered_to(tools, phrase)[:TOP]
 
 
 def test_the_asks_of_every_tool_are_caught_by_a_request():
@@ -348,7 +320,7 @@ def test_the_asks_of_every_tool_are_caught_by_a_request():
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert is_own_words(tools, phrase)
-    names = offered_for_no_ask(tools, name, phrase)
-    assert name in names[:TOP], names.index(name) + 1 if name in names else None
+    assert_offered_with_room(tools, name, phrase, room=TOP)
+
     unasked = offered_without_its_asks(tools, name, phrase)
     assert name not in unasked[:TOP], unasked.index(name) + 1

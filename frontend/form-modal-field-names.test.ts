@@ -35,10 +35,6 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/service/frontend/components/GrantVoidModal.vue': 1,
   'apps/service/frontend/components/PackageFormModal.vue': 9,
   'apps/service/frontend/components/ServiceFormModal.vue': 6,
-  'apps/tax/frontend/components/AliasCreateModal.vue': 3,
-  'apps/tax/frontend/components/CategoryCreateModal.vue': 3,
-  'apps/tax/frontend/components/RuleCreateModal.vue': 12,
-  'apps/tax/frontend/components/RuleEndModal.vue': 1,
 };
 
 /** What is left of the raw reads of a window's refusal in windows that do not take `fieldErrors`, by file: it only goes

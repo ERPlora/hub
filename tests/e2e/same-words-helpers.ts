@@ -1,8 +1,8 @@
 // e2e helpers of hub#888: a window whose save is refused for several fields with the same words, and what each field
 // shows. FormModal takes the mark away from the refused field a person corrects, told by its `name`; the specs refuse
 // in the browser (`page.route`), so nothing is created, and read the mark as Ionic paints it (`ion-invalid` and the
-// words under the field). Shared by form-modal-picker-same-words.spec.ts, table-reservation-same-words.spec.ts and
-// combo-modifier-same-words.spec.ts; the last two declare their tests with `testTheMarksGoOneByOne`.
+// words under the field). Shared by form-modal-picker-same-words.spec.ts and by the specs of each app's windows, which
+// declare their tests with `testTheMarksGoOneByOne`.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
