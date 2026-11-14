@@ -645,6 +645,34 @@ class TestTheCopyGoesThroughTheBucket:
             assert conn.execute(fingerprint).fetchone() == before
         assert says_it_is(hub.db_name) == [hub.id]
 
+    def test_a_worker_that_stops_while_it_copies_leaves_the_move_to_the_next_one(
+        self, moves, moto_s3, dumps_bucket, monkeypatch
+    ):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        stopping = {"now": False}
+        real = dumps._pg_dump_command
+
+        def stops_as_the_dump_starts(*args, **kwargs):
+            stopping["now"] = True
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(dumps, "_pg_dump_command", stops_as_the_dump_starts)
+
+        run(cancelled=lambda: stopping["now"])
+
+        # Not a failure: the move is neither undone nor noted as failed, and half a copy is never kept.
+        stopped = fresh(hub)
+        assert (stopped.moving_to_id, stopped.last_error) == (target.pk, "")
+        assert objects(moto_s3, dumps_bucket) == {}
+
+        monkeypatch.setattr(dumps, "_pg_dump_command", real)
+        assert run() == 1
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.last_error) == (target.pk, None, "")
+        assert marker(hub.db_name) == [MARKER]
+
     def test_without_a_bucket_the_business_is_never_closed_and_stays_where_it_was(self, moves, monkeypatch):
         hub = moves.hub(to=moves.cluster())
         monkeypatch.setenv("HUB_DUMPS_BUCKET", "")
