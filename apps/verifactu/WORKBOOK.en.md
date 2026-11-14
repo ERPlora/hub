@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7f1f7cb11486cc19ab50b6b5d953283fe3fc0119beeda88de2720744dc92d6af -->
+<!-- generated from WORKBOOK.md sha256:6a57323ec9fe383170a407166fc9faf9382cc5c1b77d9be5275ab0a4bced8aff -->
 
 ## What it is for and who it is for
 
@@ -622,7 +622,11 @@ Steps:
    errors", red "Rejected"; and its environment, so as not to mix testing up with production.
 In: the records.
 Out: nothing; it is a lookup.
-If it fails: the message with "Retry".
+If it fails: the message with "Retry". The total is read as in any amount field of the Hub and as in the other
+lists (hub#1247: "1.000,50", "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its
+field in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
+cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date before
+the start date, "The end date cannot be before the start date."; neither of the two filters.
 Involved: INVOICE-F16
 
 ### VERIFACTU-F17 See the detail of a record and why it waits

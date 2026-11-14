@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8a65ba63f4493932e4bb1fdfe85948dfdbbe7cc4b5f0598a075e27316fd78d1a -->
+<!-- generated from WORKBOOK.md sha256:189bb6eb04763559f7d7bf42c93255174b908dec2c79b5932cc1a9350514b3d8 -->
 
 ## What it is for and who it is for
 
@@ -144,6 +144,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a price 
 | COMBO-F12 | Mark a choice as sold out | done |
 | COMBO-F13 | When a product leaves the catalogue | done |
 | COMBO-F14 | The menu's photo | done |
+| COMBO-F15 | Recover a product's choices from a separate copy | done |
 
 ### COMBO-F01 Look up and search the menus
 Status: done
@@ -457,8 +458,9 @@ Steps:
    "Deactivated in Inventory", and the till does not offer them until it is reactivated.
 2. Someone deletes a product in Inventory: in a few seconds its choices leave on their own all the
    menus that offered it, and the open builder shows it at once. Meanwhile they come marked
-   "No longer in the catalogue" and the till neither offers them nor can they be charged (it is final: a
-   deleted product does not come back).
+   "No longer in the catalogue" and the till neither offers them nor can they be charged (from its screens a
+   deleted product does not come back; if ERPlora's staff recover it from a separate copy, its choices come back
+   with it, COMBO-F15).
 3. Look at the notice at the top of the builder: if a compulsory course has been left without enough
    choices, it says why the menu is no longer on the till; add another choice to that course (COMBO-F06).
 In: the product deactivated or deleted in Inventory.
@@ -468,7 +470,7 @@ is deleted in one business does not touch the menus of another.
 If it fails: if a compulsory course is left without enough choices to offer, the menu stops being
 on the till and the builder's notice says why. If removing the choices fails, Menus retries
 on its own; meanwhile, they stay marked and nobody sells them.
-Involved: INVENTORY-F04, COMBO-F06
+Involved: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 The menu's photo
 Status: done
@@ -494,6 +496,34 @@ the menu keeps the photo it had; the reason is "That image is no longer in the l
 one.", "There is no space left for that file: your plan includes <space>." or "The photo could not be
 saved. Try again.". A menu without a photo, or whose photo does not load, shows its initials.
 Involved: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
+
+### COMBO-F15 Recover a product's choices from a separate copy
+Status: done
+Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
+Screen: none of Menus: in the Hubs admin, Separate copies › "Recover into the business…", with **Menu choices of
+products** ticked (it is, like everything that can be brought back)
+Steps:
+1. The staff recover from a separate copy with **Menu choices of products** ticked. Menus always goes after Inventory,
+   in whatever order it is asked: a deleted product that comes back is already live when its choices are given back.
+2. Each choice that in the copy offered a product live in it and that the business no longer has is added again to its
+   course, as the menu builder adds it (COMBO-F06): with its supplement and, if it was sold out in the copy, sold out
+   (COMBO-F12). It goes at the end of the course, in the order it had in the copy.
+3. Recoveries counts it apart: "Menu choices of products: 2 created".
+In: the separate copy and what the business has today.
+Out: a choice for each one that was missing, with its new-choice notice (`combo.option.created`) made by the recovery,
+so no automation starts (FLOW-F21); nothing else. The open menu builder and the till's catalogue of menus see at once
+the product that comes back, as they saw it being deleted, and the till offers the dish in its menu again.
+If it fails: a choice the business still has stays as it is, even if its product was changed afterwards, and one whose
+product the business has offered in that course again is not repeated: the business's own stays, with its supplement,
+and asking again adds nothing twice. A choice the business removed by hand after the copy comes back too, like
+everything the business no longer has (BASE-F114). What the menu builder does not accept today does not come back and
+Recoveries says why, by the choice's identifier in the copy: a product that stays deleted (Products was not recovered,
+or the business already made another one with its SKU) ("invalid_field: …"), deactivated or no longer sold by units
+(`combo.product_inactive`, `combo.product_not_by_unit`), a full course (`combo.too_many_options`), or a menu or a
+course the business removed afterwards ("not_found: …"); a removed menu or course is not recovered from the copy
+(hub#1474). A product the business no longer had at all comes back as a new one, with another identifier
+(INVENTORY-F01), and its choices in the copy do not come back with it (hub#1473).
+Involved: BASE-F114, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
 
 ## Services: what goes in and what comes out
 
@@ -552,7 +582,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | Changes a course (only what is sent) | manage | F05 | `combo.group.update` |
 | Withdraws a course with its choices | manage | F05 | `combo.group.delete` |
 | Orders the courses of a menu, all at once | manage | F05 | `combo.group.reorder` |
-| Adds a choice (at the end) | manage | F06 | `combo.option.create` |
+| Adds a choice (at the end) | manage | F06, F15 | `combo.option.create` |
 | Adds several choices at once | manage | F06 | `combo.option.bulk_create` |
 | Changes a choice: product, supplement or available (only what is sent) | manage | F06, F12 | `combo.option.update` |
 | Removes a choice | manage | F06 | `combo.option.delete` |
@@ -570,7 +600,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | Menu withdrawn | Withdrawing | `id`, `name` | `combo.combo.deleted` |
 | Course new, changed or withdrawn | Creating, saving with changes or withdrawing a course | `id`, `combo_id` | `combo.group.created`, `.updated`, `.deleted` |
 | Courses reordered | Changing the order | `combo_id` | `combo.group.reordered` |
-| Choice new, changed or removed | Adding (one or several), saving with changes, marking sold out or removing; removing because the product was deleted carries `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
+| Choice new, changed or removed | Adding (one or several, or recovering it from a separate copy), saving with changes, marking sold out or removing; removing because the product was deleted carries `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
 | Choices reordered | Changing the order | `group_id`, `combo_id` | `combo.option.reordered` |
 
 ### What it reacts to
@@ -579,9 +609,10 @@ to, reordered in or looked for in: the action does not use it and the card does 
 |---|---|---|---|
 | Inventory: product deleted | Removes its choices from all the menus, in a few seconds (the worker's handing out of notices; repeating it changes nothing) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
 
-Besides, Inventory's product changes (`inventory.product.updated`, `.deleted`) re-read live
-the builder and the till's catalogue: the name, the price, whether it is active and whether it is
-sold out belong to Inventory.
+Besides, Inventory's product changes (`inventory.product.updated`, `.deleted`, and `.restored`
+when ERPlora's staff recover it from a separate copy) re-read live the builder and the till's
+catalogue: the name, the price, whether it is active and whether it is sold out belong to Inventory.
+To a recovered product it does not react: its choices come back from the copy (F15).
 
 ### What it needs from other apps
 
@@ -590,6 +621,7 @@ sold out belong to Inventory.
 | Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | model `inventory.Product`; the screen's search box uses `inventory.product.list` with `is_active` and `include_sold_out` (the active ones, sold out or not) |
 | Taxes (`requires`) | The tax categories of the selector and that of the menu "eaten in" | F02, F03, F09 | model `tax.TaxCategory`; the selector uses `tax.category.list` |
 | Platform | The image library: searching it and naming by its title the image set on a menu | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
+| Platform | The recovery from a separate copy (BASE-F114), to which Menus says which choices it gives back | F15 | `recoverable_from_copy` in `apps.py` |
 
 ### Contract with Sales
 

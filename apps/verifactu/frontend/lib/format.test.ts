@@ -1,10 +1,9 @@
 // How the VeriFactu screens paint numbers and days (WORKBOOK «Para quien lo mantiene»: money travels in
 // signed cents, quantities and rates as decimal strings, days as `YYYY-MM-DD`). One place turns them into
-// text in the page's language with `Intl`, and the euros a person types into cents: no page formats by
-// hand.
+// text in the page's language with `Intl`: no page formats by hand.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromEuros, formatDate, formatMoney, formatPercent, formatUnitPrice, plain } from './format';
+import { formatDate, formatMoney, formatPercent, formatUnitPrice, plain } from './format';
 
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
@@ -69,22 +68,5 @@ describe('formatDate', () => {
     expect(formatDate('', 'es')).toBe('—');
     expect(formatDate(null, 'es')).toBe('—');
     expect(formatDate('yesterday', 'es')).toBe('yesterday');
-  });
-});
-
-describe('centsFromEuros', () => {
-  it('reads what a person types, with a comma or a dot, into whole cents', () => {
-    expect(centsFromEuros('12,5')).toBe(1250);
-    expect(centsFromEuros(' 12.50 ')).toBe(1250);
-    expect(centsFromEuros('0,01')).toBe(1);
-    expect(centsFromEuros(7)).toBe(700);
-  });
-
-  it('empty, negative or not an amount is nothing', () => {
-    expect(centsFromEuros('')).toBeUndefined();
-    expect(centsFromEuros(null)).toBeUndefined();
-    expect(centsFromEuros('12,345')).toBeUndefined();
-    expect(centsFromEuros('-3')).toBeUndefined();
-    expect(centsFromEuros('abc')).toBeUndefined();
   });
 });

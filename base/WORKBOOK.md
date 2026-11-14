@@ -3063,10 +3063,11 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 <!-- origen: nuevo (aws#77; PLAN-DB §13 «Restaurar un hub»: los planes de pago prometen volver a cualquier momento de los últimos 14 días) gh:hub#1198 -->
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
-las citas periódicas, los precios de tarifa y los grupos de suplementos de los productos; crear y borrar el clúster
-temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; las opciones de menú de un producto
-que vuelve, hub#1343; los precios de tarifa de un servicio que vuelve como uno nuevo, hub#1459; los grupos de
-suplementos de una categoría que vuelve, hub#1456; un grupo de suplementos borrado, hub#1458)
+las citas periódicas, los precios de tarifa y los grupos de suplementos y las elecciones de menú de los productos; crear
+y borrar el clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; los precios de
+tarifa de un servicio que vuelve como uno nuevo, hub#1459; los grupos de suplementos de una categoría que vuelve,
+hub#1456; un grupo de suplementos borrado, hub#1458; las elecciones de menú de un producto que vuelve como uno nuevo,
+hub#1473; un menú o un plato retirado, hub#1474)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3105,10 +3106,11 @@ Pasos:
      avisa otra vez de una cita que ya tenía (hub#1307).
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
      Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios**, **Citas, Citas
-     periódicas**, **Precios de tarifa** y **Grupos de suplementos de productos**). Pulsa **Recuperar**.
+     periódicas**, **Precios de tarifa**, **Elecciones de menú de productos** y **Grupos de suplementos de productos**).
+     Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
-      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa, Grupos de suplementos de productos
-      a su negocio en unos minutos:
+      Categorías de servicios, Servicios, Citas, Citas periódicas, Precios de tarifa, Elecciones de menú de productos,
+      Grupos de suplementos de productos a su negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
@@ -3217,6 +3219,14 @@ Pasos:
       (MODIFIER-F10). No se repite uno cuyo grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno
       que la hoja del grupo no acepta hoy (su producto sigue eliminado, o el negocio ya hizo otro a mano con su SKU, o
       borró el grupo) no vuelve y su motivo lo dice.
+      Las elecciones de menú de los productos van también después de los productos: «Elecciones de menú de productos:
+      se crearon 2». Cada elección que en la copia ofrecía un producto vivo allí y que el negocio ya no tiene se vuelve a
+      añadir a su plato, como la añade el constructor del menú, con su suplemento y, si estaba agotada, agotada, así que
+      un producto eliminado que vuelve sale otra vez en sus menús del TPV (COMBO-F15). No se repite una que el negocio aún
+      tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese plato: se queda la
+      suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el negocio retiró el
+      menú o el plato) no vuelve y su motivo lo dice; las de un producto que vuelve como uno nuevo, tampoco todavía
+      (hub#1473).
 Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
 recuperar.
 Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
@@ -3241,8 +3251,9 @@ una que ya no tenía, con su aviso de cita creada (`appointment.appointment.crea
 aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), una cita periódica
 nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
 reserva, un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
-y un grupo de suplementos enganchado a un producto por cada uno que le faltaba, con su aviso de enganche hecho
-(`modifier.link.attached`), y nada más. Cada uno
+un grupo de suplementos enganchado a un producto por cada uno que le faltaba, con su aviso de enganche hecho
+(`modifier.link.attached`), y una elección de menú por cada una que le faltaba, con su aviso de elección nueva
+(`combo.option.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
 solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación;
@@ -3278,11 +3289,12 @@ Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado
 CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
 INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
 SERVICE-F31, SERVICE-F34, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
-PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198, hub#1213, hub#1257,
+PRICING-F14, PRICING-F15, MODIFIER-F05, MODIFIER-F10, COMBO-F06, COMBO-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198,
+hub#1213, hub#1257,
 hub#1282, hub#1283, hub#1284,
 hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
-hub#1458, hub#1459, aws#77
+hub#1458, hub#1459, hub#1473, hub#1474, aws#77
 
 ## Para quien lo mantiene
 

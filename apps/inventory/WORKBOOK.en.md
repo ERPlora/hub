@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1e56bf66fbe49b89e0621162726d08e237bf7e93c42c410c8b2a8d383135b5b1 -->
+<!-- generated from WORKBOOK.md sha256:81818478e7699c059999b64b00c6d041764be33252376612c69ed38cdf4c2429 -->
 
 ## What it is for and who it is for
 
@@ -1103,10 +1103,10 @@ when it was deleted (INVENTORY-F31). The image of the library does, because dele
 deleting left it, which was left without any, gets back the one it had in the copy, unless the library no longer has
 it. Its discount rules in Price Lists are switched back on by
 themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15),
-and its modifier groups, if Modifiers is recovered too (MODIFIER-F10). Its options in the menus were erased when it was
-deleted and do not come back with it yet (hub#1343).
+its modifier groups, if Modifiers is recovered too (MODIFIER-F10), and its choices in the menus, if Menus is recovered
+too (COMBO-F15).
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
-PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13
+PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ## What the verticals share
 

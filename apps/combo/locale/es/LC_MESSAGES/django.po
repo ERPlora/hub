@@ -42,6 +42,10 @@ msgstr "Menús y combos vende el menú del día, el menú infantil o el bocadill
 msgid "Menus"
 msgstr "Menús"
 
+#: apps.py:55
+msgid "Menu choices of products"
+msgstr "Elecciones de menú de productos"
+
 #: models.py:30
 msgid "Eaten in"
 msgstr "En el local"
