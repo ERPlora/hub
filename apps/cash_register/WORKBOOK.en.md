@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:26a88b5d8410ab25d1125fc982ae440b05a097577f3a50cf1434bcb143402fae -->
+<!-- generated from WORKBOOK.md sha256:26fdf12c67137fa95a580dbcd7fd546931098cc86c09c82b2ef4ae3a2bd3166a -->
 
 ## What it is for and who it is for
 
@@ -728,5 +728,4 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | See the expected cash with the blind count | yes | yes | yes | no | `cash_register.view_expected_totals` |
 | Settings and drawers | yes | yes | no | no | `cash_register.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`);
-the cashier of the current product is an employee.
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
