@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:58e054641a245191ec53e7f54c75037ac5e4ecc1c2a257e869dd046c1c6859a0 -->
+<!-- generated from WORKBOOK.md sha256:69f09ba396417bad22aa31111a829e0ea8869bdd2879eb7d3a705d6451551b44 -->
 
 ## What it is for and who it is for
 
@@ -56,8 +56,8 @@ Here the official specification prevails over the market:
   is issued** (Invoicing → Issuer, INVOICE-F21); until then, Home asks for it in "Finish setting up your
   business" with the step "Your business details" and the pill "Needed to invoice", and the banner "You
   cannot issue invoices yet" warns about it above the other screens, **Invoices** and **Series** too,
-  with "Set up". The issuer is typed here, by hand: receiving it from the ERPlora account
-  (INVOICE-F22) is not in yet.
+  with "Set up". The issuer is typed here, by hand: it does not come from the
+  ERPlora account.
 - **"Today" is Madrid time** in phase 1 (the Hub does not keep the business's time zone yet): it decides
   the date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers
   in the new year's series.
@@ -187,7 +187,6 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F01 | The ticket (simplified invoice) born when charging | done — Sales asks for it within the same charge |
 | INVOICE-F02 | The full invoice when charging a customer with a tax ID | done — Sales asks for it within the same charge |
 | INVOICE-F03 | Issue an invoice by hand | done |
-| INVOICE-F04 | The customer asks for the full invoice of their ticket | discarded — the public page where the customer types their details and the ticket's code that opens it belong to the platform and to Sales; Invoicing already issues the full invoice that page will ask for, as in INVOICE-F05 (hub#500) |
 | INVOICE-F05 | Turn a ticket into a full invoice at the counter | done |
 | INVOICE-F06 | A charged sale that could not be invoiced | done |
 | INVOICE-F07 | Void a charged sale that already has its ticket | done — Sales asks for it within the same void |
@@ -205,7 +204,6 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F19 | Mark an invoice as paid | done |
 | INVOICE-F20 | Give other apps the invoice of a sale | done |
 | INVOICE-F21 | Set up the issuer | done |
-| INVOICE-F22 | Receive the issuer from the ERPlora account | discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501) |
 | INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
@@ -309,19 +307,6 @@ territory's tax. If the currency cannot be read, the window says so ("The busine
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up (hub#938).
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
-### INVOICE-F04 The customer asks for the full invoice of their ticket
-Status: discarded — the public page where the customer types their details and the ticket's code that opens it belong to the platform and to Sales; Invoicing already issues the full invoice that page will ask for, as in INVOICE-F05 (hub#500)
-Actor: customer
-Screen: public page of the platform (it does not exist yet)
-Steps:
-1. The ticket Sales prints carries a code to ask for the invoice.
-2. The customer opens it on their phone, without signing in, and types their tax details.
-3. Invoicing issues the replacing full invoice (F3), as in INVOICE-F05.
-In: the ticket (F2) and the details the customer types.
-Out: the F3 (announces `invoice.invoice.issued`).
-If it fails: as in INVOICE-F05.
-Involved: SALE-F29, INVOICE-F05
-
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter
 Status: done
 Actor: employee, manager, administrator
@@ -345,7 +330,7 @@ card fills it; the tax ID's, also when the country or the document type changes)
 next try is refused too; a document that is not a ticket, "Only a ticket (simplified invoice) can be
 replaced by a full invoice.". If the ticket already has its F3, it answers with it without issuing
 another or using a number.
-Involved: INVOICE-F04
+Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
 Status: done
@@ -721,20 +706,6 @@ next try is refused too; a refusal that names no field shows above the form and 
 (hub#854).
 Involved: none
 
-### INVOICE-F22 Receive the issuer from the ERPlora account
-Status: discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501)
-Actor: system
-Screen: Issuer
-Steps:
-1. When the ERPlora account sends the hub's data with the business's tax identity, the platform hands it
-   to Invoicing with the version of that data.
-2. Invoicing saves the issuer and **Issuer** says "Received from your ERPlora account on {date}.".
-In: the business's tax identity the account sends (legal name, tax ID, address, postal code, city,
-province and country) and its version.
-Out: the issuer (announces `invoice.issuer.updated`). Data older than the saved one is ignored.
-If it fails: an incomplete issuer or one with an invalid tax ID is refused and the previous one stays.
-Involved: none
-
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
 Status: done
 Actor: system (the ERPlora account)
@@ -863,8 +834,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
   exists (the territory the line froze when it was charged); rounding half up (`round_half_up`). The
   name of the tax of the rate of a typed line ("VAT %", "IGIC %", "IPSI %") is read by the screen from
   `tax.settings.get` (`tax_kind`, with `useTaxKind()` of Taxes), the only source:
-  `invoice.invoice.line_defaults` only gives the general rate and does not repeat the tax (round
-  2026-10-17 of PLAN-HUB). What has already been issued is labelled by what it declared (the tax of its
+  `invoice.invoice.line_defaults` only gives the general rate and does not repeat the tax. What has already been issued is labelled by what it declared (the tax of its
   breakdown; "Tax %" if it mixes), never by today's territory: the same rule as the Sales tax figure
   (SALE-F28), which says the tax of the period's sales, "Taxes" if they mix, and the territory's only
   without sales.
