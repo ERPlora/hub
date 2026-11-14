@@ -222,7 +222,8 @@ Entra: el nombre del cajón.
 Sale: el cajón (avisa: `cash_register.register.created` o `cash_register.register.updated`). Un cajón
 nunca se borra: las sesiones lo nombran.
 Si falla: sin nombre, «Escribe el nombre del cajón.»; con un nombre que ya tiene otro cajón (sin
-distinguir mayúsculas), «Ya hay un cajón con ese nombre.».
+distinguir mayúsculas), «Ya hay un cajón con ese nombre.». Los dos salen debajo del nombre y se quitan en
+cuanto se escribe en él, sin volver a pulsar «Guardar» (hub#1470).
 Implicados: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Abrir el turno de caja con el fondo inicial
@@ -247,7 +248,9 @@ fondo obligatorio y el fondo vacío o a cero, «Este negocio exige fondo de aper
 con el que empieza la caja.» bajo el campo; un cajón desactivado o que no existe, «Ese cajón no está
 disponible.»; un importe ilegible («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»),
 negativo («Este importe no puede ser negativo.») o ambiguo («1.250») se dice debajo del campo al salir de él o al
-pulsar «Abrir sesión», y no se envía; «12,555» no es ambiguo: son 12.555,00 €, como en un precio (hub#1160). «Abrir sesión» está en gris mientras el negocio no
+pulsar «Abrir sesión», y no se envía; «12,555» no es ambiguo: son 12.555,00 €, como en un precio (hub#1160). El aviso que el servidor pone debajo de
+un campo (el fondo obligatorio) se quita en cuanto se cambia ese campo, sin volver a pulsar «Abrir sesión»; el de
+otro campo se queda hasta que se cambia el suyo (hub#1470). «Abrir sesión» está en gris mientras el negocio no
 haya dicho todavía su moneda, porque el fondo se lee en ella (sin ella, «1500» yenes se guardaría como
 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir sesión» se enciende (hub#938).
@@ -292,7 +295,8 @@ Sale: el movimiento, a nombre de quien lo apunta (avisa: `cash_register.movement
 pone el sistema según el tipo.
 Si falla: «Esta salida dejaría la caja en negativo y el saldo negativo no está permitido.» si los
 ajustes no lo permiten; un importe cero («Importe inválido»), ilegible, negativo o ambiguo se dice debajo del campo
-y no se envía (se lee como en F03); la sesión
+y no se envía (se lee como en F03); el aviso de un campo se quita en cuanto se cambia ese campo, sin volver a
+pulsar «Registrar», y el de otro campo se queda hasta que se cambia el suyo (hub#1470); la sesión
 cerrada en otro dispositivo: «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.».
 «Registrar» está en gris mientras el negocio no haya dicho todavía su moneda, porque el importe se lee
 en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
