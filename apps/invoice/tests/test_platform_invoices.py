@@ -303,6 +303,7 @@ def test_the_document_of_an_invoice_it_never_issued_is_404(platform_hub):
 
 def test_it_is_healthy_only_with_its_issuer(db, settings):
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
+    settings.ERPLORA_ENVIRONMENT = "pre"
 
     unconfigured = run("invoice.invoice.platform_health", {}, system())
     run("invoice.issuer.update", PLATFORM_ISSUER, system())
@@ -311,6 +312,31 @@ def test_it_is_healthy_only_with_its_issuer(db, settings):
     assert (unconfigured.ready, configured.ready) == (False, True)
     assert unconfigured.detail
     assert configured.detail == ""
+
+
+def test_in_prod_it_is_not_ready_while_real_filing_is_closed(platform_hub, settings):
+    # The SaaS charges live only while this answers ready: a real charge with filing closed would carry an invoice
+    # the AEAT never registers for real.
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    health = run("invoice.invoice.platform_health", {}, system())
+
+    assert (health.ready, "AEAT" in health.detail) == (False, True)
+
+
+@pytest.mark.parametrize(
+    ("where", "opened"), [("prod", True), ("pre", False), ("pre", True)]
+)
+def test_it_is_ready_in_prod_with_real_filing_open_and_in_pre_whatever_the_server_says(
+    platform_hub, settings, where, opened
+):
+    settings.ERPLORA_ENVIRONMENT = where
+    settings.VERIFACTU_PRODUCTION_ENABLED = opened
+
+    health = run("invoice.invoice.platform_health", {}, system())
+
+    assert (health.ready, health.detail) == (True, "")
 
 
 # ── Two deliveries at once (Review Focus 4: the reconcile of the SaaS posting again) ────────────────

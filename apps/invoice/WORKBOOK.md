@@ -2,7 +2,7 @@
 Prefijo: INVOICE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: ver «Qué queda fuera» (INVOICE-F04, INVOICE-F22 e INVOICE-F23, descartados con su issue).
+Lo que no entra todavía: ver «Qué queda fuera» (INVOICE-F04 e INVOICE-F22, descartados con su issue).
 
 > Manual de usuario y especificación de la app `invoice`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -218,7 +218,7 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
 | INVOICE-F22 | Recibir el emisor de la cuenta de ERPlora | descartado — la cuenta de ERPlora no manda la identidad fiscal del negocio con los datos del hub y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega (hub#501) |
-| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | descartado — la parte de Facturación está hecha y probada, pero el hub de plataforma no se da de alta hasta que nazca con su propia base de datos, como cada negocio (hub#502) |
+| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 <!-- origen: wf:restaurante-dia#rec_restaurante-f12 fi:modules/invoice#command-invoice-create_from_sale-handler-wasm-create_from_sale fi:modules/invoice#event-listen-sale-completed-invoice-create_from_sale old:invoice/workflow/emision.md#invoice-f01 qa:modules/invoice/simplified-receipt-vs-invoice wf:cadena-fiscal#rec_fiscal-f02 wf:peluqueria-dia#rec_peluqueria-f11 -->
@@ -770,18 +770,22 @@ Implicados: ninguno
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 <!-- origen: nuevo (PLAN-SAAS §4: las facturas de ERPlora las emite su propio hub de plataforma) -->
-Estado: descartado — la parte de Facturación está hecha y probada, pero el hub de plataforma no se da de alta hasta que nazca con su propia base de datos, como cada negocio (hub#502)
+Estado: hecho
 Actor: sistema (la cuenta de ERPlora)
 Pantalla: ninguna (nadie entra en el hub de plataforma)
 Pasos:
-1. Un cliente paga su suscripción; la cuenta de ERPlora numera su factura (`ERP-2026-00123`, abonos en
+1. Antes de cobrar con dinero real, la cuenta pregunta al hub de plataforma si está listo: lo está con su emisor
+   y VeriFactu y, en producción, solo mientras el envío real a la AEAT está abierto en el servidor
+   (VERIFACTU-F08). Si no, contesta «no listo» con el motivo y la cuenta no cobra. En pre no cambia nada:
+   registra en pruebas y cobra con claves de prueba.
+2. Un cliente paga su suscripción; la cuenta de ERPlora numera su factura (`ERP-2026-00123`, abonos en
    `ERPR`) y la manda, firmada, al hub de plataforma de ERPlora.
-2. Facturación la emite tal cual llega, con el número y la fecha de la cuenta (ninguna serie del hub
+3. Facturación la emite tal cual llega, con el número y la fecha de la cuenta (ninguna serie del hub
    cuenta para ella), con ERPlora como emisor y el pagador de ese día como destinatario, y VeriFactu sella
    su registro en la misma operación. Contesta «emitida» con su QR.
-3. La cuenta pregunta después cómo va: «emitida» mientras el registro va a la AEAT, y «aceptada»,
+4. La cuenta pregunta después cómo va: «emitida» mientras el registro va a la AEAT, y «aceptada»,
    «aceptada con errores» o «rechazada» cuando contesta (con su código y su mensaje).
-4. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
+5. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
    tributario:», «VERI*FACTU») solo cuando la AEAT ya lo aceptó, como en la cuenta antigua.
 Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas y,
 en un abono, la factura que corrige.
@@ -790,7 +794,8 @@ Sale: la factura, con la referencia de la cuenta (avisa `invoice.invoice.issued`
 Si falla: la misma factura otra vez (o dos entregas a la vez) contesta lo que ya hay, sin escribir nada;
 un abono de una factura que no llegó se rechaza; por encima de 400 € sin el NIF del pagador se rechaza; una
 factura que no sigue el contrato se rechaza con su motivo; un rechazo de VeriFactu deshace la factura
-entera.
+entera; en producción con el envío real a la AEAT cerrado, «no listo»: «El envío real a la AEAT está cerrado en
+este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra.
 Implicados: VERIFACTU-F13
 
 ## Servicios: lo que entra y lo que sale
@@ -820,7 +825,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | El emisor | ver | F21, F22 | `invoice.issuer.get` |
 | Cómo va una factura de ERPlora (por el `id` del SaaS) | solo el sistema | F23 | `invoice.invoice.platform_status` |
 | El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
-| Si el hub de plataforma puede emitir ahora | solo el sistema | F23 | `invoice.invoice.platform_health` |
+| Si el hub de plataforma puede emitir ahora (en producción, solo con el envío real a la AEAT abierto) | solo el sistema | F23 | `invoice.invoice.platform_health` |
 
 Todas se pueden seguir en vivo.
 
@@ -1026,6 +1031,12 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
     producción; `pre` → pruebas; `verifactu.queries.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).
+  - **Salud** (`platform_health`, la puerta `/health`): «listo» solo con el emisor configurado, VeriFactu
+    activo y, con `ERPLORA_ENVIRONMENT=prod`, el envío real abierto (`production_open` de
+    `verifactu.config.get`, VERIFACTU-F08); si no, 503 `unconfigured` con su motivo. El SaaS solo cobra con
+    clave live mientras contesta `ok` (`billing/services.py::invoicing_available` de `ERPlora/saas`), así
+    que «cobro real ⇒ factura en la AEAT real» la cumple el código, no la infraestructura. En `pre` no mira
+    el envío real.
   - **PDF**: `pdf.py` (WeasyPrint ≥ 66) imprime el A4 fuera de la transacción; solo lee `data:` (nada de
     red). La imagen lleva Pango, HarfBuzz y DejaVu, y la caché de Fontconfig en `/tmp`.
 - **Alta del hub de plataforma**: `manage.py create_platform_hub` (ensayo; con `--execute` escribe),
@@ -1039,8 +1050,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual de la familia `worker`, que tiene las credenciales del
   migrador para hacer la BD, con el comando `python manage.py create_platform_hub --execute` (primero sin
-  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve. Que ERPlora
-  emita de verdad sus facturas desde él sigue en hub#502 (INVOICE-F23).
+  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,
@@ -1281,7 +1291,4 @@ Al cerrar la app (2026-10-31, `CLOSE-INVOICE`), lo que no entra tiene su issue a
   (INVOICE-F22): la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
   `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales
   del negocio viven en el Hub): primero hay que decidir la dirección.
-- **hub#502** — ERPlora todavía no puede emitir sus propias facturas desde su hub de plataforma
-  (INVOICE-F23): el alta del hub de plataforma con su BD propia es de la tenencia (S2, PLAN §35); las
-  operaciones de Facturación y sus puertas `/internal/platform/invoices` ya están.
 - Las piezas compartidas que la app pide a `@erplora/ui` y aún no han llegado: [`UI-REQUESTS.md`](UI-REQUESTS.md).
