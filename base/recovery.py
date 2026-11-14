@@ -47,8 +47,10 @@ class Recoverable:
     - ``create``: the operation of the app that creates each, the one its screen uses;
     - ``deleted(records)`` and ``restore``, together or neither, for an app whose deletion keeps the record: those the
       business still holds deleted, read in the business (its ``queries.py``), and the operation of the app that brings
-      each back, the same record with all that hangs from it, given its ``id`` (hub#1306). They come back before the
-      missing are created, so ``missing`` never counts them.
+      each back, the same record with all that hangs from it (hub#1306). It is given, of the record as ``read`` found
+      it, what its input declares: the ``id`` and whatever else it gives back to the record that the business lost
+      since (a group it deleted, hub#1356). They come back before the missing are created, so ``missing`` never counts
+      them.
     """
 
     label: Any

@@ -52,6 +52,7 @@ from apps.customer.schemas import (
     CustomerIn,
     CustomerPatchIn,
     CustomerRecoverIn,
+    CustomerRestoreIn,
     DeletedOut,
     EraseIn,
     ErasedOut,
@@ -148,7 +149,7 @@ def invalid(error):
         ("customer.customer.delete", "customer.delete", RefIn, DeletedOut),
         ("customer.customer.merge", "customer.merge", MergeIn, CustomerDetailOut),
         ("customer.customer.erase", "customer.erase", EraseIn, ErasedOut),
-        ("customer.customer.restore", "customer.restore", RefIn, CustomerDetailOut),
+        ("customer.customer.restore", "customer.restore", CustomerRestoreIn, CustomerDetailOut),
         ("customer.customer.recover", "customer.restore", CustomerRecoverIn, CustomerDetailOut),
         ("customer.note.add", "customer.manage", NoteIn, ActivityRow),
         ("customer.activity.add", "customer.record_activity", ActivityIn, ActivityRow),
@@ -821,7 +822,7 @@ def test_restore_brings_the_same_card_back_with_all_that_hangs_from_it_and_annou
     run("customer.customer.delete", RefIn(id=ana.id))
     clear_outbox()
 
-    back = system("customer.customer.restore", RefIn(id=ana.id))
+    back = system("customer.customer.restore", CustomerRestoreIn(id=ana.id))
 
     assert back.id == ana.id
     ana.refresh_from_db()
@@ -838,7 +839,7 @@ def test_restoring_a_live_card_answers_well_changes_nothing_and_announces_again(
     ana = card("Ana")
     before = Customer.objects.get(pk=ana.pk).updated_at
 
-    assert system("customer.customer.restore", RefIn(id=ana.id)).id == ana.id
+    assert system("customer.customer.restore", CustomerRestoreIn(id=ana.id)).id == ana.id
 
     assert Customer.objects.get(pk=ana.pk).updated_at == before
     assert outbox() == [(events.CUSTOMER_RESTORED, {"id": str(ana.id)})]
@@ -855,7 +856,7 @@ def test_a_card_merged_into_another_erased_or_unknown_never_comes_back(gone):
     }[gone]()
 
     with pytest.raises(NotFound) as refused:
-        system("customer.customer.restore", RefIn(id=lost))
+        system("customer.customer.restore", CustomerRestoreIn(id=lost))
 
     assert refused.value.code == "customer.customer_unavailable"
     assert list(Customer.objects.live().values_list("name", flat=True)) == ["Marta"]
@@ -868,9 +869,116 @@ def test_only_the_system_restores_a_card(role):
     ana = card("Ana", deleted_at=NOW, is_active=False)
 
     with pytest.raises(PermissionDenied):
-        run("customer.customer.restore", RefIn(id=ana.id), role)
+        run("customer.customer.restore", CustomerRestoreIn(id=ana.id), role)
 
     assert Customer.objects.get(pk=ana.pk).deleted_at == NOW
+
+
+def restored_with(ana: Customer, **hanging):
+    """``customer.customer.restore`` of ``ana`` as the recovery gives it: with what hung from her card in a separate
+    copy, each with its id there."""
+    return system("customer.customer.restore", CustomerRestoreIn.model_validate({"id": ana.id} | hanging))
+
+
+@pytest.mark.django_db
+def test_restore_gives_back_what_the_business_deleted_since_and_leaves_what_it_has_as_it_is():
+    """hub#1356: a group, tag or field the business still has (by its id in the copy) is its own, the card in it or
+    not; one it deleted since is made again as the copy had it, by its screen's operation, and the card goes back in
+    it, as a card made again from the copy (hub#1285)."""
+    regulars = CustomerGroup.objects.create(name="Regulars")
+    # Kept, Known and Size the business still has: it took Ana out of Kept and of Known and cleared her Size before
+    # deleting her.
+    kept = CustomerGroup.objects.create(name="Kept")
+    known = CustomerTag.objects.create(name="Known")
+    size = CustomField.objects.create(name="Size", field_type="select", options=["S", "M"])
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+    ana.groups.add(regulars)
+    clear_outbox()
+
+    restored_with(
+        ana,
+        groups=[
+            {"id": regulars.id, "name": "Regulars"},
+            {"id": kept.id, "name": "Kept"},
+            {"id": uuid.uuid7(), "name": "VIP", "color": "warning", "sort_order": 2},
+            {"id": uuid.uuid7(), "name": "Old", "is_active": False},
+        ],
+        tags=[{"id": known.id, "name": "Known"}, {"id": uuid.uuid7(), "name": "Regular", "color": "success"}],
+        field_values=[
+            {"id": size.id, "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
+            {"id": uuid.uuid7(), "name": "Pet", "sort_order": 2, "value": "Luna"},
+        ],
+    )
+
+    ana.refresh_from_db()
+    assert (ana.deleted_at, ana.is_active) == (None, True)
+    assert sorted(ana.groups.values_list("name", "color", "sort_order", "is_active")) == [
+        ("Old", "primary", 0, False),
+        ("Regulars", "primary", 0, True),
+        ("VIP", "warning", 2, True),
+    ]
+    assert list(ana.tags.values_list("name", "color", "is_active")) == [("Regular", "success", True)]
+    pet = CustomField.objects.get(name="Pet")
+    assert (pet.sort_order, list(ana.field_values.values_list("field_id", "value"))) == (2, [(pet.id, "Luna")])
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (4, 2, 2)
+    names = [name for name, _ in outbox()]
+    assert names[0] == events.CUSTOMER_RESTORED
+    assert sorted(names[1:]) == sorted(
+        [
+            events.GROUP_CREATED,
+            events.GROUP_CREATED,
+            events.GROUP_UPDATED,
+            events.CUSTOMER_GROUPS_CHANGED,
+            events.TAG_CREATED,
+            events.CUSTOMER_TAGS_CHANGED,
+            events.FIELD_CREATED,
+        ]
+    )
+
+
+@pytest.mark.django_db
+def test_restore_puts_the_card_in_what_the_business_made_again_by_name_and_keeps_its_own_value():
+    """A group, tag or field the business deleted and made again by hand is that one (its name, the case aside), never a
+    second one; a value the card holds already in it stays, and a field made again and deactivated takes none."""
+    vip = CustomerGroup.objects.create(name="vip")
+    regular = CustomerTag.objects.create(name="REGULAR")
+    pet = CustomField.objects.create(name="Pet")
+    CustomField.objects.create(name="Size", is_active=False)
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+    CustomFieldValue.objects.create(customer=ana, field=pet, value="Max")
+
+    restored_with(
+        ana,
+        groups=[{"id": uuid.uuid7(), "name": "VIP"}],
+        tags=[{"id": uuid.uuid7(), "name": "Regular"}],
+        field_values=[{"id": uuid.uuid7(), "name": "Pet", "value": "Luna"}, {"id": uuid.uuid7(), "name": "Size", "value": "M"}],
+    )
+
+    ana.refresh_from_db()
+    assert (list(ana.groups.all()), list(ana.tags.all())) == ([vip], [regular])
+    assert list(ana.field_values.values_list("field_id", "value")) == [(pet.id, "Max")]
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (1, 1, 2)
+
+
+@pytest.mark.django_db
+def test_restore_refuses_a_value_its_field_no_longer_takes_and_brings_back_nothing():
+    """As a card made again from the copy: all or nothing, and the card stays deleted, with why."""
+    CustomField.objects.create(name="Size", field_type="select", options=["S", "L"])
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+    clear_outbox()
+
+    with pytest.raises(InvalidPayload) as refused:
+        restored_with(
+            ana,
+            tags=[{"id": uuid.uuid7(), "name": "Regular"}],
+            field_values=[
+                {"id": uuid.uuid7(), "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"}
+            ],
+        )
+
+    assert refused.value.code == "customer.field_invalid_option"
+    assert Customer.objects.get(pk=ana.pk).deleted_at == NOW
+    assert (CustomerTag.objects.count(), outbox()) == (0, [])
 
 
 # customer.customer.recover (BASE-F114, the recovery from a separate copy, hub#1285)

@@ -15,7 +15,8 @@ the business stays open and its own work goes on.
    closed before anything is written.
 2. **Given back**: in the business (``use_hub``), the app says which of those records the business still holds deleted
    and which it no longer has: each deleted one comes back first, the same record with all that hangs from it, by the
-   app's operation that undoes a deletion (``restore``, hub#1306), and each missing one is created by the app's own
+   app's operation that undoes a deletion (``restore``, hub#1306), given of the record what its input declares (its
+   id, and what the business lost of it since, hub#1356), and each missing one is created by the app's own
    operation, the one its screen uses, as the platform runs an operation in a business (the system's permissions, in the
    staff's language): rows are never copied. They run as the recovery (``base.recovery.actor_of``), so every event they
    record says in the outbox that it came back, and nothing new to the business starts for it (hub#1307). The apps go in the order of their ``requires``
@@ -40,6 +41,7 @@ A business being moved or restored is left for a later pass: its recovery waits,
 import datetime as dt
 import logging
 from collections.abc import Callable
+from functools import partial
 
 import psycopg
 import pydantic
@@ -225,7 +227,8 @@ def _give_back(
             continue
         steps = [(one.create, one.missing, "created", _create_input)]
         if one.restore:
-            steps.insert(0, (one.restore, one.deleted, "restored", _restore_input))
+            takes = get_operation(one.restore).input.model_fields
+            steps.insert(0, (one.restore, one.deleted, "restored", partial(_restore_input, takes)))
         for name, which, counted, payload in steps:
             if not _each(ctx, get_operation(name), which(records[index]), payload, counted, result, ours):
                 refused = result["refused"]
@@ -271,9 +274,10 @@ def _create_input(record: dict) -> dict:
     return {key: value for key, value in record.items() if key != "id"}
 
 
-def _restore_input(record: dict) -> dict:
-    """What a restore takes: the record's id, the same in the copy and in the business."""
-    return {"id": record["id"]}
+def _restore_input(takes, record: dict) -> dict:
+    """What a restore takes: of the record as the copy holds it, what its input declares (``takes``): its id, the same
+    in the copy and in the business, and whatever else it gives back to the record that the business lost since."""
+    return {key: value for key, value in record.items() if key in takes}
 
 
 def _not_created(result: dict, record: dict, reason: str) -> None:
