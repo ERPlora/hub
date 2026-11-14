@@ -52,7 +52,7 @@ from live.meta import all_live_app_configs
 from live.operations import get as get_operation
 
 from base import activation, registry, services
-from base.recovery import HOOK, LeftOut, Recoverable, RecoveredOut, actor_of
+from base.recovery import HOOK, LeftOut, Recoverable, RecoveredOut, actor_of, giving_back
 from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
 from control import services as control_services
@@ -123,7 +123,7 @@ def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
         if hub.status != Hub.Status.READY or not hub.db_name:
             raise RecoveryFailed("recover_business_unavailable", f"the business {hub.slug} is {hub.status}")
         read = _read(copy, activation.in_requires_order(row.apps, activation.module_graph()))
-        with translation.override(row.language), use_hub(hub):
+        with translation.override(row.language), use_hub(hub), giving_back(actor_of(row.pk)):
             for label, declared, records, refused in read:
                 _give_back(row, hub, results, label, declared, records, refused, ours)
         control_services.recovery_done(row.pk, results, now, owner)

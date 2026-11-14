@@ -492,6 +492,14 @@ msgstr "volvió sin la subcategoría %(category)s: se movió a otro sitio despu�
 msgid "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
 msgstr "volvió sin la subcategoría %(category)s: colgaría de una de sus propias subcategorías"
 
+#, python-format
+msgid "came back without the service %(service)s: changed by the business meanwhile"
+msgstr "volvió sin el servicio %(service)s: el negocio lo cambió mientras tanto"
+
+#, python-format
+msgid "came back without the subcategory %(category)s: changed by the business meanwhile"
+msgstr "volvió sin la subcategoría %(category)s: el negocio la cambió mientras tanto"
+
 msgid ""
 "the category %(category)s came back in an earlier recovery: what goes in it "
 "is the business's to decide"
