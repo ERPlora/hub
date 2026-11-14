@@ -149,7 +149,7 @@ describe('SubstituteModal', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup('es');
-    expect(s.inDoc('invoice-substitute')?.getAttribute('aria-label')).toBe('Factura completa del ticket TICKET-2026-000004');
+    expect(s.inDoc('invoice-substitute')?.getAttribute('aria-label')).toBe('Factura completa del tique TICKET-2026-000004');
     expect(s.submitButton()?.textContent?.trim()).toBe('Emitir factura completa');
   });
 });

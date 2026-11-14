@@ -251,12 +251,12 @@
       }
     },
     "settings": {
-      "heading": "Ajustes del ticket",
+      "heading": "Ajustes del tique",
       "printersHeading": "Impresora de cada función",
       "fields": {
-        "print_receipt_on_sale": "Imprimir ticket al cobrar",
+        "print_receipt_on_sale": "Imprimir tique al cobrar",
         "open_drawer_on_sale": "Abrir cajón al cobrar",
-        "receipt_copies": "Copias del ticket"
+        "receipt_copies": "Copias del tique"
       },
       "automatic": "La primera activa con esa función",
       "receiptText": "El encabezado y el pie del tique forman parte de los ajustes de Ventas, que es de donde sale el tique.",

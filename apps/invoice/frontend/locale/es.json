@@ -20,7 +20,7 @@
     "back": "Volver",
     "types": {
       "F1": "Factura",
-      "F2": "Ticket",
+      "F2": "Tique",
       "F3": "Factura",
       "R1": "Rectificativa",
       "R2": "Rectificativa",
@@ -30,8 +30,8 @@
     },
     "typeNames": {
       "F1": "Factura (F1)",
-      "F2": "Ticket (F2)",
-      "F3": "Factura en sustitución de un ticket (F3)",
+      "F2": "Tique (F2)",
+      "F3": "Factura en sustitución de un tique (F3)",
       "R1": "Rectificativa (R1)",
       "R2": "Rectificativa (R2)",
       "R3": "Rectificativa (R3)",
@@ -178,7 +178,7 @@
         "R3": "R3 · Créditos incobrables (art. 80 Cuatro)",
         "R4": "R4 · Resto de causas"
       },
-      "simplified": "Un ticket se rectifica como R5 (rectificativa de una factura simplificada).",
+      "simplified": "Un tique se rectifica como R5 (rectificativa de una factura simplificada).",
       "reason": "Motivo",
       "reasonPlaceholder": "Motivo de la rectificación",
       "reasonRequired": "Escribe el motivo de la rectificación.",
@@ -190,8 +190,8 @@
       "failed": "No se pudo rectificar"
     },
     "substitute": {
-      "title": "Factura completa del ticket {number}",
-      "intro": "El ticket se queda como está; lo sustituye una factura completa (F3) con los mismos importes y los datos del cliente.",
+      "title": "Factura completa del tique {number}",
+      "intro": "El tique se queda como está; lo sustituye una factura completa (F3) con los mismos importes y los datos del cliente.",
       "submit": "Emitir factura completa",
       "done": "Factura completa {number} emitida",
       "failed": "No se pudo emitir la factura completa"
