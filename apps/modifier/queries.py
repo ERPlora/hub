@@ -19,7 +19,7 @@ from live.operations import operation
 from psycopg import sql
 
 from apps.inventory.models import Product, ProductCategory, Unit
-from apps.inventory.queries import find_category, find_product
+from apps.inventory.queries import find_category, find_product, products_standing_for
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.schemas import (
     CategoryRefIn,
@@ -670,9 +670,9 @@ def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
 
 # ── A separate copy of the business (BASE-F114): what Modifiers gives back from it ───────────────────────────────────
 
-#: What a group hung from a product in a separate copy is read with: its link's id there and what
-#: ``modifier.link.attach`` takes, each a column since ``0001_initial``.
-LINK_FIELDS = ("id", "group_id", "product_id")
+#: What a group hung from a product in a separate copy is read with: its link's id there, what
+#: ``modifier.link.attach`` takes and its product's SKU there, each a column since ``0001_initial``.
+LINK_FIELDS = ("id", "group_id", "product_id", "sku")
 
 
 def links_in_copy(conn) -> list[dict]:
@@ -691,7 +691,12 @@ def links_in_copy(conn) -> list[dict]:
         "SELECT {columns} FROM {links} l JOIN {products} p ON p.{product_pk} = l.{product_id}"
         " WHERE NOT p.{deleted} ORDER BY l.{link_pk}"
     ).format(
-        columns=sql.SQL(", ").join(sql.SQL("l.{}").format(column(link, field)) for field in ("id", "group", "product")),
+        columns=sql.SQL(", ").join(
+            [
+                *(sql.SQL("l.{}").format(column(link, field)) for field in ("id", "group", "product")),
+                sql.SQL("p.{}").format(column(product, "sku")),
+            ]
+        ),
         links=sql.Identifier(link.db_table),
         products=sql.Identifier(product.db_table),
         product_pk=column(product, "id"),
@@ -704,14 +709,18 @@ def links_in_copy(conn) -> list[dict]:
 
 def links_not_in_business(links: list[dict]) -> list[dict]:
     """The groups hung from a product in a separate copy (``links_in_copy``) the business no longer hangs there, in
-    their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Not lacking: one whose group the
-    business hangs from that product, the same link or one hung again: it stays as the business has it. A link never
-    changes its group nor its product, so the one the business still holds is always in its place."""
+    their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Its product is the business's that
+    stands for the copy's (Inventory's ``products_standing_for``): the same while live, else the one a recovery made
+    again with its SKU. Not lacking: one whose group the business hangs from that product, the same link or one hung
+    again: it stays as the business has it. A link never changes its group nor its product, so the one the business
+    still holds is always in its place."""
     taken = set(
         ModifierLink.objects.filter(group_id__in={one["group_id"] for one in links}).values_list("group_id", "product_id")
     )
-    return [
-        {"id": one["id"], "group_id": one["group_id"], "product_id": one["product_id"]}
-        for one in links
-        if (one["group_id"], one["product_id"]) not in taken
-    ]
+    here = products_standing_for({one["product_id"]: one["sku"] for one in links})
+    lacking = []
+    for one in links:
+        product = here.get(one["product_id"], one["product_id"])
+        if (one["group_id"], product) not in taken:
+            lacking.append({"id": one["id"], "group_id": one["group_id"], "product_id": product})
+    return lacking
