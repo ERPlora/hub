@@ -1730,9 +1730,10 @@ CATEGORY_COPY_FIELDS = ("name", "description", "icon", "color", "sort_order")
 
 def categories_in_copy(conn) -> list[dict]:
     """hub#1323: each live category of a separate copy of the business, with its ``id`` there, what
-    ``service.category.create`` takes and the id there of its parent (``parent_id``); nothing where the app's table is
-    not there. One the copy had deleted already is not the moment's and never comes back. ``conn`` is the copy's
-    direct, read-only connection (as ``services_in_copy``), so it is read by its own SQL over the model's names."""
+    ``service.category.create`` takes, the id there of its parent (``parent_id``) and of each service in it, archived
+    ones too (``service_ids``, hub#1364); nothing where the app's table is not there. One the copy had deleted already
+    is not the moment's and never comes back. ``conn`` is the copy's direct, read-only connection (as
+    ``services_in_copy``), so it is read by its own SQL over the model's names."""
     table = Category._meta.db_table
     if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
         return []
@@ -1745,23 +1746,44 @@ def categories_in_copy(conn) -> list[dict]:
         column["id"],
     )
     named = ("id", *CATEGORY_COPY_FIELDS, "parent_id")
-    return [dict(zip(named, row, strict=True)) for row in conn.execute(query)]
+    inside = _services_by_category_in_copy(conn)
+    return [
+        dict(zip(named, row, strict=True)) | {"service_ids": inside.get(row[0], [])} for row in conn.execute(query)
+    ]
+
+
+def _services_by_category_in_copy(conn) -> dict[UUID, list[UUID]]:
+    """``{category's id: [its services' ids]}`` in a separate copy, in id order; nothing where the table is not."""
+    table = Service._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return {}
+    pk, category = (sql.Identifier(Service._meta.get_field(field).column) for field in ("id", "category"))
+    query = sql.SQL("SELECT {}, {} FROM {} WHERE {} IS NOT NULL ORDER BY {}").format(
+        category, pk, sql.Identifier(table), category, pk
+    )
+    inside: dict[UUID, list[UUID]] = {}
+    for category_id, service_id in conn.execute(query):
+        inside.setdefault(category_id, []).append(service_id)
+    return inside
 
 
 def categories_not_in_business(categories: list[dict]) -> list[dict]:
     """hub#1323: the categories of a separate copy (``categories_in_copy``) the business lacks, parents first and then
-    in their order, each as ``service.category.create`` takes it here, with its ``id`` there. Not lacking: one the
+    in their order, each as ``service.category.recover`` takes it here, with its ``id`` there. Not lacking: one the
     business still has live, or one it made again (a live one with its name, the case and the spaces aside: a live name
     is unique, SERVICE-F07), so none is ever made twice. Each goes into its parent: by its id when the business has it
     (``_category_held``), by its name when it comes back too (created just before it, so with no id here yet), and at
-    the root when the copy did not have it live."""
+    the root when the copy did not have it live. Each takes the copy's category it stands for and what it had inside
+    it there, its services and its subcategories, for the create to take back what the business kept (hub#1364)."""
     here = _categories_here()
     by_id = {one["id"]: one for one in categories}
     lacking = [one for one in categories if _category_held(one["id"], one["name"], here) is None]
     created = []
     # Sorted is stable: within a depth, the copy's order.
     for one in sorted(lacking, key=lambda category: _depth(category, by_id)):
-        record = {field: one[field] for field in ("id", *CATEGORY_COPY_FIELDS)}
+        record = {field: one[field] for field in ("id", *CATEGORY_COPY_FIELDS, "service_ids")}
+        record["stands_for"] = one["id"]
+        record["subcategory_ids"] = [child["id"] for child in categories if child["parent_id"] == one["id"]]
         if (parent := by_id.get(one["parent_id"])) is not None:
             if (held := _category_held(parent["id"], parent["name"], here)) is not None:
                 record["parent_id"] = held

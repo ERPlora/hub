@@ -133,8 +133,10 @@ class ServiceConfig(LiveAppConfig):
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
         recovers from it (BASE-F114), in this order: first the categories the business lacks
-        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each created by
-        ``service.category.create``, the screen's own, parents first; then the services the copy offers and the business
+        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each made again by
+        ``service.category.recover``: created by ``service.category.create``, the screen's own, parents first, with the
+        services and subcategories it had inside that the business keeps where deleting it left them (SERVICE-F08);
+        then the services the copy offers and the business
         lacks (``queries.recoverable_services_in_copy``, ``queries.services_not_in_business``), each made again by
         ``service.service.recover``: created by ``service.service.create``, the screen's own, in its category (the same
         one, or the one brought back just before with its name), and assigned to each professional who performed it
@@ -148,7 +150,7 @@ class ServiceConfig(LiveAppConfig):
                 reads_since="0001_initial",
                 read=queries.categories_in_copy,
                 missing=queries.categories_not_in_business,
-                create="service.category.create",
+                create="service.category.recover",
             ),
             Recoverable(
                 label=self.verbose_name,
