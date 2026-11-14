@@ -192,11 +192,17 @@ remove_worktree() { # <repo> <dir>: the night's own, so --force (it has submodul
   git -C "$1" worktree prune
 }
 
+# The .env lives only in the repo's main checkout, the one that holds .git, also when the night starts from a
+# linked worktree.
+main_checkout() { (cd "$1" && cd "$(git rev-parse --git-common-dir)/.." && pwd); }
+
 make_worktree() { # <repo> <dir>
-  remove_worktree "$1" "$2" &&
+  local env_file
+  env_file="$(main_checkout "$1")/.env" &&
+    remove_worktree "$1" "$2" &&
     git -C "$1" worktree add --quiet --detach "$2" origin/main &&
     git -C "$2" submodule update --init --quiet &&
-    { [ ! -f "$1/.env" ] || cp "$1/.env" "$2/.env"; }
+    { [ ! -f "$env_file" ] || cp "$env_file" "$2/.env"; }
 }
 
 make_worktrees() { make_worktree "$HUB_REPO" "$hub_wt" && make_worktree "$SAAS_REPO" "$saas_wt"; }
@@ -259,10 +265,8 @@ start_stack() {
 }
 
 listeners() { # the pids listening on the stack's ports (a spec may restart the Hub's runserver on its own)
-  local port
-  for port in "$HUB_PORT" "$SAAS_PORT" "$PROVIDER_PORT" "$HUB_VITE" "$SAAS_VITE" "$GRAPH_PORT"; do
-    lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2> /dev/null || true
-  done
+  lsof -nP -t -sTCP:LISTEN -iTCP:"$HUB_PORT" -iTCP:"$SAAS_PORT" -iTCP:"$PROVIDER_PORT" -iTCP:"$HUB_VITE" \
+    -iTCP:"$SAAS_VITE" -iTCP:"$GRAPH_PORT" 2> /dev/null | sort -u || true
 }
 
 signal_all() { # <signal>
@@ -312,8 +316,10 @@ clean_up() {
   stop_stack
   if [ -d "$hub_wt" ]; then drop_hub_database || say "could not drop $HUB_DB: the next night tries again"; fi
   if [ -d "$saas_wt" ]; then drop_saas_database || say "could not drop $SAAS_DB: the next night tries again"; fi
+  say "clean-up: removing the worktrees"
   remove_worktree "$HUB_REPO" "$hub_wt" || say "could not remove $hub_wt"
   remove_worktree "$SAAS_REPO" "$saas_wt" || say "could not remove $saas_wt"
+  say "clean-up done"
 }
 
 prune_runs() {

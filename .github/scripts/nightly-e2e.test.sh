@@ -370,6 +370,9 @@ night HUB_REPO="$root/linked" -- install-launchd
 expect "install-launchd from a linked worktree is refused (2)" 2 "$status"
 expect "and says to run it from the main checkout" 1 "$(grep -c 'main checkout' "$root/out" || true)"
 expect "the agent still runs the main checkout's script" "$hub_clone/.github/scripts/nightly-e2e.sh" "$(plist_get ProgramArguments 0)"
+night HUB_REPO="$root/linked" FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
+expect "a night started from a linked worktree runs" 0 "$status"
+expect "with the .env of the main checkout, which a linked worktree lacks" 1 "$(calls 'e2e sees .env LOCAL_SETTING=hub')"
 night -- uninstall-launchd
 expect "uninstall-launchd ends well" 0 "$status"
 expect "it unloads the agent" 1 "$(calls_re "^launchctl bootout gui/$(id -u)/com\.erplora\.hub\.nightly-e2e\$")"
