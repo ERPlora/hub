@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:08a0360f103303c328762312b7838448f431719cbd89d73e470cbeed9ee5371d -->
+<!-- generated from WORKBOOK.md sha256:85ac64925a742372814e667747419d5d6371725bdd6489a106f3c624a5d66b4f -->
 
 ## What it is for and who it is for
 
@@ -2935,9 +2935,8 @@ Status: done (the action and the restore, in its place or to a separate copy, an
 the customers that were lost, the deleted ones as they were, the products, the services with their categories, the
 appointments, the repeating appointments, the price list prices, the modifier groups the business deleted, with their
 options, the modifier groups of the categories and of the products and the menu choices of the products; making and
-deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; the price list prices
-of a service that comes back as a new one, hub#1459; an option taken away from a modifier group the business keeps,
-hub#1505; a removed menu or course, hub#1474)
+deleting the temporary cluster is the procedure "Devolver un negocio a un momento" of ERPlora/aws; an option taken away
+from a modifier group the business keeps, hub#1505; a removed menu or course, hub#1474)
 Actor: the ERPlora staff who run the platform, when a business asks for it
 Screen: the Hub admin (`hubs.erplora.com/admin`) › Hubs, actions "Restore from a copy…" and "Restore to a separate
 copy…"; Separate copies, action "Recover into the business…"; and Recoveries
@@ -3084,7 +3083,9 @@ Steps:
       The price list prices always go after the products: "Price list prices: 2 created". Each price of the copy the
       business no longer has comes back to its price list, with its price and its "from quantity", put as the price
       list's detail puts it, so a deleted product that comes back, the same or as a new one, gets its prices back in
-      the price lists it was in (PRICING-F15). One whose place (the same price list, the same product or service and
+      the price lists it was in (PRICING-F15), and so does a service that comes back as a new one: they go after the
+      services, to the one the recovery made for it (one the business made again by hand gets none, and the price says
+      why). One whose place (the same price list, the same product or service and
       the same "from quantity") the business has taken again is not repeated: the business's own stays. One the price list does not accept today
       (deactivated, or its product still deleted) does not come back and its reason says so. The product's discount
       rules, which deleting it only switched off, are switched back on by themselves with it (PRICING-F14).

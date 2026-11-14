@@ -1246,7 +1246,13 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   mayúsculas ni espacios) en la categoría a la que volvería. Los nombres no son únicos: cada hecho otra vez responde por
   un solo servicio de la copia, el más antiguo por el más antiguo, y dos perdidos con el mismo nombre vuelven los dos.
   Es lo que usa la recuperación de otra app (Citas, hub#1284) para emparejar un servicio de la copia con el del negocio;
-  uno que la copia tenía archivado solo se empareja por su id. Las categorías se leen desde
+  uno que la copia tenía archivado solo se empareja por su id. Un servicio hecho otra vez guarda por cuál de la copia lo
+  hizo `service.service.recover` (`Service.stands_for`, de `0007_service_stands_for`; vacío en el que hace la pantalla), y
+  `queries.services_standing_for` (`{id en la copia: id en el negocio}`) dice con él qué servicio hace de cada uno de la
+  copia que el negocio ya no tiene: el que hizo una recuperación por él, archivado o renombrado después también; uno
+  hecho a mano no hace de ninguno. Lo pide Tarifas, que no requiere Servicios, por `service.service.standing_for`
+  (solo el sistema, sin ruta ni herramienta del asistente) para poner los precios de la copia (PRICING-F15, hub#1459).
+  Las categorías se leen desde
   `0001_initial` y los servicios desde `0003_service_image`, la que les dio la imagen (a una copia anterior se le
   niegan los servicios con `recover_copy_behind`); una migración que añada, quite o renombre una de las columnas que
   se leen cambia también `services_in_copy` y su `reads_since`. Tests: `tests/test_recovery.py`, también de punta a punta con la base del negocio y su copia.

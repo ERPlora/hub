@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e6911850a8b3780b50efd421c38a4e93b54200e99d25f7728309ba03f486522c -->
+<!-- generated from WORKBOOK.md sha256:2f6a1601a58fdeda9d66f9a738c19e7cd5a6aebe423223e26ec0f4747ca99801 -->
 
 ## What it is for and who it is for
 
@@ -473,7 +473,9 @@ Steps:
 2. Each price of the copy (of a product live in it or of a service) that the business no longer has comes back to its
    price list, with its price and its "from quantity", put as the price list's detail puts it (PRICING-F07). A product
    the business no longer had at all comes back as a new one, with another identifier (INVENTORY-F01): its prices go to
-   that one, the one the recovery made with its SKU.
+   that one, the one the recovery made with its SKU. The same for a service: if it comes back as a new one
+   (SERVICE-F01), its prices go to the one the recovery made for it. If both are asked, Services goes before Price
+   Lists, as in the "What to bring back" list.
 3. Recoveries counts it apart: "Price list prices: 2 created".
 In: the separate copy and what the business has today.
 Out: a price for each one that was missing, with its price-put notice (`pricing.price_item.added`) made by the
@@ -486,9 +488,12 @@ deactivated price list ("pricing.price_list_unavailable: …"), a product that s
 longer has (Products was not recovered, or the business already made another one by hand with its SKU, which keeps the
 prices the business gave it: "not_found: …"), a service that is gone or Services turned off. The product a recovery made
 is known by its SKU whether this recovery or an earlier one made it: asked again from an earlier copy, it puts back on it
-the prices the business took off later, like everything the business no longer has. A service the business no longer
-had at all comes back as a new one and its prices in the copy do not come back with it (hub#1459).
-Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14
+the prices the business took off later, like everything the business no longer has. The service a recovery made is known
+because Services keeps which one of the copy it made it for; one the business made again by hand with its name gets none
+(it keeps the prices the business gave it) and the price says why ("service.service_not_found: …"), as it does when
+Price Lists is asked without Services, or before it, and the service has not come back yet: asking again puts it. A
+service an earlier recovery brought back before this rule does not keep it, and its prices do not come back either.
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
 ## Services: what goes in and what comes out
 

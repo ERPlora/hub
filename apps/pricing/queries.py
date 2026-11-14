@@ -25,7 +25,7 @@ from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
 from live.operations import UnknownOperation, get, operation
 
@@ -69,6 +69,7 @@ SERVICES_UNAVAILABLE = _("Services is not active in this business.")
 FROM_QUANTITY = pgettext_lazy("pricing", "from %(quantity)s")
 
 SERVICE_GET = "service.service.get"
+SERVICE_STANDING_FOR = "service.service.standing_for"
 
 
 def business_today() -> dt.date:
@@ -181,6 +182,19 @@ def call_service(ctx: OperationContext, service_id: UUID | None, said: str | Non
         return op(ctx, payload)
     except AppInactive:
         raise unavailable from None
+
+
+def services_standing_for(ids: set[UUID]) -> dict[UUID, UUID]:
+    """Services' ``service.service.standing_for``, asked as the platform in the business at work: the service a
+    recovery made again for each of a separate copy's ``ids`` the business no longer holds, ``{id there: id here}``.
+    With Services off or absent, none: each price keeps the copy's service, and the list detail's add says why."""
+    if not ids:
+        return {}
+    try:
+        op = get(SERVICE_STANDING_FOR)
+        return op(system_context(platform.current_business_scope()), op.input(ids=sorted(ids))).standing_for
+    except (UnknownOperation, AppInactive):
+        return {}
 
 
 # ── Rows ─────────────────────────────────────────────────────────────────────────────────────────
@@ -843,8 +857,9 @@ def prices_not_in_business(prices: list[dict]) -> list[dict]:
     """The prices of a separate copy (``prices_in_copy``) the business no longer has, in their order, each as
     ``pricing.price_item.add`` takes it with its ``id`` there: its list, its one article (a product or a service), its
     price and its from quantity. Its product is the business's that stands for the copy's (Inventory's
-    ``products_standing_for``). Not lacking: one the business still holds, nor one whose place (its list, its article
-    and its from quantity) the business has taken again, at whatever price: that one stays as the business has it."""
+    ``products_standing_for``), and its service too (Services', ``services_standing_for``). Not lacking: one the
+    business still holds, nor one whose place (its list, its article and its from quantity) the business has taken
+    again, at whatever price: that one stays as the business has it."""
     held = set(PriceItem.objects.filter(pk__in=[one["id"] for one in prices]).values_list("pk", flat=True))
     taken = set(
         PriceItem.objects.filter(price_list_id__in={one["price_list_id"] for one in prices}).values_list(
@@ -852,16 +867,18 @@ def prices_not_in_business(prices: list[dict]) -> list[dict]:
         )
     )
     here = products_standing_for({one["product_id"]: one["sku"] for one in prices if one["product_id"]})
+    serving = services_standing_for({one["service_id"] for one in prices if one["service_id"]})
     lacking = []
     for one in prices:
         product = here.get(one["product_id"], one["product_id"])
-        if one["id"] in held or (one["price_list_id"], product, one["service_id"], one["min_quantity"]) in taken:
+        service = serving.get(one["service_id"], one["service_id"])
+        if one["id"] in held or (one["price_list_id"], product, service, one["min_quantity"]) in taken:
             continue
         lacking.append(
             {
                 "id": one["id"],
                 "price_list_id": one["price_list_id"],
-                **({"product_id": product} if product else {"service_id": one["service_id"]}),
+                **({"product_id": product} if product else {"service_id": service}),
                 "price": one["price"],
                 "min_quantity": one["min_quantity"],
             }

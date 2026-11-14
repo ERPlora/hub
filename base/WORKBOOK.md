@@ -3065,9 +3065,8 @@ Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte,
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
 las citas periódicas, los precios de tarifa, los grupos de suplementos que el negocio borró, con sus opciones, los
 grupos de suplementos de las categorías y de los productos y las elecciones de menú de los productos; crear y borrar el
-clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; los precios de tarifa de un
-servicio que vuelve como uno nuevo, hub#1459; una opción quitada de un grupo de suplementos que el negocio conserva,
-hub#1505; un menú o un plato retirado, hub#1474)
+clúster temporal es el procedimiento «Devolver un negocio a un momento» de ERPlora/aws; una opción quitada de un grupo
+de suplementos que el negocio conserva, hub#1505; un menú o un plato retirado, hub#1474)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -3214,7 +3213,9 @@ Pasos:
       Los precios de tarifa van siempre después de los productos: «Precios de tarifa: se crearon 2». Cada precio de la
       copia que el negocio ya no tiene vuelve a su tarifa, con su precio y su «desde cantidad», puesto como lo pone el
       detalle de la tarifa, así que un producto eliminado que vuelve, el mismo o como uno nuevo, recupera sus precios en
-      las tarifas donde estaba (PRICING-F15). No se repite uno cuyo sitio (la misma tarifa, el mismo producto o
+      las tarifas donde estaba (PRICING-F15), y un servicio que vuelve como uno nuevo, también: van después de los
+      servicios, al que la recuperación hizo por él (uno que el negocio volvió a crear a mano no recibe ninguno, y el
+      precio dice por qué). No se repite uno cuyo sitio (la misma tarifa, el mismo producto o
       servicio y la misma «desde cantidad») el negocio ya volvió a ocupar: se queda el suyo. Uno que la tarifa no acepta hoy (desactivada, o su
       producto sigue eliminado) no vuelve y su motivo lo dice. Las reglas de descuento del producto, que eliminarlo solo
       apagó, se vuelven a encender solas con él (PRICING-F14).

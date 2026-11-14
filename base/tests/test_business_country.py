@@ -16,9 +16,9 @@ from live.errors import NotFound, PermissionDenied
 from live.operations import get
 
 from base.models import Hub
-from base.operations import business_country, current_business_country
+from base.operations import business_country, current_business_country, current_business_scope
 from base.schemas import BusinessIn
-from base.tenancy.context import use_control, use_hub
+from base.tenancy.context import HubContextMissing, use_control, use_hub
 from base.tenancy.tests.hubs import HUB_DATABASES
 
 pytestmark = pytest.mark.django_db
@@ -101,3 +101,21 @@ def test_erplora_s_own_hub_at_work_is_in_its_issuer_s_country():
 def test_where_no_business_is_at_work_it_is_erplora_s_market(no_test_fallback):
     with use_control():
         assert current_business_country() == "ES"
+
+
+# ── The scope of the business at work, to ask another app as the platform (hub#1459) ────────────────────────────────
+# Price Lists, which does not require Services, asks Services which service stands for one of a separate copy's while
+# the copy is given back: no caller is at hand there, only the business whose database is at work.
+
+
+@pytest.mark.django_db(databases=HUB_DATABASES)
+def test_the_scope_at_work_is_its_business_s_never_another_hub_s(hub_a, hub_b, no_test_fallback):
+    with use_hub(hub_a):
+        assert current_business_scope() == Scope("host", hub_a.slug)
+    with use_hub(hub_b):
+        assert current_business_scope() == Scope("host", hub_b.slug)
+
+
+def test_where_no_business_is_at_work_there_is_no_scope_to_ask_in(no_test_fallback):
+    with use_control(), pytest.raises(HubContextMissing):
+        current_business_scope()

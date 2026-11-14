@@ -22,6 +22,10 @@ from apps.inventory.models import Product
 from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key, gone_altogether
 from apps.pricing import queries
 from apps.pricing.models import PriceItem
+from apps.service.models import Service
+from apps.service.tests.test_recovery import CATEGORIES as SERVICE_CATEGORIES
+from apps.service.tests.test_recovery import NO_LINKS, SERVICES
+from base.models import Hub
 from base.recovery import actor_of
 from base.tenancy.context import use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
@@ -80,7 +84,16 @@ def a_price_of_the_copy(price_list, *, product=None, service=None, price=1000, m
     }
 
 
+@pytest.fixture
+def at_work():
+    """A business at work (``use_hub``), as the platform always gives back a copy in one: Price Lists asks Services in
+    it which service stands for one of the copy's."""
+    with use_hub(Hub(slug="a")):
+        yield
+
+
 @pytest.mark.django_db
+@pytest.mark.usefixtures("at_work")
 def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free():
     vip, bulk = make_list("VIP"), make_list("BULK")
     shampoo = make_product("Shampoo", "SH-1")
@@ -185,6 +198,96 @@ def test_the_place_of_a_product_made_again_the_business_priced_since_stays_as_it
     lacking = queries.prices_not_in_business([taken, free])
 
     assert [(one["id"], one["product_id"]) for one in lacking] == [(free["id"], shampoo.id)]
+
+
+def a_price_of_a_service_gone(price_list, **fields) -> dict:
+    """A price of the copy whose service the business no longer holds at all: another id is all that is left of it."""
+    return a_price_of_the_copy(price_list, **fields) | {"service_id": uuid.uuid7()}
+
+
+def made_again_for(there: uuid.UUID, name: str = "Haircut") -> Service:
+    """A service a recovery made again for the copy's ``there``, as ``service.service.recover`` leaves it."""
+    return make_service(name, created_by=actor_of(uuid.uuid7()), stands_for=there)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("at_work")
+def test_a_service_no_longer_held_is_the_one_a_recovery_made_again_for_it():
+    vip = make_list("VIP")
+    gone = a_price_of_a_service_gone(vip, price=1500)
+    haircut = made_again_for(gone["service_id"])
+
+    lacking = queries.prices_not_in_business([gone])
+
+    assert lacking == [
+        {"id": gone["id"], "price_list_id": vip.id, "service_id": haircut.id, "price": 1500,
+         "min_quantity": Decimal("1")},
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("at_work")
+def test_the_copys_service_is_the_business_own_while_it_holds_it():
+    vip = make_list("VIP")
+    haircut = make_service("Haircut")
+    made_again_for(haircut.id)
+
+    [lacking] = queries.prices_not_in_business([a_price_of_the_copy(vip, service=haircut)])
+
+    assert lacking["service_id"] == haircut.id
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("at_work")
+def test_a_service_made_again_by_hand_takes_none_of_the_copys_prices():
+    vip = make_list("VIP")
+    # Made again by hand with the name: the business's own, priced as the business chose.
+    make_service("Haircut", created_by="ana")
+    by_hand = a_price_of_a_service_gone(vip)
+
+    [lacking] = queries.prices_not_in_business([by_hand])
+
+    # It stays the copy's own service, which the list detail's add refuses as not found: not created, and why.
+    assert lacking["service_id"] == by_hand["service_id"]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("at_work")
+def test_the_place_of_a_service_made_again_the_business_priced_since_stays_as_it_is():
+    vip, bulk = make_list("VIP"), make_list("BULK")
+    taken = a_price_of_a_service_gone(vip, price=1500)
+    haircut = made_again_for(taken["service_id"])
+    # Priced again by the business after the recovery made the service, at another price.
+    make_item(vip, None, price=1600, service_id=haircut.id, service_name="Haircut")
+    # The same service in another list, and from another quantity in the same one: free places.
+    other_list = a_price_of_the_copy(bulk, price=1400) | {"service_id": taken["service_id"]}
+    from_five = a_price_of_the_copy(vip, price=1300, min_quantity="5") | {"service_id": taken["service_id"]}
+
+    lacking = queries.prices_not_in_business([taken, other_list, from_five])
+
+    assert [(one["id"], one["service_id"]) for one in lacking] == [
+        (other_list["id"], haircut.id),
+        (from_five["id"], haircut.id),
+    ]
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("at_work")
+def test_without_services_each_price_keeps_the_copys_service(monkeypatch):
+    from live.operations import UnknownOperation
+
+    def missing(name):
+        raise UnknownOperation(name)
+
+    vip = make_list("VIP")
+    gone = a_price_of_a_service_gone(vip)
+    made_again_for(gone["service_id"])
+    monkeypatch.setattr(queries, "get", missing)
+
+    [lacking] = queries.prices_not_in_business([gone])
+
+    # The list detail's add refuses it for the same reason: Services is not there.
+    assert lacking["service_id"] == gone["service_id"]
 
 
 def test_the_app_declares_its_prices_put_back_by_the_list_details_add():
@@ -332,3 +435,80 @@ class TestPricesComeBack:
             "pricing.price_list_unavailable",
         ]
         assert prices(hub) == []
+
+    def a_priced_service(self, recoveries, every_app_on):
+        """A business with a service priced in a list, by their screens' operations: its id."""
+        hub, _ = recoveries.business(every_app_on)
+        haircut = run_in(hub, "service.service.create", name="Haircut", price=2000, tax_category_key=a_tax_key(hub)).id
+        run_in(hub, "pricing.price_list.create", code="VIP", name="VIP prices")
+        run_in(hub, "pricing.price_item.add", price_list="VIP", service_id=haircut, price=1500)
+        return hub, haircut
+
+    def lost(self, hub, service) -> None:
+        """``service`` and its prices gone from the business altogether: no operation deletes a service, a lost
+        database does."""
+        with use_hub(hub):
+            PriceItem.objects.filter(service_id=service).delete()
+            Service.objects.filter(pk=service).delete()
+
+    def test_a_service_gone_altogether_comes_back_as_a_new_one_with_its_prices(self, recoveries, every_app_on):
+        hub, haircut = self.a_priced_service(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.lost(hub, haircut)
+        # As Recoveries asks it, in the apps' order: Services before Price Lists.
+        row = recoveries.ask(copy, "service", "pricing")
+
+        assert run() == 1
+
+        assert said(row) == (
+            "done",
+            [SERVICE_CATEGORIES, SERVICES | {"created": 1}, *NO_LINKS, PRICES | {"created": 1}],
+        )
+        with use_hub(hub):
+            [made] = Service.objects.filter(name="Haircut").values_list("pk", flat=True)
+            assert list(PriceItem.objects.values_list("price_list__code", "service_id", "price")) == [
+                ("VIP", made, 1500)
+            ]
+        assert made != haircut
+        # Asked again, nothing is put twice: its place is taken by the price just put.
+        again = recoveries.ask(copy, "service", "pricing")
+        assert run() == 1
+        assert said(again) == ("done", [SERVICE_CATEGORIES, SERVICES, *NO_LINKS, PRICES])
+
+    def test_a_service_made_again_by_hand_takes_none_of_the_copys_prices(self, recoveries, every_app_on):
+        hub, haircut = self.a_priced_service(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.lost(hub, haircut)
+        by_hand = run_in(hub, "service.service.create", name="Haircut", price=2200, tax_category_key=a_tax_key(hub)).id
+        row = recoveries.ask(copy, "service", "pricing")
+
+        assert run() == 1
+
+        # Services holds it already (made again with its name, where it was): none is made, and its price stays out.
+        status, [*services, prices_given] = said(row)
+        assert (status, services) == ("done", [SERVICE_CATEGORIES, SERVICES, *NO_LINKS])
+        assert (prices_given["created"], prices_given["not_created"]) == (0, 1)
+        assert [reason["reason"].split(":")[0] for reason in prices_given["reasons"]] == ["service.service_not_found"]
+        with use_hub(hub):
+            assert not PriceItem.objects.filter(service_id=by_hand).exists()
+
+    def test_with_services_turned_off_the_price_stays_out_and_says_why(self, recoveries, every_app_on):
+        from base import activation
+        from base.models import AppActivation
+
+        hub, haircut = self.a_priced_service(recoveries, every_app_on)
+        copy = recoveries.copy_of(hub)
+        self.lost(hub, haircut)
+        with use_hub(hub):
+            AppActivation.objects.filter(host=hub.slug, app="service").update(state="off")
+            activation.forget(hub.slug)
+        row = recoveries.ask(copy, "pricing")
+
+        assert run() == 1
+
+        # Services cannot be asked which service stands for the copy's: the recovery goes on, and the add says why.
+        status, [result] = said(row)
+        assert (status, result["created"], result["not_created"], result["refused"]) == ("done", 0, 1, "")
+        assert [reason["reason"].split(":")[0] for reason in result["reasons"]] == ["pricing.services_unavailable"]
+        with use_hub(hub):
+            assert not PriceItem.objects.exists()

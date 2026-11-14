@@ -485,7 +485,7 @@ volvió a borrar antes de que llegue el aviso, no se activa ninguna.
 Implicados: Inventario, Clientes, Servicios, INVENTORY-F34, PRICING-F15
 
 ### PRICING-F15 Recuperar los precios de tarifa desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus precios de tarifa) gh:hub#1343 gh:hub#1442 -->
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus precios de tarifa) gh:hub#1343 gh:hub#1442 gh:hub#1459 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Tarifas: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Precios de
@@ -497,7 +497,9 @@ Pasos:
 2. Cada precio de la copia (de un producto vivo en ella o de un servicio) que el negocio ya no tiene vuelve a su
    tarifa, con su precio y su «desde cantidad», puesto como lo pone el detalle de la tarifa (PRICING-F07). Un producto
    que el negocio ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01): sus precios
-   van a ese, el que la recuperación hizo con su SKU.
+   van a ese, el que la recuperación hizo con su SKU. Lo mismo un servicio: si vuelve como uno nuevo (SERVICE-F01), sus
+   precios van al que la recuperación hizo por él. Si se piden juntos, Servicios va antes que Tarifas, como en la lista
+   de «Qué recuperar».
 3. Recuperaciones lo cuenta aparte: «Precios de tarifa: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
 Sale: un precio por cada uno que faltaba, con su aviso de precio puesto (`pricing.price_item.added`) hecho por la
@@ -510,9 +512,12 @@ desactivada («pricing.price_list_unavailable: …»), un producto que sigue eli
 recuperó Productos, o el negocio ya hizo otro a mano con su SKU, que se queda con los precios que él le puso:
 «not_found: …»), un servicio que ya no está o Servicios apagada. El producto que hizo una recuperación se reconoce por
 su SKU la hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a poner los precios que el
-negocio le quitó después, como a todo lo que ya no tiene. Un servicio que el negocio ya no tenía en absoluto vuelve como
-uno nuevo y sus precios de la copia no vuelven con él (hub#1459).
-Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14
+negocio le quitó después, como a todo lo que ya no tiene. El servicio que hizo una recuperación se reconoce porque
+Servicios guarda por cuál de la copia lo hizo; uno que el negocio volvió a crear a mano con su nombre no recibe ninguno
+(se queda con los precios que él le puso) y el precio dice por qué («service.service_not_found: …»), igual que si se
+pide Tarifas sin Servicios, o antes, y el servicio aún no ha vuelto: pedirlo otra vez lo pone. Un servicio que
+recuperó una recuperación anterior a esta regla no lo guarda, y sus precios tampoco vuelven.
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
 ## Servicios: lo que entra y lo que sale
 
@@ -725,7 +730,11 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   list prices». `queries.prices_in_copy` lee con su propio SQL los `PriceItem` de la copia que cuentan allí (de un
   servicio o de un producto no borrado, como `live_items`) y `queries.prices_not_in_business` deja los que el negocio no
   tiene ni por id ni por sitio (tarifa, producto o servicio y `min_quantity`, el índice único); la plataforma los crea
-  con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Las reglas no van por la copia: el borrado
+  con `pricing.price_item.add` como la recuperación (`copy_recovery:<id>`). Cada precio va al artículo que hace del de
+  la copia: el producto por `inventory.queries.products_standing_for` (su SKU) y el servicio por
+  `service.service.standing_for`, la operación de Servicios (no es requisito), preguntada como la plataforma en el
+  negocio en curso (`base.operations.current_business_scope`); con Servicios apagada o ausente, el de la copia, que el
+  alta rechaza con su motivo (hub#1459). Las reglas no van por la copia: el borrado
   solo las apaga, y `pricing.catalog.recall_product` (la reacción a `inventory.product.restored`) enciende las del
   producto que siguen apagadas con el `updated_by` de la plataforma, el mismo con el que `forget_product` las apagó.
   Las lee con `select_for_update`: un cambio a mano a la vez espera a que acabe (`tests/test_concurrency.py`).

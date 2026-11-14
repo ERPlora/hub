@@ -44,6 +44,7 @@ from apps.service.queries import (
     ASSIGNMENT_NOT_FOUND,
     PACKAGE_NOT_FOUND,
     SESSION_NOT_FOUND,
+    SYSTEM,
     balance,
     current_settings,
     find_category,
@@ -197,9 +198,6 @@ SESSION_NOT_SETTLED = _("That session was never charged, so there is nothing to 
 SESSION_ALREADY_RETURNED = _("That session was already given back by another refund.")
 #: How long a session held at the till waits to be charged (SERVICE-F25).
 HOLD_DURATION = dt.timedelta(days=1)
-
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
-SYSTEM = "service.system"
 
 # The plain fields of a service an edit may change (the others need a lookup or may be emptied).
 SERVICE_PLAIN = (
@@ -1158,8 +1156,10 @@ def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
     came back without them, and why (``left_out``). It is their main service only if the business gave them none since
     (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was. Its
     image of the library comes back as ``service.service.set_image`` sets it (SERVICE-F34); a photo of its own does not
-    (``base.images.from_copy``)."""
+    (``base.images.from_copy``). It keeps which of the copy's it is made again for (``stands_for``), for the apps whose
+    records hang from that one (``queries.services_standing_for``)."""
     made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
+    Service.objects.filter(pk=made.id).update(stands_for=data.stands_for)
     if image := images.from_copy(ctx, data.image):
         _change_image(ctx, find_service(made.id, None), image)
     asked = [one.member_id for one in data.assignments]
