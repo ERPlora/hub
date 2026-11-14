@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b57b4d2eac75d63307474ebd1cf2601d5bd78d247a80fd08a97734d92b844e9b -->
+<!-- generated from WORKBOOK.md sha256:a60a2c9eed9038bd5fe307daac63f37facf1726508417ef3044f3bc1be0a337e -->
 
 ## What it is for and who it is for
 
@@ -1356,6 +1356,7 @@ Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 ### SALE-F39 Charge with what another app adds (the tip)
 <!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
 Status: not done — the Charge sheet does not paint other apps' steps yet, nor does the sale keep what was charged on top
+(hub#1497, hub#1500, hub#1502)
 Vertical: common
 Actor: employee, manager
 Screen: Charge, Sale document

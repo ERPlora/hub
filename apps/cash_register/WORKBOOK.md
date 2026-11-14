@@ -613,7 +613,7 @@ Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
 <!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
-Estado: no hecho — Caja todavía no distingue lo que apunta otra app
+Estado: no hecho — Caja todavía no distingue lo que apunta otra app (hub#1499)
 Vertical: común
 Actor: sistema, empleado, responsable
 Pantalla: Caja, Detalle de la sesión

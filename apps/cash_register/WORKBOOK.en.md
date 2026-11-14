@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f25dc21d31d20e0901a140fcee01e4cecc569bbcb5fd4e8dbcf6383b167368ec -->
+<!-- generated from WORKBOOK.md sha256:26a88b5d8410ab25d1125fc982ae440b05a097577f3a50cf1434bcb143402fae -->
 
 ## What it is for and who it is for
 
@@ -590,7 +590,7 @@ Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
 <!-- origen: nuevo (hub#562; SumUp, propinas en el informe X y el Z; Square, informe de turno) -->
-Status: not done — the Cash register does not tell yet what another app records
+Status: not done — the Cash register does not tell yet what another app records (hub#1499)
 Vertical: common
 Actor: system, employee, manager
 Screen: Cash register, Session detail

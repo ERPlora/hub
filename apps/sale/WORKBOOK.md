@@ -1404,6 +1404,7 @@ Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
 <!-- origen: nuevo (hub#562; SALE-G06 del registro de la migración) -->
 Estado: no hecho — la hoja Cobro todavía no pinta pasos de otras apps ni la venta guarda lo cobrado de más
+(hub#1497, hub#1500, hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
