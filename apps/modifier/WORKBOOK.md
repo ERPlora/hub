@@ -145,7 +145,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F07 | Cobrar el suplemento: precio y IVA | hecho |
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
-| MODIFIER-F10 | Recuperar los grupos de suplementos de un producto desde una copia aparte | hecho |
+| MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
 <!-- origen: old:modifiers/WORKFLOW.md#modifiers-f01 -->
@@ -349,29 +349,38 @@ Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta
 de ERPlora recupera después el producto desde una copia aparte, sus grupos vuelven con él (MODIFIER-F10).
 Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 
-### MODIFIER-F10 Recuperar los grupos de suplementos de un producto o de una categoría desde una copia aparte
-<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 gh:hub#1457 gh:hub#1456 -->
+### MODIFIER-F10 Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus grupos de suplementos) gh:hub#1343 gh:hub#1457 gh:hub#1456 gh:hub#1458 -->
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de
-suplementos de categorías, Grupos de suplementos de productos** marcado (lo está, como todo lo que se puede traer)
+suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos** marcado (lo está, como todo lo
+que se puede traer)
 Pasos:
-1. El personal recupera desde una copia aparte con **Grupos de suplementos de categorías, Grupos de suplementos de
-   productos** marcado. Suplementos va siempre después de Inventario, se pida en el orden que se pida: una categoría o
-   un producto eliminados que vuelven ya están vivos cuando se les enganchan sus grupos.
-2. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
+1. El personal recupera desde una copia aparte con **Grupos de suplementos, Grupos de suplementos de categorías, Grupos
+   de suplementos de productos** marcado. Suplementos va siempre después de Inventario, se pida en el orden que se pida:
+   una categoría o un producto eliminados que vuelven ya están vivos cuando se les enganchan sus grupos.
+2. Primero, cada grupo de la copia que el negocio ya no tiene (lo borró, y borrarlo se lleva sus opciones y sus
+   enganches, F03) se vuelve a crear como lo crea la pantalla de Suplementos (F02), con su nombre, su nombre en la
+   comanda, su mínimo y su máximo, si una opción se puede repetir y su orden, y con sus opciones como las añade la hoja
+   del grupo (F04), cada una con su nombre, su nombre en la comanda, su suplemento, su categoría fiscal propia, si sale
+   elegida por defecto y su orden. Vuelve como un grupo nuevo, con otro identificador, y en los pasos siguientes sus
+   enganches de la copia se le hacen a ese: el que la recuperación trajo con su nombre.
+3. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
    se vuelve a enganchar, como lo engancha la hoja del grupo (MODIFIER-F05): el producto vuelve a preguntar en el TPV
    sus salsas, su punto o sus extras. Un producto que el negocio ya no tenía en absoluto vuelve como uno nuevo, con
    otro identificador (INVENTORY-F01): sus grupos se enganchan a ese, el que la recuperación hizo con su SKU.
-3. Antes, igual, cada grupo que en la copia colgaba de una categoría viva en ella y que el negocio ya no tiene
+4. Antes, igual, cada grupo que en la copia colgaba de una categoría viva en ella y que el negocio ya no tiene
    enganchado a esa categoría: todos los productos de la categoría vuelven a preguntarlo. Una categoría eliminada
    vuelve siempre como una nueva, con otro identificador (INVENTORY-F07): sus grupos se enganchan a esa, la que la
    recuperación trajo con su nombre.
-4. Recuperaciones cuenta aparte cada cosa: «Grupos de suplementos de categorías: se crearon 2» y «Grupos de suplementos
-   de productos: se crearon 2».
+5. Recuperaciones cuenta aparte cada cosa: «Grupos de suplementos: se creó 1», «Grupos de suplementos de categorías:
+   se crearon 2» y «Grupos de suplementos de productos: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
-Sale: un enganche por cada uno que faltaba, con su aviso de enganche hecho (`modifier.link.attached`) hecho por la
-recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más. Las pantallas abiertas de Suplementos,
+Sale: un grupo por cada uno que faltaba, con su aviso de grupo creado (`modifier.group.created`) y el de cada una de
+sus opciones (`modifier.option.created`), y un enganche por cada uno que faltaba, con su aviso de enganche hecho
+(`modifier.link.attached`), todos hechos por la recuperación, así que no arranca ninguna automatización (FLOW-F21);
+nada más. Las pantallas abiertas de Suplementos,
 el TPV y el reparto de Cocina ven al momento el producto que vuelve, como vieron que se eliminaba; las de Suplementos y
 el TPV, también cada grupo que vuelve a colgar de una categoría o de un producto.
 Si falla: un enganche que el negocio aún tiene se queda como está, y no se repite uno cuyo grupo el negocio ya volvió a
@@ -379,8 +388,14 @@ enganchar a ese producto o a esa categoría: se queda el suyo, y pedirlo otra ve
 a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
 hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del enganche en la copia: un
 producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos, o el negocio ya hizo otro a mano
-con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró después («not_found: …»); un
-grupo borrado no se recupera desde la copia (hub#1458). El producto que hizo una recuperación se reconoce por su SKU la
+con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró y ya volvió a crear a mano
+con su nombre («not_found: …»). Ese grupo hecho a mano se queda como el negocio lo dejó, con sus opciones y sus
+enganches: no se crea otro con su nombre ni se le añade ni engancha nada. Un grupo que el negocio conserva, aunque lo
+renombrara, también se queda con las opciones que tenga; una opción que le quitó no vuelve todavía (hub#1505). Una
+opción que la hoja del grupo no acepta hoy (su categoría fiscal propia ya no está activa en Impuestos) no vuelve: el
+grupo vuelve sin ella, su cuenta lo dice («Grupos de suplementos: se creó 1, 1 con notas») y su ficha dice en «notas»
+qué opción y por qué, por el identificador del grupo en la copia. Pedirlo otra vez no crea ningún grupo dos veces: el
+que trajo la recuperación ya es del negocio. El producto que hizo una recuperación se reconoce por su SKU la
 hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a enganchar los grupos que el negocio
 le soltó después, como a todo lo que ya no tiene. Con las categorías es igual: una que sigue eliminada (no se recuperó
 Productos) o que el negocio ya volvió a crear a mano con su nombre, que se queda con los grupos que él le enganchó, no
@@ -467,8 +482,8 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 - **Inventario** (requisito): sus productos y categorías, a los que apunta cada enganche, y las
   categorías de cada producto, para saber qué grupos lleva en el TPV.
 - **Impuestos** (requisito): la categoría fiscal propia de una opción.
-- **De la plataforma**: la recuperación desde una copia aparte (BASE-F114), a la que Suplementos dice qué grupos de
-  productos devuelve (F10).
+- **De la plataforma**: la recuperación desde una copia aparte (BASE-F114), a la que Suplementos dice qué grupos, con
+  sus opciones, y qué enganches a categorías y productos devuelve (F10).
 
 ### Quién la usa
 
@@ -548,8 +563,18 @@ cajero del producto actual es un empleado.
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
   ningún papel tiene), sin ruta, idempotentes. A `inventory.product.restored` no reacciona: lo que el borrado soltó
   vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
-- **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara dos cosas, «Modifier
-  groups of categories» y después «Modifier groups of products», cada una contada aparte.
+- **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara tres cosas, «Modifier
+  groups», «Modifier groups of categories» y después «Modifier groups of products», cada una contada aparte.
+  `queries.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y
+  `queries.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
+  nombre es único, `modifier_group_name_unique`), cada opción con la clave de su categoría fiscal propia (Impuestos nunca
+  borra una). Los crea `modifier.group.recover` (permiso `modifier.system`, sin ruta ni herramienta del asistente):
+  `create_group` y después `create_option` por cada opción, en una sola transacción; la opción que su alta rechaza
+  (`InvalidPayload` o `Conflict`) se devuelve en `left_out` con su código y `OPTION_LEFT`, y el grupo vuelve sin ella.
+  Las dos lecturas de enganches llevan además los grupos de la copia por su nombre (`queries.group_names_in_copy`,
+  `copy_groups`), y `_not_hung` pone cada enganche en el grupo que hace del de la copia
+  (`queries.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
+  recuperación, `base.recovery.brought_back`, y que no es ninguno de la copia; uno hecho a mano no hace de ninguno).
   `queries.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
   las categorías vivas de la copia por su nombre (`apps.inventory.queries.category_names_in_copy`), y
   `queries.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
