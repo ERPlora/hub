@@ -165,7 +165,7 @@ class InventoryConfig(LiveAppConfig):
             ),
             Recoverable(
                 label=_("Products"),
-                reads_since="0001_initial",
+                reads_since="0005_product_image",
                 read=queries.products_in_copy,
                 missing=queries.products_not_in_business,
                 create="inventory.product.recover",

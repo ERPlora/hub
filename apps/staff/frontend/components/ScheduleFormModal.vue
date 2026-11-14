@@ -5,7 +5,8 @@
 // proposes Monday to Friday with the business's default working day (`staff.settings.get`, followed
 // live; until it arrives, its own defaults) and sends `staff.schedule.create` for the member; editing sends
 // `staff.schedule.update`, which replaces the whole week. The server judges: a day's problem goes under
-// that day's row (its `days.<i>` named back to the weekday), a week without working days on the week.
+// that day's row (its `days.<i>` named back to the weekday), a week without working days on the week, and
+// each goes as soon as the person changes that day or the week.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
@@ -17,9 +18,10 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 import { useT } from '../composables/useT';
 import {
   blankScheduleForm,
-  dayErrors,
+  dayKey,
   daysPayload,
   DEFAULT_WORKDAY,
+  refusalByDay,
   type ScheduleForm,
   scheduleFormFromRecord,
   type WeekRow,
@@ -53,8 +55,15 @@ const sentDays = shallowRef<DayIn[]>([]);
 const creation = useCommand('staff.schedule.create');
 const update = useCommand('staff.schedule.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
-const error = computed(() => (props.schedule ? update.error.value : creation.error.value));
-const errorsByDay = computed(() => dayErrors(error.value?.fields ?? {}, sentDays.value));
+const error = computed(() => refusalByDay(props.schedule ? update.error.value : creation.error.value));
+/** The key of a day's refusal. Every control of that day carries it as its `name`, so FormModal takes the day's
+ *  reason away as soon as the person changes any of them. */
+const dayKeyOf = (weekday: number): string | undefined => dayKey(weekday, sentDays.value);
+/** What the refusal still says of a day. */
+function dayReason(fieldErrors: Readonly<Record<string, string>>, weekday: number): string | undefined {
+  const key = dayKeyOf(weekday);
+  return key === undefined ? undefined : fieldErrors[key];
+}
 /** A week without working days is refused on top of the week: a change to the week takes it away. */
 const weekChanged = useGroupChange('weekGroup');
 const title = computed(() => (props.schedule ? t('staff.schedules.form.titleEdit', { name: props.schedule.name }) : t('staff.schedules.form.titleNew')));
@@ -199,6 +208,7 @@ const HOURS = [
           >
             <ion-checkbox
               :data-testid="`staff-schedule-form-day-${day.weekday}-working`"
+              :name="dayKeyOf(day.weekday)"
               class="staff-week__name"
               label-placement="end"
               justify="start"
@@ -217,6 +227,7 @@ const HOURS = [
               >
                 <ion-input
                   :data-testid="`staff-schedule-form-day-${day.weekday}-${hour.part}`"
+                  :name="dayKeyOf(day.weekday)"
                   class="staff-week__time"
                   type="time"
                   :value="day[hour.key]"
@@ -238,11 +249,11 @@ const HOURS = [
               :data-testid="`staff-schedule-form-day-${day.weekday}-off`"
             >{{ $t('staff.schedules.form.notWorking') }}</span>
             <p
-              v-if="errorsByDay[day.weekday]"
+              v-if="dayReason(fieldErrors, day.weekday)"
               class="staff-week__error"
               :data-testid="`staff-schedule-form-day-${day.weekday}-error`"
             >
-              {{ errorsByDay[day.weekday] }}
+              {{ dayReason(fieldErrors, day.weekday) }}
             </p>
           </div>
         </fieldset>

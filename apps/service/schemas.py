@@ -21,7 +21,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
-from base.recovery import RecoveredOut
+from base.recovery import ImageInCopyIn, RecoveredOut
 from base.schemas import CatalogImageOut, exactly_one, names
 
 T = TypeVar("T")
@@ -761,9 +761,9 @@ class AssignmentOfCopyIn(In):
     is_active: bool = Field(True, description="Whether the assignment was switched on.")
 
 
-class ServiceRecoverIn(ServiceIn):
-    """A service of a separate copy the business no longer has: what ``service.service.create`` takes and who performed
-    it there (the business makes its own ids)."""
+class ServiceRecoverIn(ServiceIn, ImageInCopyIn):
+    """A service of a separate copy the business no longer has: what ``service.service.create`` takes, the image it
+    showed there and who performed it there (the business makes its own ids)."""
 
     assignments: list[AssignmentOfCopyIn] = Field(
         [], max_length=MAX_PERFORMERS, description="Who performed it in the copy."
