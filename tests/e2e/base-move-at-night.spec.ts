@@ -1,7 +1,8 @@
 // flow: ninguno — operación de plataforma (hub#1508, part of hub#931): in the Hub admin, «Move to cluster…» asks when,
-// with the business's next night first; asked so, the business stays open, the hubs' list says where and when it goes on
-// the business's own clock, and «Cancel the move» takes it away — at a phone's, a tablet's and a desktop's width, and
-// the confirmation page in Spanish too. The e2e stack's worker makes databases only: nothing starts the move.
+// with the business's next night first, and says under the hub how long it can stay closed by the size of its database
+// (hub#1527); asked so, the business stays open, the hubs' list says where and when it goes on the business's own clock,
+// and «Cancel the move» takes it away — at a phone's, a tablet's and a desktop's width, and the confirmation page in
+// Spanish too. The e2e stack's worker makes databases only: nothing starts the move.
 import { expect, type Page, test } from '@playwright/test';
 
 import { adminPage, inControl, staffSession } from './admin-list-helpers';
@@ -9,6 +10,9 @@ import { capture, horizontalOverflow } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'MOVE-AT-NIGHT';
+/** What the confirmation page says under a hub: its size and how long it can stay closed (the e2e's are small). */
+const CLOSURE = /^\d[\d.,]*\s(bytes|KB|MB|GB): closed for up to \d+\sminutes?$/;
+const CLOSURE_ES = /^\d[\d.,]*\s(bytes|KB|MB|GB): cerrado hasta \d+\sminutos?$/;
 const PLATFORM = `http://hubs.localhost:${STACK.hubPort}`;
 const HUBS = `${PLATFORM}/admin/control/hub/`;
 const ROOT = 'e2e-move-at-night-root';
@@ -70,6 +74,8 @@ for (const { label, viewport } of SIZES) {
     await expect(page.getByRole('heading', { name: 'Move to cluster' })).toBeVisible();
     await expect(page.getByLabel("In its next night, between 03:00 and 05:00 of the business's time")).toBeChecked();
     await expect(page.getByLabel('Now', { exact: true })).not.toBeChecked();
+    await expect(page.locator('fieldset.aligned .help')).toHaveText(CLOSURE);
+    await expect(page.locator('#content')).toContainText('if its copy runs past 2 hours, it is stopped and undone');
     const target = page.locator('select[name="cluster"] option', { hasText: CLUSTER });
     await page.locator('select[name="cluster"]').selectOption((await target.getAttribute('value', { timeout: 10_000 })) ?? '');
     expect(await horizontalOverflow(page), 'the confirmation page asks to be scrolled sideways').toBe(0);
@@ -79,6 +85,7 @@ for (const { label, viewport } of SIZES) {
     await expect(page.locator('.messagelist .success')).toContainText(
       `1 hub will move to ${CLUSTER} in its next night, starting between 03:00 and 05:00 on its own clock`,
     );
+    await expect(page.locator('.messagelist .success')).toHaveText(/closed while it moves, for up to \d+\sminutes?\.$/);
     await expect(rowOfA(page).locator('td.field-on_cluster')).toContainText(
       new RegExp(`\\(to ${CLUSTER} at \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} \\S+\\)`),
     );
@@ -104,6 +111,7 @@ test(`${KEY}: its confirmation page speaks Spanish`, async ({ browser }) => {
 
   await expect(page.getByLabel('En su próxima madrugada, entre las 03:00 y las 05:00 de la hora del negocio')).toBeChecked();
   await expect(page.getByLabel('Ahora', { exact: true })).not.toBeChecked();
+  await expect(page.locator('fieldset.aligned .help')).toHaveText(CLOSURE_ES);
   expect(await horizontalOverflow(page), 'the Spanish page asks to be scrolled sideways').toBe(0);
   await capture(page, `${KEY}-375x667-es`, { fullPage: true });
   await page.context().close();
