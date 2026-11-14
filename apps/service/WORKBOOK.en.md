@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5d10b802c249d378396587b25f8aae5b8a914069eb2ffb30fdb83a6e1b7044cd -->
+<!-- generated from WORKBOOK.md sha256:eba0094c844134731a6d8dfe16b4be6b43f27c2dd4927bf0aad30d9a39b6705a -->
 
 ## What it is for and who it is for
 
@@ -373,8 +373,9 @@ Involved: SERVICE-F07, SERVICE-F02, BASE-F114 (from a separate copy, the deleted
 with the lost services inside it and with what the business kept where deleting it left it: its services without a
 category and its subcategories where it hung, which Recoveries counts apart ("Service links to categories",
 "Subcategory links to categories"). What the business moved since stays where it is, and Recoveries says so in the
-category's notes. If it is asked again, the category is the business's already and is not filled: what the
-business took out of it since stays out)
+category's notes; what it changed without moving it while the category came back also stays as the business left
+it, and Recoveries counts it "not created" with its reason. If it is asked again, the category is the business's
+already and is not filled: what the business took out of it since stays out)
 
 ### SERVICE-F09 Sell a service at the till
 Status: done (Sales does it, SALE-F38)
