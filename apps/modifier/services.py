@@ -13,7 +13,7 @@ from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import atomic, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.inventory import queries as inventory_queries
@@ -43,6 +43,8 @@ from apps.modifier.schemas import (
     GroupIn,
     GroupOut,
     GroupPatchIn,
+    GroupRecoveredOut,
+    GroupRecoverIn,
     GroupRefIn,
     LinkIn,
     LinkOut,
@@ -54,6 +56,7 @@ from apps.modifier.schemas import (
 )
 from apps.tax.models import TaxCategory
 from apps.tax.queries import resolve_category_text
+from base.recovery import LeftOut
 
 GROUP_NAME_TAKEN = _("There is already a group with that name.")
 OPTION_NAME_TAKEN = _("This group already has an option with that name.")
@@ -64,8 +67,12 @@ OWN_LINE_NOT_POSITIVE = _(
     "An option with its own tax category is billed on a line of its own: its supplement must be more than zero."
 )
 LINK_EXISTS = _("This group already applies there.")
+#: What a group made again from a separate copy came back without, said by the option's name and why its create
+#: refused it (``modifier.group.recover``).
+OPTION_LEFT = _('came back without its option "%(option)s": %(why)s')
 
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
+#: Run only by the platform (events.py, and the recovery from a separate copy): no role holds it, so no person and no
+#: API key reaches it.
 SYSTEM = "modifier.system"
 
 _CONSTRAINTS = {
@@ -210,6 +217,34 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     group.delete()
     record_event(ctx, events.GROUP_DELETED, payload)
     return {"id": group_id}
+
+
+# Not an assistant tool: its one door is the recovery from a separate copy (BASE-F114, MODIFIER-F10), for a group the
+# business no longer has at all (deleting one deletes it with its options).
+@operation(
+    "modifier.group.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=GroupRecoverIn,
+    output=GroupRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_group(ctx: OperationContext, data: GroupRecoverIn) -> dict:
+    """A group of a separate copy made again by ``modifier.group.create`` with its options there, each added by
+    ``modifier.option.create``, all in one; an option its create refuses today does not come back, and the output says
+    which and why (``left_out``)."""
+    made = create_group(ctx, GroupIn.model_validate(data.model_dump(include=set(GroupIn.model_fields))))
+    left_out = []
+    for option in data.options:
+        try:
+            # A refused option leaves no trace, a default it took from another included.
+            with atomic():
+                create_option(ctx, OptionIn.model_validate(option.model_dump() | {"group_id": made.id}))
+        except (InvalidPayload, Conflict) as refused:
+            message = OPTION_LEFT % {"option": option.name, "why": refused.message}
+            left_out.append(LeftOut(code=refused.code, message=message))
+    return load_group(made.id) | {"left_out": left_out}
 
 
 # Options (MODIFIER-F04)
