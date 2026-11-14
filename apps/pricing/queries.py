@@ -32,7 +32,7 @@ from live.operations import UnknownOperation, get, operation
 from apps.customer.models import CustomerGroup
 from apps.customer.queries import find_customer, find_group
 from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
-from apps.inventory.queries import find_category, find_product
+from apps.inventory.queries import find_category, find_product, products_standing_for
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.schemas import (
     CatalogRecordOut,
@@ -54,7 +54,6 @@ from apps.pricing.schemas import (
 from base import operations as platform
 from base.business import babel_locale, business_zone
 from base.ordering import list_order
-from base.recovery import brought_back
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -843,16 +842,16 @@ def prices_in_copy(conn) -> list[dict]:
 def prices_not_in_business(prices: list[dict]) -> list[dict]:
     """The prices of a separate copy (``prices_in_copy``) the business no longer has, in their order, each as
     ``pricing.price_item.add`` takes it with its ``id`` there: its list, its one article (a product or a service), its
-    price and its from quantity. Its product is the business's that stands for the copy's (``_products_here``). Not
-    lacking: one the business still holds, nor one whose place (its list, its article and its from quantity) the
-    business has taken again, at whatever price: that one stays as the business has it."""
+    price and its from quantity. Its product is the business's that stands for the copy's (Inventory's
+    ``products_standing_for``). Not lacking: one the business still holds, nor one whose place (its list, its article
+    and its from quantity) the business has taken again, at whatever price: that one stays as the business has it."""
     held = set(PriceItem.objects.filter(pk__in=[one["id"] for one in prices]).values_list("pk", flat=True))
     taken = set(
         PriceItem.objects.filter(price_list_id__in={one["price_list_id"] for one in prices}).values_list(
             "price_list_id", "product_id", "service_id", "min_quantity"
         )
     )
-    here = _products_here(prices)
+    here = products_standing_for({one["product_id"]: one["sku"] for one in prices if one["product_id"]})
     lacking = []
     for one in prices:
         product = here.get(one["product_id"], one["product_id"])
@@ -868,16 +867,3 @@ def prices_not_in_business(prices: list[dict]) -> list[dict]:
             }
         )
     return lacking
-
-
-def _products_here(prices: list[dict]) -> dict[UUID, UUID]:
-    """The business's product that stands for each of the copy's in ``prices`` it no longer holds live (``{id there:
-    id here}``): the live one with its SKU, the article's identity, that a recovery made (``brought_back``), as
-    Inventory makes again with another id a product the business no longer holds at all (INVENTORY-F01). One the
-    business made again by hand is its own, priced as it chose: none of the copy's prices goes to it. A product still
-    live here is itself, and is not in the result."""
-    skus = {one["product_id"]: one["sku"] for one in prices if one["product_id"]}
-    live = set(Product.objects.filter(pk__in=list(skus), is_deleted=False).values_list("pk", flat=True))
-    wanted = {sku: there for there, sku in skus.items() if there not in live}
-    made = Product.objects.filter(sku__in=list(wanted), is_deleted=False).values_list("sku", "pk", "created_by")
-    return {wanted[sku]: pk for sku, pk, created_by in made if brought_back(created_by)}
