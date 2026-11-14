@@ -7,7 +7,9 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { business, IN_YEN } from '../../../../base/frontend/__tests__/business';
 import { insideTheInstalledApp } from '../__tests__/system-browser';
 import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
@@ -259,20 +261,46 @@ describe('RecordsPage: the filters behind the table funnel', () => {
   });
 
   it('a total that is not an amount, or a day «until» before its «from», is said under it and does not filter', async () => {
-    const s = await setup();
+    const s = await setup({ business: business() });
     await s.show(PAGE);
     expect(s.prop('filterErrors')).toEqual({});
     await s.emit('update:filters', { total_amount_from: '12x', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
     await s.reopen();
     expect(s.prop('filterErrors')).toEqual({
-      total_amount_from: 'Write an amount in euros, such as 12,50.',
+      total_amount_from: 'This is not an amount. Type a figure, for example 12.50.',
       issue_date_to: 'The end date cannot be before the start date.',
     });
     expect(s.params(OP)).toEqual([{ issue_date_from: '2026-10-14', sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
-    const es = await setup({ locale: 'es' });
+    const es = await setup({ locale: 'es', business: business() });
     await es.show(PAGE);
-    await es.emit('update:filters', { issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
-    expect(es.prop('filterErrors')).toEqual({ issue_date_to: 'La fecha final no puede ser anterior a la inicial.' });
+    await es.emit('update:filters', { total_amount_from: '12x', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
+    expect(es.prop('filterErrors')).toEqual({
+      total_amount_from: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      issue_date_to: 'La fecha final no puede ser anterior a la inicial.',
+    });
+  });
+
+  itReadsAmountFiltersAsTheHub({
+    ends: ['total_amount_from', 'total_amount_to'],
+    params: ['total_amount_from', 'total_amount_to'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.show(PAGE);
+      return {
+        filter: (values) => s.emit('update:filters', values),
+        query: () => s.params(OP).at(-1),
+        says: () => s.prop('filterErrors'),
+      };
+    },
+  });
+
+  it('a total that is no amount of the business\'s money does not narrow the list: «12,5» in yen', async () => {
+    const s = await setup({ business: business(IN_YEN) });
+    await s.show(EMPTY);
+    await s.emit('update:filters', { total_amount_from: '12,5' });
+    await s.reopen();
+    await s.show(EMPTY);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No records yet. Every invoice you issue is sealed and listed here.');
   });
 
   it('a filter the server refuses (422) goes under its filter; the rows stay and no error replaces them', async () => {

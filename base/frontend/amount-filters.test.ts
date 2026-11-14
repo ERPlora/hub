@@ -5,7 +5,7 @@
 // was 1.000 € in one and asked in another. A reader of its own is a function like any other, so this guard does not
 // hunt for it: it makes every list with an amount filter (a table column or panel filter `{ type: 'range', amount:
 // true }`) run the table of texts of `__tests__/amount-filter.ts` in its own test, where a reader of its own fails.
-// The lists that do not yet are named here with the issue that takes them to it.
+// There are no exceptions: a list that does not run it fails here.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
 import ts from 'typescript';
@@ -13,12 +13,6 @@ import { describe, expect, it } from 'vitest';
 
 import { bare, findingsByApp, HUB, hubFrontends, linesWhere } from './__tests__/frontend-sources';
 import { NO_CLOCK } from '../../vitest.load';
-
-/** The lists with an amount filter whose test does not run the table yet, and the issue that takes each to it. */
-const NOT_YET: Record<string, string> = {
-  // The fiscal app: its changes are supervised by hand.
-  'apps/verifactu/frontend/pages/RecordsPage.vue': 'hub#1247',
-};
 
 const RUN_THE_TABLE =
   "read the amount filter with filterCents and amountFilterErrors of base/frontend/lib/money.ts and run the table in the list's test: " +
@@ -74,9 +68,8 @@ describe('guardrail: every amount filter of the Hub is read as the money field r
     const files = [...new Set(Object.values(lists).flat().map((where) => where.replace(/:\d+$/, '')))];
     // The guard sees the lists it is about (one in each app that filters an amount).
     expect(files.length).toBeGreaterThanOrEqual(8);
-    const missing = files.filter((file) => !(file in NOT_YET) && !runsTheTable(`${HUB}/${file}`));
-    const done = Object.keys(NOT_YET).filter((file) => runsTheTable(`${HUB}/${file}`) || !files.includes(file));
-    expect({ missing, done }, RUN_THE_TABLE).toEqual({ missing: [], done: [] });
+    const missing = files.filter((file) => !runsTheTable(`${HUB}/${file}`));
+    expect(missing, RUN_THE_TABLE).toEqual([]);
   }, NO_CLOCK);
 
   it('no app keeps a copy of what an amount filter says: the words are the platform’s (base.money.filter.*)', () => {
