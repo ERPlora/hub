@@ -1,0 +1,592 @@
+{
+  "apps/appointment/frontend/components/SeriesFormModal.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "apps/appointment/frontend/composables/useAgendaActions.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/appointment/frontend/composables/useLiveWindows.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/appointment/frontend/lib/outcome.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/appointment/frontend/lib/pickers.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/appointment/frontend/lib/states.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "apps/attendance/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/attendance/frontend/lib/time.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "apps/cart_checkout/frontend/__tests__/list-page-checks.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/cart_checkout/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/cash_register/frontend/components/CloseSessionForm.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "apps/cash_register/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/cash_register/frontend/lib/summary.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/combo/frontend/composables/useLiveList.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/combo/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/customer/frontend/__tests__/mount-customer.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/customer/frontend/lib/useCustomerImport.ts": {
+    "max-depth": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/customer/frontend/lib/useListState.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/flow/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/flow/frontend/lib/document.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/flow/frontend/lib/phrasing.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 4
+    }
+  },
+  "apps/flow/frontend/lib/templates.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/inventory/frontend/__tests__/mount-inventory.ts": {
+    "max-params": {
+      "count": 3
+    }
+  },
+  "apps/inventory/frontend/components/ProductFormModal.vue": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "apps/inventory/frontend/composables/useProductImport.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/inventory/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/inventory/frontend/lib/download.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/invoice/frontend/composables/useLiveWindows.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/invoice/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/invoice/frontend/lib/format.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/kitchen/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/modifier/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/modifier/frontend/lib/format.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/online_booking/frontend/composables/useLiveList.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/online_booking/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/payment/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/pricing/frontend/__tests__/table-checks.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/pricing/frontend/composables/useLiveList.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/pricing/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/pricing/frontend/lib/format.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/pricing/frontend/lib/rules.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/printing/frontend/components/PrinterModal.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "apps/printing/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/reservation/frontend/components/ReservationFormModal.vue": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "apps/reservation/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/__tests__/mount-sale.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/components/document/__tests__/fixtures.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/components/pos/__tests__/fixtures.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/components/sales/refund.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/composables/checkout/useCheckout.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/composables/checkout/useTender.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/composables/pos/useTill.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/composables/useLiveWindows.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/lib/checkout/blocks.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/lib/format.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/lib/taxLabel.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/schedule/frontend/composables/useLiveList.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/schedule/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/service/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/staff/frontend/components/MemberFormModal.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "apps/staff/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/staff/frontend/lib/memberForm.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    }
+  },
+  "apps/table/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/table/frontend/lib/floor.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/table/frontend/lib/format.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/task/frontend/__tests__/filters-funnel.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/task/frontend/__tests__/mount-task.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/task/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/task/frontend/lib/format.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/tax/frontend/composables/useLiveList.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/tax/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/tax/frontend/pages/RulesPage.vue": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/verifactu/frontend/composables/useLiveWindows.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/verifactu/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/website/frontend/components/HoursEditor.vue": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/website/frontend/lib/hours.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "apps/whatsapp_inbox/frontend/composables/useLiveList.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/whatsapp_inbox/frontend/composables/useMetaSignup.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/whatsapp_inbox/frontend/composables/useServerTable.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "base/frontend/__tests__/app-catalogues.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/__tests__/mount-in-shell.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 3
+    }
+  },
+  "base/frontend/__tests__/same-words-refusal.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/__tests__/save-waits-for-money.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/components/FilePreview.vue": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/components/SystemUsage.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "base/frontend/lib/access.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/lib/approval.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/lib/download.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "base/frontend/lib/files.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "base/frontend/lib/home.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 4
+    }
+  },
+  "base/frontend/lib/office.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "base/frontend/lib/plan-usage.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "frontend/form-modal-field-names.test.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "frontend/main.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "scripts/app-icons.mjs": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "tests/e2e/assistant-battery.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 1
+    }
+  },
+  "tests/e2e/assistant-probes.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "tests/e2e/assistant-provider.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/fix-ui-datatable-range-filter-labels.spec.ts": {
+    "max-depth": {
+      "count": 1
+    }
+  },
+  "tests/e2e/fix-ui-form-modal-fits-the-window.spec.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/icons.spec.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/inventory-helpers.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/invoice-assistant.spec.ts": {
+    "max-depth": {
+      "count": 1
+    }
+  },
+  "tests/e2e/prod-csp.spec.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/qa/assistant-battery.spec.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/sale-till-on-its-side.spec.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/service-helpers.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "tests/e2e/whatsapp-graph.ts": {
+    "complexity": {
+      "count": 1
+    }
+  }
+}

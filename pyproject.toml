@@ -42,7 +42,42 @@ dev = [
     "flask-cors>=6",
     # The CI runs the suite in shards (.github/scripts/pytest-shard.sh, hub#1185).
     "pytest-split>=0.11",
+    "ruff>=0.17.5",
 ]
+
+# ruff only checks how big and how branchy each function is (tests/test_guardrails_lint.py runs it): none of its default
+# rules, and it is not the project's formatter. Migrations are generated, and packages/ holds the live and ui submodules,
+# checked in their own repos.
+[tool.ruff]
+target-version = "py314"
+extend-exclude = ["migrations", "packages"]
+force-exclude = true
+
+# The code keeps its own layout: `ruff format` (an editor's format on save, say) finds nothing to format.
+[tool.ruff.format]
+exclude = ["*"]
+
+[tool.ruff.lint]
+select =["C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "RUF100"]
+# Rules of other linters that the code's older `# noqa` markers name: RUF100 keeps those markers instead of reporting
+# them as unused.
+external = ["A002", "B018", "BLE001", "E402", "E731", "F401", "F403", "F405", "F811", "N801", "N802", "N803"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-positional-args = 5
+max-branches = 12
+max-returns = 6
+max-statements = 50
+
+# pytest hands fixtures over as arguments, so a test's argument count says nothing about its size.
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["PLR0913", "PLR0917"]
+"**/test_*.py" = ["PLR0913", "PLR0917"]
+"**/conftest.py" = ["PLR0913", "PLR0917"]
 
 [tool.uv]
 package = false

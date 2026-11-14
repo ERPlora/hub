@@ -552,7 +552,7 @@ class TestMoveToCluster:
 
         html = self.choose(client, first, second, apply="yes", cluster=str(target.pk), when="now").content.decode()
 
-        assert "2 hubs will move to cluster-2: each closed for a few minutes" in html
+        assert "2 hubs will move to cluster-2, one after another: each closed until its own move ends" in html
         for hub in (first, second):
             hub.refresh_from_db()
             assert hub.moving_to_id == target.pk
@@ -1327,20 +1327,9 @@ def test_the_separate_copy_speaks_spanish(client, root):
 
 def test_the_restore_speaks_spanish():
     from django.utils import translation
-    from django.utils.translation import ngettext
 
     with translation.override("es"):
         assert str(control_admin.HubAdmin.restore_from_a_copy.short_description) == "Restaurar desde una copia…"
-        assert ngettext(
-            "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed for a few minutes while "
-            "it is restored. If it is refused, its page says why under «last error».",
-            "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s: each closed for a few "
-            "minutes while it is restored. If one is refused, its page says why under «last error».",
-            2,
-        ) % {"count": 2, "cluster": "r1", "moment": "2026-11-09 14:30 UTC"} == (
-            "2 hubs se restaurarán desde r1 tal como estaban el 2026-11-09 14:30 UTC: cada uno cerrado unos minutos "
-            "mientras se restaura. Si se rechaza alguno, su ficha dice por qué en «último error»."
-        )
 
 
 @pytest.mark.parametrize(
@@ -1379,7 +1368,7 @@ def test_a_confirmation_page_wraps_a_long_database_name_as_a_hubs_own_page_does(
 
 def test_the_move_speaks_spanish():
     from django.utils import translation
-    from django.utils.translation import gettext, ngettext
+    from django.utils.translation import gettext
 
     with translation.override("es"):
         assert str(control_admin.HubAdmin.move_to_cluster.short_description) == "Mover a otro clúster…"
@@ -1387,11 +1376,6 @@ def test_the_move_speaks_spanish():
         assert gettext("Only a ready hub with a database of its own moves.") == (
             "Solo se mueve un hub listo con base de datos propia."
         )
-        assert ngettext(
-            "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves.",
-            "%(count)d hubs will move to %(cluster)s: each closed for a few minutes while it moves.",
-            2,
-        ) % {"count": 2, "cluster": "c2"} == "2 hubs se moverán a c2: cada uno cerrado unos minutos mientras se mueve."
 
 
 def the_move_page_in_spanish(client) -> str:
@@ -1429,14 +1413,14 @@ def test_the_move_at_night_speaks_spanish(client, root):
 def test_its_confirmation_page_speaks_spanish(client, root):
     html = the_move_page_in_spanish(client)
 
-    assert "Cada hub elegido se cierra unos minutos" in html and 'value="Moverlos"' in html
+    assert "Cada hub elegido se cierra mientras su base de datos se copia" in html and 'value="Moverlos"' in html
 
 
 def test_its_confirmation_page_promises_no_refusal_by_size(client, root):
     # A database of any size moves (its copy goes through the dumps bucket): the page never says a large one is refused.
     html = the_move_page_in_spanish(client)
 
-    assert "Cada hub elegido se cierra unos minutos" in html
+    assert "Cada hub elegido se cierra mientras su base de datos se copia" in html
     assert "demasiado grande" not in html and "too large" not in html
 
 

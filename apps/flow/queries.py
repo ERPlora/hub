@@ -391,7 +391,7 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
     }
 
 
-def operation_problem(
+def operation_problem(  # noqa: PLR0911
     scope: Scope, name: str, kind: str | None = None, *, asking: bool = False
 ) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
@@ -487,7 +487,7 @@ def pinned_problem(scope: Scope, tools: list[str], pinned: dict[str, dict[str, A
     return None
 
 
-def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
+def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:  # noqa: C901, PLR0912
     """What a document names that this business does not have, by field (``trigger.event``,
     ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
     person in front, ``invalid_payload`` otherwise."""
@@ -1534,7 +1534,7 @@ def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str
         "would refuse, where a condition would stop it and what it is not allowed yet. Executes nothing."
     },
 )
-def try_flow(ctx: OperationContext, data: TestIn) -> dict:
+def try_flow(ctx: OperationContext, data: TestIn) -> dict:  # noqa: C901, PLR0912, PLR0915
     grants = resolve_flow(data.id, None).grants if data.id is not None else []
     try:
         tried = TestDocumentIn.model_validate_json(data.document)

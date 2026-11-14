@@ -155,7 +155,7 @@ def _normalize_mac(mac: str) -> str:
     return ":".join(part.zfill(2) for part in re.split(r"[:-]", mac.upper()))
 
 
-def _connection(kind: str, address: str, port: int | None, usage: str) -> tuple[str, int | None]:
+def _connection(kind: str, address: str, port: int | None, usage: str) -> tuple[str, int | None]:  # noqa: C901
     """The address and port a printer of ``kind`` keeps, normalized; a 422 at the field that is wrong.
 
     The rules are the app's (``discovery::parse_print_target``): a network printer is ``<ip>:<port>``, a

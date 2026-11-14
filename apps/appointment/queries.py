@@ -890,7 +890,7 @@ def staff_days(
     return out
 
 
-def load_agenda(
+def load_agenda(  # noqa: PLR0913
     ctx: OperationContext,
     member: Member | None,
     date_from: dt.date,

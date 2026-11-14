@@ -256,7 +256,7 @@ def _shape(field) -> str:
     return field.db_type(connection) + (f" CHECK ({check.removeprefix('\"%(column)s\" ')})" if check else "")
 
 
-def _why(app_label: str, operation, state) -> tuple[str, str] | None:
+def _why(app_label: str, operation, state) -> tuple[str, str] | None:  # noqa: C901, PLR0911, PLR0912
     """``(target, why)`` if the operation breaks the code of before, else ``None``."""
     if isinstance(operation, migrations.AddField):
         field = operation.field

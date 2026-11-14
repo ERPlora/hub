@@ -314,7 +314,7 @@ def drop_old_aside_copies(now: dt.datetime) -> int:
 # ── The steps ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str, origin) -> None:
+def _close_and_keep(hub, kept_name: str, roles: bootstrap.Names, ours, copy: str, origin) -> None:  # noqa: PLR0913, PLR0917
     """Steps 2 to 4 on the hub's cluster: its fiscal records compared with the copy's, its database closed to the app
     and compared again, then noted (with its schema record) and renamed to its kept copy. A restore cut after its
     rename (its kept copy noted and there) goes on from the kept copy; without the hub's database or such a copy, there
@@ -360,7 +360,7 @@ def _make_new(hub, kept_name: str, roles: bootstrap.Names, ours) -> None:
         move._close(conn, hub.db_name, roles)
 
 
-def _finish(hub, origin, kept_name: str, roles: bootstrap.Names, ours, now: dt.datetime) -> None:
+def _finish(hub, origin, kept_name: str, roles: bootstrap.Names, ours, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """Step 6: the new database opened to the app, then control ends the restore and dates the kept copy, in one
     transaction on its locked row, only if the restore is still this worker's (``MoveStopped`` otherwise)."""
     ours()

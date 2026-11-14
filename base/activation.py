@@ -314,7 +314,7 @@ def mandatory_on(current: Mapping[str, Activation], country: str, configs: Itera
     )
 
 
-def refusals(
+def refusals(  # noqa: PLR0913
     labels: Iterable[str],
     *,
     ctx: Any,

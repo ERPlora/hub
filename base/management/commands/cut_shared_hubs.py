@@ -53,7 +53,7 @@ class Command(BaseCommand):
             help="Cut without copying control to the dumps bucket first (local development and pre only).",
         )
 
-    def handle(self, *args, dry_run=False, copy_all=None, recreate=(), skip=(), no_dump=False, **options):
+    def handle(self, *args, dry_run=False, copy_all=None, recreate=(), skip=(), no_dump=False, **options):  # noqa: C901
         modes = self._modes(copy_all, recreate, skip)
         with use_control():
             on_control = services.hubs_on_control()
@@ -135,7 +135,7 @@ class Command(BaseCommand):
                 refusals.append(f"{slug}: {cut.NOTHING_TO_COPY}")
         return refusals
 
-    def _print_plan(self, on_control: list[Hub], modes: dict[str, str], no_dump: bool) -> None:
+    def _print_plan(self, on_control: list[Hub], modes: dict[str, str], no_dump: bool) -> None:  # noqa: C901, PLR0912
         named = {hub.slug: hub for hub in on_control}
         for slug in modes:
             if slug not in named:

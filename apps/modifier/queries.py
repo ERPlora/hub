@@ -602,7 +602,7 @@ def _refuse(code: str, message: str) -> Conflict:
         },
     },
 )
-def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
+def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:  # noqa: C901, PLR0912
     product = find_product(data.product_id, data.product)
     groups = groups_for_product(product)
     offered = {

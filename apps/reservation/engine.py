@@ -194,7 +194,7 @@ def _hhmm(moment: dt.datetime, zone: dt.tzinfo | None) -> str:
     return f"{wall(moment, zone):%H:%M}"
 
 
-def verdict(
+def verdict(  # noqa: C901, PLR0911, PLR0912, PLR0913
     request: Request,
     *,
     rules: Rules,

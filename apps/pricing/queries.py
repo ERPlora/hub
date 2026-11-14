@@ -98,7 +98,7 @@ def _page(rows: QuerySet, params, to_row) -> dict:
     return {"rows": [to_row(row) for row in page], "total": rows.count(), "limit": params.limit, "offset": params.offset}
 
 
-def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, ambiguous_code: str):
+def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, ambiguous_code: str):  # noqa: PLR0913
     """The one row whose code or name is ``said`` (any case), else the one whose name holds it."""
     text = said.strip()
     for lookup in (Q(code__iexact=text), Q(name__iexact=text), Q(name__icontains=text) | Q(code__icontains=text)):

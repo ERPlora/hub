@@ -1016,7 +1016,7 @@ def _end_turn(run: FlowRun) -> None:
     run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
 
 
-def _start(
+def _start(  # noqa: PLR0913
     ctx: OperationContext,
     flow: Flow,
     *,
@@ -1141,7 +1141,7 @@ def _operation_step(
     return output, "done", {}
 
 
-def _fail(
+def _fail(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, run: FlowRun, step: dict, failure: StepFailed, now: dt.datetime, left: dict | None = None
 ) -> bool:
     """Writes a step's failure; ``True`` when the run goes on (``on_error: continue``, FLOW-F25), leaving
@@ -1178,7 +1178,7 @@ def _skipped(ctx: OperationContext, run: FlowRun, step: dict, data: dict, now: d
     return True
 
 
-def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:
+def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:  # noqa: C901, PLR0911, PLR0912
     """Runs ``run``'s steps from ``step_index`` until it ends, waits or fails."""
     steps = run.definition.get("steps", [])
     with translation.override(flow.language):
@@ -1267,7 +1267,7 @@ def _call_allowed(run: FlowRun, flow: Flow, step: dict) -> StepFailed | None:
     return None
 
 
-def _mark_calling(
+def _mark_calling(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, outcome: str, now: dt.datetime, **details
 ) -> None:
     _log(run, step, outcome, now, **details)
@@ -1298,7 +1298,7 @@ def _go_on(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) ->
     _advance(ctx, run, flow, now)
 
 
-def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:
+def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:  # noqa: PLR0913, PLR0917
     run.resume_at = None
     if _fail(ctx, run, step, failure, now, left):
         _go_on(ctx, run, flow, now)
@@ -1494,7 +1494,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     }
 
 
-def _propose(
+def _propose(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     run: FlowRun,
     flow: Flow,
@@ -1635,7 +1635,7 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
     return {"count": 1}
 
 
-def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:
+def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:  # noqa: PLR0913, PLR0917
     """Stops the step when the assistant spent its turns (``max_rounds``) and says so; ``True`` when it did."""
     if rounds < int(step.get("max_rounds", 6)):
         return False
@@ -1645,7 +1645,7 @@ def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     return True
 
 
-def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:
+def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """A yes to the assistant's change: it is made now, by its own operation, as the automation (what it was granted
     now, not when it was proposed), and the step goes back to the assistant with what happened — the change's result
     (or its refusal) and, for the calls of that answer behind it, that they were not made —, so it can say it or ask
@@ -1699,7 +1699,7 @@ def _who(ctx: OperationContext) -> str:
     return _actor(ctx)
 
 
-def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:
+def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
@@ -1733,7 +1733,7 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict
     )
 
 
-def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:
+def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     run.outputs = {**run.outputs, step["id"]: left}
     run.step_index += 1
     _go_on(ctx, run, flow, now)

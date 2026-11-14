@@ -172,7 +172,7 @@ def _contains(actual: Any, expected: Any) -> bool:
     return False
 
 
-def _compare(found: bool, actual: Any, operator: str, expected: Any) -> bool:
+def _compare(found: bool, actual: Any, operator: str, expected: Any) -> bool:  # noqa: PLR0911
     if operator == "exists":
         present = found and actual is not None
         return present is bool(expected)

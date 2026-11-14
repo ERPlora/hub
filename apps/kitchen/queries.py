@@ -655,7 +655,7 @@ def _serve(view: TicketView, at: dt.datetime) -> None:
             item.ready_at = item.ready_at or at
 
 
-def effective(
+def effective(  # noqa: C901
     view: TicketView, settings: KitchenSettings
 ) -> tuple[TicketView, list[Change]]:
     """The ticket as it stands after what Sales did to its lines and checks, and what changed.
@@ -1034,7 +1034,7 @@ def _matches(view: TicketView, params: TicketListIn) -> bool:
     )
 
 
-def merged_page(
+def merged_page(  # noqa: PLR0913, PLR0917
     first: list[dict],
     rest,
     key: Callable[[dict], tuple],

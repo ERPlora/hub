@@ -233,7 +233,7 @@ def _event(ctx: OperationContext, name: str, appointment: Appointment, **extra) 
     )
 
 
-def _history(
+def _history(  # noqa: PLR0913
     ctx: OperationContext,
     appointment: Appointment,
     action: str,
@@ -323,7 +323,7 @@ def _refuse(code: str) -> None:
     )
 
 
-def _judge(
+def _judge(  # noqa: PLR0913
     ctx: OperationContext,
     member: Member | None,
     start: dt.datetime,
@@ -379,7 +379,7 @@ def _save_lines(appointment: Appointment, lines: list[dict]) -> None:
     )
 
 
-def _create(
+def _create(  # noqa: PLR0913
     ctx: OperationContext,
     *,
     customer,
@@ -605,7 +605,7 @@ def _acting_for_customer(ctx: OperationContext, appointment: Appointment, data) 
     return by_customer
 
 
-def _move(
+def _move(  # noqa: C901, PLR0913
     ctx: OperationContext,
     appointment: Appointment,
     *,
@@ -846,7 +846,7 @@ def update_appointment(ctx: OperationContext, data: UpdateIn) -> dict:
 # ── States (F03, F05, F07, F08, F09) ─────────────────────────────────────────────────────────
 
 
-def _transition(
+def _transition(  # noqa: PLR0913
     ctx: OperationContext,
     data: AppointmentRefIn,
     *,
@@ -1665,7 +1665,7 @@ def materialize(ctx: OperationContext, data: MaterializeIn) -> dict:
         "risk": "normal",
     },
 )
-def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:
+def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:  # noqa: C901, PLR0912, PLR0915
     series = find_series(ctx, data.id, lock=True)
     if not may_change(ctx, series.staff_id):
         raise PermissionDenied(str(CHANGE_OWN_ONLY))

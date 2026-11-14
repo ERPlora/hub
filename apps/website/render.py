@@ -72,7 +72,7 @@ def _day_names() -> dict[str, str]:
     return {day: str(label) for day, label in DAY_LABELS}
 
 
-def render_site(
+def render_site(  # noqa: PLR0913
     template: str,
     theme: dict,
     content: dict,
@@ -257,7 +257,7 @@ def _variables(colours: dict[str, str]) -> dict[str, str]:
     return variables
 
 
-def _body(
+def _body(  # noqa: PLR0913, PLR0917
     content: Content,
     catalog: dict | None,
     currency: str,

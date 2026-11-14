@@ -59,6 +59,7 @@ Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Ident
 import copy as copying
 import datetime as dt
 import logging
+import math
 import os
 import select
 import socket
@@ -93,6 +94,9 @@ RESTORE_TIMEOUT_SECONDS = dumps.DUMP_TIMEOUT_SECONDS
 #: The business is closed meanwhile, so a large one is moved at night (from 03:00 to 05:00 on its clock): both halves
 #: end before 07:00, and an hour takes tens of GiB even at 10 MB/s. The move can be cancelled at any time.
 COPY_TIMEOUT_SECONDS = 60 * 60
+#: The slowest a move's copy is counted to run, in bytes of the database a second: what the Hub admin tells the staff a
+#: business stays closed from (:func:`longest_closure`).
+COPY_SLOWEST_BYTES_PER_SECOND = 10 * 1000 * 1000
 #: The kind of a move's copy in the dumps bucket (``<hex>/<AAAAMMDDTHHMMSSZ>-move.dump``).
 MOVE_DUMP_KIND = "move"
 #: How many times the rename waits for a session that came back to the origin before it gives up.
@@ -114,6 +118,13 @@ class MoveFailed(RuntimeError):
 
 class MoveStopped(RuntimeError):
     """The worker is stopping: the move is left as it is for the next one to go on."""
+
+
+def longest_closure(size: int | None) -> dt.timedelta:
+    """How long a move can keep closed a business whose database is ``size`` bytes: both halves of its copy at the
+    slowest rate counted, each within its time limit, in whole minutes (one at least). A size not known: the limit."""
+    half = COPY_TIMEOUT_SECONDS if size is None else min(size / COPY_SLOWEST_BYTES_PER_SECOND, COPY_TIMEOUT_SECONDS)
+    return dt.timedelta(minutes=max(1, math.ceil(2 * half / 60)))
 
 
 def run_due(
@@ -227,7 +238,7 @@ def move_hub(
         _close_this_processs(hub)
 
 
-def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:
+def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:  # noqa: PLR0913, PLR0917
     """Undo the move of ``hub`` and note why; one that cannot be undone now stays moving, to be undone next time."""
     try:
         _undo(hub, copy_name, origin, target, roles, ours, now)
@@ -592,7 +603,7 @@ def _kept_entries(listing: str) -> list[str]:
     return [line for line in listing.splitlines() if not any(entry in f"{line} " for entry in SKIPPED_ENTRIES)]
 
 
-def _run(
+def _run(  # noqa: PLR0913
     command: list[str],
     password: str,
     errors_path: Path,
@@ -727,7 +738,7 @@ def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
         raise MoveStopped(str(taken)) from taken
 
 
-def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:
+def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """Back where it was, the origin first. Only the worker's note says the data is in the copy (an older copy is dropped
     before the note is written, so a copy there with the note is this move's): then what has the hub's name on the
     destination is dropped if it answers (noted as left over if not) and the copy renamed back. A database with the

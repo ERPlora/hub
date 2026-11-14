@@ -90,7 +90,7 @@ def _fill(colour: str) -> tuple[str, str]:
     return BLACK, WHITE
 
 
-def _mode(primary: str, accent: str, bg: str, surface: str, text: str, link: str, border: str) -> dict[str, str]:
+def _mode(primary: str, accent: str, bg: str, surface: str, text: str, link: str, border: str) -> dict[str, str]:  # noqa: PLR0913, PLR0917
     """One mode's colours with the roles derived from them."""
     subtle = mix(primary, bg, 0.12)
     toward_text = BLACK if _luminance(bg) > _luminance(text) else WHITE

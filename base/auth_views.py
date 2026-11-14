@@ -402,7 +402,7 @@ def _device_door(request: HttpRequest):
     return slug, device, body
 
 
-def _entered(request: HttpRequest, user, device, credential: str, slug: str, body: dict) -> HttpResponse:
+def _entered(request: HttpRequest, user, device, credential: str, slug: str, body: dict) -> HttpResponse:  # noqa: PLR0913, PLR0917
     services.open_session_on_device(request, user, device, credential)
     response = JsonResponse({"next": safe_next(body.get("next"))})
     return _with_language(response, queries.language_of(user, slug))
