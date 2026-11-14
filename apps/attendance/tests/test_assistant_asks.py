@@ -18,14 +18,9 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import (
-    TOP,
-    assert_its_asks_bring,
-    assert_reported_are_owner_probes,
-    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
-    offered_place,
-    place_of_no_ask,
-)
+from base.tests.test_assistant_asks import TOP, assert_its_asks_bring, assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 #: What only who sees, corrects or sets up the team's time clock holds (``attendance.view_all``,
 #: ``attendance.correct``, ``attendance.manage_settings``): an employee clocks and reads their own days, never these.
 NOT_THE_EMPLOYEES = {
@@ -54,9 +49,6 @@ REPORTED = [
     ),
 ]
 
-#: How far down the tools a turn offers (``MAX_TOOLS``, 40) a probe of the QA may bring its tool: half of them, so the
-#: tools of the apps that say their asks later may climb past it before the model loses it.
-WITH_ROOM = 20
 #: Every probe of layer 2 of Time clock, the owner's real phrases of the QA: the two above and the ones the model got
 #: right (or answered with an equivalent list).
 PROBES = json.loads(
@@ -114,8 +106,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_attendance_request_offers_its_existing_operation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -126,8 +117,7 @@ def test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_
     assert (probe["app"], probe["role"], probe["language"]) == ("attendance", "owner", "es")
     tools = catalog_of(Membership.Role.OWNER, probe["language"])
     name, phrase = probe["tool"], probe["phrase"]
-    place = place_of_no_ask(tools, name, phrase)
-    assert place is not None and place <= WITH_ROOM, place
+    assert_offered_with_room(tools, name, phrase)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)

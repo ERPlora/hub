@@ -14,14 +14,8 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import (
-    assert_its_asks_bring,
-    comparable,
-    offered_place,
-    probe_phrases,
-    probes_of_layer_2,
-    without_its_asks,
-)
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, offered_place, offered_to, probe_phrases
+from base.tests.test_assistant_asks import probes_of_layer_2, without_its_asks
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -120,8 +114,7 @@ def test_the_reported_requests_of_layer_2_are_its_probes_word_for_word():
 def test_the_reported_sales_request_offers_its_existing_operation(language, name, phrase):
     tools = assistant.catalog(ctx_for("hub_owner", language=language))
     assert name in tools
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered[:10]
+    assert name in offered_to(tools, phrase, language)[:10]
 
 
 @pytest.mark.django_db
@@ -129,10 +122,8 @@ def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the
     """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till: they come among
     the first eight, ahead of every tool of Customers and of Cash register its words name."""
     language, name, phrase = PAYING_AT_THE_TILL
-    offered = [
-        op.name
-        for op in assistant.relevant(assistant.catalog(ctx_for("hub_owner", language=language)), [phrase], language)
-    ]
+    offered = offered_to(assistant.catalog(ctx_for("hub_owner", language=language)), phrase, language)
+
     assert name in offered[:8], offered[:10]
     named = [tool for tool in offered if tool.split(".")[0] in ("customer", "cash_register")]
     assert named  # positive control: «clientes» and «caja» bring them
