@@ -106,10 +106,11 @@ def test_the_reactions_have_no_route():
     assert not bound & {"service.assignment.release_member", "service.grant.reassign"}
 
 
-def test_making_a_service_again_from_a_copy_has_no_route():
-    # Only the recovery from a separate copy makes a service again with who performed it there.
+def test_making_a_service_or_a_category_again_from_a_copy_has_no_route():
+    # Only the recovery from a separate copy makes a service again with who performed it there, and a category with
+    # what it had inside.
     bound = {operation for _, _, operation in ROUTES}
-    assert "service.service.recover" not in bound
+    assert not bound & {"service.service.recover", "service.category.recover"}
 
 
 def test_the_sessions_of_the_till_have_no_route_sales_runs_them():
