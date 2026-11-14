@@ -156,6 +156,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | COMBO-F12 | Marcar una elección como agotada | hecho |
 | COMBO-F13 | Cuando un producto deja el catálogo | hecho |
 | COMBO-F14 | La foto del menú | hecho |
+| COMBO-F15 | Recuperar las elecciones de un producto desde una copia aparte | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
 <!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
@@ -480,8 +481,9 @@ Pasos:
    «Desactivado en Inventario», y el TPV no las ofrece hasta que se reactive.
 2. Alguien elimina un producto en Inventario: en unos segundos sus elecciones salen solas de todos los
    menús que lo ofrecían, y el constructor abierto lo enseña al momento. Mientras tanto salen marcadas
-   «Ya no está en el catálogo» y el TPV no las ofrece ni se pueden cobrar (es definitivo: un producto
-   eliminado no vuelve).
+   «Ya no está en el catálogo» y el TPV no las ofrece ni se pueden cobrar (desde sus pantallas un producto
+   eliminado no vuelve; si el personal de ERPlora lo recupera desde una copia aparte, sus elecciones vuelven
+   con él, COMBO-F15).
 3. Mira el aviso de arriba del constructor: si un plato obligatorio se ha quedado sin bastantes
    elecciones, dice por qué el menú ya no sale en el TPV; añade otra elección a ese plato (COMBO-F06).
 Entra: el producto desactivado o eliminado en Inventario.
@@ -491,7 +493,7 @@ que se elimina en un negocio no toca los menús de otro.
 Si falla: si un plato obligatorio se queda sin bastantes elecciones que ofrecer, el menú deja de salir
 en el TPV y el aviso del constructor dice por qué. Si quitar las elecciones falla, Menús lo reintenta
 solo; mientras, siguen marcadas y nadie las vende.
-Implicados: INVENTORY-F04, COMBO-F06
+Implicados: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 La foto del menú
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30, encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next: «si el menú del día lleva foto en el TPV, se decide con market-decision»). Mercado, 2026-10-30: el menú se vende en el TPV como un artículo más, con su foto: Odoo POS (un combo es un producto, con su imagen; https://www.odoo.com/documentation/19.0/applications/sales/point_of_sale/products.html, https://www.odoo.com/documentation/17.0/applications/sales/point_of_sale/combos.html), Lightspeed Restaurant (el combo tiene su campo «Image»; https://resto-support.lightspeedhq.com/hc/en-us/articles/6455698479899-Creating-and-managing-combos), Toast (el combo es un artículo del menú, que lleva imagen; https://support.toasttab.com/en/article/Adding-Images-to-Menu-Items-in-the-Menu, https://intercom.help/toast-central/en/articles/14726324-build-a-customizable-meal-combo), Shopify POS (el lote es un producto; https://changelog.shopify.com/posts/shopify-bundles-support-on-pos), Loyverse (artículo compuesto con su foto o color y forma; https://help.loyverse.com/help/how-add-items-loyverse-back-office), Square (artículos con foto en la rejilla; https://community.squareup.com/t5/Troubleshooting/Item-images-on-Square-Register-POS/m-p/683217), SumUp (catálogo con fotos y lotes de productos; https://www.sumup.com/en-ie/pos/faq/, https://www.sumup.com/en-gb/business-guide/bundle-products-create-custom-offers-with-sumup-pos/) y Clover (imagen del artículo; https://bypassmobile.zendesk.com/hc/en-us/articles/360043275151). La librería del producto viejo ya tenía menu_dia, menu_infantil, menu_hamburguesa y menu_kebab. Gana: el menú lleva foto, de la librería o propia, como el artículo (INVENTORY-F30, F31). -->
@@ -518,6 +520,37 @@ el motivo es «Esa imagen ya no está en la librería. Elige otra.», «No queda
 plan incluye <espacio>.» o «No se pudo guardar la foto. Inténtalo de nuevo.». Un menú sin foto, o cuya
 foto no carga, enseña sus iniciales.
 Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
+
+### COMBO-F15 Recuperar las elecciones de un producto desde una copia aparte
+<!-- origen: nuevo (hub#1343: un producto recuperado desde la copia aparte volvía sin sus elecciones en los menús) gh:hub#1343 -->
+Estado: hecho
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
+Pantalla: ninguna de Menús: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Elecciones de menú de
+productos** marcado (lo está, como todo lo que se puede traer)
+Pasos:
+1. El personal recupera desde una copia aparte con **Elecciones de menú de productos** marcado. Menús va siempre después
+   de Inventario, se pida en el orden que se pida: un producto eliminado que vuelve ya está vivo cuando se le devuelven
+   sus elecciones.
+2. Cada elección que en la copia ofrecía un producto vivo en ella y que el negocio ya no tiene se vuelve a añadir a su
+   plato, como la añade el constructor del menú (COMBO-F06): con su suplemento y, si en la copia estaba agotada, agotada
+   (COMBO-F12). Entra al final del plato, en el orden que tenía en la copia.
+3. Recuperaciones lo cuenta aparte: «Elecciones de menú de productos: se crearon 2».
+Entra: la copia aparte y lo que el negocio tiene hoy.
+Sale: una elección por cada una que faltaba, con su aviso de elección nueva (`combo.option.created`) hecho por la
+recuperación, así que no arranca ninguna automatización (FLOW-F21); nada más. El constructor del menú y el catálogo de
+menús del TPV abiertos ven al momento el producto que vuelve, como vieron que se eliminaba, y el TPV vuelve a ofrecer
+el plato en su menú.
+Si falla: una elección que el negocio aún tiene se queda como está, aunque después le cambiara el producto, y no se
+repite una cuyo producto el negocio ya volvió a ofrecer en ese plato: se queda la suya, con su suplemento, y pedirlo otra
+vez no añade nada dos veces. Una elección que el negocio quitó a mano después de la copia también vuelve, como todo lo
+que el negocio ya no tiene (BASE-F114). Lo que el constructor no acepta hoy no vuelve y Recuperaciones dice por qué, por
+el identificador de la elección en la copia: un producto que sigue eliminado (no se recuperó Productos, o el negocio ya
+hizo otro con su SKU) («invalid_field: …»), desactivado o que ya no se vende por unidades (`combo.product_inactive`,
+`combo.product_not_by_unit`), un plato lleno (`combo.too_many_options`), o un menú o un plato que el negocio retiró
+después («not_found: …»); un menú o un plato retirado no se recupera desde la copia (hub#1474). Un producto que el negocio
+ya no tenía en absoluto vuelve como uno nuevo, con otro identificador (INVENTORY-F01), y sus elecciones de la copia no
+vuelven con él (hub#1473).
+Implicados: BASE-F114, INVENTORY-F34, COMBO-F06, COMBO-F12, COMBO-F13
 
 ## Servicios: lo que entra y lo que sale
 
@@ -576,7 +609,7 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Cambia un plato (solo lo enviado) | gestionar | F05 | `combo.group.update` |
 | Retira un plato con sus elecciones | gestionar | F05 | `combo.group.delete` |
 | Ordena los platos de un menú, todos a la vez | gestionar | F05 | `combo.group.reorder` |
-| Añade una elección (al final) | gestionar | F06 | `combo.option.create` |
+| Añade una elección (al final) | gestionar | F06, F15 | `combo.option.create` |
 | Añade varias elecciones de golpe | gestionar | F06 | `combo.option.bulk_create` |
 | Cambia una elección: producto, suplemento o disponible (solo lo enviado) | gestionar | F06, F12 | `combo.option.update` |
 | Quita una elección | gestionar | F06 | `combo.option.delete` |
@@ -594,7 +627,7 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 | Menú retirado | Retirar | `id`, `name` | `combo.combo.deleted` |
 | Plato nuevo, cambiado o retirado | Crear, guardar con cambios o retirar un plato | `id`, `combo_id` | `combo.group.created`, `.updated`, `.deleted` |
 | Platos reordenados | Cambiar el orden | `combo_id` | `combo.group.reordered` |
-| Elección nueva, cambiada o quitada | Añadir (una o varias), guardar con cambios, agotar o quitar; quitar por producto eliminado lleva `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
+| Elección nueva, cambiada o quitada | Añadir (una o varias, o al recuperarla desde una copia aparte), guardar con cambios, agotar o quitar; quitar por producto eliminado lleva `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
 | Elecciones reordenadas | Cambiar el orden | `group_id`, `combo_id` | `combo.option.reordered` |
 
 ### A qué reacciona
@@ -603,9 +636,10 @@ o se busca una elección: la acción no lo usa y la tarjeta no lo enseña (hub#1
 |---|---|---|---|
 | Inventario: producto eliminado | Quita sus elecciones de todos los menús, en unos segundos (el reparto de avisos del worker; repetirlo no cambia nada) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
 
-Además, los cambios de producto de Inventario (`inventory.product.updated`, `.deleted`) vuelven a
-leer en vivo el constructor y el catálogo del TPV: el nombre, el precio, si está activo y si está
-agotado son de Inventario.
+Además, los cambios de producto de Inventario (`inventory.product.updated`, `.deleted`, y `.restored`
+cuando el personal de ERPlora lo recupera desde una copia aparte) vuelven a leer en vivo el constructor y
+el catálogo del TPV: el nombre, el precio, si está activo y si está agotado son de Inventario. A un
+producto recuperado no reacciona: sus elecciones vuelven desde la copia (F15).
 
 ### Lo que necesita de otras apps
 
@@ -614,6 +648,7 @@ agotado son de Inventario.
 | Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
 | Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
 | Plataforma | La librería de imágenes: buscarla y nombrar por su título la imagen que se pone a un menú | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
+| Plataforma | La recuperación desde una copia aparte (BASE-F114), a la que Menús dice qué elecciones devuelve | F15 | `recoverable_from_copy` de `apps.py` |
 
 ### Contrato con Ventas
 
@@ -684,6 +719,13 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `tests/test_relay.py`) y
   `Combo.tax_category` FK a `tax.TaxCategory` (`PROTECT`; Impuestos nunca borra una categoría). La
   migración depende de `inventory 0001` y `tax 0005`.
+- **Desde una copia aparte** (BASE-F114, F15): `recoverable_from_copy` de `apps.py` declara una sola cosa, «Menu choices
+  of products». `queries.options_in_copy` lee con su propio SQL las `ChoiceOption` de la copia de un producto no borrado
+  allí, plato a plato en su orden, y `queries.options_not_in_business` deja las que el negocio no tiene ni por id (una
+  elección puede cambiar de producto, nunca de plato) ni por sitio (plato y producto, el índice único
+  `combo_option_product_unique`); la plataforma las crea con `combo.option.create` como la recuperación
+  (`copy_recovery:<id>`), y lo que `create` rechaza sale «sin crear» con su motivo. A `inventory.product.restored` no
+  reacciona: `live.py` solo repinta con él. Pruebas: `tests/test_recovery.py`.
 - Modelos: `Combo` (precio en céntimos ≥ 0; `supply_kind` `service` | `goods`; restricción: `service`
   ⇒ categoría fiscal), `ChoiceGroup` (`min_choices`, `max_choices` con 0 = sin límite y restricción
   `max = 0 o max ≥ min`, ambos ≤ 50; nombre único por menú, sin distinguir mayúsculas) y `ChoiceOption`
