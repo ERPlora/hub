@@ -394,7 +394,9 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('header-file-name')).toBeNull();
   });
 
-  it('a refusal of the template’s file on saving is said under it', async () => {
+  // A refusal of the file goes as soon as another file is kept, before sending again: no field of the form is typed in,
+  // the window takes it away itself (hub#1448).
+  it('a refusal of the template’s file on saving is said under it, and goes once another file is kept', async () => {
     const s = await setup();
     await s.choose('header-format', 'IMAGE');
     await s.type('name', 'promo_otono');
@@ -402,23 +404,6 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     s.answer(201, SAMPLE);
     await pick(s, photo());
     const message = "Choose the header's file: Meta reviews the template with it.";
-    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { header_sample: message } } });
-    await click(s.submit());
-    await flush();
-    await settle();
-    expect(s.field('header-file-error').textContent).toContain(message);
-  });
-
-  // The window takes the file's refusal away itself once another file is kept; no field of the form is typed in
-  // (hub#1448).
-  it('a refusal of the template’s file goes once another file is kept, before sending again', async () => {
-    const s = await setup();
-    await s.choose('header-format', 'IMAGE');
-    await s.type('name', 'promo_otono');
-    await s.type('body', 'Hola');
-    s.answer(201, SAMPLE);
-    await pick(s, photo());
-    const message = 'Meta did not take this photo: choose another.';
     s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { header_sample: message } } });
     await click(s.submit());
     await flush();

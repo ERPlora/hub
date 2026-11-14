@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cc00f2949d9ad8a74351027cb1668a34ed941274c1de05c1d37f16da00884882 -->
+<!-- generated from WORKBOOK.md sha256:8bfcee37a61409fb6a57863d03af71e9cb76dfdd01f4de2a00d0822fa0bc7ac6 -->
 
 ## What it is for and who it is for
 
@@ -229,7 +229,8 @@ appointment, one of a batch and one of a series.
 If it fails: the reason shows inside the panel, without losing what was typed: outside the business's
 opening hours, the professional does not work at that time, blocked slot, the professional already has an
 appointment (`appointment.slot_taken`), too far ahead, the customer, the service or the professional do
-not exist or cannot be booked. From the front desk neither the minimum notice nor a time already past
+not exist or cannot be booked. The customer's one, shown under her search, goes away as soon as another
+customer is chosen, without saving again (hub#1448). From the front desk neither the minimum notice nor a time already past
 refuses (the past time only warns before saving); an automation does not have those exceptions. An employee
 only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.

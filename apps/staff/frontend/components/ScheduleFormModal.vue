@@ -55,6 +55,8 @@ const update = useCommand('staff.schedule.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
 const error = computed(() => (props.schedule ? update.error.value : creation.error.value));
 const errorsByDay = computed(() => dayErrors(error.value?.fields ?? {}, sentDays.value));
+/** A week without working days is refused on top of the week: a change to the week takes it away. */
+const weekChanged = useGroupChange('weekGroup');
 const title = computed(() => (props.schedule ? t('staff.schedules.form.titleEdit', { name: props.schedule.name }) : t('staff.schedules.form.titleNew')));
 
 watch(
@@ -73,9 +75,6 @@ watch(
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-
-/** A week without working days is refused on top of the week: a change to the week takes it away. */
-const weekChanged = useGroupChange('weekGroup');
 
 function setDay(weekday: number, change: Partial<WeekRow>): void {
   form.value = { ...form.value, week: form.value.week.map((day) => (day.weekday === weekday ? { ...day, ...change } : day)) };

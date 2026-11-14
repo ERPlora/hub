@@ -9,6 +9,7 @@ import { type Browser, expect, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
 import { signedIn } from './flow-helpers';
+import { shoot } from './inventory-helpers';
 import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -55,6 +56,36 @@ test('Roles: create, a duplicate refused in the form, retire from Edit (still li
     await page.locator('[data-testid=staff-role-form-submit]').click();
     await expect(row.locator('[data-testid=staff-roles-retired]')).toBeVisible();
     await page.screenshot({ path: shot('staff-roles-desktop') });
+  } finally {
+    await context.close();
+  }
+});
+
+test('Schedules: a week without working days is refused on top of it, and the line goes as soon as a day is ticked', async ({ browser }) => {
+  // flow: STAFF-F13 (hub#1448)
+  const stamp = Date.now().toString(36);
+  const noDays = 'A schedule needs at least one working day with hours.';
+  const { context, page } = await ownerPage(browser, '/staff/schedules');
+  try {
+    const created = await api<{ id: string; full_name: string }>(context, A, 'POST', '/staff/members', { first_name: `${TAG} Iris`, last_name: `Week${stamp}` });
+    expect(created.status).toBe(201);
+    const view = shown(page);
+    const member = view.locator('[data-testid=staff-schedules-member] input');
+    await member.click();
+    await member.fill(`Week${stamp}`);
+    await page.locator('[data-testid^=staff-schedules-member-option-]', { hasText: created.data.full_name }).first().click();
+    await view.locator('[data-testid=staff-schedules-add]').click();
+    for (const weekday of [0, 1, 2, 3, 4]) await page.locator(`[data-testid=staff-schedule-form-day-${weekday}-working]`).click();
+    await page.locator('[data-testid=staff-schedule-form-submit]').click();
+    const refused = page.locator('[data-testid=staff-schedule-form-week-error]');
+    await expect(refused).toContainText(noDays);
+    await shoot(page, 'APP-STAFF-STAFF-F13-week-refused', { width: 1280, height: 860 });
+    await page.locator('[data-testid=staff-schedule-form-day-2-working]').click();
+    await expect(refused).toBeHidden();
+    await shoot(page, 'APP-STAFF-STAFF-F13-week-ticked', { width: 1280, height: 860 });
+    await page.locator('[data-testid=staff-schedule-form-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-schedule-form]')).toBeHidden();
+    await expect(view.locator('[data-testid=staff-schedules-row]').first()).toContainText('Wed 09:00–18:00 (13:00–14:00)');
   } finally {
     await context.close();
   }
