@@ -474,6 +474,18 @@ msgstr "volvió sin el profesional %(member)s: dado de baja en Personal"
 msgid "came back without the professional %(member)s: no longer in Staff"
 msgstr "volvió sin el profesional %(member)s: ya no está en Personal"
 
+#, python-format
+msgid "came back without the service %(service)s: moved to another category since"
+msgstr "volvió sin el servicio %(service)s: se movió a otra categoría después"
+
+#, python-format
+msgid "came back without the subcategory %(category)s: moved elsewhere since"
+msgstr "volvió sin la subcategoría %(category)s: se movió a otro sitio después"
+
+#, python-format
+msgid "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
+msgstr "volvió sin la subcategoría %(category)s: colgaría de una de sus propias subcategorías"
+
 msgid "This voucher was voided: it can no longer be used."
 msgstr "Este bono está anulado: ya no se puede usar."
 
