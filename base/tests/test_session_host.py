@@ -15,10 +15,9 @@ from django.test import RequestFactory
 
 from base.middleware import PLATFORM_SESSION_HOST, SESSION_HOST_KEY
 from base.models import Membership
-from base.tenancy.tests import hubs
-from base.tests.test_auth_views import A, B
+from base.tests.test_auth_views import A, B, ON_HUB_A
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 HOST_A = f"{A}.localhost"
 HOST_B = f"{B}.localhost"

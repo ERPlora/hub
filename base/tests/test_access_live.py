@@ -7,9 +7,6 @@ reloading and somebody removed leaves the grid.
 Each business is on a database of its own (``hub_a``, ``hub_b``) and its operations run inside its context.
 """
 
-import json
-
-import psycopg
 import pytest
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
@@ -17,17 +14,18 @@ from live.context import OperationContext, Scope, system_context
 from live.live_registry import live_registry
 from live.operations import get
 from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
 from base import access, events
 from base.models import Credential, Membership, TrustedDevice
 from base.schemas import AccessDoorIn, AccessSettingsUpdateIn
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tests.test_auth_views import ON_HUB_A
 from base.tests.test_auth_views import A as SLUG_A
 from base.tests.test_auth_views import B as SLUG_B
+from base.tests.test_queries_home import listen, received  # noqa: F401 (listen: a fixture)
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 A, B = Scope("host", SLUG_A), Scope("host", SLUG_B)
 
@@ -64,29 +62,6 @@ def test_the_grid_of_switch_user_is_the_door_s_for_a_member_of_the_hub(make_user
     assert [person.name for person in seen.people] == ["Ana"]
     assert elsewhere.people == []
     assert faces.permission == "base.view_home"
-
-
-@pytest.fixture
-def listen(django_db_setup):
-    from django.db import connections
-
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"])
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def received(session, timeout=1.0, stop_after=None):
-    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)

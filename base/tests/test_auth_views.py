@@ -36,7 +36,9 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_middleware import through_the_jump
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+#: How a test of the way in runs: as production does, the business ``hub_a`` on a database of its own.
+ON_HUB_A = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 #: The slugs of the root conftest's ``hub_a`` and ``hub_b``.
 A = "tenant-a"

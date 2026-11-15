@@ -21,9 +21,10 @@ from base import access
 from base.models import AccessSettings, Credential, Membership, TrustedDevice
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_auth_views import A, HOST
+from base.tests.test_access_devices import employee, owner  # noqa: F401 (fixtures)
+from base.tests.test_auth_views import A, HOST, ON_HUB_A
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 
 def read(client):
@@ -34,20 +35,6 @@ def read(client):
 
 def change(client, **body):
     return client.post("/api/access/settings/update", json.dumps(body), content_type="application/json", HTTP_HOST=HOST)
-
-
-@pytest.fixture
-def owner(client, make_user):
-    user = make_user("saas:1", host=A, role=Membership.Role.OWNER, first_name="Olga")
-    client.force_login(user)
-    return user
-
-
-@pytest.fixture
-def employee(client, make_user):
-    user = make_user("saas:2", host=A, role=Membership.Role.EMPLOYEE)
-    client.force_login(user)
-    return user
 
 
 def test_without_a_row_the_factory_values(client, owner):
