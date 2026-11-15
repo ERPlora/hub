@@ -483,7 +483,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   exige que cada frase traiga su herramienta entre las diez primeras, por rol. Sin ellos, vaciar un
   carrito (F04) y añadir una línea (F02) quedaban fuera de las 40 herramientas que se ofrecen en un turno,
   y cambiar la cantidad de una línea (F03) salía por detrás de `inventory.product.update`, que fue lo que
-  el modelo cambió. `base.assistant.SYNONYMS` suma dos grupos: «cesta» y «carrito» son el carrito
+  el modelo cambió. Sus palabras propias (`assistant_synonyms`, en `apps.py`) suman dos grupos: «cesta» y «carrito» son el carrito
   (`cart_checkout.cart`), y «unidades» o «cantidad» la cantidad que toma una línea (`quantity`; «cantidad»
   nunca es una unidad de medida de Inventario). «Línea» no lleva sinónimo hacia las líneas del carrito
   (`item`): es la de las cuentas del TPV (`sale.order.*_line`) y les robaría el puesto. Los asks en inglés

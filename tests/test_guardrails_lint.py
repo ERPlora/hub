@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from collections import Counter
 
 import pytest
@@ -27,12 +28,16 @@ ESLINT_LIMITS = ("complexity", "max-depth", "max-params", "max-lines-per-functio
 SUPPRESSIONS = "eslint-suppressions.json"
 PYTHON = ("*.py", ":(exclude)*/migrations/*")
 SCRIPTS = ("*.ts", "*.tsx", "*.vue", "*.js", "*.mjs", "*.cjs")
-# A noqa on the line that opens a function, where ruff reports its limits, or alone on its line, as a file-wide
-# `# ruff: noqa` is. ruff reads `noqa` in any case.
+# A noqa on the line that opens a function, where ruff reports its limits, or alone on its line. A file-wide one, with
+# the ruff or flake8 prefix, also counts after other text of a comment alone on its line. ruff reads noqa in any case.
+FILE_WIDE = r"([Rr][Uu][Ff][Ff]|[Ff][Ll][Aa][Kk][Ee]8)[[:space:]]*:[[:space:]]*"
 NOQA_MARKER = (
-    r"^[[:space:]]*((async[[:space:]]+)?def[[:space:]].*)?#[[:space:]]*([Rr][Uu][Ff][Ff][[:space:]]*:[[:space:]]*)?"
+    rf"^[[:space:]]*(((async[[:space:]]+)?def[[:space:]].*)?#[[:space:]]*({FILE_WIDE})?|#.*#[[:space:]]*{FILE_WIDE})"
     r"[Nn][Oo][Qq][Aa][^#]*"
 )
+# A range suppression, `# ruff: disable[<codes>]` alone on its line, which silences its codes down to the matching
+# `# ruff: enable[…]`.
+RANGE_MARKER = r"^[[:space:]]*#[[:space:]]*[Rr][Uu][Ff][Ff][[:space:]]*:[[:space:]]*[Dd][Ii][Ss][Aa][Bb][Ll][Ee][[:space:]]*\[[^]]*\]"
 # An ESLint directive: a comment that opens with `eslint`, `eslint-disable…` or `eslint-enable`.
 ESLINT_COMMENT = r"(/\*|//|<!--)[[:space:]]*eslint(-disable(-next-line|-line)?|-enable)?[[:space:]][^*]*"
 ESLINT_DIRECTIVE = re.compile(r"eslint(-disable(?:-next-line|-line)?|-enable)?\s(.*)")
@@ -85,13 +90,20 @@ def limit_codes(marker: str) -> list[str]:
 
 
 def noqa_bypasses(markers: list[str]) -> list[str]:
-    """A noqa without codes, which silences every rule, and a file-wide one that names no code or a limit."""
+    """A noqa without codes, which silences every rule; a `# ruff: noqa` that names no code or a limit; and any
+    `# flake8: noqa`, which ruff takes as a file-wide exemption."""
     found = []
     for marker in markers:
+        flake8 = re.search(r"flake8\s*:\s*noqa", marker, re.IGNORECASE) is not None
         file_wide = re.search(r"ruff\s*:\s*noqa", marker, re.IGNORECASE) is not None
-        if not after_noqa(marker).startswith(":") or (file_wide and limit_codes(marker)):
+        if flake8 or not after_noqa(marker).startswith(":") or (file_wide and limit_codes(marker)):
             found.append(marker)
     return found
+
+
+def range_bypasses(markers: list[str]) -> list[str]:
+    """Range suppressions that name one of the limits."""
+    return [marker for marker in markers if LIMIT_RULES & set(re.findall(r"[A-Z]+[0-9]+", marker))]
 
 
 def eslint_bypasses(comments: list[str]) -> list[str]:
@@ -188,9 +200,22 @@ def test_the_codes_of_a_noqa_marker_are_read_after_it():
 
 
 def test_a_limit_switched_off_without_being_counted_is_found():
-    markers = ["def a():  # noqa", "def b():  # noqa - reason", "# ruff: noqa", "# ruff: noqa: C901", "# ruff: noqa: F401"]
-    markers += ["def c():  # noqa: C901", "def d():  # noqa: E731"]
-    assert noqa_bypasses(markers) == markers[:4]
+    markers = ["def a():  # noqa", "def b():  # noqa - reason", "# ruff: noqa", "# ruff: noqa: C901", "# flake8: noqa"]
+    markers += ["# Flake8: NOQA: E501", "# ruff: noqa: F401", "def c():  # noqa: C901", "def d():  # noqa: E731"]
+    assert noqa_bypasses(markers) == markers[:6]
+
+
+def test_a_file_wide_noqa_written_after_another_comment_is_found(tmp_path):
+    """ruff takes a `ruff: noqa` or `flake8: noqa` anywhere in a comment alone on its line, but not after code."""
+    lines = ["# a note # ruff: noqa", "# see # flake8: noqa: C901", "# a note on noqa", "x = 1  # ruff: noqa"]
+    (tmp_path / "probe.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    found = git(tmp_path, "grep", "--no-index", "-h", "-o", "-E", NOQA_MARKER, "--", "probe.py")
+    assert noqa_bypasses(found.stdout.splitlines()) == lines[:2]
+
+
+def test_a_range_suppression_of_a_limit_is_found():
+    markers = ["# ruff: disable[C901]", "# ruff: disable[E501, PLR0912]", "# ruff: disable[E501]", "# RUFF: DISABLE[PLR0915]"]
+    assert range_bypasses(markers) == [markers[0], markers[1], markers[3]]
 
 
 def test_an_eslint_comment_that_switches_a_limit_off_is_found():
@@ -228,7 +253,8 @@ def test_a_rule_may_lose_exceptions_and_move_them_but_never_gain_one():
 
 
 def test_no_function_limit_is_switched_off_without_being_counted():
-    found = noqa_bypasses(grep_now(NOQA_MARKER, *PYTHON)) + eslint_bypasses(grep_now(ESLINT_COMMENT, *SCRIPTS))
+    found = noqa_bypasses(grep_now(NOQA_MARKER, *PYTHON)) + range_bypasses(grep_now(RANGE_MARKER, *PYTHON))
+    found += eslint_bypasses(grep_now(ESLINT_COMMENT, *SCRIPTS))
     assert not found, "Limits switched off by a comment instead of fixing the function:\n" + "\n".join(found)
 
 
@@ -247,3 +273,30 @@ def test_the_eslint_suppressions_never_grow():
     now = suppression_counts((REPO / SUPPRESSIONS).read_text(encoding="utf-8"))
     found = grown(now, suppression_counts(before))
     assert not found, f"New suppressions in {SUPPRESSIONS}: fix the function instead.\n" + "\n".join(found)
+
+
+RUFF_CONFIGURATION = {
+    "target-version": "py314",
+    "extend-exclude": ["migrations", "packages"],
+    "force-exclude": True,
+    "format": {"exclude": ["*"]},
+    "lint": {
+        "select": ["C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "RUF100"],
+        "external": ["A002", "B018", "BLE001", "E402", "E731", "F401", "F403", "F405", "F811", "N801", "N802", "N803"],
+        "mccabe": {"max-complexity": 10},
+        "pylint": {"max-args": 5, "max-positional-args": 5, "max-branches": 12, "max-returns": 6, "max-statements": 50},
+        "per-file-ignores": {
+            "**/tests/**": ["PLR0913", "PLR0917"],
+            "**/test_*.py": ["PLR0913", "PLR0917"],
+            "**/conftest.py": ["PLR0913", "PLR0917"],
+        },
+    },
+}
+
+
+def test_the_ruff_configuration_is_exactly_the_limits():
+    """Excluding a folder, ignoring a rule or loosening a value would switch a limit off for good: any change to the
+    configuration shows here first, and no other file configures ruff."""
+    assert tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["ruff"] == RUFF_CONFIGURATION
+    configs = git(REPO, "ls-files", "--cached", "--others", "--exclude-standard", "--", "*ruff.toml", "*pyproject.toml")
+    assert configs.stdout.split() == ["pyproject.toml"]

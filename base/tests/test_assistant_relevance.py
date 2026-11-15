@@ -123,7 +123,7 @@ def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, aske
         assert not missing, (texts, missing)
 
 
-#: The Hub's own words (``base.assistant.SYNONYMS``), in phrases no tool says as its asks: a «cuenta», a check or a
+#: Sales' own words (its ``assistant_synonyms``), in phrases no tool says as its asks: a «cuenta», a check or a
 #: tab is a table's open check (``sale.order``), never the person's account; a ticket or a receipt is a sale's.
 HUB_WORDS = [
     ("es", "¿qué hay en la cuenta de la mesa 6?", "sale.order.get"),
@@ -176,5 +176,5 @@ def test_a_how_to_question_ranks_the_documentation_first_by_being_one(owner, lan
     """The documentation search is always offered (``ALWAYS``), and a how-to question also ranks it first by itself
     (``HOWTO``): ranked without what is always at hand, it still leads."""
     tools = assistant.catalog(owner(language))
-    ranking = {**assistant.RANKING, "always": ()}
+    ranking = {**assistant.ranking(tools), "always": ()}
     assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.DOCS_SEARCH

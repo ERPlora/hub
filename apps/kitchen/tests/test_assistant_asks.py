@@ -6,7 +6,7 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 (kitchen is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over its asks. Here, the people's own words:
 a «comanda» is Sales' order to live (``order``, a table's check), so without Kitchen's asks its tickets, dishes and
 routing were not among the tools a turn offers and the model answered with a check of Sales or with no tool at all. The
-Hub says what the kitchen's words name (``base.assistant.SYNONYMS``): «la comanda» is also a kitchen ticket, an
+kitchen says what its own words name (its ``assistant_synonyms``): «la comanda» is also a kitchen ticket, an
 «estación» or «el puesto» a station, «urgente» or «prisa» a rush, the «enrutado» and the «regla» that sends a dish to
 a station the routing, a dish marked «como listo» or «como hecho» is bumped and one sent back «a pendientes» or «a
 preparación» recalled.
@@ -99,7 +99,7 @@ PROBES = [
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
 
-#: The Hub's own words of the kitchen (``base.assistant.SYNONYMS``), in phrases nobody wrote as asks nor as probes, one
+#: The kitchen's own words (its ``assistant_synonyms``), in phrases nobody wrote as asks nor as probes, one
 #: per group: each brings its tool among the first ten, and none does without its group. The dishes said «listos» need
 #: live to read «listo» and «listos» as done, never as the action list, and their group too.
 KITCHEN_WORDS = [

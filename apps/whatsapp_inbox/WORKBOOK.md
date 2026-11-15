@@ -1355,7 +1355,7 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   primeras de las 40 que se ofrecen. Además, cada herramienta tiene una frase propia (`OWN_WORDS`, ni ask ni sonda) que
   solo entra entre las diez primeras con sus `asks`: neutralizarlos en una sola herramienta hace caer su caso, y los
   asks que esta app obligó a reescribir (las plantillas de negocio de `base` y la carga de Personal) guardan dos puestos
-  de margen. `base.assistant.SYNONYMS` lleva «plantilla» = template y «mensaje» = message (en inglés ya se leían así):
+  de margen. Su `assistant_synonyms` (en `apps.py`) lleva «plantilla» = template y «mensaje» = message (en inglés ya se leían así):
   sin ellos, `template.retry` quedaba el 81.º y una petición de plantilla nueva perdía frente a cualquier alta del Hub.
   Trampas al escribir `asks`: «contesta» comparte raíz con «conteo» (recuento de Caja), «listo» se leía como `list`,
   «recordatorio» suma a los `record` de VeriFactu y Control horario, y un nombre de persona suma en cada sonda que lo

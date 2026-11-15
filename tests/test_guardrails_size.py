@@ -2,9 +2,10 @@
 
 A production file holds at most 1,000 physical lines and a test file at most 1,500. Generated files (migrations, build
 output, generated folders) do not count. The files that were already longer when the limit came in are listed in
-``.file-size-allow``, one per line as ``<ceiling> <path> <issue>``, and that list only shrinks: a listed file never grows
-past its ceiling, a file leaves the list as soon as it fits under its limit, and the list never gains a path or raises a
-ceiling compared with the list where the branch left origin/main.
+``.file-size-allow``, one per line as ``<ceiling> <path> <issue>``, every one pointing to the issue that tracks
+splitting them, and that list only shrinks: a listed file never grows past its ceiling, the ceiling comes down with the
+file to its size rounded up to the hundred, a file leaves the list as soon as it fits under its limit, and the list
+never gains a path or raises a ceiling compared with the list where the branch left origin/main.
 """
 
 import functools
@@ -22,6 +23,7 @@ CODE_SUFFIXES = frozenset({".py", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".vue", 
 GENERATED_DIRS = frozenset({"migrations", "node_modules", "dist", "generated"})
 TEST_DIRS = frozenset({"tests", "e2e"})
 ALLOW_LINE = re.compile(r"([0-9]+)\s+(\S+)\s+((?:[\w.-]+/)?[\w.-]*#[0-9]+)")
+TRACKING_ISSUE = "hub#1542"
 
 
 def is_test(path: str) -> bool:
@@ -63,6 +65,16 @@ def parse_allow(text: str) -> tuple[dict[str, int], list[str]]:
     return ceilings, errors
 
 
+def untracked(text: str) -> list[str]:
+    """Lines of the list whose issue is not the one that tracks splitting the listed files."""
+    found = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        match = ALLOW_LINE.fullmatch(line.strip())
+        if match is not None and match.group(3) != TRACKING_ISSUE:
+            found.append(f"{ALLOW_FILE}:{number}: {match.group(2)} points to {match.group(3)}, not to {TRACKING_ISSUE}")
+    return found
+
+
 def oversized(sizes: dict[str, int], ceilings: dict[str, int]) -> list[str]:
     """Files over their limit that are not listed, and listed files over their ceiling."""
     found = []
@@ -75,16 +87,23 @@ def oversized(sizes: dict[str, int], ceilings: dict[str, int]) -> list[str]:
     return found
 
 
+def ceiling_for(lines: int) -> int:
+    """The size rounded up to the hundred, as a ceiling of the list is written."""
+    return -(-lines // 100) * 100
+
+
 def stale(sizes: dict[str, int], ceilings: dict[str, int]) -> list[str]:
-    """Listed paths that are gone or already fit under their limit: their line has to go."""
+    """Listed paths that are gone or already fit under their limit, whose line has to go, and ceilings a file has
+    shrunk a hundred or more below, which have to come down with it."""
     found = []
-    for path in sorted(ceilings):
-        if path not in sizes:
+    for path, ceiling in sorted(ceilings.items()):
+        lines = sizes.get(path)
+        if lines is None:
             found.append(f"{path}: listed in {ALLOW_FILE} but not a counted code file; remove its line")
-        elif sizes[path] <= limit_for(path):
-            found.append(
-                f"{path}: {sizes[path]} lines fit under the limit of {limit_for(path)}; remove its line from {ALLOW_FILE}"
-            )
+        elif lines <= limit_for(path):
+            found.append(f"{path}: {lines} lines fit under the limit of {limit_for(path)}; remove its line from {ALLOW_FILE}")
+        elif ceiling_for(lines) < ceiling:
+            found.append(f"{path}: {lines} lines; lower its ceiling in {ALLOW_FILE} from {ceiling} to {ceiling_for(lines)}")
     return found
 
 
@@ -119,10 +138,14 @@ def base_ceilings() -> dict[str, int] | None:
     return ceilings
 
 
-def current_ceilings() -> dict[str, int]:
+def allow_text() -> str:
     """The working tree's list; without the file, nothing is allowed over its limit."""
     allow = REPO / ALLOW_FILE
-    ceilings, errors = parse_allow(allow.read_text(encoding="utf-8") if allow.is_file() else "")
+    return allow.read_text(encoding="utf-8") if allow.is_file() else ""
+
+
+def current_ceilings() -> dict[str, int]:
+    ceilings, errors = parse_allow(allow_text())
     assert not errors, "\n".join(errors)
     return ceilings
 
@@ -223,7 +246,7 @@ def test_the_list_may_drop_and_lower_entries_but_not_add_or_raise_them():
 
 
 def test_a_line_of_the_list_that_cannot_be_read_is_reported():
-    text = "# a comment\n\n5200 base/services.py hub#1531\n1100 base/x.py\nabc base/y.py hub#1\n5200 base/services.py hub#2\n"
+    text = "# a comment\n\n5200 base/services.py hub#1542\n1100 base/x.py\nabc base/y.py hub#1\n5200 base/services.py hub#2\n"
     ceilings, errors = parse_allow(text)
     assert ceilings == {"base/services.py": 5200}
     assert errors == [
@@ -232,3 +255,21 @@ def test_a_line_of_the_list_that_cannot_be_read_is_reported():
         f"{ALLOW_FILE}:6: base/services.py is listed twice",
     ]
 
+
+def test_a_listed_file_that_shrank_below_the_hundred_of_its_ceiling_has_to_lower_it():
+    sizes = {"base/shrunk.py": 1150, "base/same.py": 1201, "base/edge.py": 1200}
+    ceilings = {"base/shrunk.py": 1300, "base/same.py": 1300, "base/edge.py": 1200}
+    assert stale(sizes, ceilings) == [f"base/shrunk.py: 1150 lines; lower its ceiling in {ALLOW_FILE} from 1300 to 1200"]
+
+
+def test_an_exception_that_points_to_another_issue_is_reported():
+    text = f"# split them in {TRACKING_ISSUE}\n1200 base/a.py {TRACKING_ISSUE}\n1100 base/b.py hub#1531\n1100 base/c.py saas#1542\n"
+    assert untracked(text) == [
+        f"{ALLOW_FILE}:3: base/b.py points to hub#1531, not to {TRACKING_ISSUE}",
+        f"{ALLOW_FILE}:4: base/c.py points to saas#1542, not to {TRACKING_ISSUE}",
+    ]
+
+
+def test_every_exception_points_to_the_issue_that_tracks_splitting_the_files():
+    found = untracked(allow_text())
+    assert not found, f"Lines of {ALLOW_FILE} that have to point to {TRACKING_ISSUE}:\n" + "\n".join(found)

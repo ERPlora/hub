@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -207,14 +208,16 @@ def test_a_reported_change_of_a_line_is_offered_a_read_that_finds_the_line(catal
 
 
 def test_the_hub_reads_a_cesta_as_a_cart_and_units_as_a_quantity():
-    """``base.assistant.SYNONYMS``: «la cesta» or «el carrito» is a shopping cart (``cart_checkout.cart``), and «tres
-    unidades» or «la cantidad» the quantity a line takes, never only Inventory's unit of measure: «la cantidad» names
-    no unit of measure."""
-    concepts = shared.asked(["cambia la cesta a tres unidades"], assistant.SYNONYMS).concepts
+    """Cart and checkout's own words (its ``assistant_synonyms``): «la cesta» or «el carrito» is a shopping cart
+    (``cart_checkout.cart``), and «tres unidades» or «la cantidad» the quantity a line takes, never only Inventory's
+    unit of measure: «la cantidad» names no unit of measure."""
+    own_words = apps.get_app_config("cart_checkout").assistant_synonyms
+    concepts = shared.asked(["cambia la cesta a tres unidades"], own_words).concepts
     assert any(shared.stem("cart") in concept for concept in concepts)
     assert any(shared.stem("quantity") in concept for concept in concepts)
-    assert any(shared.stem("unit") in concept for concept in concepts)  # «unidades» still names the unit of measure
-    quantity = shared.asked(["cambia la cantidad"], assistant.SYNONYMS).concepts
+    every = shared.asked(["cambia la cesta a tres unidades"], assistant.synonyms()).concepts
+    assert any(shared.stem("unit") in concept for concept in every)  # «unidades» still names the unit of measure
+    quantity = shared.asked(["cambia la cantidad"], assistant.synonyms()).concepts
     assert any(shared.stem("quantity") in concept for concept in quantity)
     assert not any(shared.stem("unit") in concept for concept in quantity)
     assert not any(shared.stem("cart") in concept for concept in shared.asked(["la cesta"]).concepts)  # the Hub's own
@@ -222,7 +225,7 @@ def test_the_hub_reads_a_cesta_as_a_cart_and_units_as_a_quantity():
 
 #: Phrases nobody wrote as an ask or a probe, in the words a shop uses for its carts, with the tool they ask for: each is
 #: among the first ten only because the Hub reads «cesta» as a cart (the first) or «unidades» and «cantidad» as a line's
-#: quantity (the other two); without its group of ``SYNONYMS`` it comes 13th or lower.
+#: quantity (the other two); without its group of words it comes 13th or lower.
 BY_SYNONYM = [
     ("cart_checkout.cart.list", "¿cuántas cestas se han quedado a medias hoy?"),
     ("cart_checkout.item.update", "en la cesta de Lucía, que sean cuatro unidades de jabón"),

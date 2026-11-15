@@ -20,6 +20,7 @@ from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
 from base.tests.test_assistant_asks import probe_phrases
@@ -310,18 +311,19 @@ def test_a_record_taken_by_its_id_says_which_read_finds_it(name, read):
 
 
 def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_assignment():
-    """``base.assistant.SYNONYMS``: «el bono» names Services' voucher, the one of the catalogue and the one sold
-    (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's assignment
-    to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
-    for phrase, wanted in (
-        ("anula el bono de Marta", "grant"),
-        ("¿qué bonos ofrecemos?", "package"),
-        ("asigna los peinados a Lucas", "assignment"),
-        ("cambia la asignación de Lucas", "assignment"),
-    ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
-        assert any(shared.stem(wanted) in concept for concept in concepts), phrase
-        assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
+    """Services' own words (its ``assistant_synonyms``): «el bono» names Services' voucher, the one of the catalogue and
+    the one sold (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's
+    assignment to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
+    grant, package, assignment = shared.stem("grant"), shared.stem("package"), shared.stem("assignment")
+    assert_its_words_name(
+        "service",
+        [
+            ("anula el bono de Marta", grant),
+            ("¿qué bonos ofrecemos?", package),
+            ("asigna los peinados a Lucas", assignment),
+            ("cambia la asignación de Lucas", assignment),
+        ],
+    )
 
 
 #: Requests in the owner's words that are neither an ask nor a probe of layer 2: each brings its tool among the first
@@ -359,9 +361,10 @@ NAMES_AN_ASSIGNMENT = re.compile(r"\basign", re.IGNORECASE)
 
 
 def without_services_groups() -> tuple[tuple[str, ...], ...]:
-    """``base.assistant.SYNONYMS`` without the groups Services adds: «bono» and «asignación»."""
-    kept = tuple(group for group in assistant.SYNONYMS if not {"bono", "asignacion"} & set(group))
-    assert len(assistant.SYNONYMS) - len(kept) == 2  # positive control: both of Services' groups are there
+    """The Hub's words (``base.assistant.synonyms``) without the groups Services says: «bono» and «asignación»."""
+    every = assistant.synonyms()
+    kept = tuple(group for group in every if not {"bono", "asignacion"} & set(group))
+    assert len(every) - len(kept) == 2  # positive control: both of Services' groups are there
     return kept
 
 

@@ -26,6 +26,9 @@ msgstr "Suplementos guarda las elecciones que acompañan a lo que vendes: el pun
 msgid "Modifier groups"
 msgstr "Grupos de suplementos"
 
+msgid "Modifier options"
+msgstr "Opciones de suplementos"
+
 msgid "Modifier groups of categories"
 msgstr "Grupos de suplementos de categorías"
 
@@ -178,6 +181,9 @@ msgstr "Este grupo ya se aplica ahí."
 
 msgid "came back without its option \"%(option)s\": %(why)s"
 msgstr "volvió sin su opción «%(option)s»: %(why)s"
+
+msgid "came back not chosen by default: its group already comes with \"%(chosen)s\""
+msgstr "volvió sin venir elegida por defecto: su grupo ya viene con «%(chosen)s»"
 
 msgid "This group does not apply there."
 msgstr "Este grupo no se aplica ahí."
