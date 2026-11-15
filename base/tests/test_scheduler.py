@@ -31,6 +31,7 @@ from ninja import Schema
 from base import scheduler
 from base.models import TaskSchedule
 from base.scheduler import ScheduledTask
+from config.tests.test_reuse_db import RUN_TIMEOUT
 
 UTC = dt.UTC
 
@@ -379,7 +380,7 @@ def test_the_check_runs_with_every_system_check():
         env={**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings"},
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=RUN_TIMEOUT,
         check=False,
     )
 
