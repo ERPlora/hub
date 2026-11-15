@@ -158,8 +158,8 @@
 5180 base/services.py hub#1542
 508 base/tenancy/bootstrap.py hub#1542
 835 base/tenancy/migrator.py hub#1542
-805 base/tenancy/move.py hub#1542
-1454 base/tenancy/tests/test_move.py hub#1542
+777 base/tenancy/move.py hub#1542
+1421 base/tenancy/tests/test_move.py hub#1542
 1182 base/tenancy/tests/test_provision.py hub#1542
 1203 base/tenancy/tests/test_recovery.py hub#1542
 1496 base/tests/test_app_activation.py hub#1542
@@ -174,9 +174,9 @@
 1230 config/tests/test_settings.py hub#1542
 990 control/admin.py hub#1542
 625 control/models.py hub#1542
-1026 control/services.py hub#1542
+1017 control/services.py hub#1542
 1553 control/tests/test_admin.py hub#1542
-1228 control/tests/test_services.py hub#1542
+1224 control/tests/test_services.py hub#1542
 109 docker/pgbouncer-entrypoint.sh hub#1542
 652 frontend/form-modal-field-names.test.ts hub#1542
 563 frontend/main.test.ts hub#1542
