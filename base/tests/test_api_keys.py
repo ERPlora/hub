@@ -95,7 +95,7 @@ TAX_CATEGORIES = "/tax/categories"
 class TestNotYetAvailable:
     """A business without its own database is not served at all: its door answers 503 before any key is read, made or
     accepted (the operations' own refusals, for the suite's fallback, are guardrail (g) of
-    ``tests/test_guardrails.py``)."""
+    ``tests/test_guardrails_tenancy.py``)."""
 
     @pytest.mark.django_db
     def test_the_screen_and_a_new_key_answer_503_and_nothing_is_created(self, client):

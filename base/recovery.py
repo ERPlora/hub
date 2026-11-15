@@ -1,8 +1,9 @@
 """What an app says it gives back from a separate copy of its business (hub#1257; BASE-F114).
 
 The contract of the hook ``recoverable_from_copy`` of a ``LiveAppConfig``, here and not in ``base.tenancy`` because the
-apps import it and a module never imports the tenancy (``tests/test_guardrails.py``): the app only declares its reads
-and its operation; the platform (``base.tenancy.recovery``) connects to the copy and chooses the business's database.
+apps import it and a module never imports the tenancy (``tests/test_guardrails_tenancy.py``): the app only declares
+its reads and its operation; the platform (``base.tenancy.recovery``) connects to the copy and chooses the business's
+database.
 """
 
 from collections.abc import Callable, Iterable, Iterator
