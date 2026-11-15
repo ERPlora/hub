@@ -17,15 +17,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get, registry
 
-from apps.sale.models import (
-    Order,
-    OrderLine,
-    Refund,
-    Sale,
-    SaleCounter,
-    SaleLine,
-    VoucherSession,
-)
+from apps.sale.models import Order, OrderLine, Refund, Sale, SaleCounter, SaleLine, VoucherSession
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from apps.service.models import Grant, Redemption
 from base.tenancy.context import use_hub

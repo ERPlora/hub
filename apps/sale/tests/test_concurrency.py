@@ -24,12 +24,7 @@ from live.context import system_context
 from live.errors import OperationError
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import (
-    card_deleted_on_screen,
-    card_protected,
-    reads,
-    writes,
-)
+from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
 from apps.sale.models import (
     Department,
     Order,
