@@ -4,9 +4,9 @@ function over source text (or the ``DATABASES`` dict), proven by a made-up offen
 control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 
 (a) Only the doors touch the ORM: managers, QuerySet methods, model writes, ``transaction``,
-    ``connection``, ``QuerySet``/``Manager`` and ``get_object_or_404`` appear only in
-    ``services.py`` and ``queries.py`` (plus the owners and exceptions of ``ORM_OWNERS`` and
-    ``ORM_EXCEPTIONS``, each with its reason). Known limit: it reads shape, not types, so methods
+    ``connection``, ``QuerySet``/``Manager`` and ``get_object_or_404`` appear only in an app's ``services`` and
+    ``queries``, a file or a package (``orm_doors.py``), plus the owners and exceptions of ``ORM_OWNERS`` and
+    ``ORM_EXCEPTIONS``, each with its reason. Known limit: it reads shape, not types, so methods
     shared with dicts, sets, strings or paths (``get``, ``update``, ``count``, ``exists``, ``add``…)
     are only caught when they hang from a manager (``Model.objects.get``).
 (b) No alias chosen by hand: no ``using=``, ``.using(`` or ``connections[``; no session
@@ -34,15 +34,13 @@ import re
 from pathlib import Path, PurePosixPath
 
 from django.conf import settings
+from orm_doors import is_door
 
 HUB_DIR = Path(__file__).resolve().parent.parent
 SOURCE_ROOTS = ("base", "control", "apps")
 
 # ── (a) Who may touch the ORM ──────────────────────────────────────────────────────────────────
 
-#: The doors (CLAUDE.md «Un solo camino hacia el servidor»): reads in ``queries.py``, writes in
-#: ``services.py``; their ``@operation`` applies hub, active app, permission and transaction.
-ORM_DOORS = frozenset({"services.py", "queries.py"})
 #: Owners of the ORM that are no path to the data from the API: ``models.py`` declares the schema
 #: (managers, QuerySets, constraints with ``Q``); ``admin.py`` is Django's admin, the second write
 #: path the platform accepts, whose actions call ``services.py``.
@@ -201,7 +199,8 @@ def is_migration(path: PurePosixPath) -> bool:
 def orm_rule_applies(path: PurePosixPath) -> bool:
     """Whether rule (a) reads ``path``: not a door, an owner, a migration or an exception."""
     return not (
-        path.name in ORM_DOORS | ORM_OWNERS
+        is_door(path)
+        or path.name in ORM_OWNERS
         or is_migration(path)
         or str(path) in ORM_EXCEPTIONS
     )
@@ -650,7 +649,7 @@ def test_only_the_doors_touch_the_orm():
     )
 
     assert offenders == [], (
-        "Only services.py and queries.py touch the ORM: move these reads and "
+        "Only an app's services and queries touch the ORM: move these reads and "
         f"writes behind an @operation, or add a reasoned entry to ORM_EXCEPTIONS: {offenders}"
     )
 
