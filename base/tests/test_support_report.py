@@ -49,7 +49,7 @@ def account(client, ana, fake_saas):
     makes it a shared device of the hub): ``_log_in`` keeps the session's credential in it. A test's own
     ``fake_saas`` then answers the report."""
     fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
-    assert enter(client).status_code == 302
+    assert enter(client, host=HOST).status_code == 302
     return ana
 
 
@@ -118,7 +118,7 @@ class TestOnlyWithTheAccount:
         bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
         with_pin(ana, "4826")
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
 
         response = report(client)
 
@@ -134,7 +134,7 @@ class TestOnlyWithTheAccount:
         saas = fake_saas(body=SENT)
         bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
         forget_the_credential(client)
         assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.PIN
 
@@ -171,7 +171,7 @@ class TestOnlyWithTheAccount:
         saas = fake_saas(body=SENT)
         bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
         forget_the_credential(client)
 
         load_the_shell(client)
@@ -203,7 +203,7 @@ class TestOnlyWithTheAccount:
         bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
         with_badge(bea, "04a1b2c3")
-        assert badge(client, "04a1b2c3").status_code == 200
+        assert badge(client, "04a1b2c3", host=HOST).status_code == 200
         assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.BADGE
 
         response = report(client)
