@@ -2,7 +2,7 @@
 // The customer picker (WORKBOOK «La búsqueda de texto de la lista»: F13, F17, F18): a search box
 // over the first 20 cards by name, followed live; typing searches as the list does (name, phone
 // however typed, email, tax id, company). It tells «searching», «no matches», «down» (with Retry,
-// the text kept) and «no permission» apart, as the product's till search did (customers#18). A tap
+// the text kept) and «no permission» apart, as the product's till search did. A tap
 // hands the card up (`pick`); `v-model:term` lets the parent offer «+ New customer «…»». A screen reader
 // reads the search box by its hint, in the person's language, never Ionic's English «search text».
 import { InlineFeedback } from '@erplora/ui/components';

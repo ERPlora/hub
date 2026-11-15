@@ -4,6 +4,8 @@
 import { toast, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
 import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { RecordOut } from '../operations';
 import RecordDetailPage from './RecordDetailPage.vue';
@@ -26,12 +28,6 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
   vi.mocked(toast).mockClear();
-});
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
 });
 
 const OP = 'verifactu.record.get';
@@ -106,6 +102,8 @@ async function setup(record: Partial<RecordOut> = {}, options: MountOptions = {}
   return m;
 }
 
+afterEach(outOfTheApp);
+
 describe('RecordDetailPage', () => {
   it('follows its record by id and names it by its invoice', async () => {
     const s = await setup();
@@ -155,7 +153,7 @@ describe('RecordDetailPage', () => {
   );
 
   it('outside Spain it says why and never that it goes out by itself', async () => {
-    // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain, the record is never sent.
+    // VeriFactu is only for Spain, the record is never sent.
     const why = 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT';
     const s = await setup({ waiting: [{ code: 'outside_spain', message: why }], next_attempt_at: null, can_transmit: false });
     const notice = s.find('verifactu-record-waiting');
@@ -220,14 +218,10 @@ describe('RecordDetailPage', () => {
     expect(s.find('verifactu-record-digest').text()).toContain('Not stamped yet');
   });
 
-  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
-    const invoke = vi.fn(() => Promise.resolve());
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
+    const invoke = insideTheInstalledApp();
     const s = await setup();
-    const tap = new MouseEvent('click', { bubbles: true, cancelable: true });
-    s.find('verifactu-record-verify').element.dispatchEvent(tap);
-    expect(tap.defaultPrevented).toBe(true);
-    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: RECORD.qr_url });
+    expectTapOpensInTheSystemBrowser(s.find('verifactu-record-verify').element, invoke, RECORD.qr_url);
   });
 
   it('the first record of a chain says so; a record without its XML yet says it is built when it is sent', async () => {

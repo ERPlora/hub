@@ -15,7 +15,7 @@ class OnlineBookingConfig(LiveAppConfig):
     icon = "ion:globe-outline"
     category = Category.PEOPLE
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Let customers book themselves online, and confirm or cancel their bookings from one inbox."
     )
@@ -53,7 +53,7 @@ class OnlineBookingConfig(LiveAppConfig):
         "hub_employee": ["online_booking.view_booking"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
-    # module's own icon. The old module's two entries.
+    # module's own icon.
     navigation = [
         Nav(
             "bookings",

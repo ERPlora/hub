@@ -1,10 +1,5 @@
-"""Models of the flow app: the automation (``Flow``), each time it ran (``FlowRun``), what the assistant
-proposed (``Draft``), the secrets its calls to other systems use (``Secret``) and the questions its runs
-ask a person (``Question``).
-
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
-per scope. Phase 2 moves them to each hub's database. An automation names other apps' operations and
-events by their names, never their rows: nothing here points at another app's table.
+"""An automation names other apps' operations and events by their names, never their rows: nothing here points at
+another app's table.
 """
 
 from django.db import models
@@ -14,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
-#: Longest name of an automation (the old module's draft schema).
+#: Longest name of an automation.
 NAME_MAX_LENGTH = 120
 #: An event name of the outbox (``live.models.OutboxEvent.name``).
 EVENT_MAX_LENGTH = 96
@@ -138,6 +133,9 @@ class FlowRun(UUIDModel):
     log = models.JSONField(_("log"), default=list, blank=True)
     # ``steps.<id>``: what each step left for the next ones.
     outputs = models.JSONField(_("outputs"), default=dict, blank=True)
+    # The ids in what its steps left, kept when that is forgotten (the run ends, the assistant's turn is over, the
+    # hourly pass): never their data. Erasing a customer finds by them a run that read her card (CUSTOMER-F16).
+    read_ids = models.JSONField(_("ids it read"), default=list, db_default=[], blank=True)
     error_code = models.CharField(_("error code"), max_length=96, blank=True)
     # As it was said, in the automation's language: what an action of another app answered is shown so.
     error_message = models.TextField(_("error"), blank=True)
@@ -229,7 +227,7 @@ class Draft(UUIDModel):
         return self.name
 
 
-#: A secret's name: upper case, digits and ``_``, up to 64 characters (the old hub's rule).
+#: A secret's name: upper case, digits and ``_``, up to 64 characters.
 SECRET_NAME_RE = r"^[A-Z][A-Z0-9_]{0,63}$"
 
 

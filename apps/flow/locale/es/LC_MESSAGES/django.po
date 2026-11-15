@@ -162,6 +162,9 @@ msgstr "registro"
 msgid "outputs"
 msgstr "resultados"
 
+msgid "ids it read"
+msgstr "ids de lo que leyó"
+
 msgid "error code"
 msgstr "código de error"
 
@@ -650,3 +653,9 @@ msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciénde
 
 msgid "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
 msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciéndela en Apps o elige otra acción."
+
+msgid "Cancelled: the customer's personal data were erased."
+msgstr "Cancelada: se borraron los datos personales del cliente."
+
+msgid "[erased with the customer's personal data]"
+msgstr "[borrado con los datos personales del cliente]"

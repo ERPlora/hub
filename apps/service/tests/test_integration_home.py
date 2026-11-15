@@ -1,7 +1,7 @@
-"""Services on the Home (PLAN-HUB round 2026-10-21; FIX-SERVICE-SETUP-HOOKS): base's own query brings the old module's
-item «Your service catalogue» (module.json `setup`, services#26), important, pending until one offered service can be
-charged (its tax category alive), to whoever adds services, leading to the list of services. Every change of it records
-an event it is refreshed on, and a change in hub B re-runs B's Home only; with Services off the Home does not ask.
+"""Services on the Home: base's own query brings «Your service catalogue», important, pending until one offered service
+can be charged (its tax category alive), to whoever adds services, leading to the list of services. Every change of it
+records an event it is refreshed on, and a change in hub B re-runs B's Home only; with Services off the Home does not
+ask.
 
 base and service run for real: the step comes from ServiceConfig through base's own query, as the person.
 """

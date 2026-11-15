@@ -5,9 +5,8 @@
 // (F33) and «See it» opens it; «Pause it» pauses it and keeps it (F34); built from an older version and
 // renamed, it says «New version» and «Restore the factory one», asked first, brings today's back (F35); set
 // up with a fault its app already fixed, nothing waits for the owner: no notice above «Your automations», and its
-// «Only when…» already has what its app added, though nothing was written (F36). One screenshot per flow and size
-// (`APP-FLOW-3-<flow>-<width>`). A business has one
-// automation per recipe: it is removed before each size and after the run.
+// «Only when…» already has what its app added, though nothing was written (F36). One screenshot per flow and size.
+// A business has one automation per recipe: it is removed before each size and after the run.
 import { expect, type Page, test } from '@playwright/test';
 
 import { confirmDialog, signedIn } from './flow-helpers';

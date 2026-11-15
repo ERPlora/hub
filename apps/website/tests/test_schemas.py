@@ -162,7 +162,7 @@ def test_the_theme_is_a_palette_and_a_mode_auto_by_default():
 
 
 def test_any_palette_takes_the_owners_two_colours_over_its_own_and_none_goes_back_to_them():
-    # Round 2026-10-22 (W8): the colours of the chosen palette, edited; custom = the owner's tweak of that palette.
+    # The colours of the chosen palette, edited; custom = the owner's tweak of that palette.
     tweaked = Theme.model_validate({"palette": "forest", "custom": {"primary": "#AABBCC", "accent": "#112233"}})
     assert (tweaked.palette, tweaked.custom.model_dump()) == ("forest", {"primary": "#aabbcc", "accent": "#112233"})
     # «Reset colours»: no overrides, the palette's own colours.

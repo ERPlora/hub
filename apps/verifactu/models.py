@@ -15,7 +15,7 @@
 - ``Event``: the audit trail, its message composed in the reader's language from a key and its parameters.
 - ``AeatRecord``: the last photo of what the AEAT holds (replaced by each query).
 
-Money is in whole cents with a sign. Phase 1 has no tenancy (like ``apps.invoice``).
+Money is in whole cents with a sign.
 """
 
 import datetime as dt
@@ -27,7 +27,7 @@ from django.db.models.functions import Length
 from django.db.models.lookups import Exact
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import pgettext_lazy
+from django.utils.translation import ngettext_lazy, pgettext_lazy
 from live.models import UUIDModel
 
 NIF_MAX_LENGTH = 32
@@ -95,9 +95,8 @@ class Config(UUIDModel):
     representation_reason = models.CharField(
         _("representation note"), max_length=500, blank=True
     )
-    # Retired (PLAN §30, round 2026-10-22b: VeriFactu on Free): no plan gates production any more, so nothing reads
-    # nor writes it. The column stays until a later contract step drops it: the tasks of the previous deployment
-    # still read it while the new one rolls out.
+    # Retired: no plan gates production any more, so nothing reads nor writes it. The column stays until a later
+    # contract step drops it: the tasks of the previous deployment still read it while the new one rolls out.
     live_paid = models.BooleanField(_("live option in the plan"), default=False)
     # From the ERPlora account's photo: the business's commercial status; going live needs it active
     # (``queries.live_problems``).
@@ -108,7 +107,7 @@ class Config(UUIDModel):
         default=HubStatus.ACTIVE,
     )
     # The business's id in ERPlora (the SaaS's ``Hub.id``), told by the photo's path: where the signed authorisation
-    # is sent (VERIFACTU-F05). Phase 2 reads it from the control registry.
+    # is sent (VERIFACTU-F05).
     hub_id = models.UUIDField(_("ERPlora business id"), null=True, blank=True)
     synced_version = models.BigIntegerField(_("synced version"), null=True, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
@@ -506,7 +505,7 @@ WAIT_REASONS = {
 }
 
 
-#: What a refusal of the gateway means, by its code (saas#29), shown in place of the SaaS's own English message.
+#: What a refusal of the gateway means, by its code, shown in place of the SaaS's own English message.
 GATEWAY_REFUSALS = {
     "hub_unknown": _(
         "ERPlora does not recognise this business: contact ERPlora's support"
@@ -610,9 +609,11 @@ class Event(UUIDModel):
                 params["reason"], params.get("detail", ""), params.get("at", "")
             )
         try:
-            return str(template) % params
+            # Formatted as it is, not through ``str()``: a sentence with a count picks its singular or its plural from
+            # the number in ``params``, and read before that it is empty.
+            return str(template % params)
         except (KeyError, TypeError, ValueError):
-            return str(template)
+            return str(template) or self.message_key
 
     def compose_search_text(self) -> str:
         """The sentence in both languages, lower case."""
@@ -634,8 +635,17 @@ EVENT_MESSAGES = {
     "anulacion_sealed": _(
         "Cancellation record #%(sequence)s sealed for invoice %(invoice_number)s: %(reason_text)s"
     ),
-    "deferred": _("Not sent to the AEAT yet (%(count)s record(s)): %(why)s."),
-    "accepted": _("AEAT (%(environment)s): %(count)s record(s) accepted, CSV %(csv)s."),
+    # A count says itself in the singular or the plural: «1 record accepted», never «record(s)».
+    "deferred": ngettext_lazy(
+        "Not sent to the AEAT yet (%(count)s record): %(why)s.",
+        "Not sent to the AEAT yet (%(count)s records): %(why)s.",
+        "count",
+    ),
+    "accepted": ngettext_lazy(
+        "AEAT (%(environment)s): %(count)s record accepted, CSV %(csv)s.",
+        "AEAT (%(environment)s): %(count)s records accepted, CSV %(csv)s.",
+        "count",
+    ),
     "accepted_with_errors": _(
         "Invoice %(invoice_number)s accepted with errors by the AEAT (%(code)s): %(message)s"
     ),
@@ -649,17 +659,27 @@ EVENT_MESSAGES = {
     "record_reconciled": _(
         "Invoice %(invoice_number)s was already in the AEAT (%(status_label)s): out of the queue."
     ),
-    "chain_valid": _(
-        "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). "
-        "Amounts are not re-audited."
+    "chain_valid": ngettext_lazy(
+        "Fingerprint chain intact: %(total)s record with its SHA-256 chaining verified (%(issuer_nif)s). "
+        "Amounts are not re-audited.",
+        "Fingerprint chain intact: %(total)s records with their SHA-256 chaining verified (%(issuer_nif)s). "
+        "Amounts are not re-audited.",
+        "total",
     ),
     "chain_broken": _(
         "Fingerprint chain BROKEN at sequence %(first_invalid_sequence)s (%(issuer_nif)s)."
     ),
-    "aeat_queried": _("AEAT query: %(count)s record(s) retrieved for %(issuer_nif)s."),
-    "chain_recovered_from_aeat": _(
+    "aeat_queried": ngettext_lazy(
+        "AEAT query: %(count)s record retrieved for %(issuer_nif)s.",
+        "AEAT query: %(count)s records retrieved for %(issuer_nif)s.",
+        "count",
+    ),
+    "chain_recovered_from_aeat": ngettext_lazy(
         "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s "
-        "(%(found)s record(s) found)."
+        "(%(found)s record found).",
+        "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s "
+        "(%(found)s records found).",
+        "found",
     ),
     "chain_continued_manually": _(
         "Chain continued manually for %(issuer_nif)s after invoice %(invoice_number)s."

@@ -226,7 +226,7 @@ def test_a_step_reads_only_what_an_earlier_step_left():
 
 
 def test_a_condition_compares_only_with_data_it_already_has():
-    # hub#1712: the second datum of a comparison is a reference like any other.
+    # The second datum of a comparison is a reference like any other.
     later = [
         {"id": "s1", "kind": "condition", "when": {"input.total": {"gt": "steps.s2.total"}}},
         COMMAND | {"id": "s2"},
@@ -353,13 +353,13 @@ def test_the_name_is_trimmed_and_at_most_120_characters():
 
 
 def test_turning_on_is_only_set_enabled_s_which_the_assistant_confirms():
-    # Review 2026-10-15, item 3: create and update carry no switch.
+    # Create and update carry no switch.
     assert "enabled" in errors(schemas.CreateIn, {"name": "A", "enabled": True})
     assert "enabled" in errors(schemas.UpdateIn, {"flow": "A", "enabled": True})
 
 
 def test_a_draft_reads_only_what_its_earlier_steps_leave():
-    # Review 2026-10-15, item 10: the same check as a person's document.
+    # The same check as a person's document.
     later = [COMMAND | {"params": {"title": "steps.s2.id"}}, COMMAND | {"id": "s2"}]
     found = errors(schemas.DraftProposeIn, {"name": "A", "definition": {"steps": later}, "notes": []})
     assert found == {"definition.steps": "Value error, Step 1 reads «steps.s2.id», which no earlier step leaves."}
@@ -377,7 +377,7 @@ ASSISTANT = {"id": "s1", "kind": "assistant", "prompt": "Answer {{input.name}} w
 
 
 def test_an_assistant_step_keeps_its_task_its_tools_how_it_changes_things_and_its_rounds():
-    # FLOW-F37 (was refused while the Hub had no assistant: the test above, before 2026-10-28): «Ask the assistant»
+    # FLOW-F37: «Ask the assistant»
     # is a step; by default a change it wants waits for a person (old module's policy) and it has 6 rounds.
     kept = schemas.CreateIn.model_validate({"steps": [ASSISTANT | {"tools": ["task.task.list", "task.task.create"]}]})
     step = kept.steps[0]
@@ -405,7 +405,7 @@ def test_an_assistant_step_without_its_task_or_out_of_bounds_is_refused(more, fi
 
 
 def test_an_assistant_step_never_hands_a_secret_to_the_assistant():
-    # Old HUB-F95: «a secret in the task is not saved»: what the step asks reaches the model.
+    # What the step asks reaches the model, so a secret is never written in it.
     found = errors(schemas.CreateIn, {"steps": [ASSISTANT | {"prompt": "Use {{secret.STRIPE_KEY}}"}]})
     assert found == {"steps": "Value error, Step 1 reads «secret.STRIPE_KEY»: a secret or the call's key only go in «Call another system»."}
 

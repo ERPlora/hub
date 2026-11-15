@@ -10,15 +10,10 @@ import { formatQuantity } from '@erplora/ui/components';
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { amountFilterErrors, filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 export { formatQuantity };
 
-const NO_MONEY_DECIMALS = 2;
-
 const formats = new Map<string, Intl.NumberFormat>();
-
-/** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
-export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
 
 function numberFormat(locale: string, kind: 'count' | 'percent'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;
@@ -51,7 +46,7 @@ export function formatPercent(rate: string | number, locale: string): string {
 }
 
 /** The ledger's date as the page language writes it short: numeric day, month and year, and the time
- *  («7/3/25, 9:05»), so a tablet column keeps the time of day (inventory#130, #139). `timeZone`: the
+ *  («7/3/25, 9:05»), so a tablet column keeps the time of day. `timeZone`: the
  *  page's when not given. Not a date: the text as it came. */
 export function formatShortDateTime(value: string, locale: string, timeZone?: string): string {
   if (!value) return '';

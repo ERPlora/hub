@@ -1,5 +1,5 @@
 """CART_CHECKOUT-F07 as the worker runs it: ``cart_checkout.cart.cleanup_expired`` through ``base.scheduler``
-every quarter of an hour, as the system on the worker's scope (phase 1: one scope, the carts are shared).
+every quarter of an hour, as the system in the scope of the hub the worker is running.
 An active cart past its expiry is stored as expired with one event that says how many; a cart without an
 expiry, one not yet due, one that is not active or one deleted stays as it was; the next quarter, with
 nothing new, expires nothing and says nothing.

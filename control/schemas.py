@@ -1,8 +1,9 @@
-"""What control's operations take and give: the database clusters of the Hub admin (round 2026-10-30b of PLAN-DB,
-decision 1; tranche S7) and its freeze switch (hub#930). Their bounds are the model's (``control.models.Cluster``,
+"""What control's operations take and give: the database clusters of the Hub admin and its
+freeze switch. Their bounds are the model's (``control.models.Cluster``,
 ``control.models.Freeze``), so any caller, not only the admin's form, is held to them."""
 
 import datetime as dt
+from typing import Literal
 from uuid import UUID
 
 from ninja import Schema
@@ -73,20 +74,86 @@ class ClusterSizesOut(Schema):
     databases: dict[str, int]
 
 
+#: A move asked now: its business closes from now until the worker is done.
+MOVE_NOW = "now"
+#: A move asked for the business's next night (``control.services.night_start``): open until the worker starts it.
+MOVE_AT_NIGHT = "at_night"
+
+
 class HubMoveIn(Schema):
-    """Which hub moves, and to which cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7)."""
+    """Which hub moves, to which cluster, and when."""
 
     hub: UUID
     cluster: UUID
+    when: Literal["now", "at_night"] = Field(
+        default=MOVE_NOW,
+        description="now: it closes and moves at once; at_night: it moves in its next night, on its own clock.",
+    )
 
 
 class HubMoveOut(Schema):
-    """The hub asked to move: the cluster it is on (none: the settings' own server) and the one it is moving to."""
+    """The hub asked to move: the cluster it is on (none: the settings' own server), the one it is moving to, and the
+    one it moves to in its night with when it starts."""
 
     id: UUID
     slug: str
     cluster: UUID | None
     moving_to: UUID | None
+    scheduled_to: UUID | None = None
+    scheduled_for: dt.datetime | None = None
+
+
+class HubRestoreIn(Schema):
+    """Which hub is put back as it was at a moment, from the copy of it on which temporary cluster."""
+
+    hub: UUID
+    cluster: UUID
+    at: dt.datetime = Field(description="The moment the copy on that cluster is of (its point-in-time restore).")
+
+
+class HubRestoreOut(Schema):
+    """The hub asked to be restored: the cluster it is on (none: the settings' own server), the temporary one its copy
+    comes from and the moment."""
+
+    id: UUID
+    slug: str
+    cluster: UUID | None
+    restoring_from: UUID | None
+    restore_point: dt.datetime | None
+
+
+class RestoredCopyOut(Schema):
+    """The separate copy asked of a hub: its id, the hub, its database's name and where it will be (none:
+    the settings' own server), the temporary cluster it comes from, the moment and how it goes."""
+
+    id: UUID
+    hub: UUID
+    slug: str
+    db_name: str
+    cluster: UUID | None
+    source: UUID | None
+    restore_point: dt.datetime
+    status: str
+
+
+class CopyRecoverIn(Schema):
+    """Which separate copy a business gets back what it lost from, and the apps whose records it gets back:
+    each an app that says what it gives back from a copy."""
+
+    copy_id: UUID
+    apps: list[str] = Field(min_length=1, description="The labels of the apps to bring back, in that order.")
+
+
+class CopyRecoveryOut(Schema):
+    """The recovery asked of a separate copy: its id, the copy, its business, the apps asked and how it
+    goes."""
+
+    id: UUID
+    copy_id: UUID
+    hub: UUID
+    slug: str
+    apps: list[str]
+    status: str
 
 
 class HubIdIn(Schema):
@@ -96,7 +163,7 @@ class HubIdIn(Schema):
 
 
 class FreezeIn(Schema):
-    """Freeze the platform (``frozen``) or lift its freeze, for a database upgrade (hub#930); ``reason``: why, for
+    """Freeze the platform (``frozen``) or lift its freeze, for a database upgrade; ``reason``: why, for
     whoever looks meanwhile. Asked while already so, nothing changes."""
 
     frozen: bool

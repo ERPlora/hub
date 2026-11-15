@@ -1,31 +1,21 @@
-// A business of the Canary Islands, end to end (TAX-F11, pm#629 VF-17; FIX-TAX-REGION-IGIC): the owner keeps
+// A business of the Canary Islands, end to end (TAX-F11): the owner keeps
 // «Canary Islands (IGIC)» in Taxes → Settings, the category has its national 21 % VAT and a Canary IGIC 7 % rule,
 // and the till charges the product at the IGIC 7 %: the ticket and its breakdown say IGIC 7 %, never VAT. The
-// settings screen is seen at 390×844, 834×1112 and 1440×900 (`FIX-TAX-REGION-IGIC-<width>.png`). What the run
+// settings screen is seen at 390×844, 834×1112 and 1440×900. What the run
 // makes is deleted after it, and the business goes back to the whole country.
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
+import { shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
-import { cleanUp as cleanTaxes, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickSelect } from './tax-helpers';
+import {  } from './invoice-helpers';
+import { cleanSales, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
+import { cleanUp as cleanTaxes, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickSelect, regionSaleContext, taxSettingsForm, taxSettingsReady, wholeCountry } from './tax-helpers';
 
 const RUN = stamp();
 let shirt: Product;
 
-/** The business back to the whole country: the other specs of the stack sell at the national VAT. */
-function wholeCountry(): void {
-  psql("update tax_taxsettings set region_code = ''");
-}
-
 test.beforeAll(async ({ browser }) => {
-  snapshotSeries();
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/tax/settings');
-  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
+  const context = await regionSaleContext(browser);
   const key = await freshCategory(context, 'igic');
   await createRule(context, { country_code: 'ES', tax_category_key: key, rate_pct: 21 });
   await createRule(context, { country_code: 'ES', region_code: 'ES-CN', tax_category_key: key, rate_pct: 7, tax_type: 'igic' });
@@ -41,16 +31,9 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-async function settingsReady(page: Page): Promise<void> {
-  await shown(page).locator('[data-testid=tax-settings-form]').waitFor({ state: 'visible' });
-}
-
 // flow: TAX-F11 (Montar un negocio de Canarias, Ceuta o Melilla) — FIX: el negocio no guarda su país ni su región y Ventas cobra sin ella
 test('TAX-F11: a business of the Canary Islands keeps its region and the till charges the IGIC 7 %, not the VAT', async ({ page, context }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page, A, '/tax/settings');
-  await settingsReady(page);
-  const form = shown(page).locator('[data-testid=tax-settings-form]');
+  const form = await taxSettingsForm(page);
   await expect(form.locator('[data-testid=tax-settings-country]')).toContainText('Spain');
   await pickSelect(page, form.locator('[data-testid=tax-settings-region]'), 'Canary Islands (IGIC)');
   await form.locator('[data-testid=tax-settings-save]').click();
@@ -60,7 +43,7 @@ test('TAX-F11: a business of the Canary Islands keeps its region and the till ch
 
   for (const vp of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await settingsReady(page);
+    await taxSettingsReady(page);
     await expect(form.locator('[data-testid=tax-settings-region]')).toContainText('Canary Islands (IGIC)');
     await expect.poll(() => horizontalOverflow(page), `settings at ${vp.label}: sideways scroll`).toBeLessThanOrEqual(1);
     await page.screenshot({ path: shot(`FIX-TAX-REGION-IGIC-${vp.label}`) });

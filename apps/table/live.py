@@ -2,7 +2,7 @@
 
 The floor is live (TABLE-F09): a table's status is computed when read from its checks, its block and
 its holds, so everything that changes one of them re-runs the plan — this app's own writes, Sales
-charging or voiding a table's check (phase 1 has no relay: the read itself sees what Sales did) and
+charging or voiding a table's check (the read itself sees what Sales did, before the relay delivers it) and
 Customers putting a card on a check or erasing it.
 """
 

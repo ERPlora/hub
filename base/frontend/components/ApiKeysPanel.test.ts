@@ -1,8 +1,3 @@
-// Employees › API keys (BASE-G146…G149, G03, G05; the old hub's ApiKeysPanel): the live `base.api_key.list` — each key
-// with the start of its token, what it may do, its state, when it was made and last used and its pace —, «New API
-// key» (name, pace, what it may do: all, read, write or per app with the apps that publish their API), its token shown
-// once with «Copy», «Rotate» and «Revoke» (both asked first, with their consequence). A business that cannot have keys
-// yet is told so; a list that cannot be read is never «no keys».
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
@@ -241,12 +236,12 @@ describe('ApiKeysPanel: Android Back with unsaved changes in «New API key» (hu
     await m.result(m.call, 'base.api_key.list', LIST);
     await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
     await flush();
-    const { expectUnsavedFormOnAndroidBack } = await import('../__tests__/unsaved-form');
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../__tests__/unsaved-form');
     const tickRead = async (checked: boolean) => {
       (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked } }));
       await flush();
     };
-    await expectUnsavedFormOnAndroidBack({
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => byTestId('api-key-form'),
       change: async () => {
         type(byTestId('api-key-form-name')!, 'Tienda');
@@ -257,7 +252,7 @@ describe('ApiKeysPanel: Android Back with unsaved changes in «New API key» (hu
         await flush();
       },
     });
-    await expectUnsavedFormOnAndroidBack({
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => byTestId('api-key-form'),
       change: () => tickRead(true),
       restore: () => tickRead(false),

@@ -509,7 +509,7 @@ def test_a_refused_write_leaves_nothing(clock):
 
 
 def test_a_date_that_passed_does_not_block_renaming_or_saving_it_again(clock):
-    # Review 2026-10-15, item 4: only a date that changes is checked against now.
+    # Only a date that changes is checked against now.
     when = dt.datetime(2026, 10, 14, 9, 0, tzinfo=MADRID)
     flow = make_flow(trigger_kind=Flow.Trigger.AT, trigger_event="", run_at=when)
     clock(NOON)

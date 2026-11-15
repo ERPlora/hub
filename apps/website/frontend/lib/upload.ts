@@ -1,4 +1,4 @@
-// The editor's image upload, as ImageUpload's `upload` (W3, @erplora/ui/components): the file travels to
+// The editor's image upload, as ImageUpload's `upload` (@erplora/ui/components): the file travels to
 // `website.image.upload` in base64 inside the operation's JSON (the repo's upload contract, as verifactu's
 // certificate: one door for the SPA, the API keys and the assistant), and the stored image's id and URL come back.
 // The server checks the type and the size again; the picker's own check is only a courtesy.

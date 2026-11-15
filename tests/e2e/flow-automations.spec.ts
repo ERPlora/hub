@@ -7,7 +7,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
-import { rowAction, signedIn, VIEWPORTS } from './task-helpers';
+import { rowAction } from './service-helpers';
+import { signedIn, VIEWPORTS } from './task-helpers';
 
 const TAG = 'E2E Flow';
 

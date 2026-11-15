@@ -1,8 +1,7 @@
 // Types of the table app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/table/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: moments ISO 8601 with their zone, money in whole cents.
+// apps/table/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`. Keep
+// it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity): no
+// path parameters, an id travels in the input. On the wire: moments ISO 8601 with their zone, money in whole cents.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type ZoneColor = 'primary' | 'secondary' | 'tertiary' | 'success' | 'warning' | 'danger' | 'medium';

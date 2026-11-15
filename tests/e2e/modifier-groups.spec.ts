@@ -4,12 +4,14 @@
 // them), creates one from «New group» (F02; a taken name is refused under Name), edits it (F03; a maximum below its
 // defaults is refused under Maximum) and deletes it after a confirmation that says what goes with it, adds, edits and
 // deletes the options of its sheet (F04: a supplement, a discount with the ± key, a soft drink with its own tax
-// category), and applies it to a product found by its SKU and to a category, then stops applying it (F05). Each screen
-// in 390×844, 834×1112 and 1440×900 (`APP-MODIFIER-MODIFIER-Fnn-<w>`). Its data are named `E2E Mod …` / `E2E-MOD-…`
+// category; one default too many is refused under «Chosen by default» until it is switched off), and applies it to a product found by its SKU and to a category, then stops applying it (F05). Each screen
+// in 390×844, 834×1112 and 1440×900. Its data are named `E2E Mod …` / `E2E-MOD-…`
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
+import { rowAction } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-MOD-${STAMP}`;
@@ -90,18 +92,6 @@ async function pickCombo(page: Page, scope: Locator, testid: string, text: strin
   await input.click();
   await input.fill(text);
   await page.locator(`[data-testid="${testid}-option-${id}"]`).click();
-}
-
-/** Runs a row action of the groups table: its inline button, or the row's «⋮» menu when it folded there. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `modifier-groups-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=modifier-groups-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
 /** A group made through the API, with its options (setup, never the check). */
@@ -233,7 +223,9 @@ test('MODIFIER-F02: «New group» creates it with its rule; a taken name is refu
   await expect(form).toContainText('There is already a group with that name.');
   await expect(form.locator('[data-testid=modifier-group-form-max_choices] input')).toHaveValue('4');
   await shoot(page, 'MODIFIER-F02', () => expect(form).toContainText('There is already a group with that name.'));
+  // «Cancel» asks before losing the refused group (BASE-F05): the person discards it.
   await form.locator('[data-testid=modifier-group-form-cancel]').click();
+  await discardChanges(page);
   await expect(form).toBeHidden();
 });
 
@@ -247,7 +239,7 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
   await openGroups(page);
   await expect(groupRow(page, group.id)).toContainText('Optional · max. 3');
 
-  await rowAction(page, group.id, 'edit');
+  await rowAction(page, 'modifier-groups', group.id, 'edit');
   const form = dialog(page, 'modifier-group-form');
   await expect(form).toBeVisible();
   await expect(form.locator('[data-testid=modifier-group-form-name] input')).toHaveValue(named('Extras'));
@@ -265,10 +257,10 @@ test('MODIFIER-F03: Edit changes only what is touched, a maximum below the defau
   await expect(groupRow(page, group.id)).toContainText('EXTRA');
 
   // Deleting it, after a confirmation that says its options and where it applies go with it.
-  await rowAction(page, group.id, 'delete');
+  await rowAction(page, 'modifier-groups', group.id, 'delete');
   const confirm = dialog(page, 'modifier-groups-delete');
-  await expect(confirm).toContainText('2 option(s) will be deleted with it.');
-  await expect(confirm).toContainText('It will stop applying to 1 product(s) or category(ies).');
+  await expect(confirm).toContainText('2 options will be deleted with it.');
+  await expect(confirm).toContainText('It will stop applying to 1 product or category.');
   await shoot(page, 'MODIFIER-F03-delete', () => expect(confirm).toBeVisible());
   await confirm.locator('[data-testid=modifier-groups-delete-submit]').click();
   await expect(confirm).toBeHidden();
@@ -343,6 +335,41 @@ test('MODIFIER-F04: the sheet adds, edits and deletes the options with their sup
   await expect(optionRows.filter({ hasText: 'Soda' })).toHaveCount(0);
 });
 
+test('MODIFIER-F04: one default too many is refused under «Chosen by default», and switching it off takes the refusal away', async ({ page, context }) => {
+  await login(page, A, '/modifier/groups');
+  const group = await makeGroup(context, { name: named('Dips'), max_choices: 2 }, [
+    { name: 'Ketchup', is_default: true },
+    { name: 'Mayo', is_default: true },
+  ]);
+  await openGroups(page);
+  await groupRow(page, group.id).locator('[role=cell]').first().click();
+  await expect(sheet(page)).toBeVisible();
+  const optionForm = dialog(page, 'modifier-option-form');
+  const isDefault = optionForm.locator('[data-testid=modifier-option-form-is_default]');
+  const refused = optionForm.locator('[data-testid=modifier-option-form-is_default-error]');
+
+  await sheet(page).locator('[data-testid=modifier-sheet-options-add]').click();
+  await expect(optionForm).toBeVisible();
+  await fill(optionForm, 'modifier-option-form-name', 'Mustard');
+  await isDefault.click();
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(refused).toHaveText('This group has more options chosen by default than its maximum.');
+  await shoot(page, 'MODIFIER-F04-too-many-defaults', () => expect(refused).toBeVisible());
+
+  // Switched off, the refusal goes at once, before saving again.
+  await isDefault.click();
+  await expect(refused).toHaveCount(0);
+  await shoot(page, 'MODIFIER-F04-default-switched-off', () => expect(refused).toHaveCount(0));
+  await optionForm.locator('[data-testid=modifier-option-form-submit]').click();
+  await expect(optionForm).toBeHidden();
+  const options = await api<{ rows: { name: string; is_default: boolean }[] }>(context, A, 'GET', `/modifier/options?group_id=${group.id}`);
+  expect(options.data.rows.map((row) => [row.name, row.is_default]).sort()).toEqual([
+    ['Ketchup', true],
+    ['Mayo', true],
+    ['Mustard', false],
+  ]);
+});
+
 test('MODIFIER-F05: the group is applied to a product by its SKU and to a category, and stops applying', async ({ page, context }) => {
   await login(page, A, '/modifier/groups');
   const group = await makeGroup(context, { name: named('Sides') }, [{ name: 'Fries' }]);
@@ -377,7 +404,9 @@ test('MODIFIER-F05: the group is applied to a product by its SKU and to a catego
   await pickCombo(page, linkForm, 'modifier-link-form-target', SKU, productId);
   await linkForm.locator('[data-testid=modifier-link-form-submit]').click();
   await expect(linkForm).toContainText('This group already applies there.');
+  // «Cancel» asks before losing the refused product (BASE-F05): the person discards it.
   await linkForm.locator('[data-testid=modifier-link-form-cancel]').click();
+  await discardChanges(page);
   await expect(linkForm).toBeHidden();
 
   // It stops applying to the product, after its confirmation: the category stays.

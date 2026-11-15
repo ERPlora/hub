@@ -86,6 +86,29 @@ export async function pickCombo(page: Page, field: Locator, query: string, text:
 /** The dialog of a FormModal (Ionic moves it to ion-app). */
 export const dialog = (page: Page, testid: string): Locator => page.locator(`ion-modal[data-testid=${testid}]`);
 
+/** Opens the dialog `testid` with `open` and resolves once Ionic has presented it (hub#1023). A fresh `ion-modal` shows
+ *  before then, while Ionic still loads it, and takes no tap, Escape nor Back yet: the press lands on the screen behind
+ *  (Back went Home under a window that opened a moment later). */
+export async function presentedDialog(page: Page, testid: string, open: () => Promise<void>): Promise<Locator> {
+  const done = page.evaluate(
+    (id) =>
+      new Promise<void>((resolve) => {
+        const seen = (event: Event) => {
+          if ((event.target as Element).getAttribute('data-testid') !== id) return;
+          document.removeEventListener('ionModalDidPresent', seen);
+          resolve();
+        };
+        document.addEventListener('ionModalDidPresent', seen);
+      }),
+    testid,
+  );
+  await open();
+  await done;
+  const shownDialog = dialog(page, testid);
+  await expect(shownDialog).toBeVisible();
+  return shownDialog;
+}
+
 /** Types into an Ionic field. */
 export async function fill(scope: Locator, testid: string, value: string): Promise<void> {
   const input = scope.locator(`[data-testid=${testid}] input, [data-testid=${testid}] textarea`).first();
@@ -118,25 +141,9 @@ export async function shoot(page: Page, name: string, restore = { width: 1280, h
   return files;
 }
 
-/** The screenshots of a flow of the migration (APP-INVENTORY): `APP-INVENTORY-<key>-<390|834|1440>`. */
+/** The screenshots of a flow: `APP-INVENTORY-<key>-<390|834|1440>`. */
 export async function shootFlow(page: Page, key: string, restore = { width: 1280, height: 860 }): Promise<string[]> {
   return shoot(page, `APP-INVENTORY-${key}`, restore);
-}
-
-/** Runs a row action of the products list: its inline button, or the row's «⋮» menu when it folded there. */
-export async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `inventory-products-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`).first();
-  const menu = shown(page).locator(`[data-testid=inventory-products-row-${id}-menu]`).first();
-  // Right after a search the row may not be painted yet: choosing then took the menu and waited there for an
-  // inline action until the test's time ran out. The row's buttons paint together, so wait for either.
-  await expect(inline.or(menu).first()).toBeVisible();
-  if (await inline.isVisible()) {
-    await inline.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
 /** How a «Not configured» chip sits in its box (`within`: the table cell, the card's value or the form's field):
@@ -260,7 +267,7 @@ export const settledChipFit = (
   message: string,
 ): Promise<Awaited<ReturnType<typeof chipFit>>> => settled(() => chipFit(chip, options), message, { problems: [], metrics: {} });
 
-/** FIX-UI-DATATABLE-CELL-NO-WRAP-SQUEEZES-CHIP-BESIDE-BADGE - How a «Not configured» chip and the badge painted after
+/** How a «Not configured» chip and the badge painted after
  *  it (`badge`, a selector inside the same box) share their box (`within`, as `chipFit`): what is wrong with them (none
  *  = the chip is whole or as wide as its box, never squeezed by the badge beside it; the badge whole and inside the box;
  *  neither over the other) and their measurements for the report. */

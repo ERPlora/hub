@@ -1,6 +1,6 @@
 // CART_CHECKOUT-F01 «Crear un carrito»: «New cart» asks for Session (required: «Save» stays off without
 // it), Email and Name, with the old panel's placeholders, and sends `cart_checkout.cart.create` without a
-// currency (the server gives the business's one: the old cart_checkout#32 sent a literal EUR). A session
+// currency (the server gives the business's one: the old module sent a literal EUR). A session
 // another cart has (409) or an email that is not one (422) goes under its field, and what was typed stays
 // (the old form-error-in-panel: the refusal travels with the form, never under it).
 import { describe, expect, it, vi } from 'vitest';
@@ -130,8 +130,8 @@ describe('CartFormModal: fields refused with the same words (hub#888)', () => {
 describe('CartFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('cart-checkout-cart-form'),
       change: () => ionValue(s.field('email'), 'ana@example.com', 'ionInput'),
       restore: () => ionValue(s.field('email'), '', 'ionInput'),

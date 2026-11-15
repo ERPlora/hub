@@ -1,7 +1,7 @@
-"""Guardrail of the savepoints (W9; the finding of hub#468; PLAN-DB §4; CLAUDE.md «Tenencia del Hub»).
+"""Guardrail of the savepoints: inside an operation they open on the hub's alias, never on ``default``.
 
 Django's ``transaction.atomic()`` opens on ``default`` (control's database) whatever hub the code works in. With a hub's
-own database (S2) an operation's transaction is on the hub's alias, and a bare ``transaction.atomic()`` inside it opens
+own database an operation's transaction is on the hub's alias, and a bare ``transaction.atomic()`` inside it opens
 another transaction on control instead of a savepoint of the operation's: ``try: with transaction.atomic(): create…
 except IntegrityError:`` then aborts the hub's transaction, and every write after it fails (or a select_for_update runs
 with no transaction at all). ``live.operations.atomic()`` opens on ``live.operations.current_alias()``: the hub's
@@ -79,7 +79,7 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
     ),
     "base/services.py::hub_register": (
         "base.hub.register is the platform's operation (use_control): its writes (control.Hub) and its two savepoints "
-        "are control's, the alias of its own transaction. The registry block is S2a's; it is left as it is here."
+        "are control's, the alias of its own transaction. The registry block is left as it is here."
     ),
     "base/services.py::open_session_from_saas": CONTROL_LOGIN,
     "base/services.py::open_session_on_device": CONTROL_LOGIN,

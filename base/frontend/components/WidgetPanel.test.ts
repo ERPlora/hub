@@ -1,7 +1,3 @@
-// One panel of the Home's board (BASE-G166, BASE-G168): its title and icon, and its data — followed live when
-// its operation is a live query (a write anywhere re-runs it on the server), asked once when it is not. A
-// failed read says «Unavailable», never the old figure; no rows say «No data». A panel of its own component
-// mounts that component of its app.
 import { HubIcon } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -85,8 +81,7 @@ describe('WidgetPanel', () => {
     expect(m.wrapper.get('[data-testid="widget-empty"]').text()).toBe('Sin datos');
   });
 
-  // FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT: a stat says under its figure what it counts, the text its app gives in
-  // `options.label` (already in the reader's language: base translates it); one without it says nothing more.
+  // `options.label` arrives already in the reader's language: base translates it.
   it('says under the figure of a stat what it counts, in its severity', async () => {
     const stat = { kind: 'stat', map: { value: 'open', severity: 'tone' }, options: { format: 'number', label: 'En cola de contingencia' } } as const;
     const m = await panel(stat, 'es');
@@ -103,7 +98,6 @@ describe('WidgetPanel', () => {
     expect(bare.wrapper.find('[data-testid="widget-label"]').exists()).toBe(false);
   });
 
-  // The old hub's gh:hub#1105: a kpi under its own title never repeats `options.label` as a second heading.
   it('a kpi paints only its figure under its title, never its `options.label`', async () => {
     const m = await panel({ options: { format: 'number', label: 'Records pending submission to the AEAT' } });
     const call = await m.live();
@@ -159,9 +153,7 @@ describe('WidgetPanel', () => {
     expect(fills.map((fill) => fill.classes())).toEqual([['widget-bar-fill'], ['widget-bar-fill']]);
   });
 
-  // BASE-F06 (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR): Staff's «Staff by role» painted every role in the panel's
-  // colour. A panel that declares `map.color` paints each bar in its row's colour; a negative stays red, and one
-  // without the declaration keeps the panel's colour.
+  // A panel without `map.color` keeps the panel's colour for every bar.
   it("paints each bar of a bar-list in its row's colour when the panel maps one, a negative still red", async () => {
     const m = await panel({ kind: 'bar-list', map: { label: 'name', value: 'n', color: 'color' } });
     const call = await m.live();
@@ -198,8 +190,8 @@ describe('WidgetPanel', () => {
     expect(m.wrapper.get('[data-testid="widget-sparkline"] polyline').attributes('points')).toBe('0,40 100,0');
   });
 
-  // BASE-G98: a panel's amounts are in the business's currency (`base.business.get`, the same subscription for every
-  // panel of the tab), never a fixed euro; until the business is known, a dash.
+  // A panel's amounts are in the business's currency (`base.business.get`, one subscription for every panel of the
+  // tab), never a fixed euro; until the business is known, a dash.
   describe("the business's currency", () => {
     const money = { map: { value: 'total' }, options: { format: 'currency' } } as const;
 
@@ -216,7 +208,7 @@ describe('WidgetPanel', () => {
     });
 
     it('with the decimals of its currency, the amount being in its minor unit', async () => {
-      // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: ¥123,400 of sales read «¥1,234».
+      // Read as cents, ¥123,400 of sales would show as «¥1,234».
       const m = await panel(money, 'en');
       const call = await m.live();
       await m.result(call, 'base.business.get', business({ country: 'JP', currency: 'JPY', currency_decimals: 0 }));
@@ -225,8 +217,8 @@ describe('WidgetPanel', () => {
     });
   });
 
-  // BASE-F06 (the old hub's gh:hub#2392): a chart of business days says each day in the person's language, never
-  // `2026-10-23`, and the amount of the chosen bar — the last one (today) until another is tapped or focused.
+  // A chart of business days says each day in the person's language, never `2026-10-23`, and the amount of the chosen
+  // bar — the last one (today) until another is tapped or focused.
   describe('a chart of days', () => {
     const chart = { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } } as const;
     const week = { rows: [{ day: '2026-10-21', total: 1250 }, { day: '2026-10-22', total: 0 }, { day: '2026-10-23', total: 500 }] };

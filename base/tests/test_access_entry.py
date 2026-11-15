@@ -1,4 +1,4 @@
-"""The way in of a browser without a session (BASE-G54, G55, G57, G58, G61): the PIN pad or erplora.com's sign-in.
+"""The way in of a browser without a session: the PIN pad or erplora.com's sign-in.
 
 A page of the hub loaded without a session goes to the hub's «Access» (``/login``) when this browser is a shared device
 of the hub, of a business that asks, with somebody to choose on its grid (saying, if so, that the session ended:

@@ -1,6 +1,6 @@
-"""Tables with the outbox relay running (``base.relay``, run by the worker on every tick; PLAN-HUB «Eventos entre
-módulos», round 2026-10-20): what other apps announce reaches the room through the worker's real loop, on the real
-database and the real apps (Reservations, Customers, Sales), without mocks.
+"""Tables with the outbox relay running (``base.relay``, run by the worker on every tick): what other apps announce
+reaches the room through the worker's real loop, on the real database and the real apps (Reservations, Customers,
+Sales), without mocks.
 
 - a card erased in Customers (``customer.customer.erased``) leaves the room without her name: her holds forget it
   and the checks she sits at no longer say it (TABLE-F31);
@@ -141,7 +141,7 @@ def test_a_hold_that_forgets_a_name_says_so_and_the_live_plan_paints_it_again(te
 
 
 def test_erasing_the_card_a_duplicate_was_merged_into_forgets_the_duplicates_holds_too(terrace, tick):
-    # tables#127: the hold keeps the absorbed card's id; erasing the card that stays erases the absorbed one too.
+    # The hold keeps the absorbed card's id; erasing the card that stays erases the absorbed one too.
     absorbed = make_customer("Ana G.", phone="600111333")
     survivor = make_customer("Ana García", phone="600111222")
     out = book(table_id=str(terrace.id), customer_id=str(absorbed.id), guest_name="Ana G.")

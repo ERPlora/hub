@@ -1,9 +1,9 @@
-"""Closing the drawer by asking the assistant (CASH_REGISTER-F09; PLAN §30, «Cinco acciones de IA pulidas», the
-first: the cash count, with its summary before and its confirmation), against the Hub's real assistant turn
-(``base.assistant.turn``): «cierra la caja con 250 € contados» offers the summary and the close; the summary
-(``cash_register.session.closing_summary``) is a read, so it runs by itself and goes back to the model, with the
-expected cash only for whoever may see it; the close is a dangerous write: it waits on its card, names the session
-and the count, and closes only after the person types the word. Cancelling leaves the session open."""
+"""Closing the drawer by asking the assistant (CASH_REGISTER-F09: the cash count, with its summary before and its
+confirmation), against the Hub's real assistant turn (``base.assistant.turn``): «cierra la caja con 250 € contados»
+offers the summary and the close; the summary (``cash_register.session.closing_summary``) is a read, so it runs by
+itself and goes back to the model, with the expected cash only for whoever may see it; the close is a dangerous write:
+it waits on its card, names the session and the count, and closes only after the person types the word. Cancelling
+leaves the session open."""
 
 import datetime as dt
 import json
@@ -23,6 +23,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_services_assistant import answered, waiting
 
 pytestmark = pytest.mark.django_db
 
@@ -110,7 +111,7 @@ def test_a_blind_figure_is_still_found_beside_an_id_and_a_moment_that_spell_it()
 
 
 def test_a_blind_count_keeps_the_expected_from_the_model_when_a_cashier_asks(coffee):
-    # gh:cash_register#24, #84: the blind count cannot be opened by asking the assistant.
+    # The blind count cannot be opened by asking the assistant.
     run("cash_register.settings.update", {"require_blind_count": True})
     open_session(10000)
     charge()
@@ -162,19 +163,19 @@ def test_the_close_waits_on_its_dangerous_card_naming_the_session_and_the_count(
         "CONFIRMAR",
         False,
     )
-    # In the person's language, Spanish here (FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH).
+    # In the person's language, Spanish here.
     assert [(field["name"], field["label"], field["kind"], field["value"]) for field in card["fields"]] == [
         ("session", "Sesión", "text", session.number),
         ("closing_balance", "Efectivo contado", "money", 25000),
     ]
-    assert plan["pending"] == [close]
+    assert waiting(plan) == [close]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 
 def test_typing_the_word_closes_the_session_as_the_person_with_the_three_figures():
     session = open_session(10000)
     close = call("cash_register.session.close", {"session": session.number, "closing_balance": 25000})
-    plan = turn(close, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "})
+    plan = answered(close, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     closed = Session.objects.get(pk=session.id)
     assert (closed.status, closed.closing_balance, closed.expected_balance, closed.difference, closed.closed_by) == (
@@ -206,16 +207,18 @@ def test_without_the_word_the_session_stays_open(decision):
 def test_a_session_closed_meanwhile_on_another_device_is_not_closed_twice_nor_another_one_closed():
     session = open_session(10000)
     close = call("cash_register.session.close", {"session": session.number, "closing_balance": 25000})
+    drawn = turn(close)
     # Between the card and the yes, another device closes it and opens the next shift.
     run("cash_register.session.close", {"closing_balance": 9000})
     later = open_session(5000)
-    plan = turn(close, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    assert plan["confirm"] is None
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "cash_register.session_not_open")]
     assert Session.objects.get(pk=session.id).closing_balance == 9000
     assert Session.objects.get(pk=later.id).status == Session.Status.OPEN
 
 
-# ── How the card names the data (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258) ──
+# ── How the card names the data (base's half is hub#258) ──
 
 
 def labels(card: dict) -> list[str]:
@@ -255,7 +258,7 @@ def test_renaming_a_drawer_names_the_drawer_and_its_new_name_apart():
     ]
 
 
-# ── What closing will do, on its card (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW; BASE-F98's hook) ──
+# ── What closing will do, on its card (BASE-F98's hook) ──
 # The card of the close listed only what it sends (the session and the counted cash), never what closing gives: the
 # expected and the difference were said only in the chat, before the card. Through base's hook it shows, before the
 # word is typed, what cash_register.session.closing_summary answers for the person: the session's number, its drawer,
@@ -302,8 +305,8 @@ def test_the_close_card_shows_the_session_its_drawer_the_expected_and_the_differ
         ("expected_balance", "money", 10150),
         ("difference", "money", difference),
     ]
-    # The difference with its sign, as the screens write it (FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN):
-    # over or short at a glance; the expected cash is an amount like any other.
+    # The difference with its sign, as the screens write it: over or short at a glance; the expected cash is an
+    # amount like any other.
     assert [field["name"] for field in preview if field.get("signed")] == ["difference"]
     assert [field["label"] for field in preview] == card_labels(SCREENS)
     assert [field["label"] for field in close_preview({"closing_balance": counted}, language="en")[1]] == card_labels(
@@ -312,26 +315,54 @@ def test_the_close_card_shows_the_session_its_drawer_the_expected_and_the_differ
     assert assistant.preview_of(get("cash_register.session.close"))["fields"] == PREVIEWED
 
 
+def what_closing_the_bar_gives(session) -> list[tuple]:
+    """The preview of closing «Barra» with 250.00 € counted, after a 100.00 € float and a 1.50 € coffee: its session,
+    its drawer, 101.50 € expected and 148.50 € over."""
+    return [("number", session.number), ("register_name", "Barra"), ("expected_balance", 10150), ("difference", 14850)]
+
+
+def previewed(card: dict) -> list[tuple]:
+    """The data of ``card``'s preview, by name and value."""
+    return [(field["name"], field["value"]) for field in card["preview"]]
+
+
 def test_the_card_the_person_sees_carries_that_preview_and_closes_nothing(coffee):
     session = at_the_bar(10000)
     charge()
     plan = turn(call("cash_register.session.close", {"session": session.number, "closing_balance": 25000}))
     card = plan["confirm"]
     assert (card["operation"], card["confirm_word"]) == ("cash_register.session.close", "CONFIRMAR")
-    assert [(field["name"], field["value"]) for field in card["preview"]] == [
-        ("number", session.number),
-        ("register_name", "Barra"),
-        ("expected_balance", 10150),
-        ("difference", 14850),
-    ]
-    # The difference reaches the person's card marked signed, the rest not (the turn's schema dropped the mark:
-    # FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN).
+    assert previewed(card) == what_closing_the_bar_gives(session)
+    # The difference reaches the person's card marked signed, the rest not (the turn's schema once dropped the
+    # mark).
     assert [field["name"] for field in card["preview"] if field["signed"]] == ["difference"]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 
+def test_the_employees_answer_that_tells_the_summary_and_calls_the_close_brings_its_card(coffee):
+    """hub#1138 (CASH_REGISTER-F09, steps 5 and 6): the route the close's description asks of the model, as the
+    employee of the QA asked it. The summary runs by itself; the answer that tells it to the person and, in the same
+    answer, calls the close comes back with the close's card, its summary on it: the person confirms there, never by
+    answering a question in the chat."""
+    asked_by = {"role": "user", "content": "cierra la caja con 250 € contados y enséñame antes el resumen"}
+    session = at_the_bar(10000)
+    charge()
+    arguments = {"session": session.number, "closing_balance": 25000}
+    summary = call("cash_register.session.closing_summary", arguments, "c1")
+    read = turn(summary, role="hub_employee", messages=[asked_by, asked(summary)])
+    assert (read["confirm"], [(row["outcome"], row["code"]) for row in read["executed"]]) == (None, [("ok", "")])
+    close = call("cash_register.session.close", arguments, "c2")
+    said = {**asked(close), "content": f"Resumen del cierre de {session.number}: esperado 101,50 €, sobran 148,50 €."}
+    plan = turn(close, role="hub_employee", messages=[asked_by, asked(summary), *read["append"], said])
+    card = plan["confirm"]
+    assert (card["operation"], card["confirm_word"], card["blocked"]) == ("cash_register.session.close", "CONFIRMAR", False)
+    assert previewed(card) == what_closing_the_bar_gives(session)
+    assert waiting(plan) == [close]
+    assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
+
+
 def test_with_a_blind_count_the_cashiers_card_shows_neither_the_expected_nor_the_difference(coffee):
-    # gh:cash_register#24, #84: the card never opens the blind count either.
+    # The card never opens the blind count either.
     run("cash_register.settings.update", {"require_blind_count": True})
     session = at_the_bar(10000)
     charge()
@@ -384,8 +415,7 @@ def test_without_the_permission_to_close_there_is_no_preview_nor_card():
     assert (failure.outcome, preview) == ("refused", None)
 
 
-# ── The record a write names by its id, by its name (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS;
-# base's half is hub#416) ──
+# ── The record a write names by its id, by its name (base's half is hub#416) ──
 # Since hub#416 the card leaves out an id its schema does not mark: «count the drawer», «take 5 € out», «close it»,
 # «print its report», «open the bar» or «rename the bar» said no session and no drawer. Now the session is named by its
 # number, as the sessions' list and every window of a shift say it («Arqueo de caja · S-…»), and the drawer by its name,
@@ -491,7 +521,7 @@ def test_a_closed_session_is_named_when_its_report_is_printed():
 
 
 def test_with_a_blind_count_the_cashier_still_reads_which_session_the_card_names():
-    # gh:cash_register#24, #84: the blind count hides the expected, never which session it is.
+    # The blind count hides the expected, never which session it is.
     run("cash_register.settings.update", {"require_blind_count": True})
     session = at_the_bar()
     said = cards(ctx_for("hub_employee", language="es"), ON_A_SESSION, "session_id", session.id)

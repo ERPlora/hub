@@ -1,6 +1,6 @@
 // How the schedule screens paint a wall-clock time and a calendar day in the reader's language: the
 // clock of the language (24 hours in Spanish, AM/PM in English) and its day/month order, never moved
-// by the device's time zone (a wall time and a calendar day name no instant). schedules#29, #50.
+// by the device's time zone (a wall time and a calendar day name no instant).
 import { describe, expect, it } from 'vitest';
 
 import { formatDate, formatSpan, formatTime, timeValue } from './format';

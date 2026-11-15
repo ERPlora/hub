@@ -1,7 +1,3 @@
-// Settings › Data › Export (BASE-G101, BASE-G102): only for who administers the hub. The name (the business's to
-// start), the language and the file's final name; «Backup of this business» or «Template to share»; the apps on with
-// «App» (registered) and «Data» (its data travels) and, under a marked «Data», one box per table with its rows —
-// personal data only in a backup —; «Select all» / «Deselect all»; «Export» saves the file and says so.
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,11 +22,7 @@ const APPS: AppDatasets[] = [
 
 const FILE = { filename: 'bar-pepe_en.blueprint.zip', content_type: 'application/zip', content_base64: 'UEsDBA==' };
 
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
-}));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 let clicked: string[] = [];
 

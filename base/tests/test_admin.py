@@ -1,7 +1,7 @@
-"""Django admin of base: Memberships are managed there in phase 1, and the scheduled tasks' clock can be seen
-and brought forward; the deep link chooses a hub (PLAN §18.1).
+"""Django admin of base: Memberships are managed there, the scheduled tasks' clock can be seen and brought forward,
+and the deep link chooses a hub.
 
-The admin lives only on the platform host (``hubs.localhost``); on a hub host it is not found (PLAN §18.1.3).
+The admin lives only on the platform host (``hubs.localhost``); on a hub host it is not found.
 """
 
 import datetime as dt
@@ -25,7 +25,7 @@ def test_membership_is_registered():
 
 
 class TestHubRegistry:
-    """The registry of hubs (plan 2026-10-17, §1.1): read only; the SaaS writes it through /internal/hubs/{id}."""
+    """The registry of hubs: read only; the SaaS writes it through /internal/hubs/{id}."""
 
     def test_is_registered(self):
         assert isinstance(admin.site._registry[Hub], HubAdmin)
@@ -71,7 +71,7 @@ def scheduled_task() -> TaskSchedule:
 
 
 class TestExpireNow:
-    """«Expire now» (plan 2026-10-17, §1.1): a demo ends at once (410) and the worker purges it; platform admins only."""
+    """«Expire now»: a demo ends at once (410) and the worker purges it; platform admins only."""
 
     @pytest.fixture
     def demo(self):
@@ -204,7 +204,7 @@ def test_admin_scripts_carry_the_csp_nonce(client, superuser):
 
 
 class TestDeepLink:
-    """``/admin/hub/<slug>/``: where «Open in the Hub admin» of the SaaS admin lands (round 13, PLAN §18.1)."""
+    """``/admin/hub/<slug>/``: where «Open in the Hub admin» of the SaaS admin lands."""
 
     def test_chooses_the_hub_and_opens_the_admin_index_with_its_banner(self, client, superuser):
         client.force_login(superuser)
@@ -228,7 +228,7 @@ class TestDeepLink:
         assert client.session[ADMIN_HUB_SESSION_KEY] == "b"
 
     def test_chooses_a_demo_too(self, client, superuser):
-        # A demo (demo-<8 hex>) is a hub of the registry the staff may look into (plan 2026-10-17, §1.1).
+        # A demo (demo-<8 hex>) is a hub of the registry the staff may look into.
         client.force_login(superuser)
         response = client.get("/admin/hub/demo-0000beef/", HTTP_HOST=PLATFORM)
         assert response.status_code == 302
@@ -245,7 +245,7 @@ class TestDeepLink:
         assert ADMIN_HUB_SESSION_KEY not in client.session
 
     def test_on_a_hub_host_it_is_not_found_and_chooses_nothing(self, client, superuser, make_user):
-        # The admin lives only on the platform host (PLAN §18.1.3), even for the staff.
+        # The admin lives only on the platform host, even for the staff.
         assert client.get("/admin/hub/a/", HTTP_HOST=HOST).status_code == 404
         for user in (make_user("ana", host="a", role="hub_owner"), superuser):
             client.force_login(user)

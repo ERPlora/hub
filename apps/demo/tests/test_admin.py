@@ -1,7 +1,7 @@
 """Django admin of the demo app: full CRUD on items and their lines, for the platform's staff.
 
-Round 12 (PLAN §17, PLAN-HUB §3.2, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a
-hub's tables but the fiscal ones. A raw admin write records no event, as in every other app's admin.
+The Hub admin has full CRUD over all of a hub's tables but the fiscal ones. A raw admin write records no event,
+as in every other app's admin.
 """
 
 import pytest
@@ -96,7 +96,7 @@ def test_changelist_and_change_page_render(client, superuser):
     ItemLine.objects.create(item=item, text="Coffee", qty=1, position=1)
     on_a_hub(client, superuser)
 
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     changelist = client.get("/admin/demo/item/", **HOST)
     change = client.get(f"/admin/demo/item/{item.pk}/change/", **HOST)
     add = client.get("/admin/demo/item/add/", **HOST)

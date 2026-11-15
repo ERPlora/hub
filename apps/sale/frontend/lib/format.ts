@@ -1,7 +1,8 @@
 // Numbers of the sale screens: the server keeps money in cents and quantities and percentages as
 // decimal strings; a person reads them in the page's language and types amounts. Until
 // `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
-// place the app turns them into text (`Intl.NumberFormat`) and typed amounts into cents.
+// place the app turns them into text (`Intl.NumberFormat`) and what the till's keypad and a refund type into cents (the
+// «Total» filter of the list is read by the platform, as every amount filter of the Hub: `filterCents`, hub#1196).
 // The money is the business's (`useBusinessMoney`: its country's currency and the decimals the server counts it in)
 // on the till, and a charged sale's own (`moneyOf`) on what it shows or prints: the screens pass it, and until it is
 // known an amount is a dash, never the euro by default nor a figure with two decimals the currency may not have
@@ -14,7 +15,7 @@ import { formatQuantity } from '@erplora/ui/components';
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 export { formatQuantity };
 
 const FALLBACK_LOCALE = 'en';
@@ -48,7 +49,7 @@ export const moneyOf = (sale: { currency: string; currency_decimals: number }): 
   sale.currency ? { currency: sale.currency, decimals: sale.currency_decimals } : undefined;
 
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
-// here beside «1.234,56 €» in the other screens (hub#1090).
+// here beside «1.234,56 €» in the other screens.
 function moneyOptions({ currency, decimals }: Money): Intl.NumberFormatOptions {
   const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' } as const;
   return { style: 'currency', currency, currencyDisplay: 'narrowSymbol', ...digits };

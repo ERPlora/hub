@@ -2,7 +2,7 @@
 // One round of the check in «Order tickets» (KITCHEN-F19, F20): «Order N», the time it was sent in the
 // business's zone, its state and «Rush» if it is; its dishes with their quantity (a dish the till voided after
 // sending it, struck, with «Voided»); and, to whoever may change tickets, «Mark rush» / «Remove rush» while it
-// cooks — a VIP round keeps its priority, so it never offers it. The words are the kitchen's (kitchen#112). The
+// cooks — a VIP round keeps its priority, so it never offers it. The words are the kitchen's. The
 // container rushes it (`rush`, with the way it goes).
 import type { OutputOf } from '@erplora/ui/sdk';
 import { computed } from 'vue';

@@ -38,6 +38,7 @@ const PREVIEW: PreviewOut = {
   lines: [],
   cash_limit: 100000,
   ticket_limit: 300000,
+  limits_currency: 'EUR',
 };
 const CARD: PaymentMethodOut = { id: 'm-card', name: 'card', display_name: 'Card', type: 'card', sort_order: 0, requires_change: false, allowed: true };
 const SALE = { id: 's1', number: '20261014-0001', total: 1000, already: false } as SaleOut;

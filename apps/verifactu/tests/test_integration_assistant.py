@@ -1,12 +1,11 @@
-"""The assistant's card for a write of verifactu (FIX-HUB-VERIFACTU-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is
-hub#258): in Spanish, every datum it sends by the name the VeriFactu screens give it, never by the title pydantic makes
-up from the field («Invoice Id», «Issuer Nif», «Month»). The card is base's (``base.assistant.card``); the names
-are verifactu's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog.
+"""The assistant's card for a write of verifactu (base's half is hub#258): in Spanish, every datum it sends by the name
+the VeriFactu screens give it, never by the title pydantic makes up from the field («Invoice Id», «Issuer Nif»,
+«Month»). The card is base's (``base.assistant.card``); the names are verifactu's: the titles of its schemas and the
+``verbose_name`` of its models, with their Spanish in its catalog.
 
-And which writes are tools at all (FIX-HUB-VERIFACTU-CERTIFICATE-PASSWORD-ASKED-IN-THE-CHAT): a write that takes a
-secret (the certificate and its password, the signed authorisation and the copy of an identity document) is «Not an
-assistant tool» — said in a chat it has already reached the model and the history, and its card would paint it in
-clear. The person gives it in «Configuración», as before."""
+And which writes are tools at all: a write that takes a secret (the certificate and its password, the signed
+authorisation and the copy of an identity document) is «Not an assistant tool» — said in a chat it has already reached
+the model and the history, and its card would paint it in clear. The person gives it in «Configuración»."""
 
 import json
 from typing import get_args
@@ -137,10 +136,9 @@ def test_a_secret_inside_a_nested_schema_is_seen_too():
 
 @pytest.mark.django_db
 def test_a_turn_that_still_names_the_certificate_upload_builds_no_card_and_runs_nothing():
-    """The way the chat really takes (``base.assistant.turn``, BASE-G118): a model that calls the write by its name
-    anyway, password included, is refused as «not available»; no card is built (before the fix, the card came back
-    with «hunter2» in clear), so the password is painted nowhere the person sees, and the receipt names what was
-    refused without running it."""
+    """The way the chat really takes (``base.assistant.turn``): a model that calls the write by its name anyway,
+    password included, is refused as «not available»; no card is built, so the password is painted nowhere the person
+    sees, and the receipt names what was refused without running it."""
     turn = get("base.assistant.turn")
     name = assistant.tool_name("verifactu.certificate.upload")
     arguments = json.dumps({"p12_base64": "MIIFAKEP12", "password": "hunter2"})
@@ -157,7 +155,7 @@ def test_a_turn_that_still_names_the_certificate_upload_builds_no_card_and_runs_
         }
     )
     plan = turn(ctx_for("hub_owner", language="es"), data).model_dump(mode="json")
-    assert plan["confirm"] is None  # before the fix: its card, the password in clear among its fields
+    assert plan["confirm"] is None  # never its card, with the password in clear among its fields
     refused = plan["executed"][0]
     assert (refused["outcome"], refused["code"], refused["name"]) == ("refused", "not_available", "verifactu.certificate.upload")
     # Only the history the model wrote itself still carries the password: nothing the turn builds does.

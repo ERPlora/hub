@@ -1,5 +1,6 @@
 // ShareDialog: the website's address to copy, its QR to download (PNG to print, SVG to scale) and, honestly, why
 // the address opens the app on the owner's own device.
+import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
@@ -7,12 +8,7 @@ import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../b
 import { mountWebsite, settle } from '../__tests__/mount-website';
 import ShareDialog from './ShareDialog.vue';
 
-const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock('@erplora/ui/shell', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastSuccess: toasts.success,
-  toastError: toasts.error,
-}));
+vi.mock('@erplora/ui/shell', async (importOriginal) => (await import('../../../../base/frontend/__tests__/toast-spies')).shellWithToastSpies(importOriginal));
 
 /** The hub's answer to the QR's address, as `website.qr.get` serves it: the image, as an attachment with its name. */
 function servesTheQr(): ReturnType<typeof vi.fn> {
@@ -47,8 +43,8 @@ afterEach(() => {
   outOfTheApp();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  toasts.success.mockReset();
-  toasts.error.mockReset();
+  vi.mocked(toastSuccess).mockReset();
+  vi.mocked(toastError).mockReset();
 });
 
 describe('ShareDialog', () => {
@@ -77,7 +73,7 @@ describe('ShareDialog', () => {
       ['website-qr-pepe.png', 'image/png'],
       ['website-qr-pepe.svg', 'image/svg+xml'],
     ]);
-    expect(toasts.error).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   it('inside the installed app the QR goes to the app’s Downloads, which says where (hub#1041)', async () => {
@@ -89,7 +85,7 @@ describe('ShareDialog', () => {
     await settle();
     expect(invoke).toHaveBeenCalledWith('save_download', { name: 'website-qr-pepe.png', dataBase64: btoa('\x89\x50') });
     expect(saved).toEqual([]);
-    expect(toasts.success).toHaveBeenCalledWith('Saved to Download/website-qr-pepe.png');
+    expect(toastSuccess).toHaveBeenCalledWith('Saved to Download/website-qr-pepe.png');
   });
 
   it('a QR that does not come is said, never a press that does nothing', async () => {
@@ -98,7 +94,7 @@ describe('ShareDialog', () => {
     const { wrapper } = await dialog({}, 'es');
     await wrapper.get('[data-testid="website-share-svg"]').trigger('click');
     await settle();
-    expect(toasts.error).toHaveBeenCalledWith('No se ha podido descargar el archivo.');
+    expect(toastError).toHaveBeenCalledWith('No se ha podido descargar el archivo.');
   });
 
   it('warns that the address opens the sign-in while the site is not online', async () => {
@@ -113,7 +109,7 @@ describe('ShareDialog', () => {
     await wrapper.get('[data-testid="website-share-copy"]').trigger('click');
     await settle();
     expect(writeText).toHaveBeenCalledWith(URL);
-    expect(toasts.success).toHaveBeenCalledWith('Link copied');
+    expect(toastSuccess).toHaveBeenCalledWith('Link copied');
     writeText.mockRejectedValueOnce(new Error('denied'));
     await wrapper.get('[data-testid="website-share-copy"]').trigger('click');
     await settle();

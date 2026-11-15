@@ -98,7 +98,7 @@ describe('SettingsPage', () => {
     expect(banner?.text()).toContain('Invalid payload');
   });
 
-  describe('a refusal by fields (hub#821, as FormModal does: ui#88, ui#89)', () => {
+  describe('a refusal by fields (hub#821, as FormModal does)', () => {
     const REFUSAL = {
       error: {
         code: 'invalid_payload',

@@ -1,4 +1,4 @@
-// The till's manager approval (BASE-F84; the old hub's HUB_SHELL-F51; Square's and Toast's manager override). What the
+// The till's manager approval (BASE-F84; Square's and Toast's manager override). What the
 // cashier's role does not allow and the app names in `apps.py` `approvals` goes through `withApproval`: the hub asks,
 // «An approval is needed» lets a manager approve it with their PIN on this very device, and the command is repeated
 // once. Where an ordinary door comes first (a discount within the maximum, an empty check), `throughManager` tries it

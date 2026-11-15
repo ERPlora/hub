@@ -1,9 +1,8 @@
 """Django admin of the pricing app: full CRUD on every model, for the platform's staff.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables. A raw admin write records no event and checks no business rule (no general list taken from
-another, no coherence of a rule): the actions that need one call the operations of services.py. Only a
-rule's tiers are read as the API reads them, because the price of a line reads them as such.
+The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
+(no general list taken from another, no coherence of a rule): the actions that need one call the operations of
+services.py. Only a rule's tiers are read as the API reads them, because the price of a line reads them as such.
 """
 
 import pydantic

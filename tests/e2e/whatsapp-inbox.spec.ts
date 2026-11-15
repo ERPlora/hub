@@ -11,9 +11,9 @@
 // «Create card» joining a Customers card; «Erase this number's data» asked first. An attachment, the
 // echo of the owner's phone and an option tapped show in the thread; the filters keep who waits; the
 // month spent and a number to reconnect are said and go by themselves. An employee notes and takes a
-// conversation but neither erases nor opens Settings. «Retry» on another business's reply, from the shared inbox of
-// phase 1, hands it to erplora.com at once, for that business (WHATSAPP_INBOX-F34). Each flow's screen in three sizes
-// (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440). What it creates is deleted after the file.
+// conversation but neither erases nor opens Settings. «Retry» on another business's reply, from an inbox shared
+// with it, hands it to erplora.com at once, for that business (WHATSAPP_INBOX-F34). Each flow's screen in three sizes
+// (`…-<flow>-390|834|1440`). What it creates is deleted after the file.
 import { execFileSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -75,7 +75,7 @@ async function contrast(bubble: Locator, part: string): Promise<number> {
   }, part);
 }
 
-/** Picks `option` in the inbox's column filter `filter`, through its «Filters» panel (the old hub's funnel). */
+/** Picks `option` in the inbox's column filter `filter`, through its «Filters» panel. */
 async function filterInbox(page: Page, filter: string, option: string): Promise<void> {
   await filterBy(page, 'whatsapp-inbox', filter, option);
 }
@@ -400,12 +400,11 @@ function notSentOfB(phone: string, contactName: string, text: string): string {
 }
 
 test('«Retry» on another business’s reply in the shared inbox hands it to erplora.com at once, for that business', async ({ page }) => {
-  // Only a hub that shares control's database lists another business's conversations. Since S2a (round 2026-10-30 of
-  // PLAN-DB) `a` and `b` have their own, so their inboxes share nothing and this case cannot happen on this stack; the
+  // Only a hub that shares control's database lists another business's conversations. `a` and `b`
+  // have their own, so their inboxes share nothing and this case cannot happen on this stack; the
   // shared one stays covered by apps/whatsapp_inbox/tests/test_resume_per_business.py.
   test.skip(psql("select db_name from base_hub where slug = 'a'") !== '', '`a` and `b` no longer share an inbox (own databases)');
-  // WHATSAPP_INBOX-F34 (FIX-HUB-WHATSAPP-INBOX-RETRY-OF-ANOTHER-BUSINESS-WAITS-FOR-THE-SWEEP): phase 1's inbox of `a` also
-  // lists `b`'s conversations. `a`'s owner retries `b`'s reply that did not leave: `a`'s request hands it to erplora.com
+  // WHATSAPP_INBOX-F34: a shared inbox of `a` also lists `b`'s conversations. `a`'s owner retries `b`'s reply that did not leave: `a`'s request hands it to erplora.com
   // at once, for `b` (never as `a`'s, never refused for running in `a`'s context), and erplora.com answers `b`'s way:
   // `b` has no number there (its test seed gives one only to `a`, whose answer would be Meta's 190, «reconnect»), so
   // «Not delivered», said in the Hub's words and never as Meta's reason. This stack runs no worker: no sweep could have
@@ -424,7 +423,7 @@ test('«Retry» on another business’s reply in the shared inbox hands it to er
   await reply.locator('[data-testid=whatsapp-inbox-message-retry]').click();
 
   await expect.poll(state, { timeout: 15_000 }).toBe('failed whatsapp_inbox.channel_not_connected');
-  // erplora.com's answer is `b`'s live notice, not `a`'s (phase 1 sends them per hub): `a`'s page reads it again.
+  // erplora.com's answer is `b`'s live notice, not `a`'s (they are sent per hub): `a`'s page reads it again.
   await page.reload();
   await searchInbox(page, phone.slice(3));
   await rowOf(page, phone).click();

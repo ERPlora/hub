@@ -206,7 +206,7 @@ describe('HealthPanel: editing the data', () => {
     expect(s.wrapper.get('[data-testid="customer-health-failure"]').text()).toContain('Record their permission first to keep health data.');
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const ALLERGIES = 'Ensure this value has at most 2000 characters.';
     const DATE = 'Enter the date of the test.';
     const RESULT = 'A result needs the date of the test.';

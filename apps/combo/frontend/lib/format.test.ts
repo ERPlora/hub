@@ -4,7 +4,7 @@
 // by default.
 import { describe, expect, it } from 'vitest';
 
-import { formatDelta, formatMoney, type Money, moneyDecimals } from './format';
+import { formatDelta, formatMoney, type Money } from './format';
 
 const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 
@@ -62,13 +62,5 @@ describe('formatDelta', () => {
   it('is only a dash without a sign until the business answers', () => {
     expect(formatDelta(200, 'es')).toBe('—');
     expect(formatDelta(-50, 'en')).toBe('—');
-  });
-});
-
-describe('moneyDecimals', () => {
-  it('is the business currency’s, two while it is unknown', () => {
-    expect(moneyDecimals(PLN)).toBe(2);
-    expect(moneyDecimals(JPY)).toBe(0);
-    expect(moneyDecimals(undefined)).toBe(2);
   });
 });

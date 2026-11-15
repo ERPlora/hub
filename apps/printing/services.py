@@ -1,20 +1,18 @@
 """Write operations of the printing app: one operation = one transaction, with its events in the outbox.
 
-The queue's state machine is the old hub's (``print_queue.rs``): a job waits ``pending``; a device takes
-it (``claim``: ``sent``, one more hand-out, a 90 s lease) with ``SELECT … FOR UPDATE SKIP LOCKED``, so two
-devices never take the same one; the device confirms it (``done``) or reports its failure (back to
-``pending``, or ``failed`` after 5 hand-outs); a lease that runs out puts it back in the queue at the next
-claim. A person retries a failed (or unanswered) job or cancels it, stamped. A job that ended (printed,
-cancelled or failed) is forgotten 30 days later by the hourly prune, the platform's own (PRINTING-F20).
+The queue's state machine: a job waits ``pending``; a device takes it (``claim``: ``sent``, one more hand-out, a 90 s
+lease) with ``SELECT … FOR UPDATE SKIP LOCKED``, so two devices never take the same one; the device confirms it
+(``done``) or reports its failure (back to ``pending``, or ``failed`` after 5 hand-outs); a lease that runs out puts it
+back in the queue at the next claim. A person retries a failed (or unanswered) job or cancels it, stamped. A job that
+ended (printed, cancelled or failed) is forgotten 30 days later by the hourly prune, the platform's own (PRINTING-F20).
 
 Every app that prints calls ``printing.job.create`` by name inside its own transaction; the job is the
-structured document the app's renderer paints, never bytes (PLAN-HUB §5; hub#501).
+structured document the app's renderer paints, never bytes.
 
-Only a device set up to print takes, confirms and fails jobs, and only those of the printers it reaches (the old
-hub's print hosts, hub#342): a session that prints is not enough, or a waiter's phone would drain the till's
-receipts. Whoever sets up the printers sets the device up — from the device («Print from this device»), or by
-printing from it — and changes or retires it from any device. The device is known by the digest of its own id,
-which no screen shows (hub#2551).
+Only a device set up to print takes, confirms and fails jobs, and only those of the printers it reaches: a
+session that prints is not enough, or a waiter's phone would drain the till's receipts. Whoever sets up the
+printers sets the device up — from the device («Print from this device»), or by printing from it — and changes
+or retires it from any device. The device is known by the digest of its own id, which no screen shows.
 """
 
 import datetime as dt
@@ -157,7 +155,7 @@ def _normalize_mac(mac: str) -> str:
     return ":".join(part.zfill(2) for part in re.split(r"[:-]", mac.upper()))
 
 
-def _connection(kind: str, address: str, port: int | None, usage: str) -> tuple[str, int | None]:
+def _connection(kind: str, address: str, port: int | None, usage: str) -> tuple[str, int | None]:  # noqa: C901
     """The address and port a printer of ``kind`` keeps, normalized; a 422 at the field that is wrong.
 
     The rules are the app's (``discovery::parse_print_target``): a network printer is ``<ip>:<port>``, a
@@ -448,7 +446,7 @@ def _given_printer(ref: str, paper: str) -> Printer:
 def _stamped(ctx: OperationContext, data: JobCreateIn) -> dict:
     """The document with the envelope the paper needs when the caller left it out: its language (the
     caller's) and, but on a generic document (which prints every key), its money scale: the decimals of the
-    caller's currency or, when it does not say, of the business's (hub#1159, #2129)."""
+    caller's currency or, when it does not say, of the business's."""
     document = dict(data.document)
     if data.format != PrintJob.Format.RECEIPT:
         return document
@@ -722,7 +720,7 @@ def _copy_of(job: PrintJob) -> dict | None:
             ),
             "es": (
                 "este equipo recoge el siguiente trabajo de impresión",
-                "este equipo está listo para imprimir el trabajo más antiguo",
+                "que este puesto coja el trabajo de impresión más antiguo",
             ),
         },
         "description": "For the device that prints (base's /ws/print): take the oldest queued job of the printers this "
@@ -917,7 +915,7 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
                 device = PrintDevice.objects.create(key=key, name=data.name, registered_by=actor(ctx))
         except IntegrityError:
             device = PrintDevice.objects.select_for_update().get(key=key)
-    # Set up from the device in hand: it is there (the old hub's «a re-registration counts as news»).
+    # Set up from the device in hand: it is there (a re-registration counts as news).
     device.name, device.retired_at, device.retired_by, device.last_seen_at = data.name, None, "", timezone.now()
     device.save(update_fields=["name", "retired_at", "retired_by", "last_seen_at"])
     device.printers.set(printers)
@@ -959,7 +957,7 @@ def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
                 "make this station reach the kitchen printer too",
             ),
             "es": (
-                "renombra el equipo de impresión Barra 2",
+                "cambia el nombre del equipo de impresión Barra 2",
                 "haz que este equipo también llegue a la impresora de cocina",
             ),
         },
@@ -994,8 +992,8 @@ def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
                 "that station was lost, take it out of service",
             ),
             "es": (
-                "retira el equipo Barra 2, ya no está",
-                "da de baja el equipo perdido de la barra",
+                "retira el dispositivo Barra 2, ya no está",
+                "el equipo de la barra se ha perdido: retíralo",
             ),
         },
         "description": "Retire a device that prints (a till replaced or lost), by its registration id: it takes, confirms "

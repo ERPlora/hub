@@ -1,11 +1,10 @@
-# Review of 2026-10-15, findings 4 and 7.
 # - A correction says explicitly whether the system made it, and keeps the name of who made it: a user
 #   deleted later empties `created_by` and must not turn their corrections into the system's.
 # - The exact coordinates of a day clocked from the shared device are dropped: nobody asked for them.
 #   Only a personal device keeps them, when the business requires the location; the distance,
 #   inside/outside and the accuracy stay. Backwards, nothing to undo: the fields go with the AddFields.
-# - Edited by tenancy W10 (a no-op where it ran): a hub's own database has no ``auth_user`` to join, and no corrections
-#   of before to name, so the names are read only where control's users are (phase 1's shared database).
+# - A hub's own database has no ``auth_user`` to join, and no corrections of before to name, so the names are read
+#   only where control's users are (the database businesses shared before each had its own).
 
 from django.conf import settings
 from django.db import migrations, models, router

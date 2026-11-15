@@ -1,7 +1,7 @@
-// flow: modifier-e2e-wait — FIX of the Modifiers specs' wait (FIX-HUB-MODIFIER-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: modifier-e2e-wait — the Modifiers specs' wait
 // Before a capture or a measurement, the Modifiers specs (modifier-*.spec.ts) wait for the screen to stop moving with
-// the harness's one wait, `untilStill` (helpers.ts). Their own wait asked the document alone for its animations, which
-// leaves shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come
+// the harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves
+// shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come
 // out with a sheet still sliding in and pass for good. Here the till's options sheet (MODIFIER-F06: tapping a dish
 // with groups opens it) enters at a fifth of its speed (Chrome's own control), and once the Modifiers specs' wait
 // returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834 and

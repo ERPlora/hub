@@ -3,7 +3,7 @@
 // overdue one turn Expired, abandon one and delete another after confirming; in Orders, reached by the
 // tabbar, mark one paid and complete it (its cart becomes Converted) and fail another with its reason.
 // Lines and orders are started through the API, as the assistant does (the screens have no form for them,
-// WORKBOOK «Pantallas»). Each flow is a step and leaves its capture, `APP-CART_CHECKOUT-<flow>-<width>`,
+// WORKBOOK «Pantallas»). Each flow is a step and leaves its capture
 // after checking that nothing scrolls sideways. Everything carries the session prefix «e2e-cc» and is
 // removed before and after it.
 // flow: CART_CHECKOUT-F01 CART_CHECKOUT-F05 CART_CHECKOUT-F06 CART_CHECKOUT-F07 CART_CHECKOUT-F09 CART_CHECKOUT-F10 CART_CHECKOUT-F11 CART_CHECKOUT-F12
@@ -20,11 +20,12 @@ import {
   listShown,
   orderFrom,
   post,
-  rowAction,
   rowOf,
   signedIn,
   snap,
 } from './cart-checkout-helpers';
+import { rowAction } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
@@ -59,13 +60,15 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(row).toContainText('€0.00');
         expect(psql(`select currency || ' ' || total_amount from cart_checkout_cart where id = '${firstId}'`)).toBe('EUR 0');
 
-        // The same session again: refused under Session, with what was typed kept.
+        // The same session again: refused under Session, with what was typed kept. «Cancel» then asks before losing it
+        // (BASE-F05), and the person discards it.
         await view.locator('[data-testid=cart-checkout-carts-add]').click();
         await page.locator('[data-testid=cart-checkout-cart-form-session] input').fill(first);
         await submit.click();
         await expect(page.locator('[data-testid=cart-checkout-cart-form]')).toContainText('There is already a cart with that session.');
         await expect(page.locator('[data-testid=cart-checkout-cart-form-session] input')).toHaveValue(first);
         await page.locator('[data-testid=cart-checkout-cart-form-cancel]').click();
+        await discardChanges(page);
         await expect(page.locator('[data-testid=cart-checkout-cart-form-submit]')).toBeHidden();
         expect(psql(`select count(*) from cart_checkout_cart where session_token = '${first}'`)).toBe('1');
       });
@@ -80,7 +83,7 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         const row = rowOf(page, 'cart-checkout-carts', secondId);
         await expect(row).toContainText('bea@example.com');
         await expect(row).toContainText('2.5');
-        // Four-digit totals are grouped (hub#1090).
+        // Four-digit totals are grouped.
         await expect(row).toContainText('€1,236.06');
 
         // A piece of the first one's code finds only it.
@@ -92,8 +95,8 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await search.fill('');
         await expect(row).toBeVisible();
 
-        // At every width the filters wait behind the funnel, as the old list (CART_CHECKOUT-F12,
-        // FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL): written in its panel (a sheet in the cards) and applied.
+        // At every width the filters wait behind the funnel (CART_CHECKOUT-F12): written in its panel (a sheet in the
+        // cards) and applied.
         const funnel = view.locator('[data-testid=cart-checkout-carts-filters-toggle]');
         const sheet = view.locator('[data-testid=cart-checkout-carts-filters-panel]');
         await expect(view.locator('[data-testid=cart-checkout-carts-filters]'), 'no open row of filters').toHaveCount(0);
@@ -103,20 +106,21 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
           await sheet.locator('[data-testid=cart-checkout-carts-filter-total_amount_from] input').fill(value);
           await view.locator('[data-testid=cart-checkout-carts-filters-apply]').click();
         }
-        // «Total from» reads an amount as it is pasted (pm#521): «1.236,06» leaves that cart only.
+        // «Total from» reads an amount as it is pasted: «1.236,06» leaves that cart only.
         await totalFrom('1.236,06');
         await expect(row).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toHaveCount(0);
-        // «1.250» is 1.250 € or 1,25 €: it says so under its box (in the panel) and filters nothing.
+        // «1.250» is 1.250 € or 1,25 €: it says both under its box (in the panel), as every amount filter of the Hub
+        // (hub#1196), and filters nothing.
         await totalFrom('1.250');
         await funnel.click();
-        await expect(view.getByText('Type an amount, like 12.50')).toBeVisible();
+        await expect(view.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toBeVisible();
         await totalFrom('');
         // «Apply» closed the panel: opened again, its box no longer warns (else the check below proves nothing).
         await funnel.click();
         await expect(sheet).toBeVisible();
-        await expect(view.getByText('Type an amount, like 12.50')).toHaveCount(0);
+        await expect(view.getByText('This amount can be read in two ways: «1.250» could be €1,250.00 or €1.25. Write the decimals so there is no doubt.')).toHaveCount(0);
         await view.locator('[data-testid=cart-checkout-carts-filters-close]').click();
         await expect(sheet).toBeHidden();
       });

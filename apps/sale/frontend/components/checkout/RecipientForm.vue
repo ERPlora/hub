@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The recipient of an invoice (the old `.limit-capture`, hub#297, sales#317, #332): name, country, the
+// The recipient of an invoice (the old `.limit-capture`): name, country, the
 // kind of document (only abroad: the country decides, as Odoo's l10n_es_edi_verifactu), tax id and
 // address. Amber while something is missing, saying what and why; green once complete. A new country
 // resets the kind of document to the usual one there. The countries are the server's list (Customers'),
@@ -212,7 +212,7 @@ function setIdType(value: unknown): void {
   font-size: 0.82rem;
 }
 
-/* Outlined boxes (sales#414): the label sits on the top border, so each box needs room above, and the
+/* Outlined boxes: the label sits on the top border, so each box needs room above, and the
    selects get the same fill as the inputs over the tinted box. */
 .limit-capture ion-input,
 .limit-capture ion-select {

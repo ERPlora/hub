@@ -29,7 +29,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('table-zone-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('table-zone-form', () => form.value, open);
 const emit = defineEmits<{ saved: [zone: ZoneOut] }>();
 
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
@@ -120,6 +120,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="table-zone-form"
     :title="title"
     :pending="pending"
@@ -133,6 +134,7 @@ async function save(): Promise<void> {
       >
         <ion-input
           data-testid="table-zone-form-name"
+          name="name"
           :value="form.name"
           :label="$t('table.zoneForm.name')"
           :placeholder="zone ? undefined : $t('table.add.zonePlaceholder')"
@@ -146,6 +148,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="table-zone-form-description"
+          name="description"
           :value="form.description"
           :label="$t('table.zoneForm.description')"
           label-placement="floating"
@@ -177,6 +180,7 @@ async function save(): Promise<void> {
           </ion-select>
           <ion-input
             data-testid="table-zone-form-sort_order"
+            name="sort_order"
             type="number"
             inputmode="numeric"
             min="0"

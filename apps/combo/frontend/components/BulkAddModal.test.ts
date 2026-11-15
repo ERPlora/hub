@@ -199,7 +199,7 @@ describe('BulkAddModal', () => {
     expect(s.inDoc('combo-bulk-row-p3')).not.toBeNull();
   });
 
-  it('combos#12: a whole category at once — its products listed, «Tick all» ticks the ones not in the course yet', async () => {
+  it('a whole category at once — its products listed, «Tick all» ticks the ones not in the course yet', async () => {
     const s = await setup();
     s.answerBy({
       '/api/inventory/categories': [200, page([{ id: 'c1', name: 'Starters', product_count: 3 }])],
@@ -253,6 +253,18 @@ describe('BulkAddModal', () => {
     expect(namesGiven(bar)).toEqual(['Busca un producto…']);
   });
 
+  // hub#1124: one ticked product is singular, two are plural, in both languages.
+  it.each([
+    { locale: 'en' as const, ticked: ['p2'], label: 'Add 1 selected' },
+    { locale: 'en' as const, ticked: ['p2', 'p3'], label: 'Add 2 selected' },
+    { locale: 'es' as const, ticked: ['p2'], label: 'Añadir 1 seleccionado' },
+    { locale: 'es' as const, ticked: ['p2', 'p3'], label: 'Añadir 2 seleccionados' },
+  ])('«$label» with $ticked.length ticked ($locale, COMBO-F06)', async ({ locale, ticked, label }) => {
+    const s = await setup(locale);
+    for (const id of ticked) await ionChecked(s.box(id), true);
+    expect(s.submit().textContent?.trim()).toBe(label);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup('es');
     expect(s.inDoc('combo-bulk')?.getAttribute('aria-label')).toBe('Añadir productos a este plato');
@@ -269,8 +281,8 @@ describe('BulkAddModal', () => {
 describe('BulkAddModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('as opened closes; a product ticked asks; unticked again closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('combo-bulk'),
       change: () => ionChecked(s.box('p3'), true),
       restore: () => ionChecked(s.box('p3'), false),

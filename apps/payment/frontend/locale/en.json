@@ -16,9 +16,6 @@
       "retry": "Retry"
     },
     "money": {
-      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
-      "negative": "This amount cannot be negative.",
-      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
       "notPositive": "The amount of a payment must be greater than 0."
     },
     "status": {

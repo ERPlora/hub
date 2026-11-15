@@ -18,6 +18,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
+from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names
 
 T = TypeVar("T")
@@ -174,7 +175,7 @@ class ProductSoldOutIn(ProductRefIn):
     )
 
 
-# The product's image (round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The product's image (base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
@@ -198,6 +199,18 @@ class ProductImageUploadIn(ProductRefIn):
 
 class ProductImageSuggestIn(ProductRefIn):
     limit: int = Field(5, ge=1, le=20, description="How many images to propose (1 to 20).")
+
+
+class ProductIdIn(Schema):
+    """A product by its id alone: the one a deleted product keeps (INVENTORY-F34), the same in a separate copy of the
+    business and in the business."""
+
+    id: UUID = Field(title=T_PRODUCT, description="The product's id.")
+
+
+class ProductRestoreIn(ProductIdIn, ImageInCopyIn):
+    """A deleted product of a separate copy the business still holds, by its id, and the image it showed there: one
+    deleted before deleting kept the image of the library gets it back."""
 
 
 class CategoryRefIn(Schema):
@@ -440,6 +453,14 @@ class ProductIn(Schema):
         title=CATEGORIES,
         description="Categories that group it in the till.",
     )
+    is_active: bool = Field(
+        True, description="Whether it is on sale; one created inactive stays out of the till until it is activated."
+    )
+
+
+class ProductRecoverIn(ProductIn, ImageInCopyIn):
+    """A product of a separate copy the business no longer holds: what ``inventory.product.create`` takes and the image
+    it showed there (the business makes its own id)."""
 
 
 class ProductPatchIn(ProductRefIn):
@@ -558,6 +579,14 @@ class CategoryIn(Schema):
     )
     tax_category_key: TaxKey | None = Field(
         None, title=TAX_RATE, description="Key of a tax category (Taxes app), optional."
+    )
+
+
+class CategoryRecoverIn(CategoryIn):
+    product_ids: list[UUID] = Field(
+        default_factory=list,
+        max_length=10_000,
+        description="Deleted products to put back in it, so that they come back inside it when restored.",
     )
 
 

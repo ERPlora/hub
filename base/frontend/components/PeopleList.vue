@@ -1,14 +1,8 @@
 <script setup lang="ts">
-// Employees › Personal (BASE-G11, G138, G142; the old hub's EmployeesPage): the live `base.person.list` — every person
-// of the business once, from the top role — in a table of User (with «You»), Email (only for who runs the business),
-// Role, Access (how they get in: their erplora.com account always, then a PIN and a badge) and Status (in, or named by
-// erplora.com and not in yet). Above it, the plan's places taken and, when every one is, why and «Upgrade plan» (web
-// only: it sells). People are invited, given a role and removed on erplora.com («Members» of the business: HUBS-F24…
-// F27), which `hub-home` names only for a session opened with the account; who runs the business opens a person's
-// page from the row (their PIN and badge). On a phone each person is a card. A list that cannot be read says so.
-// «Invite on erplora.com» leaves the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank`
-// link, its system browser does), never in the Google Play copy (`managementOffered`, as «Manage on erplora.com» at the
-// menu's foot, gh:hub#1897). «Upgrade plan» is the platform's PlanUpgradeLink: it goes with the pass (BASE-F11).
+// People are invited, given a role and removed on erplora.com («Members» of the business), which `hub-home` names only
+// for a session opened with the account. «Invite on erplora.com» leaves the Hub by `openExternalLink`, because the
+// installed app opens nothing on a `_blank` link and its system browser does; the Google Play copy never offers it
+// (`managementOffered`). «Upgrade plan» only shows on the web, because it sells.
 import { DataTable, type DataTableColumn, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';

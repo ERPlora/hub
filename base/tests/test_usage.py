@@ -1,5 +1,4 @@
-"""The nightly use of each business (BASE-F40, HUBS-F21/F22, FIX-HUB-INTERNAL-USAGE-MISSING; round 2026-10-30 of
-PLAN-DB, decision 3 and proposal (j)).
+"""The nightly use of each business (BASE-F40; the SaaS's HUBS-F21 and HUBS-F22).
 
 Every night, once the UTC day ended (00:15, before the SaaS asks at 01:15), the worker measures each hub with its own
 database (``base.usage.measure``): its database's size from the server's catalog (``pg_database_size``, never opening
@@ -208,7 +207,7 @@ def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a,
     assert HubUsageDaily.objects.filter(day=DAY).count() == 1
 
 
-# ── The worker's real loop in the other tests (W8, 2026-10-31) ───────────────────────────────────────────────────
+# ── The worker's real loop in the other tests ────────────────────────────────────────────────────────────────────
 
 
 def run_the_loop_once(monkeypatch) -> None:
@@ -225,7 +224,7 @@ def run_the_loop_once(monkeypatch) -> None:
 def test_a_test_that_runs_the_worker_s_loop_measures_nothing_unless_it_asks(monkeypatch):
     """The slow passes (a copy, the nightly measurement) run in threads of their own, on their own connections: in a
     test they committed outside its transaction, and the ``UsageRun`` of the real yesterday that the relay's tests left
-    broke the next tests (W8, 2026-10-31). The suite keeps them off (``conftest.py``, ``worker_slow_passes``)."""
+    broke the next tests. The suite keeps them off (``conftest.py``, ``worker_slow_passes``)."""
     run_the_loop_once(monkeypatch)
 
     assert not UsageRun.objects.exists()

@@ -246,7 +246,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       expect(first.status).toBe('confirmed');
       await expect(view.getByText(first.number).first()).toBeVisible();
       await capture(page, 'APPOINTMENT-F01');
-      // appointments#93, #206, #243: the day's bar is one or two rows (three on a phone), never half the screen
+      // The day's bar is one or two rows (three on a phone), never half the screen
       // above the first appointment, as the old agenda.
       const bar = (await view.locator('[data-testid=appointment-toolbar]').boundingBox())!;
       expect(bar.height, `the day's bar at ${vp.label}`).toBeLessThan(vp.width < 640 ? 190 : 130);
@@ -419,7 +419,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await form.locator('[data-testid=series-form-from_date] input').fill(SERIES_DAY);
       await form.locator('[data-testid=series-form-time] input').fill('17:00');
       await expect(form.locator('[data-testid=series-form-scope]')).toContainText('booked appointments');
-      // appointments#293: only what happens; nothing is charged here, so no «0 already charged».
+      // Only what happens; nothing is charged here, so no «0 already charged».
       await expect(form.locator('[data-testid=series-form-scope]')).not.toContainText('already charged');
       expect(await cutLabels(form), `labels cut in the series form at ${vp.label}`).toEqual([]);
       await capture(page, 'APPOINTMENT-F14');

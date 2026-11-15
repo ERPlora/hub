@@ -1,10 +1,9 @@
-// flow: KITCHEN-F21 (FIX-HUB-KITCHEN-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/kitchen/WORKBOOK.md «Comandas»)
+// flow: KITCHEN-F21 (apps/kitchen/WORKBOOK.md «Comandas»)
 // Kitchen → Tickets paints each ticket's Total in the business's currency: its country's, as erplora.com registered
 // it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: a
 // ticket of the run (made by hand through Kitchen's API with a dish of the catalogue at 24,50) reads its Total in
-// złoty and no «€», in 390, 834 and 1440 (captures `FIX-HUB-KITCHEN-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`).
-// Back in Spain it reads in euros (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put
-// back, also when a test fails.
+// złoty and no «€», in 390, 834 and 1440. Back in Spain it reads in euros. What the run creates is deleted after it and
+// `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
@@ -72,7 +71,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: KITCHEN-F21 a business in Poland reads the Total of Kitchen → Tickets in złoty in 390, 834 and 1440`, async ({ page, context }) => {
+test(`KITCHEN-F21 a business in Poland reads the Total of Kitchen → Tickets in złoty in 390, 834 and 1440`, async ({ page, context }) => {
   await registerBusinessIn(original, 'PL');
   await login(page, A, '/kitchen/tickets');
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
@@ -87,7 +86,7 @@ test(`${KEY}: KITCHEN-F21 a business in Poland reads the Total of Kitchen → Ti
   }
 });
 
-test(`${KEY}: KITCHEN-F21 back in Spain the Total of Kitchen → Tickets is in euros`, async ({ page }) => {
+test(`KITCHEN-F21 back in Spain the Total of Kitchen → Tickets is in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/kitchen/tickets');

@@ -1,7 +1,7 @@
-"""The assistant's card for a write of sale (FIX-HUB-SALE-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258): in
-Spanish, every datum it sends by the name the Sales screens give it, never by the title pydantic makes up from the
-field («Allocations», «Line Id», «Combo Lines»). The card is base's (``base.assistant.card``); the names are sale's:
-the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of sale (base's half is hub#258): in Spanish, every datum it sends by the name the
+Sales screens give it, never by the title pydantic makes up from the field («Allocations», «Line Id», «Combo Lines»).
+The card is base's (``base.assistant.card``); the names are sale's: the titles of its schemas and the ``verbose_name``
+of its models, with their Spanish in its catalog."""
 
 import json
 import re

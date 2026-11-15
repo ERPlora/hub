@@ -1,9 +1,8 @@
 """Django admin of the tax app: categories, rules (with their components) and aliases, with full CRUD.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com, for
-the platform's staff, and has full CRUD over every table, fiscal ones included. It replaces the «read
-only» this app first copied from apps/demo. The database still refuses what no door may save: a rate
-outside 0–100, a rate on a class that charges no tax, a backwards range and a root's twin.
+The Hub's admin lives only on hubs.erplora.com, for the platform's staff, and has full CRUD over every table, fiscal
+ones included. It replaces the «read only» this app first copied from apps/demo. The database still refuses what no door
+may save: a rate outside 0–100, a rate on a class that charges no tax, a backwards range and a root's twin.
 """
 
 from dataclasses import replace
@@ -76,7 +75,7 @@ def test_the_pages_render(client, superuser, shipped):
     generic, root, beer = shipped
     client.force_login(superuser)
 
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     pages = {
         "/admin/tax/taxcategory/": b"product.generic",
         "/admin/tax/taxrule/": b"product.generic",
@@ -100,7 +99,7 @@ def test_the_pages_render(client, superuser, shipped):
 def test_support_reads_each_models_own_active_in_spanish(client, superuser, shipped):
     """Support reading Impuestos in Spanish sees a category and a rule «Activa» — in the form, the list's column and
     filter, and the components' table under a rule — and when they were made «Creada el»; an alias «Activo»,
-    «Creado el». Not auth's «Activo» for all three (hub#667)."""
+    «Creado el». Not auth's «Activo» for all three."""
     generic, root, beer = shipped
     client.force_login(superuser)
 

@@ -1,5 +1,5 @@
-"""The demo hubs (plan 2026-10-17, §1.5–§1.7; round 2026-10-30 of PLAN-DB, S2a): an empty hub with a database of its
-own for one browser of the SaaS, entered with a one-time code, dropped and purged by the worker once its hour is up.
+"""The demo hubs: an empty hub with a database of its own for one browser of the SaaS, entered with a one-time code,
+dropped and purged by the worker once its hour is up.
 
 ``base.demo.create`` (``POST /internal/demos``) gives a browser, named by the sha256 of its SaaS token, its live demo
 or a new ``demo-<8 hex>`` up to ``MAX_CONCURRENT_DEMOS``, ``requested`` until the worker makes its database
@@ -120,7 +120,7 @@ class TestCreate:
         )
         assert before + 60 * MINUTE <= hub.expires_at <= after + 60 * MINUTE
         assert answer.expires_at == hub.expires_at and hub.ready_at is None
-        # Its own database, never control's (round 2026-10-30, decision 1), made by the worker it is due in.
+        # Its own database, never control's, made by the worker it is due in.
         assert hub.db_name == names.demo_db_name(control_name(), hub.id)
         assert HubDue.objects.get(pk=hub.pk).lease_until is None
         assert events("base.demo.created") == [{"id": str(hub.id), "slug": hub.slug, "vertical": "restaurant"}]
@@ -451,7 +451,7 @@ class TestExpire:
 
     @pytest.mark.parametrize("host", ["a", "demo"])
     def test_staff_acting_on_a_business_s_scope_never_ends_one(self, host):
-        """Review of hub#490: ERPlora's staff passes only on the platform's scope (the Hub admin, REGISTRY_SCOPE); on a
+        """ERPlora's staff passes only on the platform's scope (the Hub admin, REGISTRY_SCOPE); on a
         business's host, its own or the demo's, it is no more than anyone there."""
         demo = create()
         user = get_user_model().objects.create_user(username="ana", password="pw", is_staff=True, is_superuser=True)
@@ -556,7 +556,7 @@ class TestReaper:
         assert first.slug in caplog.text
 
     def test_a_demo_whose_drop_fails_waits_longer_each_time_and_is_not_tried_before(self, monkeypatch):
-        """Review of hub#471 (I3): a drop the server refuses is noted on the demo (``attempts``, ``last_error``,
+        """A drop the server refuses is noted on the demo (``attempts``, ``last_error``,
         ``next_attempt_at``: 1 min, 5 min…) and its ``hub_due`` waits for it, never every tick of the worker."""
         tried = []
 
@@ -621,7 +621,7 @@ class TestReaper:
         assert dropped == [(hub.db_name, None)]
 
     def test_a_demo_whose_row_names_another_database_drops_nothing(self, monkeypatch):
-        """Review of hub#471 (M2): a DROP only ever takes the demo's own ``<control>_demo_<hex>``, never a business's
+        """A DROP only ever takes the demo's own ``<control>_demo_<hex>``, never a business's
         or another demo's database its row might name by mistake."""
         dropped = []
         monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
@@ -633,7 +633,7 @@ class TestReaper:
         assert dropped == []
 
     def test_purging_a_demos_rows_never_drops_a_database_inside_their_transaction(self, monkeypatch):
-        """Review of hub#471 (M3): ``base.demo.purge`` purges rows only; its database went before, outside any
+        """``base.demo.purge`` purges rows only; its database went before, outside any
         transaction of control (``base.tenancy.provision.drop``)."""
         dropped = []
         monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
@@ -643,8 +643,8 @@ class TestReaper:
         assert dropped == []
 
     def test_a_demo_of_before_its_own_databases_purges_no_data_of_the_apps(self, monkeypatch):
-        # Made before round 2026-10-30, it shares the tables of every hub of phase 1, whose rows carry no hub_id (plan
-        # §1.7): nothing tells its rows apart, and there is no database of its own to drop.
+        # Made before demos had a database of their own, it shares the tables of every hub, whose rows carry no hub_id:
+        # nothing tells its rows apart, and there is no database of its own to drop.
         dropped = []
         monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
         hub = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="expired")

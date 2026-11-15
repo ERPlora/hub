@@ -106,6 +106,18 @@ def test_the_reactions_have_no_route():
     assert not bound & {"service.assignment.release_member", "service.grant.reassign"}
 
 
+def test_making_a_service_or_a_category_again_from_a_copy_has_no_route():
+    # Only the recovery from a separate copy makes a service again with who performed it there, and a category with
+    # what the business kept of what it had inside.
+    bound = {operation for _, _, operation in ROUTES}
+    assert not bound & {
+        "service.service.recover",
+        "service.category.recover",
+        "service.service.return_to_category",
+        "service.category.return_to_parent",
+    }
+
+
 def test_the_sessions_of_the_till_have_no_route_sales_runs_them():
     # Sales keeps on its check line the session it reserved: a route would let the screen hold a
     # session no line knows about (WORKBOOK «Contrato con Ventas»).

@@ -1,16 +1,12 @@
 <script setup lang="ts">
-// One panel of the Home's board (BASE-G166, BASE-G168; the old hub's `ok-widget-board` cards). A declarative
-// panel paints its operation's result by `kind` (lib/home.ts `widgetView`): followed live when the operation
-// is a live query — a write anywhere in the business re-runs it on the server and the new result arrives —,
-// asked once when it is not. A failed read says «Unavailable», never the figure it had. A panel with its own
-// `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`). A timeline says
-// when each entry happened in the device's time (the Hub has no business zone in the browser): «4:23», «Ayer 18:10»,
-// «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06). An
-// amount is in the business's currency (BASE-G98: «zł» in a Polish business, «€» in a Spanish one), never a fixed euro.
-// A row without its value (a cash session closed without a count) says «—» with no bar, never a 0 (BASE-F06). A bar is
-// as long as the size of its value; only one below zero is red, its amount with the sign, and every other bar keeps the
-// panel's colour (BASE-F06: a drawer 0,40 € short beside one 5,50 € over, which is a discrepancy too) — or its row's,
-// when the panel maps one (`map.color`: each role of Staff in its own colour); a negative stays red.
+// A declarative panel paints its operation's result by `kind` (lib/home.ts `widgetView`), followed live when the
+// operation is a live query and asked once when it is not. A failed read says «Unavailable», never the figure it had.
+// A panel with its own `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`).
+// A timeline says when each entry happened in the device's time, because the browser does not know the business's
+// zone; it is read again each minute so a Home left open past midnight moves today's entries to yesterday.
+// A row without its value (a cash session closed without a count) says «—» with no bar, never a 0. A bar is as long as
+// the size of its value; only one below zero is red, because a drawer 0,40 € short beside one 5,50 € over is a
+// discrepancy too. Every other bar keeps the panel's colour, or its row's when the panel maps one (`map.color`).
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -74,7 +70,7 @@ const custom = loader
 
 const op = props.widget.operation as OpName | null;
 const source: Source | undefined = !props.widget.component && op ? (props.widget.live ? followed(op) : askedOnce(op)) : undefined;
-/** The business's currency for a declarative panel's amounts (BASE-G98); a panel of its own component formats its own. */
+/** The business's currency for a declarative panel's amounts; a panel of its own component formats its own. */
 const money = source ? useBusinessMoney() : undefined;
 
 const unavailable = computed(
@@ -109,7 +105,7 @@ const points = computed(() => {
 const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
 
 /** The chart's bar whose day and amount are said above it (by its row's label): the last one until another is
- *  tapped or focused, and again when the chosen day is gone (the old hub's gh:hub#2392). */
+ *  tapped or focused, and again when the chosen day is gone. */
 const chosen = ref<string>();
 const chosenBar = computed(() => {
   const current = view.value;

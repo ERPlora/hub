@@ -1,5 +1,3 @@
-// «Activity» on the Home (BASE-G129): the last 100 sales of Sales (`sale.sale.list`, live), only while Sales is
-// on in this hub, with the words of the sales history; a failed read says so with «Retry», never «no sales».
 import { DataTable } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -79,7 +77,6 @@ describe('HomeActivity', () => {
     ]);
   });
 
-  // BASE-G98: the amount of each sale is in the business's currency, never a fixed euro.
   it("writes each sale's amount in the business's currency: zł in a Polish business, a dash until it answers (hub#947)", async () => {
     const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
     const call = await m.live();

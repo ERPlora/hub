@@ -1,10 +1,9 @@
 """«When something happens in the business, the automation starts» (WORKBOOK FLOW-F21), end to end through the
-worker's real outbox relay (``base.relay``, PLAN-HUB round 2026-10-20; ``base/tests/test_relay.py`` is the
-pattern): the real Customers operation writes its event, one tick of the worker's real loop hands it to flow,
-the automation runs and its task is in Tasks — once, a second tick changing nothing. An event of hub B starts
-its run in B, and its notices are heard in B only (phase 1 shares the tables; the frontier is the scope). A call to
-another system that answers late (FLOW-F27) holds neither the relay's other deliveries nor the scheduled tasks: the
-worker makes it in a thread of its own (``base.outbound``), and it is still made once.
+worker's real outbox relay (``base.relay``; ``base/tests/test_relay.py`` is the pattern): the real Customers
+operation writes its event, one tick of the worker's real loop hands it to flow, the automation runs and its task
+is in Tasks — once, a second tick changing nothing. An event of hub B starts its run in B, and its notices are
+heard in B only. A call to another system that answers late (FLOW-F27) holds neither the relay's other deliveries
+nor the scheduled tasks: the worker makes it in a thread of its own (``base.outbound``), and it is still made once.
 """
 
 import datetime as dt
@@ -143,11 +142,11 @@ def test_an_event_of_hub_b_starts_its_run_in_b_and_is_heard_in_b_only(listen, mo
     assert "flow.run.started" in heard(on_a)
 
 
-# ── A late answer of another system holds nothing else (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS) ──────────
-# One relay serves every hub of phase 1, and Django runs what a reaction leaves for after its COMMIT right there, in
-# the relay's loop: a «Call another system» step of hub A that took its 30 s held every delivery of every hub, and a
-# call the tick sent again held the scheduled tasks. The other system here answers only once the test lets it (5 s at
-# most: a worker that waits for it fails the test instead of hanging), so the order says who waited for whom.
+# ── A late answer of another system holds nothing else ────────────────────────────────────────────────────────────
+# One relay serves many hubs, and Django runs what a reaction leaves for after its COMMIT right there, in the relay's
+# loop: a «Call another system» step of hub A that took its 30 s held every delivery of every hub, and a call the tick
+# sent again held the scheduled tasks. The other system here answers only once the test lets it (5 s at most: a worker
+# that waits for it fails the test instead of hanging), so the order says who waited for whom.
 
 #: The most a test waits for the call made in the worker's thread.
 CALL_WAIT_SECONDS = 10

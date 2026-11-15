@@ -650,3 +650,24 @@ def test_the_hub_admin_deletes_a_group_or_a_tag_a_merge_moves_to_the_card_that_s
     assert not isinstance(answer, Exception), answer
     assert answer.status_code == 302
     nothing_points_at(target)
+
+
+# ── A deleted card brought back from a separate copy while the person asks to erase it ─────────────────────────────
+#
+# The restore holds the card while it judges it and gives back to it what the business deleted since the copy (a
+# group made again, hub#1356): an erasure that comes meanwhile waits, then erases the card that came back. Read
+# unlocked, the restore would bring back, live and in its group, a card already erased.
+
+
+def test_a_card_erased_while_it_is_brought_back_stays_erased_and_out_of_its_group():
+    ana = card(deleted_at=NOW, is_active=False)
+    restore = get("customer.customer.restore")
+    asked = restore.input.model_validate({"id": str(ana.id), "groups": [{"id": str(uuid.uuid7()), "name": "VIP"}]})
+    erase = lambda: run("customer.customer.erase", EraseIn(id=ana.id, reason="Asked for it"))  # noqa: E731
+    with meanwhile(reads("customer_customer"), erase) as outcomes:
+        restore(system_context(A), asked)
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    ana.refresh_from_db()
+    assert (ana.erased_at is not None, ana.deleted_at is not None, ana.is_active) == (True, True, False)
+    assert (list(ana.groups.all()), list(Customer.objects.live())) == ([], [])

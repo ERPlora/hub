@@ -1,7 +1,7 @@
-"""VeriFactu on the Home (PLAN-HUB round 2026-10-21; FIX-VERIFACTU-SETUP-HOOKS): base's own queries bring VeriFactu's
-step of «Finish setting up your business» to whoever configures it (pending until the way to production is ready,
-done with the authorisation approved by the account's photo) and its four panels to whoever reads its records, each
-answered by its own query as that person; the photo received in hub B re-runs B's checklist and tells A nothing.
+"""VeriFactu on the Home: base's own queries bring VeriFactu's step of «Finish setting up your business» to whoever
+configures it (pending until the way to production is ready, done with the authorisation approved by the account's
+photo) and its four panels to whoever reads its records, each answered by its own query as that person; the photo
+received in hub B re-runs B's checklist and tells A nothing.
 
 base and verifactu run for real: the step and the panels come from VerifactuConfig through base's own queries.
 """
@@ -117,7 +117,7 @@ def test_whoever_cannot_configure_verifactu_is_not_told_about_the_step(issuer, r
     assert STEP not in steps(ctx_for(role))
 
 
-# ── In production the way to the AEAT is a wall (PLAN-HUB round 2026-10-21) ───────────────────────────────────────
+# ── In production the way to the AEAT is a wall ───────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -189,7 +189,7 @@ def test_in_production_an_expired_or_removed_own_certificate_is_a_wall(issuer, o
 
 @pytest.mark.django_db
 def test_in_testing_a_revoked_authorisation_stops_nothing(issuer):
-    """gh:hub#1726: a hub in testing sells without a way, so the step stays functional and off the strip."""
+    """A hub in testing sells without a way, so the step stays functional and off the strip."""
     photo(1, "approved")
     photo(2, "revoked")
 
@@ -198,7 +198,7 @@ def test_in_testing_a_revoked_authorisation_stops_nothing(issuer):
     assert wall(ctx_for("hub_employee")) == (None, 0)
 
 
-# ── Only for a business in Spain (hub#682) ─────────────────────────────────────────────────────────────────────────
+# ── Only for a business in Spain ───────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -245,7 +245,7 @@ def test_whoever_reads_the_records_is_offered_the_four_panels(role):
 @pytest.mark.parametrize(("language", "label"), [("en", "In contingency queue"), ("es", "En cola de contingencia")])
 def test_the_queue_panel_says_under_its_figure_what_it_counts(language, label):
     # The old module's text under the queue's figure (its module.json, `verifactu.contingency` options.label), in the
-    # reader's language (FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT).
+    # reader's language.
     queue = panels(ctx_for("hub_employee", language=language))["verifactu.contingency"]
     assert queue["options"] == {"format": "number", "label": label}
 

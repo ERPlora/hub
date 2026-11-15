@@ -3,7 +3,7 @@ JSON Schema of the assistant's tools: every field says what it is).
 
 The jurisdiction comes from ``pycountry`` (ISO 3166-1 and 3166-2, Debian's iso-codes): a country or a
 region no business can hold would give a rule that never matches anything, and the owner would read
-it on the screen believing the tax was set (taxes#41).
+it on the screen believing the tax was set.
 
 A category may be named by its key, its name or an alias wherever an existing one is referred to
 (``tax_category_key`` of a rule, an alias, a calculation, a lookup): the assistant is used by voice.

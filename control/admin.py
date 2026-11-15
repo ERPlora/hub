@@ -1,5 +1,5 @@
 """The Hub admin of control (``hubs.erplora.com/admin``, staff only): the database clusters with their limit, and the
-hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tranche S7, part 1).
+hubs with their database.
 
 - **Clusters** lists each with its writer, its PgBouncer, whether it is open to new hubs, its limit, the hubs on it
   against that limit, its secret and the total size of its hubs' databases. Its writes are operations
@@ -14,16 +14,35 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
   ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that cannot be measured is said
   in a warning and its hubs show no size.
 
-- **Freeze** is the one switch that freezes the platform for a database upgrade (hub#930; PLAN-DB round 2026-11-04e,
-  «Congelar»): ticked, the worker makes, drops and moves no database and ``migrate_hubs`` refuses to start, while the
-  relay, the tasks and VeriFactu go on. Its form saves through ``control.freeze.set`` (shows on its field what it
-  refuses); while frozen its pages say how many hubs the worker is still working on (``control.freeze.get``), the 0 the
-  staff waits for before the upgrade. It is never deleted, and added only if its row is missing.
+- **«Move to cluster…»** asks ``control.hub.move`` for each chosen hub, with an open cluster and when: in the business's
+  next night (first, as a database's maintenance waits for its window) or now. One asked for the night stays open and
+  its cluster says where and when it goes, on the business's own clock, until the worker starts it; «Cancel the move»
+  takes it away until then, and undoes a started one. Its page says under each hub how long it can stay closed by the
+  size of its database (``base.tenancy.move.longest_closure``), and what the staff is told adds them up, as the hubs
+  move one after another.
+- **«Restore from a copy…»** (BASE-F114) asks ``control.hub.restore`` for each chosen hub, with the temporary
+  cluster its copy is on and the moment it is of; the worker restores it (``base.tenancy.restore``), or refuses it for
+  its fiscal records, and then the hub's page says why in its ``last_error``, as the worker noted it. While it is
+  restored, the hub's cluster says where the copy comes from, as a move says where it goes.
+- **«Restore to a separate copy…»** (BASE-F114) asks ``control.hub.restore_aside`` the same way: the worker
+  makes the copy next to the business, which is never closed nor changed, and **Separate copies** lists each one (read
+  only, for support too) with its moment, how it went, its database and until when it is kept.
+- **«Recover into the business…»** on Separate copies (BASE-F114) asks ``control.copy.recover`` for each
+  chosen copy, with what to bring back (the apps that say what they give back from a copy,
+  ``base.tenancy.recovery``); the worker creates in the business what it lacks, each record by its app's own
+  operation, and **Recoveries** lists each one (read only, for support too) with what came back and why not.
+
+- **Freeze** is the one switch that freezes the platform for a database upgrade: ticked, the worker makes, drops and
+  moves no database and ``migrate_hubs`` refuses to start, while the relay, the tasks and VeriFactu go on. Its form
+  saves through ``control.freeze.set`` (shows on its field what it refuses); while frozen its pages say how many hubs
+  the worker is still working on (``control.freeze.get``), the 0 the staff waits for before the upgrade. It is never
+  deleted, and added only if its row is missing.
 
 Only the platform's admins (staff and superuser) add, change, close or delete; support reads (its ``view_*``
 permissions). Nothing here writes the ORM: every write is an operation, called with the staff member's context.
 """
 
+import datetime as dt
 from collections.abc import Callable
 
 import pydantic
@@ -34,26 +53,49 @@ from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseRedirect
 from django.contrib.admin import helpers
 from django.template.defaultfilters import filesizeformat
+from django.utils.html import format_html, format_html_join
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.utils.timesince import timesince
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext, pgettext_lazy
 from live.context import OperationContext
 from live.errors import OperationError
 
 from base import admin as base_admin
+from base.business import zone_name, zone_of
 from base.registry import REGISTRY_SCOPE, database_is_made
-from control.models import Cluster, Freeze, Hub
+from base.tenancy.move import MOVED_COPY_DAYS, longest_closure
+from base.tenancy.recovery import recoverable_apps
+from control.models import Cluster, CopyRecovery, Freeze, Hub, RestoredCopy
 from control.queries import cluster_sizes, freeze_get
-from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn, FreezeGetIn, FreezeIn, HubIdIn, HubMoveIn
+from control.schemas import (
+    ClusterIdIn,
+    ClusterIn,
+    ClusterSizesIn,
+    ClusterUpdateIn,
+    CopyRecoverIn,
+    FreezeGetIn,
+    FreezeIn,
+    HubIdIn,
+    MOVE_AT_NIGHT,
+    MOVE_NOW,
+    HubMoveIn,
+    HubRestoreIn,
+)
 from control.services import (
     CLUSTER_FIELDS,
+    NIGHT_ENDS,
+    NIGHT_STARTS,
     cluster_close,
     cluster_create,
     cluster_delete,
     cluster_update,
+    copy_recover,
     freeze_set,
     hub_move,
     hub_move_cancel,
+    hub_restore,
+    hub_restore_aside,
 )
 
 
@@ -73,6 +115,72 @@ def is_platform_admin(request: HttpRequest) -> bool:
     return request.user.is_staff and request.user.is_superuser
 
 
+def utc(moment: dt.datetime) -> str:
+    """A moment as the Hub admin says it, whatever its language: ``2026-11-09 14:30 UTC``."""
+    return f"{moment.astimezone(dt.UTC):%Y-%m-%d %H:%M} UTC"
+
+
+def the_night() -> dict[str, str]:
+    """The window a move asked for the night starts in, as a page says it: ``{"start": "03:00", "end": "05:00"}``."""
+    return {"start": f"{NIGHT_STARTS:%H:%M}", "end": f"{NIGHT_ENDS:%H:%M}"}
+
+
+def a_span(span: dt.timedelta) -> str:
+    """A span of time as the staff reads it, in the admin's language: ``1 hour, 7 minutes``."""
+    start = dt.datetime(2000, 1, 1, tzinfo=dt.UTC)
+    return timesince(start, start + span)
+
+
+#: The actions that close each hub chosen while its database is copied: their page says for how long under each one.
+CLOSING_ACTIONS = ("move_to_cluster", "restore_from_a_copy")
+
+
+def closure_said(hub: Hub) -> str:
+    """How long a move or a restore can keep ``hub`` closed by the size of its database (``database_bytes``: ``None``
+    when it could not be read), as their confirmation page says it under the hub."""
+    size = getattr(hub, "database_bytes", None)
+    span = a_span(longest_closure(size))
+    if size is None:
+        return gettext("Size unknown: closed for up to %(span)s") % {"span": span}
+    return gettext("%(size)s: closed for up to %(span)s") % {"size": filesizeformat(size), "span": span}
+
+
+def closed_for(hubs: list[Hub]) -> str:
+    """How long ``hubs`` can stay closed in all, copied one after another, as the staff is told."""
+    return a_span(sum((longest_closure(getattr(hub, "database_bytes", None)) for hub in hubs), dt.timedelta()))
+
+
+def move_said(when: str, count: int) -> str:
+    """What the staff is told of ``count`` hubs asked to move ``when``; ``closed``: how long all of them take, as they
+    move one after another."""
+    if when == MOVE_AT_NIGHT:
+        return ngettext(
+            "%(count)d hub will move to %(cluster)s in its next night, starting between %(start)s and %(end)s on "
+            "its own clock: open until then, and closed while it moves, for up to %(closed)s.",
+            "%(count)d hubs will move to %(cluster)s in their next night, each starting between %(start)s and "
+            "%(end)s on its own clock: open until then, and closed while they move one after another, for up to "
+            "%(closed)s in all.",
+            count,
+        )
+    return ngettext(
+        "%(count)d hub will move to %(cluster)s: closed while it moves, for up to %(closed)s.",
+        "%(count)d hubs will move to %(cluster)s, one after another: each closed until its own move ends, for up to "
+        "%(closed)s in all.",
+        count,
+    )
+
+
+def on_its_clock(moment: dt.datetime, timezone_name: str) -> str:
+    """A moment on a business's own clock, with it: ``2026-11-17 03:00 Europe/Madrid``."""
+    zone = zone_of(timezone_name)
+    return f"{moment.astimezone(zone):%Y-%m-%d %H:%M} {zone_name(zone)}"
+
+
+def copy_said(copy: RestoredCopy) -> str:
+    """A separate copy in a list: its business and its moment on two lines, so a phone keeps room for the rest."""
+    return format_html("{}<br>{}", copy.hub.slug, utc(copy.restore_point))
+
+
 def no_limit() -> str:
     return pgettext("cluster limit", "no limit")
 
@@ -84,12 +192,15 @@ def default_server() -> str:
 
 def sizes_of(request: HttpRequest, cluster_id) -> dict[str, int] | None:
     """The sizes of the hubs' databases on ``cluster_id`` (none: the settings' own server), or ``None`` after saying
-    in a warning why they could not be read."""
-    try:
-        return cluster_sizes(staff_context(request), ClusterSizesIn(cluster=cluster_id)).databases
-    except OperationError as refused:
-        messages.warning(request, refused.message)
-        return None
+    in a warning why they could not be read; once per request (an action's list measured them before the action)."""
+    known = request.__dict__.setdefault("control_sizes", {})
+    if cluster_id not in known:
+        try:
+            known[cluster_id] = cluster_sizes(staff_context(request), ClusterSizesIn(cluster=cluster_id)).databases
+        except OperationError as refused:
+            messages.warning(request, refused.message)
+            known[cluster_id] = None
+    return known[cluster_id]
 
 
 def saved_by(form: forms.ModelForm, save: Callable[[], object]) -> object | None:
@@ -276,17 +387,112 @@ class ClusterAdmin(admin.ModelAdmin):
 
 
 class MoveToClusterForm(forms.Form):
-    """The cluster the chosen hubs move to: an open one (``control.hub.move`` checks its room, hub by hub)."""
+    """The cluster the chosen hubs move to, an open one (``control.hub.move`` checks its room, hub by hub), and when:
+    in each business's next night, first, or now."""
 
     cluster = forms.ModelChoiceField(
         queryset=Cluster.objects.filter(is_open=True).order_by("name"),
         label=gettext_lazy("cluster"),
         empty_label=None,
     )
+    # Radio buttons, as RDS asks when a change applies: their text wraps on a phone, a select's runs past its edge.
+    when = forms.ChoiceField(
+        label=pgettext_lazy("move", "When"), initial=MOVE_AT_NIGHT, widget=forms.RadioSelect(attrs={"class": "radiolist"})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        at_night = gettext("In its next night, between %(start)s and %(end)s of the business's time") % the_night()
+        self.fields["when"].choices = [(MOVE_AT_NIGHT, at_night), (MOVE_NOW, pgettext("move", "Now"))]
 
 
-#: The confirmation page of «Move to cluster…».
+class RestoreFromACopyForm(forms.Form):
+    """The temporary cluster the chosen hubs' copy is on (a point-in-time restore of their cluster, registered closed to
+    new hubs) and the moment it is of; ``control.hub.restore`` checks the rest, hub by hub."""
+
+    cluster = forms.ModelChoiceField(
+        queryset=Cluster.objects.filter(is_open=False).order_by("name"),
+        label=pgettext_lazy("restore", "Temporary cluster"),
+        empty_label=None,
+    )
+    at = forms.DateTimeField(
+        label=pgettext_lazy("restore", "Moment"),
+        help_text=gettext_lazy(
+            "The moment the temporary cluster was restored to, with its time zone: 2026-11-09T14:30:00Z is UTC."
+        ),
+    )
+
+
+def recoverable_names(labels) -> str:
+    """What the apps ``labels`` give back from a copy, as the staff reads it («Customers»); an app that no longer says
+    so, by its label."""
+    declared = recoverable_apps()
+    return ", ".join(
+        ", ".join(str(one.label) for one in declared[label]) if label in declared else label for label in labels
+    )
+
+
+class RecoverForm(forms.Form):
+    """What the chosen copies give back into their businesses: the apps that say what they give back from a copy
+    (``base.tenancy.recovery``), every one ticked; ``control.copy.recover`` checks the rest, copy by copy."""
+
+    apps = forms.MultipleChoiceField(
+        label=pgettext_lazy("recovery", "What to bring back"),
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [(label, recoverable_names([label])) for label in recoverable_apps()]
+        self.fields["apps"].choices = choices
+        self.fields["apps"].initial = [label for label, _name in choices]
+
+
+#: The confirmation pages of «Move to cluster…», «Restore from a copy…», «Restore to a separate copy…» and «Recover into
+#: the business…».
 MOVE_TEMPLATE = "admin/control/hub/move_to_cluster.html"
+RESTORE_TEMPLATE = "admin/control/hub/restore_from_a_copy.html"
+ASIDE_TEMPLATE = "admin/control/hub/restore_aside.html"
+RECOVER_TEMPLATE = "admin/control/restoredcopy/recover.html"
+
+
+class AsksFirst:
+    """The actions of an admin that ask for something on a confirmation page first, then ask its operation of each
+    chosen row (Hubs, Separate copies). The admin says ``confirmation_row(obj)``, each one's id, name and database on
+    that page, ``confirmation_note(obj, action)``, what that page says under it (nothing by default), and
+    ``chosen_name(obj)``, its name in what the staff is told."""
+
+    def confirmation(  # noqa: PLR0913, PLR0917
+        self, request: HttpRequest, chosen, form: forms.Form, action: str, title: str, template: str, **more
+    ):
+        """The confirmation page of ``action`` for ``chosen``: what it does and its ``form``, asked again until
+        valid."""
+        context = {
+            **self.admin_site.each_context(request),
+            "title": title,
+            "opts": self.model._meta,
+            "rows": [(*self.confirmation_row(obj), self.confirmation_note(obj, action)) for obj in chosen],
+            "form": form,
+            "action": action,
+            "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+            **more,
+        }
+        return TemplateResponse(request, template, context)
+
+    def confirmation_note(self, obj, action: str) -> str:
+        return ""
+
+    def ask_each(self, request: HttpRequest, chosen, ask: Callable[[object], object]) -> int:
+        """Ask ``ask`` (an operation) of each chosen row: what it refuses is said with its name; how many were asked."""
+        asked = 0
+        for obj in chosen:
+            try:
+                ask(obj)
+            except OperationError as refused:
+                self.message_user(request, f"{self.chosen_name(obj)}: {refused.message}", messages.ERROR)
+                continue
+            asked += 1
+        return asked
 
 
 class ClusterListFilter(admin.RelatedFieldListFilter):
@@ -302,7 +508,7 @@ admin.site.unregister(Hub)
 
 
 @admin.register(Hub)
-class HubAdmin(base_admin.HubAdmin):
+class HubAdmin(AsksFirst, base_admin.HubAdmin):
     """The registry of hubs with each one's database, cluster, schema and size (see the module)."""
 
     list_display = (
@@ -319,8 +525,14 @@ class HubAdmin(base_admin.HubAdmin):
         "created_at",
     )
     list_filter = ("status", ("cluster", ClusterListFilter), "schema_state", "is_demo")
-    list_select_related = ("cluster", "moving_to")
-    actions = [*base_admin.HubAdmin.actions, "move_to_cluster", "cancel_the_move"]
+    list_select_related = ("cluster", "moving_to", "move_scheduled_to", "restoring_from")
+    actions = [
+        *base_admin.HubAdmin.actions,
+        "move_to_cluster",
+        "cancel_the_move",
+        "restore_from_a_copy",
+        "restore_aside",
+    ]
     # Never a form's field, even on the page of a hub on no cluster, where ``on_cluster`` takes its place.
     exclude = ("cluster",)
 
@@ -334,66 +546,139 @@ class HubAdmin(base_admin.HubAdmin):
     @admin.action(description=gettext_lazy("Move to cluster…"), permissions=["move"])
     def move_to_cluster(self, request: HttpRequest, queryset):
         """Choose an open cluster on a confirmation page, then ask each chosen hub to move there
-        (``control.hub.move``): the worker moves it, its host answering 503 «maintenance» meanwhile."""
+        (``control.hub.move``): the worker moves it, its host answering 503 «maintenance» meanwhile. The page and what
+        the staff is told say how long each can stay closed, by the size of its database."""
+        hubs = list(queryset)
+        self.attach_sizes(request, hubs)
         form = MoveToClusterForm(request.POST if "apply" in request.POST else None)
         if not form.is_bound or not form.is_valid():
-            context = {
-                **self.admin_site.each_context(request),
-                "title": gettext("Move to cluster"),
-                "opts": self.model._meta,
-                "hubs": queryset,
-                "form": form,
-                "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
-            }
-            return TemplateResponse(request, MOVE_TEMPLATE, context)
-        target = form.cleaned_data["cluster"]
-        ctx = staff_context(request)
-        asked = 0
-        for hub in queryset:
-            try:
-                hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk))
-            except OperationError as refused:
-                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
-                continue
-            asked += 1
-        if asked:
-            self.message_user(
-                request,
-                ngettext(
-                    "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves.",
-                    "%(count)d hubs will move to %(cluster)s: each closed for a few minutes while it moves.",
-                    asked,
-                )
-                % {"count": asked, "cluster": target.name},
-                messages.SUCCESS,
+            title, limit = gettext("Move to cluster"), a_span(longest_closure(None))
+            return self.confirmation(
+                request, hubs, form, "move_to_cluster", title, MOVE_TEMPLATE, limit=limit, **the_night()
             )
+        target, when = form.cleaned_data["cluster"], form.cleaned_data["when"]
+        ctx = staff_context(request)
+        moved: list[Hub] = []
+
+        def ask(hub: Hub) -> None:
+            hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk, when=when))
+            moved.append(hub)
+
+        if self.ask_each(request, hubs, ask):
+            values = {"count": len(moved), "cluster": target.name, "closed": closed_for(moved)} | the_night()
+            self.message_user(request, move_said(when, len(moved)) % values, messages.SUCCESS)
         return None
 
     @admin.action(description=gettext_lazy("Cancel the move"), permissions=["move"])
     def cancel_the_move(self, request: HttpRequest, queryset) -> None:
-        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster."""
+        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster. One
+        asked for the night that has not started is taken away: it stays where it is, open."""
         ctx = staff_context(request)
-        asked = 0
-        for hub in queryset:
-            try:
-                hub_move_cancel(ctx, HubIdIn(id=hub.pk))
-            except OperationError as refused:
-                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
-                continue
-            asked += 1
-        if asked:
+        answers: list = []
+        self.ask_each(request, queryset, lambda hub: answers.append(hub_move_cancel(ctx, HubIdIn(id=hub.pk))))
+        undone = sum(1 for answer in answers if answer.moving_to is not None)
+        if undone:
             self.message_user(
                 request,
                 ngettext(
                     "%(count)d move will be undone: the hub goes back to its cluster within a minute.",
                     "%(count)d moves will be undone: each hub goes back to its cluster within a minute.",
-                    asked,
+                    undone,
                 )
-                % {"count": asked},
+                % {"count": undone},
+                messages.SUCCESS,
+            )
+        if unscheduled := len(answers) - undone:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d move asked for the night was cancelled: the hub stays where it is, open.",
+                    "%(count)d moves asked for the night were cancelled: each hub stays where it is, open.",
+                    unscheduled,
+                )
+                % {"count": unscheduled},
                 messages.SUCCESS,
             )
 
+    @admin.action(description=gettext_lazy("Restore from a copy…"), permissions=["restore"])
+    def restore_from_a_copy(self, request: HttpRequest, queryset):
+        """Choose the temporary cluster the hubs' copy is on and the moment it is of on a confirmation page, then ask
+        each chosen hub to be put back as it was (``control.hub.restore``): the worker restores it, its host answering
+        503 «maintenance» meanwhile, or refuses it for its fiscal records, the reason in its ``last_error``. The page
+        and what the staff is told say how long each can stay closed, by the size of its database."""
+        hubs = list(queryset)
+        self.attach_sizes(request, hubs)
+        return self.from_a_copy(
+            request,
+            hubs,
+            "restore_from_a_copy",
+            gettext("Restore from a copy"),
+            RESTORE_TEMPLATE,
+            hub_restore,
+            lambda asked: ngettext(
+                "%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed while it is "
+                "restored, for up to %(closed)s. If it is refused, its page says why under «last error».",
+                "%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s, one after another: each "
+                "closed until its own restore ends, for up to %(closed)s in all. If one is refused, its page says why "
+                "under «last error».",
+                asked,
+            ),
+        )
+
+    @admin.action(description=gettext_lazy("Restore to a separate copy…"), permissions=["restore"])
+    def restore_aside(self, request: HttpRequest, queryset):
+        """As «Restore from a copy…», but each chosen hub gets a separate copy of its database as it was, made next to
+        it (``control.hub.restore_aside``): the business is never closed nor changed, its fiscal records stop nothing,
+        and Separate copies lists the copy."""
+        return self.from_a_copy(
+            request,
+            queryset,
+            "restore_aside",
+            gettext("Restore to a separate copy"),
+            ASIDE_TEMPLATE,
+            hub_restore_aside,
+            lambda asked: ngettext(
+                "%(count)d hub will get a separate copy as it was at %(moment)s, made from %(cluster)s: the business "
+                "stays open as it is. Separate copies lists it, and says if it could not be made.",
+                "%(count)d hubs will get a separate copy each as they were at %(moment)s, made from %(cluster)s: the "
+                "businesses stay open as they are. Separate copies lists them, and says if one could not be made.",
+                asked,
+            ),
+        )
+
+    def from_a_copy(self, request: HttpRequest, hubs, action: str, title: str, template: str, operation, said):  # noqa: PLR0913, PLR0917
+        """The temporary cluster and the moment asked on ``action``'s confirmation page, then ``operation`` asked of
+        each hub with them; ``said(count)``: what the staff is told of those asked (``closed``: how long all of them
+        can stay closed)."""
+        form = RestoreFromACopyForm(request.POST if "apply" in request.POST else None)
+        if not form.is_bound or not form.is_valid():
+            return self.confirmation(request, hubs, form, action, title, template, kept_days=MOVED_COPY_DAYS)
+        source, at = form.cleaned_data["cluster"], form.cleaned_data["at"]
+        ctx = staff_context(request)
+        asked: list[Hub] = []
+
+        def ask(hub: Hub) -> None:
+            operation(ctx, HubRestoreIn(hub=hub.pk, cluster=source.pk, at=at))
+            asked.append(hub)
+
+        if self.ask_each(request, hubs, ask):
+            values = {"count": len(asked), "cluster": source.name, "moment": utc(at), "closed": closed_for(asked)}
+            self.message_user(request, said(len(asked)) % values, messages.SUCCESS)
+        return None
+
+    def confirmation_row(self, hub: Hub) -> tuple:
+        return hub.pk, hub.slug, hub.db_name
+
+    def confirmation_note(self, hub: Hub, action: str) -> str:
+        return closure_said(hub) if action in CLOSING_ACTIONS else ""
+
+    def chosen_name(self, hub: Hub) -> str:
+        return hub.slug
+
     def has_move_permission(self, request: HttpRequest) -> bool:
+        return is_platform_admin(request)
+
+    def has_restore_permission(self, request: HttpRequest) -> bool:
         return is_platform_admin(request)
 
     def get_changelist(self, request: HttpRequest, **kwargs):
@@ -419,12 +704,207 @@ class HubAdmin(base_admin.HubAdmin):
             here = default_server()
         else:
             here = self.get_empty_value_display()
-        return f"{here} → {hub.moving_to.name}" if hub.moving_to_id else here
+        if hub.moving_to_id:
+            return f"{here} → {hub.moving_to.name}"
+        if hub.restoring_from_id:
+            return f"{here} ← {hub.restoring_from.name}"
+        if hub.move_scheduled_to_id:
+            return pgettext("scheduled move", "%(here)s (to %(there)s at %(moment)s)") % {
+                "here": here,
+                "there": hub.move_scheduled_to.name,
+                "moment": on_its_clock(hub.move_scheduled_for, hub.timezone),
+            }
+        return here
 
     @admin.display(description=pgettext_lazy("hub database", "size"))
     def database_size(self, hub: Hub) -> str:
         size = getattr(hub, "database_bytes", None)
         return filesizeformat(size) if size is not None else self.get_empty_value_display()
+
+
+@admin.register(RestoredCopy)
+class RestoredCopyAdmin(AsksFirst, base_admin.ReadOnlyAdmin):
+    """The separate copies of hubs as they were at a moment (BASE-F114): asked from Hubs with «Restore to a
+    separate copy…», made and dropped by the worker; read only, for support too. «Recover into the business…»
+    asks a made copy to give back what its business lacks, for the platform's admins only."""
+
+    actions = ["recover_into_the_business"]
+
+    # What the staff looks for at a glance, in four columns a phone shows whole; its database (searchable), who asked,
+    # when, from where and on which cluster are on its page: a database's name is 40-odd characters in one piece.
+    list_display = ("made_from", "status", "kept_until", "last_error")
+    list_filter = ("status",)
+    list_select_related = ("hub", "cluster")
+    search_fields = ("hub__slug", "db_name")
+    fields = (
+        "hub",
+        "moment",
+        "status",
+        "db_name",
+        "on_cluster",
+        "source",
+        "kept_until",
+        "asked_by",
+        "asked_at",
+        "made_at",
+        "last_error",
+    )
+    readonly_fields = fields
+
+    class Media:
+        # A long last error breaks inside its cell and, up to a tablet's width, the filter goes under the list.
+        css = {"all": ["control/admin.css"]}
+
+    @admin.display(description=gettext_lazy("separate copy"), ordering="restore_point")
+    def made_from(self, copy: RestoredCopy) -> str:
+        return copy_said(copy)
+
+    @admin.display(description=pgettext_lazy("restore", "Moment"), ordering="restore_point")
+    def moment(self, copy: RestoredCopy) -> str:
+        return utc(copy.restore_point)
+
+    @admin.display(description=gettext_lazy("cluster"))
+    def on_cluster(self, copy: RestoredCopy) -> str:
+        return copy.cluster.name if copy.cluster_id else default_server()
+
+    @admin.display(description=pgettext_lazy("separate copy", "kept until"))
+    def kept_until(self, copy: RestoredCopy) -> str:
+        if copy.made_at is None:
+            return self.get_empty_value_display()
+        return utc(copy.made_at + dt.timedelta(days=MOVED_COPY_DAYS))
+
+    @admin.action(description=gettext_lazy("Recover into the business…"), permissions=["recover"])
+    def recover_into_the_business(self, request: HttpRequest, queryset):
+        """Choose what to bring back on a confirmation page, then ask each chosen copy to give it back into its business
+        (``control.copy.recover``): the worker creates what the business lacks, each record by its app's own
+        operation, and Recoveries says how it went."""
+        form = RecoverForm(request.POST if "apply" in request.POST else None)
+        copies = queryset.select_related("hub")
+        if not form.is_bound or not form.is_valid():
+            title = gettext("Recover into the business")
+            return self.confirmation(request, copies, form, "recover_into_the_business", title, RECOVER_TEMPLATE)
+        apps = form.cleaned_data["apps"]
+        ctx = staff_context(request)
+        asked = self.ask_each(
+            request, copies, lambda copy: copy_recover(ctx, CopyRecoverIn(copy_id=copy.pk, apps=apps))
+        )
+        if asked:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d separate copy will give back %(what)s into its business within a few minutes: "
+                    "Recoveries says how it went.",
+                    "%(count)d separate copies will give back %(what)s into their businesses within a few minutes: "
+                    "Recoveries says how each went.",
+                    asked,
+                )
+                % {"count": asked, "what": recoverable_names(apps)},
+                messages.SUCCESS,
+            )
+        return None
+
+    def has_recover_permission(self, request: HttpRequest) -> bool:
+        return is_platform_admin(request)
+
+    def confirmation_row(self, copy: RestoredCopy) -> tuple:
+        return copy.pk, str(copy), copy.db_name
+
+    def chosen_name(self, copy: RestoredCopy) -> str:
+        return str(copy)
+
+
+@admin.register(CopyRecovery)
+class CopyRecoveryAdmin(base_admin.ReadOnlyAdmin):
+    """What the staff asked to bring back into a business from one of its separate copies (BASE-F114): asked
+    from Separate copies with «Recover into the business…», done by the worker; read only, for support too. Its
+    results say, for each thing each app gives back, how many came back, how many not and how many came back without
+    something; its page says why each did not, what each came back without (by its id in the copy: no personal data),
+    and why an app gave nothing back."""
+
+    # What the staff looks for at a glance, as Separate copies: three columns a phone shows whole (375 px). What was
+    # asked, who asked it, when, when it was done and why each record did not come back are on its page.
+    list_display = ("made_from", "status", "outcome")
+    list_filter = ("status",)
+    list_select_related = ("copy", "copy__hub")
+    search_fields = ("copy__hub__slug", "copy__db_name")
+    fields = ("copy", "status", "what", "outcome", "why_not", "notes", "asked_by", "asked_on", "done_on", "last_error")
+    readonly_fields = fields
+
+    class Media:
+        # A long result breaks inside its cell, never pushing the list sideways on a phone.
+        css = {"all": ["control/admin.css"]}
+
+    @admin.display(description=gettext_lazy("separate copy"), ordering="copy__restore_point")
+    def made_from(self, recovery: CopyRecovery) -> str:
+        return copy_said(recovery.copy)
+
+    @admin.display(description=pgettext_lazy("recovery", "what"))
+    def what(self, recovery: CopyRecovery) -> str:
+        return recoverable_names(recovery.apps)
+
+    @admin.display(description=pgettext_lazy("recovery", "results"))
+    def outcome(self, recovery: CopyRecovery) -> str:
+        """How it went: while asked, what it brings back; done, what each app gave back; failed, that and why."""
+        if recovery.status == CopyRecovery.Status.ASKED:
+            return self.what(recovery)
+        said = [self.result_said(result) for result in recovery.results]
+        if recovery.status == CopyRecovery.Status.FAILED and recovery.last_error:
+            said.append(recovery.last_error)
+        return "; ".join(said) or self.get_empty_value_display()
+
+    @admin.display(description=pgettext_lazy("recovery", "not brought back"))
+    def why_not(self, recovery: CopyRecovery):
+        return self.by_record(recovery, "reasons", "reason")
+
+    @admin.display(description=pgettext_lazy("recovery", "notes"))
+    def notes(self, recovery: CopyRecovery):
+        """What a record that came back came back without, and why (a professional who has left since)."""
+        return self.by_record(recovery, "notes", "note")
+
+    def by_record(self, recovery: CopyRecovery, kept: str, said: str):
+        """Each of the results' ``kept`` by the record's id in the copy, one a line: ``<id>: <said>``."""
+        lines = [(one["id"], one[said]) for result in recovery.results for one in result.get(kept, [])]
+        if not lines:
+            return self.get_empty_value_display()
+        return format_html("<ul>{}</ul>", format_html_join("", "<li>{}: {}</li>", lines))
+
+    @admin.display(description=pgettext_lazy("separate copy", "asked at"), ordering="asked_at")
+    def asked_on(self, recovery: CopyRecovery) -> str:
+        return utc(recovery.asked_at)
+
+    @admin.display(description=pgettext_lazy("recovery", "done at"), ordering="done_at")
+    def done_on(self, recovery: CopyRecovery) -> str:
+        return utc(recovery.done_at) if recovery.done_at else self.get_empty_value_display()
+
+    @staticmethod
+    def result_said(result: dict) -> str:
+        """What one thing an app gives back gave, in words: «Services: 1 restored, 2 created, 1 not created, 1 with
+        notes» (one came back without something, said on its page), or why it gave nothing. Its name is kept as the code
+        writes it and said in the reader's language. A recovery noted before each thing was counted apart has no
+        ``label`` (the app's names, together), and one noted before restores were counted has no ``restored``."""
+        what, restored, created, missed, noted, why = (
+            gettext(result["label"]) if "label" in result else recoverable_names([result["app"]]),
+            result.get("restored", 0),
+            result["created"],
+            result["not_created"],
+            result.get("noted", 0),
+            result["refused"],
+        )
+        if why and not restored and not created and not missed:
+            return pgettext("recovery", "%(what)s: nothing (%(why)s)") % {"what": what, "why": why}
+        counts = []
+        if restored:
+            counts.append(ngettext("%(count)d restored", "%(count)d restored", restored) % {"count": restored})
+        if created or not restored:
+            counts.append(ngettext("%(count)d created", "%(count)d created", created) % {"count": created})
+        if missed:
+            counts.append(ngettext("%(count)d not created", "%(count)d not created", missed) % {"count": missed})
+        if noted:
+            counts.append(ngettext("%(count)d with notes", "%(count)d with notes", noted) % {"count": noted})
+        said = pgettext("recovery", "%(what)s: %(counts)s") % {"what": what, "counts": ", ".join(counts)}
+        if why:
+            said = pgettext("recovery", "%(said)s, then stopped (%(why)s)") % {"said": said, "why": why}
+        return said
 
 
 class FreezeForm(forms.ModelForm):

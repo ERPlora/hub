@@ -9,6 +9,7 @@ waits for the write or refuses it as one deleted before, never a 500 nor a menu 
 
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
@@ -20,7 +21,7 @@ from live.models import OutboxEvent
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.inventory.models import Product
 
-from .conftest import FOOD, make_combo, make_group, make_option, make_product, run
+from .conftest import FOOD, ctx_for, make_combo, make_group, make_option, make_product, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -70,6 +71,25 @@ def test_two_courses_with_the_same_name_at_once_make_one():
     assert OutboxEvent.objects.filter(name="combo.group.created").count() == 1
 
 
+def as_the_platform():
+    """What a recovery from a separate copy runs its operations with: every permission."""
+    return ctx_for(actor="system", permissions={"*"})
+
+
+def test_a_course_made_again_while_one_with_its_name_is_added_makes_one():
+    combo = make_combo()
+    results = at_once(
+        lambda: run("combo.group.create", {"combo_id": str(combo.id), "name": "Sides"}),
+        lambda: run(
+            "combo.group.recover",
+            {"combo_id": str(combo.id), "name": "sides", "stands_for": str(uuid.uuid7())},
+            as_the_platform(),
+        ),
+    )
+    assert [error.code for error in refused(results)] == ["combo.group_exists"]
+    assert ChoiceGroup.objects.filter(combo=combo).count() == 1
+
+
 def test_the_same_product_twice_at_once_in_one_course_makes_one_choice():
     course = make_group(make_combo())
     lentils = make_product("Lentils")
@@ -106,8 +126,8 @@ def test_a_full_course_takes_no_one_more_whatever_arrives_together():
     assert sorted(course.options.values_list("sort_order", flat=True))[-2:] == [38, 39]
 
 
-# Edits and reorders against writes of the same menu: a 409 or a success, never a raw database error
-# (review 3). Each case repeats, so a race that only bites now and then still shows.
+# Edits and reorders against writes of the same menu: a 409 or a success, never a raw database error.
+# Each case repeats, so a race that only bites now and then still shows.
 
 
 def unexpected(results) -> list:
@@ -448,6 +468,18 @@ TAX_WRITES = {
     "combo.update": (
         lambda w: run("combo.combo.update", {"id": str(w.combo.id), "tax_category_key": PROBE}),
         'UPDATE "combo_combo" SET',
+    ),
+    # A menu made again from a separate copy names its tax category as the screen's create does.
+    "combo.recover": (
+        lambda w: run(
+            "combo.combo.recover",
+            {
+                "name": "Menu of the night", "price": 1500, "supply_kind": "service", "tax_category_key": PROBE,
+                "stands_for": str(uuid.uuid7()),
+            },
+            as_the_platform(),
+        ),
+        'INSERT INTO "combo_combo"',
     ),
 }
 

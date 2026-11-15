@@ -1,5 +1,5 @@
-// The op → route map the SDK's API client uses. Written by hand for the PoC (V3 generates it from
-// `/api/openapi.json`); these cases pin the routes the shell and the demo depend on.
+// The op → route map the SDK's API client uses, written by hand (nothing generates it from `/api/openapi.json`);
+// these cases pin the routes the shell and the demo depend on.
 import { describe, expect, it } from 'vitest';
 
 import { OPERATION_ROUTES } from './operation-routes';

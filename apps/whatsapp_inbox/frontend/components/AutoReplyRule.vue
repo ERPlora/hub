@@ -3,7 +3,7 @@
 // Citas' «confirm the customer's bookings by themselves» (`auto_confirm_online`) or Reservas' «confirm new
 // reservations by themselves» (`auto_confirm`), read live and saved at once in that app, never in this one. Mounted only
 // under a card that is on, so nobody else subscribes to the rule. Each choice is a full-width row whose words wrap
-// (whatsapp_inbox#285: a segment cut «Las reservas se co…» on a phone).
+// (a segment cut «Las reservas se co…» on a phone).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonItem, IonList, IonRadio, IonRadioGroup } from '@ionic/vue';
@@ -120,7 +120,7 @@ async function choose(value: Choice): Promise<void> {
   --inner-padding-end: 0;
 }
 
-/* The choice's words wrap on a phone instead of ending in «…» (whatsapp_inbox#285). */
+/* The choice's words wrap on a phone instead of ending in «…». */
 .wa-rule__item ion-radio::part(label) {
   white-space: normal;
   overflow: visible;

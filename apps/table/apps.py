@@ -12,11 +12,11 @@ class TableConfig(LiveAppConfig):
     label = "table"
     kind = "app"
     verbose_name = _("Tables")
-    # Registered in the shell (ION_ICONS); the old `map-outline` waits in UI-REQUESTS.md.
+    # Registered in the shell (ION_ICONS); `map-outline` waits in UI-REQUESTS.md.
     icon = "ion:grid-outline"
     category = Category.RESTAURANT
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your dining room: zones, tables on a live floor plan, and the checks seated at each table."
     )
@@ -50,8 +50,8 @@ class TableConfig(LiveAppConfig):
         "table.view_settings",
         "table.manage_settings",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier
-    # (an employee who also charges) is the employee now.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier (an
+    # employee who also charges) is an employee.
     role_permissions = {
         "hub_owner": ["table.*"],
         "hub_admin": ["table.*"],
@@ -78,10 +78,9 @@ class TableConfig(LiveAppConfig):
             "table.view_settings",
         ],
     }
-    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your tables» (module.json `setup`,
-    # tables#24), order 100 and recommended, done once one table is in use (not deleted, active: an occupied or blocked
-    # one still counts), for whoever adds tables, leading to the list of tables. Refreshed on what changes the tables in
-    # use; never a zone (one with tables is not deleted). The old module declared no panel and no bell row.
+    # The Home's step «Your tables», order 100 and recommended, done once one table is in use (not deleted, active:
+    # an occupied or blocked one still counts), for whoever adds tables, leading to the list of tables. Refreshed on
+    # what changes the tables in use; never a zone (one with tables is not deleted).
     setup = [
         SetupStep(
             key="tables",
@@ -91,7 +90,7 @@ class TableConfig(LiveAppConfig):
             description=_(
                 "Add the tables of your dining room: without them there is no order per table, no split and no transfer."
             ),
-            # The old `map-outline` waits in UI-REQUESTS.md, as the menu's.
+            # `map-outline` waits in UI-REQUESTS.md, as the menu's.
             icon="ion:grid-outline",
             route="/table/tables",
             permission="table.add_table",
@@ -101,8 +100,7 @@ class TableConfig(LiveAppConfig):
         )
     ]
     # TABLE-F29: the holds whose window passed are marked expired, every hour, by the worker as the
-    # system (cron in UTC). Phase 1 sweeps the one database every hub shares; phase 2 runs it per hub,
-    # each under ``use_hub``. Reading the plan already ignores them.
+    # system (cron in UTC), per hub, each under ``use_hub``. Reading the plan already ignores them.
     scheduled_tasks = [
         {
             "name": "expire_table_holds",
@@ -112,9 +110,8 @@ class TableConfig(LiveAppConfig):
         }
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. Registered icons only: the old `map-outline` waits in
-    # UI-REQUESTS.md. The same icons as the tabbar (frontend/tabs.ts), which adds Settings for whoever
-    # may save them, as the old shell did.
+    # `icon =` as the module's own icon. Registered icons only: `map-outline` waits in UI-REQUESTS.md.
+    # The same icons as the tabbar (frontend/tabs.ts), which adds Settings for whoever may save them.
     navigation = [
         Nav("floor_plan", _("Floor plan"), "ion:apps-outline", "/table/floor-plan"),
         Nav("zones", _("Zones"), "ion:layers-outline", "/table/zones"),

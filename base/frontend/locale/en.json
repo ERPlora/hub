@@ -193,8 +193,8 @@
         "body": "You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off. | You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off."
       },
       "counter": {
-        "limited": "{enabled} of {max} apps turned on",
-        "unlimited": "1 app turned on · Unlimited | {enabled} apps turned on · Unlimited"
+        "limited": "1 app turned on · {chosen} of {max} in your plan | {on} apps turned on · {chosen} of {max} in your plan",
+        "unlimited": "1 app turned on · Unlimited | {on} apps turned on · Unlimited"
       }
     },
     "appBlocked": {
@@ -1508,7 +1508,12 @@
     },
     "money": {
       "unreadable": "The business's currency could not be read",
-      "retry": "Retry"
+      "retry": "Retry",
+      "filter": {
+        "notAmount": "This is not an amount. Type a figure, for example {amount}.",
+        "negative": "This amount cannot be negative.",
+        "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
+      }
     },
     "unsavedChanges": {
       "title": "Discard changes?",

@@ -84,6 +84,7 @@ HistoryAction = Literal[
     "charged",
     "uncharged",
     "deleted",
+    "restored",
 ]
 AppointmentSort = Literal[
     "start",
@@ -215,6 +216,13 @@ class AppointmentRefIn(In):
     @classmethod
     def _number(cls, value, info: ValidationInfo):
         return _named(value, info, "id", SAY_WHICH_APPOINTMENT)
+
+
+class AppointmentIdIn(In):
+    """An appointment by its id alone: the one a deleted appointment keeps (APPOINTMENT-F11), the same in a separate
+    copy of the business and in the business."""
+
+    id: UUID = Field(title=T_APPOINTMENT, description="The appointment's id.")
 
 
 Services = Annotated[
@@ -606,8 +614,9 @@ class HistoryOut(Schema):
     id: UUID
     action: HistoryAction
     at: dt.datetime
-    actor: str = Field(description="Who did it (empty for the platform).")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark.")
     by_customer: bool
+    by_platform: bool = Field(description="No person did it: the platform (the system, an automation, a recovery).")
     reason: str
     old_value: dict
     new_value: dict

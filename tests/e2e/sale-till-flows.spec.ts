@@ -101,7 +101,7 @@ async function checkOf(context: BrowserContext, label: string): Promise<{ id: st
   return res.data.rows.find((row) => row.label === label);
 }
 
-// rv-hub-292: the till goes through 390 twice, and the first time its drawer was opened. The second time the open
+// The till goes through 390 twice, and the first time its drawer was opened. The second time the open
 // drawer covers the cart button, and a spec that tapped it again waited for it until the test's time ran out: this is
 // what fails here when `openTillCart` taps whatever the drawer's state. The CPU runs 20 times slower, as on a busy
 // machine, but that does not make the other fault certain (reading the button before the till has laid itself out

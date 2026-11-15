@@ -9,13 +9,7 @@
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
-
-/** The decimals of an amount while the currency is unknown. */
-const UNKNOWN_DECIMALS = 2;
-
-/** The decimals of an amount in `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while it is unknown. */
-export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
+export { filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
@@ -65,4 +59,13 @@ export function formatDate(value: string | null | undefined, locale: string, tim
     days.set(key, found);
   }
   return found.format(date);
+}
+
+/** A translator of the app's catalogue: what `useT()` gives. */
+type Translate = (key: string, named?: Record<string, unknown>) => string;
+
+/** What a courtesy or a correction moved, «1 session» / «2 sessions» and «1 day» / «30 days» (hub#1147): each
+ *  count goes to the catalogue as `count`, so vue-i18n picks its singular or plural; never «session(s)». */
+export function sessionsAndDays(t: Translate, sessions: number, days: number): { sessions: string; days: string } {
+  return { sessions: t('service.counts.sessions', { count: sessions }), days: t('service.counts.days', { count: days }) };
 }

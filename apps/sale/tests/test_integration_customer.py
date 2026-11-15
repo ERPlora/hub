@@ -2,8 +2,7 @@
 purchase history the sale's real events write on its card.
 
 The sale's real event (``sale.sale.completed`` / ``voided`` / ``refunded``, as recorded in the outbox)
-is handed to Customers' real reaction (``apps.customer.events.react``), as the outbox relay will in
-phase 2.
+is handed to Customers' real reaction (``apps.customer.events.react``), as the worker's outbox relay does.
 """
 
 import pytest
@@ -132,5 +131,5 @@ def test_an_erased_customer_keeps_the_sales_printed_name(coffee, customer):
     )
     run("customer.customer.erase", {"id": str(ana.id), "reason": "GDPR request"})
     found = run("sale.sale.get", {"sale_id": str(sale.id)})
-    # A sale is a fiscal record: its copy of the name stays (WORKBOOK «Dudas abiertas»).
+    # A sale is a fiscal record: its copy of the name stays.
     assert found.customer_name == "Ana López" and found.customer_id == ana.id

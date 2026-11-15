@@ -36,7 +36,7 @@ cambia las suyas (asignadas o creadas por él); el responsable, todas.
 | Operaciones | 7 consultas (`queries.py`) y 11 acciones (`services.py`), todas con `ai=`; 17 rutas en `/api/task/…` (`task.task.release_member`, solo de la plataforma, no tiene ruta) |
 | Eventos | 10, `task.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `staff.member.terminated` (`task.task.release_member`), por el relay del outbox |
 | Tareas programadas | ninguna |
-| Migraciones | `0001_initial` |
+| Migraciones | `0001_initial` y `0002_hub_users` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (número sin huecos, lo propio, el orden de los bloqueos con Personal, el «hoy» del

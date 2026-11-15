@@ -1,7 +1,6 @@
-// The sections of Sales & POS (the WORKBOOK's screens; the old manifest's `navigation` and the settings
-// tab the old hub added): Sell, Sales, Quick notes, Sections and Settings, as the footer tabbar of
-// every sale page. The old «Departments» is «Sections» (FIX-SALE-TABBAR-LABEL): its one word was wider
-// than a fifth of a phone's strip, so the five tabs did not fit whole. Each tab follows its route, has a registered icon and its label in the reader's
+// The sections of Sales & POS (the WORKBOOK's screens): Sell, Sales, Quick notes, Sections and Settings, as the footer
+// tabbar of every sale page. «Sections», not «Departments»: that word is wider than a fifth of a phone's strip, so the
+// five tabs would not fit whole. Each tab follows its route, has a registered icon and its label in the reader's
 // language, and wears the same icon and path as its menu entry in apps.py.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

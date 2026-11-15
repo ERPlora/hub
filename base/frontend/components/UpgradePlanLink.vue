@@ -1,10 +1,8 @@
 <script setup lang="ts">
-// «Upgrade plan» at the foot of the side menu (BASE-G169; the old hub's, HUB_SHELL-F129): this hub's plan page
-// on erplora.com, which `base/spa.py` embeds in `hub-home`, for every profile (the owner often comes in through
-// the till's session); what the hub may do there, erplora.com decides by profile. It is the platform's
-// PlanUpgradeLink, with the menu's icon and label: its click goes with the pass (BASE-F11), so the person arrives
-// already signed in, and the link keeps the usual address, for when the browser blocks the new tab. It sells, so
-// only on the web (`useSurface`).
+// This hub's plan page on erplora.com (`hub-home`, embedded by `base/spa.py`), shown for every profile because the
+// owner often comes in through the till's session; erplora.com decides what each profile may do there. Its click goes
+// with the pass so the person arrives signed in, and the link keeps the plain address for when the browser blocks the
+// new tab. It sells, so it shows only on the web (`useSurface`).
 import { HubIcon } from '@erplora/ui/shell';
 
 import { usePlanLink } from '../lib/plan-link';

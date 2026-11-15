@@ -1,10 +1,9 @@
-"""FIX-HUB-KITCHEN-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#671): the card of a write of Kitchen says which ticket,
-dish, station, product, category, check or line of a check it acts on by its name, read as whoever asks, never by
-its id, and leaves it out when that person may not read it or it is not there. A ticket goes by its number, as the
-«Cancel ticket …?» dialog and the ticket's sheet say it; a dish and a station by their names, as the board and the
-stations' «Delete …?» dialog say them; a product and a category by their names, as Inventory says them; a check of
-Sales by its title (else its amount) and its line by the dish on it, as Sales says them. The type of a ticket sent
-or received is said by its label («Para llevar»), never by its code.
+"""hub#671: the card of a write of Kitchen says which ticket, dish, station, product, category, check or line of a check
+it acts on by its name, read as whoever asks, never by its id, and leaves it out when that person may not read it or it
+is not there. A ticket goes by its number, as the «Cancel ticket …?» dialog and the ticket's sheet say it; a dish and a
+station by their names, as the board and the stations' «Delete …?» dialog say them; a product and a category by their
+names, as Inventory says them; a check of Sales by its title (else its amount) and its line by the dish on it, as Sales
+says them. The type of a ticket sent or received is said by its label («Para llevar»), never by its code.
 """
 
 import dataclasses

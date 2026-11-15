@@ -1,8 +1,7 @@
-"""Staff on the Home (PLAN-HUB round 2026-10-21; FIX-STAFF-SETUP-HOOKS): base's own query brings the old module's five
-panels — the head count, who is away today, the requests waiting, today's time off and the people by role
-(STAFF-F20, STAFF-F23) — each answered by Staff's own query as that person, only to whoever may read it: the team's
-figures to whoever sees the team, the time off to whoever sees the time off. A change in hub B re-runs B's panels and
-tells A nothing.
+"""Staff on the Home: base's own query brings five panels — the head count, who is away today, the requests waiting,
+today's time off and the people by role (STAFF-F20, STAFF-F23) — each answered by Staff's own query as that person, only
+to whoever may read it: the team's figures to whoever sees the team, the time off to whoever sees the time off. A change
+in hub B re-runs B's panels and tells A nothing.
 
 base and staff run for real: the panels come from StaffConfig through base's own query, and the figures from records,
 roles and time off written through Staff's own operations.
@@ -235,8 +234,8 @@ def test_staff_by_role_paints_the_active_people_of_each_role_the_biggest_first_t
 
 @pytest.mark.django_db
 def test_staff_by_role_gives_each_bar_its_roles_colour_and_none_to_a_role_without_one():
-    """The old module's `map.color`: base paints each bar in the hex its row gives (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-
-    MAP-COLOR); a role without a colour gives "" and its bar keeps the panel's (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR)."""
+    """The old module's `map.color`: base paints each bar in the hex its row gives; a role without a colour gives ""
+    and its bar keeps the panel's."""
     panel = panels(ctx_for())[BY_ROLE]
     assert panel["map"]["color"] == "color"
     stylist, colourist = role("Stylist", color="#E11D48"), role("Colourist", color="#16A34A")

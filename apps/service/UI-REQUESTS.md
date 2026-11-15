@@ -3,9 +3,9 @@
 Lo que las páginas de Servicios necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo
 más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-**Estado (2026-10-23, FIX-UI-SHELL-ICONS-SERVICE-TASK)**: los iconos ya llegaron a `ui` y salieron de aquí
-(«Hechas»). Sigue abierto el panel lateral, en «Fuera por ahora» (`## 6` de `MIGRATION.md`), como lo piden
-también Inventario, Clientes, Tarifas y Tareas.
+**Estado (2026-10-23, FIX-UI-SHELL-ICONS-SERVICE-TASK)**: los iconos ya llegaron a `ui` y salieron de aquí («Hechas»).
+Sigue abierto el panel lateral, en «Fuera por ahora» (`## 6` de `archive/migration/MIGRATION.md` de
+`ERPlora/erplora-next`), como lo piden también Inventario, Clientes, Tarifas y Tareas.
 
 ## Panel lateral de `DataTable`
 

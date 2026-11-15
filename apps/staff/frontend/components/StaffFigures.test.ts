@@ -1,5 +1,5 @@
-// STAFF-G02, G03, G04 (the old Home panels «Active staff», «On leave today» and «Pending time off»,
-// STAFF-F20, F23): three figures above the staff list while the Hub's Home has no panels, followed
+// The old Home panels «Active staff», «On leave today» and «Pending time off» (STAFF-F20,
+// F23): three figures above the staff list while the Hub's Home has no panels, followed
 // live from `staff.member.stats`; a write anywhere re-runs it on the server.
 import { describe, expect, it } from 'vitest';
 

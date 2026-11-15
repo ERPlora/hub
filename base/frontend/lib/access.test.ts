@@ -1,6 +1,3 @@
-// The way in's browser rules (APP-BASE-3): the entry by PIN or badge (BASE-G55, G56, G60), the badge reader's burst
-// (G56; cases of the old hub's `badge-scanner.test.ts`), the idle lock (G59; its `idle-logout.test.ts`), the
-// session's way in from the HTML (`hub-home.access`), a safe `next` and the «Now serving» note across a reload.
 import { ApiError } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -92,7 +89,7 @@ describe('safeNext', () => {
 
 describe('nextWithHash', () => {
   // A link with a fragment opened without a session reaches the Access page as «/login?next=/settings#data»: the
-  // browser keeps the fragment on the page's own address, so it goes back on `next` (BASE-G52).
+  // browser keeps the fragment on the page's own address, so it goes back on `next`.
   it.each([
     ['/settings', '#data', '/settings#data'],
     ['/settings?tab=1', '#data', '/settings?tab=1#data'],
@@ -275,7 +272,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
   const ACCOUNT = { credential: 'account', switch_user: false, idle_minutes: null };
   const NONE = { theme_mode: '', palette: '', ui_scale: 100 };
 
-  it('a till that always asks signs out after its idle minutes (BASE-G59)', () => {
+  it('a till that always asks signs out after its idle minutes', () => {
     const d = deps();
     const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
     vi.advanceTimersByTime(5 * 60_000);
@@ -291,7 +288,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     stop();
   });
 
-  it('paints the person’s own appearance (BASE-G125)', () => {
+  it('paints the person’s own appearance', () => {
     const d = deps();
     startWayIn(page({ access: ACCOUNT, preferences: { theme_mode: 'dark', palette: 'forest', ui_scale: 120 } }), d)();
     expect(d.paint).toHaveBeenCalledWith('dark', 'forest', 120);
@@ -305,7 +302,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     expect(d.reset).not.toHaveBeenCalled();
   });
 
-  it('after «Switch user», tells who serves now and forgets the appearance of whoever left (gh:hub#2506)', () => {
+  it('after «Switch user», tells who serves now and forgets the appearance of whoever left', () => {
     const storage = memoryStorage();
     announceSwitch('Bea', storage);
     const d = deps(storage);

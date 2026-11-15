@@ -57,10 +57,14 @@ function detail(row: ActivityRow): string {
   return formatMoney(amount, locale.value, recordMoney({ currency: row.data.currency, currency_decimals: row.currency_decimals }, money.value));
 }
 
+function who(row: ActivityRow): string {
+  const author = row.data.author_name;
+  if (typeof author === 'string' && author) return t('customer.activity.by', { name: author });
+  return row.by_platform ? t('customer.activity.byPlatform') : t('customer.activity.by', { name: row.actor });
+}
+
 function when(row: ActivityRow): string {
-  const author = typeof row.data.author_name === 'string' && row.data.author_name ? row.data.author_name : row.actor;
-  const at = formatDateTime(row.created_at, locale.value);
-  return author ? `${at} · ${t('customer.activity.by', { name: author })}` : at;
+  return `${formatDateTime(row.created_at, locale.value)} · ${who(row)}`;
 }
 
 // ── Add note ────────────────────────────────────────────────────────────────────────────────────

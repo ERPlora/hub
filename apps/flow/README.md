@@ -73,8 +73,8 @@ CI=1 pnpm e2e tests/e2e/flow-flows.spec.ts tests/e2e/flow-steps.spec.ts tests/e2
 
 ## Qué queda fuera
 
-- **hub#497** y **hub#498** — fallos vistos en la migración: textos en español con las palabras de otra app y
-  el importe de un paso que cobra que no se dice como dinero.
+- Ya no están fuera: hub#497 y hub#498 (fallos vistos en la migración: textos en español con las palabras de otra
+  app y el importe de un paso que cobra que no se decía como dinero) se cerraron el 2026-11-07 y el 2026-11-06.
 - Trabajo encolado del carril: la reanudación de una ejecución aparcada. Reservar, mover, confirmar y editar la cita de
   cualquier profesional ya los hace un paso con su permiso; anularla, solo «Que me lo pregunte» tras el sí (hub#634).
 - Lo que no hace a propósito (bifurcaciones, lienzo de nodos, encender o conceder sin confirmarlo, automatizar lo que

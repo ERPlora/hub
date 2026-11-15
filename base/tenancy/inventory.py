@@ -1,13 +1,12 @@
-"""Which database every model lives in (PLAN-DB §2 and §14.1; plan 2026-10-22-fase-2-tenencia §2.1).
+"""Which database every model lives in.
 
 An explicit list, read by the ``TenantRouter`` and by ``base/tenancy/tests/test_inventory.py``:
 
 - ``control``: the control database (``default``): the registry (``control``), Django's admin, auth, contenttypes
-  and sessions, and phase 1's ``base.Membership`` and ``base.SessionOwner``;
+  and sessions, and ``base.Membership`` and ``base.SessionOwner``, which live next to the sessions;
 - ``hub``: a hub's own database: ``base``, ``live`` and every module of ``apps/``;
 - ``contextual``: the database of the context that writes it: the outbox and its deliveries, whose rows a hub's
-  command writes in its hub and the registry's operations (``base.hub.*``, the demos) in control
-  (plan §1, contradiction 5);
+  command writes in its hub and the registry's operations (``base.hub.*``, the demos) in control;
 - ``shared``: the SaaS's ``shared`` schema, which ``base.routers.SharedRouter`` sends to its alias.
 
 A model in none of them is refused (``UnclassifiedModel``): it never lands anywhere by default. The labels are
@@ -33,21 +32,20 @@ APP_CLASSES: dict[str, str] = {
     "live": HUB,
 }
 
-#: Every module of ``apps/`` keeps its tables in each hub's database (CLAUDE.md «Apps»).
+#: Every module of ``apps/`` keeps its tables in each hub's database.
 HUB_MODULES_PACKAGE = "apps."
 
 #: Models whose class is not their app's, each with its reason.
 MODEL_CLASSES: dict[str, tuple[str, str]] = {
     "base.membership": (
         CONTROL,
-        "phase 1's session seam: the role of a SaaS user on a host stays in control with Django's sessions "
-        "until the hub's own staff and sessions come (plan 2026-10-22, decision 3).",
+        "the role of a SaaS user on a host lives next to Django's sessions, which are control's: it stays in "
+        "control until each hub has its own staff and sessions.",
     ),
     "base.sessionowner": (
         CONTROL,
         "the index of whose and where every session is (a key to Django's sessions, control's): it lives next to "
-        "the sessions it names, so /internal/sessions/revoke ends them without decoding any (plan 2026-10-22, "
-        "decision 3).",
+        "the sessions it names, so /internal/sessions/revoke ends them without decoding any.",
     ),
     "base.hub": (
         CONTROL,
@@ -60,7 +58,7 @@ MODEL_CLASSES: dict[str, tuple[str, str]] = {
     "live.outboxevent": (
         CONTEXTUAL,
         "a hub's commands record their events in the hub's database; the registry's (base.hub.*, the demos), "
-        "which belong to no hub, in control's (plan 2026-10-22, contradiction 5).",
+        "which belong to no hub, in control's.",
     ),
     "base.eventdelivery": (
         CONTEXTUAL,

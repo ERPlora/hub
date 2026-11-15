@@ -140,7 +140,7 @@ export function describeClause(clause: Pick<ClauseOut, 'path' | 'op' | 'value'>,
   const what = pathLabel(clause.path, steps, catalog, p);
   const op = p.t(`flow.steps.operators.${clause.op}`);
   if (clause.op === 'exists') return `${what} ${op}: ${valueText(clause.value, p)}`;
-  // Another datum is named in words, never by its path (hub#1712).
+  // Another datum is named in words, never by its path.
   const named = (value: unknown): unknown => (isPath(value) ? pathLabel(String(value), steps, catalog, p) : value);
   const value = Array.isArray(clause.value) ? clause.value.map(named) : named(clause.value);
   return `${what} ${op} ${valueText(value, p)}`;

@@ -8,7 +8,7 @@
 // like an item's): a library image or a photo of its own, sent once the menu is saved (`set_image`, `upload_image`,
 // «Uploading photo…»); if the menu saved and the photo did not, the dialog says so with «Retry» (only the photo goes
 // again) and the menu keeps the photo it had.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -19,10 +19,8 @@ import { draftOf, type ImageDraft, useImageSave } from '../../../../base/fronten
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchTaxCategories } from '../lib/pickers';
 import type { ComboIn, ComboOut, ComboPatchIn, SupplyKind } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   /** The menu being edited; `null` = «New menu». */
@@ -165,7 +163,7 @@ function retryPhoto(): void {
 }
 
 // An untouched price follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'combo-menu-form',
   () => {
     const stored = props.combo ? moneyFieldText(props.combo.price, locale.value, money.value) : '';
@@ -178,6 +176,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-menu-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : $t('combo.save')"
@@ -209,6 +208,7 @@ useUnsavedFormOnOpen(
         </InlineFeedback>
         <ion-input
           data-testid="combo-menu-form-name"
+          name="name"
           :value="form.name"
           :label="$t('combo.form.name')"
           label-placement="floating"
@@ -221,6 +221,7 @@ useUnsavedFormOnOpen(
         />
         <ion-input
           data-testid="combo-menu-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('combo.form.kitchenName')"
           :helper-text="$t('combo.form.kitchenNameHelp')"
@@ -235,6 +236,8 @@ useUnsavedFormOnOpen(
         <MoneyInput
           v-model="form.price"
           testid="combo-menu-form-price"
+          name="price"
+          :money="money"
           :label="money ? t('combo.form.priceIn', { currency: money.currency }) : t('combo.form.price')"
           :helper-text="t('combo.form.priceHelp')"
           :error-text="fieldErrors.price"
@@ -274,6 +277,7 @@ useUnsavedFormOnOpen(
         <Combo
           v-if="eatenIn"
           testid="combo-menu-form-tax_category"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTax"
           :label="t('combo.form.taxCategory')"
@@ -284,6 +288,7 @@ useUnsavedFormOnOpen(
         />
         <ion-input
           data-testid="combo-menu-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

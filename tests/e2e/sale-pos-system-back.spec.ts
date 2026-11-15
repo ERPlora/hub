@@ -1,4 +1,4 @@
-// flow: SALE-F01 · FIX-HUB-SALE-POS-MORE-MENU-ANDROID-BACK-GOES-HOME — Android's Back on the till of the installed app.
+// flow: SALE-F01 — Android's Back on the till of the installed app.
 // The till's own layers (the ⋮ screen menu, «Open checks», the phone's check drawer) are sheets of the app, not Ionic
 // overlays: they answer base's `erplora:back` (base/frontend/lib/system-back.ts), so Back closes the topmost one and
 // the till stays; with nothing open, Back is the shell's (the root of an app goes Home). Tauri does not run in
@@ -7,15 +7,9 @@
 // does. Hub, SaaS and the till are the real ones; nothing is written.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, openApps, shot, shown } from './helpers';
+import { A, login, openApps, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
 import { openTillCart } from './sale-helpers';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
 
 /** The till of the installed app, opened cold (a link or a reload straight into it). */
 async function tillInsideTheApp(page: Page): Promise<void> {

@@ -290,7 +290,7 @@ def test_the_sort_and_the_pages(person, clock):
 
 
 def test_ties_go_by_id_in_the_lists_own_direction(person, clock):
-    """hub#684 (the rule of hub#2355, as in Sales, Cash register, Inventory and Tasks): a descending list is
+    """hub#684 (as in Sales, Cash register, Inventory and Tasks): a descending list is
     the ascending one read backwards, ties included, and its pages neither repeat nor lose rows. Same person,
     day, status and (empty) clock-out: only the id tells these days apart."""
     clock(NOW)
@@ -408,7 +408,7 @@ def test_whoever_corrects_days_reads_the_one_they_correct(person):
         run("attendance.record.detail", {"id": str(record.id)}, ctx_for(permissions={"attendance.clock"}))
 
 
-# attendance.correction.list: the history (ATTENDANCE-F09; the employee's own, attendance#8)
+# attendance.correction.list: the history (ATTENDANCE-F09; the employee's own)
 
 
 def test_the_history_newest_first_with_who(person, make_user):
@@ -750,8 +750,7 @@ def test_the_file_name_follows_the_dates():
 
 
 # A forgotten day (open longer than the settings' hours) reads as waiting for review, whether or not
-# the worker's review has run yet (every quarter of an hour): it never counts «until now» (review of
-# 2026-10-15, findings 1–3).
+# the worker's review has run yet (every quarter of an hour): it never counts «until now».
 
 
 def test_is_stale_is_an_open_day_past_the_hours():
@@ -824,7 +823,7 @@ def test_the_csv_writes_a_forgotten_day_as_needs_review_without_worked_time(pers
 
 
 def test_a_correction_keeps_who_made_it_when_their_user_is_deleted(person, make_user):
-    # Review of 2026-10-15, finding 4: «System» is only the system, never a deleted user.
+    # «System» is only the system, never a deleted user.
     ana, ctx = person()
     record = day(ana, "2026-10-05T07:00", "2026-10-05T15:00")
     boss = make_user("boss", role="hub_manager", first_name="Marta", last_name="Jefa")

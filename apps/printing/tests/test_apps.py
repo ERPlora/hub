@@ -89,9 +89,7 @@ def test_the_queue_forgets_its_finished_jobs_once_an_hour():
     ]
 
 
-# The Home's hooks (PLAN-HUB round 2026-10-21; FIX-PRINTING-SETUP-HOOKS): the old hub's core item «Set up your printer»
-# (setup_status.rs ITEM_PRINTER, hub#1948) and its bell row «Nothing is printing “…”» (old-hub:HUB_SHELL-F63,
-# hub#987), which live in Printing here. The old module itself declared neither, nor any panel.
+# The Home's hooks: the step «Set up your printer» and the bell row «Nothing is printing “…”», both Printing's.
 
 #: What changes whether a device set up here reaches an active receipt printer: a device set up, changed or retired,
 #: and a printer switched off, on, or to another function or connection. Never a printer just added (no device
@@ -104,9 +102,8 @@ UNATTENDED = [E.JOB_QUEUED, E.JOB_FAILED, E.JOB_CANCELLED, E.PRINTER_UPDATED, *E
 
 
 def test_the_homes_step_is_set_up_your_printer_done_once_a_device_prints_the_receipts():
-    """The old core item, same order and words: recommended (without a printer the business still sells, hub#1731),
-    done once a device set up here reaches an active receipt printer (the old «registered for the receipt station»,
-    live or not), for whoever sets printers and devices up, leading to the devices."""
+    """Recommended (without a printer the business still sells), done once a device set up here reaches an active
+    receipt printer, live or not, for whoever sets printers and devices up, leading to the devices."""
     (step,) = config().setup
     assert isinstance(step, SetupStep)
     assert (
@@ -162,9 +159,9 @@ FUNCTIONS = [("receipt", "Receipt", "Recibo"), ("kitchen", "Kitchen", "Cocina"),
 
 
 def test_the_bell_says_which_function_nobody_is_printing_one_row_each():
-    """One row per function, as the old bell (the kitchen and the bar are two places to go), named as Printing names
-    them (the old row showed its internal key, HUB_SHELL-F63), to everybody with Printing (who stands at the counter can
-    switch the till on), leading to the printers' state by function (gh:hub#2016)."""
+    """One row per function (the kitchen and the bar are two places to go), named as Printing names them, never by
+    their internal key, to everybody with Printing (who stands at the counter can switch the till on), leading to the
+    printers' state by function."""
     counters = config().bell
     assert all(isinstance(counter, BellCounter) for counter in counters)
     assert [
@@ -187,7 +184,7 @@ def test_the_bell_says_which_function_nobody_is_printing_one_row_each():
 
 def test_the_bell_reads_the_clock_every_30_seconds_for_each_function():
     """A job starts counting once it has waited a minute, and a device stops counting 90 s after its last news: the
-    number moves with no event, so the bell reads it again every 30 s, the old bell's poll (print-alert.ts, POLL_MS)."""
+    number moves with no event, so the bell reads it again every 30 s."""
     assert config().bell_refresh_every == {f"stalled_{usage}": 30 for usage, _english, _spanish in FUNCTIONS}
     assert set(config().bell_refresh_every) == {counter.key for counter in config().bell}
 
@@ -218,13 +215,12 @@ def test_the_hooks_query_is_re_run_on_their_events_and_their_icon_is_registered(
 
 
 def test_printing_brings_no_panels_to_the_home():
-    # The old module declared none (its module.json has no `widgets`), nor did the old core for printing.
     assert config().widgets == []
 
 
 def test_its_card_of_system_is_your_printer_for_everybody_with_printing_and_base_checks_it_clean():
-    """hub#683: System › «Usage and plan» has the old hub's «Your printer» of «Resources» while Printing is on, painted by
-    the app's own component; every role sees Printing, so every role sees the card (base.E015 checks the declaration)."""
+    """hub#683: System › «Usage and plan» has «Your printer» while Printing is on, painted by the app's own component;
+    every role sees Printing, so every role sees the card (base.E015 checks the declaration)."""
     assert config().system_cards == [
         {"key": "printer", "component": "SystemPrinterCard", "permission": "printing.view_settings"}
     ]

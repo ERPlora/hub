@@ -77,8 +77,8 @@ describe('RefundModal: Android Back with unsaved changes (hub#1020, BASE-F05)', 
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
     await s.result('sale.refund.options', REFUND_OPTIONS);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('sale-refund'),
       change: () => ionValue(s.inDoc('refund-reason'), 'Mistake', 'ionInput'),
       restore: () => ionValue(s.inDoc('refund-reason'), '', 'ionInput'),

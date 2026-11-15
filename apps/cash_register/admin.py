@@ -1,9 +1,8 @@
 """Django admin of the cash register app: full CRUD over its tables, for the platform's staff only.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com and has
-full CRUD over every table. What it saves does not go through the operations (no event, no number, no
-check of the open session); the database still refuses a negative amount, a second open session, a
-difference that is not counted − expected and a sale line copied twice.
+The Hub's admin lives only on hubs.erplora.com and has full CRUD over every table. What it saves does not go through the
+operations (no event, no number, no check of the open session); the database still refuses a negative amount, a second
+open session, a difference that is not counted − expected and a sale line copied twice.
 """
 
 from django.contrib import admin

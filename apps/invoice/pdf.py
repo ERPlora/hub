@@ -1,5 +1,5 @@
 """The PDF of a document: WeasyPrint prints the A4 HTML ``queries.render_document`` writes (the platform hub's PDF
-of ERPlora's invoices, PLAN-SAAS §4), offline and outside any transaction.
+of ERPlora's invoices), offline and outside any transaction.
 
 Nothing outside the page is fetched: the document is whole (its styles inline, VeriFactu's QR a ``data:`` URI), so
 the fetcher allows ``data:`` alone and a URL among the texts it prints never makes the server call anywhere (it is

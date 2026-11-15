@@ -54,12 +54,13 @@ async function issue(): Promise<void> {
   emit('substituted', answer.invoice);
 }
 
-useUnsavedFormOnOpen('invoice-substitute', recipient, open);
+const canDismiss = useUnsavedFormOnOpen('invoice-substitute', recipient, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-substitute"
     :title="$t('invoice.substitute.title', { number: ticket?.number ?? '' })"
     :submit-label="$t('invoice.substitute.submit')"

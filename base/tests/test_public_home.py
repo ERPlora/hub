@@ -93,7 +93,7 @@ def test_a_published_site_is_the_home_page_of_a_visitor_without_a_session(client
 
 
 def test_the_public_home_page_sets_no_cookie(client, website):
-    # No CSRF cookie, no session, no login state: the page may be cached and shared (round 2026-10-21).
+    # No CSRF cookie, no session, no login state: the page may be cached and shared.
     response = browse(client)
     assert response.status_code == 200
     assert not response.cookies

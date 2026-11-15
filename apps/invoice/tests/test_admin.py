@@ -1,4 +1,4 @@
-"""Django admin of the invoice app, for the platform's staff (hubs.erplora.com, PLAN §17–§18).
+"""Django admin of the invoice app, for the platform's staff (hubs.erplora.com).
 
 Series and issuer: full CRUD, ids and dates read-only. Invoices and their lines: every field is shown and
 the fiscal ones are read-only; there is no adding (the number comes only from the operations) and no

@@ -21,8 +21,7 @@ def test_a_new_site_starts_classic_never_published_and_offline():
 
 
 def test_each_hub_has_one_site_at_most():
-    # Phase 1: the tables are shared by every hub until phase 2 moves them to each hub's database (WORKBOOK): the
-    # row names its hub, and a hub has one row.
+    # The row names its hub, and a hub has one row.
     a, b = uuid.uuid7(), uuid.uuid7()
     Site.objects.create(hub_id=a)
     Site.objects.create(hub_id=b)

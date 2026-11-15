@@ -1,6 +1,3 @@
-// Employees › Roles (BASE-G143, G144; the old hub's RolesPanel): erplora.com's four roles, live, each with where it comes
-// from («Basic»), «Always available», how many people have it and how many permissions it gives; they are given and
-// changed on erplora.com. A catalogue that cannot be read says so.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
@@ -62,7 +59,7 @@ describe('RolesList', () => {
     expect(other.wrapper.find('[data-testid="roles-change"]').exists()).toBe(false);
   });
 
-  // gh:hub#439: the installed app opens nothing on a `_blank` link; the system browser does.
+  // The installed app opens nothing on a `_blank` link; the system browser does.
   it('in the installed app «Change roles on erplora.com» opens the system browser; the Google Play copy has none', async () => {
     embed({ name: 'Bar', plan_url: '', members_url: MEMBERS_URL });
     const invoke = installedApp('direct');

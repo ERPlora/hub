@@ -1,4 +1,4 @@
-"""A change of the business made on erplora.com reaches Settings › Business without reloading (APP-BASE-6, BASE-G99).
+"""A change of the business made on erplora.com reaches Settings › Business without reloading.
 
 The SaaS registers the business again (``PUT /internal/hubs/{id}``, HUBS-F15) as the platform: its own event goes to the
 platform's channel. ``base.business.get`` listens on the business's, so the registry notifies that one too, after the

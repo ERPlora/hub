@@ -1,7 +1,6 @@
-"""Tables on the Home (PLAN-HUB round 2026-10-21; FIX-TABLE-SETUP-HOOKS): base's own query brings the old module's
-item «Your tables» (module.json `setup`, tables#24), recommended, pending until one table of the room is in use (not
-deleted, active), to whoever adds tables, leading to the list of tables. Every change of it records an event it is
-refreshed on, and a change in hub B re-runs B's Home only.
+"""Tables on the Home: base's own query brings the step «Your tables», recommended, pending until one table of the room
+is in use (not deleted, active), to whoever adds tables, leading to the list of tables. Every change of it records an
+event it is refreshed on, and a change in hub B re-runs B's Home only.
 
 base and table run for real: the step comes from TableConfig through base's own query, as the person.
 """
@@ -74,7 +73,7 @@ def test_a_zone_alone_is_not_enough_its_first_table_ticks_it():
 
 @pytest.mark.django_db
 def test_a_table_switched_off_or_deleted_is_not_in_use():
-    # tables#24: a deleted table is gone and one switched off cannot be sat at.
+    # A deleted table is gone and one switched off cannot be sat at.
     zone = make_zone()
     make_table("1", zone=zone, is_active=False)
     make_table("2", zone=zone, is_deleted=True)
@@ -83,7 +82,7 @@ def test_a_table_switched_off_or_deleted_is_not_in_use():
 
 @pytest.mark.django_db
 def test_a_full_or_blocked_room_is_still_set_up():
-    # tables#24: occupancy is not set-up; reading the status would put the step back to pending in mid-service.
+    # Occupancy is not set-up; reading the status would put the step back to pending in mid-service.
     zone = make_zone()
     make_session(make_table("1", zone=zone))
     make_table("2", zone=zone, blocked=True)
@@ -92,7 +91,7 @@ def test_a_full_or_blocked_room_is_still_set_up():
 
 @pytest.mark.django_db
 def test_the_manager_who_adds_tables_is_told_and_the_waiter_is_not():
-    # Recommended, never ⛔: who cannot add a table is not told (base's rule; hub#435 is for the wall only).
+    # Recommended, never ⛔: who cannot add a table is not told (base's rule; only a pending ⛔ is told to all).
     assert step(ctx_for("hub_manager"))["state"] == "pending"
     assert step(ctx_for("hub_employee")) is None
 

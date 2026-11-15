@@ -176,7 +176,7 @@ def test_another_hubs_records_are_not_seen_from_this_one(client, make_user, issu
     invoice = manual(series_code="TICKET")
     client.force_login(make_user("boss", host="a", role="hub_admin"))
     post(client, "/verifactu/records", {"invoice_id": str(invoice.id)})
-    # Phase 1 has no tenancy (one database): the host only scopes who may act. A user of another hub
+    # Both hubs share this test's database: the host only scopes who may act. A user of another hub
     # has no permission here.
     other = make_user("eve", host="b", role="hub_admin")
     client.force_login(other)

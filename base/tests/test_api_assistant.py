@@ -1,4 +1,4 @@
-"""The assistant over HTTP (APP-BASE-9): its four routes, each bound to its operation; the turn answers as a stream
+"""The assistant over HTTP: its four routes, each bound to its operation; the turn answers as a stream
 of frames (``text/event-stream``) the panel reads with ``fetch``; the gateway is ``fake_gateway`` (a real server).
 """
 
@@ -6,15 +6,15 @@ import json
 
 import pytest
 from asgiref.sync import async_to_sync
-from django.urls import resolve
 
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tests.routes import assert_bound
 
 pytestmark = pytest.mark.django_db
 
 HOST = {"HTTP_HOST": "a.localhost:8000"}
-#: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and since
-#: live#22 a «¿cuántos…?» of nothing a tool knows brings no list at all.
+#: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and a
+#: «¿cuántos…?» of nothing a tool knows brings no list at all.
 ASK = {"role": "user", "content": "¿cuántos elementos tengo en Demo?"}
 
 
@@ -43,15 +43,10 @@ def post(client, path, body, **extra):
     ],
 )
 def test_each_route_is_bound_to_its_operation(path, method, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == ([method], operation)
-    assert resolve(f"/api{path}").url_name
+    assert_bound(method, path, operation)
 
 
 def test_nobody_without_a_session_talks_to_the_assistant(client, gateway):
-    """gh:hub#1254: the old hub's assistant doors answered without a session."""
     assert post(client, "/assistant/turn", {"messages": [ASK]}).status_code == 401
     assert client.get("/api/assistant/usage", **HOST).status_code == 401
     assert gateway.requests == []
@@ -78,29 +73,25 @@ def test_a_turn_streams_the_answer_of_the_gateway(client, make_user, gateway):
 
 def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(client, make_user, gateway):
     client.force_login(make_user("ana", host="a", role="hub_manager"))
-    call = {"call_id": "c1", "name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}
-    asked = {"role": "assistant", "content": "", "tool_calls": [
-        {"id": "c1", "type": "function", "function": {"name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}}
-    ]}
-    got = frames(post(client, "/assistant/turn", {"messages": [ASK, asked], "pending": [call], "continuation": "tok"}))
+    body = _create_turn()
+    [call] = body["pending"]
+    got = frames(post(client, "/assistant/turn", {key: value for key, value in body.items() if key != "decision"}))
     assert [frame["type"] for frame in got] == ["confirm", "done"]
     assert got[0]["card"]["operation"] == "demo.item.create"
-    assert got[0]["call"] == call
-    assert (got[1]["pending"], got[1]["continuation"]) == ([call], "tok")
+    # hub#1208: the call its card waits on comes with the fingerprint of what the card showed, in the card's frame and
+    # in the calls that wait: the panel gives these back with the yes.
+    assert got[0]["call"] == {**call, "shown": got[0]["call"]["shown"]} and len(got[0]["call"]["shown"]) == 64
+    assert (got[1]["pending"], got[1]["continuation"]) == ([got[0]["call"]], "tok")
     # A round that never reached the gateway brought no pages of the web (hub#870): without the word, the browser would
-    # not know where the whole answer came from (ui#105), and its report would reach support without its text.
+    # not know where the whole answer came from, and its report would reach support without its text.
     assert got[1]["web"] is False
     assert gateway.requests == []
 
 
 def test_the_yes_runs_it_and_the_turn_goes_on_with_its_result(client, make_user, gateway):
     client.force_login(make_user("ana", host="a", role="hub_manager"))
-    call = {"call_id": "c1", "name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}
-    asked = {"role": "assistant", "content": "", "tool_calls": [
-        {"id": "c1", "type": "function", "function": {"name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}}
-    ]}
+    body = _answering_its_card(client, _create_turn())
     gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-    body = {"messages": [ASK, asked], "pending": [call], "continuation": "tok", "decision": {"call_id": "c1", "accepted": True}}
     got = frames(post(client, "/assistant/turn", body))
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     assert (got[0]["name"], got[0]["outcome"]) == ("demo.item.create", "ok")
@@ -160,7 +151,7 @@ def test_a_dictation_over_two_megabytes_is_refused_by_the_hub(client, make_user)
 
 
 def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
-    """An answer with a long table runs past 4,000 characters: the Hub takes what erplora.com's door takes (BASE-G123)."""
+    """An answer with a long table runs past 4,000 characters: the Hub takes what erplora.com's door takes."""
     client.force_login(make_user("ana", host="a", role="hub_employee"))
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     answer = "| a | b |\n" * 2_000
@@ -169,7 +160,7 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
     assert gateway.sent("/internal/assistant/report")[0].body["answer"] == answer
 
 
-# ── Whether the answer came from the web, end to end (hub#870, saas#287, BASE-F105) ────────────────────────────────
+# ── Whether the answer came from the web, end to end (hub#870, BASE-F105) ──────────────────────────────────────────
 
 
 def test_a_turn_that_searched_the_web_tells_the_browser_and_its_report_tells_erplora(client, make_user, gateway):
@@ -217,7 +208,7 @@ def test_a_turn_the_gateway_refused_closes_saying_it_brought_no_pages(client, ma
     assert got[-1]["web"] is False
 
 
-# ── A write a manager may approve (BASE-G118, with APP-BASE-5's approvals): the chat asks as the screen does ────────
+# ── A write a manager may approve: the chat asks as the screen does ─────────────────────────────────────────────────
 
 APPROVED_CREATE = {"demo.item.create": "Create an item"}
 
@@ -283,6 +274,13 @@ def _create_turn() -> dict:
     return {"messages": [ASK, asked], "pending": [call], "continuation": "tok", "decision": {"call_id": "c1", "accepted": True}}
 
 
+def _answering_its_card(client, body: dict) -> dict:
+    """``body`` with the calls that wait as the turn that draws their card gives them back, the way the panel sends
+    its answer (hub#1208: a yes is for the card it answers)."""
+    drawn = frames(post(client, "/assistant/turn", {key: value for key, value in body.items() if key != "decision"}))
+    return {**body, "pending": drawn[-1]["pending"]}
+
+
 def _employee_and_manager(client, make_user):
     from base.tests.test_people import with_pin
 
@@ -299,7 +297,7 @@ def _items(name: str = "Mesa 4") -> int:
 
 def test_its_yes_asks_for_a_managers_approval_as_the_screen_does_and_runs_nothing(client, make_user, gateway, approvable_create):
     _employee_and_manager(client, make_user)
-    response = post(client, "/assistant/turn", _create_turn())
+    response = post(client, "/assistant/turn", _answering_its_card(client, _create_turn()))
     assert response.status_code == 403
     error = response.json()["error"]
     assert error["code"] == "requires_elevation"
@@ -313,7 +311,7 @@ def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent
     from base.models import Approval, Credential
 
     _employee_and_manager(client, make_user)
-    body = _create_turn()
+    body = _answering_its_card(client, _create_turn())
     asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
     manager = str(Credential.objects.get(username="saas:4").pk)
     approval = {"operation": asked["operation"], "fingerprint": asked["fingerprint"], "person": manager, "pin": "1357"}
@@ -335,15 +333,15 @@ def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent
 
 
 def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(client, make_user, gateway, approvable_create, monkeypatch):
-    """FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE: the chat asks with the figures of the very write the
-    person said yes to, read from its arguments as the command validates them; the pass spent keeps them."""
+    """The chat asks with the figures of the very write the person said yes to, read from its arguments as the
+    command validates them; the pass spent keeps them."""
     from django.apps import apps
 
     from base.models import Approval, Credential
 
     monkeypatch.setattr(apps.get_app_config("demo"), "approval_figures", {"demo.item.create": ["Create the item {name}"]}, raising=False)
     _employee_and_manager(client, make_user)
-    body = _create_turn()
+    body = _answering_its_card(client, _create_turn())
     asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
     assert asked["label"] == "Create the item Mesa 4"
     manager = str(Credential.objects.get(username="saas:4").pk)
@@ -359,11 +357,12 @@ def test_a_pass_for_another_request_does_not_let_this_one_through(client, make_u
     from base.models import Credential
 
     _employee_and_manager(client, make_user)
-    asked = post(client, "/assistant/turn", _create_turn()).json()["error"]["approval"]
+    asked = post(client, "/assistant/turn", _answering_its_card(client, _create_turn())).json()["error"]["approval"]
     manager = str(Credential.objects.get(username="saas:4").pk)
     token = post(client, "/approvals", {**asked, "person": manager, "pin": "1357"}).json()["token"]
     other = _create_turn()
     other["pending"][0]["arguments"] = other["messages"][1]["tool_calls"][0]["function"]["arguments"] = '{"name": "Mesa 9"}'
+    other = _answering_its_card(client, other)
     gateway.turn({"type": "text_delta", "text": "No."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     got = frames(post(client, "/assistant/turn", other, HTTP_X_ELEVATION_TOKEN=token))
     assert (got[0]["outcome"], got[0]["code"]) == ("error", "requires_elevation")
@@ -380,7 +379,7 @@ def test_a_write_nobody_may_approve_is_still_refused_flat(client, make_user, gat
 
 def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_it_through(client, make_user, gateway, monkeypatch):
     """What the manager read on the dialog is what runs: a pass granted as «Create an item» on the fingerprint of a
-    turn that renames one spends nothing on the rename (rv-hub-247)."""
+    turn that renames one spends nothing on the rename."""
     from django.apps import apps
     from django.core.cache import cache
 
@@ -397,6 +396,7 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     body = _create_turn()
     body["pending"][0]["name"] = body["messages"][1]["tool_calls"][0]["function"]["name"] = "demo__item__update"
     body["pending"][0]["arguments"] = body["messages"][1]["tool_calls"][0]["function"]["arguments"] = arguments
+    body = _answering_its_card(client, body)
     asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
     assert asked["operation"] == "demo.item.update"
     manager = str(Credential.objects.get(username="saas:4").pk)
@@ -410,7 +410,7 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     cache.clear()
 
 
-# ── How-to questions answered from ERPlora's documentation (saas ASSISTANT-F28) ─────────────────────────────────────
+# ── How-to questions answered from ERPlora's documentation ──────────────────────────────────────────────────────────
 
 DOCS = "/internal/assistant/docs/search"
 HOW = {"role": "user", "content": "¿Cómo abro la caja?"}
@@ -422,28 +422,47 @@ EXCERPT = {
     "score": 0.91,
     "lang": "es",
 }
+#: What the model reads of it: the excerpt with the line its answer cites it by (hub#1079).
+CITED = {**EXCERPT, "cite": "Fuente: Caja > Abrir la caja"}
 SEARCH = {"call_id": "d1", "name": "base__docs__search", "arguments": '{"query": "¿Cómo abro la caja?"}'}
 SEARCH_ASKED = {"role": "assistant", "content": "", "tool_calls": [
     {"id": "d1", "type": "function", "function": {"name": "base__docs__search", "arguments": SEARCH["arguments"]}}
 ]}
 
 
-def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_result(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+def _how_to_turn(client, make_user, gateway, role: str) -> list[dict]:
+    """The frames of a turn where ``role`` asked how to open the till and the model searched the documentation, which
+    erplora.com answers with ``EXCERPT``."""
+    client.force_login(make_user("ana", host="a", role=role))
     gateway.reply(DOCS, json={"results": [EXCERPT]})
     gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-
     body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
-    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+    return frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+
+
+def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_result(client, make_user, gateway):
+    got = _how_to_turn(client, make_user, gateway, "hub_employee")
 
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     assert (got[0]["name"], got[0]["outcome"], got[0]["app_name"]) == ("base.docs.search", "ok", "Ayuda")
     result = got[-1]["append"][0]
-    assert (result["tool_call_id"], json.loads(result["content"])) == ("d1", {"results": [EXCERPT]})
+    assert (result["tool_call_id"], json.loads(result["content"])) == ("d1", {"results": [CITED]})
     [asked] = gateway.sent(DOCS)
     assert asked.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
     assert signed(asked)
     assert gateway.sent("/internal/assistant/chat/stream")[0].body["messages"][-1]["tool_call_id"] == "d1"
+
+
+def test_the_model_answers_a_how_to_question_told_to_end_it_with_the_cite_of_its_excerpt(client, make_user, gateway):
+    """hub#1079: «¿cómo se hace una factura a partir de un tique?» got the steps and no excerpt they came from. What
+    the model reads next is the excerpt with the line its answer cites it by, in the person's language, and the
+    instruction to end the answer with it; nothing of the business ran for it, only the search."""
+    got = _how_to_turn(client, make_user, gateway, "hub_owner")
+
+    assert [(frame["name"], frame["kind"]) for frame in got if frame["type"] == "executed"] == [("base.docs.search", "query")]
+    [tool] = [message for message in gateway.sent("/internal/assistant/chat/stream")[0].body["messages"] if message["role"] == "tool"]
+    assert [excerpt["cite"] for excerpt in json.loads(tool["content"])["results"]] == ["Fuente: Caja > Abrir la caja"]
+    assert "end that answer with the `cite` of each excerpt you used" in _instructions_sent(gateway)
 
 
 def test_documentation_that_cannot_be_searched_is_told_to_the_model_never_made_up(client, make_user, gateway):
@@ -468,8 +487,8 @@ def test_nobody_without_a_session_makes_erplora_com_search(client, gateway):
 
 @pytest.mark.django_db(transaction=True)
 def test_the_turn_asks_the_documentation_before_its_transaction_opens(client, make_user, gateway, monkeypatch):
-    """The search waits on erplora.com (up to 15 s): inside the turn's transaction it would hold the hub's connection
-    (PLAN §14.2), so the route asks it first (``assistant.prepare``) and the turn reads the answer."""
+    """The search waits on erplora.com (up to 15 s): inside the turn's transaction it would hold the hub's connection,
+    so the route asks it first (``assistant.prepare``) and the turn reads the answer."""
     from django.db import connections
 
     from base import assistant

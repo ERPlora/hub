@@ -8,20 +8,20 @@
 // (hub#938). «Editing package — {name}» changes
 // everything but the lines (shown, fixed) and sends only what changed; an emptied closed price,
 // validity or uses removes it (null). Refusals stay in the dialog, under their field.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
 import { useLocale, useT } from '../composables/useT';
 import { type Money, percentFieldText, readPercentBp, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchServices } from '../lib/pickers';
 import type { DiscountType, PackageIn, PackageOut, PackagePatchIn } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   /** The package being edited; `null` = «New package». */
@@ -29,7 +29,7 @@ const props = defineProps<{
 }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
+const canDismiss = useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
 
 interface Line {
   key: number;
@@ -139,12 +139,20 @@ const wholeOrNull = (value: string): number | null => {
 };
 /** Minor units of a money field (empty = none); `undefined` when it is not an amount (the field says why). */
 const minor = (value: string, currency: Money): number | null | undefined => {
-  const read = parseMoney(value, currency);
+  const read = parseMoney(value, { money: currency });
   return read.ok ? read.cents : undefined;
 };
 
+/** The server refuses the lines as a whole too (a service twice), on a line under them: a change to them takes it away. */
+const linesChanged = useGroupChange('itemsGroup');
+
+function setLines(lines: Line[]): void {
+  form.value = { ...form.value, lines };
+  linesChanged();
+}
+
 function setLine(index: number, part: Partial<Line>): void {
-  form.value = { ...form.value, lines: form.value.lines.map((line, i) => (i === index ? { ...line, ...part } : line)) };
+  setLines(form.value.lines.map((line, i) => (i === index ? { ...line, ...part } : line)));
 }
 
 /** The money (in the business's `currency`) and discount of the form, or `null` when something typed is not an amount
@@ -210,6 +218,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-package-form"
     :title="title"
     :submit-label="pkg ? $t('service.packages.form.save') : $t('service.packages.form.create')"
@@ -225,6 +234,7 @@ async function save(): Promise<void> {
         <BusinessMoneyError />
         <ion-input
           data-testid="service-package-form-name"
+          name="name"
           :value="form.name"
           :label="$t('service.packages.form.name')"
           label-placement="floating"
@@ -255,6 +265,7 @@ async function save(): Promise<void> {
         <ion-input
           v-if="form.discountType === 'percentage'"
           data-testid="service-package-form-discount_percent"
+          name="discount_percent_bp"
           type="text"
           inputmode="decimal"
           :value="form.percent"
@@ -269,7 +280,9 @@ async function save(): Promise<void> {
         <MoneyInput
           v-else
           testid="service-package-form-discount_amount"
+          name="discount_amount"
           :model-value="form.amount"
+          :money="money"
           :label="money ? t('service.packages.form.discountAmountIn', { currency: money.currency }) : t('service.packages.form.discountAmount')"
           :error-text="fieldErrors.discount_amount"
           :show-error="tried"
@@ -277,7 +290,9 @@ async function save(): Promise<void> {
         />
         <MoneyInput
           testid="service-package-form-fixed_price"
+          name="fixed_price"
           :model-value="form.fixedPrice"
+          :money="money"
           :label="money ? t('service.packages.form.fixedPriceIn', { currency: money.currency }) : t('service.packages.form.fixedPrice')"
           :helper-text="t('service.packages.form.fixedPriceHelp')"
           :error-text="fieldErrors.fixed_price"
@@ -286,6 +301,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="service-package-form-validity_days"
+          name="validity_days"
           type="number"
           inputmode="numeric"
           min="1"
@@ -301,6 +317,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="service-package-form-max_uses"
+          name="max_uses"
           type="number"
           inputmode="numeric"
           min="1"
@@ -336,7 +353,13 @@ async function save(): Promise<void> {
             </li>
           </ul>
         </template>
-        <template v-else>
+        <FieldGroup
+          v-else
+          ref="itemsGroup"
+          name="items"
+          class="service-package-form__lines"
+          :aria-label="$t('service.packages.form.lines')"
+        >
           <div
             v-for="(line, index) in form.lines"
             :key="line.key"
@@ -344,6 +367,7 @@ async function save(): Promise<void> {
           >
             <Combo
               :testid="`service-package-form-line-service-${index}`"
+              :name="lineField(line, 'service_id')"
               :model-value="line.service"
               :search="searchOffered"
               :label="t('service.packages.form.service')"
@@ -352,6 +376,7 @@ async function save(): Promise<void> {
             />
             <ion-input
               :data-testid="`service-package-form-line-sessions-${index}`"
+              :name="lineField(line, 'sessions')"
               type="number"
               inputmode="numeric"
               min="1"
@@ -367,7 +392,7 @@ async function save(): Promise<void> {
               :data-testid="`service-package-form-remove-line-${index}`"
               fill="clear"
               size="small"
-              @click="form = { ...form, lines: form.lines.filter((_, i) => i !== index) }"
+              @click="setLines(form.lines.filter((_, i) => i !== index))"
             >
               {{ $t('service.packages.form.removeLine') }}
             </ion-button>
@@ -376,7 +401,7 @@ async function save(): Promise<void> {
             data-testid="service-package-form-add-line"
             fill="outline"
             size="small"
-            @click="form = { ...form, lines: [...form.lines, newLine()] }"
+            @click="setLines([...form.lines, newLine()])"
           >
             {{ $t('service.packages.form.addLine') }}
           </ion-button>
@@ -387,7 +412,7 @@ async function save(): Promise<void> {
           >
             {{ fieldErrors.items || t('service.packages.form.noLines') }}
           </InlineFeedback>
-        </template>
+        </FieldGroup>
       </div>
     </template>
   </FormModal>
@@ -410,6 +435,11 @@ async function save(): Promise<void> {
 .service-package-form__fixed {
   margin: 0;
   padding-left: 1.2rem;
+}
+/* The lines, with «Add service» and what is said of them, spaced as the rest of the form; a group, not a box. */
+.service-package-form__lines {
+  display: grid;
+  gap: 14px;
 }
 /* Each line: its service on a row of its own, so the name reads whole in the dialog's width; its Sessions
    and «Remove line» below. */

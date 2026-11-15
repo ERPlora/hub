@@ -1,7 +1,7 @@
 // A download in a test (hub#1041): the page inside the installed app, whose bridge answers `save_download` as
 // ERPlora/app does (HUB_APP-F30) — the place it saved the file, or a refusal by its code — and the files a browser
 // would have saved through a link, captured instead of followed. Shared by every screen that downloads.
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
 type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
 
@@ -19,6 +19,14 @@ export function insideTheAppSaving(answer: { path: string } | string | Record<st
 /** Takes the page out of the installed app again (an `afterEach`). */
 export function outOfTheApp(): void {
   delete (window as TauriWindow).__TAURI__;
+}
+
+/** Ends each test of the file out of the installed app, with the spies on the browser's download restored. */
+export function outOfTheAppAfterEach(): void {
+  afterEach(() => {
+    outOfTheApp();
+    vi.restoreAllMocks();
+  });
 }
 
 export interface BrowserDownload {

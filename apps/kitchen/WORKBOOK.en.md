@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9c3ba2579e0563126f3154fa449fc28a603e18f08dc6f04eb72f45b0bed92955 -->
+<!-- generated from WORKBOOK.md sha256:85acbc5af572d69ae02bc194d4ee5d237e89f83b587b1495e972afffb7ea25eb -->
 
 ## What it is for and who it is for
 
@@ -29,8 +29,7 @@ exists, does not show.
 
 ## Adopted reference
 
-ERPlora does not invent flows: it adopts the ones the market has already proven (checked against the
-current product on 10/08, 15/08, 24/08 and 02/09/2026, and reviewed when porting).
+ERPlora does not invent flows: it adopts the ones the market has already proven.
 
 - **Prep stations, pass view (all the stations), mark ready per dish and per ticket, "rush" after
   sending**:
@@ -45,17 +44,16 @@ current product on 10/08, 15/08, 24/08 and 02/09/2026, and reviewed when porting
 - **The ticket moves on by itself to the next stage when its last dish is ticked off**:
   [Odoo — preparation display](https://www.odoo.com/documentation/18.0/applications/sales/point_of_sale/preparation.html).
 - **A station stops seeing a ticket as soon as it finishes its part; the pass ("All") keeps seeing it
-  whole** (Toast prep stations, Square KDS per station, Fresh KDS): market decision on question 1 of the
-  current product.
+  whole** (Toast prep stations, Square KDS per station, Fresh KDS): market decision.
 - **Each tablet remembers its station** (Toast, Square and Fresh set each screen to one station): market
-  decision on question 4.
+  decision.
 - **Print the pass when marking ready, off by default; a single sound switch with volume and a tone from a
   closed list** (Toast, Fresh KDS, MobiPOS).
 - **What goes only to a printer does not wait for anyone to mark it**, and **charging does not stop the
   kitchen** (Toast, Lightspeed K, Odoo, LS Central, Simphony): on charging, what nobody is going to mark
   goes out.
 - **The ticket names whoever serves the check ("Served by" in the till) and, if it is "Me", whoever sends
-  it** (market decision of 21/10/2026; kitchen#82, hub#2033, staff#59). That way the pass knows whom to
+  it** (market decision of 21/10/2026). That way the pass knows whom to
   call, even if that person does not sign in to the app.
   - Full-service tills name the waiter who owns the check or the table:
     [Toast](https://support.toasttab.com/en/article/Why-Aren-t-Server-Names-Showing-on-Kitchen-Tickets)
@@ -75,8 +73,7 @@ current product on 10/08, 15/08, 24/08 and 02/09/2026, and reviewed when porting
     That is where the "Me" fallback comes from.
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) lets you choose
     the fields of the ticket.
-  - It is also what the current product did and what the till itself promises in "Who is serving this
-    check".
+  - It is what the till itself promises in "Who is serving this check".
 
 ## Before you start
 
@@ -150,7 +147,8 @@ its dialog. The actions only show to whoever can manage stations (manager, admin
 ### History
 Menu **Kitchen → History**, title "Kitchen history". Table of what happened in the kitchen, latest first,
 50 per page (another size is chosen at the bottom): Action, Ticket (the number), Dish, Who (the person's
-name or, if they have none, their e-mail; "System" if Kitchen did it by itself), Notes and When (date and
+name or, if they have none, their e-mail, or the API key's; "System" if no person did it: Kitchen by
+itself or an automation), Notes and When (date and
 time of the business). Search box "Search ticket or notes…" (a piece of the number or words of the notes);
 action filter with the same words as the column ("Received", "Created", "Fired", "Ready", "Dish ready",
 "Dish recalled", "Dish voided", "Served", "Recalled", "Cancelled", "Rush", "Rush removed", "Reprinted",
@@ -214,7 +212,6 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | KITCHEN-F27 | Close the rounds when the whole check is charged | done |
 | KITCHEN-F28 | Withdraw the rounds of a check deleted or merged into another | done |
 | KITCHEN-F29 | Void a dish already sent, with a notice to the kitchen | done |
-| KITCHEN-F30 | Move the tickets of a customer merged into another | discarded — the ticket does not keep a customer |
 | KITCHEN-F31 | Give Cash register the tickets still under way | done |
 
 ### KITCHEN-F01 Create a station
@@ -665,7 +662,8 @@ Actor: employee, manager, administrator
 Screen: History
 Steps:
 1. Open **Kitchen → History**: what happened, on which ticket and with which dish, who (their name or, if
-   they have none, their e-mail), their notes and when, latest first.
+   they have none, their e-mail; "System" if it was no person: Kitchen by itself or an automation), their
+   notes and when, latest first.
 2. In "Search ticket or notes…", write a piece of the ticket's number or a few words of the notes; filter
    by action ("Received", "Cancelled"…).
 3. At the bottom, change page or choose how many entries to see (25, 50…).
@@ -754,20 +752,6 @@ Out: the dish Voided (announces: dish voided; History "Dish voided" with the rea
 on paper, the slip "VOIDED DISH · Table 4" comes out with that dish.
 If it fails: a Served or Cancelled round is not touched.
 Involved: SALE-F20, COMBO-F11, KITCHEN-F06, KITCHEN-F10, KITCHEN-F15, KITCHEN-F19, KITCHEN-F25
-
-### KITCHEN-F30 Move the tickets of a customer merged into another
-Status: discarded — the ticket does not keep a customer: merging two customer records does not touch Kitchen
-Actor: nobody in Kitchen (Customers does the merge)
-Screen: none
-Steps:
-1. In Customers two records of the same person are merged (CUSTOMER-F13) and Sales moves their sales to
-   the one that stays (SALE-F33).
-2. Nothing happens in Kitchen: the ticket keeps the check's label as text and no customer, so there is
-   nothing to move.
-In: nothing; the till does not send the customer to Kitchen.
-Out: nothing; the tickets do not change.
-If it fails: not applicable: Kitchen does nothing that could fail.
-Involved: CUSTOMER-F13, SALE-F33
 
 ### KITCHEN-F31 Give Cash register the tickets still under way
 Status: done

@@ -1,4 +1,4 @@
-"""The Home's rules (PLAN-HUB round 2026-10-21), as the old hub's ``setup_status.rs`` had them.
+"""The Home's rules, as the old hub's ``setup_status.rs`` had them.
 
 The cases are those of its tests (``crates/runtime/src/setup_status.rs`` at ``9dd38215``): which row a step reads,
 when a condition passes, which countries a step applies to, its level and the counters of the document.
@@ -205,7 +205,7 @@ def test_the_setting_is_off_in_production_and_on_with_debug():
     assert settings.SHOW_UNLISTED_MODULES is True  # the suite runs with the development settings
 
 
-# --- The bell by the clock (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE) --------------------------------------
+# --- The bell by the clock ----------------------------------------------------------------------------------------
 
 UNSET = object()
 
@@ -425,7 +425,7 @@ def test_the_check_of_the_cards_runs_with_the_others(monkeypatch):
     assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == ["base.E015"]
 
 
-# ── The apps a business must have on in its country (hub#997, PLAN-HUB round 2026-11-07) ───────────────────────────
+# ── The apps a business must have on in its country (hub#997) ──────────────────────────────────────────────────────
 
 
 def obliged(label="fiscal", countries=("PT",), platform_turns_on=False, **more):

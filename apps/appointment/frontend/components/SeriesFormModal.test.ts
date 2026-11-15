@@ -158,7 +158,7 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
     ]);
   });
 
-  // appointments#211: closing the panel while what it reaches is still loading closes it for good; the answer
+  // Closing the panel while what it reaches is still loading closes it for good; the answer
   // that arrives afterwards opens nothing.
   it('closed while it loads, it stays closed when the answer arrives', async () => {
     const s = await setup({ series: SERIES, fromDate: '2026-11-02' });
@@ -206,8 +206,8 @@ describe('SeriesFormModal: fields refused with the same words (hub#888)', () => 
 describe('SeriesFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('series-form'),
       change: () => ionValue(s.field('time'), '11:00', 'ionInput'),
       restore: () => ionValue(s.field('time'), '', 'ionInput'),

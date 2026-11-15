@@ -1,8 +1,8 @@
 """A receipt whose caller does not say its currency is printed in the business's (flow business-currency, PRINTING-F07):
-its country's, as ``base.business.get`` reads it from this hub's registry (APP-BASE-6), never a euro fixed in the app
-nor a call to erplora.com. The amounts' decimals are the server's (CLDR), never the browser's: a business in Japan
-prints yen without cents, one in Tunisia dinars with three, one in Poland zlotys with two (hub#2129). An API key or the
-assistant that queues a receipt without ``currency`` gets the same, and each hub its own."""
+its country's, as ``base.business.get`` reads it from this hub's registry, never a euro fixed in the app nor a call to
+erplora.com. The amounts' decimals are the server's (CLDR), never the browser's: a business in Japan prints yen without
+cents, one in Tunisia dinars with three, one in Poland zlotys with two. An API key or the assistant that queues a
+receipt without ``currency`` gets the same, and each hub its own."""
 
 import json
 
@@ -63,7 +63,7 @@ def test_each_hub_prints_in_its_own_business_s_currency():
 
 @pytest.mark.parametrize(("country", "decimals"), [("JP", 0), ("TN", 3)])
 def test_erploras_own_hub_prints_in_the_currency_of_its_issuer_s_country(settings, country, decimals):
-    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub): its receipts keep
+    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its receipts keep
     # the currency of its issuer's country, as its sales and invoices do (hub#286), never a 404 for want of a business.
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country
@@ -73,8 +73,8 @@ def test_erploras_own_hub_prints_in_the_currency_of_its_issuer_s_country(setting
 
 
 def test_a_receipt_asks_base_for_the_business_s_currency(monkeypatch):
-    # FIX-HUB-PRINTING-OWN-COPY-OF-BUSINESS-CURRENCY: printing asks the one question every app that charges asks
-    # (``base.operations.business_currency``, BASE-F50), never a copy of its own that drifts in silence from it.
+    # Printing asks the one question every app that charges asks (``base.operations.business_currency``, BASE-F50),
+    # never a copy of its own that drifts in silence from it.
     business_in("ES")
     monkeypatch.setattr(base_operations, "business_currency", lambda scope: "KWD")
     assert printed(enqueue())["decimals"] == 3

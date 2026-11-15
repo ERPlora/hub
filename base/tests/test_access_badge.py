@@ -1,4 +1,4 @@
-"""BASE-G56: entering by passing a badge on a shared device of the hub (the same identity as the PIN, never a new one).
+"""Entering by passing a badge on a shared device of the hub (the same identity as the PIN, never a new one).
 
 A card reader types the card's number; the Hub keeps only a keyed digest of it (``base.access.badge_digest``, with the
 hub's key, made once and kept). The brakes are the PIN's: wrong cards count against that card and against the address.

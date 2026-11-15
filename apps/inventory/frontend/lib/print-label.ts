@@ -12,7 +12,7 @@ export interface LabelText {
 
 const HOOK = 'inventory-label-print';
 
-/** The sheet itself: black on white whatever the theme, so the scanner reads the printed label (inventory#45). */
+/** The sheet itself: black on white whatever the theme, so the scanner reads the printed label. */
 const SHEET = `
   [data-testid="${HOOK}"] { display: block; text-align: center; padding: 8mm; color: #000; background: #fff;
     font-family: sans-serif; }

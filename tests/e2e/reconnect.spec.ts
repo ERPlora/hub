@@ -1,4 +1,4 @@
-// PoC §8.5 (first half): runserver dies for 10 s with a list open. The page shows «Reconnecting…»,
+// Runserver dies for 10 s with a list open. The page shows «Reconnecting…»,
 // reopens ONE stream with the same subscriptions once the server is back, and paints an item created
 // meanwhile from another tab, without a reload and without duplicate rows.
 //

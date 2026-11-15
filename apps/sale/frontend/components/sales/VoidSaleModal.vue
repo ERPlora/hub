@@ -62,12 +62,13 @@ async function confirm(): Promise<void> {
   emit('voided');
 }
 
-useUnsavedFormOnOpen('sale-void', () => reason.value, open);
+const canDismiss = useUnsavedFormOnOpen('sale-void', () => reason.value, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     testid="sale-void"
     role="alertdialog"

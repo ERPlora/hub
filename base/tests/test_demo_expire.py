@@ -1,4 +1,4 @@
-"""``manage.py demo_expire <slug>``: end a demo now and purge it at once (plan 2026-10-17, §1.7).
+"""``manage.py demo_expire <slug>``: end a demo now and purge it at once.
 
 Support's tool and the e2e's clock: through its operations (``base.demo.expire``, then one pass of the reaper), in
 every environment (not only ``DEBUG``), and it says how the demo was left. While the platform is frozen for a database

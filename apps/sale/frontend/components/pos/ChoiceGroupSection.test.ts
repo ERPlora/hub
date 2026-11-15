@@ -65,8 +65,8 @@ describe('ChoiceGroupSection', () => {
   });
 
   it('lays a repeatable group out one choice per line, the name on its own line beside its counter and its minus', async () => {
-    // FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS: in a tile the counter and the minus left the name a few
-    // pixels, and it broke letter by letter at 390 and 834 px.
+    // In a tile the counter and the minus leave the name a few pixels, and it breaks letter by letter on a phone
+    // (390 px) and a tablet (834 px).
     const s = await setup('menu', { picks: ['latte', 'latte'], refused: null });
     const list = s.inDoc('pos-menu-course-coffee')?.querySelector('.pos-options__list');
     expect(list?.classList.contains('pos-options__list--rows')).toBe(true);

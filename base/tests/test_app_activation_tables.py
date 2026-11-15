@@ -1,9 +1,8 @@
-"""An app's tables made when a hub with its own database turns it on (S3; PLAN-DB §7, spec 2026-10-11 «tablas al
-activar», PLAN §33): ``base.app.enable`` answers 202 ``creating`` and rings the hub's ``hub_due``; the worker makes the
-tables (``base.tenancy.migrator.ensure_schema(hub, add=[app, *requires])``) and turns it ``on`` (its event and live
-notice), or ``failed`` with why, tried again at 1, 5 and 15 minutes and then every hour, or by hand
-(``base.app.retry``). An app whose tables the hub has is on at once (200), and turning one off never drops them. A hub
-that still shares phase 1's database keeps turning apps on at once (proposal (i) of round 2026-10-30, until S5).
+"""An app's tables made when a hub with its own database turns it on: ``base.app.enable`` answers 202 ``creating`` and
+rings the hub's ``hub_due``; the worker makes the tables (``base.tenancy.migrator.ensure_schema(hub, add=[app,
+*requires])``) and turns it ``on`` (its event and live notice), or ``failed`` with why, tried again at 1, 5 and 15
+minutes and then every hour, or by hand (``base.app.retry``). An app whose tables the hub has is on at once (200), and
+turning one off never drops them. A hub without its own database keeps turning apps on at once.
 """
 
 import datetime as dt
@@ -269,8 +268,7 @@ def test_which_app_a_name_names_tells_it_being_set_up_or_failed_as_the_apps_scre
 
 
 @pytest.mark.django_db
-def test_a_hub_that_shares_phase_1s_database_turns_an_app_on_at_once():
-    """Proposal (i) of round 2026-10-30: until S5 a hub without its own database keeps the immediate turn on."""
+def test_a_hub_without_its_own_database_turns_an_app_on_at_once():
     Hub.objects.update_or_create(slug="c", defaults={"status": "ready", "db_name": ""})
     op = get("base.app.enable")
     ctx = OperationContext(scope=Scope("host", "c"), actor="ana", permissions=frozenset({"*"}), language="en")
@@ -463,7 +461,7 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
     """The worker turns an app on in another process: where the cache is the process's own (local development, no
     Valkey) its forgetting never reaches the web. The Apps list every screen follows (AppsFollower) is read again when
     the live notice of the change arrives, before the session is: that read forgets this process's apps of the
-    business, so the menu read right after it has the app (PLAN-DB §7, «cache_inval <hex>:apps»)."""
+    business, so the menu read right after it has the app (``cache_inval <hex>:apps``)."""
     from django.core.cache import cache
 
     given(hub_a, printing="on*", created=["printing"])

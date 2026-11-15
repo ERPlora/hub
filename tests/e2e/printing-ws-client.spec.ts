@@ -1,12 +1,12 @@
-// The device takes the paper out of the queue, in Chrome (apps/printing/WORKBOOK.md PRINTING-F18, F05, F13, F14;
-// FIX-HUB-PRINTING-WS-PRINT-CLIENT-IN-PACKAGES-UI): the page runs as the installed app — a fake `window.__TAURI__` that
-// keeps every command it is asked and answers it, well or with the device's error — against the Hub's real /ws/print
-// (daphne). The owner sets this device up from Printing → Devices, and from then on, on any screen:
+// The device takes the paper out of the queue, in Chrome (apps/printing/WORKBOOK.md PRINTING-F18, F05, F13, F14): the
+// page runs as the installed app — a fake `window.__TAURI__` that keeps every command it is asked and answers it, well
+// or with the device's error — against the Hub's real /ws/print (daphne). The owner sets this device up from Printing →
+// Devices, and from then on, on any screen:
 //   - «Test» on its printer leaves the «Test page» in the queue, the device prints it (`erplora_test_print`) and the
 //     queue says «Printed» (F05);
 //   - a cash charge at the till queues the receipt with the drawer's order; the device prints it (`erplora_print`), then
 //     opens the drawer (`erplora_open_drawer`) and the queue says «Printed» (F18, F13); when the drawer does not answer,
-//     the till says so and the receipt is not printed again (hub#2724);
+//     the till says so and the receipt is not printed again;
 //   - a printer that does not print: the job goes back to the queue with the device's error, and after five hand-outs
 //     it is «Failed» (F14).
 // Screenshots of the queue in the three viewports. What is made here is deleted, and the settings put back, after it.
@@ -20,6 +20,7 @@ import { cleanInventory, createProduct, dialog, fill, type Product } from './inv
 import { cleanInvoices, ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -143,17 +144,6 @@ async function closeDocument(page: Page): Promise<void> {
   await expect(document).toBeHidden();
 }
 
-async function printersRowAction(page: Page, action: string): Promise<void> {
-  const hook = `printing-printers-row-${printer}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-printers-row-${printer}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
-}
-
 async function dismissToasts(page: Page): Promise<void> {
   await page.locator('ion-toast').evaluateAll((toasts) =>
     Promise.all(toasts.map((toast) => (toast as unknown as { dismiss: () => Promise<boolean> }).dismiss())),
@@ -229,7 +219,7 @@ test('PRINTING-F18, F05: the device set up from Devices prints the test page fro
 
   await page.goto('/printing/printers');
   await shown(page).locator('[data-testid=printing-printers-row]').filter({ hasText: PRINTER }).waitFor({ state: 'visible' });
-  await printersRowAction(page, 'test');
+  await rowAction(page, 'printing-printers', printer, 'test');
   await expect(page.locator('ion-toast').filter({ hasText: /Test page sent to the queue of|Hoja de prueba enviada a la cola de/ }).last()).toBeVisible();
   await expect.poll(async () => (await newestJob(context))?.status).toBe('done');
   const test = await newestJob(context);
@@ -291,7 +281,7 @@ test('PRINTING-F18, F14: a printer that does not print sends the job back with i
     await route.continue();
   });
   const before = (await jobsOf(context)).length;
-  await printersRowAction(page, 'test');
+  await rowAction(page, 'printing-printers', printer, 'test');
   // The test page in the queue, then back in it with the device's error after its first hand-out.
   await expect.poll(async () => (await jobsOf(context)).length).toBe(before + 1);
   await expect

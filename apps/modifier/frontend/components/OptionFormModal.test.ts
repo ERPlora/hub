@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import type { GroupOut, OptionOut } from '../operations';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
@@ -51,6 +52,16 @@ async function setup(option: OptionOut | null = null, locale: 'en' | 'es' = 'en'
   const save = () => m.inDoc('modifier-option-form-submit') as Control;
   const tax = () => m.wrapper.findComponent(Combo);
   return { ...m, field, save, tax };
+}
+
+const TOO_MANY_DEFAULTS = 'This group has more options chosen by default than its maximum.';
+
+/** «Mustard», switched on as chosen by default, is created, and the server refuses it under `fields`. */
+async function createADefaultTooMany(s: Awaited<ReturnType<typeof setup>>, fields: Record<string, string> = { is_default: TOO_MANY_DEFAULTS }) {
+  s.answer(409, { error: { code: 'modifier.too_many_defaults', message: TOO_MANY_DEFAULTS, fields } });
+  await ionValue(s.field('name'), 'Mustard', 'ionInput');
+  await ionChecked(s.field('is_default'), true);
+  await click(s.save());
 }
 
 describe('OptionFormModal: New option', () => {
@@ -123,12 +134,25 @@ describe('OptionFormModal: New option', () => {
   });
   it('more defaults than the group’s maximum is said under «Chosen by default»', async () => {
     const s = await setup();
-    const message = 'This group has more options chosen by default than its maximum.';
-    s.answer(409, { error: { code: 'modifier.too_many_defaults', message, fields: { is_default: message } } });
-    await ionValue(s.field('name'), 'Mustard', 'ionInput');
-    await ionChecked(s.field('is_default'), true);
-    await click(s.save());
-    expect(s.inDoc('modifier-option-form-is_default-error')?.textContent).toContain(message);
+    await createADefaultTooMany(s);
+    expect(s.inDoc('modifier-option-form-is_default-error')?.textContent).toContain(TOO_MANY_DEFAULTS);
+  });
+
+  it('switching «Chosen by default» off takes its refusal away at once, before saving again (hub#1437)', async () => {
+    const s = await setup();
+    await createADefaultTooMany(s);
+    expect(s.inDoc('modifier-option-form-is_default-error')).not.toBeNull();
+    await ionChecked(s.field('is_default'), false);
+    expect(s.inDoc('modifier-option-form-is_default-error')).toBeNull();
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('switching «Chosen by default» takes only its own refusal away: the name’s stays', async () => {
+    const s = await setup();
+    const taken = 'There is already an option with this name in the group.';
+    await createADefaultTooMany(s, { name: taken, is_default: TOO_MANY_DEFAULTS });
+    await ionChecked(s.field('is_default'), false);
+    expect([s.field('name').errorText, s.inDoc('modifier-option-form-is_default-error')]).toEqual([taken, null]);
   });
 });
 
@@ -167,7 +191,8 @@ describe('OptionFormModal: in the business’s currency', () => {
 });
 
 describe('OptionFormModal: the business answers after the form opened', () => {
-  const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.';
+  /** What the money field says in yen, with its examples in yen. */
+  const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 1, or -1 for a discount.';
 
   it('an untouched supplement is rewritten from the option with the yen’s decimals, and «Save» keeps its scale', async () => {
     const s = await setup({ ...SODA, price_delta: 150 }, 'en', null);
@@ -230,7 +255,7 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     expect(s.field('price_delta').value).toBe('1,75');
     await click(s.save());
     expect(s.sent()).toEqual([]);
-    expect(s.field('price_delta').errorText).toBe(NOT_AMOUNT);
+    expect(s.field('price_delta').errorText).toBe(NOT_AMOUNT_IN_YEN);
   });
 
   // hub#945: a supplement typed with its sign cannot be read before the money is known; leaving the field while the
@@ -292,8 +317,8 @@ describe('OptionFormModal: a business whose money cannot be read (hub#938)', () 
 describe('OptionFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup(SODA);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('modifier-option-form'),
       change: () => ionValue(s.field('name'), 'Cola', 'ionInput'),
       restore: () => ionValue(s.field('name'), SODA.name, 'ionInput'),
@@ -312,4 +337,18 @@ describe('OptionFormModal: Android Back with unsaved changes (hub#1031, BASE-F05
     await ionValue(s.field('price_delta'), '200', 'ionInput');
     expect(unsavedChangesIn(overlay)).toBeDefined();
   });
+});
+
+describe('OptionFormModal: fields refused with the same words (hub#888)', () => {
+  // A new option: Name, Kitchen ticket name, Supplement, Own tax category (the picker) and Order paint a refusal,
+  // each under its own key.
+  itTellsTheCorrectedFieldApart(['name', 'kitchen_name', 'price_delta', 'tax_category_key', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Soda', 'ionInput');
+    await ionValue(s.field('price_delta'), '1.50', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'product.generic', label: 'Product — generic' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'tax_category_key');
 });

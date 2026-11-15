@@ -1,4 +1,4 @@
-"""The website's theme: from two free colours to a palette (round 2026-10-22).
+"""The website's theme: from two free colours to a palette.
 
 The draft's theme and the publication's ``{primary, accent, mode}`` become ``{palette: "custom", custom: {primary,
 accent}, mode}``: every page keeps its colours, now as the owner's own palette. A theme already in the new shape and an

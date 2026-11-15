@@ -1,6 +1,6 @@
 """Fixtures of the verifactu tests: contexts per role, the real apps a record is born from (Invoicing's issuer and
 its documents, made through Invoicing's own operations, never by hand) and the outbox's delivery to VeriFactu's
-reaction, as the relay will in phase 2.
+reaction, in place of the relay.
 
 The only stand-in is the SaaS's gateway (``gateway_answers``): its transport is replaced and it answers with the
 AEAT's **real** answers kept in ``fixtures/`` (accepted, accepted with errors, duplicate, fault), rewritten only
@@ -246,7 +246,8 @@ def aeat_answer(name: str, records: list[tuple[str, str]] | None = None) -> str:
 
 
 def paged(body: str, last: tuple[str, str, str]) -> str:
-    """A real query answer as the AEAT gives it when more follow (RespuestaConsultaLR.xsd, §6.4.3):
+    """A real query answer as the AEAT gives it when more follow (RespuestaConsultaLR.xsd; the AEAT's web service
+    description, section 6.4.3):
     ``IndicadorPaginacion`` S and ``ClavePaginacion`` naming its last record (nif, number, dd-mm-yyyy).
     The preproduction never paginated for us (it takes over 10,000 records), so only these two fields change."""
     nif, number, day = last

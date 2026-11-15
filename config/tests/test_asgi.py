@@ -122,7 +122,7 @@ def test_a_client_root_path_does_not_reach_the_api_of_a_hub():
     assert urlsplit(target).path == "/auth/login"
 
 
-# WebSockets: /ws/print is the only one (PLAN-HUB §5); it was a 500, Django serves HTTP only.
+# WebSockets: /ws/print is the only one, served next to Django, which serves HTTP only.
 
 
 def websocket_scope(path: str, root_path: str = "") -> dict:

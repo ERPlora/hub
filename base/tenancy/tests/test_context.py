@@ -1,4 +1,4 @@
-"""``use_hub``, ``use_control`` and the database of an operation (PLAN-DB §4; plan 2026-10-22-fase-2-tenencia §4, 3).
+"""``use_hub``, ``use_control`` and the database of an operation.
 
 The context lives in a ``ContextVar``: nested contexts restore the outer one, ``sync_to_async`` inherits it and a
 thread of its own starts without it. Without a context, a hub's database is never guessed: ``HubContextMissing``.
@@ -36,7 +36,7 @@ def own_hub(slug: str):
 
 
 def shared_hub(slug: str):
-    """A business of phase 1 not yet cut (``db_name=""``): since S5 it is never entered."""
+    """A business not yet cut, still without a database of its own (``db_name=""``): it is never entered."""
     return SimpleNamespace(id=uuid.uuid7(), slug=slug, db_name="")
 
 
@@ -77,7 +77,7 @@ def test_a_hub_runs_on_its_own_alias():
 
 
 def test_a_business_without_its_own_database_is_never_entered_nor_sent_to_control():
-    # S5: phase 1's shared database is gone; a business not yet cut is not served (its host answers 503).
+    # The old shared database is gone: a business not yet cut is not served (its host answers 503).
     a = shared_hub("a")
 
     def probe():

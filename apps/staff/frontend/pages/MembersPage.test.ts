@@ -186,7 +186,6 @@ describe('MembersPage: the live directory', () => {
   });
 
   it('filters behind the table funnel as the old columns did: each column its own, the rest as fields of the panel', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -419,7 +418,7 @@ describe('MembersPage: my record (STAFF-F08)', () => {
   });
 });
 
-describe('MembersPage: the figures (STAFF-G02, G03, G04)', () => {
+describe('MembersPage: the figures (STAFF-F20, F23)', () => {
   it('shows the old Home panels above the list, for everyone who reads the directory', async () => {
     const s = await setup({ session: EMPLOYEE });
     expect(s.params('staff.member.stats')).toEqual([{}]);
@@ -436,7 +435,7 @@ describe('MembersPage: the figures (STAFF-G02, G03, G04)', () => {
   });
 });
 
-describe('MembersPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('MembersPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

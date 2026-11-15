@@ -154,6 +154,7 @@ export const preview = (over: Partial<PreviewOut> = {}): PreviewOut => ({
   lines: [],
   cash_limit: 100000,
   ticket_limit: 300000,
+  limits_currency: 'EUR',
   ...over,
   operation_total: over.operation_total ?? over.total ?? 150,
 });

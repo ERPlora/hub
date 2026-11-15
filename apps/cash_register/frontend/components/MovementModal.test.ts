@@ -5,9 +5,12 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { click, expectWaitsForTheYen, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
+import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
 import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
+import type { Business } from '../../../../base/frontend/operations';
 import MovementModal from './MovementModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -94,6 +97,42 @@ describe('MovementModal', () => {
   });
 });
 
+describe('MovementModal: a refused field, corrected, loses its mark without saving again (hub#1470)', () => {
+  it('a refused amount: typing another one takes its mark away, before «Register» is pressed again', async () => {
+    const s = await setup();
+    const amount = () => s.inDoc('cash-register-movement-amount');
+    await ionValue(amount(), '20', 'ionInput');
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { amount: 'Input should be greater than 0' } } });
+    await s.submit();
+    expect(prop(amount(), 'errorText')).toBe('Input should be greater than 0');
+    amount()?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(amount(), '25', 'ionInput');
+    expect(prop(amount(), 'errorText') ?? '').toBe('');
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('a zero amount: typing one takes «Invalid amount» away', async () => {
+    const s = await setup();
+    await s.submit();
+    expect(prop(s.inDoc('cash-register-movement-amount'), 'errorText')).toBe('Invalid amount');
+    await ionValue(s.inDoc('cash-register-movement-amount'), '5', 'ionInput');
+    expect(prop(s.inDoc('cash-register-movement-amount'), 'errorText') ?? '').toBe('');
+  });
+
+  const FIELD: Record<string, string> = { type: 'type', amount: 'amount', description: 'concept' };
+  itTellsTheCorrectedFieldApart(
+    ['type', 'amount', 'description'],
+    async (locale, refusal) => {
+      const s = await setup(locale);
+      await ionValue(s.inDoc('cash-register-movement-amount'), '20', 'ionInput');
+      await ionValue(s.inDoc('cash-register-movement-concept'), 'Change', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.inDoc(`cash-register-movement-${FIELD[key]}`), send: s.submit, settle };
+    },
+    'amount',
+  );
+});
+
 describe('MovementModal: before the business answers its money (hub#921)', () => {
   it('«Register» waits in grey and reads no amount; once the yen arrives «1500» is 1500', async () => {
     const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, business: null });
@@ -118,14 +157,33 @@ describe('MovementModal: a business whose money cannot be read (hub#938)', () =>
   });
 });
 
-describe('MovementModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
-  it('as opened closes; a change asks; restored as opened closes again', async () => {
+describe('MovementModal: unsaved changes ask before closing (hub#1031, hub#1234, BASE-F05)', () => {
+  it('a typed concept: Back, «Cancel», the «×», Escape and a tap outside ask «Discard changes?»; restored, Back closes', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('cash-register-movement'),
       change: () => ionValue(s.inDoc('cash-register-movement-concept'), 'Change for the till', 'ionInput'),
       restore: () => ionValue(s.inDoc('cash-register-movement-concept'), '', 'ionInput'),
     });
   });
+  it('as opened, «Cancel», the «×», Escape and a tap outside close it without asking', async () => {
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'cash-register-movement');
+  });
+});
+
+describe('MovementModal: the amount, read as every amount of the Hub', () => {
+  const window = {
+    open: async (business?: Business | null) => {
+      const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, business });
+      await m.live();
+      return m;
+    },
+    field: 'cash-register-movement-amount',
+    submit: 'cash-register-movement-submit',
+    amount: (body: Record<string, unknown>) => body.amount,
+  };
+  itReadsAmountsAsTheHub(window);
+  itReadsWhatWasLeftOnceTheMoneyArrives(window);
 });

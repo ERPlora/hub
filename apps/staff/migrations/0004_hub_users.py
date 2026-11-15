@@ -1,10 +1,10 @@
-# Tenancy W10, expand: a staff record and its approval hang from the person in the business's own database
-# (``base.HubUser``), never from control's user, which no hub's database holds (a key between two databases does not
-# exist). In four steps, the code of before alive all along:
+# Expand: a staff record and its approval hang from the person in the business's own database (``base.HubUser``), never
+# from control's user, which no hub's database holds (a key between two databases does not exist). In four steps, the
+# code of before alive all along:
 #
 # 1. the new columns ``hub_user_id`` and ``approved_by_hub_user_id``, nullable, keyed to ``base_hubuser``;
-# 2. filled from the old ones in phase 1's shared database, each control user with their own ``HubUser``; a hub's own
-#    database has no control users and no old links to fill;
+# 2. filled from the old ones in the database the businesses shared before, each control user with their own
+#    ``HubUser``; a hub's own database has no control users and no old links to fill;
 # 3. the old fields leave the state; their columns stay, nullable as they were, for the code of before during the
 #    deploy, without their key to ``auth_user`` (control may delete a user they still name);
 # 4. the new links take the fields' names (``user``, ``approved_by``), their columns kept, and «one user, one live
@@ -67,7 +67,7 @@ def link_hub_users(apps, schema_editor):
 
 
 def drop_keys_to_control_users(apps, schema_editor):
-    """The old columns' keys to ``auth_user``, where the database has them (phase 1's shared one)."""
+    """The old columns' keys to ``auth_user``, where the database has them (the shared one of before)."""
     users = apps.get_model(settings.AUTH_USER_MODEL)._meta.db_table
     connection = schema_editor.connection
     for model_name, column in OLD_LINKS:

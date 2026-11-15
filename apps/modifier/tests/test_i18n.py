@@ -82,6 +82,13 @@ def test_spanish_texts_of_the_workbook():
             == "Este grupo tiene más opciones por defecto que su máximo."
         )
         assert str(services.LINK_EXISTS) == "Este grupo ya se aplica ahí."
+        assert str(services.OPTION_LEFT) % {"option": "Alioli", "why": "x"} == "volvió sin su opción «Alioli»: x"
+        # What Recoveries counts apart of a separate copy (BASE-F114, MODIFIER-F10).
+        assert [str(one.label) for one in config.recoverable_from_copy()] == [
+            "Grupos de suplementos",
+            "Grupos de suplementos de categorías",
+            "Grupos de suplementos de productos",
+        ]
         assert str(services.OWN_LINE_NOT_POSITIVE) == (
             "Una opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser "
             "mayor que cero."

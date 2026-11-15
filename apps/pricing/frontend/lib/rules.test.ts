@@ -1,4 +1,4 @@
-// What the rules table paints: the VALUE of a rule with its unit (the old module's pricing#28: one column,
+// What the rules table paints: the VALUE of a rule with its unit (one column,
 // «10 %», «0,50 € por unidad», never a bare 0), what it applies to (with its group), and the tax basis of
 // a price list (an empty one follows the business, and says so).
 import { createShellI18n } from '@erplora/ui/shell';

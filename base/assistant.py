@@ -1,8 +1,8 @@
-"""The Hub's assistant (APP-BASE-9; PLAN §30, ronda 2026-10-22b): chat and voice in the Hub against erplora.com's AI
-gateway (``saas`` ``assistant/internal.py``), without the ORM.
+"""The Hub's assistant: chat and voice in the Hub against erplora.com's AI gateway (``saas`` ``assistant/internal.py``),
+without the ORM.
 
-The mechanics that do not depend on the gateway are ``live.assistant``'s, shared with the SaaS's panel
-(docs/plans/2026-10-30-asistente-saas.md §2) and re-exported here; this module gives them the Hub's own:
+The mechanics that do not depend on the gateway are ``live.assistant``'s, shared with the SaaS's panel and re-exported
+here; this module gives them the Hub's own:
 
 - **Its tools** (``catalog``) are the operations of the apps on in this business (``active_apps``: its right and its
   switch) that this person may run, by their ``ai=`` (``live.assistant.is_tool``: an ``AI``; ``INTERNAL``, a «Not an
@@ -15,7 +15,9 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
   hour; a record by its name, as the read its schema marks answers it to them (``REFERS``), or not at all: never by
   its id; an amount in the currency the write names (``CURRENCY``) or the business's —; ``risk="high"`` asks to type
   a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many. Its preview
-  (``preview``) says the amounts of its read in the currency it answers. A platform action is named by the screen
+  (``preview``) says the amounts of its read in the currency it answers. The yes is for that card (``fingerprint``:
+  what it showed and the ids of the records it read, by its marked data and its check): drawn again with the yes, a
+  card that changed runs nothing and is shown anew. A platform action is named by the screen
   where the person would do it (``screen``, ``app_name``). An operation may replace the detailed fields with its own
   summary (``ai={"summary": …}``), computed as the person and in their language.
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
@@ -27,6 +29,7 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
 import contextlib
 import dataclasses
 import datetime as dt
+import hashlib
 import json
 import logging
 import time
@@ -111,6 +114,105 @@ APP_WORDS = shared.app_words
 SYNONYMS = (
     ("placa", "badge"),
     ("empleado", "empleada", "employee", "person"),
+    ("arqueo", "recuento", "conteo", "count"),
+    ("divisa", "moneda", "currency"),
+    # service
+    ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+    ("asignacion", "asignaciones", "assignment", "assignments"),
+    # staff
+    ("desactiva", "desactivar", "deactivate"),
+    ("pido", "solicito", "solicitud", "request"),
+    # cart_checkout: a «cesta» or a «carrito» is a shopping cart (``cart_checkout.cart``), and «unidades» or «cantidad»,
+    # as «tres unidades», the quantity a line takes (never «cantidad» as Inventory's unit of measure). Never «línea»: it
+    # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
+    ("unidades", "cantidad", "quantity"),
+    ("cesta", "carrito", "cart", "basket"),
+    # payment: where the business pays its suppliers from is a payment method (``payment.method``), and so is its «cuenta
+    # bancaria» or «cuenta del banco», named by its phrases: a «cuenta» alone is a table's check.
+    (
+        "method", "methods", "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco",
+        "bank account", "bank accounts",
+    ),
+    # invoice: an invoice «pagada» or «pagado» is a paid one (``invoice.invoice.mark_paid``), as «paid» is in
+    # English, and so is one marked «como cobrada», named by its phrases: «cobrar» and «cobro» alone are a sale's
+    # charge.
+    (
+        "pagada", "pagadas", "pagado", "pagados", "paid", "como cobrada", "como cobradas", "como cobrado",
+        "como cobrados",
+    ),
+    # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
+    # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
+    # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
+    # pregunta»). A run is its «ejecución» (``flow.run``), the assistant's draft its «borrador» (``flow.draft``; «borra»,
+    # «bórralo» and «borrada» stem apart from it) and a ready-made one an app brings its «receta» or «prefabricada»
+    # (``flow.recipe``).
+    (
+        "flujo", "flow", "an automation", "a new automation", "the automation", "this automation", "that automation",
+        "each automation", "any automation", "the automations", "my automations", "your automations",
+        "which automations", "what automations",
+        *(f"{one} automatizacion" for one in ("la", "una", "esta", "esa", "cada", "alguna", "ninguna", "otra")),
+        *(f"{one} automatizacion" for one in ("nueva", "mi", "tu", "su", "de")),
+        *(f"{many} automatizaciones" for many in ("las", "unas", "estas", "esas", "todas", "otras", "que", "cuantas")),
+        *(f"{many} automatizaciones" for many in ("mis", "tus", "sus", "nuestras", "de")),
+    ),
+    ("ejecucion", "ejecuciones", "run", "runs"),
+    (
+        "step", "steps", "paso a paso",
+        *(f"{one} paso" for one in ("el", "un", "ese", "este", "cada", "primer", "ultimo", "otro", "algun", "ningun")),
+        *(f"{one} paso" for one in ("mi", "tu", "su")),
+        *(f"{many} pasos" for many in ("los", "unos", "esos", "estos", "todos", "otros", "nuevos", "que", "cuantos")),
+        *(f"{many} pasos" for many in ("mis", "tus", "sus", "de")),
+    ),
+    (
+        "question", "questions",
+        *(f"{one} pregunta" for one in ("la", "una", "esa", "esta", "cada", "primera", "ultima", "otra", "alguna")),
+        *(f"{one} pregunta" for one in ("ninguna", "mi", "tu", "su")),
+        *(f"{many} preguntas" for many in ("las", "unas", "esas", "estas", "todas", "otras", "nuevas", "que")),
+        *(f"{many} preguntas" for many in ("cuantas", "mis", "tus", "sus", "de")),
+    ),
+    ("borrador", "borradores", "draft", "drafts"),
+    ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
+    # demo
+    ("elemento", "elementos", "item", "items"),
+    # kitchen
+    (
+        "ticket", "la comanda", "una comanda", "unas comandas", "esta comanda", "esa comanda", "su comanda",
+        "sus comandas", "que comanda", "que comandas", "cuantas comandas", "otra comanda", "alguna comanda",
+        "cada comanda", "comanda manual", "comandas manuales", "las comandas de",
+    ),
+    ("estacion", "estaciones", "station", "stations", "el puesto", "al puesto", "del puesto", "un puesto",
+     "los puestos", "que puesto", "que puestos", "cada puesto", "por puesto"),
+    ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
+    ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
+    # the «regla» that sends a product or a family to a station is its routing (``kitchen.routing``): live reads
+    # «regla» as any rule («rule», as Taxes' and Pricing's), and the QA says it of the routing.
+    ("regla", "routing"),
+    ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
+     "como hechas"),
+    ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
+    # whatsapp_inbox
+    ("plantilla", "plantillas", "template", "templates"),
+    ("mensaje", "mensajes", "message", "messages"),
+    # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
+    # (``modifier.option``). live still reads «ordena» and «orden» as «ordenador»'s stem, so they also name a device.
+    ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
+    # modifier: the «predeterminada» option is the one a group brings chosen, its default (``is_default``), as the
+    # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
+    # threshold (Staff's and Inventory's settings), whose asks would then rank the options of a group.
+    ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
+    # appointment: a «bloqueo» of the agenda is its blocked period (``appointment.blocked_time``), as «block» says in
+    # English; a «cita fija», a «serie semanal» or a «cita que se repite» is a repeating appointment
+    # (``appointment.recurring``), named by its phrases and never by «serie» alone, which is also an invoice's series;
+    # whether someone «puede atender» or there is a «hueco libre» asks for the availability of the agenda
+    # (``appointment.availability``), named by its phrases: «puede» and «libre» alone ask for nothing.
+    ("bloqueo", "blocked"),
+    (
+        "recurring", "cita fija", "citas fijas", "cita periodica", "citas periodicas", "cita semanal", "citas semanales",
+        "cita mensual", "citas mensuales", "serie semanal", "series semanales", "serie mensual", "serie quincenal",
+        "serie de citas", "series de citas", "que se repite", "que se repiten", "que se repita", "que se repitan",
+        "repeating appointment", "repeating appointments", "weekly appointment", "monthly appointment",
+    ),
+    ("availability", "puede atender", "pueda atender", "puede coger", "pueda coger", "hueco libre", "huecos libres"),
 )
 #: The attribute of an app's ``LiveAppConfig`` that says what its own words mean, in groups as ``SYNONYMS``'s: a word of
 #: a group asks for all of them, and a phrase with spaces names its group without lending its stems to other words
@@ -201,8 +303,8 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 
 def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = None) -> dict[str, Operation]:
     """The tools of ``ctx``'s person: by name, in name order, of the apps on in its business (``active_labels``, else
-    ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is (APP-BASE-5): running
-    it asks for the approval (BASE-G118)."""
+    ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is: running
+    it asks for the approval."""
     tools = shared.catalog(
         ctx,
         active_labels=active_apps(ctx.scope) if active_labels is None else active_labels,
@@ -218,7 +320,7 @@ def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -
     return shared.relevant(tools, texts, language, **RANKING)
 
 
-# ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
+# ── The card of a write in the Hub's words ───────────────────────────────────────────────────────────────────────
 
 #: The mark of the datum that names the currency of the amounts beside it, at any depth below it: a payment in dollars.
 #: ``True`` on a text, an ISO 4217 code; on a datum that names a record in a currency of its own (a cart, a price list),
@@ -281,7 +383,10 @@ class _Words:
     """The Hub's words of a card (``live.assistant.Words``): the person's language and the person (``ctx``: to read a
     record's name and its currency as them; ``None`` for an automation's card, which reads no record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
     the record it names, or a preview's read answers, with the decimals it answers: ``answered``); ``priced`` false
-    when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent."""
+    when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent;
+    ``found``, the ids of the records it read to name them, one list for all its data (hub#1208: what a yes is for);
+    ``data``, the object whose data these words say, which a record said by its name inside another is read with
+    (``within``, hub#1245)."""
 
     op: Operation
     language: str
@@ -289,6 +394,8 @@ class _Words:
     currency: str | None = None
     priced: bool = True
     answered: dict | None = None
+    found: list = dataclasses.field(default_factory=list)
+    data: dict = dataclasses.field(default_factory=dict)
 
     @classmethod
     def of_answer(cls, read: Operation, ctx: OperationContext, answer: dict) -> "_Words":
@@ -297,11 +404,13 @@ class _Words:
         return cls(read, ctx.language, ctx, currency=money["currency"] if money else None, answered=money)
 
     def within(self, value: Any, props: dict, defs: dict) -> "_Words":
-        """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one."""
+        """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one;
+        beside its own data (``data``)."""
+        data = value if isinstance(value, dict) else {}
         priced, currency = _named_currency(value, props, defs, self)
         if priced and currency is None:
-            return self
-        return dataclasses.replace(self, currency=currency, priced=priced, answered=None)
+            return dataclasses.replace(self, data=data)
+        return dataclasses.replace(self, currency=currency, priced=priced, answered=None, data=data)
 
     def _currency_money(self) -> dict | None:
         return {"currency": self.currency, "decimals": currency_decimals(self.currency)} if self.currency else None
@@ -350,19 +459,28 @@ def _moment(value: str, kind: str, words: _Words) -> str | None:
 
 
 def _reference(value: Any, prop: dict, words: _Words) -> Any:
-    """The name of the record ``value`` names, as the read its schema marks (``REFERS``) answers it to the person; or
-    ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read, its app off):
-    the card names nobody by an id, nor reads anything for somebody else."""
+    """The name of the record ``value`` names, as the read its schema marks (``REFERS``) answers it to the person —
+    read with the data of its own object the mark names beside it (``within``: a course by its name with its menu,
+    hub#1245) —; or ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read,
+    its app off): the card names nobody by an id, nor reads anything for somebody else. Words a person says that it
+    cannot read (``as_said``: several fit, none does) are said as said instead. A datum the write does not use,
+    because a datum of its own object the mark names came (``unless``: the record's id), is neither read nor shown
+    (hub#1250)."""
     declared = refers_of(prop)
+    if declared and any(words.data.get(name) not in (None, "") for name in declared.get("unless", ())):
+        return _LEFT_OUT
     read = registry.get(declared.get("read")) if declared else None
+    as_said = value if declared and declared.get("as_said") is True and isinstance(value, str) else _LEFT_OUT
     if read is None or words.ctx is None or not isinstance(value, str):
-        return _LEFT_OUT
-    failure, answer = _run(words.ctx, read, {declared.get("by"): value})
+        return as_said
+    beside = {name: words.data[name] for name in declared.get("within", ()) if words.data.get(name) not in (None, "")}
+    failure, answer = _run(words.ctx, read, {**beside, declared.get("by"): value})
     if failure is not None:
-        return _LEFT_OUT
+        return as_said
     said = answer.model_dump(mode="json")
+    words.found.append(said.get("id"))
     names = [said.get(field) for field in _names(declared)]
-    return next((name for name in names if isinstance(name, str) and name.strip()), _LEFT_OUT)
+    return next((name for name in names if isinstance(name, str) and name.strip()), as_said)
 
 
 def _names(declared: dict) -> list:
@@ -371,17 +489,22 @@ def _names(declared: dict) -> list:
     return [name] if isinstance(name, str) else name if isinstance(name, list) else []
 
 
-def _card_details(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
-    return shared.card(op, arguments, language, _Words(op, language, ctx))
+def _card_details(
+    op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None, found: list | None = None
+) -> dict:
+    return shared.card(op, arguments, language, _Words(op, language, ctx, found=[] if found is None else found))
 
 
-def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
+def card(
+    op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None, *, found: list | None = None
+) -> dict:
     """What the person sees before ``op`` runs with ``arguments`` (``live.assistant.card``), in the Hub's words: a
     moment at the business's hour, a record by its name read as ``ctx``'s person, an amount in the currency the write
     names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``).
     With ``ctx`` and a callable ``ai["summary"]``, its fields are exactly what that callable returns; it receives
-    ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too."""
-    shown = _card_details(op, arguments, language, ctx)
+    ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too.
+    ``found`` gathers the ids of the records it read to name them (``fingerprint``)."""
+    shown = _card_details(op, arguments, language, ctx, found)
     summary = op.ai.get("summary") if isinstance(op.ai, dict) else None
     if ctx is None or not callable(summary):
         return shown
@@ -483,13 +606,15 @@ def _answer_money(answer: dict) -> dict | None:
     return {"currency": currency, "decimals": decimals}
 
 
-def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
+def preview(
+    ctx: OperationContext, op: Operation, arguments: dict, *, found: list | None = None
+) -> tuple[ToolOutcome | None, list[dict] | None]:
     """What comes before the card of the write ``op`` with ``arguments``, run as ``ctx``'s person: first its check
-    (``checked``), whose refusal is the write's outcome; then what the dangerous write will do
-    (``live.assistant.preview``: the read its ``ai=`` names), in the Hub's words: its amounts in the currency the read
-    answers (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` and
-    ``base.E012`` check the declarations at start."""
-    refused = checked(ctx, op, arguments)
+    (``checked``, which adds the id of what it found to ``found``), whose refusal is the write's outcome; then what the
+    dangerous write will do (``live.assistant.preview``: the read its ``ai=`` names), in the Hub's words: its amounts
+    in the currency the read answers (``_answer_money``), else the business's; ``signed`` when its schema declares it
+    so. ``base.E005`` and ``base.E012`` check the declarations at start."""
+    refused = checked(ctx, op, arguments, found=found)
     if refused is not None:
         return refused, None
     return shared.preview(ctx, op, arguments, words_of_answer=_Words.of_answer)
@@ -501,17 +626,32 @@ def check_of(op: Operation) -> Any:
     return declared.get("check") if isinstance(declared, dict) else getattr(declared, "check", None)
 
 
-def checked(ctx: OperationContext, op: Operation, arguments: dict) -> ToolOutcome | None:
+def checked(
+    ctx: OperationContext, op: Operation, arguments: dict, *, found: list | None = None
+) -> ToolOutcome | None:
     """Why the read the write ``op`` names as its check (``check_of``) refuses ``arguments`` — run as ``ctx``'s person,
     with the data of the write its input takes —, or ``None`` when it takes them or the write names none (hub#538: a
     role the business does not have reached the card, and the write refused it only after the person's yes). Nothing
-    of its answer is shown: a normal write's card stays a single line."""
+    of its answer is shown: a normal write's card stays a single line; the id of what it found goes to ``found``
+    (``fingerprint``: a record the write takes by its name is the one the check found)."""
     name = check_of(op)
     if name is None:
         return None
     read = registry[name]
-    failure, _ = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+    failure, answer = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+    if failure is None and found is not None:
+        found.append(answer.model_dump(mode="json").get("id"))
     return failure
+
+
+def fingerprint(drawn: dict, found: list) -> str:
+    """The fingerprint of what a write's card showed the person (``drawn``: its data and what it will do, in their
+    words) and of the records it read to show them (``found``: their ids, by the data it names and its check) — what
+    their yes is for (hub#1208): with the yes the card is drawn again, and a different fingerprint runs nothing.
+    Only what the person saw and which records: never a read's whole answer (a signed link to a photo changes on each
+    read, and the yes would never come)."""
+    said = json.dumps({"card": drawn, "found": found}, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(said.encode()).hexdigest()
 
 
 @checks.register("base")
@@ -607,14 +747,21 @@ def _check_problems(op: Operation, declared: Any) -> list[str]:
 @checks.register("base")
 def check_references(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E009``: a datum marked ``REFERS`` names a read of the operation's own app, of ``base`` or of one it
-    requires, that takes the datum (``by``) and answers the record's name (``name``)."""
+    requires, that takes the datum (``by``) and the data of its own object it is read with (``within``), and answers
+    the record's name (``name``); only text a person says is said as said (``as_said``), never an id."""
     errors: list[checks.CheckMessage] = []
     for op in registry.values():
         schema = _schema(op)
+        defs = schema.get("$defs", {})
         problems = [
             f"{path} {problem}"
-            for path, declared in _marks(schema, schema.get("$defs", {}))
+            for path, declared in _marks(schema, defs)
             for problem in _reference_problems(op, declared)
+        ] + [
+            f"{path}.{name} {problem}" if path else f"{name} {problem}"
+            for path, props in _objects(schema, defs)
+            for name, prop in props.items()
+            for problem in _beside_problems(prop, props, defs)
         ]
         if problems:
             errors.append(
@@ -746,12 +893,42 @@ def _currency_problems(op: Operation, declared: Any) -> list[str]:
     return _reference_problems(op, {"read": declared["read"], "by": declared["by"], "name": declared["code"]})
 
 
+def _beside_problems(prop: dict, props: dict, defs: dict) -> list[str]:
+    """What is wrong with the datum ``prop`` of an object (``props``) a mark reads with the data beside it
+    (``within``), leaves unread beside others (``unless``) or says as said (``as_said``): data its own object does not
+    have, or an id said as said."""
+    declared = prop.get(REFERS)
+    if not isinstance(declared, dict):
+        return []
+    problems = [
+        f"is {verb} with {name}, which its own object does not have"
+        for key, verb in (("within", "read"), ("unless", "left unread"))
+        for name in (declared.get(key) if isinstance(declared.get(key), list) else [])
+        if isinstance(name, str) and name not in props
+    ]
+    if declared.get("as_said") is True and _is_id(prop, defs):
+        problems.append("is said as said, but it is an id")
+    return problems
+
+
+def _is_id(prop: dict, defs: dict, depth: int = 0) -> bool:
+    """Whether the schema ``prop`` is an id (``format: uuid``), on its own or as a branch of its union."""
+    prop = _unreferred(prop, defs)
+    branches = [*prop.get("anyOf", []), *prop.get("oneOf", [])]
+    return prop.get("format") == "uuid" or (depth < 8 and any(_is_id(branch, defs, depth + 1) for branch in branches))
+
+
 def _reference_problems(op: Operation, declared: Any) -> list[str]:
     if (
         not isinstance(declared, dict)
         or not all(isinstance(declared.get(key), str) for key in ("read", "by"))
         or not _names(declared)
         or not all(isinstance(name, str) for name in _names(declared))
+        or not isinstance(declared.get("within", []), list)
+        or not all(isinstance(name, str) for name in declared.get("within", []))
+        or not isinstance(declared.get("as_said", False), bool)
+        or not isinstance(declared.get("unless", []), list)
+        or not all(isinstance(name, str) for name in declared.get("unless", []))
     ):
         return ["is not a read, by and name"]
     read = registry.get(declared["read"])
@@ -763,8 +940,11 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
     own = active_apps_label(op.app_label)
     if read.app_label not in {op.app_label, "base", *(own.requires if own else ())}:
         problems.append(f"names {read.name}, of {read.app_label}, which {op.app_label} does not require")
-    if declared["by"] not in read.input.model_fields:
-        problems.append(f"names {read.name}, which takes no {declared['by']}")
+    problems += [
+        f"names {read.name}, which takes no {name}"
+        for name in [declared["by"], *declared.get("within", [])]
+        if name not in read.input.model_fields
+    ]
     given = _output_schema(read).get("properties", {})
     problems += [f"names {read.name}, which gives no {name}" for name in _names(declared) if name not in given]
     return problems
@@ -779,7 +959,7 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
 ABOVE = {Membership.Role.MANAGER: "the owner or an administrator", Membership.Role.EMPLOYEE: "a manager or the owner"}
 
 
-def instructions(
+def instructions(  # noqa: PLR0913
     *,
     language: str,
     currency: str,
@@ -809,8 +989,9 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
 - Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
   answer, not in a table either.
 - For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
-  with `base__docs__search` and answer only from what it returns, citing the section; if it returns nothing, say the
-  documentation does not cover it.
+  with `base__docs__search` and answer only from what it returns; end that answer with the `cite` of each excerpt you
+  used, at least one, as it comes and in a line of its own; if it returns nothing, say the documentation does not
+  cover it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
 - Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
@@ -853,7 +1034,7 @@ def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> s
 
 
 def setup_block(status: dict | None) -> str:
-    """The checklist «Finish setting up your business» as the model reads it (BASE-G121): what is pending, what
+    """The checklist «Finish setting up your business» as the model reads it: what is pending, what
     blocks invoicing, what is done, and what only an administrator can do. ``None``: it could not be read."""
     if status is None:
         return "The checklist of this business could not be read now: do not say the business is set up."
@@ -878,7 +1059,7 @@ def setup_block(status: dict | None) -> str:
 
 # ── The gateway (erplora.com) ────────────────────────────────────────────────────────────────────────────────────
 
-#: Each failed call to the gateway leaves one line here (saas#167): its door, the business, the HTTP status and the
+#: Each failed call to the gateway leaves one line here: its door, the business, the HTTP status and the
 #: gateway's code, or that it never got there and how. The panel says every failure in a few words of its own, so the
 #: reason lives only in this log. Never what the person said, dictated or was answered.
 logger = logging.getLogger(__name__)
@@ -961,11 +1142,11 @@ def usage(scope: Scope) -> dict:
     return {key: answer.get(key) for key in ("used", "limit", "resets_at", "demo")}
 
 
-def report(
+def report(  # noqa: PLR0913
     scope: Scope, *, message_id: str, reason: str, comment: str, question: str, answer: str, web: bool | None = None
 ) -> dict:
     """Send erplora.com a bad answer of the assistant: ``{sent, duplicate}``. ``web``: whether its turn brought pages of
-    the web (the turn's ``done.web``, kept by the browser), whose text erplora.com then does not mail (saas#287); left
+    the web (the turn's ``done.web``, kept by the browser), whose text erplora.com then does not mail; left
     out when the browser does not know, and erplora.com's safe default decides."""
     payload = {
         "hub": scope.key, "message_id": message_id, "reason": reason, "comment": comment, "question": question,
@@ -1050,7 +1231,7 @@ def prepared_docs(prepared: dict[tuple[str, int], dict | GatewayError]):
 
 async def prepare(request: Any, data: Any) -> dict[tuple[str, int], dict | GatewayError]:
     """What the turn's tools wait on erplora.com for, asked before ``base.assistant.turn`` opens its transaction (up to
-    ``TIMEOUT_SECONDS`` inside it would hold the hub's connection, PLAN §14.2): the documentation searches the model
+    ``TIMEOUT_SECONDS`` inside it would hold the hub's connection): the documentation searches the model
     asked for (``prepare_docs``), for the route to hand them to the turn (``prepared_docs``)."""
     name = tool_name(DOCS_SEARCH)
     if not any(call.name == name for call in data.pending):
@@ -1097,13 +1278,13 @@ def _assistant_message(text: str, calls: list[dict]) -> dict:
     return message
 
 
-async def stream_turn(
+async def stream_turn(  # noqa: C901, PLR0912, PLR0915
     scope: Scope, *, messages: list[dict], tools: list[dict], instructions: str, continuation: str | None
 ) -> AsyncIterator[dict]:
     """A turn through the gateway, as the Hub's frames: ``text`` piece by piece, ``usage``, an ``error``, and ``done``
     with what the browser keeps (``append``), the tools the model asked for (``pending``), their ``continuation`` and
     whether the turn brought pages of the web (``web``: the gateway's ``{type: web}``, also before a failure; the
-    browser sends it back with a report of the answer, saas#287). A refusal of the gateway is a lone ``error``; a
+    browser sends it back with a report of the answer). A refusal of the gateway is a lone ``error``; a
     failure half way keeps what was said."""
     payload = {"hub": scope.key, "messages": messages, "instructions": instructions, "tools": tools}
     if continuation:

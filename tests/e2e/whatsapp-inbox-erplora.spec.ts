@@ -9,12 +9,11 @@
 // - F32, F34, F02: the owner's reply goes through erplora.com (door 5) to Meta, which refuses the made-up permission
 //   (its 190, erplora.com's `whatsapp.reconnect_needed`): the bubble says «Not delivered» in the Hub's words, never
 //   Meta's, and once erplora.com's next photo says the number must be reconnected, «Needs reconnecting» with
-//   «Reconnect» (to Settings), and the box says why nothing leaves — in Spanish too
-//   (FIX-HUB-WHATSAPP-INBOX-RECONNECT-NEEDED-REFUSAL-390|834|1440);
+//   «Reconnect» (to Settings), and the box says why nothing leaves — in Spanish too;
 // - F10, F11: erasing a number, in the inbox or from the customer's card, has erplora.com forget it (door 6), which
 //   confirms.
-// Each flow's screen in three sizes (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12-<flow>-390|834|1440). What it creates
-// is named `e2e.…` and deleted after the file; erplora.com's side lives in its own run database.
+// Each flow's screen in three sizes. What it creates is named `e2e.…` and deleted after the file; erplora.com's side
+// lives in its own run database.
 import { execFileSync } from 'node:child_process';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';

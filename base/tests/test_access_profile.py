@@ -1,4 +1,4 @@
-"""BASE-G125: «My profile»: one's own name, contact email, photo, language and appearance in this hub.
+"""«My profile»: one's own name, contact email, photo, language and appearance in this hub.
 
 The profile is always the person's who has the session. The name and the contact email are this business's: the
 contact email is not the one to sign in with and never gives nor takes any access. The language and the appearance

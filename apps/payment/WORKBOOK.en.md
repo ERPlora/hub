@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:64bd06a5b8e65258759c76235b9efe8c1c5877d48217d861bec5784ef66cf7f4 -->
+<!-- generated from WORKBOOK.md sha256:5bbd916c4e33acabf5253e3713cc972f403033e29912af5de23c55ed1f4dc0e7 -->
 
 ## What it is for and who it is for
 
@@ -159,7 +159,8 @@ Steps:
    recorded only once.
 In: the form's data; the business's currency, its country's (a payment that does not say its currency is
 recorded in it, also through the assistant or the API). While the app does not know the business's
-currency yet, the field says "Amount" and "Record payment" waits. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+currency yet, the field says "Amount" and "Record payment" waits; leaving the amount keeps it as typed,
+without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Record payment" lights up (hub#938).
 Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
@@ -273,8 +274,12 @@ Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
 Steps:
-1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens.
-2. Change the name, the type or the account and tap **Save**.
+1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens with what the
+   row already says; **Account** and **Save** wait in grey while the whole method arrives (the list
+   masks the account).
+2. Change the name, the type or the account and tap **Save**. The name and the type can be changed
+   before the whole method arrives: what was typed stays, and the method, when it arrives, fills only
+   what has not been touched.
 3. To stop using it, tap **Deactivate** in its row: it moves to **Deactivated** and no longer shows in
    "New payment". **Activate** brings it back.
 In: the method (through the assistant, by its name) and what changes.
@@ -331,7 +336,7 @@ cancelling need a person: an automation does not do them.
 | Manager | yes | yes | yes |
 | Employee | yes | no | no |
 
-Whoever has both permissions can approve what they recorded (as today and as QuickBooks; see
+Whoever has both permissions can approve what they recorded (as QuickBooks; see
 "Reference adopted"); the payment keeps who recorded it, who approved it (`approved_by`,
 `approved_at`), when it was sent and completed (`sent_at`, `completed_at`) and who cancelled it and when
 (`cancelled_by`, `cancelled_at`).

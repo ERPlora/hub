@@ -1,14 +1,16 @@
-"""The assistant's card for a write of combo (FIX-HUB-COMBO-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258):
-in Spanish, every datum it sends by the name the Menus screens give it, never by the title pydantic makes up from the
-field («Group Ids», «New Product», «Tax Category Key»). The card is base's (``base.assistant.card``); the names are
-combo's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of combo (base's half is hub#258): in Spanish, every datum it sends by the name the
+Menus screens give it, never by the title pydantic makes up from the field («Group Ids», «New Product», «Tax Category
+Key»). The card is base's (``base.assistant.card``); the names are combo's: the titles of its schemas and the
+``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import json
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from live.operations import get, registry
 
+from apps.combo.tests.conftest import ctx_for, make_combo
 from base import assistant
 from base.tests.test_assistant import technical_names
 
@@ -37,12 +39,15 @@ def test_no_datum_of_a_write_of_combo_reaches_a_spanish_card_by_its_technical_na
     assert technical_names(writes) == {}
 
 
+@pytest.mark.django_db
 def test_the_card_names_the_courses_of_a_menu_put_in_a_new_order():
-    """Dragging the courses of a menu: the builder's «Platos», never «Group Ids»."""
+    """Dragging the courses of a menu: the builder's «Platos», never «Group Ids». The menu said by its name is read as
+    the person asks, as the write will find it (hub#1217): a card with nobody at hand reads no record."""
+    make_combo("Menú del día")
     reorder = get("combo.group.reorder")
     arguments = {"combo": "Menú del día", "group_ids": ["x", "y"]}
-    assert labels(assistant.card(reorder, arguments, "es")) == ["Menú", SCREENS["courses"]["title"]]
-    assert labels(assistant.card(reorder, arguments, "en")) == ["Menu", SCREENS_EN["courses"]["title"]]
+    assert labels(assistant.card(reorder, arguments, "es", ctx_for())) == ["Menú", SCREENS["courses"]["title"]]
+    assert labels(assistant.card(reorder, arguments, "en", ctx_for())) == ["Menu", SCREENS_EN["courses"]["title"]]
     assert labels(assistant.card(reorder, {"group_ids": "x"}, "es")) == ["Platos"]
 
 

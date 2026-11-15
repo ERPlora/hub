@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// The form of «Send a message» (WORKBOOK FLOW-F31; the old module's flows-f15): a «Do something» step of the
+// The form of «Send a message» (WORKBOOK FLOW-F31): a «Do something» step of the
 // WhatsApp inbox's narrow send (`whatsapp_inbox.message.notify`). To whom is a datum — the customer's exact
 // international number, never one typed by hand —; the message goes as it is within the customer's 24 hours;
 // after them WhatsApp only lets an approved template through, chosen from the ones the inbox can fill (read live
 // from it) with a value for each of its blanks. A template it no longer finds stays chosen and says so.
-// A template with a photo, a video or a document at the top (FLOW-F32; the old hub's HUB-F112) goes with a file: its
+// A template with a photo, a video or a document at the top (FLOW-F32) goes with a file: its
 // own, or the one chosen here, kept at once in the business's files (`whatsapp_inbox.template_sample.upload`, checked
 // here first by type and size) and kept by the step as `template.header_sample`; a saved step's file is read by its id.
 import { InlineFeedback } from '@erplora/ui/components';

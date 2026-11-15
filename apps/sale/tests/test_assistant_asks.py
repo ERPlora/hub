@@ -1,5 +1,5 @@
-"""What layer 1 of the assistant's QA does not say of Sales & POS (erplora-next docs plan 2026-10-31, the assistant's
-knowledge and QA): how many phrases its tools put to a turn, and what each role is never offered.
+"""What layer 1 of the assistant's QA does not say of Sales & POS: how many phrases its tools put to a turn, and what
+each role is never offered.
 
 Every ask of every tool of sale bringing its tool among the first ten, role by role, in English and in Spanish, out of
 the catalogue of a business with every app on and ranked as a turn ranks, is ``base/tests/test_assistant_asks.py``'s
@@ -14,6 +14,8 @@ from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
+from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, offered_place, offered_to, probe_phrases
+from base.tests.test_assistant_asks import probes_of_layer_2, without_its_asks
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -40,8 +42,23 @@ def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     assert "sale.sale.void" in employee
 
 
-#: The requests of the QA of hub#1085, each as a person says it: a record of the QA's data names what it is («the
-#: QA Sweets section»), as no selection knows a bare name («Chuches QA») without the business's data.
+#: How the owner asks layer 2 what the till takes: live reads no «abonar» as paying, so nothing in it names
+#: the payment methods, while «clientes» names the customers and «caja» the till; only the asks of
+#: ``sale.payment_method.list`` bring it, and ahead of them.
+PAYING_AT_THE_TILL = ("es", "sale.payment_method.list", "¿de qué maneras pueden abonarme los clientes en caja?")
+
+#: The owner's requests of layer 2 that were not offered their tool, word for word as the probes of
+#: ``tests/e2e/qa/probes/owner-es-sale-2026-11-08.json`` say them: the record named by its bare name («Chuches QA»),
+#: what the asks of each tool bring among the first ten.
+LAYER_2 = [
+    ("es", "sale.department.update", "renombra Chuches QA como Golosinas QA y déjala la primera de la lista"),
+    ("es", "sale.quick_note.update", "donde pone «Sin cilantro QA» escribe mejor «Nada de cilantro QA»"),
+    PAYING_AT_THE_TILL,
+]
+
+#: The requests of the real-model QA, each as a person says it: a record of the QA's data names what it is («the
+#: QA Sweets section»), as no selection knows a bare name («Chuches QA») without the business's data; and the probes
+#: of ``LAYER_2``, said as they are.
 QA_PROBES = [
     ("es", "sale.order.split", "Pasa el cruasán de Cuenta QA a otra cuenta"),
     ("en", "sale.order.split", "Move the croissant from QA Check to another check"),
@@ -77,11 +94,19 @@ QA_PROBES = [
     ("en", "sale.sale.issue_documents", "Issue the pending documents"),
     ("es", "sale.sale.refund", "Devuelve 2 € de la venta"),
     ("en", "sale.sale.refund", "Refund 2 euros of the sale"),
-    ("es", "sale.department.update", "Renombra la sección Chuches QA a Golosinas QA y ordénala la primera"),
     ("en", "sale.department.update", "Rename the QA Sweets section to QA Candy and reorder it first"),
-    ("es", "sale.quick_note.update", "Renombra la nota Sin cilantro QA"),
     ("en", "sale.quick_note.update", "Rename the No cilantro QA note"),
+    *LAYER_2,
 ]
+
+
+def test_the_reported_requests_of_layer_2_are_its_probes_word_for_word():
+    """A paraphrase of a probe («Renombra la sección Chuches QA…») passed while the owner's own words were never
+    offered their tool: the cases of ``LAYER_2`` are the probes of their tool, as layer 2 says them."""
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, _, phrase in LAYER_2] == [
+        f"qa20261108.owner.es.{name}" for _, name, _ in LAYER_2
+    ]
 
 
 @pytest.mark.django_db
@@ -89,14 +114,100 @@ QA_PROBES = [
 def test_the_reported_sales_request_offers_its_existing_operation(language, name, phrase):
     tools = assistant.catalog(ctx_for("hub_owner", language=language))
     assert name in tools
-    offered = [op.name for op in assistant.relevant(tools, [phrase], language)]
-    assert name in offered[:10]
+    assert name in offered_to(tools, phrase, language)[:10]
+
+
+@pytest.mark.django_db
+def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the_customers_and_the_till():
+    """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till: they come among
+    the first eight, ahead of every tool of Customers and of Cash register its words name."""
+    language, name, phrase = PAYING_AT_THE_TILL
+    offered = offered_to(assistant.catalog(ctx_for("hub_owner", language=language)), phrase, language)
+
+    assert name in offered[:8], offered[:10]
+    named = [tool for tool in offered if tool.split(".")[0] in ("customer", "cash_register")]
+    assert named  # positive control: «clientes» and «caja» bring them
+    assert offered.index(name) < offered.index(named[0]), offered[:10]
+
+
+#: Who asks each probe of layer 2, as ``ctx_for`` names the role.
+ROLE_OF = {"owner": "hub_owner", "admin": "hub_admin", "manager": "hub_manager", "employee": "hub_employee"}
+
+
+@pytest.mark.django_db
+def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_payments_methods():
+    """The payment methods of the till are no accounts the business pays its suppliers from (``payment.method.*``):
+    each probe of layer 2 of Payments that brings its tool among the first ten brings it at the same place with the
+    asks of ``sale.payment_method.list`` as without them."""
+    moved = []
+    kept = 0
+    for probe in probes_of_layer_2():
+        if not probe["tool"].startswith("payment.method."):
+            continue
+        tools = assistant.catalog(ctx_for(ROLE_OF[probe["role"]], language=probe["language"]))
+        if probe["tool"] not in tools:
+            continue
+        said = probe["tool"], probe["phrase"], probe["language"]
+        asked = offered_place(tools, *said)
+        if asked is None or asked > 10:
+            continue
+        kept += 1
+        unasked = offered_place(without_its_asks(tools, "sale.payment_method.list"), *said)
+        if asked != unasked:
+            moved.append((probe["id"], unasked, asked))
+    assert kept  # positive control: some probe of Payments brings its tool among the first ten
+    assert moved == []
+
+
+#: Requests in words that are no ask nor probe, each brought among the first ten by its tool's asks and out of them
+#: without: undoing a line's voucher (``sale.order.remove_voucher``, whose asks no longer say the QA's «quita el bono de
+#: la línea» with one word changed); and, for ``sale.department.update`` and ``sale.quick_note.update``, one for each of
+#: their asks in each language, which falls out without that ask alone (it shares two of its stems at most, and fewer
+#: than half of its own), and the English twins of the probes of ``LAYER_2``; and so for ``sale.payment_method.list``,
+#: but for «¿con qué me pueden pagar?», which ``PAYING_AT_THE_TILL`` needs instead (the asks of many other tools say
+#: «pueden»), and «¿se puede pagar con Bizum?», which says no word the others do not («Bizum» is in «do we accept
+#: Bizum?»).
+OWN_WORDS = [
+    ("en", "sale.payment_method.list", "would we take an Amex card?"),
+    ("en", "sale.payment_method.list", "are cheques from regulars accepted?"),
+    ("en", "sale.payment_method.list", "which card could they hand over?"),
+    ("en", "sale.payment_method.list", "tourists want to settle up, what else is there?"),
+    ("es", "sale.payment_method.list", "¿aceptamos el cheque gourmet?"),
+    ("es", "sale.payment_method.list", "¿qué maneras tenemos, además del efectivo?"),
+    ("es", "sale.payment_method.list", "¿con qué abonan los turistas normalmente?"),
+    ("es", "sale.order.remove_voucher", "no lo uses en esta cuenta, mejor lo guarda"),
+    ("en", "sale.order.remove_voucher", "she would rather not use it on the haircut"),
+    ("en", "sale.department.update", "soft drinks belong on the standard band"),
+    ("en", "sale.department.update", "the Misc heading would look better as Others"),
+    ("en", "sale.department.update", "rename Sweets as Candy and put it first in the list"),
+    ("en", "sale.department.update", "sweets are cheaper on VAT"),
+    ("en", "sale.department.update", "rename Sweets to Candy and leave it first on the list"),
+    ("es", "sale.department.update", "los refrescos y demás bebidas, que paguen el tipo general"),
+    ("es", "sale.department.update", "«Varios» mejor como «Otros», que suena más claro"),
+    ("es", "sale.department.update", "la bollería casera, la primera de todas, junto al mostrador"),
+    ("es", "sale.department.update", "que las chuches tributen menos"),
+    ("en", "sale.quick_note.update", "the salt one: low sodium, as the doctor asked"),
+    ("en", "sale.quick_note.update", "our ice one has to sit right at the top, above the rest"),
+    ("en", "sale.quick_note.update", "the lactose one would be clearer as 'dairy free' instead"),
+    ("en", "sale.quick_note.update", "swap 'spicy' for 'a bit spicy'"),
+    ("en", "sale.quick_note.update", "where it says 'No cilantro' write 'No coriander' instead"),
+    ("es", "sale.quick_note.update", "lo de la sal ponlo más suave"),
+    ("es", "sale.quick_note.update", "lo del hielo tiene que salir el primero cuando apunto bebidas frías"),
+    ("es", "sale.quick_note.update", "que en la de los frutos secos diga «trazas»"),
+    ("es", "sale.quick_note.update", "en la de «sin trigo», escribe «sin harina»"),
+]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
+def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
+    assert_its_asks_bring(assistant.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
 
 
 def test_no_qa_probe_is_an_ask():
-    """The probes measure that the selection generalises (erplora-next docs plan 2026-10-31 §1.5): a probe copied into
-    the asks of its tool ranks its own words, layer 2 skips it as a copy of an ask, and a record of the QA's data
-    («Cuenta QA», «Chuches QA») is no phrase a business says."""
+    """The probes measure that the selection generalises: a probe copied into the asks of its tool ranks its own words,
+    layer 2 skips it as a copy of an ask, and a record of the QA's data («Cuenta QA», «Chuches QA») is no phrase a
+    business says."""
     for language, name, phrase in QA_PROBES:
         assert phrase not in asks_of(registry[name]).get(language, ()), phrase
     for op in registry.values():

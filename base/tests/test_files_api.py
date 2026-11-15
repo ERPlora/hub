@@ -1,10 +1,10 @@
-"""Files' operations and routes (APP-BASE-8, BASE-G82…G86): ``base.file.*``, on the hub of the request only.
+"""Files' operations and routes: ``base.file.*``, on the hub of the request only.
 
 Everyone of the hub sees and opens the files (``base.view_files``); who runs it (owner, admin) also uploads, makes
 folders and renames (``base.upload_files``) and deletes (``base.delete_files``; moving takes both, as the old hub).
 Every write records its event (``base.file.<fact>``) in its transaction, and the live listing follows it after the
 COMMIT. A file is read at ``/api/files/raw`` with the session, never cached, sandboxed and, unless it is a type that is
-safe to show, as an attachment: never from ``/p/media/`` (public), never a URL of the bucket (saas#968, saas#972).
+safe to show, as an attachment: never from ``/p/media/`` (public), never a URL of the bucket.
 """
 
 import base64
@@ -14,7 +14,6 @@ import psycopg
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
-from django.urls import resolve
 from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload, NotFound, OperationError, PermissionDenied
@@ -29,6 +28,7 @@ from base import events, files
 from base.models import Hub
 from base.queries import refuse_past_the_plans_space
 from base.storage import hub_prefix
+from base.tests.routes import assert_bound, spa_route_map
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -113,7 +113,7 @@ def test_the_listing_follows_every_write_of_the_files_and_the_photo():
     assert [name for name in events.ALL if name.startswith("base.file.")] == FILE_EVENTS
 
 
-# ── See (BASE-G82) ───────────────────────────────────────────────────────────────────────────────────────────
+# ── See ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -149,7 +149,7 @@ def test_a_hub_lists_its_own_files_only(store):
     assert run("base.file.list", ctx(scope=B))["folders"][0]["name"] == "Secreto"
 
 
-# ── Upload and new folder (BASE-G83) ─────────────────────────────────────────────────────────────────────────
+# ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -191,8 +191,8 @@ def test_an_upload_past_the_plan_s_space_is_refused(store):
 
 @pytest.mark.django_db
 def test_an_app_refuses_past_the_plan_s_space_of_the_hub_that_asks_in_its_language(store):
-    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: the website's images and WhatsApp's header samples take the
-    # plan's space as Files does; each read the plan and said the sentence on its own, now they ask base.
+    # The website's images and WhatsApp's header samples take the plan's space as Files does: they ask base, never
+    # read the plan and say the sentence on their own.
     full = hub("a")
     full.state = {"plan": {"max_storage_bytes": MB}}
     full.save(update_fields=["state"])
@@ -237,7 +237,7 @@ def test_who_does_not_run_the_business_neither_uploads_nor_makes_folders():
     assert recorded() == []
 
 
-# ── Read (BASE-G84) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -254,7 +254,7 @@ def test_reading_describes_the_file_of_this_hub(store):
         run("base.file.read", ctx(scope=B), path="Facturas/marzo.pdf")
 
 
-# ── Rename and move (BASE-G85) ───────────────────────────────────────────────────────────────────────────────
+# ── Rename and move ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -280,7 +280,7 @@ def test_moving_takes_both_deleting_where_it_was_and_uploading_where_it_goes(sto
     assert recorded() == []
 
 
-# ── Delete (BASE-G86) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Delete ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -314,17 +314,11 @@ ROUTES = {
 
 @pytest.mark.parametrize(("method", "path", "operation"), sorted(ROUTES))
 def test_each_route_is_bound_to_its_operation(method, path, operation):
-    from base.api import router
-
-    [route] = router.path_operations[path.removeprefix("/api")].operations
-    assert (route.methods, route.operation_id) == ([method], operation)
-    assert resolve(path).url_name
+    assert_bound(method, path.removeprefix("/api"), operation)
 
 
-def test_the_spa_s_route_map_names_the_files_routes(settings):
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.file.")}
-    assert mine == ROUTES
+def test_the_spa_s_route_map_names_the_files_routes():
+    assert spa_route_map("base.file.") == ROUTES
 
 
 def owner(client, make_user, slug="a"):

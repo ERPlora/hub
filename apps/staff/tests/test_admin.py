@@ -1,7 +1,6 @@
 """Django admin of the staff app: full CRUD on every model.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables; it repeals the read-only admin that apps/demo still copies from round 9 (PLAN §14.3).
+The Hub admin has full CRUD over all of a hub's tables, unlike the read-only admin apps/demo carries.
 """
 
 import pytest
@@ -50,7 +49,7 @@ def test_every_model_is_registered():
 
 
 def test_full_crud_for_the_platform_staff(superuser):
-    # Round 12 (PLAN §17): CRUD, not read only.
+    # CRUD, not read only.
     request = request_by(superuser)
     for model in MODELS:
         model_admin = admin.site._registry[model]
@@ -101,7 +100,7 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         (f"/admin/staff/timeoff/{leave.pk}/change/", b"Flu"),
         ("/admin/staff/staffsettings/", b"staff settings"),
     ):
-        # The admin lives only on the platform host (PLAN §18.1.3).
+        # The admin lives only on the platform host.
         response = client.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url

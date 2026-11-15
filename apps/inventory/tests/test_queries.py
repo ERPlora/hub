@@ -216,7 +216,7 @@ def test_a_row_has_everything_the_screen_and_the_form_show(general):
         "is_active": True,
         "is_sold_out": False,
         "category_ids": [drinks.id],
-        # Round 2026-10-30: no image yet, so the till shows its initials.
+        # No image yet, so the till shows its initials.
         "image": "",
         "image_url": "",
     }
@@ -435,7 +435,7 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
         "price_quantity": Decimal("100.000"),
         "pricing_unit": "g",
         "tracks_stock": True,
-        # Round 2026-10-30 (INVENTORY-F32): the till's tile shows it, or its initials without one.
+        # INVENTORY-F32: the till's tile shows it, or its initials without one.
         "image": "",
         "image_url": "",
     }
@@ -493,7 +493,7 @@ def test_a_category_counts_what_the_till_shows_sold_out_included(general):
         link(product(name, tax=general, is_sold_out=sold_out), drinks)
     [row] = run("inventory.category.list", CategoryListIn()).rows
     # The till's category strip shows this count next to a grid with both tiles, the tea greyed «Sold out»
-    # (SALE-F07): the count says what the person sees (FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS).
+    # (SALE-F07): the count says what the person sees.
     assert (row.name, row.product_count) == ("Drinks", 2)
 
 
@@ -643,8 +643,8 @@ def test_the_ledger_most_recent_first_with_the_product_it_moved():
 
 
 def test_inventory_f16_a_sale_reads_as_the_number_on_its_paper_and_that_number_finds_it_and_its_void():
-    # inventory#137, inventory#142: the reference of a sale is its id; the screen shows, and the search
-    # finds, its ticket or invoice number (or, with no fiscal document, the sale's own number).
+    # The reference of a sale is its id; the screen shows, and the search finds, its ticket or invoice number (or, with
+    # no fiscal document, the sale's own number).
     tea, cake = product("Tea", "TEA"), product("Cake", "CAK")
     ticketed, numbered, unknown = uuid.uuid7(), uuid.uuid7(), uuid.uuid7()
     SaleStock.objects.create(
@@ -868,8 +868,8 @@ def _tied_movements():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
-    included, and its pages neither repeat nor lose rows."""
+    """As in Customers, a descending list is the ascending one read backwards, ties included, and its pages neither
+    repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column, schema=schema), sorted(tied()))
 
 
@@ -1079,7 +1079,7 @@ def test_category_list_filters_and_orders():
 
 
 def test_category_list_names_the_categories_asked_by_id():
-    # The product form names the categories of a product beyond the first page (FIX-INVENTORY-SEARCHSELECT-TO-COMBO).
+    # The product form names the categories of a product beyond the first page.
     drinks = Category.objects.create(name="Drinks", slug="drinks")
     food = Category.objects.create(name="Food", slug="food")
     Category.objects.create(name="Wines", slug="wines")

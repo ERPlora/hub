@@ -9,8 +9,6 @@
 - ``TaxAlias`` is an outside text (``beer``) that the importer of inventory reads as a category.
 - ``TaxSettings`` is the business's tax region (``ES-CN``), one row at most: what every calculation that names
   no country reads, with the business's country (TAX-F11).
-
-Phase 1 has no tenancy (like ``apps.demo``): phase 2 moves these tables to each hub's database.
 """
 
 from datetime import date
@@ -260,8 +258,8 @@ class TaxAlias(UUIDModel):
     source = models.CharField(
         _("source"), max_length=8, choices=Source.choices, default=Source.LEARNED
     )
-    # As in the current product: the lists and the importer read the active ones. An alias is masculine
-    # («activo», «creado el»): the same words as the apps before, so no context of its own.
+    # The lists and the importer read the active ones. An alias is masculine («activo», «creado el»): the
+    # same words as the apps before it, so no context of its own.
     is_active = models.BooleanField(_("active"), default=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)

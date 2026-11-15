@@ -15,6 +15,7 @@ from live.ninja import ensure_api_parity
 from apps.whatsapp_inbox.api import router
 from apps.whatsapp_inbox.models import Message
 from apps.whatsapp_inbox.tests.conftest import connect, receive
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -159,16 +160,7 @@ def test_the_api_keeps_parity():
 
 
 def test_the_spa_s_route_map_names_every_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("whatsapp_inbox.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("whatsapp_inbox.") == ROUTES
 
 
 @pytest.mark.django_db

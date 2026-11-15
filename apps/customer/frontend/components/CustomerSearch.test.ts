@@ -312,17 +312,45 @@ describe('CustomerSearch: markup', () => {
 });
 
 
-describe('CustomerSearch: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
-  it('as opened closes; a change asks; restored as opened closes again', async () => {
+describe('CustomerSearch: the quick add with unsaved changes asks before closing (hub#1046, hub#1233, BASE-F05)', () => {
+  async function quickAdd() {
     const s = await setup(null, undefined, true);
     await s.results([]);
     await s.type('customer-picker-search', 'Marta');
     await s.click('customer-search-quick-add');
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    return s;
+  }
+
+  it('a typed name: Back, the «×», Escape and a tap outside ask «Discard changes?»; «Keep editing» keeps it', async () => {
+    const s = await quickAdd();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.el('customer-search-modal'),
       change: () => s.type('customer-search-quick-name', 'Marta López'),
       restore: () => s.type('customer-search-quick-name', 'Marta'),
+    });
+  });
+
+  it('«Discard changes» closes it and assigns nobody', async () => {
+    const s = await quickAdd();
+    const { answerUnsavedQuestion } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await s.type('customer-search-quick-phone', '600 000 000');
+    await s.click('customer-search-modal-close');
+    await answerUnsavedQuestion('discard');
+    expect(s.isOpen.value).toBe(false);
+    expect(s.value.value).toBeNull();
+  });
+
+  it('as opened (only what was searched), the «×», Escape and a tap outside close it without asking', async () => {
+    const s = await quickAdd();
+    const { expectUntouchedFormClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedFormClosesAtOnce({
+      overlay: () => s.el('customer-search-modal'),
+      reopen: async () => {
+        s.isOpen.value = true;
+        await flush();
+        await s.click('customer-search-quick-add');
+      },
     });
   });
 });

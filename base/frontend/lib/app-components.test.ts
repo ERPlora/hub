@@ -1,5 +1,3 @@
-// The components an app gives base to mount where it says (a panel of the Home, BASE-G168; a card of System, hub#683):
-// one of its own `apps/<app>/frontend/components/<name>.vue`, by its file name, loaded on demand; never a path.
 import { describe, expect, it } from 'vitest';
 
 import { appComponent } from './app-components';

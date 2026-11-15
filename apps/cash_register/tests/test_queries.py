@@ -63,8 +63,8 @@ def test_drawers_are_listed_by_name_with_search_and_the_active_filter():
 
 
 def test_a_drawer_is_read_by_its_id_active_or_not():
-    """The read the assistant's card names a drawer by (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS):
-    its name, also when it is inactive (reactivating it names it), for every till user."""
+    """The read the assistant's card names a drawer by: its name, also when it is inactive (reactivating it names it),
+    for every till user."""
     bar = run("cash_register.register.create", {"name": "Bar"})
     run("cash_register.register.update", {"register_id": str(bar.id), "is_active": False})
     read = run("cash_register.register.get", {"register_id": str(bar.id)}, ctx_for("hub_employee"))
@@ -400,8 +400,8 @@ def test_a_blind_count_hides_the_sale_lines_and_the_totals_of_the_open_session_f
 
 
 def test_the_recent_discrepancies_are_the_last_eight_closed_by_their_close():
-    # cash_register#119: the panel of the last closed sessions showed none, because the hub refused the
-    # filter it asked for. The figures of Cash register (F12) ask for exactly this, and it is answered.
+    # The figures of Cash register (F12) ask for exactly this filter for the panel of the last closed sessions, and it
+    # is answered.
     base = timezone.now() - dt.timedelta(days=20)
     for day in range(10):
         session = open_session(1000)
@@ -424,8 +424,8 @@ def test_the_recent_discrepancies_are_the_last_eight_closed_by_their_close():
 
 
 def test_the_session_list_takes_every_filter_its_screen_sends():
-    # module-toolkit#382: a screen offered a filter its list did not take. The funnel of Cash register
-    # (sessionFilters.ts) sends these, and the list takes each one.
+    # The funnel of Cash register (sessionFilters.ts) sends these, and the list takes each one: a screen never offers a
+    # filter its list does not take.
     sent = {
         "number": "S-261014-0001",
         "status": "closed",
@@ -503,7 +503,7 @@ def test_the_close_summary_names_its_drawer_and_the_session_said_by_its_number()
 
 
 def test_a_blind_count_keeps_the_expected_and_the_difference_out_of_the_cashiers_close_summary():
-    # gh:cash_register#24, #84: who may not see the expected never reads it, nor the difference that gives it away.
+    # Who may not see the expected never reads it, nor the difference that gives it away.
     run("cash_register.settings.update", {"require_blind_count": True})
     open_session(10000)
     cashier = summarize(ctx_for("hub_employee"), closing_balance=25000)
@@ -513,7 +513,7 @@ def test_a_blind_count_keeps_the_expected_and_the_difference_out_of_the_cashiers
         None,
         True,
     )
-    # gh:cash_register#83: whoever may see it reads how much there should be.
+    # Whoever may see it reads how much there should be.
     manager = summarize(ctx_for("hub_manager"), closing_balance=25000)
     assert (manager.expected_balance, manager.difference, manager.expected_hidden) == (10000, 15000, False)
 
@@ -576,7 +576,7 @@ def test_the_close_summary_needs_the_permission_to_close():
         summarize(reader, closing_balance=10000)
 
 
-# ── CASH_REGISTER-F08 The shift review inside the close's summary (gh:cash_register#68) ─────────────────
+# ── CASH_REGISTER-F08 The shift review inside the close's summary ─────────────────────────────────────────────
 
 
 def test_the_close_summary_carries_what_is_still_pending_in_sales_the_kitchen_and_printing():
@@ -678,7 +678,7 @@ def _tied_counts():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
-    pages neither repeat nor lose rows."""
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its pages neither repeat nor
+    lose rows."""
     ids, filters = tied()
     assert_reads_backwards(listed_with(run, operation, column, by_dir=True, **filters), sorted(ids))

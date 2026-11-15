@@ -1,9 +1,9 @@
-// flow: BASE-F06 «Ver los paneles de las apps en Inicio» (panel `kind: chart`) — the old hub's gh:hub#2392, back in
-// the new Home: Sales' «Ventas últimos 7 días» painted each day as `2026-10-23` («2026…» cut at 390 px) and no amount
-// at all. The owner of hub `a` reads it in Spanish with two sales today and one yesterday: each bar says its weekday
+// flow: BASE-F06 «Ver los paneles de las apps en Inicio» (panel `kind: chart`) — Sales' «Ventas últimos 7 días» must
+// not paint a day as `2026-10-23` («2026…» cut at 390 px) with no amount at all. The owner of hub `a` reads it in
+// Spanish with two sales today and one yesterday: each bar says its weekday
 // («vie»); above the bars, the chosen day and its amount, today's until another bar is tapped; no text cut nor sideways
-// scroll at 390, 834 and 1440 px. Each viewport leaves its capture `FIX-HUB-HOME-CHART-ISO-DAY-LABELS-<width>`. What
-// this file creates is deleted after it (`cleanSales()`, `cleanInventory()`).
+// scroll at 390, 834 and 1440 px. Each viewport leaves its capture. What this file creates is deleted after it
+// (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';

@@ -1,4 +1,4 @@
-"""Django admin of the online booking app: full CRUD on both tables for support (round 12, PLAN §17).
+"""Django admin of the online booking app: full CRUD on both tables, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations' rules (a
 booking's appointment, the page's limits), so it warns rather than prevents, and it leaves no event. What the

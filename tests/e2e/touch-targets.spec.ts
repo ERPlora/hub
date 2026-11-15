@@ -1,5 +1,5 @@
-// Touch targets from ui#129/#130 and hub#1074…#1078, measured in Chrome with a coarse pointer. The demo owner
-// only visits existing screens: no business record is created, changed or removed. Failure screenshots and traces
+// Touch targets of the shared components and of hub#1074…#1078, measured in Chrome with a coarse pointer. The demo
+// owner only visits existing screens: no business record is created, changed or removed. Failure screenshots and traces
 // come from the shared Playwright configuration; a passing run captures nothing.
 import { expect, type Locator, test } from '@playwright/test';
 

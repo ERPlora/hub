@@ -1,8 +1,8 @@
 """Price lists in the business's currency (flow pricing-business-currency): its country's, as ``base.business.get``
-reads it from this hub's registry (APP-BASE-6), never a euro fixed in the app. A business in Poland prices its lines
-with its general list in zlotys (one in euros never competes: currencies are not compared without converting), makes
-a zloty list the general one and not a euro one, and a list created without a currency is in zlotys; one in Spain
-stays in euros; each hub its own. A list already stored keeps its currency."""
+reads it from this hub's registry, never a euro fixed in the app. A business in Poland prices its lines with its general
+list in zlotys (one in euros never competes: currencies are not compared without converting), makes a zloty list the
+general one and not a euro one, and a list created without a currency is in zlotys; one in Spain stays in euros; each
+hub its own. A list already stored keeps its currency."""
 
 import pytest
 from live.context import Scope
@@ -50,7 +50,7 @@ def test_a_business_in_poland_prices_a_line_with_its_general_list_in_zlotys():
 
 
 def test_in_poland_a_list_in_euros_never_competes_with_the_zloty_ones():
-    # 5,00 € is not cheaper than 9,00 zł: prices of different currencies are never compared (gh:pricing#7).
+    # 5,00 € is not cheaper than 9,00 zł: prices of different currencies are never compared.
     business_in("PL")
     product = make_product("Shampoo", "SH-1", price=1250)
     vip = make_group("VIP")
@@ -142,7 +142,7 @@ def test_each_hub_creates_its_lists_in_its_own_business_s_currency():
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("ES", "EUR")])
 def test_erploras_own_hub_prices_in_the_currency_of_its_issuer_s_country(settings, country, currency):
-    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub): its lists keep
+    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its lists keep
     # the currency of its issuer's country, as its sales and invoices do (hub#286), never a 404 for want of a business.
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country
@@ -152,9 +152,9 @@ def test_erploras_own_hub_prices_in_the_currency_of_its_issuer_s_country(setting
     assert run("pricing.price_list.create", {"code": "VIP", "name": "VIP"}, platform).currency == currency
 
 
-# One way to the currency (FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY): pricing asks the one question every app that
-# charges asks (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own that
-# drifts in silence (here, an answer other than the one of the business's or the issuer's country).
+# One way to the currency: pricing asks the one question every app that charges asks
+# (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own that drifts in
+# silence (here, an answer other than the one of the business's or the issuer's country).
 
 
 def line_with(ctx) -> tuple:

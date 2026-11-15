@@ -2,7 +2,7 @@
 
 The cases come from the old module's batteries (clock_cycle against the kernel; data.pg: two clock-ins
 in a row, the geofence, clock-out closing the running break, the correction guards and the overlap of
-attendance#12, the review of forgotten days, the settings singleton) and the WORKBOOK. A refused command
+two days of a person, the review of forgotten days, the settings singleton) and the WORKBOOK. A refused command
 leaves no trace: no row, no event.
 """
 
@@ -172,7 +172,7 @@ def test_an_open_day_younger_than_the_threshold_still_blocks(person, clock):
 
 
 # The workplace radius (ATTENDANCE-F03): only personal devices, never the clock-out. Whether a device is
-# personal is the server's to know, never the payload's (review of 2026-10-15, finding 6): it is the mode of
+# personal is the server's to know, never the payload's: it is the mode of
 # the session's device, which an administrator chose on it (BASE-F62, «Settings › This device»).
 
 
@@ -285,7 +285,7 @@ def test_the_counter_pos_is_never_asked_for_a_location(person, clock):
 
 
 def test_a_position_nobody_asked_for_keeps_only_how_far_never_where(person, clock):
-    # Review of 2026-10-15, finding 7: the exact coordinates are kept only when the business requires
+    # The exact coordinates are kept only when the business requires
     # the location and the device is personal; otherwise only the distance, inside/outside and accuracy.
     clock("2026-10-06T07:00")
     AttendanceSettings.objects.create(workplace_lat=WORKPLACE[0], workplace_lng=WORKPLACE[1])
@@ -660,7 +660,7 @@ def test_a_day_waiting_for_review_is_closed_with_a_correction_and_its_break_too(
 
 
 class TestOverlap:
-    """attendance#12: a correction never puts two days of the same person over each other."""
+    """A correction never puts two days of the same person over each other."""
 
     @pytest.fixture
     def days(self, person, clock):
@@ -931,8 +931,8 @@ def test_a_refused_command_notifies_nobody(listen, person):
     assert received(on_a, timeout=0.3) == []
 
 
-# A forgotten day is not closed as a 24-hour day: it waits for a manager's correction (review of
-# 2026-10-15, finding 1). The commands judge it themselves, without waiting for the worker's review.
+# A forgotten day is not closed as a 24-hour day: it waits for a manager's correction. The
+# commands judge it themselves, without waiting for the worker's review.
 
 
 @pytest.mark.parametrize("name", ["attendance.record.clock_out", "attendance.break.start", "attendance.break.end"])
@@ -965,7 +965,7 @@ def test_the_open_day_of_a_terminated_record_is_closed_by_a_correction(person, c
 
 
 def test_the_reaction_closes_nothing_for_a_record_that_is_not_terminated(person, clock):
-    # Review of 2026-10-15, finding 5: only a termination closes a day; a stray call changes nothing.
+    # Only a termination closes a day; a stray call changes nothing.
     from live.context import system_context
 
     clock("2026-10-06T12:00")

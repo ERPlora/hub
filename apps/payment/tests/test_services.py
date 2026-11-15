@@ -3,7 +3,7 @@ payments (record with their reference of the day, approve, send, complete, cance
 
 The cases come from the old module's WORKFLOW and tests, with its silent no-ops turned into refusals:
 a step from the wrong state, or a payment from a method that does not exist or is deactivated, says
-why, changes nothing, spends no number and records no event (PAYMENTS-F02 to F05 «parcial»).
+why, changes nothing, spends no number and records no event (PAYMENT-F02 to F05).
 """
 
 import datetime as dt
@@ -240,7 +240,7 @@ def test_past_9999_the_number_is_written_whole(bank):
     assert record(bank).reference == "PAY-20261014-10000"
 
 
-# The same attempt sent again (payments#8: a retry used to record a second payment)
+# The same attempt sent again (a retry used to record a second payment)
 
 
 def test_the_same_attempt_sent_again_answers_the_payment_it_recorded(bank):
@@ -364,7 +364,7 @@ def test_a_name_that_matches_several_methods_says_which(bank):
 
 
 def test_without_a_currency_the_payment_is_in_the_business_currency(bank):
-    # The old payments#38: the assistant or an API integration may leave it out.
+    # The assistant or an API integration may leave it out.
     assert record(bank).currency == "EUR"
     assert record(bank, currency=None).currency == "EUR"
     assert record(bank, currency="  ").currency == "EUR"

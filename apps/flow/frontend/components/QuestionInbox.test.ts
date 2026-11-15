@@ -1,4 +1,4 @@
-// «Waiting for your answer» (WORKBOOK FLOW-F29; the old module's flows-f24): every question an automation asked and
+// «Waiting for your answer» (WORKBOOK FLOW-F29): every question an automation asked and
 // waits on that this person may answer, live — its words, who it was asked of, what a no and silence do —,
 // a note, and «Approve» or «No». A refusal (too late, someone already answered, paused…) stays on its card.
 import { describe, expect, it, vi } from 'vitest';

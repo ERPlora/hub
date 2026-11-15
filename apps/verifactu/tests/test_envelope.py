@@ -513,11 +513,12 @@ def test_an_f3_declares_the_ticket_it_replaces():
 @pytest.mark.parametrize(
     ("previous_rejection", "expected"),
     [
-        # §9.1.3: the initial alta was rejected, so the invoice is not in the AEAT yet.
+        # The AEAT's web service description, section 9.1.3: the initial alta was rejected, so the invoice is not in
+        # the AEAT yet.
         ("X", "<sum1:RechazoPrevio>X</sum1:RechazoPrevio>"),
         # The AEAT holds the invoice and a later correction of it was rejected.
         ("S", "<sum1:RechazoPrevio>S</sum1:RechazoPrevio>"),
-        # §9.1.2: the usual correction of a record the AEAT holds.
+        # Same description, section 9.1.2: the usual correction of a record the AEAT holds.
         ("N", ""),
     ],
 )
@@ -577,7 +578,8 @@ def test_an_anulacion_names_the_cancelled_invoice_and_carries_no_amounts():
 
 
 def test_an_anulacion_after_a_rejected_anulacion_says_so():
-    # §9.2.2: the invoice is in the AEAT and the earlier anulación of it was rejected.
+    # The AEAT's web service description, section 9.2.2: the invoice is in the AEAT and the earlier anulación of it was
+    # rejected.
     data = AnulacionData(
         issuer_nif="B12345674", number="T-1", issue_date=DAY, previous_rejection="S"
     )
@@ -679,7 +681,8 @@ def test_a_query_through_erplora_raises_the_representative_flag():
 
 
 def test_a_query_continues_after_the_last_record_of_the_previous_page():
-    # §6.4.3: ClavePaginacion names the last record the previous answer returned.
+    # The AEAT's web service description, section 6.4.3: ClavePaginacion names the last record the previous answer
+    # returned.
     xml = envelope.query(
         obligado_nif="B12345674",
         obligado_name="Ana",

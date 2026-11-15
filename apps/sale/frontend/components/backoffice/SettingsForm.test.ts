@@ -173,7 +173,7 @@ describe('SettingsForm: saving', () => {
     expect(s.control('max_discount_percent').value).toBe('150');
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const DISCOUNT = 'Input should be less than or equal to 100';
     const LINK = 'Enter a valid URL.';
     const REFUSAL = {

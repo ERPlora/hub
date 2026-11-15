@@ -1,10 +1,8 @@
 // @vitest-environment node
 // Guardrail: every e2e scope (a spec file or one of its `test.describe`) that seeds erplora.com (`seedErplora` of
 // whatsapp-helpers.ts, whose push replaces `a`'s photo with erplora.com's: its plan is Free, one device) puts `a`'s
-// photo back in its own `test.afterAll`, as its last step (`restorePhoto()`). Until
-// FIX-HUB-E2E-WHATSAPP-INBOX-CONNECT-LEAVES-FREE-PLAN only whatsapp-inbox-plan-cap put back what it changed (its
-// plan's WhatsApp figure, in erplora.com), and every other spec left `a` on the Free plan: a spec run after it on the
-// same database lost its sessions to the device cap (BASE-G57; website-flows.spec.ts, WEBSITE-F11: 401). Last, because
+// photo back in its own `test.afterAll`, as its last step (`restorePhoto()`): a spec that left `a` on the Free plan
+// would make a spec run after it on the same database lose its sessions to the device cap, with a 401. Last, because
 // what the hook pushes after it (a seed again, erplora.com's plan put back) would leave the photo changed once more.
 // whatsapp-photo.spec.ts proves the pair itself against the run's real erplora.com.
 //

@@ -404,12 +404,33 @@ msgstr "Ese clúster no tiene sitio para otro hub."
 msgid "The database of this hub is not on its server: there is nothing to move."
 msgstr "La base de datos de este hub no está en su servidor: no hay nada que mover."
 
-msgid ""
-"This hub's database is too large to move with a copy: it needs logical "
-"replication."
-msgstr ""
-"La base de datos de este hub es demasiado grande para moverla con una copia: "
-"necesita replicación lógica."
+#: services.py (control.hub.restore; hub#1198)
+msgid "This hub is being restored from a copy."
+msgstr "Este hub se está restaurando desde una copia."
+
+msgid "The hub's database is not on that cluster: there is no copy to restore it from."
+msgstr "La base de datos del hub no está en ese clúster: no hay copia desde la que restaurarla."
+
+msgid "This hub's database is too large to restore with a copy."
+msgstr "La base de datos de este hub es demasiado grande para restaurarla con una copia."
+
+msgid "Only a ready hub with a database of its own is restored."
+msgstr "Solo se restaura un hub listo con base de datos propia."
+
+msgid "A demo is not restored: it ends on its own."
+msgstr "Una demo no se restaura: termina sola."
+
+msgid "The copy comes from a temporary cluster restored to that moment, never from the hub's own."
+msgstr "La copia sale de un clúster temporal restaurado a ese momento, nunca del propio del hub."
+
+msgid "A copy is restored only from a cluster closed to new hubs: a temporary one."
+msgstr "Solo se restaura una copia desde un clúster cerrado a hubs nuevos: uno temporal."
+
+msgid "Hubs live on that cluster: the copy comes from a temporary one with none."
+msgstr "En ese clúster viven hubs: la copia sale de uno temporal sin ninguno."
+
+msgid "That moment has not come yet."
+msgstr "Ese momento todavía no ha llegado."
 
 #: admin.py and templates/admin/control/hub/move_to_cluster.html
 msgid "Move to cluster…"
@@ -418,26 +439,38 @@ msgstr "Mover a otro clúster…"
 msgid "Move to cluster"
 msgstr "Mover a otro clúster"
 
-msgid "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves."
+msgid "%(count)d hub will move to %(cluster)s: closed while it moves, for up to %(closed)s."
 msgid_plural ""
-"%(count)d hubs will move to %(cluster)s: each closed for a few minutes while "
-"it moves."
-msgstr[0] "%(count)d hub se moverá a %(cluster)s: cerrado unos minutos mientras se mueve."
+"%(count)d hubs will move to %(cluster)s, one after another: each closed until "
+"its own move ends, for up to %(closed)s in all."
+msgstr[0] "%(count)d hub se moverá a %(cluster)s: cerrado mientras se mueve, hasta %(closed)s."
 msgstr[1] ""
-"%(count)d hubs se moverán a %(cluster)s: cada uno cerrado unos minutos "
-"mientras se mueve."
+"%(count)d hubs se moverán a %(cluster)s, uno tras otro: cada uno cerrado hasta "
+"que acaba su traslado, hasta %(closed)s en total."
 msgstr[2] ""
-"%(count)d hubs se moverán a %(cluster)s: cada uno cerrado unos minutos "
-"mientras se mueve."
+"%(count)d hubs se moverán a %(cluster)s, uno tras otro: cada uno cerrado hasta "
+"que acaba su traslado, hasta %(closed)s en total."
 
 msgid ""
-"Each hub chosen closes for a few minutes while its database is copied to the "
-"cluster you choose, and opens again there. A database too large for a copy is "
-"refused."
+"Each hub chosen closes while its database is copied to the cluster you choose, "
+"and opens again there: in its next night, starting between %(start)s and "
+"%(end)s of the business's time, or now. How long depends on the size of its "
+"database, as said under each one, and if its copy runs past %(limit)s, it is "
+"stopped and undone. The hubs are copied one after another: one asked with "
+"others also stays closed while those before it are copied."
 msgstr ""
-"Cada hub elegido se cierra unos minutos mientras su base de datos se copia al "
-"clúster que elijas, y vuelve a abrirse allí. Una base de datos demasiado grande "
-"para una copia se rechaza."
+"Cada hub elegido se cierra mientras su base de datos se copia al clúster que "
+"elijas, y vuelve a abrirse allí: en su próxima madrugada, empezando entre las "
+"%(start)s y las %(end)s de la hora del negocio, o ahora. Cuánto tarda depende "
+"del tamaño de su base de datos, como dice debajo de cada uno, y si su copia "
+"pasa de %(limit)s, se para y se deshace. Los hubs se copian uno tras otro: uno "
+"pedido junto con otros también sigue cerrado mientras se copian los anteriores."
+
+msgid "%(size)s: closed for up to %(span)s"
+msgstr "%(size)s: cerrado hasta %(span)s"
+
+msgid "Size unknown: closed for up to %(span)s"
+msgstr "Tamaño desconocido: cerrado hasta %(span)s"
 
 msgid "Move them"
 msgstr "Moverlos"
@@ -466,6 +499,12 @@ msgstr[2] ""
 
 msgid "move undo asked"
 msgstr "deshacer el traslado pedido"
+
+msgid "restoring from"
+msgstr "restaurando desde"
+
+msgid "restore point"
+msgstr "momento a restaurar"
 
 msgid "noted at"
 msgstr "anotada el"
@@ -515,3 +554,346 @@ msgstr[2] "Congelado: el worker aún trabaja en %(count)d hubs; espera a que sea
 
 msgid "Frozen: the worker is working on no hub: the database may be upgraded."
 msgstr "Congelado: el worker no trabaja en ningún hub: ya se puede subir la base de datos."
+
+#: admin.py and templates/admin/control/hub/restore_from_a_copy.html («Restore from a copy…», hub#1198)
+msgid "Restore from a copy…"
+msgstr "Restaurar desde una copia…"
+
+msgid "Restore from a copy"
+msgstr "Restaurar desde una copia"
+
+msgctxt "restore"
+msgid "Temporary cluster"
+msgstr "Clúster temporal"
+
+msgctxt "restore"
+msgid "Moment"
+msgstr "Momento"
+
+msgid "The moment the temporary cluster was restored to, with its time zone: 2026-11-09T14:30:00Z is UTC."
+msgstr "El momento al que se restauró el clúster temporal, con su zona horaria: 2026-11-09T14:30:00Z es UTC."
+
+msgid ""
+"%(count)d hub will be restored from %(cluster)s as it was at %(moment)s: closed while it is restored, for up to "
+"%(closed)s. If it is refused, its page says why under «last error»."
+msgid_plural ""
+"%(count)d hubs will be restored from %(cluster)s as they were at %(moment)s, one after another: each closed until "
+"its own restore ends, for up to %(closed)s in all. If one is refused, its page says why under «last error»."
+msgstr[0] ""
+"%(count)d hub se restaurará desde %(cluster)s tal como estaba el %(moment)s: cerrado mientras se restaura, hasta "
+"%(closed)s. Si se rechaza, su ficha dice por qué en «último error»."
+msgstr[1] ""
+"%(count)d hubs se restaurarán desde %(cluster)s tal como estaban el %(moment)s, uno tras otro: cada uno cerrado "
+"hasta que acaba su restauración, hasta %(closed)s en total. Si se rechaza alguno, su ficha dice por qué en «último "
+"error»."
+msgstr[2] ""
+"%(count)d hubs se restaurarán desde %(cluster)s tal como estaban el %(moment)s, uno tras otro: cada uno cerrado "
+"hasta que acaba su restauración, hasta %(closed)s en total. Si se rechaza alguno, su ficha dice por qué en «último "
+"error»."
+
+msgid ""
+"Each hub chosen is put back as it was at the moment you give, from its copy on the temporary cluster you choose (a "
+"point-in-time restore of its cluster, registered closed to new hubs). It closes while its database is replaced, "
+"for as long as said under it by the size of its database, and the one it has now is kept for %(days)s days. The "
+"hubs are restored one after another: one asked with others also stays closed while those before it are restored. "
+"It is refused, nothing changed, if it has fiscal records made, sent or changed after that moment: its page then "
+"says why under «last error»."
+msgstr ""
+"Cada hub elegido vuelve a como estaba en el momento que indiques, desde su copia en el clúster temporal que elijas "
+"(una restauración a un momento de su clúster, dada de alta cerrada a hubs nuevos). Se cierra mientras se sustituye "
+"su base de datos, lo que dice debajo de él según su tamaño, y la que tiene ahora se guarda %(days)s días. Los hubs "
+"se restauran uno tras otro: uno pedido junto con otros también sigue cerrado mientras se restauran los anteriores. "
+"Se rechaza, sin cambiar nada, si tiene registros fiscales hechos, enviados o cambiados después de ese momento: su "
+"ficha dice entonces por qué en «último error»."
+
+msgid "Restore them"
+msgstr "Restaurarlos"
+
+#: models.py (RestoredCopy, hub#1213)
+msgid "separate copy"
+msgstr "copia aparte"
+
+msgid "separate copies"
+msgstr "copias aparte"
+
+msgctxt "separate copy"
+msgid "Being made"
+msgstr "Haciéndose"
+
+msgctxt "separate copy"
+msgid "Made"
+msgstr "Hecha"
+
+msgctxt "separate copy"
+msgid "Failed"
+msgstr "No se pudo hacer"
+
+msgctxt "separate copy"
+msgid "asked by"
+msgstr "pedida por"
+
+msgctxt "separate copy"
+msgid "asked at"
+msgstr "pedida el"
+
+msgctxt "separate copy"
+msgid "made at"
+msgstr "hecha el"
+
+#: services.py (cluster_delete)
+msgid ""
+"%(count)d separate copy of a hub is on this cluster or still to be made from it: it is deleted once the copy is "
+"made or dropped."
+msgid_plural ""
+"%(count)d separate copies of hubs are on this cluster or still to be made from it: it is deleted once the copies "
+"are made or dropped."
+msgstr[0] ""
+"%(count)d copia aparte de un hub está en este clúster o aún se tiene que hacer desde él: se borra cuando la copia "
+"esté hecha o borrada."
+msgstr[1] ""
+"%(count)d copias aparte de hubs están en este clúster o aún se tienen que hacer desde él: se borra cuando las "
+"copias estén hechas o borradas."
+msgstr[2] ""
+"%(count)d copias aparte de hubs están en este clúster o aún se tienen que hacer desde él: se borra cuando las "
+"copias estén hechas o borradas."
+
+#: admin.py (HubAdmin.restore_aside, RestoredCopyAdmin)
+msgid "Restore to a separate copy…"
+msgstr "Restaurar en una copia aparte…"
+
+msgid "Restore to a separate copy"
+msgstr "Restaurar en una copia aparte"
+
+msgid ""
+"%(count)d hub will get a separate copy as it was at %(moment)s, made from %(cluster)s: the business stays open as "
+"it is. Separate copies lists it, and says if it could not be made."
+msgid_plural ""
+"%(count)d hubs will get a separate copy each as they were at %(moment)s, made from %(cluster)s: the businesses "
+"stay open as they are. Separate copies lists them, and says if one could not be made."
+msgstr[0] ""
+"%(count)d hub tendrá una copia aparte tal como estaba el %(moment)s, hecha desde %(cluster)s: el negocio sigue "
+"abierto tal como está. Copias aparte la lista y dice si no se pudo hacer."
+msgstr[1] ""
+"%(count)d hubs tendrán una copia aparte cada uno tal como estaban el %(moment)s, hecha desde %(cluster)s: los "
+"negocios siguen abiertos tal como están. Copias aparte las lista y dice si alguna no se pudo hacer."
+msgstr[2] ""
+"%(count)d hubs tendrán una copia aparte cada uno tal como estaban el %(moment)s, hecha desde %(cluster)s: los "
+"negocios siguen abiertos tal como están. Copias aparte las lista y dice si alguna no se pudo hacer."
+
+msgctxt "separate copy"
+msgid "kept until"
+msgstr "se guarda hasta"
+
+#: templates/admin/control/hub/restore_aside.html
+msgid ""
+"Each hub chosen gets a separate copy of its database as it was at the moment you give, made on its own cluster "
+"from its copy on the temporary cluster you choose (a point-in-time restore of its cluster, registered closed to new "
+"hubs). The business stays open and nothing of it changes, its fiscal records included. The copy is no business: "
+"nobody opens it and nothing in it is sent to the tax authority. Separate copies lists it, and it is kept for "
+"%(days)s days."
+msgstr ""
+"Cada hub elegido tendrá una copia aparte de su base de datos tal como estaba en el momento que indiques, hecha en "
+"su propio clúster desde su copia en el clúster temporal que elijas (una restauración a un momento de su clúster, "
+"dada de alta cerrada a hubs nuevos). El negocio sigue abierto y no cambia nada de él, tampoco sus registros "
+"fiscales. La copia no es un negocio: nadie la abre y nada de ella se envía a Hacienda. Copias aparte la lista, y se "
+"guarda %(days)s días."
+
+msgid "Make the copies"
+msgstr "Hacer las copias"
+
+#: models.py (CopyRecovery, hub#1257)
+msgid "recovery"
+msgstr "recuperación"
+
+msgid "recoveries"
+msgstr "recuperaciones"
+
+msgctxt "recovery"
+msgid "Asked"
+msgstr "Pedida"
+
+msgctxt "recovery"
+msgid "Done"
+msgstr "Hecha"
+
+msgctxt "recovery"
+msgid "Failed"
+msgstr "No se pudo hacer"
+
+msgctxt "recovery"
+msgid "what"
+msgstr "qué"
+
+msgctxt "recovery"
+msgid "results"
+msgstr "resultado"
+
+msgctxt "recovery"
+msgid "done at"
+msgstr "hecha el"
+
+#: services.py (copy_recover)
+msgid "This separate copy does not exist."
+msgstr "Esta copia aparte no existe."
+
+msgid "Only a separate copy that is made gives anything back."
+msgstr "Solo una copia aparte ya hecha devuelve algo."
+
+msgid "These apps give nothing back from a separate copy: %(apps)s."
+msgstr "Estas apps no devuelven nada desde una copia aparte: %(apps)s."
+
+msgid "This separate copy is already giving something back: wait until it is done."
+msgstr "Esta copia aparte ya está devolviendo algo: espera a que termine."
+
+#: admin.py (RestoredCopyAdmin.recover_into_the_business, CopyRecoveryAdmin)
+msgctxt "recovery"
+msgid "What to bring back"
+msgstr "Qué recuperar"
+
+msgid "Recover into the business…"
+msgstr "Recuperar en el negocio…"
+
+msgid "Recover into the business"
+msgstr "Recuperar en el negocio"
+
+msgid ""
+"%(count)d separate copy will give back %(what)s into its business within a few minutes: Recoveries says how it went."
+msgid_plural ""
+"%(count)d separate copies will give back %(what)s into their businesses within a few minutes: Recoveries says how "
+"each went."
+msgstr[0] "%(count)d copia aparte devolverá %(what)s a su negocio en unos minutos: Recuperaciones dice cómo fue."
+msgstr[1] ""
+"%(count)d copias aparte devolverán %(what)s a sus negocios en unos minutos: Recuperaciones dice cómo fue cada una."
+msgstr[2] ""
+"%(count)d copias aparte devolverán %(what)s a sus negocios en unos minutos: Recuperaciones dice cómo fue cada una."
+
+msgctxt "recovery"
+msgid "not brought back"
+msgstr "sin recuperar"
+
+msgctxt "recovery"
+msgid "notes"
+msgstr "notas"
+
+msgctxt "recovery"
+msgid "%(what)s: nothing (%(why)s)"
+msgstr "%(what)s: nada (%(why)s)"
+
+msgid "%(count)d restored"
+msgid_plural "%(count)d restored"
+msgstr[0] "se restauró %(count)d"
+msgstr[1] "se restauraron %(count)d"
+msgstr[2] "se restauraron %(count)d"
+
+msgid "%(count)d created"
+msgid_plural "%(count)d created"
+msgstr[0] "se creó %(count)d"
+msgstr[1] "se crearon %(count)d"
+msgstr[2] "se crearon %(count)d"
+
+msgid "%(count)d not created"
+msgid_plural "%(count)d not created"
+msgstr[0] "%(count)d sin crear"
+msgstr[1] "%(count)d sin crear"
+msgstr[2] "%(count)d sin crear"
+
+msgid "%(count)d with notes"
+msgid_plural "%(count)d with notes"
+msgstr[0] "%(count)d con notas"
+msgstr[1] "%(count)d con notas"
+msgstr[2] "%(count)d con notas"
+
+msgctxt "recovery"
+msgid "%(what)s: %(counts)s"
+msgstr "%(what)s: %(counts)s"
+
+msgctxt "recovery"
+msgid "%(said)s, then stopped (%(why)s)"
+msgstr "%(said)s, y luego se paró (%(why)s)"
+
+#: templates/admin/control/restoredcopy/recover.html
+msgid ""
+"Each separate copy chosen gives back into its business what the copy holds and the business lacks, of what you tick "
+"below: what the business deleted and still holds comes back as it was, with its history, and what it no longer has "
+"is created again as its own screen creates it; nothing is ever copied. What the business has, or has made again "
+"since, is left as it is, but for one thing: a category that comes back takes back what it had inside and the "
+"business still keeps, without taking it out of where the business has put it since. Records for the tax authority "
+"are never brought back, and the business stays open meanwhile. Recoveries says how it went, a few minutes later."
+msgstr ""
+"Cada copia aparte elegida devuelve a su negocio lo que la copia tiene y al negocio le falta, de lo que marques abajo: "
+"lo que el negocio eliminó y aún guarda vuelve tal como era, con su historial, y lo que ya no tiene se vuelve a crear "
+"como lo crea su propia pantalla; nunca se copia nada. Lo que el negocio tiene, o ha vuelto a crear desde entonces, se "
+"queda como está, salvo una cosa: una categoría que vuelve recupera lo que tenía dentro y el negocio aún conserva, sin "
+"sacarlo de donde el negocio lo haya puesto después. Los registros para Hacienda no se recuperan nunca, y el negocio "
+"sigue abierto mientras tanto. Recuperaciones dice cómo fue, unos minutos después."
+
+#: templates/admin/control/restoredcopy/recover.html
+msgid ""
+"What comes back is nothing new to the business: it starts none of its automations, so nobody is welcomed or told "
+"again of a booking they already had."
+msgstr ""
+"Lo que vuelve no es nada nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da "
+"la bienvenida ni se le avisa otra vez de una cita que ya tenía."
+
+msgid "Recover"
+msgstr "Recuperar"
+
+#: a move asked for the business's night: models.py, services.py, admin.py
+msgid "move scheduled to"
+msgstr "traslado programado a"
+
+msgid "move scheduled for"
+msgstr "traslado programado para"
+
+msgid "This hub already has a move asked for the night: cancel it first."
+msgstr "Este hub ya tiene un traslado programado para la madrugada: cancélalo primero."
+
+msgctxt "move"
+msgid "When"
+msgstr "Cuándo"
+
+msgctxt "move"
+msgid "Now"
+msgstr "Ahora"
+
+msgid "In its next night, between %(start)s and %(end)s of the business's time"
+msgstr "En su próxima madrugada, entre las %(start)s y las %(end)s de la hora del negocio"
+
+msgid ""
+"%(count)d hub will move to %(cluster)s in its next night, starting between "
+"%(start)s and %(end)s on its own clock: open until then, and closed while it "
+"moves, for up to %(closed)s."
+msgid_plural ""
+"%(count)d hubs will move to %(cluster)s in their next night, each starting "
+"between %(start)s and %(end)s on its own clock: open until then, and closed "
+"while they move one after another, for up to %(closed)s in all."
+msgstr[0] ""
+"%(count)d hub se moverá a %(cluster)s en su próxima madrugada, empezando entre "
+"las %(start)s y las %(end)s de su hora: abierto hasta entonces y cerrado "
+"mientras se mueve, hasta %(closed)s."
+msgstr[1] ""
+"%(count)d hubs se moverán a %(cluster)s en su próxima madrugada, cada uno "
+"empezando entre las %(start)s y las %(end)s de su hora: abiertos hasta "
+"entonces y cerrados mientras se mueven uno tras otro, hasta %(closed)s en total."
+msgstr[2] ""
+"%(count)d hubs se moverán a %(cluster)s en su próxima madrugada, cada uno "
+"empezando entre las %(start)s y las %(end)s de su hora: abiertos hasta "
+"entonces y cerrados mientras se mueven uno tras otro, hasta %(closed)s en total."
+
+msgid "%(count)d move asked for the night was cancelled: the hub stays where it is, open."
+msgid_plural ""
+"%(count)d moves asked for the night were cancelled: each hub stays where it "
+"is, open."
+msgstr[0] ""
+"Se ha cancelado %(count)d traslado programado para la madrugada: el hub se "
+"queda donde está, abierto."
+msgstr[1] ""
+"Se han cancelado %(count)d traslados programados para la madrugada: cada hub "
+"se queda donde está, abierto."
+msgstr[2] ""
+"Se han cancelado %(count)d traslados programados para la madrugada: cada hub "
+"se queda donde está, abierto."
+
+msgctxt "scheduled move"
+msgid "%(here)s (to %(there)s at %(moment)s)"
+msgstr "%(here)s (a %(there)s el %(moment)s)"

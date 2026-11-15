@@ -1,5 +1,3 @@
-// The faces and the PIN pad of a shared till (BASE-G55, G60): a card per person with a PIN (initials and name, never
-// an email: gh:hub#2536), the pad of the chosen one, and back to the faces. One person: already chosen.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { mountBase } from '../__tests__/mount-base';

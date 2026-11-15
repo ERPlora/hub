@@ -1,6 +1,5 @@
 // flow: PRINTING-F01 PRINTING-F18
-// The bell with the device off (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF; the old hub's print_hosts::is_undrained
-// and its bell row, old-hub:HUB_SHELL-F63): a device set up for the receipt printer that gave no news for 90 s is off,
+// The bell with the device off: a device set up for the receipt printer that gave no news for 90 s is off,
 // and a receipt that has waited a minute on it rings «Nadie está imprimiendo «Recibo» (N)» for the owner of hub `a`,
 // in Spanish, with no event and no reload: the bell reads its rows again by the clock (`bell_refresh_every`, 30 s).
 // Its row leads to Printing → Printers, whose receipts' card says «Dispositivo apagado» and what to do. With Printers
@@ -8,11 +7,12 @@
 // «Listo» by themselves; it goes quiet again and both say so again, with no event and no reload (the card reads the
 // summary every 30 s while something waits). The minute and the 90 s are not waited for: `psql()` moves the receipt and
 // the device's last news back. In each of the three sizes,
-// leaving the capture `FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF-<width>` with the bell open. What it makes is
+// leaving a capture with the bell open. What it makes is
 // «e2e Off …», deleted before and after.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
@@ -133,18 +133,8 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
   return { context, page, streams, reads, loads, cardReads };
 }
 
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
-
-async function badgeSays(page: Page, total: number, options = {}): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
-  else await expect(bellBadge(page)).toHaveCount(0, options);
-}
-
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
-  test(`${KEY} PRINTING-F01 «Nadie está imprimiendo «Recibo»» with the device off, by the clock — ${label}`, async ({ browser }) => {
+  test(`PRINTING-F01: «Nadie está imprimiendo «Recibo»» with the device off, by the clock — ${label}`, async ({ browser }) => {
     const device = `${TAG} device ${RUN} ${label}`;
     let job = '';
     // The device set up from itself is there; a receipt queued on its printer is its: nothing rings.
@@ -180,10 +170,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await openBell(page);
       const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Nadie está imprimiendo «Recibo» \(\d+\)\s*$/ });
       await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capturedFitting(page, `${KEY}-${label}`, label);
 
       // The row leads to the printers, where the receipts' card says the device is off and what to do.
       await row.click();

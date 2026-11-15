@@ -11,7 +11,8 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, PHOTO_PNG, photoLoaded, stamp, VIEWPORTS } from './inventory-helpers';
-import { drawerOff, restoreDrawer } from './sale-helpers';
+import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 interface Menu {
   id: string;
@@ -75,14 +76,7 @@ async function editForm(page: Page, menu: Menu): Promise<Locator> {
   await login(page, A, '/combo/menus');
   await shown(page).locator('[data-testid=combo-menus-search] input').fill(menu.name);
   await expect(shown(page).locator(`[data-testid=combo-menus-row][data-id="${menu.id}"]`)).toBeVisible();
-  const action = shown(page).locator(`[data-testid=combo-menus-row-${menu.id}-edit]`);
-  const more = shown(page).locator(`[data-testid=combo-menus-row-${menu.id}-menu]`);
-  await action.or(more).first().waitFor({ state: 'visible' });
-  if (await action.isVisible()) await action.click();
-  else {
-    await more.click();
-    await page.locator(`ion-popover [data-testid=combo-menus-row-${menu.id}-edit]`).click();
-  }
+  await rowAction(page, 'combo-menus', menu.id, 'edit');
   const form = dialog(page, 'combo-menu-form');
   await expect(form).toBeVisible();
   return form;
@@ -122,8 +116,7 @@ test('COMBO-F14: a library image is the menu’s photo in the list and on its ti
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const tile = shown(page).locator(`[data-testid=pos-menu-${daily.id}]`);
     await tile.scrollIntoViewIfNeeded();
-    await expect(tile.locator('.pos-menu__thumb img')).toHaveAttribute('src', LIBRARY_URL);
-    expect(await photoLoaded(tile.locator('.pos-menu__thumb'))).toBe(512);
+    expect(await tilePhotoLoaded(tile, daily.name, LIBRARY_URL)).toBe(512);
     await capture(page, `APP-COMBO-F14-${viewport.label}`);
   }
 });

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // «Manage on erplora.com» at the foot of the side menu, right below «Upgrade plan» (BASE-F11; the old hub's
-// `management-link.ts`, gh:hub#364, gh:hub#1400): this business on erplora.com's panel. It shows only where
+// `management-link.ts`): this business on erplora.com's panel. It shows only where
 // `base/spa.py` embeds its address (`hub-home`'s `manage_url`: whoever may open the panel, with their account, never a
 // PIN session) and never in the Google Play copy (`managementOffered`: nothing until the installed app answers). It does
 // not sell, so unlike «Upgrade plan» the installed app offers it too. Its click goes with the pass (`useSaasPass`): the

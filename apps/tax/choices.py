@@ -3,7 +3,7 @@ no field of the models labels, so the app declares it (``TaxConfig.choices``) an
 country by its name, never by its ISO code (hub#678).
 
 The codes are the 249 officially assigned ISO 3166-1 alpha-2 of ``pycountry`` (Debian's iso-codes; no ZZ, EU or XK):
-a country no business can hold would give a rule that never matches anything (taxes#41). The names are CLDR's, said
+a country no business can hold would give a rule that never matches anything. The names are CLDR's, said
 in the active language (``base.business.country_name``): the ones the Rules screen's picker shows
 (``Intl.DisplayNames``, CLDR too). No ORM, no models: ``apps.py`` reads it while the apps load.
 """

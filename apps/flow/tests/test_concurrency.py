@@ -75,7 +75,7 @@ def test_two_workers_fire_a_due_schedule_once(monkeypatch):
 
 
 def test_two_workers_resume_each_waiting_run_once(monkeypatch):
-    # Review 2026-10-15, item 8: `resume_due` claims its runs with SKIP LOCKED.
+    # `resume_due` claims its runs with SKIP LOCKED.
     from django.utils import timezone
 
     start = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -93,10 +93,10 @@ def test_two_workers_resume_each_waiting_run_once(monkeypatch):
     assert Task.objects.filter(title="After").count() == 3
 
 
-# An automation deleted while it is being looked up (FIX-FLOW-DETAIL-RACE): the lookup found it and then
-# loaded it again by its id, so a deletion committed between the two either raised DoesNotExist (a 500)
-# or handed back the automation that was just deleted. Each case lands the deletion there, both the
-# business's «Delete» (the row stays, marked deleted) and the Hub admin's (the row goes).
+# An automation deleted while it is being looked up: the lookup found it and then loaded it again by its id, so a
+# deletion committed between the two either raised DoesNotExist (a 500) or handed back the automation that was just
+# deleted. Each case lands the deletion there, both the business's «Delete» (the row stays, marked deleted) and the Hub
+# admin's (the row goes).
 
 DELETIONS = ["operation", "row"]
 
@@ -221,7 +221,7 @@ def test_a_command_by_id_locks_its_automation_in_the_read_that_finds_it(how):
     assert [(f.name, f.deleted_at is None) for f in Flow.objects.all()] == [("Renamed", True)]
 
 
-# «Ask someone first» (FLOW-F29, FLOW-F30; hub#2502): whatever decides it at once, it is decided once.
+# «Ask someone first» (FLOW-F29, FLOW-F30): whatever decides it at once, it is decided once.
 
 
 def _asking(hours=1):
@@ -309,7 +309,7 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
 
 
 def test_two_people_turning_the_same_recipe_on_at_once_build_one_automation():
-    # FLOW-F33: the old Hub could build two (HUB-F105 «parcial»); here one wins and the other finds it.
+    # FLOW-F33: one of them builds the automation and the others find it.
     turn_on = lambda: run("flow.recipe.enable", {"recipe": "appointment/customer_cancelled"})  # noqa: E731
     results = at_once(turn_on, turn_on, turn_on)
     assert not [result for result in results if isinstance(result, Exception)], results

@@ -428,6 +428,32 @@ def test_a_category_without_rule_is_refused_naming_the_line():
     assert "Mystery" in refusal.value.message
 
 
+def test_a_category_without_rule_is_refused_by_the_name_its_reader_gives_it():
+    with pytest.raises(Conflict) as refusal:
+        value(
+            [line(100, category="mystery.box", name="Mystery")],
+            tax_included=True,
+            close=fake_close,
+            category_name={"mystery.box": "Mystery box"}.__getitem__,
+        )
+    assert refusal.value.code == "sale.no_tax_rule"
+    assert "«Mystery box»" in refusal.value.message
+    assert "mystery.box" not in refusal.value.message
+
+
+def test_a_line_without_a_name_is_refused_by_its_categorys_name():
+    with pytest.raises(Conflict) as refusal:
+        value(
+            [line(100, category="mystery.box")],
+            tax_included=True,
+            close=fake_close,
+            category_name={"mystery.box": "Mystery box"}.__getitem__,
+        )
+    assert refusal.value.message.startswith("«Mystery box»")
+    assert "mystery.box" not in refusal.value.message
+
+
+
 def test_an_empty_charge_is_refused():
     with pytest.raises(Conflict) as refusal:
         value([], tax_included=True, close=fake_close)

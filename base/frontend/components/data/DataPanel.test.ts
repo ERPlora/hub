@@ -1,5 +1,3 @@
-// Settings › Data and backups (BASE-G101–G109): the old hub's selector of its three sections, Import (what opens),
-// Export and Reset, with the section in the address (`?data=export`), so a link opens it and Back leaves the page.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../../__tests__/mount-base';

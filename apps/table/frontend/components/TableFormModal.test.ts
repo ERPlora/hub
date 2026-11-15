@@ -4,6 +4,7 @@
 // table asks Number (empty = the first free one), Capacity and Zone. Refusals stay in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionChecked, ionValue, mountTable, settle } from '../__tests__/mount-table';
 import { tableRow, zoneRow } from '../__tests__/tables';
 import type { TableOut } from '../operations';
@@ -18,8 +19,8 @@ type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolea
 
 const ZONES = [zoneRow(), zoneRow({ id: 'z2', name: 'Terrace' })];
 
-async function form(table: TableOut | null, more: Record<string, unknown> = {}, answers: Record<string, [number, unknown]> = {}) {
-  const m = await mountTable(TableFormModal, { props: { open: false, table, zones: ZONES, canDelete: true, ...more }, answers });
+async function form(table: TableOut | null, more: Record<string, unknown> = {}, answers: Record<string, [number, unknown]> = {}, locale: 'en' | 'es' = 'en') {
+  const m = await mountTable(TableFormModal, { props: { open: false, table, zones: ZONES, canDelete: true, ...more }, answers, locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -106,11 +107,20 @@ describe('TableFormModal · new', () => {
   });
 });
 
+describe('TableFormModal: fields refused with the same words (hub#888)', () => {
+  // Editing shows the three fields that paint a refusal (a new table has no Name); each is refused under its own key.
+  itTellsTheCorrectedFieldApart(['number', 'capacity', 'name'], async (locale, refusal) => {
+    const f = await form(tableRow({ name: 'Window' }), {}, { '/api/table/tables/update': [422, refusal] }, locale);
+    await ionValue(f.field('capacity'), '6', 'ionInput');
+    return { field: f.field, send: () => click(f.field('submit')), settle };
+  }, 'capacity');
+});
+
 describe('TableFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const f = await form(null);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => f.inDoc('table-form'),
       change: () => ionValue(f.field('number'), '7', 'ionInput'),
       restore: () => ionValue(f.field('number'), '', 'ionInput'),

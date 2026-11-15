@@ -5,6 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
 import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { ConfigOut, DiagnosticOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
@@ -21,12 +23,6 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
 beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
-});
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
 });
 
 const CONFIG: ConfigOut = {
@@ -74,6 +70,8 @@ async function setup(config: Partial<ConfigOut> = {}, options: MountOptions = {}
   await m.result('verifactu.diagnostic.last', { result: null });
   return m;
 }
+
+afterEach(outOfTheApp);
 
 describe('SettingsPage', () => {
   it('says who files and in which environment', async () => {
@@ -200,18 +198,14 @@ describe('SettingsPage', () => {
     expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
   });
 
-  it('in the installed app, «Read the signed declaration» opens it in the system browser (gh:hub#518)', async () => {
-    const invoke = vi.fn(() => Promise.resolve());
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+  it('in the installed app, «Read the signed declaration» opens it in the system browser', async () => {
+    const invoke = insideTheInstalledApp();
     const s = await setup();
-    const tap = new MouseEvent('click', { bubbles: true, cancelable: true });
-    s.find('verifactu-settings-declaration').element.dispatchEvent(tap);
-    expect(tap.defaultPrevented).toBe(true);
-    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: CONFIG.declaration_url });
+    expectTapOpensInTheSystemBrowser(s.find('verifactu-settings-declaration').element, invoke, CONFIG.declaration_url);
   });
 
-  // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain; outside it nothing that would lead
-  // to the AEAT is offered, with that one reason in sight.
+  // VeriFactu is only for Spain; outside it nothing that would lead to the AEAT is offered, with that one reason in
+  // sight.
   const OUTSIDE_SPAIN = { code: 'outside_spain', message: 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT' };
   const disabled = (s: Awaited<ReturnType<typeof setup>>, hook: string) =>
     (s.find(`verifactu-settings-${hook}`).element as unknown as { disabled: boolean }).disabled;

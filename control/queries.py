@@ -1,5 +1,4 @@
-"""Control's queries: the size of the hubs' own databases, as the Hub admin shows it (round 2026-10-30b of PLAN-DB,
-decision 1 of Ioan; tranche S7, part 1).
+"""Control's queries: the size of the hubs' own databases, as the Hub admin shows it.
 
 ``control.cluster.sizes`` measures the databases with ``pg_database_size`` over the server's catalogue, never opening
 any of them (a connection to a hub's database is its alias's, and to a template's would block its next clone):
@@ -15,11 +14,11 @@ so a new hub is measured on the next look without measuring the others again; a 
 a measure, said in the log. A database that is not on the server is left out, never cached. A server that cannot be
 reached, or a secret that does not resolve, is ``control.cluster_unreachable`` (503) with its reason.
 
-The worker's metrics (``base.metrics``, hub#488; PLAN-AWS §8, PLAN-DB §6 and §8) read the registry's health here too:
+The worker's metrics (``base.metrics``) read the registry's health here too:
 :func:`registry_health` is a plain read, not an operation (no hub and no user: the worker's own measure, like
 ``base.services.hubs_to_serve``), on control's database (the caller opens ``use_control``).
 
-The freeze switch (hub#930; PLAN-DB round 2026-11-04e, «Congelar») is read here twice: ``control.freeze.get`` says how
+The freeze switch is read here twice: ``control.freeze.get`` says how
 it stands to the staff in the Hub admin, with how many hubs the worker is still working on; :func:`active_freeze`, a
 plain read too, is what the worker asks once a tick, ``manage.py migrate_hubs`` before it starts and ``base.hub.get``
 adds to the SaaS's signed status poll.
@@ -28,6 +27,7 @@ adds to the SaaS's signed status poll.
 import datetime as dt
 import logging
 from dataclasses import dataclass
+from uuid import UUID
 
 import psycopg
 from django.core.cache import cache
@@ -44,7 +44,7 @@ from base.registry import PREPARING_STATUSES, internal_only
 from base.tenancy.connections import NON_LIBPQ_OPTIONS
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from base.tenancy.ops import MAINTENANCE_DATABASE
-from control.models import Cluster, Freeze, Hub, HubDue
+from control.models import Cluster, CopyRecovery, Freeze, Hub, HubDue, RestoredCopy
 from control.schemas import ClusterSizesIn, ClusterSizesOut, FreezeGetIn, FreezeOut
 
 logger = logging.getLogger(__name__)
@@ -199,7 +199,18 @@ def registry_health(now: dt.datetime) -> RegistryHealth:
     return RegistryHealth(**row)
 
 
-# ── The freeze switch (hub#930) ──
+# ── The recoveries from a separate copy ──
+
+
+def failed_recoveries(copy_id: UUID) -> list[UUID]:
+    """The recoveries of the copy ``copy_id`` that failed, a plain read of the worker's (``base.tenancy.recovery``): the
+    next one asked of that copy carries them on (``base.recovery.carries_on``)."""
+    return list(
+        CopyRecovery.objects.filter(copy_id=copy_id, status=CopyRecovery.Status.FAILED).values_list("pk", flat=True)
+    )
+
+
+# ── The freeze switch ──
 
 
 def active_freeze() -> Freeze | None:
@@ -217,8 +228,13 @@ def active_freeze() -> Freeze | None:
 
 
 def freeze_answer(row: Freeze | None) -> dict:
-    """The switch as its operations answer it (``FreezeOut``), with the hubs the worker is working on now."""
-    working = HubDue.objects.filter(lease_until__gt=timezone.now()).count()
+    """The switch as its operations answer it (``FreezeOut``), with the hubs the worker is working on now: under their
+    lease, or making a separate copy of one under the copy's own."""
+    now = timezone.now()
+    working = (
+        HubDue.objects.filter(lease_until__gt=now).count()
+        + RestoredCopy.objects.filter(lease_until__gt=now).count()
+    )
     if row is None:
         return {"frozen": False, "reason": "", "since": None, "by": "", "working": working}
     return {"frozen": row.frozen, "reason": row.reason, "since": row.since, "by": row.by, "working": working}

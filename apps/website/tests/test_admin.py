@@ -1,6 +1,6 @@
-"""Django admin of the website app, read-mostly (round 12, PLAN §17): the staff on hubs.erplora.com see the site and
-its images and can only take a site offline (``is_live``); its content goes through the editor's operations, which
-validate it and write its images' URLs."""
+"""Django admin of the website app, read-mostly: the staff on hubs.erplora.com see the site and its images and can only
+take a site offline (``is_live``); its content goes through the editor's operations, which validate it and write its
+images' URLs."""
 
 import uuid
 
@@ -58,7 +58,7 @@ def test_only_whether_the_site_is_live_can_change(superuser):
 
 
 def test_the_staff_see_whose_hub_each_row_is():
-    # Phase 1: every hub's rows share the tables, so the list says which hub each one belongs to.
+    # The list says which hub each row belongs to.
     for model in MODELS:
         model_admin = admin.site._registry[model]
         assert "hub_id" in model_admin.list_display and "hub_id" in model_admin.fields, model
@@ -66,7 +66,7 @@ def test_the_staff_see_whose_hub_each_row_is():
 
 @pytest.mark.django_db
 def test_the_admin_in_spanish_says_the_websites_own_words(client, superuser):
-    """The staff read the site and its images in Página web's words (hub#661): the site is «Página web» and feminine
+    """The staff read the site and its images in Página web's words: the site is «Página web» and feminine
     («Actualizada el», «Actualizada por», like its «Publicada el»), an image «Creada el»; not Clientes' «Web» nor Demo's
     and Clientes' masculine."""
     site = Site.objects.create(hub_id=uuid.uuid7(), updated_by="ana")

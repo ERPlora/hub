@@ -19,7 +19,7 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 from apps.customer.tax_ids import InvalidCountry, normalize_country
 from apps.tax.schemas import TerritoryTaxKind
-from base.schemas import names
+from base.schemas import exactly_one, names
 
 T = TypeVar("T")
 
@@ -732,7 +732,8 @@ class OrderFireIn(Closed):
 
 
 class RecordRefIn(Closed):
-    """One record a write of Sales names, by its id: exactly one (``sale.record.get``)."""
+    """One record of Sales, or of an app it asks, that the assistant's card names by its id: exactly one
+    (``sale.record.get``)."""
 
     department_id: UUID | None = Field(None, description="A section of the open price.")
     quick_note_id: UUID | None = Field(None, description="A quick note.")
@@ -741,6 +742,7 @@ class RecordRefIn(Closed):
     line_id: UUID | None = Field(None, description="A line of an open check.")
     sale_line_id: UUID | None = Field(None, description="A line of a sale.")
     payment_id: UUID | None = Field(None, description="A tender of a sale.")
+    refund_id: UUID | None = Field(None, description="A refund of a sale.")
     product_id: UUID | None = Field(None, description="A product of Inventory.")
     service_id: UUID | None = Field(None, description="A service of Services.")
     combo_id: UUID | None = Field(None, description="A menu of Menus.")
@@ -752,13 +754,7 @@ class RecordRefIn(Closed):
 
     @model_validator(mode="after")
     def _one(self):
-        if sum(getattr(self, name) is not None for name in type(self).model_fields) != 1:
-            raise ValueError(str(ONE_RECORD))
-        return self
-
-
-class RecordOut(Schema):
-    name: str = Field(description="What the screens call it, in the reader's language.")
+        return exactly_one(self, ONE_RECORD)
 
 
 class OrderListIn(PageIn):

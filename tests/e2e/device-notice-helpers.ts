@@ -2,11 +2,20 @@
 // run in Playwright: only this edge is simulated; the Hub, SaaS, live stream and database stay real.
 import { expect, type Page } from '@playwright/test';
 
+/** How the simulated app answers what the listening with the screen off asks (HUB_APP-F26, hub#836). */
+export interface NativeAppOptions {
+  /** Android's answer about the notices (`check_permissions`); without it the app answers nothing, as before. */
+  notices?: boolean;
+  /** An app without `keep_listening` (the 1.1.34): Tauri refuses the command, as its ACL does. */
+  withoutKeepListening?: boolean;
+}
+
 /**
- * Every native command is recorded; the notification tap listener, the app's «a tap waits» listeners, the tap the
- * app keeps for the page and the device's memory are kept.
+ * Every native command is recorded, and handed to `window.__nativeCall` when the test exposes it (it outlives the
+ * page: a sign-out leaves it); the notification tap listener, the app's «a tap waits» listeners, the tap the app
+ * keeps for the page and the device's memory are kept.
  */
-export function nativeApp(): void {
+export function nativeApp(options: NativeAppOptions = {}): void {
   const win = window as unknown as Record<string, unknown>;
   win.__asked = [];
   win.__told = 0;
@@ -21,6 +30,13 @@ export function nativeApp(): void {
     core: {
       invoke: async (command: string, args?: unknown) => {
         (win.__asked as unknown[]).push([command, args ?? null]);
+        (win.__nativeCall as ((command: string, args: unknown) => unknown) | undefined)?.(command, args ?? null);
+        if (command === 'plugin:erplora-android|check_permissions' && options?.notices !== undefined) {
+          return { 'android.permission.POST_NOTIFICATIONS': options.notices };
+        }
+        if (command === 'plugin:erplora-android|keep_listening' && options?.withoutKeepListening) {
+          throw 'erplora-android.keep_listening not allowed. Command not found';
+        }
         if (command !== 'erplora_take_notice_tap') return null;
         // The kept tap is handed over once, like the app's `take_notice_tap`.
         const kept = win.__kept;

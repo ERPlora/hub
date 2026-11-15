@@ -1,4 +1,4 @@
-"""How a list that sorts both ways orders its rows (the old product's rule, hub#2355)."""
+"""How a list that sorts both ways orders its rows (the old product's rule)."""
 
 from collections.abc import Mapping, Sequence
 

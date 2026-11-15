@@ -13,9 +13,6 @@
       "noPermission": "You do not have permission to see this."
     },
     "money": {
-      "notAnAmount": "This is not an amount. Type a figure, for example 12.50.",
-      "negative": "A drawer amount cannot be negative. To take money out of the drawer, record a «Cash out».",
-      "ambiguous": "This amount can be read two ways: «{typed}» may be {grouped} or {decimal}. Type the decimals so there is no doubt.",
       "zero": "Invalid amount"
     },
     "status": {
@@ -83,9 +80,6 @@
         "heading": "Session {number} was due to close by itself at {time}",
         "body": "It closes by itself when the next session opens."
       }
-    },
-    "filters": {
-      "amountInvalid": "This is not an amount."
     },
     "open": {
       "title": "Open cash session",

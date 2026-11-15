@@ -1,7 +1,7 @@
-"""BASE-G138…G144, G10, G11 and G26: the people of the business and their roles, in Employees (APP-BASE-5).
+"""The people of the business and their roles, in Employees.
 
-Who is in the business, and with which role, is erplora.com's (HUBS-F24…F29: inviting, changing the role, removing,
-the plan's places): the Hub lists them — those who already entered and those the SaaS's photo names that have not yet
+Who is in the business, and with which role, is erplora.com's (inviting, changing the role, removing, the plan's
+places): the Hub lists them — those who already entered and those the SaaS's photo names that have not yet
 — with how each one gets in (the account, and here a PIN and a badge), and lets whoever runs the business take away a
 PIN or give and take away a badge. A person removed on erplora.com and invited again comes back with what the hub kept
 of them. The roles are the four of erplora.com, with how many people and permissions each has.
@@ -26,6 +26,7 @@ from base import access, services
 from base import people as people_rules
 from base.permissions import permissions_for
 from base.models import AccessSettings, Credential, Hub, Membership
+from base.tests.routes import bound_routes, spa_routes
 from base.tests.test_access_pin import a_device, door
 
 pytestmark = pytest.mark.django_db
@@ -107,7 +108,7 @@ def row(answer: dict, person: str) -> dict:
 
 
 class TestWhoIsInTheBusiness:
-    """BASE-G11 (Employees › Personal) and BASE-G142 (how each person gets in)."""
+    """Employees › Personal, with how each person gets in."""
 
     def test_every_person_of_this_business_once_from_the_top_role(self, client, olga, eva, mario, make_user):
         make_user("saas:9", host="b", role=Membership.Role.ADMIN, first_name="Bea")
@@ -156,7 +157,7 @@ class TestWhoIsInTheBusiness:
 
 
 class TestThePlansPlaces:
-    """BASE-G138: the places of the plan the photo carries; every one taken says so."""
+    """The places of the plan the photo carries; every one taken says so."""
 
     def test_the_places_used_against_the_plans_limit(self, client, olga, eva):
         photo(max_users=3)
@@ -177,7 +178,7 @@ class TestThePlansPlaces:
 
 
 class TestOnePerson:
-    """BASE-G10: a person's page, for whoever runs the business."""
+    """A person's page, for whoever runs the business."""
 
     def test_what_the_hub_keeps_of_a_person_and_what_this_admin_may_do(self, client, adam, eva, olga):
         with_pin("saas:3")
@@ -203,7 +204,7 @@ class TestOnePerson:
 
 
 class TestRemoveAPin:
-    """BASE-G139: whoever runs the business takes a person's PIN away; their account still gets them in."""
+    """Whoever runs the business takes a person's PIN away; their account still gets them in."""
 
     def test_the_pin_goes_and_the_person_leaves_the_pin_pad(self, client, adam, eva):
         with_pin("saas:3")
@@ -248,7 +249,7 @@ KEY_WHOSE_DIGEST_HOLDS_0003 = "0" * 61 + "33f"
 
 
 class TestABadge:
-    """BASE-G140: whoever runs the business gives a person a badge, or takes it away; never their own."""
+    """Whoever runs the business gives a person a badge, or takes it away; never their own."""
 
     def test_the_card_is_kept_as_its_digest_never_its_number(self, client, adam, eva):
         AccessSettings.objects.create(badge_key=KEY_WHOSE_DIGEST_HOLDS_0003)
@@ -305,7 +306,7 @@ class TestABadge:
         assert Credential.objects.filter(username="saas:3").exclude(badge_digest="").count() == 0
 
     def test_trying_cards_is_braked_and_then_says_nothing_about_them(self, client, adam, eva, mario):
-        """gh:hub#2560: «already taken» tells that a number is someone's card, so every try counts (30 an hour)."""
+        """«Already taken» tells that a number is someone's card, so every try counts (30 an hour)."""
         with_badge("saas:4", "CARD-0004")
         client.force_login(adam)
         for attempt in range(people_rules.BADGE_CHANGE_LIMIT.attempts):
@@ -343,7 +344,7 @@ class TestABadge:
 
 
 class TestComingBack:
-    """BASE-G141: removed on erplora.com and invited again, a person comes back with their PIN and badge."""
+    """Removed on erplora.com and invited again, a person comes back with their PIN and badge."""
 
     def test_what_the_hub_kept_of_them_is_theirs_again(self, client, olga, eva):
         with_pin("saas:3")
@@ -358,7 +359,7 @@ class TestComingBack:
 
 
 class TestTheRoles:
-    """BASE-G143 and G144: the roles of the business, who has each one and how many permissions it gives."""
+    """The roles of the business, who has each one and how many permissions it gives."""
 
     def test_the_four_roles_of_erplora_com_with_their_people_and_permissions(self, client, olga, adam, eva):
         client.force_login(eva)
@@ -376,7 +377,7 @@ class TestTheRoles:
 
 
 class TestPermissions:
-    """BASE-G26: what each role may do is checked on every operation (``@operation``), whatever the caller."""
+    """What each role may do is checked on every operation (``@operation``), whatever the caller."""
 
     def test_an_operation_refuses_whom_its_permission_is_not_given(self, eva, olga):
         op = get_operation("base.person.pin_remove")
@@ -401,7 +402,7 @@ class TestFollowedLive:
         assert on["base.person.list"] == people_events
         assert on["base.person.detail"] == people_events
         assert on["base.role.list"] == [events.HUB_STATE_APPLIED]
-        # An app turned on or off changes the apps a key may be given (PLAN-HUB §9).
+        # An app turned on or off changes the apps a key may be given.
         assert on["base.api_key.list"] == sorted({events.HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *events.APP_EVENTS})
 
     def test_the_prefix_of_a_person_is_the_one_of_their_account(self):
@@ -421,14 +422,12 @@ PEOPLE_ROUTES = {
 class TestTheRoutes:
     """The SPA calls each operation by its name: the hand-written map names the route ``base/api.py`` binds."""
 
-    def test_the_spas_route_map_names_every_route_of_people_and_roles(self, settings):
-        from base.tests.test_access_routes import bound_routes
+    def test_the_spas_route_map_names_every_route_of_people_and_roles(self):
+        from base.api import router
 
-        assert PEOPLE_ROUTES <= bound_routes()
-        spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+        assert PEOPLE_ROUTES <= bound_routes(router)
         mine = {op for _, _, op in PEOPLE_ROUTES}
-        named = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op in mine}
-        assert named == PEOPLE_ROUTES
+        assert {route for route in spa_routes("base.") if route[2] in mine} == PEOPLE_ROUTES
 
     @pytest.mark.parametrize("name", sorted(op for _, _, op in PEOPLE_ROUTES))
     def test_each_tells_the_assistant_what_it_does(self, name):

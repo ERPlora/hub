@@ -1,5 +1,5 @@
-"""A service's image (SERVICE-F34, SERVICE-F35; round 2026-10-30): ``Service.image``, as a product's (INVENTORY-F30,
-F31) through ``base.images``.
+"""A service's image (SERVICE-F34, SERVICE-F35): ``Service.image``, as a product's (INVENTORY-F30, F31) through
+``base.images``.
 
 A service shows an image of the shared library (``catalog:<folder>/<name>``; for the hair salon, ``beauty_hair/`` and
 ``beauty_body/``) or a photo of its own (``file:service/services/<uuid7 hex>.webp`` under its hub's prefix), or none: the

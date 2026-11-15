@@ -3,7 +3,7 @@ apps invoice works with (tax's factory catalogue, inventory's products, customer
 refunds and voids) — made through their own operations, never by hand: no mocks.
 
 ``deliver(name)`` hands the newest ``name`` event of the outbox to Invoicing's real reaction
-(``apps.invoice.events.react``), as the outbox relay will in phase 2.
+(``apps.invoice.events.react``), as the worker's outbox relay does.
 """
 
 import pytest

@@ -1,8 +1,8 @@
-// The e2e's start (global-setup.ts) refuses local databases with unapplied migrations: on 2026-10-16 the
+// The e2e's start (global-setup.ts) refuses local databases with unapplied migrations: once the
 // local `hub` lacked verifactu.0003–0005 and the specs failed with «not valid JSON» (the `post` helper got
 // Django's HTML error page), a red that never said its cause. The check never applies anything: the
 // database is shared with other sessions.
-// flow: ninguno — FIX de proceso (guardarraíl del e2e)
+// flow: none — a guardrail of the e2e run.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,7 +41,7 @@ const CONTROL_PENDING: CommandResult = {
 
 const HUBS_UP_TO_DATE: CommandResult = {
   status: 0,
-  stdout: 'migrate_hubs: the control database is up to date (phase 1: no hub databases yet).\n',
+  stdout: 'migrate_hubs: the control database, 1 template(s) and 2 hub(s) are up to date.\n',
   stderr: '',
 };
 
@@ -149,7 +149,7 @@ describe('assertMigrationsApplied', () => {
     expect(() => assertMigrationsApplied(manage.run, 'hub')).not.toThrow('unapplied migrations');
   });
 
-  // flow: ninguno — FIX de la infraestructura e2e del Hub (aislar los datos de cada ejecución)
+  // flow: none — the Hub's e2e harness keeps each run's data apart.
   it('says how to create the e2e database of a stack beside the shared one when it does not exist yet', () => {
     const missing: CommandResult = {
       status: 1,
@@ -229,7 +229,7 @@ describe('managePy', () => {
   });
 });
 
-// The host gate answers 404 to a slug the registry does not have (plan 2026-10-17, §1.3): without `a` and `b` every
+// The host gate answers 404 to a slug the registry does not have: without `a` and `b` every
 // spec would fail on a 404 that never says why. `seed_local_hubs --check` writes nothing.
 describe('assertLocalHubsRegistered', () => {
   it('passes when a and b are ready, asking only the check', () => {
@@ -252,13 +252,13 @@ describe('assertLocalHubsRegistered', () => {
   });
 });
 
-// flow: ninguno — arnés e2e del Hub (FIX-HUB-E2E-README-PARALLEL-STACK-MISSES-DEMO-SEED)
+// flow: none — the Hub's e2e harness.
 // The specs sign in with the SaaS's demo accounts (`login` of helpers.ts), which the SaaS's `manage.py demo_seed`
 // creates. A stack's own SaaS on its fresh database (`saas_e2e_<port>`, the SaaS's tests/e2e/database.ts) has none: on
 // 2026-10-28 the README's recipe never said it, and every login waited 30 s to fail with «The email address and/or
 // password you specified are not correct.». The run stops before the first spec with the command that seeds them,
 // reading the SaaS's database with one select (it writes nothing there).
-// hub-e2e-stack (FIX-HUB-E2E-README-DEMO-SEED-BREAKS-WHATSAPP-SPECS): that command is erplora.com's WhatsApp seed with
+// hub-e2e-stack: that command is erplora.com's WhatsApp seed with
 // this Hub's ids of `a` and `b` (it runs `demo_seed` with them), never `demo_seed` alone: `demo_seed` gives them ids of
 // its own, and every WhatsApp spec then fell on «whatsapp_hub_seed.py: a is … here and … in the Hub: drop this
 // database». It runs with this Hub's runserver stopped: with it running, the seed's photo puts `a` on erplora.com's
@@ -437,9 +437,9 @@ describe('psqlOn', () => {
   });
 });
 
-// flow: ninguno — infraestructura del e2e del Hub (`tests/e2e/global-setup.ts`): una pila compartida no admite `--workers` > 1
+// flow: none — the Hub's e2e harness (`tests/e2e/global-setup.ts`): a shared stack takes no `--workers` above 1.
 // `--workers=N` on the command line overrides `workers: 1` of playwright.config.ts, and Playwright hands globalSetup the
-// resolved count (`--workers=2` → 2, `50%` → half the cores). On 2026-10-23 `--workers=2` ran two specs at once on the one
+// resolved count (`--workers=2` → 2, `50%` → half the cores). Once `--workers=2` ran two specs at once on the one
 // stack: appointment-employee.spec.ts deleted `E2E Apt%`, the rows appointment-agenda.spec.ts was using, and the agenda
 // spent its 180 s waiting for them. The run stops before any check touches a database.
 describe('globalSetup', () => {
@@ -492,7 +492,7 @@ describe('globalSetup', () => {
     expect(() => globalSetup({ workers: 1 }, manage.run, saas.run, start)).not.toThrow();
     expect(manage.calls.map((args) => args[0])).toEqual(['migrate', 'migrate_hubs', 'seed_local_hubs']);
     expect(saas.statements).toHaveLength(1);
-    // Then the worker, which makes the databases of the hubs registered during the run (round 2026-10-30, S2a).
+    // Then the worker, which makes the databases of the hubs registered during the run.
     expect(started).toEqual([[STACK.database, STACK.saasDatabase]]);
   });
 
@@ -538,6 +538,12 @@ describe('globalSetup', () => {
 
 
 describe('startWorker', () => {
+  // hub#759: with the machine loaded (load average 50–90, swapping) the worker took about 3 min to import Django and
+  // say it waits for work, silent until then; a 60 s budget failed the run before its first spec, with no output.
+  const LOADED_START_MS = 3 * 60_000;
+  /** The longest a run waits for a worker that hangs alive and never waits for work. */
+  const HUNG_WORKER_MAX_MS = 5 * 60_000;
+
   /** A `run_worker` child as `spawn` returns it: its two outputs, its exit and the signals it was sent. */
   class FakeWorker extends EventEmitter {
     stdout = new EventEmitter();
@@ -611,10 +617,71 @@ describe('startWorker', () => {
       const failed = expect(up).rejects.toThrow(`did not wait for work within ${WORKER_START_TIMEOUT_MS / 1000} s`);
 
       worker.stderr.emit('data', Buffer.from('WARNING base.worker worker: shared schema not migrated yet\n'));
-      await vi.advanceTimersByTimeAsync(WORKER_START_TIMEOUT_MS);
+      await vi.advanceTimersByTimeAsync(HUNG_WORKER_MAX_MS);
 
       await failed;
       expect(worker.signals).toEqual(['SIGTERM']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is up when a loaded machine takes minutes to start it, silent until it waits for work', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const outcome = up.then(
+        () => 'up',
+        (error: Error) => error.message,
+      );
+
+      await vi.advanceTimersByTimeAsync(LOADED_START_MS);
+      worker.stderr.emit('data', Buffer.from(`INFO base.worker ${WORKER_READY} (3 app(s) registered).\n`));
+
+      expect(await outcome).toBe('up');
+      expect(worker.signals).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops the run the moment the worker dies, leaving no wait behind however long the start budget is', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const outcome = up.then(
+        () => 'up',
+        (error: Error) => error.message,
+      );
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      worker.stderr.emit('data', Buffer.from('django.db.utils.OperationalError: database "hub_e2e_8030" does not exist\n'));
+      worker.exit(1);
+
+      expect(await outcome).toMatch(/exited with 1 before it waited for work[\s\S]*does not exist/);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops the run at once when the worker cannot even start, which spawn reports without any exit', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const outcome = up.then(
+        () => 'up',
+        (error: Error) => error.message,
+      );
+
+      // What Node does when the fork fails on a loaded machine (or `uv` is gone): 'error' and 'close', never 'exit'.
+      worker.emit('error', Object.assign(new Error('spawn uv EAGAIN'), { code: 'EAGAIN' }));
+
+      expect(await outcome).toMatch(/run_worker of the e2e \(DB_NAME=hub_e2e_8030\) could not start: spawn uv EAGAIN/);
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }

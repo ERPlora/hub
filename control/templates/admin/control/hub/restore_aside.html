@@ -1,0 +1,14 @@
+{% extends "admin/control/action_confirmation.html" %}
+{% load i18n %}
+{% comment %}
+«Restore to a separate copy…» of the Hub admin (control.admin.HubAdmin.restore_aside, hub#1213, BASE-F114): the chosen
+hubs, the temporary cluster their copy is on and the moment it is of. Confirmed, each is asked through
+control.hub.restore_aside; the worker makes the copy next to the business (base.tenancy.restore), never closing it.
+{% endcomment %}
+{% block intro %}{% blocktranslate trimmed with days=kept_days %}
+  Each hub chosen gets a separate copy of its database as it was at the moment you give, made on its own cluster from
+  its copy on the temporary cluster you choose (a point-in-time restore of its cluster, registered closed to new hubs).
+  The business stays open and nothing of it changes, its fiscal records included. The copy is no business: nobody opens
+  it and nothing in it is sent to the tax authority. Separate copies lists it, and it is kept for {{ days }} days.
+{% endblocktranslate %}{% endblock intro %}
+{% block submit %}{% translate 'Make the copies' %}{% endblock submit %}

@@ -1,6 +1,6 @@
-// PoC §8.7 (CSP, zero violations), §8.11 (OpenAPI ↔ list), §8.13 (no Iconify requests) and part of
-// §8.4 (list → detail → back): the real login on `a`, the shell with the old hub's side menu and its
-// topbar (⠿ apps; Back on a detail only, PLAN-MIGRATIONS §16), the empty state.
+// The CSP with zero violations, the OpenAPI ↔ list match, no Iconify requests and part of list → detail →
+// back: the real login on `a`, the shell with the old hub's side menu and its
+// topbar (⠿ apps; Back on a detail only), the empty state.
 import { expect, test } from '@playwright/test';
 
 import {
@@ -38,9 +38,8 @@ test('login on a: shell, topbar with Demo among the apps, empty state, CSP heade
   const csp = response?.headers()['content-security-policy'] ?? '';
 
   await expect(page.locator('ion-app')).toHaveCount(1);
-  // The old hub's side menu (PLAN-MIGRATIONS §16), pinned at this width: the platform's entries whose
-  // screen exists and the owner may open (Home, Apps and System: APP-BASE-4; Settings: APP-BASE-3; Employees:
-  // APP-BASE-5; Files: APP-BASE-8; «API» only with its docs shown), never an app; the apps are the topbar's sheet.
+  // The old hub's side menu, pinned at this width: the platform's entries whose screen exists and the owner may
+  // open (Home, Apps, System, Settings, Employees and Files; «API» only with its docs shown), never an app; the apps are the topbar's sheet.
   await expect(page.locator('ion-menu.dash-menu')).toBeVisible();
   await expect(page.locator('ion-menu.dash-menu ion-item.nav-item')).toHaveText([
     /^\s*Home\s*$/,
@@ -94,7 +93,7 @@ test('login on a: shell, topbar with Demo among the apps, empty state, CSP heade
   expect(found.console).toEqual([]);
   expect(found.page).toEqual([]);
   expect(iconifyRequests).toEqual([]);
-  // §8.13: every ion-icon paints its SVG from the baked registry, with no request at all.
+  // Every ion-icon paints its SVG from the baked registry, with no request at all.
   expect.soft(listIcons.filter((i) => !i.painted), 'ion-icons left empty').toEqual([]);
   expect.soft(iconFetches, 'icon SVG fetched as a URL from our own server').toEqual([]);
 });

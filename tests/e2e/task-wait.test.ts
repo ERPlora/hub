@@ -1,10 +1,10 @@
-// flow: task-e2e-wait — FIX of the Tasks specs' wait (FIX-HUB-TASK-E2E-WAIT-COUNTS-ONLY-OVERLAYS)
+// flow: task-e2e-wait — the Tasks specs' wait
 // Before a capture, the Tasks specs (task-*.spec.ts) and their helpers wait with the harness's one wait,
-// `untilStill(page)` (helpers.ts), which asks the document and every open shadow root for what moves. Their own wait
-// counted Ionic's modals and popovers between their «will» and «did» events and nothing else, so a toast entering
-// (`task-settled.spec.ts` shows it with «Task started») passed for still and the capture caught it half in. This keeps
-// such a wait — counting what moves itself, or sleeping a fixed time — from coming back in the Tasks files, and keeps
-// `snap()` on untilStill. The same rule for every spec of the e2e is FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED's (hub:base).
+// `untilStill(page)` (helpers.ts), which asks the document and every open shadow root for what moves. A wait that
+// counts only Ionic's modals and popovers between their «will» and «did» events lets a toast entering pass for still
+// (`task-settled.spec.ts` shows it with «Task started»), and the capture catches it half in. This keeps such a wait —
+// counting what moves itself, or sleeping a fixed time — out of the Tasks files, and keeps `snap()` on untilStill.
+// own-animation-waits.test.ts holds the same rule for every spec of the e2e.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

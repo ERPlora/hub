@@ -161,7 +161,7 @@ def test_member_list_filters_and_sorts():
     assert invalid_fields(MemberListIn, status="terminated") == {"status"}
     assert MemberListIn(sort="-hire_date").sort == "-hire_date"
     assert invalid_fields(MemberListIn, sort="salary") == {"sort"}
-    # Every column of the old table sorts both ways.
+    # Every column of the list sorts both ways.
     assert set(MEMBER_SORTS) == {
         "name",
         "first_name",
@@ -464,7 +464,7 @@ def test_a_day():
         dt.time(11, 30),
         True,
     )
-    # The old module's defaults: 09:00 to 18:00.
+    # The defaults: 09:00 to 18:00.
     assert (DayIn(weekday=0).start_time, DayIn(weekday=0).end_time) == (
         dt.time(9),
         dt.time(18),
@@ -775,7 +775,7 @@ def test_time_off_outputs():
 # Settings
 
 
-#: The old module's settings that nothing reads (FIX-STAFF-SETTINGS-ORPHANS): retired from the API.
+#: Settings that nothing reads: out of the API.
 RETIRED_SETTINGS = {
     "min_advance_booking": 1,
     "max_daily_hours": 8,

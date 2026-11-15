@@ -6,17 +6,17 @@
 // until a label printer is added and its device takes it (PRINTING-F12, INVENTORY-F25).
 // Screenshots of both pages, and of each flow, in the three viewports. What is made here is deleted, and the
 // settings put back, after it.
-// FIX-HUB-E2E-PRINTING-QUEUE-CLAIM-LEAKS-ACROSS-RUNS: on a database other runs used, the job goes to this run's
-// printer by its id (a kitchen printer the settings still name, left by a run cut short, took it), the claims get
-// past the older jobs waiting for any kitchen printer, each test finds or makes this run's kitchen printer (a
-// failure restarts the worker with a new `RUN`), and the cleanup also runs before, so a run whose `afterAll` never
-// ran leaves the next one clean.
+// On a database other runs used, the job goes to this run's printer by its id (a kitchen printer the settings still
+// name, left by a run cut short, took it), the claims get past the older jobs waiting for any kitchen printer, each
+// test finds or makes this run's kitchen printer (a failure restarts the worker with a new `RUN`), and the cleanup also
+// runs before, so a run whose `afterAll` never ran leaves the next one clean.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
-import { createProduct, dialog, fill, pick, productsReady, rowAction as productAction, searchProducts } from './inventory-helpers';
+import { createProduct, dialog, fill, pick, productsReady, searchProducts } from './inventory-helpers';
 import { claim, fail, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const RUN = stamp();
 const KITCHEN = `e2e Kitchen ${RUN}`;
@@ -134,7 +134,7 @@ async function titleOffset(card: Locator): Promise<number> {
   return Math.round(title.y - box.y);
 }
 
-/** This task's screenshots (`FIX-PRINTING-F12-INVENTORY-ALREADY-ASKS-<390|834|1440>`), each once `ready` says the page is painted. */
+/** The label flow's screenshots at 390, 834 and 1440, each once `ready` says the page is painted. */
 async function taskShots(page: Page, ready: (page: Page) => Promise<void>): Promise<void> {
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -148,17 +148,6 @@ async function taskShots(page: Page, ready: (page: Page) => Promise<void>): Prom
 async function jobByRef(context: BrowserContext): Promise<Job> {
   const listed = await api<{ rows: Job[] }>(context, A, 'GET', `/printing/jobs?search=${encodeURIComponent(REF)}`);
   return listed.data.rows[0];
-}
-
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `printing-jobs-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-jobs-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
 test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelled with its reason', async ({ page, context }) => {
@@ -190,11 +179,11 @@ test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelle
     await expect(shown(p).locator('[data-testid=printing-jobs-row]').filter({ hasText: REF })).toBeVisible();
   });
 
-  await rowAction(page, queued.data.job.id, 'retry');
+  await rowAction(page, 'printing-jobs', queued.data.job.id, 'retry');
   await expect.poll(async () => (await jobByRef(context)).status).toBe('pending');
   await expect(row).toContainText(/Pending|Pendiente/);
 
-  await rowAction(page, queued.data.job.id, 'cancel');
+  await rowAction(page, 'printing-jobs', queued.data.job.id, 'cancel');
   const modal = dialog(page, 'printing-cancel-job');
   await expect(modal).toBeVisible();
   await fill(modal, 'printing-cancel-job-reason', 'e2e reason');
@@ -250,7 +239,7 @@ test('PRINTING-F12: the label asked from the product sheet waits in the «Label�
   page,
   context,
 }) => {
-  // flow: PRINTING-F12 (INVENTORY-F25 asks for it; printing#62: the warning of a label with no printer shows)
+  // flow: PRINTING-F12 (INVENTORY-F25 asks for it: the warning of a label with no printer shows)
   await login(page, A, '/inventory/products');
   try {
     await switchOffLabelPrinters(context);
@@ -259,7 +248,7 @@ test('PRINTING-F12: the label asked from the product sheet waits in the «Label�
     // Inventory: «Print barcode» on the product sheet asks Printing for the label; no printer has the «Label» function.
     await productsReady(page);
     await searchProducts(page, LABEL_SKU);
-    await productAction(page, product.id, 'detail');
+    await rowAction(page, 'inventory-products', product.id, 'detail');
     const sheet = dialog(page, 'inventory-product-detail');
     await sheet.locator('[data-testid=inventory-product-detail-print-label]').click();
     await expect(sheet.locator('[data-testid=inventory-product-detail-label]')).toContainText(/(waiting in the print queue|espera en la cola)/);
@@ -290,8 +279,8 @@ test('PRINTING-F12: the label asked from the product sheet waits in the «Label�
       await expect(shown(p).locator('[data-testid=printing-summary-card-label]')).toContainText(/(Waiting, no printer|En cola, sin impresora)/);
     });
 
-    // A label printer arrives: the card names it and, until a device set up here reaches it, says nobody prints it
-    // (FIX-PRINTING-SETUP-HOOKS); the device next to it, set up by printing from it, takes the label and the card
+    // A label printer arrives: the card names it and, until a device set up here reaches it, says nobody prints it;
+    // the device next to it, set up by printing from it, takes the label and the card
     // turns ready.
     const labels = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
       name: `e2e Labels ${RUN}`,

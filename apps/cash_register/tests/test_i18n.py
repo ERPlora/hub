@@ -31,7 +31,7 @@ def visible_texts() -> set[str]:
     lazies = [
         *config_texts(config),
     ]
-    # The Home's step and panels (gh:cash_register#123: the old picker spoke Spanish to an English reader).
+    # The Home's step and panels (the old picker spoke Spanish to an English reader).
     lazies += [text for step in config.setup for text in (step.title, step.description)]
     lazies += [panel.title for panel in config.widgets]
     lazies += module_texts(queries, services, schemas, models)

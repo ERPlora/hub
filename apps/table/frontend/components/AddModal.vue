@@ -13,7 +13,7 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 const props = defineProps<{ zoneId: string | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('table-add', () => ({ zoneName: zoneName.value, number: number.value }), open);
+const canDismiss = useUnsavedFormOnOpen('table-add', () => ({ zoneName: zoneName.value, number: number.value }), open);
 const emit = defineEmits<{ zone: [id: string] }>();
 
 const zoneName = ref('');
@@ -62,6 +62,7 @@ async function addTable(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="table-add"
     :title="$t('table.add.title')"
     :pending="pending"

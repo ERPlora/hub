@@ -1,4 +1,4 @@
-// Where to get the ERPlora app (hub#683, the old hub's HUB_SHELL-F138): erplora.com's door of each system it publishes,
+// Where to get the ERPlora app (hub#683): erplora.com's door of each system it publishes,
 // which `base/spa.py` embeds in `hub-home` (`app_downloads`), in the server's order: the till's Windows first, then Linux
 // and Android (no macOS: nothing is published for it). Offered in a browser only: inside the installed app it would be
 // the app offering to install itself.

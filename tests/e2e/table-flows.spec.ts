@@ -433,7 +433,7 @@ test('TABLE-F09, F10, F32, F14, F11: seat a party with its customer, correct the
     });
     await expect(shown(page).locator('[data-testid=pos-customer-chip]')).toContainText(ana.name);
 
-    // sales#569 (TABLE-F32): back on the plan, the next free table starts its check without her.
+    // TABLE-F32: back on the plan, the next free table starts its check without her.
     await page.goBack();
     await page.waitForURL(/\/table\/floor-plan$/);
     await floor(page);

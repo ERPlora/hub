@@ -1,13 +1,13 @@
-"""Slow I/O after the COMMIT, off the loop that committed (PLAN-HUB «Eventos entre módulos»; FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS).
+"""Slow I/O after the COMMIT, off the loop that committed.
 
 The worker relays the outbox of every hub and runs the scheduled tasks in one loop, one transaction each, and Django
-runs what a transaction leaves for after its COMMIT right there, in that loop: a reaction that called another system
-(a «Call another system» step, up to 30 s; «Ask the assistant», minutes) held every other delivery, of every hub,
-until it answered, and a call the tick sent again held the scheduled tasks. ``after_commit(fn, *args)`` is the one way
-an app makes such I/O: after the COMMIT of the running operation (never after a rollback), ``fn(*args)`` goes to a
+runs what a transaction leaves for after its COMMIT right there, in that loop: a reaction that calls another system (a
+«Call another system» step, up to 30 s; «Ask the assistant», minutes) would hold every other delivery, of every hub,
+until it answered, and a call the tick sent again would hold the scheduled tasks. ``after_commit(fn, *args)`` is the one
+way an app makes such I/O: after the COMMIT of the running operation (never after a rollback), ``fn(*args)`` goes to a
 few threads of the process's own, in the database context of the operation that asked (its ``use_hub``, or
-``use_control``), and the loop goes on at once: a hub's database holds its own rows only, so a job never reaches
-another hub's (FIX-HUB-BASE-OUTBOUND-JOB-OF-ANOTHER-BUSINESS-HUB-CONTEXT-MISMATCH, hub#1053).
+``use_control``), and the loop goes on at once: a hub's database holds its own rows only, so a job never reaches another
+hub's (hub#1053).
 
 - **Recovered by its app**: a job may be lost (its queue is full, the worker stops, the process dies), so ``fn`` is
   only work its app finds again by itself: a claim with a lease, and a sweep that sends again what nobody claimed or

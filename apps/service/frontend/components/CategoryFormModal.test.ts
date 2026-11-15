@@ -5,6 +5,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryOut } from '../operations';
 import { click, ionValue, mountService, page, settle } from '../__tests__/mount-service';
 import CategoryFormModal from './CategoryFormModal.vue';
@@ -102,11 +103,24 @@ describe('CategoryFormModal: Editing category — {name}', () => {
   });
 });
 
+describe('CategoryFormModal: fields refused with the same words (hub#888)', () => {
+  // Name, the parent category (the picker) and Order each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { parent_id: 'parent' };
+  itTellsTheCorrectedFieldApart(['name', 'parent_id', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Colour', 'ionInput');
+    s.parent().vm.$emit('update:modelValue', { id: 'c1', label: 'Hair' });
+    await ionValue(s.field('sort_order'), '2', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  });
+});
+
 describe('CategoryFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('service-category-form'),
       change: () => ionValue(s.field('name'), 'Colour', 'ionInput'),
       restore: () => ionValue(s.field('name'), '', 'ionInput'),

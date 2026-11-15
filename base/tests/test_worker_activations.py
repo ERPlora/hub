@@ -1,5 +1,4 @@
-"""The worker makes the tables of the apps a hub with its own database turned on (S3; PLAN-DB §7 and §8, spec
-2026-10-11 «tablas al activar» §4–§8 and §14).
+"""The worker makes the tables of the apps a hub with its own database turned on.
 
 ``base.app.enable`` leaves the app ``creating`` and rings the hub's ``hub_due``; each tick the worker takes the hubs
 rung (and, every ``ACTIVATION_SWEEP_SECONDS``, every ready hub with its own database, so a ring lost is found again),
@@ -16,6 +15,7 @@ the platform (``base``, ``live``) and two businesses cloned from it, A and B.
 import datetime as dt
 import threading
 import uuid
+from collections.abc import Callable
 
 import pytest
 from django.db import connections
@@ -82,7 +82,7 @@ def no_visit_outlives_its_test(django_db_setup, django_db_blocker):
 @pytest.fixture(scope="module")
 def platform_template(django_db_setup, django_db_blocker):
     """A template with the platform's tables alone: what a hub's template is for an app ported after it was made. The
-    real ones carry every portable app (``migrator.templates``, PLAN-DB round 2026-11-01), so turning on an app they have
+    real ones carry every portable app (``migrator.templates``), so turning on an app they have
     is on at once; this one makes every app one whose tables its hubs lack."""
     with django_db_blocker.unblock():
         name = names.template_db_name(tenancy_connections.control_name(), VERTICAL)
@@ -178,6 +178,22 @@ def run_pass(now: dt.datetime | None = None) -> None:
     worker._activations(now or timezone.now())
 
 
+def run_pass_at(at: dt.datetime) -> None:
+    """A pass at ``at`` with the deployment's clock standing still there while it runs. What it puts off or tries again
+    later is written from that clock, so it is ``at`` plus its wait exactly, however long a loaded machine takes to get
+    there (hub#826)."""
+    with pytest.MonkeyPatch.context() as clock:
+        clock.setattr(timezone, "now", lambda: at)
+        run_pass(at)
+
+
+def tables_failing(monkeypatch) -> Callable[[], None]:
+    """Making the tables raises ``RuntimeError("boom")`` until the function returned puts the real one back."""
+    real = migrator.ensure_schema
+    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    return lambda: monkeypatch.setattr(migrator, "ensure_schema", real)
+
+
 # ── What is due in a hub ────────────────────────────────────────────────────────────────────────────────────────
 # (A ``django_db`` test: pytest-django sets the test databases up for the session before any of this module's.)
 
@@ -211,7 +227,7 @@ def _what_is_due():
     assert activations_due("d", now) == {}
 
 
-# ── Spec §14, 1: turned on in A, its tables are made in A and nowhere else ──────────────────────────────────────
+# ── Turned on in A, its tables are made in A and nowhere else ───────────────────────────────────────────────────
 
 
 def test_turned_on_in_a_its_tables_are_made_there_only_and_bs_database_is_never_opened(business):
@@ -258,30 +274,29 @@ def test_the_pass_leaves_no_connection_to_the_hubs_database_open(business):
     hubs.assert_nobody_on(a.db_name)
 
 
-# ── Spec §14, 4: a failure leaves it failed with why, never on; the next try finishes it ────────────────────────
+# ── A failure leaves it failed with why, never on; the next try finishes it ─────────────────────────────────────
 
 
 def test_making_its_tables_failing_leaves_it_failed_with_why_and_a_try_a_minute_later_finishes_it(business, monkeypatch):
     a = business("a")
     turn_on(a)
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    mend = tables_failing(monkeypatch)
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
 
     failed = row(a)
     assert (failed.state, failed.attempts) == (FAILED, 1)
     assert "boom" in failed.last_error
-    assert dt.timedelta(seconds=55) <= failed.next_attempt_at - now <= dt.timedelta(seconds=65)
+    assert failed.next_attempt_at == now + dt.timedelta(seconds=60)
     assert outbox(a)[-1] == (events.APP_ACTIVATION_FAILED, {"apps": [APP], "error": "schema_failed"})
     assert not hubs.hub_tables([APP]) & tables(a)
 
-    monkeypatch.setattr(migrator, "ensure_schema", real)
-    run_pass(now + dt.timedelta(seconds=30))  # not due yet
+    mend()
+    run_pass_at(now + dt.timedelta(seconds=30))  # not due yet
     assert row(a).state == FAILED
 
-    run_pass(now + dt.timedelta(seconds=61))
+    run_pass_at(now + dt.timedelta(seconds=61))
     done = row(a)
     assert (done.state, done.attempts, done.last_error, done.next_attempt_at) == (ON, 0, "", None)
     assert hubs.hub_tables([APP]) <= tables(a)
@@ -293,17 +308,17 @@ def test_each_failure_waits_longer_up_to_an_hour(business, monkeypatch, attempts
     turn_on(a)
     with use_hub(fresh(a)):
         AppActivation.objects.filter(host=a.slug, app=APP).update(attempts=attempts)
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    tables_failing(monkeypatch)
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
 
     failed = row(a)
     assert failed.attempts == attempts + 1
-    assert abs((failed.next_attempt_at - now).total_seconds() - wait) < 5
+    assert failed.next_attempt_at == now + dt.timedelta(seconds=wait)
 
 
-# ── Spec §14, 3: two at once in one hub, one waits or is put off; no 42P07 ──────────────────────────────────────
+# ── Two at once in one hub, one waits or is put off; no 42P07 ───────────────────────────────────────────────────
 
 
 def test_a_schema_held_by_another_run_puts_it_off_30_seconds(business):
@@ -312,15 +327,15 @@ def test_a_schema_held_by_another_run_puts_it_off_30_seconds(business):
     now = timezone.now()
     with hubs._maintenance(a.db_name) as holder:
         holder.execute("SELECT pg_advisory_lock(hashtext('erplora.schema'))")
-        run_pass(now)
+        run_pass_at(now)
         waiting = row(a)
         assert waiting.state == CREATING and waiting.attempts == 0
-        assert dt.timedelta(seconds=25) <= waiting.next_attempt_at - now <= dt.timedelta(seconds=35)
+        assert waiting.next_attempt_at == now + dt.timedelta(seconds=30)
         assert not hubs.hub_tables([APP]) & tables(a)
-        run_pass(now + dt.timedelta(seconds=10))  # not due yet
+        run_pass_at(now + dt.timedelta(seconds=10))  # not due yet
         assert row(a).state == CREATING
 
-    run_pass(now + dt.timedelta(seconds=40))  # its wait counts from when the lock was found held (1 s of waiting)
+    run_pass_at(now + dt.timedelta(seconds=40))  # past its 30 s
     assert row(a).state == ON
 
 
@@ -388,11 +403,11 @@ def test_a_request_of_a_newer_code_waits_for_a_worker_of_that_code(business, cap
         AppActivation.objects.filter(host=a.slug, app=APP).update(target="9999_of_a_newer_code")
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
 
     waiting = row(a)
     assert waiting.state == CREATING
-    assert dt.timedelta(seconds=55) <= waiting.next_attempt_at - now <= dt.timedelta(seconds=65)
+    assert waiting.next_attempt_at == now + dt.timedelta(seconds=60)
     assert not hubs.hub_tables([APP]) & tables(a)
     assert "base.app.activation_newer_code" in caplog.text
 
@@ -422,7 +437,7 @@ def test_the_pass_takes_only_the_hubs_rung(business):
     assert not [alias for alias in sent if a.id.hex in alias]
 
 
-# ── Its retries go by hub_due, which the pass over the hubs due leaves to it (PLAN-DB §8) ─────────────────────────
+# ── Its retries go by hub_due, which the pass over the hubs due leaves to it ──────────────────────────────────────
 
 
 def due_at(hub: Hub):
@@ -437,27 +452,26 @@ def test_a_schema_held_puts_it_off_30_seconds_in_hub_due_and_the_pass_over_the_h
     now = timezone.now()
     with hubs._maintenance(a.db_name) as holder:
         holder.execute("SELECT pg_advisory_lock(hashtext('erplora.schema'))")
-        run_pass(now)
-    assert dt.timedelta(seconds=25) <= due_at(a) - now <= dt.timedelta(seconds=35)
+        run_pass_at(now)
+    assert due_at(a) == now + dt.timedelta(seconds=30)
 
     provision.run_due(now + dt.timedelta(seconds=40))  # the worker's own pass over hub_due, after the ring came
 
     assert due_at(a) is not None
-    run_pass(now + dt.timedelta(seconds=40))
+    run_pass_at(now + dt.timedelta(seconds=40))
     assert row(a).state == ON
 
 
 def test_a_failure_rings_its_hub_at_its_next_try_and_nothing_pending_ends_the_ring(business, monkeypatch):
     a = business("a")
     turn_on(a)
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    mend = tables_failing(monkeypatch)
     now = timezone.now()
 
     run_pass(now)
 
     assert due_at(a) == row(a).next_attempt_at
-    monkeypatch.setattr(migrator, "ensure_schema", real)
+    mend()
     run_pass(row(a).next_attempt_at)
     assert row(a).state == ON
     assert due_at(a) is None
@@ -474,7 +488,7 @@ def test_a_ring_with_other_work_of_the_hub_is_left_to_it(business):
     assert due_at(a) is not None  # the reset still to do keeps it due
 
 
-# ── A ring lost is found by the sweep of the hubs served: every 10 min the active ones, daily all (PLAN-DB §8) ─────
+# ── A ring lost is found by the sweep of the hubs served: every 10 min the active ones, daily all ──────────────────
 
 
 def activation_reads(sent: dict[str, list[str]], hub: Hub) -> int:
@@ -530,7 +544,7 @@ def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, active, again):
         assert activation_reads(sent, a) > 0
 
 
-# ── PLAN-DB §7, rollback: a database ahead of this code holds back only what it is about ────────────────────────
+# ── Rollback: a database ahead of this code holds back only what it is about ────────────────────────────────────
 
 
 def test_the_platform_ahead_of_this_code_does_not_hold_back_another_apps_tables(business):
@@ -556,12 +570,14 @@ def test_an_app_asked_by_a_code_that_is_gone_fails_as_code_behind_after_ten_minu
         Hub.objects.filter(pk=a.pk).update(schema_apps={**fresh(a).schema_apps, APP: "9999_of_a_code_rolled_back"})
     now = timezone.now()
 
-    run_pass(now)
+    run_pass_at(now)
     assert row(a).state == CREATING  # a newer worker may still be coming: put off
 
+    later = now + dt.timedelta(minutes=2)  # past its wait of a minute
     with use_hub(fresh(a)):
-        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=now - dt.timedelta(minutes=10))
-    run_pass(now + dt.timedelta(minutes=2))  # past its wait of a minute
+        # Asked for exactly ten minutes before the clock the pass stands at, so a longer threshold leaves it waiting.
+        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=later - dt.timedelta(minutes=10))
+    run_pass_at(later)
 
     failed = row(a)
     assert (failed.state, failed.attempts) == (FAILED, 1)
@@ -612,7 +628,7 @@ def test_a_hub_that_fails_is_logged_and_the_others_are_served(business, monkeypa
     assert "went away" in caplog.text
 
 
-# ── Spec §14, 2: migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ────
+# ── migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ─────────────────
 
 
 def test_migrate_hubs_brings_xs_new_migration_to_a_and_never_opens_b(business, opened_at):
@@ -642,7 +658,7 @@ def test_migrate_hubs_brings_xs_new_migration_to_a_and_never_opens_b(business, o
     assert APP not in recorded(b)
 
 
-# ── Spec §14, 5 and 6: an app not on is never reached in a hub, whatever a process kept ─────────────────────────
+# ── An app not on is never reached in a hub, whatever a process kept ────────────────────────────────────────────
 
 
 def read_printing(hub: Hub):
@@ -694,7 +710,7 @@ def test_an_app_b_never_turned_on_says_app_inactive_in_b_never_a_database_error(
         read_printing(b)
 
 
-# ── Spec §14, 8: turning X on changes nothing of the process ────────────────────────────────────────────────────
+# ── Turning X on changes nothing of the process ─────────────────────────────────────────────────────────────────
 
 
 def test_turning_an_app_on_changes_neither_the_installed_apps_nor_the_urls_nor_the_api_routes(business):
@@ -721,7 +737,7 @@ def test_turning_an_app_on_changes_neither_the_installed_apps_nor_the_urls_nor_t
     assert snapshot() == before
 
 
-# ── Spec §14, 11: each app is made alone from nothing on the platform's template ────────────────────────────────
+# ── Each app is made alone from nothing on the platform's template ──────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("label", sorted(activation.module_graph()))
@@ -738,24 +754,25 @@ def test_each_app_is_made_alone_with_what_it_requires_on_the_platforms_template(
     assert not hubs.hub_tables(others) & tables(a)
 
 
-def test_a_hub_moving_to_another_cluster_is_not_entered_until_its_move_ends(business):
-    """Its database is being copied (S7, ``base.tenancy.move``): tables made meanwhile would stay behind on the old
-    cluster. Its ring waits; once the move ends, the app is set up."""
+@pytest.mark.parametrize("copying", ["moving_to", "restoring_from"])
+def test_a_hub_whose_database_is_copied_is_not_entered_until_its_copy_ends(business, copying):
+    """Its database is being copied (``base.tenancy.move``, or ``base.tenancy.restore``, hub#1198): tables made
+    meanwhile would stay behind in the database it leaves. Its ring waits; once the copy ends, the app is set up."""
     from control.models import Cluster
 
     a = business("a")
     turn_on(a)
     target = Cluster.objects.create(name=f"w6-{a.id.hex[-8:]}", host="127.0.0.1", port=5432)
-    Hub.objects.filter(pk=a.pk).update(moving_to=target)
+    Hub.objects.filter(pk=a.pk).update(**{copying: target})
     try:
         with hubs.watched() as sent:
             run_pass()
         assert not [alias for alias in sent if a.id.hex in alias]
         assert row(a).state == CREATING and due_at(a) is not None
 
-        Hub.objects.filter(pk=a.pk).update(moving_to=None)
+        Hub.objects.filter(pk=a.pk).update(**{copying: None})
         run_pass()
         assert row(a).state == ON
     finally:
-        Hub.objects.filter(pk=a.pk).update(moving_to=None)
+        Hub.objects.filter(pk=a.pk).update(**{copying: None})
         target.delete()

@@ -1,10 +1,10 @@
-"""FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES (BASE-F97, step 2): the card of a write the assistant wants to run said
-each datum as the model sent it — «Starts at: 2026-11-02T10:00:00+01:00», «Booked through: whatsapp», «Professional:
-<uuid>» — where the person reads a day and a time, a channel and a person. Its schema says what each datum is, at any
-depth: a moment (``format: date-time``, ``date``, ``time``) is said as the person's language writes it, in the
-business's zone; a value of a closed list (``enum``) by the label its app's models give it; a record named by its id
-(``format: uuid``, or a datum its schema marks ``refers``) by the read that mark names, run as the person — otherwise
-it is left out, never shown by its id.
+"""How the card of a write the assistant wants to run says each datum (BASE-F97, step 2): never as the model sent it
+(«Starts at: 2026-11-02T10:00:00+01:00», «Booked through: whatsapp», «Professional: <uuid>») but as the person reads a
+day and a time, a channel and a person. Its schema says what each datum is, at any depth: a moment (``format:
+date-time``, ``date``, ``time``) is said as the person's language writes it, in the business's zone; a value of a
+closed list (``enum``) by the label its app's models give it; a record named by its id (``format: uuid``, or a datum
+its schema marks ``refers``) by the read that mark names, run as the person — otherwise it is left out, never shown by
+its id.
 """
 
 import dataclasses
@@ -21,12 +21,13 @@ from django.core import checks
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.assistant import CHOICES_OF, NAMED, REFERS, choices_of
-from live.errors import NotFound
+from live.errors import Conflict, NotFound
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
 from base import access, assistant
 from base.models import Hub, Membership, TrustedDevice
+from base.schemas import names, unless_given
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -407,11 +408,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
     "invoice": 1,
-    # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
-    # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
-    # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
-    # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
-    "service": 7,
     "verifactu": 6,
 }
 
@@ -523,7 +519,7 @@ def test_the_ratchet_reads_a_closed_list_by_the_field_its_mark_names_as_the_card
     assert unnamed(MARKED)[1] == ["odd", "elsewhere"]
 
 
-# ── A datum the screen knows by its name, titled by its app (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME) ──
+# ── A datum the screen knows by its name, titled by its app ───────────────────────────────────────────────────────────
 
 #: What the card of a dangerous write calls a datum it knows by its name (``FIELDS`` of the shared assistant's
 #: ``card.ts`` and its catalogue, @erplora/ui) when its app gives it no title of its own, in Spanish.
@@ -746,6 +742,279 @@ def test_a_mark_is_checked_at_start(monkeypatch, write, why):
     assert write.name in error.msg and why in error.msg
 
 
+# ── A record said by its name inside another, and words that cannot be read (hub#1245) ────────────────────────────────
+# A course is found by its name inside its menu, a choice inside its course: its mark names the data of its own object
+# the read takes beside it (``within``), never all of them (the ``id`` of a write on a course is the course, which the
+# menu's read would take as a menu's). A datum a person says in words (``as_said``) that cannot be read — several fit,
+# none does, nobody is at hand — is said as said, never left out: the words are theirs, never an id.
+
+#: The dishes of the test by their menu: «postres» fits one in «Vegano» and two in «Infantil».
+DISHES = {
+    "Vegano": {"D-1": "Postres caseros", "D-2": "Primeros"},
+    "Infantil": {"D-3": "Postres de fruta", "D-4": "Postres lácteos"},
+    "Degustación": {"D-5": "Sorpresa"},
+}
+#: A dish its read answers with no name.
+NAMELESS = {"D-5"}
+#: A dish said by its name, read with its menu beside it.
+A_DISH = {"refers": {"read": "demo.item.dish", "by": "dish", "name": ["name"], "within": ["menu"], "as_said": True}}
+
+
+class DishIn(Schema):
+    id: str | None = None
+    menu: str | None = None
+    dish: str | None = None
+
+
+class DishOut(Schema):
+    id: str
+    name: str
+
+
+def dish_of(read: list) -> Operation:
+    def dish(ctx, data):
+        read.append(data.model_dump(exclude_none=True))
+        menu = DISHES.get(data.menu or "", {})
+        fits = [(key, name) for key, name in menu.items() if data.dish and data.dish.lower() in name.lower()]
+        if len(fits) > 1:
+            raise Conflict("Several dishes fit.", code="demo.dish_ambiguous")
+        if not fits:
+            raise NotFound("There is no such dish.")
+        key, name = fits[0]
+        return {"id": key, "name": "" if key in NAMELESS else name}
+
+    return Operation(
+        name="demo.item.dish",
+        kind="query",
+        permission="demo.view",
+        input=DishIn,
+        output=DishOut,
+        expose_api=False,
+        ai={"description": "A dish by its name inside its menu."},
+        fn=dish,
+    )
+
+
+@pytest.fixture
+def dish_reads(monkeypatch) -> list:
+    """The dish's read registered as an app's would be: what it was asked, in order."""
+    read: list = []
+    op = dish_of(read)
+    monkeypatch.setitem(registry, op.name, op)
+    return read
+
+
+def serving(mark: dict = A_DISH) -> Operation:
+    """A write on a table (``id``) that serves a dish of a menu, on top and on a line of its own."""
+
+    class ServedLineIn(Schema):
+        menu: str | None = None
+        dish_id: str | None = None
+        dish: str | None = Field(None, json_schema_extra=mark)
+
+    class ServeIn(Schema):
+        id: str | None = None
+        menu: str | None = None
+        dish_id: str | None = None
+        dish: str | None = Field(None, json_schema_extra=mark)
+        line: ServedLineIn | None = None
+
+    return Operation(
+        name="demo.item.serve",
+        kind="command",
+        permission="demo.manage",
+        input=ServeIn,
+        output=ServeIn,
+        expose_api=False,
+        ai={"description": "Serves a dish of a menu."},
+        fn=lambda ctx, data: data,
+    )
+
+
+SERVER = {*ADMIN, "demo.view", "demo.manage"}
+
+
+def served(arguments: dict, permissions=SERVER, *, person: bool = True, found: list | None = None, mark=A_DISH) -> dict:
+    card = assistant.card(serving(mark), arguments, "es", ctx=ctx(permissions) if person else None, found=found)
+    return values(card)
+
+
+def test_names_marks_the_data_a_record_is_read_with_and_words_said_as_said():
+    assert names("demo.item.dish", by="dish", within=("menu",), as_said=True) == A_DISH
+    # Without them, a mark is what it always was.
+    assert names("demo.item.dish") == {"refers": {"read": "demo.item.dish", "by": "id", "name": ["name"]}}
+
+
+@pytest.mark.django_db
+def test_a_record_said_by_its_name_inside_another_is_read_with_the_data_its_mark_names(dish_reads):
+    assert served({"menu": "Vegano", "dish": "postres"}) == {"menu": "Vegano", "dish": "Postres caseros"}
+    assert dish_reads == [{"menu": "Vegano", "dish": "postres"}]
+
+
+@pytest.mark.django_db
+def test_only_the_data_its_mark_names_go_with_it(dish_reads):
+    """The table's ``id`` stays out of the dish's read, though that read takes an ``id`` of its own."""
+    served({"id": "T-9", "menu": "Vegano", "dish": "postres"})
+    assert dish_reads == [{"menu": "Vegano", "dish": "postres"}]
+
+
+@pytest.mark.django_db
+def test_inside_an_object_the_data_beside_it_are_those_of_its_own_object(dish_reads):
+    shown = served({"menu": "Infantil", "line": {"menu": "Vegano", "dish": "postres"}})
+    assert shown["line"] == {"menu": "Vegano", "dish": "Postres caseros"}
+    assert dish_reads == [{"menu": "Vegano", "dish": "postres"}]
+
+
+@pytest.mark.django_db
+def test_inside_an_object_a_datum_takes_nothing_from_the_object_around_it(dish_reads):
+    """A line that names no menu is read with none, though the write around it names one: it is said as said."""
+    shown = served({"menu": "Vegano", "line": {"dish": "postres"}})
+    assert shown["line"] == {"dish": "postres"}
+    assert dish_reads == [{"dish": "postres"}]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "arguments",
+    [{"menu": "Infantil", "dish": "postres"}, {"menu": "Vegano", "dish": "helados"}, {"dish": "postres"}],
+    ids=["several fit", "none does", "without its menu"],
+)
+def test_words_that_cannot_be_read_are_said_as_said(dish_reads, arguments):
+    found: list = []
+    assert served(arguments, found=found)["dish"] == arguments["dish"]
+    assert found == []
+
+
+@pytest.mark.django_db
+def test_words_nobody_may_read_or_with_nobody_at_hand_are_said_as_said(dish_reads):
+    arguments = {"menu": "Vegano", "dish": "postres"}
+    assert served(arguments, ADMIN)["dish"] == "postres"
+    # Refused before it reads: the person may not see the dishes.
+    assert dish_reads == []
+    assert served(arguments, person=False)["dish"] == "postres"
+    # Without the person at hand (an automation's card) the read is not run for anybody.
+    assert dish_reads == []
+
+
+@pytest.mark.django_db
+def test_the_record_found_by_its_name_goes_in_what_the_yes_is_for(dish_reads):
+    found: list = []
+    served({"menu": "Vegano", "dish": "postres"}, found=found)
+    assert found == ["D-1"]
+
+
+@pytest.mark.django_db
+def test_a_record_found_that_has_no_name_is_said_as_said_and_goes_in_what_the_yes_is_for(dish_reads):
+    found: list = []
+    assert served({"menu": "Degustación", "dish": "sorpresa"}, found=found)["dish"] == "sorpresa"
+    assert found == ["D-5"]
+
+
+@pytest.mark.django_db
+def test_without_as_said_words_that_cannot_be_read_are_left_out(dish_reads):
+    """``as_said`` is the mark's to say: a datum that names a record otherwise is left out, as ever."""
+    mark = names("demo.item.dish", by="dish", within=("menu",))
+    assert "dish" not in served({"menu": "Infantil", "dish": "postres"}, mark=mark)
+
+
+#: A dish said by its name, which the write does not use when the dish comes by its id (hub#1250).
+UNLESS_ITS_ID = {"refers": {**A_DISH["refers"], "unless": ["dish_id"]}}
+
+
+def test_names_marks_the_data_that_leave_a_name_unread():
+    assert names("demo.item.dish", by="dish", within=("menu",), as_said=True, unless=("dish_id",)) == UNLESS_ITS_ID
+
+
+def test_unless_given_is_a_mark_left_unread_beside_those_data_and_leaves_the_mark_as_it_was():
+    """One mark, declared once, left unread beside a different datum in each object that carries it."""
+    assert unless_given(A_DISH, "dish_id") == UNLESS_ITS_ID
+    assert "unless" not in A_DISH["refers"]
+
+
+@pytest.mark.django_db
+def test_a_name_beside_the_record_the_write_takes_instead_is_neither_read_nor_shown(dish_reads):
+    """The write takes the dish by its id and never looks at the name beside it: the card says no other dish."""
+    found: list = []
+    shown = served({"menu": "Vegano", "dish_id": "D-2", "dish": "postres"}, found=found, mark=UNLESS_ITS_ID)
+    assert "dish" not in shown
+    assert (dish_reads, found) == ([], [])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("dish_id", [None, ""], ids=["none", "empty"])
+def test_without_the_record_that_leaves_it_unread_a_name_is_read_as_ever(dish_reads, dish_id):
+    shown = served({"menu": "Vegano", "dish_id": dish_id, "dish": "postres"}, mark=UNLESS_ITS_ID)
+    assert shown["dish"] == "Postres caseros"
+
+
+@pytest.mark.django_db
+def test_inside_an_object_only_its_own_record_leaves_its_name_unread(dish_reads):
+    shown = served(
+        {"dish_id": "D-2", "line": {"menu": "Vegano", "dish": "postres"}}, mark=UNLESS_ITS_ID
+    )
+    assert shown["line"] == {"menu": "Vegano", "dish": "Postres caseros"}
+    shown = served({"line": {"menu": "Vegano", "dish_id": "D-2", "dish": "postres"}}, mark=UNLESS_ITS_ID)
+    assert "dish" not in shown["line"]
+
+
+def beside(refers: object, *, kind: type = str) -> Operation:
+    class BesideIn(Schema):
+        menu: str | None = None
+        table: str | None = None
+        dish: kind | None = Field(None, json_schema_extra={"refers": refers})
+
+    return Operation(
+        name="demo.item.beside",
+        kind="command",
+        permission="demo.manage",
+        input=BesideIn,
+        output=BesideIn,
+        expose_api=False,
+        ai={"description": "Serves a dish of a menu."},
+        fn=lambda ctx, data: data,
+    )
+
+
+def test_a_mark_read_with_the_data_beside_it_is_sound(monkeypatch, dish_reads):
+    write = beside(A_DISH["refers"])
+    monkeypatch.setitem(registry, write.name, write)
+    assert reference_errors() == []
+
+
+@pytest.mark.parametrize(
+    ("refers", "kind", "why"),
+    [
+        ({**A_DISH["refers"], "within": ["table"]}, str, "takes no table"),
+        ({**A_DISH["refers"], "within": ["id"]}, str, "is read with id, which its own object does not have"),
+        (A_DISH["refers"], UUID, "is said as said, but it is an id"),
+        ({**A_DISH["refers"], "within": "menu"}, str, "is not a read, by and name"),
+        ({**A_DISH["refers"], "as_said": "yes"}, str, "is not a read, by and name"),
+        (
+            {**A_DISH["refers"], "unless": ["dish_id"]},
+            str,
+            "is left unread with dish_id, which its own object does not have",
+        ),
+        ({**A_DISH["refers"], "unless": "table"}, str, "is not a read, by and name"),
+        ({**A_DISH["refers"], "unless": [1]}, str, "is not a read, by and name"),
+    ],
+    ids=[
+        "a datum its read does not take",
+        "one its object does not have",
+        "an id said as said",
+        "no list",
+        "no yes",
+        "left unread with a datum its object does not have",
+        "unless no list",
+        "unless a list of no names",
+    ],
+)
+def test_a_mark_read_with_the_data_beside_it_is_checked_at_start(monkeypatch, dish_reads, refers, kind, why):
+    write = beside(refers, kind=kind)
+    monkeypatch.setitem(registry, write.name, write)
+    [error] = reference_errors()
+    assert write.name in error.msg and why in error.msg
+
+
 # ── A name a person says, checked at start (base.E014) ────────────────────────────────────────────────────────────────
 
 
@@ -843,7 +1112,7 @@ def test_a_preview_says_a_moment_as_the_person_reads_it_too(monkeypatch):
     assert [(field["name"], field["value"]) for field in fields] == [("name", "Item 7"), ("since", "2 nov 2026, 10:00")]
 
 
-# ── An attempt key: never on the card, always in the write (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS) ───────────
+# ── An attempt key: never on the card, always in the write ────────────────────────────────────────────────────────────
 
 #: A key of the caller's attempt (idempotency), as a model sends it: born once, the same on every retry, so a retry
 #: never charges, sends or prints twice. Nobody can judge it: «Clave del intento: charge-0192f5a0-retry-7».
@@ -919,9 +1188,9 @@ def test_the_yes_runs_the_write_with_its_attempt_keys_as_sent(monkeypatch):
     received = []
     write = keyed(lambda ctx, data: received.append(data.model_dump()) or data)
     monkeypatch.setitem(registry, write.name, write)
-    asked = turn(call(write.name, KEYED_ARGUMENTS))["confirm"]
-    assert ATTEMPT not in json.dumps(asked, ensure_ascii=False)
-    plan = turn(call(write.name, KEYED_ARGUMENTS), decision={"call_id": "c1", "accepted": True})
+    drawn = turn(call(write.name, KEYED_ARGUMENTS))
+    assert ATTEMPT not in json.dumps(drawn["confirm"], ensure_ascii=False)
+    plan = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True})
     assert plan["executed"][0]["outcome"] == "ok"
     assert received == [KEYED_ARGUMENTS]
 
@@ -934,10 +1203,10 @@ def test_a_line_the_assistant_adds_twice_with_its_key_is_one_line():
 
     item = run("demo.item.create", name="Mesa 4")
     line = {"id": item["id"], "text": "Café", "qty": "1", "client_line_id": "0192f5a0-0000-7000-8000-000000000001"}
-    asked = turn(call("demo.item.add_line", line))["confirm"]
-    assert values(asked) == {"id": "Mesa 4", "text": "Café", "qty": "1"}
+    drawn = turn(call("demo.item.add_line", line))
+    assert values(drawn["confirm"]) == {"id": "Mesa 4", "text": "Café", "qty": "1"}
     for _ in range(2):
-        plan = turn(call("demo.item.add_line", line), decision={"call_id": "c1", "accepted": True})
+        plan = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True})
         assert plan["executed"][0]["outcome"] == "ok"
     lines = run("demo.item.detail", id=item["id"])["lines"]
     assert [(row["text"], row["client_line_id"]) for row in lines] == [("Café", line["client_line_id"])]
@@ -1053,7 +1322,7 @@ def test_an_attempt_key_is_marked_only_on_a_text():
     assert [f"{name}:{path}" for name, op in sorted(registry.items()) for path in misplaced_marks(op)] == []
 
 
-# ── An amount, known by the mark of its schema (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS) ─────────
+# ── An amount, known by the mark of its schema ────────────────────────────────────────────────────────────────────────
 
 #: The mark of an amount: a whole number in the minor unit of its currency (``json_schema_extra={"money": True}``).
 MONEY = {"money": True}
@@ -1149,7 +1418,7 @@ class NamedCentsIn(Schema):
 def test_a_name_in_cents_alone_makes_no_amount_its_mark_does():
     """hub#917: a whole number named ``…_cents`` was money by its name while its schema carried no mark, so a new
     datum named so that is no amount would reach the card as money in the business's currency. Only the mark says an
-    amount now (PLAN-HUB §50), on top and inside an object or a list: the rest stays as sent."""
+    amount, on top and inside an object or a list: the rest stays as sent."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
     arguments = {"total_cents": 1500, "line": {"text": "Café", "unit_cents": 150}, "lines": [{"text": "Té", "unit_cents": 1200}]}
     card = assistant.card(priced(NamedCentsIn), arguments, "es", ctx=ctx(language="es"))

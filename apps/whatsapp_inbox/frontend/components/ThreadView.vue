@@ -10,7 +10,7 @@
 // erplora.com, over https only (WORKBOOK F06): a photo or a sticker is painted in its bubble (opening full size
 // in a new tab) and a voice note gets a player — the Hub's CSP lets `img-src` and `media-src` reach erplora.com's
 // origin —; one that does not load says so and, like a video or a document, offers «Open the attachment» there. Both
-// links leave the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link).
+// links leave the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link).
 // «View earlier» asks the page for the previous page; the page owns the data.
 import { InlineFeedback } from '@erplora/ui/components';
 import { openExternalLink, useSession } from '@erplora/ui/shell';

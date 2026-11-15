@@ -5,11 +5,10 @@
 change of the draft never reaches the public page until it is published. ``published_version`` goes up on every
 publication and names the cached HTML (``public_home``). ``is_live`` says whether ``/`` shows it.
 
-Phase 1 has no tenancy (PLAN §29): the tables are shared by every hub until phase 2 moves them to each hub's
-database, so each row names its hub in ``hub_id``, the registry's ``Hub.id`` (``base.operations.hub_id``; no foreign
-key: the registry lives in the control database from phase 2). A hub has one site, and the operations and ``/`` only
-ever read and write the request hub's rows. In phase 2 each hub's database holds its one site and its own images,
-and the column stays, always the same value. The images' keys and the cache keys carry the hub too.
+Each row names its hub in ``hub_id``, the registry's ``Hub.id`` (``base.operations.hub_id``; no foreign key: the
+registry lives in the control database). Each hub's database holds its one site and its own images, so the column
+always holds the same value, and the operations and ``/`` only ever read and write the request hub's rows. The images'
+keys and the cache keys carry the hub too.
 """
 
 from django.db import models
@@ -40,7 +39,7 @@ class Site(UUIDModel):
     #: cache when it was flushed or Google fails, for 30 days at most.
     reviews_snapshot = models.JSONField(_("Google reviews"), default=dict, blank=True, db_default={})
     #: Said with the app's context, like ``created_at`` of ``Image``: the site and its images are feminine in Spanish
-    #: («actualizada el», like its «publicada el»), where Demo and Clientes, loaded before, say it masculine (hub#661).
+    #: («actualizada el», like its «publicada el»), where Demo and Clientes, loaded before, say it masculine.
     updated_at = models.DateTimeField(pgettext_lazy("website", "updated at"), auto_now=True)
     updated_by = models.CharField(pgettext_lazy("website", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
 
@@ -69,7 +68,7 @@ class Image(UUIDModel):
     height = models.PositiveIntegerField(_("height"))
     size = models.PositiveIntegerField(_("size"))
     # The name of the file it was first uploaded with (the same bytes again are the same image): what the assistant's
-    # card calls it (hub#679). Empty for an upload of before.
+    # card calls it. Empty for an upload of before.
     filename = models.CharField(_("file name"), max_length=200, blank=True, default="", db_default="")
     created_at = models.DateTimeField(pgettext_lazy("website", "created at"), auto_now_add=True)
 

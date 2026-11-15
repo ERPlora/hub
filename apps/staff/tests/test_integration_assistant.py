@@ -1,7 +1,7 @@
-"""The assistant's card for a write of staff (FIX-HUB-STAFF-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258):
-in Spanish, every datum it sends by the name the Personal screens give it, never by the title pydantic makes up from
-the field («Days», «Members»). The card is base's (``base.assistant.card``); the names are staff's: the titles of its
-schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of staff (base's half is hub#258): in Spanish, every datum it sends by the name the
+Personal screens give it, never by the title pydantic makes up from the field («Days», «Members»). The card is base's
+(``base.assistant.card``); the names are staff's: the titles of its schemas and the ``verbose_name`` of its models, with
+their Spanish in its catalog."""
 
 import json
 from pathlib import Path
@@ -174,6 +174,6 @@ def test_a_new_member_with_a_role_the_business_has_gets_its_card_and_the_yes_cre
     luis = call("staff.member.create", LUIS)
     plan = turn(luis)
     assert (plan["confirm"]["operation"], plan["executed"]) == ("staff.member.create", [])
-    done = turn(luis, decision={"call_id": "c1", "accepted": True, "typed": ""})
+    done = turn(*plan["pending"], decision={"call_id": "c1", "accepted": True, "typed": ""})
     assert [(row["outcome"], row["code"]) for row in done["executed"]] == [("ok", "")]
     assert list(Member.objects.values_list("first_name", "role_id")) == [("Luis", cashier.id)]

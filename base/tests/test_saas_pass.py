@@ -1,10 +1,10 @@
-"""BASE-F11 · the pass to erplora.com: «Upgrade plan» and «Manage on erplora.com» arrive already signed in (saas#190).
+"""BASE-F11 · the pass to erplora.com: «Upgrade plan» and «Manage on erplora.com» arrive already signed in.
 
-``base.saas_pass.create`` signs, at the click, what erplora.com's ``GET /hub-pass/`` reads (ACCOUNTS-F29 of the SaaS,
-``accounts/hub_pass.py``): the Hub never asks the SaaS anything per request (PLAN-SAAS §2). These tests read the pass
-as the SaaS does, ``django.core.signing`` with ``INTERNAL_SHARED_SECRET``, its salt and its minute. A pass opens a
+``base.saas_pass.create`` signs, at the click, what erplora.com's ``GET /hub-pass/`` reads (the SaaS's
+``accounts/hub_pass.py``): the Hub never asks the SaaS anything per request. These tests read the pass as the SaaS
+does, ``django.core.signing`` with ``INTERNAL_SHARED_SECRET``, its salt and its minute. A pass opens a
 session on erplora.com, so it goes only to a session opened with the account: a PIN or a badge on a shared till is
-not the browser's erplora.com account (gh:hub#2506).
+not the browser's erplora.com account.
 """
 
 import json

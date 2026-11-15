@@ -1,4 +1,4 @@
-// A fiscal document that waits has a way out in phase 1 (SALE-F29; INVOICE-F06; apps/sale/WORKBOOK.md):
+// A fiscal document that waits has a way out (SALE-F29; INVOICE-F06; apps/sale/WORKBOOK.md):
 // with no issuer the card charge goes through and its ticket waits; Sales says «Document pending» under
 // the sale's status and on its document, and once the issuer is set up «Issue now» issues its F2 — the
 // pill goes by itself (live) and the paper prints the ticket's number. Setup and evidence through the

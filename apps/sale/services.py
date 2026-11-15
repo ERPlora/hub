@@ -309,7 +309,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
             "es": (
                 "que no se pueda cobrar sin cliente",
                 "pon el descuento máximo en un 15 %",
-                "quiero que salga factura por defecto",
+                "que cada venta salga con factura por defecto",
                 "cambia el texto del pie del ticket",
             ),
         },
@@ -435,18 +435,23 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
     input=DepartmentUpdateIn,
     output=DepartmentOut,
     ai=AI(
-        description="Change the name, the tax category or the position of a department of the open price. Pass its "
-        "current name in department, or its id when already known; never ask the person for an internal id. What was "
-        "already sold keeps the name and the VAT it was charged with.",
+        description="Change the name, the tax category (the VAT its products charge: a cheaper reduced rate, the "
+        "standard one) or the position of a department of the open price. Pass its current name in department, or its "
+        "id when already known; never ask the person for an internal id. What was already sold keeps the name and the "
+        "VAT it was charged with.",
         risk="normal",
         asks={
             "en": (
                 "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
+                "put the bakery section first",
+                "sweets go at the reduced rate",
             ),
             "es": (
                 "pon la sección de bebidas al IVA general",
                 "renombra el departamento «Varios» a «Otros»",
+                "pon la bollería la primera de las secciones",
+                "las chuches pásalas al IVA reducido",
             ),
         },
     ),
@@ -544,10 +549,14 @@ def create_quick_note(ctx: OperationContext, data: QuickNoteIn) -> dict:
             "en": (
                 "change the 'no salt' note to 'low salt'",
                 "move 'no ice' to the top of the notes",
+                "the note should read 'gluten free' instead of 'no gluten'",
+                "where it says 'spicy', put 'hot'",
             ),
             "es": (
                 "cambia la nota «sin sal» por «poca sal»",
                 "sube «sin hielo» a la primera de las notas",
+                "la nota que pone «sin gluten», que diga «apto para celíacos»",
+                "escribe «sin lactosa» en vez de «sin leche»",
             ),
         },
     ),
@@ -1024,11 +1033,11 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
         asks={
             "en": (
                 "don't use the voucher for the haircut after all",
-                "take the voucher off that line",
+                "leave the voucher unused on this check",
             ),
             "es": (
                 "al final no uses el bono en el corte",
-                "quita el bono de esa línea",
+                "deja el bono sin usar en esta cuenta",
             ),
         },
     ),
@@ -1337,7 +1346,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "channel": data.channel,
             "priority": data.priority,
             "round_no": round_no,
-            # Who attends the check («Atiende» of the till), else who sends the round (kitchen#82).
+            # Who attends the check («Atiende» of the till), else who sends the round.
             "waiter": data.waiter or person_label(ctx),
             "items": [
                 {
@@ -1445,7 +1454,7 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
         risk="normal",
         asks={
             "en": (
-                "merge tables 3 and 4",
+                "merge the checks of tables 3 and 4",
                 "put the bar tab together with table 2's",
             ),
             "es": (
@@ -1901,7 +1910,7 @@ def _checked_tax_id(tax_id: str, country: str, id_type: str) -> str:
         ) from None
 
 
-def _check_discounts(
+def _check_discounts(  # noqa: PLR0913
     lines: list[OrderLine],
     percent: Decimal,
     amount: int,
@@ -1939,7 +1948,7 @@ def _check_discounts(
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
 
 
-def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
+def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:  # noqa: C901, PLR0912
     """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
     no cash at all when the whole ``operation`` reaches the cash limit."""
     if total == 0:
@@ -2009,10 +2018,10 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
 
 # ── The fiscal document of a write: Invoicing, by name, in the same transaction ──────────────────
 
-#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT
-#: now (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal.
-#: Working-rules §15, as the old Hub's ``enforce_fiscal_road`` (HUB-1935): nothing is charged that could never be
-#: filed. The route's lacks and the server's (its own certificate it cannot open, no gateway, real filing closed).
+#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT now
+#: (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal. Nothing is
+#: charged that could never be filed. The route's lacks and the server's (its own certificate it cannot open, no
+#: gateway, real filing closed).
 NO_WAY_TO_THE_AEAT = frozenset(
     {
         "verifactu.representation_not_approved",
@@ -2033,7 +2042,7 @@ RECIPIENT_KEYS = (
 )
 
 
-def _fiscal_document(
+def _fiscal_document(  # noqa: C901
     ctx: OperationContext,
     name: str,
     data: dict,
@@ -2041,9 +2050,9 @@ def _fiscal_document(
     typed_recipient: bool = False,
     strict: bool = False,
 ) -> dict:
-    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund
-    or a void), run by name with the seller's session INSIDE this write's transaction (CLAUDE.md
-    «Fiscal»): the document and its number commit with the sale, or neither does.
+    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund or a void),
+    run by name with the seller's session INSIDE this write's transaction: the document and its number commit with the
+    sale, or neither does.
 
     ``{status, id, number, type}``: «issued» with the document; «none» when there is nothing to declare
     (a refund of no money); «unavailable» when Invoicing is not in this business (the sale stays a ticket
@@ -2189,8 +2198,8 @@ def _replay(ctx: OperationContext, data: CompleteIn) -> dict | None:
         )
     if not same:
         raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
-    # The same attempt again is the till's retry: a document that waited is asked for once more (phase 1
-    # has no relay to issue it on its own); still refused, it keeps waiting, in sight.
+    # The same attempt again is the till's retry: a document that waited is asked for once more (no relay issues it on
+    # its own); still refused, it keeps waiting, in sight.
     _issue_waiting_document(ctx, sale)
     with translation.override(ctx.language):
         return sale_detail(sale, already=True)
@@ -2214,7 +2223,7 @@ def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
         return answer
 
 
-def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:
+def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:  # noqa: C901, PLR0912, PLR0915
     answer = _replay(ctx, data)
     if answer is not None:
         return answer
@@ -2534,8 +2543,8 @@ def voucher_unsold(ctx: OperationContext, data: VoucherUnsoldIn) -> dict:
 def record_voucher_session(ctx: OperationContext, data: VoucherSessionIn) -> dict:
     """Services' step when a session of a voucher is spent outside the till saying who did it (SERVICE-F21): no line
     carries it, so what it is worth counts in her production on today's business day (SALE-F28), the till's: the day a
-    sale charged at that moment would count on (hub#771). Whoever may sell may say who did a service, as on a line.
-    The same session told again counts once: the first telling stays."""
+    sale charged at that moment would count on. Whoever may sell may say who did a service, as on a line. The same
+    session told again counts once: the first telling stays."""
     session, created = VoucherSession.objects.get_or_create(
         session_id=data.session_id,
         defaults={"staff_id": data.staff_id, "business_day": business_today(), "value": data.value},
@@ -2627,7 +2636,7 @@ def _sale_lines(
     return rows
 
 
-def _completed_payload(
+def _completed_payload(  # noqa: PLR0913, PLR0917
     sale, lines, payments, tax_id, address, country, id_type
 ) -> dict:
     """What ``sale.sale.completed`` carries: Inventory reads ``items``, Customers the customer and total."""
@@ -3274,11 +3283,11 @@ class _Unprintable(Exception):
 
 
 def _queue_paper(ctx: OperationContext, request: dict) -> dict:
-    """Asks Printing for one paper by its operation's name (no ``requires``; PLAN-HUB: the charge calls the queue
-    inside its own transaction, and nothing happens when Printing is not on), in a savepoint of its own. A job no
-    printer would take (it would wait in the queue for ever) is undone. Never raises for Printing: off, absent,
-    refusing, failing or without a printer, the answer is «not queued» and the device prints the screen's paper;
-    the write that asked goes on."""
+    """Asks Printing for one paper by its operation's name (no ``requires``: the charge calls the queue inside its own
+    transaction, and nothing happens when Printing is not on), in a savepoint of its own. A job no printer would take
+    (it would wait in the queue for ever) is undone. Never raises for Printing: off, absent, refusing, failing or
+    without a printer, the answer is «not queued» and the device prints the screen's paper; the write that asked goes
+    on."""
     try:
         op = get(PRINT_JOB)
     except UnknownOperation:
@@ -3317,7 +3326,7 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
+def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:  # noqa: PLR0913
     """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
     itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
     fiscal document still pending never prints as if issued: the screen's paper says it is pending."""
@@ -3367,7 +3376,7 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
             "en": (
                 "print the last ticket again",
                 "reprint the receipt of sale 7",
-                "she wants a copy of the invoice",
+                "print her a copy of the invoice of sale 7",
             ),
             "es": (
                 "imprime otra vez el último ticket",

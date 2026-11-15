@@ -1,12 +1,11 @@
-"""The assistant's card for a write of attendance (FIX-HUB-ATTENDANCE-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is
-hub#258): in Spanish, every datum it sends by the name the Time tracking screens give it, never by the title pydantic
-makes up from the field («Lat», «Lng», «Accuracy M»). The card is base's (``base.assistant.card``); the names are
-attendance's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog.
+"""The assistant's card for a write of attendance (base's half is hub#258): in Spanish, every datum it sends by the name
+the Time tracking screens give it, never by the title pydantic makes up from the field («Lat», «Lng», «Accuracy M»). The
+card is base's (``base.assistant.card``); the names are attendance's: the titles of its schemas and the ``verbose_name``
+of its models, with their Spanish in its catalog.
 
-The record a write names by its id (FIX-HUB-ATTENDANCE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half is hub#416):
-the person clocked, whose break starts or ends or whose day is closed, and the working day corrected, by the name
-the screens give them («Ana López», «Ana López · 6 oct 2026»), read as whoever asks — never by the id, and left out
-when that person may not read it."""
+The record a write names by its id (base's half is hub#416): the person clocked, whose break starts or ends or whose day
+is closed, and the working day corrected, by the name the screens give them («Ana López», «Ana López · 6 oct 2026»),
+read as whoever asks — never by the id, and left out when that person may not read it."""
 
 import datetime as dt
 import json

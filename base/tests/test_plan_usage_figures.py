@@ -1,6 +1,6 @@
-"""System › «Usage and plan» reads ``base.plan.usage`` (BASE-F40; PLAN-HUB, round 2026-11-01g): every figure of the business
-against what its plan really gives, with two real hubs so one never sees the other's. What was not measured yet comes as
-nothing, never as a zero. The bell's row is worked out here, with no call to erplora.com.
+"""System › «Usage and plan» reads ``base.plan.usage`` (BASE-F40): every figure of the business against what its plan
+really gives, with two real hubs so one never sees the other's. What was not measured yet comes as nothing, never as a
+zero. The bell's row is worked out here, with no call to erplora.com.
 """
 
 import datetime as dt

@@ -72,7 +72,7 @@ async function inSpanish(context: BrowserContext, page: Page, path: string): Pro
   await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
 }
 
-test(`${KEY} TAX-F17: «Your taxes» says Portugal brings no factory rates and leads to Rules, on the Home and in Taxes`, async ({ page }) => {
+test(`TAX-F17: «Your taxes» says Portugal brings no factory rates and leads to Rules, on the Home and in Taxes`, async ({ page }) => {
   await login(page, A, '/');
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
@@ -104,7 +104,7 @@ test(`${KEY} TAX-F17: «Your taxes» says Portugal brings no factory rates and l
   );
 });
 
-test(`${KEY} TAX-F17: in Spanish, «Tus impuestos» says the same`, async ({ page, context }) => {
+test(`TAX-F17: in Spanish, «Tus impuestos» says the same`, async ({ page, context }) => {
   await login(page, A, '/tax/categories');
   await inSpanish(context, page, '/tax/categories');
   await expect(notice(page)).toContainText('Tus impuestos');
@@ -112,7 +112,7 @@ test(`${KEY} TAX-F17: in Spanish, «Tus impuestos» says the same`, async ({ pag
   await seenAtEachSize(page, notice(page), 'notice-es');
 });
 
-test(`${KEY} TAX-F19: the till of a business in Portugal never charges Spain's VAT, and says why`, async ({ page, context }) => {
+test(`TAX-F19: the till of a business in Portugal never charges Spain's VAT, and says why`, async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   const refusal = await chargeRefused(page, shirt);

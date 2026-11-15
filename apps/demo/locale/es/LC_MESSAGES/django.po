@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hub-next demo\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-06 22:45+0100\n"
+"POT-Creation-Date: 2026-11-11 11:10+0100\n"
 "PO-Revision-Date: 2026-10-13 23:05+0200\n"
 "Last-Translator: ERPlora\n"
 "Language-Team: Spanish\n"
@@ -129,14 +129,28 @@ msgstr "línea"
 msgid "lines"
 msgstr "líneas"
 
-#: queries.py:15
+#: queries.py:20
 msgid "This item no longer exists."
 msgstr "Este elemento ya no existe."
 
-#: schemas.py:23
+#: queries.py:21
+#, python-format
+msgid "No item is called “%(said)s”."
+msgstr "Ningún elemento se llama «%(said)s»."
+
+#: queries.py:22
+#, python-format
+msgid "There are several items called “%(said)s”: %(names)s. Say which one."
+msgstr "Hay varios elementos que se llaman «%(said)s»: %(names)s. Di cuál."
+
+#: schemas.py:25
 msgid "Item"
 msgstr "Elemento"
 
-#: services.py:21
+#: schemas.py:28
+msgid "Say which item: its id or its name."
+msgstr "Di qué elemento: su id o su nombre."
+
+#: services.py:19
 msgid "This item is closed: open it to add lines."
 msgstr "Este elemento está cerrado: ábrelo para añadir líneas."

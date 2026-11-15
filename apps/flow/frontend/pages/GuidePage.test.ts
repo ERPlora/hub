@@ -1,7 +1,5 @@
 // The guide (WORKBOOK FLOW-F08): «How automations work» in five parts, with its texts inside the app,
-// and «Back to the automations». What it says it cannot do is what this Hub cannot do (flows#16): no
-// message, call or question steps, and — while the events of other apps are not delivered to it
-// (FLOW-F21, phase 2) — no starting on its own when something happens.
+// and «Back to the automations». What it says it cannot do is only what this Hub cannot do today.
 import { describe, expect, it } from 'vitest';
 
 import { click, mountFlow, settle } from '../__tests__/mount-flow';

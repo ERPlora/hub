@@ -1,4 +1,4 @@
-"""``manage.py create_platform_hub [--execute]``: bring up ERPlora's own hub, repeatably (PLAN-SAAS §4).
+"""``manage.py create_platform_hub [--execute]``: bring up ERPlora's own hub, repeatably.
 
 ERPlora's platform hub issues ERPlora's invoices to its customers, posted by the SaaS to
 ``/internal/platform/invoices`` (``base.internal``). Ported from the old SaaS's ``ensure_platform_hub``: idempotent and a
@@ -6,7 +6,7 @@ dry run unless ``--execute``; it names what it finds, and it refuses rather than
 issuer is one VeriFactu chain: it never writes over another identity.
 
 The platform hub is its reserved slug, ``PLATFORM_HUB_SLUG`` (``erplora``, in ``live.slugs``' reserved list, so no
-business can ever take it and the SaaS's normal sign-up never creates it), and since S5 a row of the registry
+business can ever take it and the SaaS's normal sign-up never creates it), and a row of the registry
 (``is_platform``) with a database of its own, as every business: with ``--execute``, a missing one is made as a sign-up
 is (``base.services.platform_hub_register``, then ``base.tenancy.provision``), never as a business of the SaaS's.
 Then, inside that database, it gives the hub its issuer, ERPlora's tax identity from ``PLATFORM_ISSUER_*``
@@ -115,7 +115,7 @@ class Command(BaseCommand):
                 f"Set {', '.join(missing)}: the platform hub's issuer. Nothing was written."
             )
         # What ``verifactu.config.follow_deployment`` pins on a new hub (``queries.production_open``): production only
-        # on the prod deployment once ERPlora opens real filing there (working-rules §15).
+        # on the prod deployment once ERPlora opens real filing there.
         environment = (
             "production"
             if settings.ERPLORA_ENVIRONMENT == "prod"

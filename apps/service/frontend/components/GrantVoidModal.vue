@@ -22,7 +22,7 @@ const locale = useLocale();
 const money = useBusinessMoney();
 const voiding = useCommand('service.grant.void');
 const reason = ref('');
-useUnsavedFormOnOpen('service-grant-void', reason, open);
+const canDismiss = useUnsavedFormOnOpen('service-grant-void', reason, open);
 
 watch(open, (isOpen) => {
   if (!isOpen) return;
@@ -53,6 +53,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-grant-void"
     role="alertdialog"
     size="sm"
@@ -72,6 +73,7 @@ async function confirm(): Promise<void> {
         </p>
         <ion-textarea
           data-testid="service-grant-void-reason"
+          name="reason"
           :value="reason"
           :label="t('service.void.reason')"
           :helper-text="t('service.void.reasonHelp')"

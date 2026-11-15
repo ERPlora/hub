@@ -1,5 +1,5 @@
-// Why the charge sheet cannot charge yet, one reason at a time, in the old screen's order (sales#159,
-// #222, #297, #309, #498): the customer the business requires, the invoice recipient (complete, its tax
+// Why the charge sheet cannot charge yet, one reason at a time, in the old screen's order:
+// the customer the business requires, the invoice recipient (complete, its tax
 // ID checking and, abroad, its kind of document: `sale.invoice_recipient_incomplete`, 422 on
 // `customer_tax_id` / `customer_id_type`), cash over the
 // legal limit, what a split has left, cash with nothing tendered, cash short. Every one of them is also

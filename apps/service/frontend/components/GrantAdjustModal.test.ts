@@ -4,6 +4,7 @@
 // Adjust sends `service.grant.adjust` with signed sessions and closes; a refusal stays in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountService, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import GrantAdjustModal from './GrantAdjustModal.vue';
@@ -45,7 +46,7 @@ describe('GrantAdjustModal', () => {
     await ionValue(s.el('service-grant-adjust-uses'), '2', 'ionInput');
     await ionValue(s.el('service-grant-adjust-days'), '30', 'ionInput');
     await ionValue(s.el('service-grant-adjust-reason'), 'closed in August', 'ionInput');
-    expect(s.el('service-grant-adjust-preview')?.textContent).toContain('After the adjustment: 5 session(s) left · expires Apr 29, 2027');
+    expect(s.el('service-grant-adjust-preview')?.textContent).toContain('After the adjustment: 5 sessions left · expires Apr 29, 2027');
     await click(s.el('service-grant-adjust-submit'));
     expect(s.sent()).toEqual([
       { method: 'POST', path: '/api/service/grants/adjust', query: {}, body: { id: 'g1', uses_delta: 2, days_delta: 30, reason: 'closed in August' } },
@@ -75,6 +76,18 @@ describe('GrantAdjustModal', () => {
     expect(forever.el('service-grant-adjust-days')).toBeNull();
   });
 
+  // hub#1147: what is left after the adjustment says one session in the singular and several in the plural.
+  it.each([
+    { locale: 'en' as const, add: '0', said: 'After the adjustment: 1 session left' },
+    { locale: 'en' as const, add: '2', said: 'After the adjustment: 3 sessions left' },
+    { locale: 'es' as const, add: '0', said: 'Tras el ajuste: queda 1 sesión' },
+    { locale: 'es' as const, add: '2', said: 'Tras el ajuste: quedan 3 sesiones' },
+  ])('adding $add to a voucher with one left ($locale): «$said»', async ({ locale, add, said }) => {
+    const s = await setup({ remaining: 1 }, locale);
+    await ionValue(s.el('service-grant-adjust-uses'), add, 'ionInput');
+    expect(s.el('service-grant-adjust-preview')?.textContent).toContain(said);
+  });
+
   it('a refusal stays in the dialog', async () => {
     const s = await setup();
     s.answer(409, { error: { code: 'service.grant_adjust_below_used', message: 'You cannot take away more sessions than the customer has left.' } });
@@ -91,11 +104,24 @@ describe('GrantAdjustModal', () => {
   });
 });
 
+describe('GrantAdjustModal: fields refused with the same words (hub#888)', () => {
+  // The sessions, the days and the Reason each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { uses_delta: 'uses', days_delta: 'days' };
+  itTellsTheCorrectedFieldApart(['uses_delta', 'days_delta', 'reason'], async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await ionValue(s.el('service-grant-adjust-uses'), '2', 'ionInput');
+    await ionValue(s.el('service-grant-adjust-days'), '30', 'ionInput');
+    await ionValue(s.el('service-grant-adjust-reason'), 'closed in August', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.el(`service-grant-adjust-${FIELD_OF[key] ?? key}`), send: () => click(s.el('service-grant-adjust-submit')), settle };
+  });
+});
+
 describe('GrantAdjustModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('service-grant-adjust'),
       change: () => ionValue(s.el('service-grant-adjust-reason'), 'Gift', 'ionInput'),
       restore: () => ionValue(s.el('service-grant-adjust-reason'), '', 'ionInput'),

@@ -1,4 +1,4 @@
-"""BASE-G62 and G151: how the business asks who is at the till (Settings › General, «PIN pad»).
+"""How the business asks who is at the till (Settings › General, «PIN pad»).
 
 «Show the PIN pad» on or off (``never``), «Ask again after inactivity» (1, 5, 10, 15 or 30 minutes: ``always``; «Until
 signing out»: ``per_shift``, the factory value) and «PIN digits» (4 or 6). Each control is saved on its own and the

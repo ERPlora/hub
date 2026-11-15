@@ -33,6 +33,7 @@ def test_the_events_of_the_workbook_and_the_ones_that_refresh_the_screens():
         "PRODUCT_CREATED": "inventory.product.created",
         "PRODUCT_UPDATED": "inventory.product.updated",
         "PRODUCT_DELETED": "inventory.product.deleted",
+        "PRODUCT_RESTORED": "inventory.product.restored",
         "PRODUCT_CATEGORIZED": "inventory.product.categorized",
         "PRODUCT_UNCATEGORIZED": "inventory.product.uncategorized",
         "CATEGORY_CREATED": "inventory.category.created",
@@ -55,7 +56,7 @@ def test_all_lists_every_event_once():
 
 
 def test_it_reacts_to_a_paid_sale_a_voided_one_and_a_refund():
-    # INVENTORY-F24 (2026-10-14): the units a refund brings back go back to the stock.
+    # INVENTORY-F24: the units a refund brings back go back to the stock.
     assert events.REACTIONS == {
         "sale.sale.completed": "inventory.stock.apply_sale",
         "sale.sale.voided": "inventory.stock.restore_sale",

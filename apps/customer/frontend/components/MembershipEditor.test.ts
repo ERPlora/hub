@@ -97,7 +97,7 @@ describe('MembershipEditor', () => {
   });
 
   // The card's live result arrives again whenever the card changes (its other list saved, a note, someone
-  // else): it must not untick what the user ticked and has not saved yet (hub#114: «Save tags» sent []
+  // else): it must not untick what the user ticked and has not saved yet («Save tags» sent []
   // right after «Save groups», and the card lost the tag).
   it('a live result of the card between ticking and «Save groups» keeps the tick, and saving sends it', async () => {
     const s = await setup();

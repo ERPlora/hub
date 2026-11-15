@@ -1,4 +1,4 @@
-"""The migrator's maintenance connection: making and dropping a hub's database (PLAN-DB §6; round 2026-10-30, S2a).
+"""The migrator's maintenance connection: making and dropping a hub's database.
 
 ``base.tenancy.ops`` reaches the server directly as the migrator (``DB_MIGRATOR_USER``; the default connection's role
 where it is not set: local development and these tests), never through PgBouncer and never on a Django alias:
@@ -248,7 +248,7 @@ def test_the_control_database_is_never_dropped_nor_cloned_into():
 def test_a_migrators_alias_registered_again_never_keeps_another_roles_connection(
     settings, hub_databases, django_db_blocker
 ):
-    """CI of hub#471: a migrator's alias registered with one role and forgotten left this thread's connection object
+    """A migrator's alias registered with one role and forgotten left this thread's connection object
     behind; registered again with another role, it must not reach the server with the first one."""
     from base.tenancy.tests import hubs as test_hubs
 
@@ -270,8 +270,8 @@ def test_a_migrators_alias_registered_again_never_keeps_another_roles_connection
 
 
 def test_forgetting_an_alias_drops_this_threads_connection_object_too(hub_databases):
-    """Re-review of hub#471 (a): ``hubs.forget_aliases`` leaves no connection object behind for an alias it forgets, as
-    ``migrator._forget_alias`` does (the leftover one was what broke the CI of 2b46f6e7)."""
+    """``hubs.forget_aliases`` leaves no connection object behind for an alias it forgets, as
+    ``migrator._forget_alias`` does: a leftover one breaks the next registration of that alias."""
     from base.tenancy.tests import hubs as test_hubs
 
     before = django_connections.settings

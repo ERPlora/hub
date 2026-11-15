@@ -1,6 +1,6 @@
 """Ninja routes of base: each route calls exactly one operation and holds no logic.
 
-Settings › Data's (APP-BASE-2) that read or load a file take it in base64 in their body, more than Django's ceiling for
+Settings › Data's that read or load a file take it in base64 in their body, more than Django's ceiling for
 any other view; both are commands (POST): reading what a file brings writes nothing, but no query string carries it.
 """
 
@@ -45,7 +45,7 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
-from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalExportIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
+from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalExportIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402
 
 router = Router(tags=["base"])
 
@@ -76,7 +76,7 @@ async def notice_list(request):
     return await run_operation(request, queries.notice_list)
 
 
-# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @bind(router, "base.app.list", "/apps")
@@ -84,8 +84,8 @@ async def app_list(request):
     return await run_operation(request, queries.app_list)
 
 
-# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app by its name or its id in the body; which app
-# a name names, by ``base.app.get`` (hub#539). While a hub's own database gets the app's tables (S3) the same answer
+# Turning an app on or off, with the plan's limit: the app by its name or its id in the body; which app
+# a name names, by ``base.app.get``. While a hub's own database gets the app's tables the same answer
 # comes with 202: accepted, the worker finishes it. Both codes are in the OpenAPI, with the same schema.
 from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
 
@@ -119,7 +119,7 @@ async def plan_usage(request):
     return await run_operation(request, queries.plan_usage)
 
 
-# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+# ── Data: blueprints, imports and reset ───────────────
 #: The upload's body: 20 MB of zip in base64 (27 962 028 characters) and its JSON around it.
 MAX_BLUEPRINT_BODY = 28_100_000
 
@@ -181,7 +181,7 @@ async def hub_dump_link(request, data: Query[HubDumpLinkIn]):
     return await run_operation(request, queries.hub_dump_link, data)
 
 
-# ── Business settings and the hub's context (APP-BASE-6) ──
+# ── Business settings and the hub's context ───────────────
 
 
 @bind(router, "base.business.get", "/business")
@@ -189,7 +189,7 @@ async def business_get(request):
     return await run_operation(request, queries.business_get)
 
 
-# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+# ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @bind(router, "base.system.cards", "/system/cards")
@@ -232,7 +232,7 @@ async def failed_event_discard(request, data: FailedEventDiscardIn):
     return await run_operation(request, services.failed_event_discard, data)
 
 
-# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
+# ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
 #: An upload's body: 25 MB of file in base64 (34 952 536 characters) and its JSON around it.
 MAX_FILE_BODY = 35_100_000
 
@@ -291,7 +291,7 @@ async def file_delete(request, data: FileDeleteIn):
     return await run_operation(request, services.file_delete, data)
 
 
-# ── The way in (APP-BASE-3) ────────────────────────────────────────────────────────────────────────────────────────
+# ── The way in ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 # auth=None: the PIN pad is the door of a browser without a session (its device cookie decides what it shows).
@@ -383,7 +383,7 @@ async def avatar_remove(request):
     return await run_operation(request, services.avatar_remove)
 
 
-# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+# ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
 
 
 @bind(router, "base.person.list", "/people")
@@ -416,7 +416,7 @@ async def role_list(request):
     return await run_operation(request, queries.role_list)
 
 
-# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+# ── People and permissions: the business's API keys ────────────────────────────────────────────────────────────────
 
 
 @bind(router, "base.api_key.list", "/keys")
@@ -444,7 +444,7 @@ async def api_key_revoke(request, data: ApiKeyIdIn):
     return await run_operation(request, services.api_key_revoke, data)
 
 
-# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+# ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
 
 
 @bind(router, "base.approval.list", "/approvals")
@@ -467,7 +467,7 @@ async def approval_approve(request, data: ApprovalIn):
     return await run_operation(request, services.approval_approve, data)
 
 
-# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+# ── People and permissions: the API's documentation ────────────────────────────────────────────────────────────────
 from base.schemas import ApiDocSettingsUpdateIn  # noqa: E402
 
 
@@ -486,7 +486,7 @@ async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
     return await run_operation(request, services.api_doc_settings_update, data)
 
 
-# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+# ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
 from base.schemas import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
@@ -560,7 +560,7 @@ async def assistant_speak(request, data: AssistantSpeakIn):
     )
 
 
-# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+# ── Locations ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 @bind(router, "base.location.list", "/locations")
@@ -568,7 +568,7 @@ async def location_list(request):
     return await run_operation(request, queries.location_list)
 
 
-# ── The shared image library (round 2026-10-30, base.image_catalog) ────────────────────────────────────────────────
+# ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────
 
 from base.schemas import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
 

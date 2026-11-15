@@ -1,10 +1,13 @@
 // What the tax e2e specs share (apps/tax/WORKBOOK.md): the three sizes a flow is seen at, the
 // screenshot of each, the cleanup of what a run made (categories are never deleted by the app), the
-// API setup of a fresh category and its rules, and the pickers of the tax screens (a Combo, an
-// `ion-select` popover, a row action inline or behind the row's «⋮»).
-import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+// API setup of a fresh category and its rules, and the pickers of the tax screens (a Combo and an
+// `ion-select` popover). A row action is service-helpers.ts's `rowAction`, on the table `tax-<section>`.
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, psql, shown } from './helpers';
+import { countryRulesCleanup } from './country-rules';
+import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
+import { snapshotSeries } from './invoice-helpers';
+import { drawerOff } from './sale-helpers';
 
 /** 390×844, 834×1112 and 1440×900: a phone, a tablet and a desk. */
 export const FLOW_VIEWPORTS = [
@@ -61,6 +64,12 @@ export interface Rule {
   is_active: boolean;
 }
 
+/** Deletes, in hub `a`, every rule of `country` (not Spain): the one a spec mounted to sell in a business it moved there,
+ *  and any a killed run left (country-rules.ts). */
+export function dropCountryRules(country: string): void {
+  psql(countryRulesCleanup(country));
+}
+
 /** Creates a rule through the API (setup) and returns it. */
 export async function createRule(context: BrowserContext, body: Record<string, unknown>): Promise<Rule> {
   const res = await api<Rule>(context, A, 'POST', '/tax/rules', body);
@@ -107,14 +116,31 @@ export async function pickSelect(page: Page, select: Locator, text: string | Reg
   await expect(popover).toBeHidden();
 }
 
-/** Runs a row action of a tax list: its inline button, or the row's «⋮» menu when it folded there. */
-export async function rowAction(page: Page, section: Section, id: string, action: string): Promise<void> {
-  const hook = `tax-${section}-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=tax-${section}-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
+/** The business back to the whole country: the other specs of the stack sell at the national VAT. */
+export function wholeCountry(): void {
+  psql("update tax_taxsettings set region_code = ''");
+}
+
+/** The tax settings painted: their form on screen. */
+export async function taxSettingsReady(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=tax-settings-form]').waitFor({ state: 'visible' });
+}
+
+/** The owner on the tax settings at a desk's size: their form, painted. */
+export async function taxSettingsForm(page: Page): Promise<Locator> {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/tax/settings');
+  await taxSettingsReady(page);
+  return shown(page).locator('[data-testid=tax-settings-form]');
+}
+
+/** The owner's context for a spec that sells in a tax region: the invoice numbering kept to give back, and the drawer off
+ *  (cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's). */
+export async function regionSaleContext(browser: Browser): Promise<BrowserContext> {
+  snapshotSeries();
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/tax/settings');
+  await drawerOff(context);
+  return context;
 }

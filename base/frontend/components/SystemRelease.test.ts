@@ -1,6 +1,3 @@
-// System › Updates, the part of who runs the business (BASE-G89; the old hub's «You are on {version}», HUB_SHELL-F142):
-// the version running, from the live `base.system.status` (a deploy reconnects the stream and the new one shows by
-// itself), and when it was published, never a made-up date. A failed read says so, with «Retry».
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';

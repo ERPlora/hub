@@ -179,7 +179,8 @@
         "unassigned": "Professional left: to be reassigned",
         "charged": "Charged",
         "uncharged": "Sale voided",
-        "deleted": "Deleted"
+        "deleted": "Deleted",
+        "restored": "Restored"
       }
     },
     "series": {

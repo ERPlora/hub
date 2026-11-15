@@ -7,6 +7,8 @@ from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
+from base import assistant
+
 PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
 QUERIES = {
     "flow.operation.get",
@@ -36,6 +38,7 @@ COMMANDS = {
     "flow.draft.propose",
     "flow.draft.dismiss",
     "flow.run.react",
+    "flow.customer.erase",
     "flow.schedule.fire_due",
     "flow.run.resume_due",
     "flow.run.prune",
@@ -70,10 +73,11 @@ HIGH_RISK = {
     "flow.recipe.disable",
     "flow.recipe.restore",
 }
-# Run only by the platform: the reactions (to every event, and to a run parked on a call) and the
-# scheduled tasks.
+# Run only by the platform: the reactions (to every event, to a run parked on a call and to an erased
+# card) and the scheduled tasks.
 SYSTEM = {
     "flow.run.react",
+    "flow.customer.erase",
     "flow.run.call",
     "flow.schedule.fire_due",
     "flow.run.resume_due",
@@ -208,6 +212,8 @@ def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if assistant.is_tool(op):  # what a person says to ask for it (hub#1106); the engine's are no tool
+            expected |= {"asks"}
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name

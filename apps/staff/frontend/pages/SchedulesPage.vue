@@ -2,7 +2,7 @@
 // Staff → Schedules (WORKBOOK «Pantallas · Horarios»): the Member picker (searched on the server) above
 // the schedules of the chosen member (MemberSchedules) — the first one by name to begin with. The
 // picker is the scope of the list, not a field of the form. With no member at all there is nobody to
-// schedule: «No staff members yet» and «Add staff member», which opens Staff (the old staff#98).
+// schedule: «No staff members yet» and «Add staff member», which opens Staff.
 import { Combo, type ComboOption, EmptyState } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';

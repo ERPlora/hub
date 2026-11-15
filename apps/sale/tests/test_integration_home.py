@@ -1,6 +1,6 @@
-"""Sales on the Home (PLAN-HUB round 2026-10-21): base's ``base.widget.list`` offers Sales' four panels to whoever
-may read them, each followed live and answered by its own query as that person (today's money and tickets after a
-charge, the seven days, the last eight sales newest first), and a charge in hub B re-runs them on B's channel only.
+"""Sales on the Home: base's ``base.widget.list`` offers Sales' four panels to whoever may read them, each followed live
+and answered by its own query as that person (today's money and tickets after a charge, the seven days, the last eight
+sales newest first), and a charge in hub B re-runs them on B's channel only.
 
 base and sale run for real: the panels come from SaleConfig through base's own query, never a stand-in module.
 """

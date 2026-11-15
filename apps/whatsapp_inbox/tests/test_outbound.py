@@ -1,11 +1,11 @@
 """What the inbox hands to erplora.com after a COMMIT never holds the worker.
 
-FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY. One worker relays the outbox of every hub and runs the scheduled tasks in one loop, and Django ran what a transaction
-left for after its COMMIT right there: the message an automation of hub A sends (door 5), the number an erased card
+One worker relays the outbox of every hub and runs the scheduled tasks in one loop, and Django runs what a transaction
+leaves for after its COMMIT right there: the message an automation of hub A sends (door 5), the number an erased card
 asks erplora.com to forget (door 6), and what the tick hands over again (messages, erasures, templates and their
-deletions, doors 5, 6, 8 and 9) held every other delivery, of every hub, and the scheduled tasks while erplora.com did
-not answer (up to 20 s a call). They go through ``base.outbound``: a thread of the worker's own makes the call, with
-no database connection held while it waits, and each still goes out once, with its own key.
+deletions, doors 5, 6, 8 and 9) would hold every other delivery, of every hub, and the scheduled tasks while erplora.com
+does not answer (up to 20 s a call). So they go through ``base.outbound``: a thread of the worker's own makes the call,
+with no database connection held while it waits, and each still goes out once, with its own key.
 
 erplora.com answers here only once the test lets it (5 s at most: a worker that waits for it fails the test instead of
 hanging), and every delivery of hub B lets it, so the order says who waited for whom. The real pool runs the calls

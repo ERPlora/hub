@@ -1,12 +1,7 @@
 <script setup lang="ts">
-// System › Failed events (BASE-G91…G94; the old hub's SystemPage `#events`, HUB_SHELL-F145…F148), for who runs the
-// business (the page shows anyone else who may see it): the live `base.failed_event.list`, the 100 most recent events
-// between apps the relay gave up on — which event, from which app to which, its attempts, when and its last error —,
-// re-run when the relay gives one up and when one is resent or discarded, so the bell and this list never disagree.
-// «Resend» puts one back in the queue (not when the app it was for is off: the row says why); «Resend all» asks
-// first; «Discard» closes one for good in the product's dialog, with what is lost and an optional reason. Each action
-// has its label (the old icons had none) and a refusal is told from its code. A failed read is never «All in order»
-// (it may be fiscal): it says so, with «Retry» in sight (hub#2540).
+// System › Failed events: the most recent events between apps that the relay gave up on. The list is read again
+// whenever the relay gives one up or one is resent or discarded, so the bell and this list never disagree. A failed
+// read is never shown as «All in order», because a lost event may be fiscal.
 import { ConfirmDialog, EmptyState, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastError, toastSuccess } from '@erplora/ui/shell';
@@ -18,7 +13,7 @@ import { failureKey } from '../lib/system';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
 import type { FailedEvent } from '../operations';
 
-/** The most the list shows: the old hub's; «Resend all» reaches the ones beyond it too. */
+/** The most the list shows; «Resend all» reaches the ones beyond it too. */
 const SHOWN = 100;
 
 const { t, locale } = useBaseI18n();
@@ -39,7 +34,7 @@ const discarding = ref<FailedEvent | null>(null);
 const discardOpen = ref(false);
 const reason = ref('');
 // A typed reason is unsaved: Android's Back asks before dropping it (hub#1046, BASE-F05).
-useUnsavedFormOnOpen('failed-event-discard-dialog', reason, discardOpen);
+const canDismiss = useUnsavedFormOnOpen('failed-event-discard-dialog', reason, discardOpen);
 
 const when = (iso: string) =>
   new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
@@ -213,6 +208,7 @@ async function confirmDiscard(): Promise<void> {
     </template>
     <ConfirmDialog
       v-model:open="discardOpen"
+      :can-dismiss="canDismiss"
       testid="failed-event-discard-dialog"
       tone="danger"
       :title="t('base.system.failed.discardConfirm.title')"

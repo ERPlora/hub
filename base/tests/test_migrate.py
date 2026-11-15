@@ -1,4 +1,4 @@
-"""``manage.py migrate`` migrates control only (PLAN-DB §4 «Comandos», §14.9; plan 2026-10-22-fase-2-tenencia §2.7).
+"""``manage.py migrate`` migrates control only.
 
 A hub's, a demo's or a template's database changes only through the migrator, which creates just the apps that hub
 has: ``migrate`` on its alias would create them all, so it is refused before it opens a connection.

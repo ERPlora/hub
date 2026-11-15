@@ -6,7 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
-> (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
+> (saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
 > la actividad), con lo que acompaña a cualquier pantalla: la campana, «Mejorar plan», «Gestionar en
 > erplora.com» y la franja que avisa cuando todavía no se puede facturar. También «Apps», «Uso y plan» de
 > Sistema y las plantillas: la tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y
@@ -44,8 +44,7 @@ Quién lo usa:
 
 ## Referencia adoptada
 
-Es el Inicio del hub viejo de ERPlora, el mismo que ya usan los negocios, con su estructura: saludo y
-fecha, lanzador de apps, lista de configuración con barra de progreso, tablero de paneles y pestañas
+El Inicio tiene esta estructura: saludo y fecha, lanzador de apps, lista de configuración con barra de progreso, tablero de paneles y pestañas
 «Resumen» y «Actividad». Sigue lo que hace el mercado: la lista de «Setup guide» de Shopify y Square
 (pasos con su botón, el progreso arriba y lo hecho plegado), el lanzador de apps de Odoo, el tablero de
 paneles que cada uno elige y ordena de Lightspeed y Toast, y la campana con contadores de cualquier
@@ -130,8 +129,10 @@ el Inicio. Si desde ahí no hay ninguno que configurar, solo el aviso.
 
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
-«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps ha elegido
-el negocio frente al límite de su plan: «17 de 20 apps activadas» o, sin límite, «17 apps activadas · Sin límite».
+«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps tiene
+activadas el negocio (las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra)
+y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan» o, sin límite, «27 apps
+activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
 Cada pestaña, una tabla (o tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y
 nombre), «Categoría» y «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con».
 «Abrir» en la fila de una app que la persona puede abrir y, para quien administra, «Activar» o «Desactivar».
@@ -312,7 +313,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | descartado |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | hecho |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -338,7 +339,6 @@ En la pantalla Archivos:
 | BASE-F25 | Ver que una app se niega a desactivarse | hecho |
 | BASE-F26 | Entender por qué una app no se abre | hecho |
 | BASE-F27 | Ver una app de pago bloqueada | hecho |
-| BASE-F28 | Ver cuánto de los límites del plan se está usando | descartado |
 | BASE-F29 | Elegir una plantilla del catálogo para importar | hecho |
 | BASE-F30 | Subir un fichero para importar | hecho |
 | BASE-F31 | Revisar y cargar lo que trae el fichero | hecho |
@@ -351,7 +351,7 @@ En la pantalla Archivos:
 | BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
 | BASE-F39 | Abrir Sistema y moverse por sus pestañas | hecho |
 | BASE-F40 | Ver lo que usa el negocio y si tiene que ampliar el plan | hecho |
-| BASE-F41 | Saber qué versión corre y qué se le ha actualizado | descartado |
+| BASE-F41 | Saber qué versión corre y cuándo se actualizó | hecho |
 | BASE-F42 | Ver el registro de sucesos del sistema | hecho |
 | BASE-F43 | Ver los eventos caídos | hecho |
 | BASE-F44 | Reenviar un evento caído | hecho |
@@ -392,7 +392,7 @@ En la pantalla Archivos:
 | BASE-F79 | Dar de alta o retirar la placa de una persona | hecho |
 | BASE-F80 | Reincorporar a una persona que salió del negocio | hecho |
 | BASE-F81 | Entender cómo entra cada persona | hecho |
-| BASE-F82 | Ver los roles y encender los que trae una app | descartado |
+| BASE-F82 | Ver los roles del negocio | hecho |
 | BASE-F83 | Asignar un rol a una persona | hecho |
 | BASE-F84 | Aprobar con el PIN de un responsable | hecho |
 | BASE-F85 | Consultar quién aprobó qué | hecho |
@@ -421,9 +421,12 @@ En la pantalla Archivos:
 | BASE-F108 | Reportar un problema a soporte | hecho |
 | BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
 | BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
+| BASE-F111 | Esperar a la base de datos cuando se corta un momento | hecho |
+| BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
+| BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
+| BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
-<!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
@@ -433,14 +436,16 @@ Pasos:
      luego los «Importante», cada grupo en el orden que fijan las apps, también en el móvil, donde solo caben
      dos filas. Los «Recomendado» salen plegada solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
      también los hechos, en el orden que fijan las apps.
-  3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
-     las personas que usarán el TPV); el resto los trae cada app encendida.
+  3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio; Impuestos, con la que nace todo
+     negocio, no cuenta, porque con ella sola el TPV no tiene nada que vender) y «Tu equipo» (añadir a las personas
+     que usarán el TPV); el resto los trae cada app encendida.
   4. Además, por cada app obligatoria en el país del negocio que está desactivada, un paso «Importante» de la
      plataforma: «Activa VeriFactu» con «Es obligatoria para los negocios de España.» (VeriFactu, en España) o
      «Activa Impuestos» con el país del negocio (Impuestos, en todos). Solo lo ve quien administra el negocio, que
      es quien activa apps; «Configurar» lleva a **Apps**, a «Añadir apps». En cuanto la activa, el paso se va solo
      y llegan los de la propia app («Configura VeriFactu», «Tus impuestos»). Un negocio de otro país no ve el de
-     VeriFactu (hub#997).
+     VeriFactu (hub#997). Un negocio recién dado de alta no ve «Activa Impuestos», porque nace con ella activada
+     (BASE-F14); en España sí ve «Activa VeriFactu»: VeriFactu nunca se activa sola.
   5. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
      demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
@@ -457,8 +462,7 @@ nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
 Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
-<!-- origen: old-hub:HUB_SHELL-F25 -->
-Estado: descartado — la fila de salud del hub (la impresora y WhatsApp, con un enlace a Sistema) necesita que cada app diga cómo está lo suyo, y eso toca Impresión y la Bandeja de WhatsApp; hoy la campana ya avisa cuando nadie está imprimiendo (hub#573)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
@@ -478,7 +482,6 @@ apilan y «Mis apps» se pliega.
 Implicados: ninguno
 
 ### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
-<!-- origen: old-hub:HUB_SHELL-F38 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Inicio · Resumen
@@ -496,7 +499,6 @@ Si falla: mientras esa pantalla no existe en el hub, el paso sale sin «Configur
 Implicados: BASE-F38
 
 ### BASE-F04 Ver qué pasos de la lista tiene que configurar un administrador
-<!-- origen: old-hub:HUB_SHELL-F29 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Inicio · Resumen
@@ -511,7 +513,6 @@ Si falla: si no se puede comprobar ese paso, no sale.
 Implicados: ninguno
 
 ### BASE-F05 Abrir una app desde «Mis apps»
-<!-- origen: old-hub:HUB_SHELL-F32 old-hub:HUB_APP-F28 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen · la barra de arriba de cualquier pantalla
@@ -529,7 +530,10 @@ Pasos:
      ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda, y una que guarda algo
      escrito sin guardar y lo pide (en el alta y la edición de producto de Inventario y en las ventanas de alta y edición de Ventas, Mesas, Cocina, Clientes, Reservas, Citas, Personal, Servicios, Control horario, Carrito y pago, Caja, Menús, Suplementos, Pagos, Tarifas, Facturación, Impresión, Horarios, Tareas, Impuestos y la Bandeja de WhatsApp, en las de categoría y stock de Inventario y en «Nueva API key», en las anulaciones con motivo de Reservas online, Pagos, Impresión, Reservas, Servicios, VeriFactu y Cocina (cancelar una comanda), en el motivo de «Descartar» un evento caído de Sistema, en «Nueva carpeta» y «Renombrar» de Archivos, en los pasos de importar productos, en las fichas de Tarea y Proyecto y en el alta rápida de cliente del TPV) pregunta antes
      «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
-     cambios» la cierra (hub#1015, hub#1020, hub#1031, hub#1046). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     cambios» la cierra (hub#1015, hub#1020, hub#1031, hub#1046). Esas mismas ventanas hacen la misma pregunta al
+     pulsar «Cancelar», «Cerrar», la «×» o Escape y al tocar fuera, en el móvil y en el ordenador, y sin nada escrito
+     se cierran sin preguntar (hub#1023, hub#1156; las fichas de Tarea y Proyecto y el alta rápida de cliente del TPV,
+     hub#1233; las de abrir el turno, entrada o salida, contar y cerrar de Caja, hub#1234). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
      la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
      Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
@@ -547,7 +551,6 @@ en cuanto el servidor responde.
 Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, ATTENDANCE-F08, CART_CHECKOUT-F01, CASH_REGISTER-F02, COMBO-F02, INVENTORY-F06, MODIFIER-F02, PAYMENT-F01, PRICING-F02, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86, ONLINE_BOOKING-F05, PAYMENT-F05, PRINTING-F14, RESERVATION-F09, SERVICE-F17, VERIFACTU-F30, BASE-F73, BASE-F75, INVENTORY-F09, TASK-F09, TASK-F10, TASK-F13, CUSTOMER-F18, KITCHEN-F22, BASE-F46
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
-<!-- origen: old-hub:HUB_SHELL-F33 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
@@ -581,7 +584,6 @@ con «Reintentar».
 Implicados: ninguno
 
 ### BASE-F07 Personalizar el tablero de paneles
-<!-- origen: old-hub:HUB_SHELL-F34 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
@@ -598,7 +600,6 @@ ofrezca paneles: «Ninguna app instalada ofrece widgets todavía.».
 Implicados: ninguno
 
 ### BASE-F08 Mantener los paneles al día sin recargar
-<!-- origen: old-hub:HUB_SHELL-F35 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Inicio · Resumen
@@ -615,7 +616,6 @@ vuelve la conexión, se pone al día solo.
 Implicados: ninguno
 
 ### BASE-F09 Consultar la actividad reciente
-<!-- origen: old-hub:HUB_SHELL-F36 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Actividad
@@ -637,7 +637,6 @@ si ya había ventas en pantalla, se quedan debajo del aviso.
 Implicados: SALE-F28
 
 ### BASE-F10 Ver en la campana los avisos entre apps que no se entregaron
-<!-- origen: old-hub:HUB_SHELL-F62 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: La campana
@@ -655,7 +654,6 @@ vuelva la conexión.».
 Implicados: BASE-F40
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
-<!-- origen: old-hub:HUB_SHELL-F129 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Menú lateral
@@ -685,7 +683,6 @@ y la app de Google Play no tienen «Gestionar en erplora.com».
 Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
-<!-- origen: old-hub:HUB_SHELL-F30 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
@@ -699,7 +696,6 @@ Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
 Implicados: BASE-F103
 
 ### BASE-F13 Perder el acceso al cambiar de rol o al salir del negocio
-<!-- origen: old-saas:SAAS_AUTH-F22 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: cualquier pantalla del hub
@@ -721,7 +717,6 @@ siguiente vez que erplora.com le pase al hub el estado del negocio también se c
 Implicados: HUBS-F26, HUBS-F27, HUBS-F28
 
 ### BASE-F14 Ver las apps del negocio
-<!-- origen: old-hub:HUB_SHELL-F105 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Apps
@@ -731,7 +726,10 @@ Pasos:
   2. Mientras llega la lista: «Cargando tus apps…». Después, una fila (o una tarjeta, a elegir) por cada app que
      el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»). Una app que el
      país del negocio exige lleva además, junto a su estado, «Obligatoria en España» (o el país del negocio): Impuestos
-     en todos, VeriFactu en España (hub#997).
+     en todos, VeriFactu en España (hub#997). Un negocio recién dado de alta ya tiene Impuestos aquí, «Activa»: nace
+     activada con los impuestos de su país y no cuenta para el tope de apps del plan: el contador de arriba dice
+     «1 app activada · 0 de 20 de tu plan». Las demás apps nacen desactivadas, también VeriFactu, que activa el
+     dueño.
   3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
      ordena o elige columnas.
   4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
@@ -744,7 +742,6 @@ hay apps). Sin ninguna app: «Aún no tienes apps. Abre «Añadir apps» para ve
 Implicados: ninguno
 
 ### BASE-F15 Abrir una app desde Apps
-<!-- origen: old-hub:HUB_SHELL-F106 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Apps
@@ -758,7 +755,6 @@ sale). Al pulsarlo se vuelve a comprobar, por si acaba de cambiar: si ya no est�
 Implicados: ninguno
 
 ### BASE-F16 Buscar una app en el catálogo
-<!-- origen: old-hub:HUB_SHELL-F107 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Apps
@@ -777,7 +773,6 @@ búsqueda.».
 Implicados: APPS-F01
 
 ### BASE-F17 Saber cuánto cuesta una app antes de tenerla
-<!-- origen: old-hub:HUB_SHELL-F108 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Apps
@@ -796,7 +791,6 @@ Si falla: sin la lista, como en «Mis apps» (BASE-F14).
 Implicados: APPS-F01, APPS-F07
 
 ### BASE-F18 Instalar una app
-<!-- origen: old-hub:HUB_SHELL-F109 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -806,8 +800,9 @@ Pasos:
   2. En «Añadir apps», quien administra busca una app que el negocio no usa, «Desactivada», y pulsa «Activar». Si
      necesita otras apps que están desactivadas, antes le pregunta nombrándolas (BASE-F19).
   3. La app pasa a «Instalada» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
-     dispositivos del negocio. El contador de arriba suma una: de «16 de 20 apps activadas» a «17 de 20 apps
-     activadas».
+     dispositivos del negocio. El contador de arriba suma las apps que se activan y una de las del plan: al activar
+     Tareas, de «26 apps activadas · 16 de 20 de tu plan» a «27 apps activadas · 17 de 20 de tu plan»; las que
+     llegan con ella suman a las activadas, no a las del plan.
 Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en erplora.com.
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
@@ -819,7 +814,6 @@ motivo, que se queda hasta cerrarlo.
 Implicados: APPS-F07, VERIFACTU-F01
 
 ### BASE-F19 Saber qué más viene con una app
-<!-- origen: old-hub:HUB_SHELL-F110 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -840,7 +834,6 @@ entonces, «Necesita suscripción». Con «Cancelar», no cambia nada.
 Implicados: ninguno
 
 ### BASE-F20 Intentar usar una app que necesita suscripción
-<!-- origen: old-hub:HUB_SHELL-F111 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Apps
@@ -860,7 +853,6 @@ que se abra dice por qué (BASE-F27).
 Implicados: APPS-F07
 
 ### BASE-F21 Ver por qué no se ha podido activar una app y reintentarlo
-<!-- origen: old-hub:HUB_SHELL-F112 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -882,7 +874,6 @@ que se queda hasta cerrarlo. Desde el asistente, un nombre que vale para varias 
 Implicados: BASE-F32
 
 ### BASE-F22 Seguir la activación de una app mientras se navega
-<!-- origen: old-hub:HUB_SHELL-F113 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -903,7 +894,6 @@ Si falla: BASE-F21. Mientras el personal de ERPlora tiene congelada la plataform
 Implicados: BASE-F31, BASE-F32
 
 ### BASE-F23 Desactivar una app
-<!-- origen: old-hub:HUB_SHELL-F122 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -915,7 +905,8 @@ Pasos:
      que el país del negocio exige: al desactivar Ventas, Impuestos se queda activa y no se nombra (hub#997).
   3. Confirma con «Desactivar»: «Reservas está desactivada. También se ha desactivado: Mesas.». Las dos salen de
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
-     está disponible (BASE-F26) y el contador de arriba resta una.
+     está disponible (BASE-F26) y el contador de arriba resta las que se desactivan y, de las del plan, la que
+     eligió el negocio.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
   5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
      la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
@@ -926,7 +917,6 @@ Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desa
 Implicados: VERIFACTU-F32
 
 ### BASE-F24 Activar una app
-<!-- origen: old-hub:HUB_SHELL-F123 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -951,7 +941,6 @@ cuál, nombrándolas; uno que no es de ninguna: «Ninguna app tiene ese nombre o
 Implicados: BASE-F97
 
 ### BASE-F25 Ver que una app se niega a desactivarse
-<!-- origen: old-hub:HUB_SHELL-F125 -->
 Estado: hecho
 Actor: administrador
 Pantalla: Apps
@@ -979,7 +968,6 @@ contestado el hub.
 Implicados: VERIFACTU-F32, BASE-F01
 
 ### BASE-F26 Entender por qué una app no se abre
-<!-- origen: old-hub:HUB_SHELL-F41 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: La pantalla de una app que no se abre
@@ -999,7 +987,6 @@ permiso.
 Implicados: ninguno
 
 ### BASE-F27 Ver una app de pago bloqueada
-<!-- origen: old-hub:HUB_SHELL-F49 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: La pantalla de una app que no se abre
@@ -1019,21 +1006,7 @@ Si falla: si nadie avisa al hub cuando termina el periodo contratado, el hub lo 
 negocio de demostración tiene todas las apps, también las de pago, para probarlas.
 Implicados: APPS-F07
 
-### BASE-F28 Ver cuánto de los límites del plan se está usando
-<!-- origen: old-hub:HUB_SHELL-F128 -->
-Estado: descartado — unido a BASE-F40
-Actor: propietario, administrador
-Pantalla: Sistema · Uso y plan
-Pasos:
-  1. Pulsa «Sistema» en el menú lateral: se abre «Uso y plan», que junta lo que estaba en «Recursos» y en «Plan y límites».
-  2. Las personas, los dispositivos y las apps del plan están en «Lo que incluye tu plan» (BASE-F40).
-Entra: lo mismo que BASE-F40.
-Sale: nada guardado.
-Si falla: lo dice BASE-F40.
-Implicados: BASE-F40, BASE-F57
-
 ### BASE-F29 Elegir una plantilla del catálogo para importar
-<!-- origen: old-hub:HUB_SHELL-F175 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -1059,7 +1032,6 @@ puede ver e importar plantillas.».
 Implicados: INVENTORY-F12
 
 ### BASE-F30 Subir un fichero para importar
-<!-- origen: old-hub:HUB_SHELL-F176 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -1075,7 +1047,6 @@ hizo una versión más nueva de ERPlora o pasa de 20 MB) y se queda en la elecci
 Implicados: ninguno
 
 ### BASE-F31 Revisar y cargar lo que trae el fichero
-<!-- origen: old-hub:HUB_SHELL-F177 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -1110,7 +1081,6 @@ preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para
 Implicados: BASE-F22, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F32 Leer el informe de la importación
-<!-- origen: old-hub:HUB_SHELL-F178 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -1140,7 +1110,6 @@ app queda activa y su fila dice «Falló» con «Algo falló al cargar esta part
 Implicados: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Volver al informe de una importación que no entró entera y reintentar
-<!-- origen: old-hub:HUB_SHELL-F179 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -1164,7 +1133,6 @@ Si falla: «El reintento falló: {reason}» y el informe sigue a la vista.
 Implicados: BASE-F32
 
 ### BASE-F34 Deshacer una importación
-<!-- origen: old-hub:HUB_SHELL-F180 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Restablecer
@@ -1181,12 +1149,11 @@ Pasos:
 Entra: la importación elegida.
 Sale: borradas exactamente las filas que trajo, también lo que entró después porque esperaba a una app, y lo que aún
 esperaba ya no entra; lo creado después se queda (`base.import.undone`).
-Si falla: el motivo sale en la propia ventana, que no se cierra (en el hub viejo no se decía nada); una
+Si falla: el motivo sale en la propia ventana, que no se cierra; una
 importación ya deshecha, «Esta importación ya se deshizo.».
 Implicados: BASE-F32
 
 ### BASE-F35 Exportar una copia de seguridad o una plantilla
-<!-- origen: old-hub:HUB_SHELL-F173 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Exportar
@@ -1207,7 +1174,6 @@ exportar. Quien no administra el negocio lee «Solo un administrador puede expor
 Implicados: BASE-F112 (dentro de la app)
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
-<!-- origen: old-hub:HUB_SHELL-F174 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Exportar
@@ -1229,7 +1195,6 @@ se puede exportar.
 Implicados: ninguno
 
 ### BASE-F37 Restablecer el negocio por secciones
-<!-- origen: old-hub:HUB_SHELL-F181 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Restablecer
@@ -1264,13 +1229,12 @@ restablecer el negocio.».
 Implicados: ninguno
 
 ### BASE-F38 Ver Inicio al día después de importar una plantilla
-<!-- origen: old-hub:HUB_SHELL-F39 old-hub:HUB_SHELL-F26 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Inicio · Resumen
 Pasos:
   1. Mientras el negocio no tiene nada de lo que trae una plantilla (un negocio nace con todas las apps
-     desactivadas), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
+     desactivadas salvo Impuestos), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
      parezca al tuyo: activamos sus apps y cargamos su catálogo de una vez. Después tendrás que poner tus
      propios datos.»): hasta cuatro plantillas, una por
      tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
@@ -1299,7 +1263,6 @@ cargar las plantillas para empezar.» con «Reintentar» y «Ahora no».
 Implicados: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Abrir Sistema y moverse por sus pestañas
-<!-- origen: old-hub:HUB_SHELL-F135 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Sistema · Uso y plan
@@ -1323,7 +1286,6 @@ resto de la pestaña sigue; una tarjeta que no carga se queda fuera y las demás
 Implicados: BASE-F40, PRINTING-F21
 
 ### BASE-F40 Ver lo que usa el negocio y si tiene que ampliar el plan
-<!-- origen: old-hub:HUB_SHELL-F136 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
@@ -1383,9 +1345,8 @@ erplora.com lo envíe.» y, bajo «Lo que usas», las cifras sin tope, barra, pa
 administra el negocio lee lo que dice BASE-F39.
 Implicados: BASE-F10, BASE-F11, BASE-F39, BASE-F57, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
-### BASE-F41 Saber qué versión corre y qué se le ha actualizado
-<!-- origen: old-hub:HUB_SHELL-F142 -->
-Estado: descartado — la versión y su fecha sí; las apps ya no tienen versión propia (se publican todas juntas con el hub) y todavía no hay notas de cada versión que enseñar (hub#576)
+### BASE-F41 Saber qué versión corre y cuándo se actualizó
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Actualizaciones
 Pasos:
@@ -1403,7 +1364,6 @@ volver a intentarlo.» con «Reintentar».
 Implicados: ninguno
 
 ### BASE-F42 Ver el registro de sucesos del sistema
-<!-- origen: old-hub:HUB_SHELL-F144 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Registros
@@ -1424,7 +1384,6 @@ eventos: todavía no ha pasado nada entre las apps de este negocio.».
 Implicados: ninguno
 
 ### BASE-F43 Ver los eventos caídos
-<!-- origen: old-hub:HUB_SHELL-F145 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Eventos caídos
@@ -1448,7 +1407,6 @@ lee «Solo el dueño o un administrador puede ver los eventos caídos.».
 Implicados: ninguno
 
 ### BASE-F44 Reenviar un evento caído
-<!-- origen: old-hub:HUB_SHELL-F146 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Eventos caídos
@@ -1466,7 +1424,6 @@ reenviarlo.» o «solo el dueño o un administrador puede hacerlo.».
 Implicados: ninguno
 
 ### BASE-F45 Reenviar todos los eventos caídos
-<!-- origen: old-hub:HUB_SHELL-F147 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Eventos caídos
@@ -1485,7 +1442,6 @@ Si falla: «No se pudo reenviar:» y el motivo, como en BASE-F44.
 Implicados: ninguno
 
 ### BASE-F46 Descartar un evento caído
-<!-- origen: old-hub:HUB_SHELL-F148 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Eventos caídos
@@ -1504,7 +1460,6 @@ Si falla: «No se pudo descartar:» y el motivo, como en BASE-F44.
 Implicados: ninguno
 
 ### BASE-F47 Informar de un error de la pantalla sin que nadie lo pida
-<!-- origen: old-hub:HUB_SHELL-F149 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -1524,13 +1479,12 @@ menú de usuario (BASE-F108).
 Implicados: ninguno
 
 ### BASE-F48 Abrir Ajustes y moverse por sus pestañas
-<!-- origen: old-hub:HUB_SHELL-F155 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes
 Pasos:
   1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
-  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias», en el orden del hub viejo; se abre
+  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias»; se abre
      «General» (BASE-F62). La pestaña elegida queda en el enlace, así que un enlace guardado vuelve a ella y Atrás
      sale de Ajustes en vez de recorrer sus pestañas. En el móvil caben las cuatro, enteras.
   3. Los enlaces antiguos siguen llevando a su sitio: el de la antigua «General» abre «General», el de la antigua
@@ -1545,7 +1499,6 @@ BASE-F29).
 Implicados: PRINTING-F06, BASE-F29, BASE-F49, BASE-F62
 
 ### BASE-F49 Ver el país del negocio
-<!-- origen: old-hub:HUB_SHELL-F156 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · Negocio
@@ -1562,7 +1515,6 @@ Si falla: si los datos del negocio no se pueden leer, «No se pudieron cargar lo
 Implicados: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 Ver la moneda del negocio
-<!-- origen: old-hub:HUB_SHELL-F158 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
@@ -1583,7 +1535,6 @@ Si falla: como en BASE-F49.
 Implicados: BASE-F49
 
 ### BASE-F51 Cambiar el idioma del negocio en erplora.com
-<!-- origen: old-hub:HUB_SHELL-F159 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Negocio
@@ -1606,7 +1557,6 @@ erplora.com: sus datos no se cambian.».
 Implicados: HUBS-F15, HUBS-F08, BASE-F64
 
 ### BASE-F52 Entrar con la cuenta de erplora.com
-<!-- origen: old-hub:HUB_SHELL-F01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
@@ -1627,7 +1577,6 @@ negocio no guarda nada hasta que vuelve con la persona identificada.
 Implicados: BASE-F13
 
 ### BASE-F53 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
-<!-- origen: old-hub:HUB_SHELL-F02 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
@@ -1641,7 +1590,6 @@ Si falla: un pase caducado o ya usado no abre nada: el negocio vuelve a pedir la
 Implicados: BASE-F52
 
 ### BASE-F54 Elegir el PIN la primera vez que se entra en una caja
-<!-- origen: old-hub:HUB_SHELL-F03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Crea tu PIN de acceso
@@ -1663,7 +1611,6 @@ se elige en **Mi perfil**.
 Implicados: BASE-F52, BASE-F65
 
 ### BASE-F55 Entrar con PIN
-<!-- origen: old-hub:HUB_SHELL-F04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
@@ -1691,7 +1638,6 @@ aquí, «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.».
 Implicados: BASE-F54, BASE-F67
 
 ### BASE-F56 Entrar pasando la placa
-<!-- origen: old-hub:HUB_SHELL-F05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
@@ -1708,7 +1654,6 @@ o pídeselo a un administrador.»; cuenta como un intento fallido. El pinpad sig
 Implicados: BASE-F55
 
 ### BASE-F57 Perder la sesión porque se abrió en otro dispositivo
-<!-- origen: old-hub:HUB_SHELL-F06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
@@ -1727,7 +1672,6 @@ Si falla: sin tope en el plan no se cierra nada.
 Implicados: BASE-F11, BASE-F40
 
 ### BASE-F58 La sesión termina mientras se trabaja
-<!-- origen: old-hub:HUB_SHELL-F07 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
@@ -1746,7 +1690,6 @@ Si falla: sin red, la pantalla no da la sesión por terminada.
 Implicados: BASE-F13, BASE-F70
 
 ### BASE-F59 Cerrar la sesión de una caja que nadie toca
-<!-- origen: old-hub:HUB_SHELL-F08 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Acceso
@@ -1762,7 +1705,6 @@ la pantalla se quede colgada, una sesión abierta mientras el negocio pide siemp
 Implicados: BASE-F67
 
 ### BASE-F60 Cambiar de usuario sin perder la venta
-<!-- origen: old-hub:HUB_SHELL-F09 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Cambiar de usuario
@@ -1786,7 +1728,6 @@ Comprueba la conexión e inténtalo de nuevo.».
 Implicados: BASE-F55, BASE-F56
 
 ### BASE-F61 Cerrar sesión
-<!-- origen: old-hub:HUB_SHELL-F10 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: El menú de usuario
@@ -1799,10 +1740,9 @@ Pasos:
 Entra: la sesión.
 Sale: la sesión cerrada en el negocio; la de erplora.com, solo si la persona lo confirma.
 Si falla: si el negocio no contesta, la sesión caduca sola.
-Implicados: ninguno
+Implicados: BASE-F113 (en la app de Android, antes de salir deja de estar a la escucha)
 
 ### BASE-F62 Decidir si este dispositivo es compartido o personal
-<!-- origen: old-hub:HUB_SHELL-F11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -1823,14 +1763,13 @@ este dispositivo. Comprueba la conexión e inténtalo de nuevo.».
 Implicados: BASE-F55
 
 ### BASE-F63 Abrir un hub que todavía no está dado de alta
-<!-- origen: old-hub:HUB_SHELL-F12 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Estamos preparando tu negocio
 Pasos:
   1. Abre la dirección de un negocio que erplora.com aún está preparando (recién creado).
   2. Sale «Estamos preparando tu negocio» — «Tarda unos segundos. Esta página se actualiza sola.».
-  3. Cuando está listo, la página se actualiza y entra como siempre.
+  3. Cuando está listo, la página se actualiza y entra como siempre, con Impuestos ya activa (BASE-F14).
 Entra: el estado del negocio que le pasa erplora.com.
 Sale: nada guardado.
 Si falla: una dirección que no es de ningún negocio no existe; un negocio dado de baja dice «Este hub ya no está
@@ -1840,7 +1779,6 @@ sola en cuanto se descongela y termina.
 Implicados: ninguno
 
 ### BASE-F64 Cambiar mis datos, foto, idioma y apariencia
-<!-- origen: old-hub:HUB_SHELL-F21 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Mi perfil
@@ -1869,7 +1807,6 @@ preferencias. Comprueba la conexión e inténtalo de nuevo.».
 Implicados: BASE-F51
 
 ### BASE-F65 Cambiar mi PIN desde Mi perfil
-<!-- origen: old-hub:HUB_SHELL-F22 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Mi perfil
@@ -1889,7 +1826,6 @@ es: «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; tr
 Implicados: BASE-F54
 
 ### BASE-F66 Elegir cuántos dígitos tiene el PIN del negocio
-<!-- origen: old-hub:HUB_SHELL-F100 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -1905,7 +1841,6 @@ Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.».
 Implicados: BASE-F67
 
 ### BASE-F67 Decidir si se pide PIN en la caja y cuándo se vuelve a pedir
-<!-- origen: old-hub:HUB_SHELL-F99 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -1930,7 +1865,6 @@ controles apagados y «Solo un administrador puede cambiar si se pregunta.».
 Implicados: BASE-F55, BASE-F59
 
 ### BASE-F68 Ver los dispositivos en los que se ha entrado
-<!-- origen: old-hub:HUB_SHELL-F101 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -1950,7 +1884,6 @@ entrado nadie desde ningún dispositivo.», que es solo para una lista de verdad
 Implicados: BASE-F69, BASE-F70, BASE-F71
 
 ### BASE-F69 Ponerle nombre a un dispositivo
-<!-- origen: old-hub:HUB_SHELL-F102 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -1966,7 +1899,6 @@ largo. Ponle uno más corto y vuelve a guardar.».
 Implicados: BASE-F68
 
 ### BASE-F70 Quitar un dispositivo que se ha perdido
-<!-- origen: old-hub:HUB_SHELL-F103 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -1985,7 +1917,6 @@ no está registrado aquí. Actualiza la lista.»; nunca queda como hecho lo que 
 Implicados: BASE-F58, BASE-F68
 
 ### BASE-F71 Quitar de golpe los dispositivos que nadie usa
-<!-- origen: old-hub:HUB_SHELL-F104 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -2002,7 +1933,6 @@ Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexi
 Implicados: BASE-F70
 
 ### BASE-F72 Ver los archivos del negocio
-<!-- origen: old-hub:HUB_SHELL-F130 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Archivos
@@ -2029,7 +1959,6 @@ archivos».
 Implicados: BASE-F40
 
 ### BASE-F73 Subir archivos y crear carpetas
-<!-- origen: old-hub:HUB_SHELL-F131 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Archivos
@@ -2053,7 +1982,6 @@ los archivos.».
 Implicados: BASE-F40
 
 ### BASE-F74 Previsualizar y descargar un archivo
-<!-- origen: old-hub:HUB_SHELL-F132 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Archivos
@@ -2092,7 +2020,6 @@ descargar «{name}»: {reason}».
 Implicados: BASE-F112 (dentro de la app)
 
 ### BASE-F75 Mover y renombrar un archivo o una carpeta
-<!-- origen: old-hub:HUB_SHELL-F133 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Archivos
@@ -2114,7 +2041,6 @@ administrador puede modificar los archivos.».
 Implicados: ninguno
 
 ### BASE-F76 Borrar un archivo o una carpeta
-<!-- origen: old-hub:HUB_SHELL-F134 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Archivos
@@ -2133,7 +2059,6 @@ igual, lee «Solo un administrador puede modificar los archivos.».
 Implicados: ninguno
 
 ### BASE-F77 Llegar al tope de personas del plan
-<!-- origen: old-hub:HUB_SHELL-F83 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Personal
@@ -2151,7 +2076,6 @@ negocio.».
 Implicados: BASE-F81, BASE-F83
 
 ### BASE-F78 Retirar el PIN a una persona
-<!-- origen: old-hub:HUB_SHELL-F86 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ficha de una persona
@@ -2169,7 +2093,6 @@ propietario cambia el acceso del propietario.».
 Implicados: BASE-F81, BASE-F55
 
 ### BASE-F79 Dar de alta o retirar la placa de una persona
-<!-- origen: old-hub:HUB_SHELL-F87 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ficha de una persona
@@ -2189,7 +2112,6 @@ placa.». Nadie da de alta la suya: «Nadie da de alta su propia placa: pídesel
 Implicados: BASE-F56, BASE-F81
 
 ### BASE-F80 Reincorporar a una persona que salió del negocio
-<!-- origen: old-hub:HUB_SHELL-F89 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Personal
@@ -2204,7 +2126,6 @@ Si falla: mientras no acepta, sale como «Aún no ha entrado».
 Implicados: BASE-F77, BASE-F81
 
 ### BASE-F81 Entender cómo entra cada persona
-<!-- origen: old-hub:HUB_SHELL-F90 -->
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Empleados · Personal
@@ -2221,9 +2142,8 @@ Sale: nada guardado. Se pone al día sola cuando alguien elige o pierde su PIN o
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar».
 Implicados: BASE-F77, BASE-F78, BASE-F79
 
-### BASE-F82 Ver los roles y encender los que trae una app
-<!-- origen: old-hub:HUB_SHELL-F91 -->
-Estado: descartado — se ven los cuatro roles de erplora.com; que una app traiga roles propios que encender está por decidir en el producto nuevo, donde el rol se da al invitar en erplora.com (hub#579)
+### BASE-F82 Ver los roles del negocio
+Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Empleados · Roles
 Pasos:
@@ -2238,7 +2158,6 @@ Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
 Implicados: BASE-F83
 
 ### BASE-F83 Asignar un rol a una persona
-<!-- origen: old-hub:HUB_SHELL-F92 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Roles
@@ -2254,7 +2173,6 @@ Si falla: lo que diga erplora.com.
 Implicados: BASE-F82, BASE-F13
 
 ### BASE-F84 Aprobar con el PIN de un responsable
-<!-- origen: old-hub:HUB_SHELL-F51 -->
 Estado: hecho
 Actor: empleado, encargado
 Pantalla: Hace falta una aprobación
@@ -2287,7 +2205,6 @@ aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» 
 Implicados: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
 
 ### BASE-F85 Consultar quién aprobó qué
-<!-- origen: old-hub:HUB_SHELL-F93 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Aprobaciones
@@ -2311,7 +2228,6 @@ lo dice con su motivo y no se descarga nada.
 Implicados: BASE-F84, BASE-F112 (dentro de la app)
 
 ### BASE-F86 Crear una llave de API y copiar su token
-<!-- origen: old-hub:HUB_SHELL-F94 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
@@ -2331,7 +2247,6 @@ publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.»
 Implicados: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotar una llave de API
-<!-- origen: old-hub:HUB_SHELL-F95 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
@@ -2347,7 +2262,6 @@ Actualiza la lista y vuelve a intentarlo.».
 Implicados: BASE-F86, BASE-F89
 
 ### BASE-F88 Revocar una llave de API
-<!-- origen: old-hub:HUB_SHELL-F96 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
@@ -2362,7 +2276,6 @@ Si falla: «No se pudo revocar la API key.».
 Implicados: BASE-F89
 
 ### BASE-F89 Ver las llaves de API y qué puede cada una
-<!-- origen: old-hub:HUB_SHELL-F97 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
@@ -2378,7 +2291,6 @@ que un sistema externo pueda leer o escribir datos de tu negocio.».
 Implicados: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Consultar la documentación de la API
-<!-- origen: old-hub:HUB_SHELL-F98 -->
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Documentación de la API
@@ -2400,7 +2312,6 @@ llamarla.».
 Implicados: BASE-F91, BASE-F86, BASE-F112 (dentro de la app)
 
 ### BASE-F91 Mostrar u ocultar la documentación de la API
-<!-- origen: old-hub:HUB_SHELL-F161 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
@@ -2425,15 +2336,15 @@ En las pantallas de Empleados y en la Documentación de la API:
 | Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
 
 ### BASE-F92 Abrir y cerrar el panel del asistente
-<!-- origen: old-hub:HUB_SHELL-F185 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra. En un móvil, los destellos y la campana (y «erplora.com», para quien lo tiene) van juntos
-     en «Más opciones» (con el número de la campana), para que el título siga centrado: ahí, «Asistente» abre el
-     panel y «Notificaciones», la campana.
+     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
+     campana), para que el título siga centrado: ahí, «Asistente» abre el panel en cuanto el menú termina de
+     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía; y «Notificaciones»
+     abre la campana.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -2450,7 +2361,6 @@ respuesta que ya viene: sigue escribiéndose y, si pide confirmación, la tarjet
 Implicados: BASE-F93, BASE-F97, BASE-F103, BASE-F104
 
 ### BASE-F93 Preguntar al asistente y leer cómo escribe
-<!-- origen: old-hub:HUB_SHELL-F186 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2467,7 +2377,9 @@ Pasos:
      pregunta, pero no se envía hasta que acaba esta.
   5. Si pregunta cómo se hace algo en ERPlora, qué significa una opción o qué incluye un plan («¿Cómo abro la caja?»),
      el asistente busca en la documentación de ERPlora (la ayuda, la de cada app y los planes) y contesta solo con lo
-     que dice, citando de qué sección sale; si la documentación no lo cubre, lo dice en lugar de inventarlo.
+     que dice, y termina la respuesta con una línea «Fuente: …» que nombra la sección de la que sale (sus títulos o, si
+     no los tiene, su ruta), para que la persona pueda comprobarla y leer más; si la documentación no lo cubre, lo dice
+     en lugar de inventarlo.
   6. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
   7. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
   8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del dispositivo, si la tiene, y «Dejar de
@@ -2483,7 +2395,6 @@ tampoco hay, bajo la respuesta dice «No se ha podido leer la respuesta en voz a
 Implicados: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Adjuntar un archivo o dictar por voz
-<!-- origen: old-hub:HUB_SHELL-F187 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2512,7 +2423,6 @@ audio. Inténtalo de nuevo.».
 Implicados: BASE-F93, BASE-F97
 
 ### BASE-F95 Leer la respuesta: texto, listas, tablas y enlaces
-<!-- origen: old-hub:HUB_SHELL-F188 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2530,7 +2440,6 @@ Si falla: una respuesta mal escrita se lee como texto: nunca se pierde ni rompe 
 Implicados: BASE-F96
 
 ### BASE-F96 Ir a una pantalla desde una respuesta
-<!-- origen: old-hub:HUB_SHELL-F189 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2550,7 +2459,6 @@ lo dice esa pantalla.
 Implicados: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirmar una acción antes de que se ejecute
-<!-- origen: old-hub:HUB_SHELL-F190 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Tarjeta de confirmación del asistente
@@ -2593,7 +2501,10 @@ Pasos:
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno),
      también el de un dato que su app no llama como el campo que lo nombra («Rectificativa: resto de causas (R4)», no «R4»); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     no lo pone, nunca por su código. Un registro que se dijo con palabras se busca como lo buscará la acción, también
+     dentro de otro (un plato dentro de su menú), y sale el que encuentra («Plato: Postres caseros» cuando se dijo
+     «postres»); si esas palabras valen para varios o para ninguno, salen tal como se dijeron; y si la acción no las usa
+     porque llega el identificador de su registro, ni se leen ni salen. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
      reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
      ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
@@ -2616,12 +2527,16 @@ alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asi
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
-llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Si se recarga la
-página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
+llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. «Ejecutar» vale solo
+para lo que enseña la tarjeta: si antes de pulsarlo cambia —la acción encuentra por su nombre otro registro, porque
+alguien ha creado uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4»), el registro cambia de
+nombre o lo que dice «Lo que va a pasar» ya no es lo mismo—, no se hace nada y sale la tarjeta nueva, para
+confirmarla otra vez; si lo que encontró ya no está, no sale tarjeta y el asistente lo cuenta como su error.
+«Cancelar» y lo escrito que no coincide valen igual aunque haya cambiado. Si se recarga la página con la tarjeta
+abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
 Implicados: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Acciones peligrosas: escribir para confirmar, o no desde el chat
-<!-- origen: old-hub:HUB_SHELL-F191 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Tarjeta de confirmación del asistente
@@ -2650,7 +2565,6 @@ asistente cuenta por qué.
 Implicados: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Comprobar lo que dice el asistente contra lo que de verdad hizo
-<!-- origen: old-hub:HUB_SHELL-F192 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2675,7 +2589,6 @@ avisos de lo que llegó a decir y los recibos de lo que sí se hizo.
 Implicados: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
-<!-- origen: old-hub:HUB_SHELL-F193 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2705,7 +2618,6 @@ cuenta.
 Implicados: BASE-F13, BASE-F84, BASE-F97
 
 ### BASE-F101 Pedirle varias cosas seguidas
-<!-- origen: old-hub:HUB_SHELL-F194 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2725,7 +2637,6 @@ cortada a mitad, BASE-F106.
 Implicados: BASE-F97, BASE-F106
 
 ### BASE-F102 La conversación: qué se guarda, dónde y cuándo se borra
-<!-- origen: old-hub:HUB_SHELL-F195 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2749,7 +2660,6 @@ conversación».
 Implicados: BASE-F59, BASE-F60, BASE-F61
 
 ### BASE-F103 El asistente en la puesta en marcha
-<!-- origen: old-hub:HUB_SHELL-F196 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2773,7 +2683,6 @@ caído nadie se queda sin salida.
 Implicados: BASE-F01, BASE-F12, BASE-F97
 
 ### BASE-F104 Ver el plan del asistente, el límite de uso y ampliarlo
-<!-- origen: old-hub:HUB_SHELL-F197 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2800,7 +2709,6 @@ responder es lo que vale. Si el pase de «Mejorar plan» no llega, se abre la di
 Implicados: BASE-F11, BASE-F106
 
 ### BASE-F105 Informar de una respuesta mala
-<!-- origen: old-hub:HUB_SHELL-F198 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2824,7 +2732,6 @@ escrito.
 Implicados: ASSISTANT-F23
 
 ### BASE-F106 El asistente sin conexión, con el servicio caído o sin plan
-<!-- origen: old-hub:HUB_SHELL-F199 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
@@ -2848,7 +2755,6 @@ Si falla: un fallo sin nada escrito no deja una burbuja vacía: solo la frase co
 Implicados: BASE-F93, BASE-F102, BASE-F104
 
 ### BASE-F107 Pasar la QA maestra del Hub
-<!-- origen: qa:shared/qa-hub -->
 Estado: hecho
 Actor: el equipo de QA de ERPlora
 Pantalla: todas las de la plataforma del hub
@@ -2872,7 +2778,6 @@ todavía los tipos de negocio o el asistente de pruebas, la QA no empieza y dice
 Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48, BASE-F92
 
 ### BASE-F108 Reportar un problema a soporte
-<!-- origen: nuevo (Ioan, 2026-10-25: «Reportar un problema» del menú de usuario en una ventana del hub, sin salir a la página de erplora.com de ACCOUNTS-F38) -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado (quien entró con su cuenta de erplora.com)
 Pantalla: El menú de usuario
@@ -2896,7 +2801,6 @@ para escribir directamente. En los dos casos lo escrito se queda y se puede volv
 Implicados: ACCOUNTS-F38, BASE-F40
 
 ### BASE-F109 Borrar un negocio eliminado pasados sus 90 días
-<!-- origen: nuevo (hub#599; PLAN-DB §6 «Baja»: lo que pasa el día 90) -->
 Estado: parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738)
 Actor: nadie: lo hace el Hub solo, sin que nadie pulse nada
 Pantalla: Ninguna; la dirección del negocio sigue diciendo «Este hub ya no está disponible.»
@@ -2927,7 +2831,6 @@ de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a 
 Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
 
 ### BASE-F110 Abrir la web del negocio por su dominio propio
-<!-- origen: nuevo (saas#195, HUBS-F17; PLAN-SAAS §37, punto 2) -->
 Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
 Actor: cualquiera, sin cuenta
 Pantalla: La página pública del negocio (WEBSITE-F10), en su dominio
@@ -2946,7 +2849,6 @@ en un momento.
 Implicados: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Esperar a la base de datos cuando se corta un momento
-<!-- origen: nuevo (PLAN-DB, ronda 2026-11-04e, punto 5: un reinicio, un mantenimiento de AWS o el cambio de versión cortan la base unos segundos; gemelo de ACCOUNTS-F50 de erplora.com) gh:hub#831 -->
 Estado: hecho
 Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
 Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
@@ -2982,7 +2884,6 @@ Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), todas las apps con cambios 
 de espera del Hub (un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
 
 ### BASE-F112 Guardar un archivo descargado dentro de la app
-<!-- origen: old-hub:HUB_SHELL-F126 old-hub:HUB_SHELL-F132 old-hub:HUB_SHELL-F173 (la parte del Hub de HUB_APP-F30 de ERPlora/app) gh:hub#1041 -->
 Estado: hecho
 Actor: cualquier persona del negocio que descarga un archivo en el Hub
 Pantalla: las que descargan un archivo que la pantalla ya tiene: VeriFactu › Configuración (el modelo del
@@ -3007,6 +2908,301 @@ ERPlora (Datos y copias › Copias) bajan por un enlace firmado y no pasan por a
 Implicados: HUB_APP-F30 (ERPlora/app), BASE-F35, BASE-F74, BASE-F85, BASE-F90, VERIFACTU-F05, ATTENDANCE-F10,
 INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 
+### BASE-F113 Seguir avisando con la pantalla apagada (app de Android)
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna; en Android, el aviso fijo «ERPlora está a la escucha»
+Pasos:
+  1. En la app de ERPlora, una persona entra en el negocio y oye algún aviso (una comanda nueva de Cocina, una cita
+     que pidió la clienta, un cliente que espera respuesta en WhatsApp), y Android no tiene negados los avisos.
+  2. Después de la pregunta de los avisos, si toca (HUB_APP-F07), el Hub pide a la app que se quede a la escucha, con
+     las palabras de su aviso fijo en el idioma de la persona: «ERPlora está a la escucha» y «Te avisará cuando algo
+     necesite tu atención, aunque la pantalla esté apagada.», en el canal «Avisos con la pantalla apagada».
+  3. Con la pantalla apagada o la app en segundo plano, los avisos siguen llegando al momento (KITCHEN-F16,
+     APPOINTMENT-F28).
+  4. Al cerrar la sesión, también por inactividad (BASE-F61), o cuando ya no queda nada que avisar (la app que avisaba
+     se desactiva), el Hub pide a la app que deje de escuchar; al cerrar la sesión, antes de salir de la página.
+Entra: los avisos que oye la persona y lo que dice Android de los avisos.
+Sale: la orden a la app de quedarse a la escucha o de dejarlo. En el Hub no se guarda nada.
+Si falla: con los avisos negados («Ahora no» a nuestra pregunta, o negados en Android), sin nada que avisar o sin saber
+qué dice Android, la app no se queda despierta. Una app sin esta orden (la 1.1.34 y la 1.1.35) la rechaza: el Hub lo anota en la
+consola, no se la vuelve a pedir en esa página y la persona no ve ningún error; los avisos llegan con la app en
+pantalla. Si Android no deja empezar, igual, y se vuelve a pedir en la siguiente entrada. Mientras el Hub
+no sabe aún si hay algo que avisar, no pide nada a la app: recargar la página no la para ni la vuelve a encender.
+Cerrar la sesión nunca espera a la app más de 2 segundos. En un navegador no hay app a la que pedírselo.
+Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, APPOINTMENT-F28, BASE-F61; hub#836
+
+### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
+Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
+clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
+las citas periódicas, los precios de tarifa, los grupos de suplementos que el negocio borró, con sus opciones, los
+grupos de suplementos de las categorías y de los productos, los menús que el negocio retiró y los platos que quitó de un
+menú y las elecciones de menú de los productos; crear y borrar el clúster temporal es el procedimiento «Devolver un
+negocio a un momento» de ERPlora/aws; una opción quitada de un grupo de suplementos que el negocio conserva, hub#1505)
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
+Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
+copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
+Pasos:
+  1. Un negocio pide volver a cómo estaban sus datos en un momento de los últimos días. El personal crea un clúster
+     temporal restaurado a ese momento y lo da de alta en Clústeres, cerrado a hubs nuevos.
+  2. En Hubs elige el negocio (o varios del mismo clúster) y la acción «Restaurar desde una copia…».
+  3. La página de confirmación explica lo que va a pasar, dice debajo de cada negocio el tamaño de su base de datos y
+     hasta cuánto puede estar cerrado («476,8 MB: cerrado hasta 2 minutos»; varios se restauran uno tras otro) y pide
+     el clúster temporal (solo salen los cerrados a hubs nuevos) y el momento con su zona horaria
+     («2026-11-09T14:30:00Z es UTC»). Pulsa **Restaurarlos**.
+  4. Sale «1 hub se restaurará desde <clúster> tal como estaba el 2026-11-09 14:30 UTC: cerrado mientras se restaura,
+     hasta 2 minutos. Si se rechaza, su ficha dice por qué en «último error».» (con varios, el tiempo de todos). Mientras
+     dura, la lista dice en la columna del clúster de dónde viene la copia («<su clúster> ← <clúster temporal>»), y quien
+     abre el negocio ve que está en mantenimiento.
+  5. Cuando acaba, en ese tiempo como mucho, el sistema ha copiado la base del negocio desde el clúster temporal, ha
+     guardado aparte la que tenía y ha puesto la copia en su sitio. El negocio vuelve a abrirse con sus datos de ese momento y la flecha desaparece de la
+     lista.
+  En una copia aparte (hub#1213), para un negocio que factura con VeriFactu en producción o cuando solo se quiere
+  recuperar lo perdido sin tocar lo demás:
+  6. En Hubs elige el negocio y la acción «Restaurar en una copia aparte…». La misma página pide el clúster temporal y
+     el momento, y explica que el negocio sigue abierto sin cambiar nada y que la copia no es un negocio: nadie la abre y
+     nada de ella se envía a Hacienda. Pulsa **Hacer las copias**.
+  7. Sale «1 hub tendrá una copia aparte tal como estaba el 2026-11-09 14:30 UTC, hecha desde <clúster>: el negocio
+     sigue abierto tal como está. Copias aparte la lista y dice si no se pudo hacer.». El negocio no se cierra ni un
+     segundo.
+  8. En Copias aparte la ve «Haciéndose» y, unos minutos después, «Hecha», con su momento y hasta cuándo se guarda
+     (7 días); su ficha dice además su base de datos, su clúster, quién la pidió y cuándo. Si no se pudo hacer, dice «No
+     se pudo hacer» y por qué en «último error».
+  Recuperar en el negocio lo que la copia aparte tiene y al negocio le falta (hub#1257):
+  9. En Copias aparte elige la copia hecha y la acción «Recuperar en el negocio…». La página explica que lo que el
+     negocio eliminó y aún guarda vuelve tal como era, con su historial, y que lo que ya no tiene se crea de nuevo como lo
+     crea su propia pantalla, sin copiar nada; que lo que el negocio tiene, o ha vuelto a crear, se queda como está,
+     salvo una cosa: una categoría que vuelve recupera lo que tenía dentro y el negocio aún conserva, sin sacarlo de
+     donde el negocio lo haya puesto después; que los registros para Hacienda no se recuperan nunca y que el negocio
+     sigue abierto. Y que lo que vuelve no es nada
+     nuevo para el negocio: no arranca ninguna de sus automatizaciones, así que a nadie se le da la bienvenida ni se le
+     avisa otra vez de una cita que ya tenía (hub#1307).
+     Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
+     Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios, Enlaces de servicios a
+     categorías, Enlaces de subcategorías a categorías**, **Citas, Citas periódicas**, **Precios de tarifa**,
+     **Menús, Platos de menú, Elecciones de menú de productos** y **Grupos de suplementos, Grupos de suplementos de
+     categorías, Grupos de suplementos de productos**). Pulsa **Recuperar**.
+  10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
+      Categorías de servicios, Servicios, Enlaces de servicios a categorías, Enlaces de subcategorías a categorías,
+      Citas, Citas periódicas, Precios de tarifa, Menús, Platos de menú, Elecciones de menú de productos, Grupos de
+      suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos a su negocio en unos minutos:
+      Recuperaciones dice cómo
+      fue.». En
+      Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
+  11. Unos minutos después dice «Hecha» y qué volvió, cada cosa aparte y con su nombre: «Clientes: se restauró 1, se
+      crearon 2» o «Clientes: se crearon 2, 1 sin crear». Su ficha dice además cuáles no volvieron y por qué (por su identificador en la copia, sin datos
+      personales). Si uno volvió sin algo de lo que tenía, su cuenta lo dice («Servicios: se crearon 2, 1 con notas») y
+      su ficha, en «notas», qué le falta y por qué, por su identificador en la copia. Un cliente que el negocio eliminó y
+      aún guarda vuelve LA MISMA ficha, con sus compras y lo gastado, sus
+      consentimientos, notas y actividad, sus grupos, etiquetas y campos propios y sus pedidos enlazados (CUSTOMER-F33).
+      Uno que el negocio ya no tiene vuelve como ficha nueva, creada como la crea la pantalla de Clientes, con su nombre,
+      contacto, NIF, dirección, fechas, origen, etapa, canal y notas, y con sus grupos, etiquetas y campos propios: el
+      grupo, la etiqueta o el campo que el negocio tiene con ese nombre es ese, sin hacer otro, y el que ya no tiene se
+      vuelve a crear como estaba (hub#1285); un valor de un campo que el negocio desactivó, o que su campo ya no
+      admite, no vuelve, y la ficha vuelve sin él, con su nota («Clientes: se crearon 2, 1 con notas»; hub#1438). A una ficha
+      eliminada que vuelve le vuelven también el grupo, la etiqueta o el campo propio que el negocio borró después, igual
+      que a la ficha nueva (hub#1356); lo que el negocio aún tiene se queda como está, aunque la sacara de un grupo o le
+      quitara un valor antes de eliminarla, y un valor que ya tiene en un campo que el negocio volvió a crear se queda.
+      Nunca vuelve una ficha cuyos datos personales se borraron (RGPD) ni una que se unió a otra, ni se repite una que el
+      negocio ya volvió a crear (el mismo nombre, teléfono y email). Con Productos, «Categorías de productos: se
+      creó 1; Productos: se restauró 1, se creó 1; Enlaces de productos a categorías: se creó 1» (las categorías, los
+      productos y los enlaces que volvieron, cada uno con su cuenta): primero vuelve
+      cada categoría de productos que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como la
+      crea la pantalla de Categorías, con su nombre, slug, descripción, icono, color, orden y categoría fiscal; la
+      eliminada sigue eliminada (INVENTORY-F07). Una que el negocio conserva, aunque la renombrara, es la misma, y una
+      que ya volvió a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios, que no sea ya una de la
+      copia; la más antigua si hay dos) no se repite: se usa la suya, tal como está. Después, un producto que el negocio
+      eliminó y aún guarda vuelve EL MISMO y cuenta como restaurado, con su stock, sus categorías que siguen vivas, la que
+      acaba de volver si la tenía en la copia, su imagen de la librería (la que tenía en la copia si lo eliminó antes de
+      que eliminar se la dejara y se quedó sin ninguna) y en Movimientos su historial entero, activo y a la venta
+      (INVENTORY-F34).
+      Uno que el negocio ya no tiene vuelve como uno nuevo, creado como lo crea la pantalla de Productos, con su nombre,
+      SKU, EAN-13, descripción, tipo, precio, coste, unidades, umbral, control de stock y categoría fiscal, activo o
+      desactivado como estaba y en sus categorías: la misma si el negocio aún la tiene, y si no, la que acaba de volver
+      o la que el negocio volvió a crear con su nombre; sin stock, que se cuenta (INVENTORY-F14), porque el de la copia es
+      de otro día, y con la imagen de la librería que tenía (una que la librería ya no tiene, no; una foto propia,
+      nunca, porque se borró con el producto). No vuelve ni se repite uno que el negocio ya volvió a dar de alta (otro
+      vivo con su SKU o su EAN-13). Al final, los productos que el negocio conserva vivos y estaban en la copia en una
+      categoría que acaba de volver vuelven a ella, sin perder ninguna otra (INVENTORY-F07): es lo único que la
+      recuperación toca de lo que el negocio tiene, y se cuenta aparte, como «Enlaces de productos a categorías». Una
+      categoría que el negocio conserva (aunque le quitara productos) o que volvió a crear a mano no se rellena. Con
+      Servicios,
+      «Categorías de servicios: se creó 1; Servicios: se crearon 2; Enlaces de servicios a categorías: se crearon 3;
+      Enlaces de subcategorías a categorías: se creó 1» (las categorías, los servicios y lo que el negocio conservaba y
+      volvió a ellas, cada uno con su cuenta): primero
+      vuelve cada categoría de servicios que el negocio ya no tiene (la eliminó o la perdió), como una nueva, creada como
+      la crea la pantalla de Categorías, con su nombre, descripción, icono, color y orden, dentro de su categoría padre si
+      el negocio la tiene o vuelve también (si no, en la raíz); la eliminada sigue eliminada. Al final vuelve a ella lo
+      que tenía dentro en la copia y el negocio conserva donde lo dejó eliminarla (SERVICE-F08): sus servicios que siguen
+      sin categoría, archivados también, y sus subcategorías que siguen colgando de donde colgaba ella (la raíz, si estaba
+      en la raíz), cada uno cambiado como lo cambia la pantalla: es lo que la recuperación toca de lo que el negocio
+      tiene, y se cuenta aparte, como «Enlaces de servicios a categorías» y «Enlaces de subcategorías a categorías»; si
+      el negocio lo mueve mientras tanto, se queda donde lo puso y se cuenta «sin crear» con su porqué
+      (`service.service_moved`), y si lo cambia sin moverlo mientras vuelve la categoría (otro precio, otro icono), se
+      queda como lo dejó y se cuenta igual, «sin crear» con su porqué («service.service_changed: volvió sin el servicio
+      <su identificador>: el negocio lo cambió mientras tanto», o `service.subcategory_changed`). Lo que el negocio
+      movió después (un servicio en otra categoría, una subcategoría en otro sitio) se queda donde está, y la cuenta de
+      la categoría lo dice («Categorías de
+      servicios: se creó 1, 1 con notas»), con el porqué en sus notas («service.service_moved: volvió sin el servicio <su
+      identificador>: se movió a otra categoría después»). Una que el negocio ya volvió
+      a crear (otra viva con su nombre, sin distinguir mayúsculas ni espacios) no se repite: se usa la suya, tal como está,
+      y no se rellena, como tampoco la que trajo una recuperación anterior si se pide otra vez. Si aquella recuperación
+      falló a medias, pedirla otra vez desde la misma copia termina lo que dejó: lo que el negocio conserva sin tocar
+      desde que volvió la categoría vuelve a ella, contado en sus enlaces.
+      Después, cada servicio que el negocio ya no tiene vuelve como uno nuevo, en oferta, creado como lo crea la pantalla
+      de Servicios, con su nombre, tarifa, precios, coste, duración, márgenes, capacidad, descripciones, reservas, orden,
+      destacado, SKU, código de barras y notas, su categoría fiscal y su categoría: la misma si el negocio aún la tiene,
+      y si no, la que acaba de volver o la que el negocio volvió a crear con su nombre; y con los profesionales que lo
+      hacían y el negocio sigue teniendo de alta, cada uno con sus minutos y su precio propios, asignados como los asigna
+      Servicios (SERVICE-F31): como su servicio principal si el negocio no le ha dado otro desde entonces, y apagado si lo
+      estaba. A quien Personal dio de baja, o el negocio ya no tiene, no se le asigna, porque ya no se le puede reservar,
+      y Recuperaciones lo dice en las notas del servicio («service.member_terminated: volvió sin el profesional <su
+      identificador>: dado de baja en Personal», o «…: ya no está en Personal»). Vuelve con la imagen de la librería que
+      tenía, como la pone Servicios (SERVICE-F34): una que la librería ya no tiene, no; una foto propia, nunca, porque la
+      copia aparte es de la base de datos y no de los ficheros. Uno archivado sigue
+      en el negocio y no vuelve (se restaura en Servicios), tampoco uno que la copia tenía archivado, y no se repite uno
+      que el negocio ya volvió a crear (otro con el mismo nombre en la misma categoría, que no sea ya uno de la copia; cada
+      uno vale por uno solo, así que dos servicios con el mismo nombre vuelven los dos). Pedirlo otra vez no crea nada
+      dos veces.
+      Con Citas, «Citas: se restauró 1; Citas periódicas: se restauró 1» (las citas y las citas periódicas que
+      volvieron, cada una con su cuenta).
+      Las citas van siempre después de los clientes y los servicios, se pidan en el orden que se pidan, para que cada
+      una encuentre a su clienta y sus servicios. Vuelve cada cita que aún no ha llegado y seguía reservada (pendiente o
+      confirmada, sin cobrar). Una que el negocio borró y aún guarda vuelve LA MISMA y cuenta como restaurada, tal como
+      estaba al borrarla: con su número, su clienta, sus servicios, su profesional, su hora, sus notas, su serie y su
+      historial, que suma «Recuperada» (APPOINTMENT-F11). Una que el negocio ya no tiene vuelve reservada como la reserva
+      la agenda: para la ficha de su clienta en el negocio (la misma, aquella en la que se unió o la que se volvió a
+      crear), con sus servicios en el negocio como los empareja Servicios (el mismo o, si ya no está, el que se volvió a
+      crear a mano o acaba de volver con Servicios: el mismo nombre en la misma categoría, el más antiguo si hay dos), su
+      profesional, su hora, sus minutos y sus notas; como cita nueva, con otro número y sin su historial. Nunca se
+      reserva encima de otra: una cuya hora ya está ocupada, ya no encaja en el horario del negocio o del profesional o
+      está bloqueada, o cuya clienta, servicio o profesional ya no están, no vuelve y su motivo lo dice
+      («appointment.slot_taken: …», «service.service_not_found: …»); una borrada que no vuelve por eso no se crea de
+      nuevo. Las que ya pasaron no vuelven, y tampoco una que el negocio tiene (aunque la cancelara) o que volvió a
+      reservar (la misma clienta a la misma hora, o su serie en esa fecha).
+      Detrás de las citas van sus citas periódicas, las que en la copia seguían reservando (activas, con su profesional y
+      sin terminar). Una que el negocio borró y aún guarda vuelve LA MISMA a Periódicas y cuenta como restaurada: activa,
+      con su clienta, sus servicios, su profesional, su repetición y las citas que ya había reservado (APPOINTMENT-F15).
+      No reserva nada por sí sola, así que nada se reserva dos veces: sus fechas siguientes las reserva «Reservar citas»,
+      que salta las que ya tienen cita. Una que el negocio ya no tiene se crea de nuevo como la crea Periódicas
+      (APPOINTMENT-F12), para la ficha de su clienta y sus servicios en el negocio como las citas, y reserva solo las
+      fechas de su ventana que aún caben: ninguna en la que ya volvió una cita. Si su clienta ya no está o su profesional
+      o uno de sus servicios ya no se reservan, no vuelve y su motivo lo dice; una que el negocio volvió a crear (la
+      misma clienta, que se repite igual el mismo día a la misma hora) se queda como está.
+      Los precios de tarifa van siempre después de los productos: «Precios de tarifa: se crearon 2». Cada precio de la
+      copia que el negocio ya no tiene vuelve a su tarifa, con su precio y su «desde cantidad», puesto como lo pone el
+      detalle de la tarifa, así que un producto eliminado que vuelve, el mismo o como uno nuevo, recupera sus precios en
+      las tarifas donde estaba (PRICING-F15), y un servicio que vuelve como uno nuevo, también: van después de los
+      servicios, al que la recuperación hizo por él (uno que el negocio volvió a crear a mano no recibe ninguno, y el
+      precio dice por qué). No se repite uno cuyo sitio (la misma tarifa, el mismo producto o
+      servicio y la misma «desde cantidad») el negocio ya volvió a ocupar: se queda el suyo. Uno que la tarifa no acepta hoy (desactivada, o su
+      producto sigue eliminado) no vuelve y su motivo lo dice. Las reglas de descuento del producto, que eliminarlo solo
+      apagó, se vuelven a encender solas con él (PRICING-F14).
+      Los grupos de suplementos de los productos van también después de los productos: «Grupos de suplementos de
+      productos: se crearon 2». Cada grupo que en la copia colgaba de un producto vivo allí y que el negocio ya no tiene
+      enganchado a ese producto se vuelve a enganchar, como lo engancha la hoja del grupo, así que un producto eliminado
+      que vuelve, el mismo o como uno nuevo, pregunta otra vez en el TPV sus salsas, su punto o sus extras
+      (MODIFIER-F10). No se repite uno cuyo grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno
+      que la hoja del grupo no acepta hoy (su producto sigue eliminado, o el negocio ya hizo otro a mano con su SKU, o
+      borró el grupo y ya hizo otro a mano con su nombre) no vuelve y su motivo lo dice. Justo antes van, contados aparte, los grupos de suplementos de las
+      categorías: «Grupos de suplementos de categorías: se crearon 2». Cada grupo que en la copia colgaba de una
+      categoría viva allí y que el negocio ya no tiene enganchado a ella se vuelve a enganchar del mismo modo: a la
+      misma categoría si el negocio la conserva, o a la que la recuperación trajo por ella con su nombre, así que sus
+      productos vuelven a preguntarlo en el TPV. Una categoría que sigue eliminada o que el negocio volvió a crear a mano
+      se queda sin él, y su motivo lo dice. Y antes de los enganches, contados aparte, los propios grupos: «Grupos de
+      suplementos: se creó 1». Cada grupo que la copia tiene y el negocio ya no (lo borró, con sus opciones y sus
+      enganches) se vuelve a crear como lo crea la pantalla de Suplementos, con sus opciones como las añade la hoja del
+      grupo, y sus enganches de la copia se le hacen a ese, así que vuelve a salir en el TPV con sus opciones y sus
+      suplementos (MODIFIER-F10). Uno que el negocio volvió a crear a mano con su nombre se queda como está, sin otro
+      igual, y uno que conserva, con las opciones que tenga. Una opción que la hoja del grupo no acepta hoy (su categoría
+      fiscal propia ya no está activa en Impuestos) no vuelve: el grupo vuelve sin ella y su nota lo dice («Grupos de
+      suplementos: se creó 1, 1 con notas»).
+      Las elecciones de menú de los productos van también después de los productos: «Elecciones de menú de productos:
+      se crearon 2». Cada elección que en la copia ofrecía un producto vivo allí y que el negocio ya no tiene se vuelve a
+      añadir a su plato, como la añade el constructor del menú, con su suplemento y, si estaba agotada, agotada, así que
+      un producto que vuelve, el mismo o como uno nuevo, sale otra vez en sus menús del TPV (COMBO-F15). No se repite una
+      que el negocio aún tiene, aunque le cambiara el producto, ni una cuyo producto el negocio ya volvió a ofrecer en ese
+      plato: se queda la suya. Una que el constructor no acepta hoy (su producto sigue eliminado o está desactivado, o el
+      negocio ya hizo otro a mano con su SKU) no vuelve y su motivo lo dice. Justo antes van, contados aparte, los menús
+      y sus platos: «Menús: se creó 1; Platos de menú: se crearon 2». Cada menú que la copia tiene y el negocio retiró
+      (con sus platos y sus elecciones) se vuelve a crear como lo crea la pantalla de Menús, con su precio, su categoría
+      fiscal y la imagen de la librería que tenía; después, cada plato que su menú ya no tiene (el menú acaba de volver
+      o el negocio quitó el plato) se vuelve a añadir al final del menú como lo añade el constructor, y sus elecciones
+      van a ese plato, así que el menú vuelve a salir en el TPV con sus platos y sus suplementos (COMBO-F15). Uno que el
+      negocio volvió a crear a mano con su nombre (el menú, o el plato en su menú) se queda como está, sin otro igual, y
+      lo que en la copia colgaba de él no vuelve y su motivo lo dice; lo que vuelve se reconoce aunque se renombre, así
+      que pedirlo otra vez no lo repite.
+Entra: los negocios elegidos, el clúster temporal con su copia y el momento; para recuperar, la copia aparte hecha y qué
+recuperar.
+Sale: la base del negocio como estaba en ese momento; la que tenía, guardada 7 días en su servidor; el aviso
+`control.hub.restore_requested` con quién lo pidió. Los demás negocios no notan nada. En una copia aparte: el negocio
+tal como estaba, sin tocarlo; una base aparte en su clúster con los datos de ese momento, cerrada a la aplicación y
+guardada 7 días; el aviso `control.hub.restore_aside_requested` con quién lo pidió. Al recuperar: en el negocio, cada ficha
+eliminada que aún guardaba, viva otra vez con su aviso de ficha recuperada (`customer.customer.restored`), una ficha
+nueva por cada cliente que ya no tenía, con su aviso de ficha creada (`customer.customer.created`), y en las dos los de
+sus grupos y etiquetas puestos (`customer.customer.groups_changed`, `customer.customer.tags_changed`), cada grupo, etiqueta o campo
+propio que le faltaba hecho otra vez, con su aviso (`customer.group.created`, `customer.tag.created`,
+`customer.field.created`, y `customer.group.updated` o `customer.tag.updated` si estaba desactivado), una categoría de
+productos nueva por cada una que le faltaba, con su aviso de categoría creada (`inventory.category.created`) y el de cada
+producto eliminado que vuelve en ella (`inventory.product.categorized`), cada producto
+eliminado que aún guardaba, vivo otra vez con su aviso de producto recuperado (`inventory.product.restored`), un
+producto nuevo por cada producto que ya no tenía, con su aviso de producto creado (`inventory.product.created`), una
+categoría de servicios nueva por cada una que le faltaba, con su aviso de categoría creada (`service.category.created`)
+y el de cada servicio o subcategoría que el negocio conservaba y vuelve a ella (`service.service.updated`,
+`service.category.updated`), un servicio nuevo por cada uno que ya no tenía, con su aviso de servicio creado (`service.service.created`) y uno de
+profesional asignado (`service.assignment.assigned`) por cada profesional que vuelve con él, cada cita borrada que aún
+guardaba, viva otra vez con su aviso de cita recuperada (`appointment.appointment.restored`), una cita nueva por cada
+una que ya no tenía, con su aviso de cita creada (`appointment.appointment.created`), cada cita periódica borrada que
+aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.recurring.restored`), una cita periódica
+nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
+reserva, un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
+un grupo de suplementos nuevo por cada uno que le faltaba, con su aviso de grupo creado (`modifier.group.created`) y el
+de cada una de sus opciones (`modifier.option.created`), un grupo de suplementos enganchado a una categoría o a un producto por cada uno que le faltaba, con su aviso de enganche
+hecho (`modifier.link.attached`), un menú por cada uno que le faltaba, con su aviso de menú nuevo (`combo.combo.created`),
+un plato por cada uno que le faltaba, con su aviso de plato nuevo (`combo.group.created`), y una elección de menú por
+cada una que le faltaba, con su aviso de elección nueva (`combo.option.created`), y nada más. Cada uno
+de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
+que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
+solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación;
+Tarifas vuelve a encender las reglas del producto que vuelve, `pricing.rule.activated`), y lo
+que graba al hacerlo lleva la misma marca, así que tampoco arranca ninguna, ni de primera ni de segunda mano (la
+conversación enlazada otra vez no arranca «se vincula una conversación de WhatsApp a un cliente»; hub#1365). La
+copia, sin tocar; el aviso `control.copy.recovery_requested` con quién lo pidió.
+Si falla: lo que la restauración no admite lo dice el aviso, negocio a negocio, y ese negocio no se toca: uno que no está
+listo o no tiene base propia, una demo, uno que se está trasladando o restaurando, un clúster abierto a hubs nuevos o con
+negocios vivos, el propio clúster del negocio, una copia que no está en ese clúster o que es demasiado grande, y un
+momento que aún no ha llegado. Sin clúster o sin momento, la página los vuelve a pedir. Si el negocio tiene registros
+VeriFactu de producción hechos, enviados o cambiados después de ese momento, no se restaura y no cambia nada, porque
+volvería a usar números que la AEAT ya tiene: su ficha lo dice en «último error» («restore_fiscal_records: …»); para ese
+caso está «Restaurar en una copia aparte…», que no los compara porque no toca el negocio. Cualquier otro fallo deshace la
+restauración sola: el negocio sigue con su base de siempre y su ficha dice por qué. Una copia aparte admite lo mismo que
+la restauración y lo que no admite lo dice el aviso igual; si falla al hacerla, no queda nada de ella y Copias aparte dice
+por qué («restore_aside_<paso>: …»); el negocio no se entera. Recuperar solo se puede desde una copia hecha y una sola
+vez a la vez por copia; si no, el aviso lo dice («Solo una copia aparte ya hecha devuelve algo.»), y sin nada marcado la
+página lo vuelve a pedir. Lo que no se puede traer de una app lo dice su resultado y lo demás sigue: la app está apagada en
+el negocio («Clientes: nada (app_inactive: …)»; en una app que devuelve varias cosas, cada una lo dice: «Categorías de
+servicios: nada (app_inactive: …); Servicios: nada (app_inactive: …)»), o la copia no la tenía, le falta la migración que su lectura necesita o
+tiene una que este código no conoce (`recover_not_in_copy`, `recover_copy_behind`, `recover_copy_ahead`). Lo que la
+operación de crear no acepta hoy (un teléfono que ya no vale, un producto sin categoría fiscal o con una que Impuestos
+ya no tiene activa, un servicio cuya categoría fiscal se desactivó (`service.tax_category_unknown`), una hora ocupada,
+una clienta que ya no está, un servicio que el negocio ya no tiene ni volvió a crear) se cuenta «sin crear» con su
+motivo, y lo demás vuelve; también una ficha eliminada que
+entretanto se unió a otra o se borró («customer.customer_unavailable: …»). Si la copia ya no está,
+la recuperación dice «No se pudo hacer» y por qué («recover_copy_unreadable: …»). Mientras el negocio se traslada o se
+restaura, la recuperación espera sin hacer nada. Con la plataforma congelada para una subida de la base de datos, la restauración espera, con el negocio en
+mantenimiento, hasta que se descongela. Con registros solo del entorno de pruebas, después se recupera la cadena
+(VERIFACTU-F28). El personal de soporte ve la lista, Copias aparte y Recuperaciones, pero no las acciones.
+Implicados: VERIFACTU-F28, BASE-F111 (la misma página de espera que un traslado), CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06,
+CUSTOMER-F07, CUSTOMER-F12, CUSTOMER-F13, CUSTOMER-F16, CUSTOMER-F29, CUSTOMER-F33, INVENTORY-F01, INVENTORY-F04,
+INVENTORY-F07, INVENTORY-F30, INVENTORY-F34, SERVICE-F01, SERVICE-F04, SERVICE-F05, SERVICE-F07, SERVICE-F08,
+SERVICE-F31, SERVICE-F34, APPOINTMENT-F01, APPOINTMENT-F10, APPOINTMENT-F11, APPOINTMENT-F12, APPOINTMENT-F15, PRICING-F07,
+PRICING-F14, PRICING-F15, MODIFIER-F02, MODIFIER-F04, MODIFIER-F05, MODIFIER-F10, COMBO-F04, COMBO-F05, COMBO-F06, COMBO-F15, FLOW-F21, WHATSAPP_INBOX-F04; hub#1198,
+hub#1213, hub#1257,
+hub#1282, hub#1283, hub#1284,
+hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, hub#1326, hub#1327, hub#1341, hub#1343,
+hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
+hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
+
 ## Para quien lo mantiene
 
 - **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
@@ -3027,7 +3223,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   rechaza ninguna foto y nunca se sirve la web equivocada. `custom_domains.served_on(hub)` dice en qué dominio abre la
   puerta la web de un negocio ahora (el de su fila, si el mapa se lo da a él), y es lo que su página nombra como
   dirección principal (WEBSITE-F10, hub#818).
-- **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
+- **Orden de una lista** (`base/ordering.py`): `list_order(*columnas, descending=…,
   nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
   lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.
   `list_order_for(sort, *desempates, columns=…, nulls_last=…)` es lo mismo para un `sort` que dice su dirección con un
@@ -3038,7 +3234,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
   `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
-  `base/home.py` (sin ORM): las del `setup_status.rs` del hub viejo.
+  `base/home.py` (sin ORM).
 - Punto de extensión: cada módulo declara en su `LiveAppConfig` `setup` (`SetupStep`), `widgets`
   (`Widget`) y `bell` (`BellCounter`), dataclasses de `live.meta` comprobadas por `live.checks`
   (E009–E016). Cada consulta que nombran es un `kind="query"` de la propia app; base la ejecuta como la
@@ -3046,8 +3242,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 - País: un paso con `countries` solo sale en un hub de esos países (`home.applies_to_country`); el país del hub
   se lee con `base.business.country_or_market`, la única lectura de la plataforma: sin país (una demo, el hub de
   ERPlora sin fila) es `MARKET_COUNTRY`, España, el mercado de ERPlora, como lo cuenta VeriFactu
-  (`queries.outside_spain` la usa). Invierte la regla del hub viejo («un hub sin país no recibe pasos
-  nacionales»), hub#682.
+  (`queries.outside_spain` la usa), hub#682.
 - Nivel: ⛔ `legal` para `LEGAL_STEPS` (`invoice.business_identity`) y, donde la primera fila de su propia
   consulta dice que el hub presenta en producción, para `LEGAL_IN_PRODUCTION` (`verifactu.sending_route`, con
   `environment` de `verifactu.config.get`: sin vía lista en producción se rechaza toda venta; en pruebas se vende
@@ -3060,17 +3255,17 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
 - `base/live.py`: cada consulta se re-ejecuta tras los eventos de `refresh_on` de su gancho más
   `base.hub.state_applied` (la foto del SaaS puede encender o apagar apps). Escribir en el hub B no avisa
   al A (test de dos hubs en `base/tests/test_queries_home.py`).
-- Campana por reloj (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): un contador cuya cifra cambia porque pasa el
+- Campana por reloj: un contador cuya cifra cambia porque pasa el
   tiempo, sin evento (un trabajo que lleva un minuto en cola sin dispositivo vivo), lo dice su módulo en
   `bell_refresh_every` de su `LiveAppConfig` (clave del contador → segundos; la forma de `scheduled_tasks` y
   `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home.py`) exige claves de su propio `bell` y
-  segundos enteros desde `MIN_BELL_REFRESH_SECONDS` (30, el ritmo de la campana vieja). `base.bell.counters` devuelve
+  segundos enteros desde `MIN_BELL_REFRESH_SECONDS` (30). `base.bell.counters` devuelve
   `refresh_every`, el menor de los contadores que la persona puede ver de las apps encendidas (también a cero: es el
   tiempo el que los sube), y `HubBell.vue` vuelve a leer `GET /api/home/bell` cada tantos segundos mientras la página
   está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se descarta, y una que falla deja
-  lo último. Sin `refresh_every`, la campana solo se mueve por eventos, como antes. Tests: `test_home.py`,
+  lo último. Sin `refresh_every`, la campana solo se mueve por eventos. Tests: `test_home.py`,
   `test_queries_home.py` y `HubBell.test.ts`.
-- Presencia del dispositivo que imprime (misma tarea; el `heartbeat` de `print_hosts.rs` del hub viejo): la app que
+- Presencia del dispositivo que imprime (misma tarea): la app que
   lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
   `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
   mientras imprime para alguna impresora, como mucho una vez cada `PRESENCE_SECONDS` (15 s, medio latido). Si falla,
@@ -3090,7 +3285,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
-- Apps obligatorias por país (hub#997, PLAN-HUB ronda 2026-11-07, BASE-F01): una app declara en su `LiveAppConfig`
+- Apps obligatorias por país (hub#997, BASE-F01): una app declara en su `LiveAppConfig`
   `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
   plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
   con la AEAT). `base.E016` (`base/home.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
@@ -3100,7 +3295,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
   (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
   `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
-  (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
+  (`creating`) el paso sigue: todavía no está encendida. Tests:
   `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
   hubs reales) y `apps/tax/tests/test_apps.py`.
   Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
@@ -3115,20 +3310,29 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
   reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
   `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
+  Al alta nacen encendidas (hub#997, parte 3; BASE-F63, F14, F01): `activation.born_on(país)` da las obligatorias del
+  país que dicen `platform_turns_on`, y `activation.born_apps(país)` les suma lo que necesitan. `provision._prepare` hace
+  sus tablas en `migrating` (junto a las del vertical) y, en `seeding`, tras la semilla y antes de la foto del SaaS
+  (cuyos bloques son de las apps encendidas), `services.turn_on_born_apps` escribe todas las filas del negocio: esas
+  `on` y sin elegir (no gastan `max_apps`), las demás `off`, y olvida lo que la caché guardaba de sus apps. Si la semilla
+  ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
+  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries._platform_steps`) no cuenta
+  las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
+  apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
+  negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
+  `tests/e2e/base-sign-up-taxes-on.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
   fecha (`17 oct`); una etiqueta que no es un día se queda tal cual. Encima de las barras salen el día entero y el
-  importe (`options.format`) de la barra elegida: la última hasta que se toca o enfoca otra (gh:hub#2392 del hub
-  viejo; `tests/e2e/fix-hub-home-chart-iso-day-labels.spec.ts`).
-- Un panel `bar-list` cuyo `map` declara `color` pinta cada barra con el color de su fila (`renderBarList` del hub
-  viejo: `color: row[map.color]`), solo si es un hex `#rgb` o `#rrggbb` (`HEX_COLOR` de `base/frontend/lib/home.ts`):
+  importe (`options.format`) de la barra elegida: la última hasta que se toca o enfoca otra (`tests/e2e/fix-hub-home-chart-iso-day-labels.spec.ts`).
+- Un panel `bar-list` cuyo `map` declara `color` pinta cada barra con el color de su fila (`color: row[map.color]`), solo si es un hex `#rgb` o `#rrggbb` (`HEX_COLOR` de `base/frontend/lib/home.ts`):
   lo teclea una persona y va al estilo de la barra, así que cualquier otra cosa (un nombre CSS, `var(…)`, `url(…)`)
   pinta como sin `map.color`. Una barra negativa no lleva color: su rojo gana, porque una alarma pesa más que la
   categoría (las barras de datos de Excel con su relleno de negativo, el formato condicional de Power BI sobre los
-  colores de categoría, los umbrales de Grafana sobre su color fijo; FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR).
+  colores de categoría, los umbrales de Grafana sobre su color fijo).
   Un color claro casi no se ve sobre la pista gris: el contraste es el del color que eligió quien lo tecleó. Un
-  `chart` no pinta `map.color` (el hub viejo tampoco).
+  `chart` no pinta `map.color`.
 - Un panel `timeline` dice cuándo pasó cada entrada con `formatMoment` de `base/frontend/lib/home.ts` (`Intl`, en
   la zona del dispositivo: el Hub aún no tiene la del negocio en el navegador, gh:hub#1212): de hoy, la hora sola;
   de ayer, la palabra de `Intl.RelativeTimeFormat` y la hora; antes, la fecha corta y la hora (con el año si es de
@@ -3144,7 +3348,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `SAAS_URL/dashboard/store/plans?business=<id del hub>`) y `widget-list`, `base.widget.list` tal como su consulta viva se lo
   contesta a la persona (sin el permiso del Inicio no va): `WidgetBoard.vue` monta sus paneles con él, así que los
   datos de los paneles van en el mismo flujo vivo que la lista y el Inicio abre un solo `/api/live` por carga
-  (antes lo reabría al llegar la lista, `net::ERR_ABORTED`, con cada consulta dos veces); manda la respuesta viva.
+  (sin él lo reabriría al llegar la lista, `net::ERR_ABORTED`, con cada consulta dos veces); manda la respuesta viva.
   Lo comprueban `test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream` y
   `tests/e2e/base-home.spec.ts` («one live stream»).
 - Las piezas de base en el marco (`CHROME` de `frontend/main.ts`: la campana, las apps seguidas junto al panel, la
@@ -3152,18 +3356,15 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   monta cuando han llegado (o han fallado: una que no carga lo vuelve a intentar al pintarse y Vue lo pasa al informe
   de errores de base), y como mucho 3 s (`CHROME_WAIT_MS`): un trozo que la red deja colgado nunca deja la página en
   blanco; monta sin él, lo avisa en la consola y la pieza se pinta cuando llega. Así sus consultas vivas (`base.bell.counters`, `base.app.list`, `base.setup.status`) van en el
-  mismo `/api/live` de la pantalla. Antes se montaban al llegar su trozo, y con un equipo lento (la CPU de la pestaña
-  ×6) llegaban más de 150 ms después que las de la pantalla y reabrían el flujo (`net::ERR_ABORTED`; 7 de 9 cargas del
-  Inicio). Se precargan con el cargador del propio componente de Vue: otro `import()` de un módulo ya cargado se
+  mismo `/api/live` de la pantalla. Montadas al llegar su trozo, con un equipo lento (la CPU de la pestaña ×6)
+  llegarían más de 150 ms después que las de la pantalla y reabrirían el flujo (`net::ERR_ABORTED`). Se precargan con el cargador del propio componente de Vue: otro `import()` de un módulo ya cargado se
   resuelve en otra tarea, cuando el flujo ya ha abierto. Lo comprueban `frontend/main.chrome.test.ts`, `frontend/main.chrome-wait.test.ts` y
-  `tests/e2e/base-home.spec.ts` («when base's chrome arrives late»: cada pieza llega un segundo tarde)
-  (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY).
+  `tests/e2e/base-home.spec.ts` («when base's chrome arrives late»: cada pieza llega un segundo tarde).
 - La SPA responde toda ruta sin URL propia en Django, salvo la que nombra un fichero (`base.spa.NOT_A_FILE`: el
   último segmento lleva extensión, con barra final o sin ella, como `/robots.txt`, `/favicon.ico` o
   `/wp-login.php`): esa no es ruta de la SPA (`spa_route` en `config/urls.py`) y recibe el 404 llano de Django, sin
-  la SPA y sin cookie, con sesión o sin ella y acepte lo que acepte (FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE). Antes
-  recibía la SPA con 200 y `csrftoken`: la web pública perdía el «sin cookies» y un buscador leía HTML como
-  `robots.txt`. Un 404 en `robots.txt` es «sin reglas» (RFC 9309), así que la web de `/` sigue indexable. Es la regla
+  la SPA y sin cookie, con sesión o sin ella y acepte lo que acepte. Así la
+  web pública sigue «sin cookies» y un buscador no lee HTML como `robots.txt`. Un 404 en `robots.txt` es «sin reglas» (RFC 9309), así que la web de `/` sigue indexable. Es la regla
   del punto de connect-history-api-fallback y de `{*path:nonfile}` de ASP.NET Core; ninguna ruta de la SPA lleva
   punto (sus parámetros son ids). Una navegación (sin extensión) sigue igual: con sesión, la SPA y su `csrftoken`;
   sin sesión y pidiendo HTML, el salto al login del SaaS; sin pedir HTML, la SPA; `/` con web publicada, la web
@@ -3176,9 +3377,9 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   (`nextWithHash` de `base/frontend/lib/access.ts` lo junta al `next`) y el aviso de la sesión terminada se calcula
   antes de que el middleware de sesiones borre su cookie (`base/tests/test_middleware.py`, `test_access_entry.py`;
   e2e `tests/e2e/base-deep-link.spec.ts` y BASE-G58 de `base-access.spec.ts`). Como
-  `/favicon.ico` es un 404, la SPA declara los iconos del hub viejo, el de la pestaña y el de la pantalla de inicio
+  `/favicon.ico` es un 404, la SPA declara sus iconos, el de la pestaña y el de la pantalla de inicio
   (`LIVE["spa"]["icons"]` de `live.spa`, estáticos de `base` en `base/static/base/icons/`; nunca por CDN).
-- Navegador: el tablero se guarda en `localStorage["dashboard-hub"]` (la clave del viejo) y el uso de
+- Navegador: el tablero se guarda en `localStorage["dashboard-hub"]` y el uso de
   apps en `localStorage["hub-app-usage"]`. La pestaña «Actividad» es el hash `#actividad`.
 - Frontend en `base/frontend/` (rutas, catálogos `en`/`es` bajo `base`, componentes y su `lib/home.ts`);
   la campana, «Mejorar plan» y la franja se enchufan en `frontend/main.ts` por `chrome` de
@@ -3196,11 +3397,10 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
   `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
-- Plantillas y Ajustes › Datos (BASE-F29–F38, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
+- Plantillas y Ajustes › Datos (BASE-F29–F38): `base/blueprint.py` (sin ORM) tiene el formato
   `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
   `data/<app>.<parte>.json`, más las fotos propias en `media/<nombre>`, WebP de 2 MB como mucho; 20 MB, 100 MB al
-  descomprimir y 1 000 entradas como mucho desde el 2026-10-30, para que quepan 300 fotos de 60 KB; antes 5 MB, 50 MB y
-  200; `BlueprintInvalid.reason`),
+  descomprimir y 1 000 entradas como mucho, para que quepan 300 fotos de 60 KB; `BlueprintInvalid.reason`),
   el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
   partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
   `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
@@ -3227,16 +3427,16 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
 - Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
-  `base.reset_shared_database` (`available: false` en el plan). Desde el corte S5 (hub#602) ninguno de
-  producción está así: solo lo alcanza el respaldo de los tests escritos antes de la tenencia
+  `base.reset_shared_database` (`available: false` en el plan). Ninguno de producción está así
+  (hub#602): solo lo alcanza el respaldo de los tests escritos antes de la tenencia
   (`base/tenancy/tests/legacy.py`), y la rama se va con él (hub#611).
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
-  del viejo llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
+  llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
   `test_services_data.py`, `test_queries_data.py`; Vitest en `base/frontend/**`; e2e `tests/e2e/base-data.spec.ts`
   (vacía lo que trae una plantilla por las operaciones de cada app antes de empezar).
 
-- **Apps (APP-BASE-4: BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
+- **Apps (BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
   módulo con `premium = False` siempre lo tiene; uno con `premium = True` necesita su id en `modules[]` de la última
   foto (`Hub.state`, `source` `plan` o `purchase`, con `valid_until` leído contra el reloj) o el de un módulo que lo
   requiere (cierre por `requires`, que solo conoce el Hub); un slug sin módulo se ignora y queda en el log; un hub de
@@ -3266,7 +3466,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   de ninguna no saca tarjeta, vuelve al modelo, que pregunta cuál. `AppChangeIn.app` la marca `REFERS`, así que la
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
-- «Uso y plan» (BASE-F40, hub#603; PLAN-HUB, rondas 2026-11-01f y 2026-11-01g). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
+- «Uso y plan» (BASE-F40, hub#603). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries._plan_motives`, sin
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
@@ -3288,15 +3488,16 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
   para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
   `base/tenancy/tests/test_limits.py`.
-- Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`, las del hub viejo;
-  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema (APP-BASE-7)» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
+- Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`;
+  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
   en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
-  «Mejorar plan» (antes «Contratar en erplora.com») solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
+  «Mejorar plan» solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
   `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
-- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; desde la ronda
-  2026-10-27 un negocio nace con todo apagado, sin filas, también una demo; los hubs de antes conservan todo encendido
-  con sus raíces elegidas, migración `base/0017`, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
+- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio nace con todo
+  apagado, también una demo, salvo las obligatorias de su país que la plataforma
+  enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
+  anteriores a la migración `base/0017` conservan todo encendido con sus raíces elegidas, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
   `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
   `base.app.enable`: tope, derechos y evento); la que no puede encender sale `inactive` con su `reason` en el
@@ -3311,7 +3512,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
   `last_error` y `next_attempt_at` (1, 5 y 15 min, luego cada hora), y `base.app.retry` la vuelve a pedir (BASE-F21, F22;
-  S3, hub#601). Fuera de una operación (un `events.py`, el admin, una tarea) tocar un modelo de esa app da el mismo 404: el `TenantRouter`
+  hub#601). Fuera de una operación (un `events.py`, el admin, una tarea) tocar un modelo de esa app da el mismo 404: el `TenantRouter`
   lanza `AppNotCreated` antes de mandar SQL (hub#608). Lo decide `base.activation.has_tables`: lo que lista la fila que el
   contexto ya tiene pasa sin consulta ni caché; lo que no lista se pregunta a control por `base.apps_created:<host>`,
   olvidada con `activation.forget` y al acabar `ensure_schema`, porque esa fila puede ser de antes de crear las tablas. Una
@@ -3321,12 +3522,12 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   de las dos sale en el menú. El veto de VeriFactu está en su app (VERIFACTU-F32). Los ganchos `can_disable(ctx)` y `can_enable(ctx)` corren en `translation.override(ctx.language)`: un
   `gettext` a secas ya responde en el idioma de quien pide (gh:hub#2595). En Apps, la negativa (409 o cualquier otro
   fallo al cambiar) es un `InlineFeedback` `apps-refused` que se queda hasta cerrarlo o hasta el siguiente cambio,
-  nunca un toast (gh:hub#2594). Re-triados en FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS: F18, F19, F23–F25
-  `hecho` (e2e `tests/e2e/base-app-activation.spec.ts`, en español y en los 3 tamaños).
+  nunca un toast (gh:hub#2594). F18, F19 y F23–F25 los prueba la e2e
+  `tests/e2e/base-app-activation.spec.ts`, en español y en los 3 tamaños.
 
-- **Sistema (APP-BASE-7: BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
+- **Sistema (BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
   `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
-  «Datos y copias» de APP-BASE-2); a quien no
+  «Datos y copias» de Ajustes); a quien no
   administra no se le monta ningún componente que pida lo que el Hub le negaría (gh:hub#2519).
 - Consultas (`base/queries.py`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
   `shared`/`own` según `Hub.db_name`, `version` y `released_at` de `base/system.py`, que lee `APP_VERSION` y
@@ -3347,17 +3548,23 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
   `base.bell.counters` con `created`, `retried` y `discarded`; `base.system.status`, con `base.hub.state_applied`. Tests:
   `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
+- Lo que una reacción graba como el sistema al contestar un aviso cuyo autor se pasa (`base.relay.carried`) lleva ese
+  autor, de primera y de segunda mano; lo que graba como alguien propio conserva el suyo. Se pasan el de una
+  recuperación (`copy_recovery:<id>`, BASE-F114) y los que una app declara en `carried_actors` de su `LiveAppConfig`
+  (`<label>:` o `<label>_<nombre>:`; hoy Automatizaciones, para que su guarda de bucles siga una cadena a través de
+  otra app). Una declaración que no es de la propia app (vacía, `system`, la de otra) la rechaza `base.E017` al
+  arrancar y no se usa. Tests: `base/tests/test_relay_carried.py`.
 - Lo que una reacción o una tarea programada deja para después del COMMIT y espera a la red va por
-  `base.outbound.after_commit(fn, *args)` (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS): `THREADS` (4) hilos del
+  `base.outbound.after_commit(fn, *args)`: `THREADS` (4) hilos del
   worker en el contexto de BD de la operación que lo pidió (`base.tenancy.context.use_again`), `QUEUED` (1000) en
   espera, sin encolar dos veces lo que ya espera; `release()` suelta la conexión antes de esperar a la red; al parar, el
   worker da `OUTBOUND_GRACE_SECONDS` (15) a lo que corre y tira lo que espera. Un trabajo puede perderse: solo vale para
   lo que su app recupera sola (reclamo con plazo y barrido, como `flow.run.claim_call`). En los tests corre en línea
   (`conftest.py`); la marca `outbound_threads` da los hilos de verdad. Tests: `base/tests/test_outbound.py` y
   `apps/flow/tests/test_relay.py`.
-- Un trabajo corre en el contexto de quien lo pide, fijado al pedirlo (`Job` inmutable): desde el corte (S5) cada BD
-  solo guarda sus filas, la operación de otro hub se rechaza (`HubContextMismatch`) y ningún trabajo entra jamás en la
-  BD de otro hub (hub#1053 quitó el `scope=` de `after_commit`, que ya no cambiaba nada).
+- Un trabajo corre en el contexto de quien lo pide, fijado al pedirlo (`Job` inmutable): cada BD solo guarda sus
+  filas, la operación de otro hub se rechaza (`HubContextMismatch`) y ningún trabajo entra jamás en la BD de otro hub
+  (hub#1053).
 - Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
   `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
   `frontend/main.ts`. No envía los avisos del navegador de `BROWSER_NOTICES` («ResizeObserver loop completed with
@@ -3369,19 +3576,18 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
   va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
   `base/frontend/lib/error-report.test.ts`.
-- Pantalla: `SystemPage.vue` con `SystemResources.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
+- Pantalla: `SystemPage.vue` con `SystemUsage.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
   e2e: `tests/e2e/base-system.spec.ts` (tres tamaños, dos hubs, campana → `#events`).
 
-- **Ajustes del negocio (APP-BASE-6: BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
+- **Ajustes del negocio (BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
   viva con `base.hub.registered`): la fila del registro del ámbito, la que manda el SaaS por `PUT /internal/hubs/{id}`
   (nombre, país, zona e idioma, HUBS-F15), con la moneda del país (`base/business.py`: CLDR por Babel; sin país,
   `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/dashboard/businesses/<id>/settings` (vacío en una
   demo). El registro se aplica como la plataforma: tras su COMMIT, `base.hub.register` avisa también al canal del
   propio negocio (`base/tests/test_business_live.py`). El Hub no guarda ni cambia nada de esto y no hay almacén
-  clave/valor de ajustes: el `hub_settings` del runtime viejo se repartió entre sus dueños (país, zona e idioma en el
-  registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). El hub
-  propio de ERPlora (`PLATFORM_HUB_SLUG`; desde S5, una fila del registro con BD propia, de `create_platform_hub`)
+  clave/valor de ajustes: cada ajuste es de su dueño (país, zona e idioma en el registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). El hub
+  propio de ERPlora (`PLATFORM_HUB_SLUG`; una fila del registro con BD propia, de `create_platform_hub`)
   contesta el negocio de ERPlora, su emisor:
   `PLATFORM_ISSUER_LEGAL_NAME` y `PLATFORM_ISSUER_COUNTRY` con la moneda de ese país, la zona y el idioma del despliegue,
   `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host no sirve
@@ -3412,7 +3618,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   el reloj del despliegue es lo que llega a un registro fiscal, y cambia junto y con supervisión (hub#772): las fechas de
   la factura y las horas de VeriFactu, el día y el número de una venta y el «hoy» de Impuestos; hasta entonces lo congela
   `tests/test_guardrails_fiscal_clock.py`.
-- **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
+- **Acceso (BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
   `Credential` (por `username`: `pin_hash` argon2id y `badge_digest` = HMAC-SHA256 del número con
@@ -3496,8 +3702,8 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   sesión que pinta el shell (el menú lateral); si esa lectura falla, se queda la que había.
 - «Uso y plan» (BASE-F40, `queries.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F57
   (`services._end_other_devices`): los `device_id` distintos de las sesiones vivas del host (`SessionOwner`).
-- `TrustedDevice`, `Credential`, `AccessSettings` y `Profile` viven en la BD de cada negocio, y desde el corte (S5) no
-  hay ninguno en una compartida: la lista de dispositivos, el dial y «Quitar» son de ese negocio. Las caras y los PIN se
+- `TrustedDevice`, `Credential`, `AccessSettings` y `Profile` viven en la BD de cada negocio, y no hay ninguno en una
+  compartida: la lista de dispositivos, el dial y «Quitar» son de ese negocio. Las caras y los PIN se
   filtran además por las personas del negocio (`Membership`, en control). El e2e devuelve el dial al de fábrica al
   acabar.
 - Tests: `base/tests/test_access*.py` y `test_api.py`; Vitest de `base/frontend/lib/access.test.ts`,
@@ -3526,8 +3732,8 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
   `base.queries.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
-  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app
-  (FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS). Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
+  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app.
+  Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A) y
   `tests/e2e/fix-base-plan-space-check.spec.ts` (el tope en español: Archivos y la web dicen la misma frase).
@@ -3538,7 +3744,15 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   (`drop_failed: HubFilesNotDeleted: …`, `files_purge_failed: …`) y se reintenta; nunca queda `purged` con ficheros. El
   bucket tiene versionado: la clave deja su marcador de borrado y la versión antigua se va a los 90 días por la regla
   `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`, `test_provision.py`.
-- **`/p/media/<hex>/<nombre>`** (`base/media.py`, FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES): sirve, desde el
+- Lo que dejaron las purgas de antes de hub#781 (una fila `purged` no vuelve a pasar por la purga) se borra una vez con
+  `manage.py delete_leftover_hub_files` (hub#785): busca en el almacén las carpetas de arriba con forma de prefijo de hub
+  (`base.files.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.gone_hubs`): solo
+  cuenta un hub `purged` o sin fila (la lápida de una demo, olvidada a los `DEMO_TOMBSTONE_DAYS`) cuyo prefijo aún guarda
+  claves. Cualquier otro estado conserva sus ficheros, `shared/`, `_inventory/` y lo que no es un prefijo de hub no se
+  miran, y no abre la base de datos de ningún hub. Sin `--delete` solo lista (prefijo, motivo, claves y bytes); con él
+  borra cada uno con `delete_hub_files`, y un prefijo que falla no para a los demás y deja el comando en error. Corre como
+  tarea suelta de la familia `worker`, la que borra del bucket. Test: `base/tests/test_delete_leftover_hub_files.py`.
+- **`/p/media/<hex>/<nombre>`** (`base/media.py`): sirve, desde el
   host de su hub y nunca el de otro, solo las carpetas del almacén que declara cada app en su `LiveAppConfig`:
   `public_media` (cualquiera; caché pública de un año: `website/img/`, las imágenes de la web) y `members_media` (solo una
   sesión de este hub, caché `private`: `whatsapp_inbox/samples/`, el archivo de la cabecera de una plantilla); las fotos de
@@ -3549,7 +3763,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   otra. Lo que no cumple no se sirve y `base.E010` lo dice al arrancar. Una app que guarde archivos para enseñarlos los
   declara ahí, sin tocar `base/`. Tests: `base/tests/test_media.py` (miembro, visitante, otro hub, app apagada, `..` y la
   carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
-- **Asistente** (APP-BASE-9, BASE-F92…F106; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
+- **Asistente** (BASE-F92…F106): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. Las mecánicas que no dependen de la pasarela son de `live.assistant` (las mismas del panel
   del SaaS; `docs/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant.py` (sin ORM) las reexporta con
@@ -3578,7 +3792,7 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   exacta; sin clave, «Do this»): una app con una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
   `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`; antes que el de su acción va el
   verbo de la operación entera, `base.assistant.card.operations.<app>.<entidad>.<acción>`, para la que el de su acción
-  no dice lo que hace (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: `cart_checkout.cart.clear` vacía
+  no dice lo que hace (`cart_checkout.cart.clear` vacía
   el carrito, «Vaciar», mientras `kitchen.routing.clear` quita una ruta, «Quitar»; `cash_register.count.add` y
   `cash_register.movement.add` registran un arqueo y un movimiento, no añaden nada): lo comprueban
   `test_a_write_whose_actions_verb_does_not_say_what_it_does_is_named_by_its_own` y
@@ -3605,8 +3819,8 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   previa, en la que dé su lectura) y, dentro de un objeto o de una lista, igual: el servidor lo manda como dinero
   (`_Words.amount`: `{"kind": "money", "value": …, "money"?: …}`) y la pantalla lo escribe como el de arriba
   (`card.ts` del chat compartido, `isAmount` y `formatMoney` con `narrowSymbol`: un mismo símbolo en toda la tarjeta, «1,50 $» y
-  no «1,50 US$» al lado; `money_text` queda para correos, PDF y avisos, donde «US$» desambigua); las palabras de su descripción no cuentan (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS:
-  «in minor units» y «in whole cents» dejaban un precio como «1500»), ni su nombre (hub#917: un `…_cents` sin la marca
+  no «1,50 US$» al lado; `money_text` queda para correos, PDF y avisos, donde «US$» desambigua); las palabras de su descripción no cuentan
+  («in minor units», «in whole cents»), ni su nombre (hub#917: un `…_cents` sin la marca
   no es un importe, arriba, dentro de un objeto o en una lista; lo fijan
   `test_a_name_in_cents_alone_makes_no_amount_its_mark_does` y, en Automatizaciones,
   `test_each_datum_of_the_change_comes_as_the_chat_card_says_it`), `signed` exige la marca (`base.E005`, también a un
@@ -3662,9 +3876,22 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
   puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report`, `docs/search`,
   `/internal/speech/transcribe` y `/internal/speech/synthesize`, con el HMAC de `base.signing`).
+- **La tarjeta es la confirmación** (hub#1140, hub#1175): ninguna descripción `ai=` de una herramienta manda preguntar,
+  confirmar o esperar un sí en el chat antes de llamarla («Ask first.», «confirm it first», «tell the person…, then…»
+  y, en la lectura previa de una escritura, «Read it before … and tell the person …»): con esa frase el modelo pregunta
+  en el chat y la tarjeta no sale (Reservas, hub#1105; Mesas; Caja, hub#1138; Facturación, hub#1102). Lo que se cuenta
+  antes de una escritura va en la misma respuesta que su llamada. Lo guarda `tests/test_guardrails_assistant.py` sobre
+  todas las herramientas del Hub, sin excepciones (hub#1175 arregló las nueve que quedaban en Control horario,
+  Automatizaciones, Personal y Facturación); lo citado («…», `código`, nombres con punto) y lo negado no cuentan.
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
-  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un
+  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; la llamada que espera su tarjeta vuelve con `shown`, la
+  huella de lo que enseñó (`assistant.fingerprint`: sus datos y «Lo que va a pasar» como los ve la persona, más el id
+  de cada registro que leyó, por sus datos marcados con `names(…)` —por id o por nombre— y por su `check`), y el
+  panel la devuelve tal cual con el «sí»; con él la tarjeta se vuelve a dibujar y, si la huella no coincide (o no
+  viene), no corre nada y sale la tarjeta nueva (hub#1208; lo comprueba `base/tests/test_assistant_yes_for_its_card.py`).
+  Una escritura que toma su registro por el nombre sin marcarlo ni comprobarlo no queda fijada: su tarjeta tiene que
+  leerlo (patrón de Demo, hub#1206); el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
   instrucciones con las pantallas que puede enlazar
@@ -3674,21 +3901,19 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,
   `error` y `done`), no una segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un
   proveedor.
-- **Leer en voz alta con la voz del servidor** (ronda 2026-11-03n, PLAN-HUB §73; dormida desde la ronda 2026-11-04a:
-  `ASSISTANT_SERVER_VOICE`, apagado por defecto, la enciende; apagado, `hub-home.server_voice` es `false`, el panel no
+- **Leer en voz alta con la voz del servidor** (PLAN-HUB §73; dormida: `ASSISTANT_SERVER_VOICE`, apagado por defecto, la enciende; apagado, `hub-home.server_voice` es `false`, el panel no
   recibe `speak` —ni selector de voz ni petición— y lee con la voz del dispositivo, y la operación responde 503
   `base.assistant_speech_unavailable` sin llamar a erplora.com): `base.assistant.speak` (`database=False`)
   pide a erplora.com el mp3 de una respuesta (`text` de 1 a 4096 caracteres, sin espacios de los extremos; `language`,
   `es` o `en`, la de la pantalla si no viene y el inglés para cualquier otra; `voice`, una voz del motor de
-  erplora.com, o ninguna: la suya del idioma; `@erplora/ui` no nombra voces desde saas#242). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
+  erplora.com, o ninguna: la suya del idioma; `@erplora/ui` no nombra voces, saas#242). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
   que erplora.com espera al proveedor). La ruta devuelve el mp3 (`audio/mpeg`, `no-store`), o la salida JSON (el mp3 en
   base64) a quien solo acepta JSON. Sin voz configurada en erplora.com (`assistant.speech_unavailable`,
   `assistant.provider_not_configured`) responde 503 `base.assistant_speech_unavailable`; cualquier otro fallo (4xx,
   5xx, tiempo agotado, una respuesta que no es audio), 503 `base.assistant_speech_failed`; los dos dejan su línea en el
   log. El panel lo reproduce desde un `blob:` (CSP `media-src 'self' blob:` y el origen del SaaS) y, si falla, lee con
   la voz del dispositivo (`hubAssistant(doc).speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
-- **La documentación de ERPlora** (saas ASSISTANT-F28; ronda 2026-10-30e, plan `docs/plans/2026-10-30-asistente-saas.md`
-  de la raíz, tarea T5): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
+- **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
   panel y los planes) por `POST /internal/assistant/docs/search` (`assistant.docs_search`: `hub`, `query`, `language`
@@ -3698,14 +3923,17 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   esquema acepta) y el turno lee esa respuesta (`prepared_docs`, `searched_docs`); fuera de un turno pregunta en el
   momento. Lo que la pasarela no contesta (409 sin proveedor, 503, 429, una respuesta que no es el contrato, sin red)
   es 503 `base.assistant_unavailable`, «Ahora no se puede buscar en la documentación de ERPlora.», que el modelo
-  cuenta: nunca fragmentos inventados. Las instrucciones mandan contestar el «cómo se hace» solo con lo que devuelve,
-  citando la sección, y decir que la documentación no lo cubre si no devuelve nada; la regla de no inventar un
-  registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
+  cuenta: nunca fragmentos inventados. Cada extracto vuelve con su `cite`, la línea con la que la respuesta lo cita,
+  escrita por el Hub en el idioma de la persona: «Fuente: <heading>» (`pgettext("assistant answer", "Source")`), o su
+  `path` si no trae títulos (hub#1079: la respuesta daba los pasos sin nombrar ningún extracto). Las instrucciones
+  mandan contestar el «cómo se hace» solo con lo que devuelve y terminar la respuesta con el `cite` de cada extracto
+  usado, al menos uno, tal cual y en su propia línea, y decir que la documentación no lo cubre si no devuelve nada; la
+  regla de no inventar un registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
   puerta de ERPlora/saas#178 desplegada: sin ella contesta 503. Tests: `base/tests/test_queries_docs_search.py`,
   `test_assistant.py` (catálogo, `ALWAYS`, instrucciones, «Ayuda») y `test_api_assistant.py` (el turno, y que la
   pasarela se espera fuera de su transacción).
-- Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`, desde el
-  2026-10-30: el SaaS monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
+- Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`; el SaaS
+  monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
   `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
   y `AssistantButton`, montado por `createShell({ chrome: { topbar: TopbarChrome, background: BackgroundChrome } })`
   en `frontend/main.ts`. El Hub lo configura con `configureAssistant(HUB_ASSISTANT)` (`base/frontend/lib/assistant-hub.ts`:
@@ -3746,15 +3974,15 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   `ctx` o sin callable, deja el detalle normal. `website.site.save` es el primer uso; su contrato está en
   `base/tests/test_assistant.py`.
 
-- Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
+- Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
   `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.list` (rutas `/api/people…`,
-  `/api/roles`). El PIN y la placa son los de APP-BASE-3 (`Credential`): mismo hash, mismos frenos.
+  `/api/roles`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
 - Llaves de API: `base.models.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
-  por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que desde el corte (S5) tienen todos: sin
+  por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que tienen todos: sin
   ella, `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no entra (test A≠B en
   `base/tests/test_api_keys.py`); esa rama, y el «Todavía no disponible» de sus pantallas, solo la alcanza el
   respaldo de los tests, y se retira con él (hub#611).
@@ -3763,8 +3991,8 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
-  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras
-  (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE; hub#2180 y hub#2186 del hub viejo): junto a `approvals`, la
+  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras:
+  junto a `approvals`, la
   app declara `approval_figures = {"<orden>": [_("… {campo} …"), …]}`, frases que se prueban en orden con huecos de
   la entrada de la orden: `{campo}` (texto o número), `{campo, percent}` (0–100, `format_percent`) y
   `{campo, money}` (unidades menores en la moneda del negocio, `business_currency`); gana la primera cuyos huecos se
@@ -3785,8 +4013,8 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   (`base.approval.spend`, sin ruta, con la fila bloqueada), así que una orden que falla lo deja sin gastar, una que
   salió bien no se repite y de dos a la vez solo corre una (`base/tests/test_approval_spend.py`; excepción razonada
   en `tests/test_guardrails.py`, `APPROVAL_SPEND_REASON`).
-  Lo que la orden aprobada pide a otras apps por el camino va con ella (hub#250,
-  FIX-HUB-BASE-APPROVED-COMMAND-CROSS-APP-CALLS-USE-CALLER-PERMISSIONS): una app corre la operación de otra con
+  Lo que la orden aprobada pide a otras apps por el camino va con ella (hub#250):
+  una app corre la operación de otra con
   `base.operations.call(ctx, name, data, unavailable=…)` (la entrada se valida como en una ruta y lo que no valida es
   el 422 del que llama; la app ausente o apagada, su `unavailable`, o `UnknownOperation`/`AppInactive` sin él), que la
   corre con `approvals.consequence_context`: mientras corre la orden aprobada de esa petición (el `current_operation`
@@ -3814,40 +4042,36 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts` y `tests/e2e/base-api-keys.spec.ts` (crear, copiar, usar, rotar y revocar una
   llave en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
-- La QA maestra del Hub (BASE-F107 = BASE-G152, `qa:shared/qa-hub`, APP-BASE-10): el contrato de los agentes
-  `qa-hub*` del hub viejo pasa a ser una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`, contra el SaaS de la pila
+- La QA maestra del Hub (BASE-F107 = BASE-G152) es una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`,
+  contra el SaaS de la pila
   (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
   proveedor de `tests/e2e/assistant-provider.ts`. Pide al SaaS su taxonomía (`seed_taxonomy`, que corre en cada
   despliegue) y el proveedor sembrado (README de `tests/e2e`, «El asistente» y «La QA maestra»). Cada pantalla se
   comprueba contra los catálogos del propio hub (`tests/e2e/translations.ts`: los `en`/`es` de la SPA y los `.po`;
   un texto que solo escribe el otro idioma o una clave a la vista es un fallo) y deja
   `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>`.
-- Del contrato viejo, lo que es de otras apps (cada flujo con su estado en su WORKBOOK y su e2e): §4 la siembra por
-  vertical = BASE-F29/F31 + plantillas `base/seeds/<vertical>.<idioma>.json` (la carta con la categoría de IVA de
-  cada producto y la sala, de la plantilla; la cocina y la caja, de sus apps). §5 restaurante: R-01 CASH_REGISTER-F03,
-  TABLE-F09; R-02 RESERVATION-F06/F10/F11, TABLE-F28; R-03 TABLE-F10; R-04 SALE-F19, MODIFIER-F07, KITCHEN-F07;
-  R-05/R-06 KITCHEN-F04/F05/F10/F18; R-07 TABLE-F15/F16/F17, SALE-F23/F24; R-08 SALE-F21, PRINTING-F09; R-09
-  SALE-F01/F02/F03, INVOICE-F01/F02, VERIFACTU-F19, PRINTING-F07/F13; R-10 TABLE-F21, CASH_REGISTER-F09/F16,
-  SALE-F28; R-11 SALE-F14/F15/F20/F29/F30/F31, INVOICE-F07/F09/F10. §6 peluquería: B-01 CASH_REGISTER-F03,
-  APPOINTMENT-F01; B-02 APPOINTMENT-F01/F02/F04/F05/F09; B-03 APPOINTMENT-F07, CUSTOMER-F01; B-04 APPOINTMENT-F04;
-  B-05 APPOINTMENT-F17, SALE-F38; B-06 como R-09; B-07 CASH_REGISTER-F09, SALE-F16/F28, STAFF-F21; B-08
-  APPOINTMENT-F09, SALE-F30/F31, STAFF-F21, SERVICE-F12/F14/F22. §7 fiscal: INVOICE-F01/F02/F07/F09/F10/F15 y
-  VERIFACTU-F15/F18/F19/F26/F28 (solo contra el entorno de pruebas de la AEAT). §8 impresión: PRINTING-F01/F02/F04/
-  F07/F09/F10/F13/F14/F17/F18 (la cola de `/ws/print`). Sus specs: `cash-register-*`, `table-flows`, `reservation-book`,
+- Lo que el día de cada vertical recorre en otras apps (cada flujo con su estado en su WORKBOOK y su e2e): la
+  siembra por vertical = BASE-F29/F31 + plantillas `base/seeds/<vertical>.<idioma>.json` (la carta con la categoría de
+  IVA de cada producto y la sala, de la plantilla; la cocina y la caja, de sus apps). Restaurante: CASH_REGISTER-F03,
+  TABLE-F09; RESERVATION-F06/F10/F11, TABLE-F28; TABLE-F10; SALE-F19, MODIFIER-F07, KITCHEN-F07;
+  KITCHEN-F04/F05/F10/F18; TABLE-F15/F16/F17, SALE-F23/F24; SALE-F21, PRINTING-F09; SALE-F01/F02/F03,
+  INVOICE-F01/F02, VERIFACTU-F19, PRINTING-F07/F13; TABLE-F21, CASH_REGISTER-F09/F16, SALE-F28;
+  SALE-F14/F15/F20/F29/F30/F31, INVOICE-F07/F09/F10. Peluquería: CASH_REGISTER-F03, APPOINTMENT-F01;
+  APPOINTMENT-F01/F02/F04/F05/F09; APPOINTMENT-F07, CUSTOMER-F01; APPOINTMENT-F04; APPOINTMENT-F17, SALE-F38; el
+  cobro como en el restaurante; CASH_REGISTER-F09, SALE-F16/F28, STAFF-F21; APPOINTMENT-F09, SALE-F30/F31, STAFF-F21,
+  SERVICE-F12/F14/F22. Fiscal: INVOICE-F01/F02/F07/F09/F10/F15 y VERIFACTU-F15/F18/F19/F26/F28 (solo contra el
+  entorno de pruebas de la AEAT). Impresión: PRINTING-F01/F02/F04/F07/F09/F10/F13/F14/F17/F18 (la cola de
+  `/ws/print`). Sus specs: `cash-register-*`, `table-flows`, `reservation-book`,
   `sale-*` (con `sale-invoice-chain`), `modifier-till`, `kitchen-*`, `invoice-sale`, `verifactu-flows`,
   `printing-*`, `appointment-*`, `staff-commissions`, `service-flows` y `customer-flows`. Lo que aún no está entero
-  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `descartado` (app#17: en una red sin salida a internet la app del
-  dispositivo no barre la red), y de SERVICE-F14 la venta del bono en el
-  TPV está en «Lo que queda fuera» de Servicios.
-- Del contrato viejo no sigue lo que era proceso de aquella flota: §2 (método: el QA no arregla y abre issues por
-  repo), §2b (el banco de pruebas en PRE con `spawn-hub.sh`), §3 (contar 25–27 módulos y sus `module.json`), §9 (la
-  lista de vigilancia), §10 (el informe PASS/FAIL por escenario) y §11 (el `POST /api/command|query` del runtime en
-  Rust): aquí cada flujo tiene su e2e en `tests/e2e`, el banco es la pila de su README y la API es la de django-ninja
-  de cada operación. La propina sigue fuera (pm#100).
-- «Reportar un problema» (BASE-F108, FIX-HUB-BASE-REPORT-PROBLEM-MODAL): la entrada `report` del menú de usuario
+  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `parcial` (la app la barre también sin salida a
+  internet desde la 1.1.34, pero falta probarlo en un dispositivo con una impresora de verdad), y de SERVICE-F14 la
+  venta del bono en el
+  TPV está en «Lo que queda fuera» de Servicios. La propina queda fuera (pm#100).
+- «Reportar un problema» (BASE-F108): la entrada `report` del menú de usuario
   (`frontend/main.ts`) es una acción (`run` de `ShellUserMenuItem`, `packages/ui`) que abre `ReportProblemDialog.vue`
   (en `BackgroundChrome.vue`, con `lib/report-problem.ts`), el `ReportProblemModal` de `@erplora/ui/components`
-  sobre `FormModal`. Sale con `account_url` (la sesión abierta con la cuenta; `base/spa.py` ya no incrusta
+  sobre `FormModal`. Sale con `account_url` (la sesión abierta con la cuenta; `base/spa.py` no incrusta
   `report_url`). `base.support.report` (`base/services.py`, `database=False`: espera a erplora.com sin transacción
   abierta) solo acepta una sesión abierta con la cuenta (`CREDENTIAL_SESSION_KEY` de `base/access.py`, que escribe
   `_log_in` como `SessionOwner.credential`; una sesión sin ella no es de la cuenta, y el shell, `base/spa.py`, la
@@ -3875,14 +4099,102 @@ INVENTORY-F11, CUSTOMER-F09, WEBSITE-F09; hub#1041
   (`place_hub`). El admin de Hubs lo dice con palabras en la lista, su filtro y la ficha (`control/admin.py`), salvo en
   un hub sin BD hecha (`base.registry.database_is_made`): en preparación, cancelado antes de estar listo o ya borrado.
 
+- **«Mover a otro clúster…» de madrugada** (hub#1508, parte de hub#931) es `control.admin.HubAdmin.move_to_cluster`
+  con «Cuándo»: «En su próxima madrugada» (marcada de entrada, como la «próxima ventana de mantenimiento» de RDS) o
+  «Ahora» (lo de siempre; también lo que hace `control.hub.move` sin `when`). La de madrugada deja en el hub
+  `move_scheduled_to` y `move_scheduled_for` (`control.services.night_start`: arranca entre las 03:00 y las 05:00 de
+  su `Hub.timezone`, o de la del despliegue si no tiene una válida; dentro de esa franja, en el acto) y el negocio
+  sigue abierto: la lista de Hubs lo dice en la columna del clúster, con la hora en su reloj. La franja acota el
+  arranque, no el final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del
+  negocio; Business Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o
+  «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.run_due` (`launch_due`), con el
+  arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
+  (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
+  cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
+  cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
+  (`move_not_started: <código>: …`); si no, pone `moving_to` y el mismo pase la mueve. Cuenta para el hueco del
+  clúster destino y lo protege de borrarse. «Cancelar el traslado» la quita mientras no ha empezado
+  (`control.hub.scheduled_move_cancelled`), sin cerrar nada. Tests: `control/tests/test_services.py::TestTheNight` y
+  `::TestMoveAtNight`, `base/tenancy/tests/test_move.py::TestAMoveAskedForTheNight` (dos BD reales y el arriendo) y
+  `control/tests/test_admin.py::TestMoveToCluster` y `::TestCancelTheMove`. El aviso al negocio de que esa noche se
+  le traslada no existe todavía (hub#1510).
+- **Un negocio de cualquier tamaño se traslada** (hub#1509): la copia pasa por el bucket de volcados
+  (`HUB_DUMPS_BUCKET`), nunca por el disco del worker, así que `control.hub.move` no rechaza por tamaño (solo
+  comprueba que la base está en su servidor). El negocio está en mantenimiento mientras dura la copia, y por eso se
+  pide de madrugada. `pg_dump` sube la copia en
+  partes según la hace (`base.tenancy.dumps.stream_to_bucket`, partes de 32 MiB, una en memoria), y la subida solo se
+  completa si `pg_dump` acabó bien: si falla, se para o se pasa de tiempo, se aborta y no queda nada. En el destino,
+  `pg_restore` lee la copia desde el bucket por su entrada (`dumps.stream_from_bucket` en `move._restore_from_bucket`:
+  primero su índice y después la restauración en una transacción, las dos sin fichero). Cada mitad tiene una hora
+  (`move.COPY_TIMEOUT_SECONDS`): de madrugada acaba antes de las 07:00 y una hora da para decenas de GiB; se puede
+  cancelar en cualquier momento. La copia queda en `<hex>/<AAAAMMDDTHHMMSSZ>-move.dump` los 90 días del bucket, sin
+  fila `HubDump` (no es una copia del negocio para descargar; el worker no puede borrar del bucket). Sin bucket no se
+  cierra nada: el traslado acaba con `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La
+  restauración a un momento y la copia aparte (BASE-F114) siguen copiando por un fichero del worker, con su tope
+  (`control.services.RESTORE_MAX_BYTES`, hub#1524). Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
+  `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
+  de moto), `control/tests/test_services.py::TestMove` y
+  `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
+- **«Restaurar desde una copia…»** (BASE-F114, hub#1198) es `control.admin.HubAdmin.restore_from_a_copy`: su página de
+  confirmación (`RestoreFromACopyForm`, la plantilla `action_confirmation.html` que comparte con «Mover a otro
+  clúster…») y, por cada hub, `control.hub.restore` con el actor del personal; el admin no comprueba nada que la
+  operación compruebe. Restaura el worker (`base.tenancy.restore`), y su negativa fiscal (`restore_fiscal_records`, con
+  el gancho `fiscal_record_states` de cada app que presenta a Hacienda) queda en `Hub.last_error`, que la ficha enseña
+  tal cual. Tests: `control/tests/test_admin.py::TestRestoreFromACopy` y, de punta a punta con el worker y dos BD
+  reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
+- **Cuánto puede estar cerrado el negocio** (hub#1527): las páginas de «Mover a otro clúster…» y «Restaurar desde una
+  copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
+  petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.longest_closure`: las dos mitades de la copia a
+  `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un tamaño que
+  no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada uno se cierra
+  al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
+  `base/tenancy/tests/test_move_closure.py` y `control/tests/test_admin_closure.py`.
+- **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
+  formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
+  `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
+  `<control>_copy_<hex de la fila>` (`base.tenancy.names.copy_db_name`). El worker la hace en el hilo de los traslados
+  (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: clona sin
+  conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore`, comprueba la identidad, la cierra otra vez y
+  suelta el clúster temporal. El envío a Hacienda está apagado por construcción: ninguna fila de `base_hub` la nombra
+  (el worker sirve solo las del registro), ningún rol de la app conecta y su nombre es de copia que queda atrás
+  (`names.is_left_behind`), así que `connections.register_hub_alias` se niega a darle alias. Se borra con su fila a los
+  `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema
+  es el del momento. Tests: `base/tenancy/tests/test_restore_aside.py` (dos BD reales, la guarda de red y
+  `TestSendingToTheTaxAuthorityIsOffInTheCopy`, que nunca puede caer), `control/tests/test_services.py::TestRestoreAside`
+  y `control/tests/test_admin.py::TestRestoreToASeparateCopy`.
+- **«Recuperar en el negocio…»** (BASE-F114, hub#1257, capa 2a) es `control.admin.RestoredCopyAdmin.recover_into_the_business`:
+  su página (`RecoverForm`, la misma `action_confirmation.html` de las acciones de Hubs, con `AsksFirst`) y, por cada
+  copia, `control.copy.recover`, que escribe una fila `control.CopyRecovery` con las apps pedidas y el idioma del personal.
+  La hace el worker en el hilo de los traslados (`base.tenancy.recovery.run_due`), una por pasada, con el arriendo de la
+  propia fila (`still_recovering` lo renueva antes de cada ficha). La web no puede leer la copia: no tiene el rol del
+  migrador y la copia está cerrada a los de la app. El worker la lee con la conexión directa del migrador
+  (`ops.connect_ops`) con `default_transaction_read_only`, nunca con un alias de hub (`names.is_left_behind`): ni tareas ni
+  cola de VeriFactu corren en ella. Antes de leer lo de cada app mira su `django_migrations` en la copia. Qué devuelve lo
+  dice cada app con el gancho `recoverable_from_copy` de su `LiveAppConfig` (una lista de `base.recovery.Recoverable`:
+  `label`, `reads_since`, `read(conn)` por SQL sobre los nombres del modelo en su `queries.py`, `missing(records)` en su
+  `queries.py` y `create`, la operación que crea cada uno; y, los dos o ninguno, `deleted(records)` en su `queries.py` y
+  `restore`, la operación que devuelve lo que el negocio guarda eliminado, hub#1306, que recibe del registro leído lo
+  que declara su entrada: el `id` y, si quiere devolverle lo que el negocio le quitó después, lo demás que nombre,
+  hub#1356; la de Inventario, además, la imagen que el producto tenía en la copia, hub#1431; las de Citas, solo el
+  `id`); `base/` no nombra ninguna. La imagen de lo que vuelve (productos, servicios) la lleva la entrada con
+  `base.recovery.ImageInCopyIn` y se queda lo que deja `base.images.from_copy`: la de la librería, salvo una que la
+  librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar el
+  registro fuera. Primero vuelve lo eliminado y después se crea lo que falta, con las operaciones de la app, en el contexto del
+  sistema y en el idioma del personal, dentro de `use_hub`; un `InvalidPayload` o un `NotFound` es de ese registro y los
+  demás siguen, cualquier otro rechazo para la app. Mientras devuelve, `base.recovery.at_work()` dice el actor de la
+  recuperación en marcha (fuera de una, `None`): con él la lectura de una app distingue lo que trajo esta misma
+  recuperación de lo que dejó una anterior (Servicios, hub#1494). Clientes responde con `recoverable_cards_in_copy`,
+  `cards_deleted_in_business` con `customer.customer.restore`, que le devuelve lo que el negocio borró después
+  (hub#1356), y `cards_not_in_business` (con `has_live_twin`, la regla de la importación) con
+  `customer.customer.recover`, que rehace la ficha con sus grupos, etiquetas y campos (hub#1285). Ninguna app cuyos
+  registros llegan a Hacienda responde (contrato en `test_recovery.py`). Tests: `base/tenancy/tests/test_recovery.py`
+  (dos BD reales: la copia y el negocio), `apps/customer/tests/test_recovery.py`, `control/tests/test_services.py::TestRecover`,
+  `control/tests/test_admin.py::TestRecoverIntoTheBusiness` y `tests/e2e/base-recover-from-copy.spec.ts`.
+
 ## Lo que queda fuera
 
-Al cerrar la app (2026-11-01) ninguno de sus flujos quedó a medias: los que no entran están `descartado`, cada uno
-con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601), BASE-F37 y BASE-G157 (hub#580), BASE-F40
-(hub#603), BASE-F11 (hub#716) y BASE-F74 (hub#578).
-
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
-  (ronda 2026-11-01f de PLAN-HUB y PLAN-SAAS §28) y lleva su flujo y su issue allí.
+  (PLAN-SAAS §28) y lleva su flujo y su issue allí.
 - **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
   base de datos y sus ficheros pasados los 90 días.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
@@ -3897,7 +4209,7 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 ## Lo que NO hace, a propósito
 
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
-- No guarda el tablero en el servidor: es de cada dispositivo, como en el hub viejo.
+- No guarda el tablero en el servidor: es de cada dispositivo.
 - No enseña nunca a un cliente los ejemplos de la app Demo.
 - Importar no trae personas, PIN, datos fiscales ni los ajustes del negocio; exportar no los lleva nunca, ni
   archivos ni imágenes.

@@ -4,11 +4,10 @@ services.py records them in the outbox, in the command's transaction; live.py na
 re-run each live query. They carry ids only, never personal data: whoever needs the card asks
 ``customer.customer.detail``.
 
-Reactions (WORKBOOK «A qué reacciona»): a paid sale is recorded on its customer's card, a voided one
-taken off and a refund subtracted from the spend, each through an operation of this app run as the
-system, in its own transaction. The outbox relay (phase 2, in the worker) hands each delivered event
-to ``react``; the operations are idempotent per sale and per refund, so a repeated delivery changes
-nothing. ``customer`` does not require ``sale``: this is the only link.
+Reactions (WORKBOOK «A qué reacciona»): a paid sale is recorded on its customer's card, a voided one taken off and a
+refund subtracted from the spend, each through an operation of this app run as the system, in its own transaction. The
+worker's outbox relay hands each delivered event to ``react``; the operations are idempotent per sale and per refund, so
+a repeated delivery changes nothing. ``customer`` does not require ``sale``: this is the only link.
 """
 
 from typing import Any
@@ -23,6 +22,7 @@ CUSTOMER_TAGS_CHANGED = "customer.customer.tags_changed"
 CUSTOMER_DELETED = "customer.customer.deleted"
 CUSTOMER_MERGED = "customer.customer.merged"
 CUSTOMER_ERASED = "customer.customer.erased"
+CUSTOMER_RESTORED = "customer.customer.restored"
 NOTE_ADDED = "customer.note.added"
 ACTIVITY_RECORDED = "customer.activity.recorded"
 CONSENT_GRANTED = "customer.consent.granted"
@@ -53,6 +53,7 @@ ALL = [
     CUSTOMER_DELETED,
     CUSTOMER_MERGED,
     CUSTOMER_ERASED,
+    CUSTOMER_RESTORED,
     NOTE_ADDED,
     ACTIVITY_RECORDED,
     CONSENT_GRANTED,

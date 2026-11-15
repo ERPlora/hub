@@ -2,10 +2,10 @@
 copy of the templates Meta approved (WORKBOOK «Para quien lo mantiene → Modelo»).
 
 Each business has these tables in its own database; only the live notifications are per scope. A conversation is live
-while ``erased_at`` is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a conversation is with,
-who sent a message from the Hub and who wrote a note hang from the person in the business's own database
-(``base.HubUser``), never from control's user (tenancy W10): the columns ``*_hub_user_id`` are new, the old ones wait
-empty for a later deploy to drop them (``migrations/0010_hub_users``).
+while ``erased_at`` is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a
+conversation is with, who sent a message from the Hub and who wrote a note hang from the person in the business's own
+database (``base.HubUser``), never from control's user: the columns ``*_hub_user_id`` are new, the old ones wait empty
+for a later deploy to drop them (``migrations/0010_hub_users``).
 """
 
 import datetime as dt
@@ -36,8 +36,9 @@ class Channel(UUIDModel):
     """The business's WhatsApp number as erplora.com reports it: one row per business, written only by what the SaaS
     says (its photo, and its answer when the Hub connects or disconnects the number).
 
-    Each business keeps one row in its own database: the database holds it to one by the unique business column phase 1
-    left (``migrations/0005``), empty in every row the code writes since ``0011`` and ``0012``.
+    Each business keeps one row in its own database: the database holds it to one by the unique business column left
+    from when the businesses shared these tables (``migrations/0005``), empty in every row the code writes since
+    ``0011`` and ``0012``.
     """
 
     class Status(models.TextChoices):
@@ -51,7 +52,7 @@ class Channel(UUIDModel):
     # The business's own number (E.164) and the name WhatsApp shows for it.
     phone_number = models.CharField(_("phone number"), max_length=16, blank=True)
     display_name = models.CharField(_("display name"), max_length=200, blank=True)
-    # The plan's monthly allowance of messages sent (0 = the plan includes none, ADR-0474; there is no
+    # The plan's monthly allowance of messages sent (0 = the plan includes none; there is no
     # «unlimited») and what is spent, with the month (``YYYY-MM``) the figure counts: another month's figure
     # counts as nothing spent.
     monthly_limit = models.PositiveIntegerField(_("monthly limit"), default=0)
@@ -511,7 +512,7 @@ class Template(UUIDModel):
         ordering = ["name", "language", "id"]
         constraints = [
             # One live template per name and language: one deleted here frees them. In the database it still holds
-            # the business column phase 1 left (``migrations/0012``), where every row the code writes has it empty.
+            # the old business column (``migrations/0012``), where every row the code writes has it empty.
             models.UniqueConstraint(
                 fields=["name", "language"],
                 condition=Q(deleted_at__isnull=True),

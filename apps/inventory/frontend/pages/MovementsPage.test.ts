@@ -79,13 +79,13 @@ describe('MovementsPage', () => {
       ['reference_label', 'Reference', false],
     ]);
     const cells = (row: number) => s.rows()[row].text();
-    // The short date with its time (inventory#130, #139): a tablet column keeps the time of day.
+    // The short date with its time: a tablet column keeps the time of day.
     expect(cells(0)).toContain(formatShortDateTime('2026-10-13T10:00:00Z', 'en'));
     expect(cells(0)).toMatch(/Coffee.*CAF-1.*Count.*-1\.5.*8\.5.*Broken bottle/);
     expect(cells(1)).toMatch(/Reception.*\+10.*10.*ALB-2026-0001/);
   });
 
-  it('INVENTORY-F16: a sale reads as the number on its ticket, never as its id (inventory#137)', async () => {
+  it('INVENTORY-F16: a sale reads as the number on its ticket, never as its id', async () => {
     const s = await setup();
     const id = '0199a6c0-0000-7000-8000-00000000abcd';
     await s.show(page([movement('m3', 'sale', '-2.000', '8.000', { reference: id, reference_label: 'TICKET-2026-000007' })]));
@@ -93,7 +93,7 @@ describe('MovementsPage', () => {
     expect(s.rows()[0].text()).not.toContain(id);
   });
 
-  it('names every type as the old module did', async () => {
+  it('names every type in words', async () => {
     const s = await setup();
     const types = ['initial', 'reception', 'sale', 'void', 'count', 'write_off', 'refund'];
     await s.show(page(types.map((type, i) => movement(`m${i}`, type, '1.000', '1.000'))));
@@ -219,7 +219,7 @@ describe('MovementsPage', () => {
   });
 });
 
-describe('MovementsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('MovementsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

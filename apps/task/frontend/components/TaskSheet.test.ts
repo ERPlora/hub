@@ -6,7 +6,7 @@
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { task } from '../__tests__/task';
 import TaskFormModal from './TaskFormModal.vue';
 import TaskSheet from './TaskSheet.vue';
@@ -232,15 +232,24 @@ describe('TaskSheet', () => {
 });
 
 
-describe('TaskSheet: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
-  it('as opened closes; a change asks; restored as opened closes again', async () => {
+describe('TaskSheet: unsaved changes ask before closing (hub#1046, hub#1233, BASE-F05)', () => {
+  it('a half-written comment: Back, «Close», Escape and a tap outside ask «Discard changes?»; «Keep editing» keeps it', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('task-sheet'),
       change: () => ionValue(s.el('task-sheet-new-comment'), 'Half done', 'ionInput'),
       restore: () => ionValue(s.el('task-sheet-new-comment'), '', 'ionInput'),
     });
+  });
+
+  it('a half-written subtask asks on «Close» too; «Discard changes» closes it', async () => {
+    await expectSheetDiscardsOnClose(await setup(), 'task-sheet', 'task-sheet-new-subtask', 'Buy bleach');
+  });
+
+  it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'task-sheet');
   });
 
   it('closing after discarding clears the half-written comment and subtask', async () => {

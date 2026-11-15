@@ -1,4 +1,4 @@
-"""What the Hub's log says when erplora.com's assistant does not answer (saas#167; BASE-F94, BASE-F106).
+"""What the Hub's log says when erplora.com's assistant does not answer (BASE-F94, BASE-F106).
 
 The panel says every failure in a few words of its own («The assistant is not available right now…», «The audio could
 not be transcribed…»), so the reason lives only in the log: each failed call to the gateway leaves one line with its

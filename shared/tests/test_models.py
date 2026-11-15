@@ -1,4 +1,4 @@
-"""The Hub's mirror of the ``shared`` schema of the SaaS's database (round 16, PLAN §21; spec §3.2).
+"""The Hub's mirror of the ``shared`` schema of the SaaS's database.
 
 The SaaS owns ``shared.app`` and ``shared.app_doc`` and migrates them; the Hub writes them through
 these models, ``managed = False``, from ``base/catalog.py`` only. The columns come from

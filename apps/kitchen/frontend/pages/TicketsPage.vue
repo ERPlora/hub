@@ -73,7 +73,7 @@ const blocked = computed(() => blockingError(error.value));
 const options = (values: readonly string[], prefix: string) => values.map((value) => ({ value, label: t(`${prefix}.${value}`) }));
 
 const columns = computed<DataTableColumn<TicketRowOut>[]>(() => [
-  // kitchen#134: the whole number (its end tells one ticket from another), never «20261021-00…».
+  // The whole number (its end tells one ticket from another), never «20261021-00…».
   { key: 'number', label: t('kitchen.tickets.columns.number'), sortable: true, priority: 'high', width: 'minmax(9.5rem, 1fr)' },
   { key: 'label', label: t('kitchen.tickets.columns.label'), format: (_, r) => r.label || '—' },
   {
@@ -151,7 +151,7 @@ const formOpen = ref(false);
 const cancelOpen = ref(false);
 const reason = ref('');
 // A typed reason is unsaved: Android's Back asks before dropping it (hub#1046, BASE-F05).
-useUnsavedFormOnOpen('kitchen-tickets-cancel', reason, cancelOpen);
+const canDismiss = useUnsavedFormOnOpen('kitchen-tickets-cancel', reason, cancelOpen);
 
 async function step(run: () => Promise<unknown>): Promise<void> {
   actionError.value = null;
@@ -282,6 +282,7 @@ async function confirmCancel(): Promise<void> {
     />
     <ConfirmDialog
       v-model:open="cancelOpen"
+      :can-dismiss="canDismiss"
       testid="kitchen-tickets-cancel"
       tone="danger"
       :title="t('kitchen.tickets.cancelDialog.title', { number: target?.number ?? '' })"

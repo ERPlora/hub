@@ -1,4 +1,4 @@
-"""What System's operations share and touches no database (APP-BASE-7): an app's name as the business knows it, and
+"""What System's operations share and touches no database: an app's name as the business knows it, and
 the release running (``APP_VERSION``, ``APP_RELEASED_AT``: the image's commit and its time, fixed by the build)."""
 
 import datetime as dt

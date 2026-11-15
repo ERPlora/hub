@@ -1,12 +1,9 @@
-// Files (APP-BASE-8; the old hub's `lib/media.ts` and `file-preview.ts`): what the screen works out by itself. The
-// server (`base.file.*`, `base/files.py`) decides and refuses; here, sizes as people read them, the tree flattened for
-// the narrow selector and «Move to…», where the screen goes after a rename, a move or a delete of the folder it shows,
-// the search of the open folder, a CSV for the preview, the viewer of a spreadsheet and of a Word document (hub#578),
-// and the sentence of each refusal the server gives (hub#1776).
+// What the Files screen works out by itself; the server (`base.file.*`, `base/files.py`) decides and refuses. Each
+// refusal code the server gives has its own sentence, never one «check the connection» for all.
 
 /** The heaviest file the server takes (`base.files.MAX_FILE_BYTES`): refused here before sending 33 MB of base64. */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-/** The pages of a PDF the preview draws (the old hub's); a longer one says so and offers the download. */
+/** The pages of a PDF the preview draws; a longer one says so and offers the download. */
 export const PDF_PAGES = 30;
 /** The characters of a text the preview shows; a longer one says so. */
 export const TEXT_PREVIEW_CHARS = 1_000_000;
@@ -100,7 +97,7 @@ const KB = 1024;
 const MB = KB * 1024;
 const GB = MB * 1024;
 
-/** «512 B», «2 KB», «1,5 MB», «5 GB» (the old hub's `human_bytes`, in the person's language). */
+/** «512 B», «2 KB», «1,5 MB», «5 GB», in the person's language. */
 export function formatSize(bytes: number, locale: string): string {
   const number = (value: number, decimals: number) =>
     new Intl.NumberFormat(locale, { maximumFractionDigits: decimals }).format(value);

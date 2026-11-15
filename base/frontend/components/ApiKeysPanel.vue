@@ -1,12 +1,6 @@
 <script setup lang="ts">
-// Employees › API keys (BASE-G146…G149, G03, G05; the old hub's ApiKeysPanel), for who runs the business: the live
-// `base.api_key.list` — Name, Token (its start only), Permissions (the mode, or each app with R/W), State, Created,
-// Last use («Never») and Limit («60/min») — and «New API key»: its name, its requests a minute (1 to 10,000) and what it
-// may do (full access, read only, write only, or per app over the apps this business has that publish their API; per
-// app by default, as the old hub). Its token is shown once, with «Copy» («Copied» for two seconds). «Rotate» gives it a
-// new token and «Revoke» stops it for good: both are asked first with their consequence (the old hub rotated at the
-// first tap). A business that cannot have keys yet is told so; a refusal is told from its code; a list that cannot be
-// read is never «no keys».
+// Employees › API keys, for whoever runs the business. A key's token is shown only once, when it is created or
+// rotated. A list that cannot be read is never shown as «no keys».
 import {
   ConfirmDialog,
   DataTable,
@@ -27,6 +21,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import { useBaseI18n } from '../lib/i18n';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
 import type { ApiKeyInput, ApiKeyMode, ApiKeyRow, ApiKind } from '../operations';
+import FieldGroup from './FieldGroup.vue';
 
 const MODES: readonly ApiKeyMode[] = ['full', 'read', 'write', 'per_app'];
 const KINDS: readonly ApiKind[] = ['read', 'write'];
@@ -121,7 +116,7 @@ function tick(app: string, kind: ApiKind, on: boolean): void {
 /** The apps with a box ticked: a box ticked and unticked again is no change. */
 const tickedScopes = () => Object.fromEntries(Object.entries(form.value.scopes).filter(([, kinds]) => kinds.length > 0));
 
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'api-key-form',
   () => ({ name: form.value.name, rate: rateText.value, mode: form.value.mode, scopes: tickedScopes() }),
   creating,
@@ -270,6 +265,7 @@ async function confirmRevoke(): Promise<void> {
 
     <FormModal
       v-model:open="creating"
+      :can-dismiss="canDismiss"
       testid="api-key-form"
       size="md"
       :title="t('base.apiKeys.form.title')"
@@ -309,7 +305,7 @@ async function confirmRevoke(): Promise<void> {
           :max="10000"
           @ion-input="rateText = String($event.detail.value ?? '')"
         />
-        <fieldset class="api-key-modes">
+        <FieldGroup class="api-key-modes">
           <legend>{{ t('base.apiKeys.form.mode') }}</legend>
           <div
             role="radiogroup"
@@ -332,7 +328,7 @@ async function confirmRevoke(): Promise<void> {
           <p class="api-keys-hint">
             {{ form.mode === 'per_app' ? t('base.apiKeys.form.perAppHint') : t('base.apiKeys.form.generalHint') }}
           </p>
-        </fieldset>
+        </FieldGroup>
         <div
           v-if="form.mode === 'per_app'"
           class="api-key-apps"
@@ -510,9 +506,6 @@ async function confirmRevoke(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
 .api-key-modes legend {

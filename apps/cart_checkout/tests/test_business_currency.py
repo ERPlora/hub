@@ -37,7 +37,7 @@ def created_currency() -> str:
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("SE", "SEK"), ("HU", "HUF"), ("ES", "EUR")])
 def test_a_cart_without_a_currency_is_born_in_the_currency_of_the_business_s_country(country, currency):
-    # cart_checkout#32, #34: a hub that did not work in euros got euro carts from the screen, the assistant and the API.
+    # A hub that does not work in euros never gets euro carts from the screen, the assistant or the API.
     business_in(country)
     cart = run("cart_checkout.cart.create", {"session_token": "sess_1"})
     assert cart.currency == currency
@@ -65,8 +65,8 @@ def test_an_api_key_with_only_the_cart_permission_gets_the_business_s_currency()
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("JP", "JPY")])
 def test_erploras_own_hub_creates_its_carts_in_the_currency_of_its_issuer_s_country(settings, country, currency):
-    # Phase 1's platform hub has no business on erplora.com and every module is on in it: its carts go in the
-    # currency of its issuer's country, as its sales and invoices do, never a 404 because there is no business to read.
+    # ERPlora's own hub has no business on erplora.com and every module is on in it: its carts go in the currency of its
+    # issuer's country, as its sales and invoices do, never a 404 because there is no business to read.
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country
     platform = ctx_for(scope=Scope("host", "erplora"))

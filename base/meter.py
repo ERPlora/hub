@@ -1,5 +1,5 @@
 """What each business does during the day, counted in the memory of every process that serves it and written to control
-once a minute (BASE-F40; PLAN-HUB §66 and its correction).
+once a minute.
 
 Four figures, each in the UTC day of its moment:
 

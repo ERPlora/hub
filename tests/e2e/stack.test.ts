@@ -1,4 +1,4 @@
-// Where the browser PoC finds the dev stack: the defaults are the shared one (runserver on :8000, its
+// Where the e2e finds the dev stack: the defaults are the shared one (runserver on :8000, its
 // Vite on :5173, the SaaS on :8001, the database `hub`); a branch checked out beside it runs its own
 // stack on other ports and its own e2e database, set by the same variables Django and Vite read.
 import { describe, expect, it } from 'vitest';
@@ -37,9 +37,8 @@ describe('stackFrom', () => {
     expect(() => stackFrom({ DB_NAME: 'hub; drop database hub' })).toThrow(/DB_NAME/);
   });
 
-  // flow: ninguno — FIX de la infraestructura e2e del Hub (aislar los datos de cada ejecución)
-  // On 2026-10-16 two stacks ran beside each other (8030 and 8040, each with its SaaS) on the default
-  // `hub`: the cash sale of one fell into the other's open shift and cash-register-shift.spec.ts failed.
+  // flow: none — the Hub's e2e stack keeps each run's data on its own
+  // Two stacks beside each other on the default `hub` share it: the cash sale of one falls into the other's open shift.
   describe('a stack beside the shared one runs on its own e2e database', () => {
     const beside = { E2E_HUB_PORT: '8030', VITE_DEV_PORT: '5203', SAAS_URL: 'http://localhost:8031' };
 
@@ -68,7 +67,7 @@ describe('stackFrom', () => {
     });
   });
 
-  // flow: ninguno — arnés e2e del Hub (FIX-HUB-E2E-README-PARALLEL-STACK-MISSES-DEMO-SEED)
+  // flow: none — the Hub's e2e harness
   // Where the stack's SaaS keeps its accounts, for the start's check of the demo accounts (global-setup.ts): the rule
   // the assistant's specs already follow (README «Varias ejecuciones a la vez»: the SaaS on the Hub's port + 1).
   describe("the SaaS's database", () => {

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ce41752ed7af37abee9f4ae2ecd3927006e516e673ba8d1614fb09ece9398862 -->
+<!-- generated from WORKBOOK.md sha256:364e7398f7b82b43e44f6b14dfd72c6c623f9ab572e7a799616cdcc04334000a -->
 
 ## What it is for and who it is for
 
@@ -43,11 +43,11 @@ conversation as a message from the business (Meta's coexistence).
 **Wins:** an inbox you answer from (Square, Shopify, Fresha, Vagaro, Odoo), with three statuses (open, pending,
 closed) where a new message from the customer reopens the conversation (Zendesk), assignment to whoever can read the
 inbox with "Assign to me" that never overrides someone else (Shopify, Chakra), internal notes in the thread (Fresha,
-Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI,
-Respond.io and the current product).
-**Why not the others:** answering only from the phone (the current product) forces you to pick up the phone and
+Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI
+and Respond.io).
+**Why not the others:** answering only from the phone forces you to pick up the phone and
 leaves the inbox read-only; two statuses (Shopify) do not tell "waiting for the customer" from "it is done";
-assigning by typing an identifier (the current product) is used by nobody; sending the owner to WhatsApp Manager to
+assigning by typing an identifier is used by nobody; sending the owner to WhatsApp Manager to
 create the templates takes them out of the app for something they do every day.
 
 ## Before you start
@@ -261,12 +261,15 @@ Steps:
 3. The number is compared as a number: written with spaces, with the country prefix or with "00" in front it is the
    same person in a business in Spain, and a foreign number that keeps its zero (a landline in Italy) too; the same
    digits with another country's prefix are another person.
+4. When ERPlora's staff recover from the separate copy a card the business deleted (the same card comes back,
+   CUSTOMER-F33), the conversations of its number that are still without a card are linked to it again within a
+   few seconds, without waiting for the customer to write again.
 In: the conversation's number and the cards with that number.
 Out: the conversation knows which card it belongs to. It only fills an empty link: the one a person set is
 respected. A deleted card counts as empty: its conversation is left without a card and another live card with the
-same number claims it.
+same number claims it; if the card comes back from the separate copy and no other claimed it, it is hers again.
 If it fails: if two cards have the same number, it is linked to neither and the message stays saved.
-Involved: Customers
+Involved: Customers, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Read a conversation
 Status: done
@@ -1079,7 +1082,8 @@ They carry identifiers, never a number, a name or a text of the conversation.
 - **Customers** (required): `customer.customer.created` and `customer.customer.updated` link the conversations with no
   card of that number (F04); `customer.customer.merged` moves them to the card that stays (F12);
   `customer.customer.deleted` leaves them without a card and another live card of the number claims them;
-  `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
+  `customer.customer.restored` (the deleted card coming back from the separate copy, CUSTOMER-F33) links them again,
+  as a new card does (F04); `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
   creates cards only with `customer.customer.create`.
 
 ### Who uses it
@@ -1094,7 +1098,11 @@ They carry identifiers, never a number, a name or a text of the conversation.
   (`note.get`, `template.get`). Before changing anything it asks to confirm with its card (BASE-F97), which names each
   record as the screens name it, never by its id: the conversation as the inbox calls it ("Conversation: Ana López"),
   the card joined to it, the message retried and the note deleted by their text, and the template by its name and its
-  language ("Template: recordatorio (es)"). What the person asking cannot see is left out.
+  language ("Template: recordatorio (es)"). What the person asking cannot see is left out. Each tool knows how a
+  person asks for it, in English and in Spanish: "open Ana's last message", "retry the template that did not reach
+  Meta" or "which people can take this WhatsApp conversation?" reach their operation (before, opening one message, retrying a
+  message or a template, sending, changing a template and seeing who a conversation can be assigned to did not reach
+  it and it said it could not). For the assistant, a "template" and a "message" are this inbox's.
 
 ### Who can do what
 

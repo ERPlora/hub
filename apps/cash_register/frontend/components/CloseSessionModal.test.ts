@@ -53,8 +53,9 @@ describe('CloseSessionModal: before the business answers its money (hub#921)', (
   });
 });
 
-describe('CloseSessionModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
-  it('as opened closes, also once the last closing count fills the cash; a change asks; restored closes again', async () => {
+describe('CloseSessionModal: unsaved changes ask before closing (hub#1031, hub#1234, BASE-F05)', () => {
+  /** The window with the session read and its last closing count (15,00) in the counted cash. */
+  async function opened() {
     const m = await mountCash(CloseSessionModal, { props: { open: true, session: SESSION } });
     await m.live();
     const page = (rows: unknown[]) => ({ rows, total: rows.length, limit: 20, offset: 0 });
@@ -66,14 +67,37 @@ describe('CloseSessionModal: Android Back with unsaved changes (hub#1031, BASE-F
     const counted = () => m.inDoc('cash-register-close-counted');
     const seeded = (counted() as unknown as { value?: unknown }).value;
     expect(seeded).toBeTruthy();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    return { ...m, counted, seeded };
+  }
+
+  it('a changed count: Back, its «Cancel», the «×», Escape and a tap outside ask «Discard changes?»; restored, Back closes', async () => {
+    const m = await opened();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => m.inDoc('cash-register-close'),
-      change: () => ionValue(counted(), '14,00', 'ionInput'),
-      restore: () => ionValue(counted(), seeded, 'ionInput'),
+      change: () => ionValue(m.counted(), '14,00', 'ionInput'),
+      restore: () => ionValue(m.counted(), m.seeded, 'ionInput'),
     });
     await ionValue(m.inDoc('cash-register-close-notes'), 'Short by one', 'ionInput');
     const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
     expect(unsavedChangesIn(m.inDoc('cash-register-close')!)).toBeDefined();
+  });
+
+  it('«Discard changes» after its «Cancel» closes the window and closes no session', async () => {
+    const m = await opened();
+    const { answerUnsavedQuestion } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await ionValue(m.inDoc('cash-register-close-notes'), 'Short by one', 'ionInput');
+    m.inDoc('cash-register-close-cancel')!.click();
+    await flush();
+    await answerUnsavedQuestion('discard');
+    expect(m.inDoc('cash-register-close-notes')).toBeNull();
+    expect(m.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+    expect(m.wrapper.emitted('closed')).toBeUndefined();
+  });
+
+  it('as opened, with the last closing count in the cash, its «Cancel», the «×», Escape and a tap outside close it without asking', async () => {
+    const m = await opened();
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(m, 'cash-register-close');
   });
 });

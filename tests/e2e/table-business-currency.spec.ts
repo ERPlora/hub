@@ -1,20 +1,21 @@
-// flow: table-business-currency (FIX-HUB-TABLE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/table/WORKBOOK.md «Sesiones»,
-// TABLE-F17 and TABLE-F22)
+// flow: table-business-currency (apps/table/WORKBOOK.md «Sesiones», TABLE-F17 and TABLE-F22)
 // Tables paints money in the currency it was charged in and, what is not charged yet, in the business's: its country's,
-// as erplora.com registered it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Against
-// the real Sales and Inventory, no mocks: a check of the run is charged in euros while hub `a` is in Spain; then `a`
-// moves to Poland and a second check is charged there (Sales keeps each sale's currency). In 390, 834 and 1440, Tables →
-// Sessions «Closed» reads the Polish check's «Charged» in złoty and the Spanish one's still in euros (a record is never
-// rewritten), «Details» of the Polish one says złoty, and «Split check» of an open table paints its lines in złoty
-// (captures `FIX-HUB-TABLE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>` and `…-split-<width>`). Back in Spain the open
-// table splits in euros and the Polish check keeps its złoty (`…-es-1440`). What the run creates is deleted after it and
-// `a`'s registration put back, also when a test fails.
+// as erplora.com registered it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro.
+// Against the real Sales and Inventory, no mocks: a check of the run is charged in euros while hub `a` is in Spain;
+// then `a` moves to Poland and a second check is charged there (Sales keeps each sale's currency). In 390, 834 and
+// 1440, Tables → Sessions «Closed» reads the Polish check's «Charged» in złoty and the Spanish one's still in euros (a
+// record is never rewritten), «Details» of the Polish one says złoty, and «Split check» of an open table paints its
+// lines in złoty. Back in Spain the open table splits in euros and the Polish check keeps its złoty. What the run
+// creates is deleted after it and `a`'s registration put back, also when a test fails. Like any business in Poland, `a`
+// charges there with a rule of its own country for the dish's category: Spain alone has factory rules (TAX-F16), and
+// without one Sales refuses the charge with `sale.no_tax_rule`; the run mounts it and deletes it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 import { noHorizontalScroll, post, rowAction, settled } from './service-helpers';
+import { createRule, dropCountryRules } from './tax-helpers';
 
 const KEY = 'FIX-HUB-TABLE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const SIZES = [
@@ -111,11 +112,14 @@ async function splitLine(page: Page): Promise<Locator> {
 test.beforeAll(async ({ browser }) => {
   original = registrationOf('a');
   cleanUp();
+  dropCountryRules('PL');
   await registerBusinessIn(original, 'ES');
   const context = await browser.newContext({ baseURL: A, locale: 'en-US' });
   try {
     await login(await context.newPage(), A, '/table/sessions');
     dish = await createProduct(context, { name: `${TAG} dish`, sku: SKU, price: 1250, tax_category_key: 'restaurant.drink' });
+    // Poland's reduced VAT for what a restaurant serves: the price already holds it, so the checks keep their totals.
+    await createRule(context, { country_code: 'PL', tax_category_key: 'restaurant.drink', rate_pct: 8 });
     zoneId = (await post<{ id: string }>(context, '/table/zones', { name: ZONE })).id;
     // Charged while the business is in Spain: its sale keeps the euro.
     run.spanish = await chargedCheck(context, '1', 1, 'EUR');
@@ -129,9 +133,10 @@ test.afterAll(async () => {
   cleanUp();
   cleanSales();
   cleanInventory();
+  dropCountryRules('PL');
 });
 
-test(`${KEY}: table-business-currency a business in Poland reads Sessions, Details and Split check in złoty in 390, 834 and 1440`, async ({
+test(`table-business-currency a business in Poland reads Sessions, Details and Split check in złoty in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -174,7 +179,7 @@ test(`${KEY}: table-business-currency a business in Poland reads Sessions, Detai
   }
 });
 
-test(`${KEY}: table-business-currency back in Spain an open table splits in euros and the check charged in Poland keeps its złoty`, async ({
+test(`table-business-currency back in Spain an open table splits in euros and the check charged in Poland keeps its złoty`, async ({
   page,
 }) => {
   await registerBusinessIn(original, 'ES');

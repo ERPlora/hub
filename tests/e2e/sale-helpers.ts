@@ -8,7 +8,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, parkIssuer, unparkIssuer } from './invoice-helpers';
 
 export const VIEWPORTS = [
@@ -76,6 +76,53 @@ export async function newestSaleOf(context: BrowserContext, sku: string): Promis
 /** When the till is a phone's: the catalogue alone and the check a drawer behind the cart button. The rule of
  *  `apps/sale/frontend/pages/PosPage.vue` (`PHONE`, `NARROW_TILL`): this window, or a till narrower than that. */
 const TILL_PHONE = { media: '(max-width: 820px), (max-height: 500px)', narrowerThan: 700 };
+
+/** The till (`/sale/pos`) painted: its frame, and its grid's first product or its empty state. */
+export async function tillReady(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
+}
+
+/**
+ * Whether the till takes `button` — a tile of its grid or a row of its search, both Ionic buttons (SALE-F07,
+ * INVENTORY-F29): `data-aria-disabled` on the button, which greys it, and `aria-disabled` on its native button, which a
+ * screen reader announces. Never the host's own `aria-disabled`: Ionic moves it to the native button when it loads and
+ * leaves a later one on the host, where nothing reads it (hub#1337). A refused one still takes the tap, to say why.
+ */
+export async function expectTakes(button: Locator, takes: boolean): Promise<void> {
+  await expect(button).toHaveAttribute('data-aria-disabled', String(!takes));
+  const native = button.locator('button');
+  await expect(native).toHaveCount(1);
+  if (takes) await expect(native).not.toHaveAttribute('aria-disabled', 'true');
+  else await expect(native).toHaveAttribute('aria-disabled', 'true');
+}
+
+/** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
+export const TILL_TILE = ':scope > ion-button.pos-tile';
+
+/** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
+export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
+
+/** That one grid of the till is on screen and its first tile is `testid`'s (COMBO-F07, SALE-F12: the menus go first). */
+export async function expectFirstTile(page: Page, testid: string | RegExp): Promise<void> {
+  const grid = tillGrid(page);
+  await expect(grid, 'one grid of the till on screen').toHaveCount(1);
+  await expect(grid.locator(TILL_TILE).first()).toHaveAttribute('data-testid', testid);
+}
+
+/**
+ * The width the photo of `tile` loaded at, once it is on screen: the image named after its item `name`, as ItemImage.vue
+ * names it, never a style class of the tile, which a restyle renames. With `src`, it is also that image.
+ */
+export async function tilePhotoLoaded(tile: Locator, name: string, src?: string): Promise<number> {
+  const photo = tile.getByAltText(name, { exact: true });
+  if (src !== undefined) await expect(photo).toHaveAttribute('src', src);
+  return photoLoaded(photo.locator('xpath=..'));
+}
+
+/** The lines of the check on screen that sell `product`. */
+export const linesOf = (page: Page, product: { name: string }): Locator =>
+  shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });
 
 /**
  * Whether the till on screen is a phone's, once it has laid itself out for the window. It does so a frame after a
@@ -169,6 +216,28 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   const dish = await createProduct(context, { name: `E2E ${label} Dish ${run}`, sku: `E2E-${label}-${run}`, price: 700, tax_category_key: 'restaurant.food' });
   await context.close();
   return dish;
+}
+
+/** The room a spec made (its zones named `<tag>…`, their tables and the seatings on them), and the checks of Sales its
+ *  seating opened (they carry no line nor any sale). */
+export function cleanRoom(tag: string): void {
+  const tables = `select id from table_table where zone_id in (select id from table_zone where name like '${tag}%')`;
+  const sessions = `select id from table_tablesession where table_id in (${tables})`;
+  const orders = psql(`select order_id from table_tablesession where id in (${sessions}) and order_id is not null`)
+    .split('\n')
+    .filter(Boolean)
+    .map((id) => `'${id}'`)
+    .join(', ');
+  psql(
+    [
+      `delete from table_sessionmove where session_id in (${sessions})`,
+      `delete from table_tablesession where id in (${sessions})`,
+      `delete from table_hold where table_id in (${tables})`,
+      ...(orders ? [`delete from sale_order where id in (${orders})`] : []),
+      `delete from table_table where id in (${tables})`,
+      `delete from table_zone where name like '${tag}%'`,
+    ].join('; '),
+  );
 }
 
 /** For a spec that seats a table (SALE-F19, SALE-F20): the zone `zone` and its table `number`, for four, through Tables'

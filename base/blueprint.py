@@ -1,27 +1,27 @@
-"""Blueprints (PLAN-HUB round 2026-10-21, «Blueprints»): the ``.blueprint.zip``, the catalogue of seeds by vertical and
-what travels of each app. Flows BASE-G101–G109 (Settings › Data) and the Home's card (BASE-G131).
+"""Blueprints: the ``.blueprint.zip``, the catalogue of seeds by vertical and what travels of each app, behind
+Settings › Data and the Home's card.
 
 A blueprint is a manifest (who made it, for what, its language and country, the apps it turns on) and, per dataset,
 the rows that travel. A **dataset** is one kind of thing an app lets travel (inventory's categories, its products,
 the tables of the room…): it reads its rows with that app's own list and writes them with that app's own create, so
-the app's rules hold for an import too, and never a table is dumped (hub#426). Rows name each other by their natural
-key — a product's categories by name, a table's zone by name — never by an id of the business that made the file
-(hub#2626). People, PINs and fiscal data have no dataset: they never travel, and a file that brings them has them
-dropped on reading (``Bundle.dropped``).
+the app's rules hold for an import too, and never a table is dumped. Rows name each other by their natural
+key — a product's categories by name, a table's zone by name — never by an id of the business that made the file.
+People, PINs and fiscal data have no dataset: they never travel, and a file that brings them has them dropped on
+reading (``Bundle.dropped``).
 
 - The file: ``manifest.json``, ``data/<dataset>.json`` and the rows' own photos at ``media/<name>`` in a zip
   (:func:`read_zip`, :func:`write_zip`), read with limits (20 MB, 100 MB inflated, 1 000 entries) and refused with a
   reason the person can read (:class:`BlueprintInvalid`).
-- Images (INVENTORY-F33; round 2026-10-30, ``base.images``): an image of the shared library travels as its reference
+- Images (``base.images``): an image of the shared library travels as its reference
   (``catalog:<folder>/<name>``), a photo of a row's own inside the file (:func:`export_media`); loading it copies the
   photo under a new name through the app's own upload, and a row whose image cannot be set loads without it and is
   told (:func:`_load_image`).
 - The catalogue: the seeds of ``base/seeds/<vertical>.<language>.json``, one per vertical and language; what a seed
-  turns on is its vertical's apps (``base.catalog.template_apps``, PLAN §15.2), what it brings is its own data.
+  turns on is its vertical's apps (``base.catalog.template_apps``), what it brings is its own data.
 - :func:`apply` loads a blueprint app by app, each part on its own: a row an app refuses fails alone and is told, the
   rest loads, and loading again duplicates nothing (each dataset skips what is already there). Personal data (the
   customers) travels only in a backup, never in a template. Before it, ``base.blueprint.import`` turns on the apps
-  the manifest lists that are off (round 2026-10-27: a hub is born with every app off); one it could not turn on (the
+  the manifest lists that are off (a hub is born with every app off); one it could not turn on (the
   plan's limit, no right to it) loads nothing and its report says why.
 - :func:`undo` removes exactly the rows a load created; :func:`reset` every row of the apps chosen; both through the
   apps' own delete (or archive).
@@ -73,7 +73,7 @@ PURPOSE_TEMPLATE = "template"
 PURPOSES = (PURPOSE_BACKUP, PURPOSE_TEMPLATE)
 #: The largest file read (what the person uploads), before anything is inflated. A photo travels as the 512 × 512 WebP
 #: it was kept as (``base.images``), 20–60 KB and already compressed, so the zip weighs what its photos weigh: 300
-#: photos of 60 KB are 18 MB, and the rows' JSON a few hundred KB more (round 2026-10-30; it was 5 MB without photos).
+#: photos of 60 KB are 18 MB, and the rows' JSON a few hundred KB more.
 MAX_FILE_BYTES = 20 * 1024 * 1024
 #: The most its members may weigh once inflated: a zip bomb stops here, never in memory. The photos inflate to what
 #: they weigh (≤ 20 MB) and the rows' JSON about ten to one: 100 MB holds both with room.
@@ -95,7 +95,7 @@ MEDIA_FILE_RE = re.compile(r"^media/((?:[a-z][a-z0-9_]*/){2}[0-9a-f]{32}\.webp)$
 #: What a spreadsheet runs as a formula; the customers' export quotes a cell that starts with one (CUSTOMER-F09).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
-# Statuses of a dataset and of an app in the report of a load (the screen names each one, hub#1891).
+# Statuses of a dataset and of an app in the report of a load (the screen names each one).
 APPLIED, PARTIAL, ALREADY, FAILED, EMPTY, DISCARDED = "applied", "partial", "already", "failed", "empty", "discarded"
 INACTIVE, UNKNOWN, NOT_SELECTED = "inactive", "unknown", "not_selected"
 # An app of a template its load turned on and its business's database is still making the tables of (hub#609): the load
@@ -233,7 +233,7 @@ def read_base64(text: str) -> Bundle:
     return read_zip(content)
 
 
-def read_zip(content: bytes) -> Bundle:
+def read_zip(content: bytes) -> Bundle:  # noqa: C901
     """The blueprint in ``content``, or :class:`BlueprintInvalid` with the reason it cannot be read."""
     if len(content) > MAX_FILE_BYTES:
         raise BlueprintInvalid("too_big")
@@ -294,7 +294,7 @@ def file_name(name: str, language: str) -> str:
     return f"{slugify(name) or 'blueprint'}_{slugify(language) or 'xx'}.blueprint.zip"
 
 
-def manifest(*, name: str, language: str, country: str, purpose: str, created_at: str, vertical: str, apps: list[str],
+def manifest(*, name: str, language: str, country: str, purpose: str, created_at: str, vertical: str, apps: list[str],  # noqa: PLR0913
              version: str = "") -> dict:
     """A manifest of this format."""
     return {
@@ -481,7 +481,7 @@ def template_out(seed: Template) -> dict:
 
 
 def summary(ctx: OperationContext, bundle: Bundle, *, seed: Template | None) -> dict:
-    """What a blueprint brings and what of it would load here (BASE-G105), writing nothing."""
+    """What a blueprint brings and what of it would load here, writing nothing."""
     on = active_apps(ctx.scope)
     blocked = blocked_apps(ctx.scope)
     known = {config.label for config in module_configs()}
@@ -755,7 +755,7 @@ def _dataset_report(dataset: Dataset, loaded: Loaded, rows: list[dict], *, disca
     }
 
 
-def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset[str], known: set[str],
+def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset[str], known: set[str],  # noqa: PLR0913, PLR0917
                 loads: dict[str, dict], refused: dict[str, str], waiting: set[str]) -> dict:
     report = {"id": app, "label": app_label(app), "status": APPLIED, "reason": "", "datasets": []}
     if chosen is not None and app not in chosen:
@@ -791,7 +791,7 @@ def _overall(app_reports: list[dict], created: dict[str, list[str]]) -> str:
 
 
 def app_label(app: str) -> str:
-    """The app's name as the person reads it (hub#488), or its id for an app this hub does not have."""
+    """The app's name as the person reads it, or its id for an app this hub does not have."""
     try:
         return str(django_apps.get_app_config(app).verbose_name)
     except LookupError:
@@ -979,7 +979,7 @@ def _created(loaded: Loaded, result: Any) -> str:
     return pk
 
 
-def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, name: str, key: Callable[[dict], str],
+def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, name: str, key: Callable[[dict], str],  # noqa: PLR0913
                  existing: set[str], build: Callable[[dict], dict], label: Callable[[dict], str],
                  after: Callable[[dict, str], None] | None = None) -> None:
     """Create each row by ``name`` unless its natural ``key`` is already there; a refused row fails alone. ``after``
@@ -1002,7 +1002,7 @@ def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, nam
             after(row, pk)
 
 
-def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str, row: dict, label: str) -> None:
+def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str, row: dict, label: str) -> None:  # noqa: PLR0913, PLR0917
     """Show on the row just created the image its file names: one of the library through the app's ``set_image``, a
     photo the file carries through its ``upload_image`` (a copy under a new name, within the plan's space). One that
     cannot be set leaves the row without an image, and the report says why (INVENTORY-F33)."""
@@ -1076,7 +1076,7 @@ def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
     ]
 
 
-def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
+def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:  # noqa: C901, PLR0912
     by_sku: dict[str, dict] = {}
     for start in range(0, len(rows), PAGE):
         chunk = rows[start : start + PAGE]
@@ -1109,7 +1109,7 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
             elif outcome.status == "skipped":
                 loaded.already += 1
             else:
-                # Named as the person knows it (hub#1891): its name, its code only without one.
+                # Named as the person knows it: its name, its code only without one.
                 loaded.refuse(_text(row, "name") or outcome.key or _text(row, "sku"), outcome.reason)
     if not by_sku:
         return

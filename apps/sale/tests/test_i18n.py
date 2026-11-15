@@ -84,7 +84,7 @@ def test_spanish_texts():
         assert str(queries.SERVICES_UNAVAILABLE).startswith(
             "Servicios no está activa en este negocio"
         )
-        # FIX-SALE-TABBAR-LABEL: the open price's families are «secciones» everywhere the user reads.
+        # The open price's families are «secciones» everywhere the user reads.
         assert str(queries.DEPARTMENT_NOT_FOUND) == (
             "Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo."
         )
@@ -161,8 +161,8 @@ TAB_KEYS = {
 
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_the_menu_and_the_tabbar_name_each_section_alike(language):
-    # FIX-SALE-TABBAR-LABEL: a menu entry and its footer tab say the same word. «Sections» took the
-    # place of «Departments», one word wider than a fifth of a phone's tabbar.
+    # A menu entry and its footer tab say the same word: «Sections», since «Departments» is wider than a fifth of a
+    # phone's tabbar.
     frontend = Path(apps.get_app_config("sale").path) / "frontend" / "locale"
     catalogue = json.loads((frontend / f"{language}.json").read_text(encoding="utf-8"))
     tabs = catalogue["sale"]["tabs"]

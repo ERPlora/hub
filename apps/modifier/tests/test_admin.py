@@ -1,4 +1,4 @@
-"""Django admin of the modifier app: full CRUD for support (round 12, PLAN §17).
+"""Django admin of the modifier app: full CRUD, for support.
 
 The Hub admin, on hubs.erplora.com and for the staff only, adds, changes and deletes every table so that
 support can repair; it is a second write path that warns rather than prevents, and the database still
@@ -71,7 +71,7 @@ def test_changelists_and_change_pages_render(client, superuser):
     )
     client.force_login(superuser)
 
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     for path, text in (
         ("/admin/modifier/modifiergroup/", b"Sauces"),
         (f"/admin/modifier/modifiergroup/{group.pk}/change/", b"Mayo"),

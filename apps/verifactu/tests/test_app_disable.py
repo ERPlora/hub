@@ -1,4 +1,4 @@
-"""VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
+"""VeriFactu never goes off once on, in Spain (VERIFACTU-F32).
 
 The platform's ``base.app.disable`` asks the app's ``can_disable`` (``base.activation.veto``). A business in Spain that
 turned VeriFactu on has its invoices reach the AEAT from then on: VERI*FACTU binds it at least to the end of the
@@ -6,7 +6,7 @@ natural year (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way 
 always 409 ``base.app_vetoed`` with the legal reason in the reader's language, and the app stays on — whether records
 are still to send or the AEAT answered all of them. A business without a country (a demo) is in Spain. Outside Spain
 nothing is ever sent (``test_outside_spain``), so it goes off. So does one that never got on: its tables still being
-made, or making them failed (S3, ``base.activation``), it sealed nothing and the rule does not bind it yet. Each hub
+made, or making them failed (``base.activation``), it sealed nothing and the rule does not bind it yet. Each hub
 reads its own business's country: a business outside Spain in hub A turns it off while the one in Spain in hub B is
 refused.
 """

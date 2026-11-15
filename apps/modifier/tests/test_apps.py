@@ -78,8 +78,12 @@ def test_the_workbook_has_the_user_part_and_the_maintainers_part():
         assert section in workbook
 
 
+#: What only the recovery from a separate copy runs (a group made again with its options): no tool (``INTERNAL``).
+NO_TOOL = {"modifier.group.recover"}
+
+
 def test_every_operation_is_described_for_the_assistant():
-    from live.operations import registry
+    from live.operations import INTERNAL, registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("modifier.")}
     assert sorted(ops) == sorted(
@@ -103,9 +107,13 @@ def test_every_operation_is_described_for_the_assistant():
             "modifier.link.detach",
             "modifier.link.drop_product",
             "modifier.link.drop_category",
+            "modifier.group.recover",
         ]
     )
     for name, op in ops.items():
+        if name in NO_TOOL:
+            assert op.ai is INTERNAL, name
+            continue
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name
         )
@@ -116,7 +124,7 @@ def test_every_operation_is_described_for_the_assistant():
     high = {
         name
         for name, op in ops.items()
-        if op.kind == "command" and op.ai["risk"] == "high"
+        if op.kind == "command" and name not in NO_TOOL and op.ai["risk"] == "high"
     }
     assert high == {"modifier.group.delete", "modifier.option.delete"}
 

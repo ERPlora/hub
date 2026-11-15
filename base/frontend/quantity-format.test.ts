@@ -7,12 +7,13 @@
 //   `Intl.NumberFormat`, in the options given to an app's helper, or in a table of options;
 // - a function or constant named `formatQuantity` written in the app: the shared one is imported or re-exported.
 // What a person types is no written quantity: a field shows its figure ungrouped, as typed (QtyStepper; a till's field
-// does not group, PLAN-HUB «lo que se teclea no se agrupa»), and needs only the decimal mark of the language.
+// does not group), and needs only the decimal mark of the language.
 // `packages/ui` is not read: it holds the one formatter.
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { bare, findingsByApp, hubFrontends, linesWhere } from './__tests__/frontend-sources';
+import { NO_CLOCK } from '../../vitest.load';
 
 const WRITE_IT_WITH_THE_PLATFORM =
   'write the quantity with formatQuantity of @erplora/ui/components (the platform\'s one way to write a quantity), ' +
@@ -70,9 +71,8 @@ describe('guardrail: every quantity of the Hub is written by the platform (base-
     expect(ownQuantityFormats(component.join('\n'), 'QtyStepper.vue')).toEqual([3]);
   });
 
-  it('no app, nor base, writes a quantity with a formatter of its own', () => {
-    expect(findingsByApp(hubFrontends({ ui: false }), ownQuantityFormats), WRITE_IT_WITH_THE_PLATFORM).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600): the limit of the guardrails that read a whole tree (60 s,
-    // tsconfig.test.ts).
-  }, 60_000);
+  it('no app, nor base, writes a quantity with a formatter of its own', async () => {
+    expect(await findingsByApp(hubFrontends({ ui: false }), ownQuantityFormats), WRITE_IT_WITH_THE_PLATFORM).toEqual({});
+    // It reads every frontend file of the Hub (some 2,000) without holding the worker, as long as the machine makes it (hub#1315).
+  }, NO_CLOCK);
 });

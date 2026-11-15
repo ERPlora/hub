@@ -1,7 +1,5 @@
-"""Events of the appointment app and its reactions to the events of Customers, Staff and Sales.
-
-The reactions are handed the real payloads, read back from the outbox where each app's own operation
-recorded them (as the relay of phase 2 will), and run as the system; repeating one changes nothing.
+"""The reactions are handed the real payloads, read back from the outbox where each app's own operation
+recorded them (as the relay does), and run as the system; repeating one changes nothing.
 """
 
 import datetime as dt

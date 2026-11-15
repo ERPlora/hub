@@ -1,7 +1,7 @@
 """Live queries of base: the Home's three and the device's notices, re-run after the events the modules' hooks name;
-and the way in's (APP-BASE-3): the grid of «Switch user», the devices, the PIN pad's dial and «My profile».
+and the way in's: the grid of «Switch user», the devices, the PIN pad's dial and «My profile».
 
-Each step, panel and counter names in ``refresh_on`` the events that change it (PLAN-HUB round 2026-10-21); base
+Each step, panel and counter names in ``refresh_on`` the events that change it; base
 follows the union of them per query, fixed from the start like every declaration. The SaaS's photo
 (``base.hub.state_applied``) re-runs the three: it may turn apps on or off and change the country or the vertical. What
 Settings › Data does to the business (a load, an undo, a reset) re-runs them too, and its own queries: the copies of
@@ -26,7 +26,7 @@ from base.events import (
     HUB_USAGE_MEASURED,
 )
 
-#: What changes the failed events: the relay gives one up, who runs the business resends or discards one (APP-BASE-7).
+#: What changes the failed events: the relay gives one up, who runs the business resends or discards one.
 FAILED_EVENTS = [FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED]
 
 
@@ -39,54 +39,54 @@ def events_of(hook: str) -> list[str]:
 
 live("base.setup.status", on=sorted({*events_of("setup"), *DATA_EVENTS}))
 live("base.widget.list", on=sorted({*events_of("widgets"), *DATA_EVENTS}))
-# The failed events of System (APP-BASE-7) change the bell's row of them too.
+# The failed events of System change the bell's row of them too.
 live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_EVENTS}))
 live("base.notice.list", on=events_of("notices"))
 
-# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
 # The SaaS's photo gives or takes the right to a paid module (base.entitlement) and carries the plan's limit of apps;
-# the business turns apps on and off (base.activation, PLAN-HUB §9): the Apps screen follows both.
+# the business turns apps on and off (base.activation): the Apps screen follows both.
 live("base.app.list", on=sorted([HUB_STATE_APPLIED, *APP_EVENTS]))
 # The plan and the members come in the photo too: «Usage and plan» follows it, and the size of the business's own
-# database the nightly measurement keeps (BASE-F40, base.usage).
+# database the nightly measurement keeps (base.usage).
 live("base.plan.usage", on=[HUB_STATE_APPLIED, HUB_USAGE_MEASURED])
 
-# ── Data: blueprints, imports and reset (APP-BASE-2) ──
-# A load, an undo or a reset re-runs the Home (above: BASE-G131, the Home up to date without reloading), the catalogue
+# ── Data: blueprints, imports and reset ───────────────
+# A load, an undo or a reset re-runs the Home (above: the Home up to date without reloading), the catalogue
 # (the Home's card asks whether the business is still empty) and the list of loads of Settings › Data.
 live("base.blueprint.list", on=sorted({HUB_STATE_APPLIED, *DATA_EVENTS}))
-# A load that waits for an app says how its setup goes (hub#609): the list follows the apps too.
+# A load that waits for an app says how its setup goes: the list follows the apps too.
 live("base.import.list", on=sorted({*DATA_EVENTS, *APP_EVENTS}))
-# The copies of the business's data and its last reset (round 2026-10-30 of PLAN-DB, decision 2): each step of a reset
-# the worker takes (copying, emptying, failed; a copy made), and the reset done.
+# The copies of the business's data and its last reset: each step of a reset the worker takes (copying, emptying,
+# failed; a copy made), and the reset done.
 live("base.hub.dumps", on=sorted([HUB_RESET_PROGRESSED, HUB_DATA_RESET]))
 
-# ── Business settings and the hub's context (APP-BASE-6) ──
+# ── Business settings and the hub's context ───────────────
 # The SaaS registers the business again when its owner changes its name, time zone or language on erplora.com
-# (HUBS-F15): Settings › Business follows it without reloading.
+# Settings › Business follows it without reloading.
 live("base.business.get", on=[HUB_REGISTERED])
 
-# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+# ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────
 # The failed events follow the relay, who resends or discards them, and the photo (it turns their app on or off).
 live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS, *APP_EVENTS]))
-# The cards the apps on put in «Usage and plan» (hub#683): an app turned on or off brings its cards or takes them away.
+# The cards the apps on put in «Usage and plan»: an app turned on or off brings its cards or takes them away.
 live("base.system.cards", on=sorted([HUB_STATE_APPLIED, *APP_EVENTS]))
 # The status: the photo, and every reconnection of the stream (a deploy) sends it again with the new release.
 live("base.system.status", on=[HUB_STATE_APPLIED])
 # The log: what a new event brings shows when the tab opens again; a failed event changes the level of its row at once.
 live("base.event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
 
-# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
+# ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
 # Files' listing follows every write of the business's files (from any device) and the photo (the plan's space).
 live("base.file.list", on=sorted([HUB_STATE_APPLIED, *FILE_EVENTS]))
 
-# The way in (APP-BASE-3): the grid of «Switch user» follows the PINs, the people (the photo), the dial and the devices.
+# The way in: the grid of «Switch user» follows the PINs, the people (the photo), the dial and the devices.
 _DEVICES = [events.DEVICE_MODE_CHANGED, events.DEVICE_RENAMED, events.DEVICE_REMOVED, events.DEVICES_PRUNED]
 live(
     "base.access.faces",
     on=sorted(
         {events.PIN_SET, HUB_STATE_APPLIED, events.ACCESS_SETTINGS_CHANGED, events.PROFILE_UPDATED, *_DEVICES}
-        # APP-BASE-5: a PIN taken away leaves the grid.
+        # A PIN taken away leaves the grid.
         | {events.PERSON_PIN_REMOVED}
     ),
 )
@@ -95,7 +95,7 @@ live("base.device.current", on=sorted({events.DEVICE_MODE_CHANGED, events.DEVICE
 live("base.access.settings", on=[events.ACCESS_SETTINGS_CHANGED])
 live("base.profile.get", on=sorted({events.PROFILE_UPDATED, events.PIN_SET, events.ACCESS_SETTINGS_CHANGED}))
 
-# ── People and permissions (APP-BASE-5) ────────────────────────────────────────────────────────────────────────────
+# ── People and permissions ─────────────────────────────────────────────────────────────────────────────────────────
 # Employees › Personal and a person's page follow the ways in (a PIN chosen or taken away, a badge), the names of «My
 # profile» and the photo (erplora.com's people and roles, and the plan's places); Roles, the photo.
 _PEOPLE = sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS})

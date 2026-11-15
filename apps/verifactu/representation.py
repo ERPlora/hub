@@ -4,9 +4,9 @@ ERPlora files a business's records with the AEAT on its behalf only with its sig
 representación». The business downloads the model here, its details already in, signs it away from the screen and uploads it with
 the signer's identity document; a person at ERPlora reviews it in the SaaS (``fiscal/``), and its state comes back
 in the account's photo (``verifactu.config.sync``). The Hub keeps none of the documents: it checks them and hands
-them on byte for byte, as the old Hub did (``crates/server/src/representation_grant.rs``).
+them on byte for byte.
 
-Two doors of the SaaS (plan 2026-10-15, «Contrato SaaS ↔ Hub», point 2), signed like every ``/internal`` call:
+Two doors of the SaaS, signed like every ``/internal`` call:
 ``X-Erplora-Timestamp``, ``X-Erplora-Signature`` (v1, ``base.auth.sign``: the body) and ``X-Erplora-Signature-V2``
 (v2, ``base.internal.sign_v2``: method, path and body) with ``INTERNAL_SHARED_SECRET``:
 
@@ -53,7 +53,7 @@ TIMEOUT = httpx.Timeout(60.0, connect=5.0)
 #: The statuses whose contract error is about the documents, not about this server.
 REFUSALS = (400, 413, 422)
 PDF_MAGIC = b"%PDF"
-#: At most this many bytes per document, decoded (the contract; the old Hub took 10 MB).
+#: At most this many bytes per document, decoded (the contract).
 MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
 #: Base64 of ``MAX_DOCUMENT_BYTES``: anything longer is too large before decoding it.
 MAX_DOCUMENT_CHARACTERS = 4 * -(-MAX_DOCUMENT_BYTES // 3)

@@ -12,7 +12,7 @@
 //
 // WEBSITE-F10 signs the owner in from a second browser, so `a` has no plan while the spec runs, whatever plan the
 // seed left in its photo (erplora.com's Free covers one device: that entry would end the session the rest of the spec
-// and its `afterAll` use, BASE-G57); its photo is put back at the end.
+// and its `afterAll` use); its photo is put back at the end.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

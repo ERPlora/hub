@@ -13,7 +13,8 @@ LISTS = events.PRICE_LIST_EVENTS
 ITEMS = events.PRICE_ITEM_EVENTS
 RULES = events.RULE_EVENTS
 GROUP = ["customer.group.updated", "customer.group.deleted"]
-PRODUCT = ["inventory.product.updated", "inventory.product.deleted"]
+# A product recovered from the separate copy is the same one again (INVENTORY-F34): what showed it gone shows it back.
+PRODUCT = ["inventory.product.updated", "inventory.product.deleted", "inventory.product.restored"]
 CATEGORY = ["inventory.category.updated", "inventory.category.deleted"]
 
 
@@ -38,7 +39,14 @@ def test_each_query_and_its_events():
     queries = pricing_queries()
     # A list row names its group and counts its live prices.
     for name in ("pricing.price_list.list", "pricing.price_list.get"):
-        assert queries[name] == [*LISTS, events.PRICE_ITEM_ADDED, events.PRICE_ITEM_REMOVED, *GROUP, "inventory.product.deleted"], name
+        assert queries[name] == [
+            *LISTS,
+            events.PRICE_ITEM_ADDED,
+            events.PRICE_ITEM_REMOVED,
+            *GROUP,
+            "inventory.product.deleted",
+            "inventory.product.restored",
+        ], name
     # A price row shows its list's code and its product's name, SKU, unit and catalog price.
     assert queries["pricing.price_item.list"] == [*ITEMS, *LISTS, *PRODUCT]
     # A rule row names its category, product and group.

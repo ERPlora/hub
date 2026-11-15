@@ -105,7 +105,7 @@ def load_settings(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize(("env", "on"), [({}, False), ({"ASSISTANT_SERVER_VOICE": "True"}, True)])
 def test_the_server_voice_of_the_assistant_is_off_unless_the_environment_turns_it_on(load_settings, env, on):
-    """Round 2026-11-04a: no voice provider for now; the panel reads with the device's voice."""
+    """No voice provider is configured: the panel reads with the device's voice."""
     assert load_settings(**PRODUCTION_ENV, **env)["ASSISTANT_SERVER_VOICE"] is on
 
 
@@ -116,7 +116,7 @@ def test_live_precedes_daphne_so_its_runserver_wins():
 
 
 def test_base_precedes_the_admin_so_its_admin_templates_win():
-    # base/templates/admin/base_site.html adds the chosen hub's banner (round 13, PLAN §18.1). Django's admin is
+    # base/templates/admin/base_site.html adds the chosen hub's banner. Django's admin is
     # installed through its config with the Hub's own site (base/admin_site.py: a hub's model only with a business).
     installed = settings.INSTALLED_APPS
     assert "django.contrib.admin" not in installed
@@ -124,7 +124,7 @@ def test_base_precedes_the_admin_so_its_admin_templates_win():
 
 
 def test_the_platform_host_is_hubs_and_no_customer_can_take_it():
-    # hubs.erplora.com (locally hubs.localhost:8000) is only the Hub admin for the staff (PLAN §18.1);
+    # hubs.erplora.com (locally hubs.localhost:8000) is only the Hub admin for the staff;
     # `hub` stays reserved but is not the platform host.
     assert settings.PLATFORM_HOST_LABEL == "hubs"
     assert is_reserved_hub_slug(settings.PLATFORM_HOST_LABEL)
@@ -366,9 +366,9 @@ def test_the_internal_saas_url_comes_from_the_environment(load_settings):
 
 def test_a_burst_of_pooled_connections_is_given_back_within_minutes(load_settings):
     # psycopg_pool closes one connection above min_size per max_idle, 600 s by default: a scanner
-    # burst on *.erplora.com (60 requests/s, 2026-10-18) left the idle hub web holding its 8 control
+    # burst on *.erplora.com (60 requests/s) left the idle hub web holding its 8 control
     # connections for over an hour. With 60 s it is back to one within 7 minutes; that one stays
-    # open for the next request (PLAN-DB «Conexiones», round 2026-10-18).
+    # open for the next request.
     pool = load_settings(**DEVELOPMENT_ENV)["DATABASES"]["default"]["OPTIONS"]["pool"]
     assert (pool["min_size"], pool["max_size"], pool["max_idle"]) == (1, 8, 60)
 
@@ -522,7 +522,7 @@ def test_the_cache_is_valkey_when_set_else_local_memory(load_settings):
     }
 
 
-# ── The environment: prod or pre, the team's pre-production on the same Valkey (plan 2026-10-14) ──
+# ── The environment: prod or pre, the team's pre-production on the same Valkey ──
 
 VALKEY_ENV = {"VALKEY_URL": "rediss://cache.example:6379"}
 
@@ -559,7 +559,7 @@ def test_hub_base_domain_comes_from_the_environment(load_settings):
     # pre: <slug>.pre.erplora.com and hubs.pre.erplora.com; written in any case, with dots around.
     loaded = load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN=".Pre.Erplora.com.")
     assert loaded["HUB_BASE_DOMAIN"] == "pre.erplora.com"
-    # Empty: no base domain, the hub is the Host's first label wherever it is (before 2026-10-14).
+    # Empty: no base domain, the hub is the Host's first label wherever it is.
     assert load_settings(**PRODUCTION_ENV, HUB_BASE_DOMAIN="")["HUB_BASE_DOMAIN"] == ""
 
 
@@ -721,6 +721,73 @@ def test_only_the_checks_the_platform_answers_elsewhere_are_silenced():
     ]
 
 
+# Exit codes of a child that run_to_the_end stops at once instead of waiting for it.
+WAITED = 97
+KEPT_ALIVE = 98
+# The child of run_to_the_end: the script as __main__, with what could keep it from ever ending turned into an
+# immediate failure that says what it was (hub#807): its main thread waiting, on the network or in a sleep, for what
+# may never come, and a thread that is not a daemon, which the interpreter waits for at exit. os._exit, so that no
+# except in the script can swallow it.
+CHILD = f"""
+import os, runpy, socket, sys, threading, time
+
+def stop(code, why):
+    sys.stdout.flush()  # what the script said up to here, which os._exit would drop
+    os.write(2, f"{{why}}\\n".encode())
+    os._exit(code)
+
+def refused(call):
+    def waits(*args, **kwargs):
+        if threading.current_thread() is threading.main_thread():
+            stop({WAITED}, f"the main thread waits: {{call.__qualname__}}{{args!r}}")
+        return call(*args, **kwargs)
+    return waits
+
+socket.getaddrinfo = refused(socket.getaddrinfo)
+socket.socket.connect = refused(socket.socket.connect)
+time.sleep = refused(time.sleep)
+sys.argv = sys.argv[1:]
+try:
+    runpy.run_path(sys.argv[0], run_name="__main__")
+finally:
+    alive = [t.name for t in threading.enumerate() if not t.daemon and t is not threading.main_thread()]
+    if alive:
+        stop({KEPT_ALIVE}, f"threads that keep it from ending: {{alive}}")
+"""
+
+
+def run_to_the_end(script: Path, *args: str, **kwargs) -> subprocess.CompletedProcess:
+    """Run ``script`` in a fresh Python and wait for it to end, however long the machine takes (hub#807).
+
+    No clock: a cut at N seconds cannot tell a stuck child from a slow one, and a loaded machine makes it slow. What the
+    clock was there for, a child that never ends, is what CHILD turns into an exit of its own. What it cannot see, a
+    main thread blocked on a lock or an event nobody releases, or a loop that never ends, nothing but a clock tells from
+    a slow child: the cap of the CI job (30 minutes) still ends that run in red.
+    """
+    return subprocess.run(
+        [sys.executable, "-c", CHILD, str(script), *args], capture_output=True, text=True, **kwargs
+    )
+
+
+@pytest.mark.parametrize("waits", ["socket.create_connection(('127.0.0.1', 9))", "time.sleep(1)"])
+def test_a_child_whose_main_thread_waits_ends_at_once(tmp_path, waits):
+    # A retry that swallows the error, or a loop that sleeps until something is ready, would wait on what never comes
+    # for ever: its first try ends it.
+    script = tmp_path / "waits.py"
+    script.write_text(f"import socket, time\ntry:\n    {waits}\nexcept OSError:\n    pass\n")
+    result = run_to_the_end(script)
+    assert result.returncode == WAITED, result.stdout + result.stderr
+
+
+def test_a_child_that_leaves_a_thread_keeping_it_alive_ends_at_once(tmp_path):
+    # The interpreter waits at exit for every thread that is not a daemon: one that never ends keeps the child alive.
+    script = tmp_path / "keeps_alive.py"
+    script.write_text("import threading, time\nthreading.Thread(target=time.sleep, args=(1,), name='keeper').start()\n")
+    result = run_to_the_end(script)
+    assert result.returncode == KEPT_ALIVE, result.stdout + result.stderr
+    assert "keeper" in result.stderr
+
+
 def test_check_deploy_is_clean_in_production():
     # A fresh process: the settings of this one are the development ones (.env, DEBUG=True).
     env = {key: value for key, value in os.environ.items() if key not in ENV_KEYS}
@@ -731,13 +798,8 @@ def test_check_deploy_is_clean_in_production():
         "ALLOWED_HOSTS": ".erplora.com",
         "SES_REGION": "eu-west-1",
     }
-    result = subprocess.run(
-        [sys.executable, "manage.py", "check", "--deploy", "--fail-level", "WARNING"],
-        cwd=BASE_DIR,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=120,
+    result = run_to_the_end(
+        BASE_DIR / "manage.py", "check", "--deploy", "--fail-level", "WARNING", cwd=BASE_DIR, env=env
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "System check identified no issues" in result.stdout
@@ -894,7 +956,7 @@ def test_live_settings():
     }
 
 
-# ── The `shared` alias: the SaaS's `saas` database, for register_apps only (round 16, PLAN §21) ──
+# ── The `shared` alias: the SaaS's `saas` database, for register_apps only ──
 
 
 def test_development_always_has_the_shared_alias_on_the_local_saas_database(
@@ -941,7 +1003,7 @@ XDIST_SUFFIXES = ("", "_gw0", "_gw9", "_gw10", "_gw999")
 
 def names_the_suite_derives(databases: dict) -> list[str]:
     """Every database the suite may create from these settings, with and without xdist's suffix: the test databases
-    and, from control's, both test hubs', a demo's (``<control>_demo_<hex>``, the longest; round 2026-10-30 of PLAN-DB)
+    and, from control's, both test hubs', a demo's (``<control>_demo_<hex>``, the longest)
     and every template's (``base.tenancy.names``, which refuses a name past PostgreSQL's 63 characters instead of
     truncating it)."""
     from base import catalog
@@ -965,7 +1027,7 @@ def names_the_suite_derives(databases: dict) -> list[str]:
     ["test_hub_next", "test_hub_sup", "t" * 19, "t" * 20, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 10, "ñ" * 40, "t" * 100],
 )
 def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres(load_settings, requested):
-    """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (TODO.md, hub#188, hub#204)."""
+    """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (hub#188, hub#204)."""
     from base.tenancy import names
 
     databases = load_settings(**DEVELOPMENT_ENV, TEST_DB_NAME=requested)["DATABASES"]
@@ -1013,7 +1075,7 @@ def test_the_migrators_role_is_the_default_connections_only_in_development(load_
 
 
 def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_in_development(load_settings):
-    """Phase 2, S1: every hub's alias copies hub_template (base.tenancy.connections); locally, the compose Postgres."""
+    """Every hub's alias copies hub_template (base.tenancy.connections); locally, the compose Postgres."""
     databases = load_settings(**DEVELOPMENT_ENV, DB_NAME="pre_hub", TEST_DB_NAME="test_hub_sup")["DATABASES"]
     template = databases["hub_template"]
 
@@ -1025,7 +1087,7 @@ def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_
 
 
 def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load_settings):
-    """The sidecar listens on the task's loopback; TLS goes from it to Aurora (PLAN-DB §5), so the alias drops the
+    """The sidecar listens on the task's loopback; TLS goes from it to Aurora, so the alias drops the
     writer's sslmode and certificate and keeps the rest."""
     loaded = load_settings(
         **PRODUCTION_ENV,
@@ -1044,7 +1106,8 @@ def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load
 
 
 def test_what_pgbouncer_gives_each_database_is_prod_s_unless_the_environment_says(load_settings):
-    """No plan gets more at once than this (``base.tenancy.limits``): 6 in prod, 3 in pre (aws ``stacks/*/apps.tf``)."""
+    """No plan gets more at once than this (``base.tenancy.limits``): 48 in prod and in pre (ERPlora/aws
+    ``stacks/prod/apps.tf``); without the setting, 6."""
     assert load_settings(**PRODUCTION_ENV)["PGBOUNCER_MAX_DB_CONNECTIONS"] == 6
     assert load_settings(**PRODUCTION_ENV, PGBOUNCER_MAX_DB_CONNECTIONS="3")["PGBOUNCER_MAX_DB_CONNECTIONS"] == 3
 
@@ -1099,7 +1162,7 @@ def test_production_shared_alias_without_its_password_refuses_to_start(load_sett
 
 
 def test_the_shared_router_goes_first(load_settings):
-    # Phase 2's TenantRouter goes after it and never touches `shared`. The tests put one of theirs in front, for their
+    # The TenantRouter goes after it and never touches `shared`. The tests put one of theirs in front, for their
     # businesses written before the tenancy only (base/tenancy/tests/legacy.py): never production's settings.
     assert settings.DATABASE_ROUTERS == [
         "base.tenancy.tests.legacy.LegacyTablesRouter",
@@ -1113,7 +1176,7 @@ def test_the_shared_router_goes_first(load_settings):
 
 
 def test_the_static_files_finders_add_the_documentation_images_of_the_modules():
-    # base.catalog.AppImagesFinder publishes apps/<id>/docs/img/ as /static/catalog/<id>/img/ (spec §4.4).
+    # base.catalog.AppImagesFinder publishes apps/<id>/docs/img/ as /static/catalog/<id>/img/.
     assert settings.STATICFILES_FINDERS == [
         "django.contrib.staticfiles.finders.FileSystemFinder",
         "django.contrib.staticfiles.finders.AppDirectoriesFinder",
@@ -1122,7 +1185,7 @@ def test_the_static_files_finders_add_the_documentation_images_of_the_modules():
 
 
 def test_the_release_comes_from_the_image(load_settings):
-    # The build fixes APP_VERSION (the commit's sha) and APP_RELEASED_AT (its time) in the image (spec §4.3).
+    # The build fixes APP_VERSION (the commit's sha) and APP_RELEASED_AT (its time) in the image.
     loaded = load_settings(**DEVELOPMENT_ENV)
     assert (loaded["APP_VERSION"], loaded["APP_RELEASED_AT"]) == ("", "")
     loaded = load_settings(

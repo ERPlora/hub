@@ -1,4 +1,4 @@
-"""VeriFactu does not go on outside Spain (VERIFACTU-F01, hub#694).
+"""VeriFactu does not go on outside Spain (VERIFACTU-F01).
 
 VeriFactu binds the taxpayers of Spain alone and, for a business registered elsewhere, seals and sends nothing
 (``test_outside_spain``). The platform's ``base.app.enable`` asks the app's ``can_enable`` (``base.activation.veto``):
@@ -7,9 +7,8 @@ outside Spain it is 409 ``base.app_vetoed`` with the reason in the reader's lang
 on. One already on outside Spain stays as it is and can go off (``test_app_disable``). Each hub reads its own business's
 country.
 
-A template of the catalogue never turns it on, in Spain either (PLAN-HUB round 2026-11-07, hub#998): VeriFactu binds the
-business to the AEAT until the end of the calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it
-on, from Apps.
+A template of the catalogue never turns it on, in Spain either: VeriFactu binds the business to the AEAT until the end
+of the calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it on, from Apps.
 """
 
 import pytest
@@ -146,7 +145,7 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
 @pytest.mark.parametrize("key", [seed.key for seed in blueprint.catalog()])
 def test_a_template_in_spain_leaves_verifactu_off_for_the_home_to_ask_and_turns_on_the_rest(born, load, key):  # noqa: F811
     """The review does not announce it and the load leaves it off, so «Finish setting up your business» asks its owner
-    to turn it on (hub#997); everything else the template lists goes on, what VeriFactu needs included (hub#998)."""
+    to turn it on; everything else the template lists goes on, what VeriFactu needs included."""
     business_in("ES", slug="c")
 
     review = call(born, "base.blueprint.inspect", template=key)

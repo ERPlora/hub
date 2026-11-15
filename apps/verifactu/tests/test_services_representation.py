@@ -2,7 +2,7 @@
 ``verifactu.representation.model``, and what the account's photo tells the Hub about it.
 
 The Hub checks the documents with the SaaS's own rules and codes (the old Hub's ``validate``: the codes are the
-contract, hub#1293) before anything crosses the network, and hands them on byte for byte; it keeps none. The state
+contract) before anything crosses the network, and hands them on byte for byte; it keeps none. The state
 comes back in the photo (``verifactu.config.sync``), which also tells the Hub its id in ERPlora; the Hub marks the
 upload «under review» on the 201 without waiting for it. ``respx`` stands in for the SaaS.
 """
@@ -433,7 +433,7 @@ def test_the_model_comes_with_the_business_of_invoicing(issuer):
     route = respx.get(MODEL_URL).mock(return_value=a_model())
     run("verifactu.representation.model")
     # The taxpayer of the upload (Invoicing's issuer), as the SaaS writes it in the model's blanks; the number goes
-    # within the street, as the issuer keeps its address. Never a signer: that one is written by hand (saas#1743).
+    # within the street, as the issuer keeps its address. Never a signer: that one is written by hand.
     assert dict(route.calls.last.request.url.params) == {
         "taxpayer_tax_id": "B12345674",
         "taxpayer_name": "Peluquería Ana SL",
@@ -444,7 +444,7 @@ def test_the_model_comes_with_the_business_of_invoicing(issuer):
 
 @respx.mock
 def test_the_model_takes_the_issuer_as_it_is_now(issuer):
-    # hub#1306: the business's tax ID saved in Invoicing is the one the model carries, with no wait for the account.
+    # The business's tax ID saved in Invoicing is the one the model carries, with no wait for the account.
     route = respx.get(MODEL_URL).mock(return_value=a_model())
     run(
         "invoice.issuer.update",

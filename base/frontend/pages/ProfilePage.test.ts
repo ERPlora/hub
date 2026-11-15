@@ -1,6 +1,3 @@
-// «My profile» (`/profile`, BASE-G125 and G126; the old hub's ProfilePage): the person's name, contact email and photo,
-// their language and appearance (applied at once, saved for them on every device) and their own PIN. The summary is
-// named in the person's language (gh:hub#2589). A profile that cannot be read offers nothing to save, only «Retry».
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
@@ -249,7 +246,7 @@ describe('ProfilePage — my PIN', () => {
 });
 
 describe('ProfilePage — Spanish', () => {
-  it('names the summary and the cards in Spanish (gh:hub#2589)', async () => {
+  it('names the summary and the cards in Spanish', async () => {
     const { wrapper } = await profile(PROFILE, ok, 'es');
     expect(wrapper.get('[data-testid="profile-summary"]').attributes('aria-label')).toBe('Resumen de la cuenta');
     expect(wrapper.text()).toContain('Datos de la cuenta');
@@ -257,7 +254,7 @@ describe('ProfilePage — Spanish', () => {
     expect(wrapper.text()).toContain('Propietario');
   });
 
-  it('names each palette in Spanish, never by its English id (BASE-G152)', async () => {
+  it('names each palette in Spanish, never by its English id', async () => {
     const { wrapper } = await profile(PROFILE, ok, 'es');
     const names = wrapper.findAll('.profile__palette-name').map((name) => name.text());
     expect(names).toEqual(['ERPlora', 'Terracota', 'Corporativo', 'Minimalista', 'Bosque', 'Océano', 'Violeta']);

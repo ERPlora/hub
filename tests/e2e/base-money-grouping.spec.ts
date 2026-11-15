@@ -15,6 +15,7 @@ import { type Card, cleanUp as cleanCustomers, createCard, customersReady, e2eNa
 import { A, api, capture, hostPage, login, psql, shown } from './helpers';
 import { dialog } from './inventory-helpers';
 import { noHorizontalScroll, post } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'base-money-grouping';
 const SIZES = [
@@ -228,7 +229,9 @@ for (const language of LANGUAGES) {
         await noHorizontalScroll(page, where);
         await capture(page, `${KEY}-appointment-${where}`);
 
+        // The service chosen is a change: «Cancel» asks first (BASE-F05) and the person discards it.
         await form.locator('[data-testid=appointment-form-cancel]').click();
+        await discardChanges(page);
         await expect(form).toBeHidden();
       }
     } finally {

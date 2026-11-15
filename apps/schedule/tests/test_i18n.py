@@ -49,7 +49,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("schedule")
     lazies = [
         *config_texts(config),
-        # The Home's step (FIX-SCHEDULE-SETUP-HOOKS).
+        # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
         *models.WEEKDAY_NAMES,
         *module_texts(queries, services, schemas),

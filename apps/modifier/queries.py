@@ -16,9 +16,16 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
+from psycopg import sql
 
-from apps.inventory.models import ProductCategory, Unit
-from apps.inventory.queries import find_category, find_product
+from apps.inventory.models import Product, ProductCategory, Unit
+from apps.inventory.queries import (
+    categories_standing_for,
+    category_names_in_copy,
+    find_category,
+    find_product,
+    products_standing_for,
+)
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.schemas import (
     CategoryRefIn,
@@ -40,7 +47,9 @@ from apps.modifier.schemas import (
     TargetIn,
     TargetOut,
 )
+from apps.tax.models import TaxCategory
 from base.ordering import list_order, list_order_for
+from base.recovery import brought_back
 
 GROUP_NOT_FOUND = _("This group does not exist.")
 GROUP_AMBIGUOUS = _("«%(said)s» names several groups: %(names)s. Say which one.")
@@ -256,7 +265,17 @@ def _page(queryset, params, row) -> dict:
     expose_api=True,
     ai={
         "description": "List the modifier groups (sauces, doneness, extras…) with their rule, how many options "
-        "they have and how many products and categories they apply to; a minimum of 1 or more means required."
+        "they have and how many products and categories they apply to; a minimum of 1 or more means required.",
+        "asks": {
+            "en": (
+                "which modifier groups have we set up?",
+                "what add-ons and extras do we offer with the dishes?",
+            ),
+            "es": (
+                "¿qué grupos de suplementos usamos?",
+                "enséñame los extras que se pueden pedir con los platos",
+            ),
+        },
     },
 )
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
@@ -286,7 +305,17 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     output=GroupOut,
     expose_api=True,
     ai={
-        "description": "Get one modifier group, named by its id or its name (e.g. «group Sauces»), with its rule."
+        "description": "Get one modifier group, named by its id or its name (e.g. «group Sauces»), with its rule.",
+        "asks": {
+            "en": (
+                "how many sauces can be picked in the Sauces group?",
+                "what are the minimum and maximum of the Doneness group?",
+            ),
+            "es": (
+                "¿cuántas salsas se pueden elegir en el grupo Salsas?",
+                "dime el mínimo y el máximo del grupo Punto de la carne",
+            ),
+        },
     },
 )
 def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
@@ -302,7 +331,17 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Name by its id, or find by its name, the Inventory category a modifier group applies to, as "
-        "the list of what a group applies to names it."
+        "the list of what a group applies to names it.",
+        "asks": {
+            "en": (
+                "how is Pizzas named when it takes add-ons?",
+                "find Sandwiches to hang extras on it",
+            ),
+            "es": (
+                "¿cómo se identifica Bocadillos al colgarle suplementos?",
+                "busca Pizzas, la de los extras",
+            ),
+        },
     },
 )
 def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
@@ -322,7 +361,17 @@ def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List the options of a modifier group (or of every group) with their supplement in cents, "
-        "their own tax category if any and whether they come chosen by default."
+        "their own tax category if any and whether they come chosen by default.",
+        "asks": {
+            "en": (
+                "which sauces can people choose and what does each cost?",
+                "list the choices of Doneness and which one is preselected",
+            ),
+            "es": (
+                "¿qué salsas hay para elegir y cuánto cuesta cada una?",
+                "¿qué opciones trae Punto de la carne y cuál viene por defecto?",
+            ),
+        },
     },
 )
 def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
@@ -350,7 +399,17 @@ def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one option of a modifier group, named by its id or its name (and its group, when two "
-        "groups have one with that name), with its supplement in cents and the group it belongs to."
+        "groups have one with that name), with its supplement in cents and the group it belongs to.",
+        "asks": {
+            "en": (
+                "how much is the extra cheese option?",
+                "which group is the Gluten free option in?",
+            ),
+            "es": (
+                "¿qué suplemento lleva la opción Doble de queso?",
+                "¿de qué grupo es la opción Sin gluten?",
+            ),
+        },
     },
 )
 def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
@@ -370,7 +429,17 @@ def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "List what modifier groups apply to: the products and categories of a group, or the groups "
-        "of a product or of a category."
+        "of a product or of a category.",
+        "asks": {
+            "en": (
+                "which dishes ask for the doneness?",
+                "what products is the Sauces group on?",
+            ),
+            "es": (
+                "¿a qué platos se les pregunta el punto de la carne?",
+                "¿qué productos llevan el grupo Salsas?",
+            ),
+        },
     },
 )
 def list_links(ctx: OperationContext, params: LinkListIn) -> dict:
@@ -421,7 +490,17 @@ def groups_for_product(product) -> list[ModifierGroup]:
     expose_api=True,
     ai={
         "description": "Get one link between a modifier group and what it applies to: by the link's id, or by the "
-        "group and the product (id, SKU or name) or category (id or name). One to something deleted is not there."
+        "group and the product (id, SKU or name) or category (id or name). One to something deleted is not there.",
+        "asks": {
+            "en": (
+                "does the Margherita pizza carry the Sauces group?",
+                "is Extras attached to the fries?",
+            ),
+            "es": (
+                "¿tiene la Pizza margarita enganchado el grupo Salsas?",
+                "¿qué asignación hay entre el grupo Extras y las patatas bravas?",
+            ),
+        },
     },
 )
 def get_link(ctx: OperationContext, data: LinkRefIn) -> dict:
@@ -460,7 +539,17 @@ def _target_option(option: ModifierOption) -> dict:
     expose_api=True,
     ai={
         "description": "The modifier groups and options of a product (named by its id, SKU or name), its own and "
-        "those of its categories: what the till asks before adding the line."
+        "those of its categories: what the till asks before adding the line.",
+        "asks": {
+            "en": (
+                "what does the till ask when selling a Margherita pizza?",
+                "which add-ons does the steak sandwich carry, its category's included?",
+            ),
+            "es": (
+                "¿qué hay que preguntar al vender una Pizza margarita?",
+                "¿qué extras lleva el Bocadillo de lomo, contando los de su familia?",
+            ),
+        },
     },
 )
 def for_target(ctx: OperationContext, data: TargetIn) -> dict:
@@ -500,10 +589,20 @@ def _refuse(code: str, message: str) -> Conflict:
     ai={
         "description": "Check and value the options chosen for a product: that each one is offered with it and "
         "every group's minimum, maximum and repeats hold; returns each one at its catalog price, what to add to "
-        "the line, what goes on a line of its own and the kitchen text."
+        "the line, what goes on a line of its own and the kitchen text.",
+        "asks": {
+            "en": (
+                "how much is a pizza with extra cheese and barbecue sauce?",
+                "what does the kitchen read for a rare steak?",
+            ),
+            "es": (
+                "con salsa barbacoa y doble de queso, ¿cuánto cuesta la pizza?",
+                "¿con qué nota llega a cocina un entrecot poco hecho?",
+            ),
+        },
     },
 )
-def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
+def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:  # noqa: C901, PLR0912
     product = find_product(data.product_id, data.product)
     groups = groups_for_product(product)
     offered = {
@@ -575,3 +674,187 @@ def resolve_selection(ctx: OperationContext, data: ResolveIn) -> dict:
         "own_lines": list(own_lines.values()),
         "kitchen_text": ", ".join(pick["kitchen_name"] for pick in picks),
     }
+
+
+# ── A separate copy of the business (BASE-F114): what Modifiers gives back from it ───────────────────────────────────
+
+#: What a group of a separate copy is read with besides its id: what ``modifier.group.create`` takes, each a column since
+#: ``0001_initial``.
+GROUP_COPY_FIELDS = ("name", "kitchen_name", "min_choices", "max_choices", "allow_repeat", "sort_order")
+
+#: What each option of a group of a separate copy is read with besides its tax category: what ``modifier.option.create``
+#: takes but its group, each a column since ``0001_initial``.
+OPTION_COPY_FIELDS = ("name", "kitchen_name", "price_delta", "is_default", "sort_order")
+
+#: What a group hung from a product in a separate copy is read with: its link's id there, what
+#: ``modifier.link.attach`` takes and its product's SKU there, each a column since ``0001_initial``.
+LINK_FIELDS = ("id", "group_id", "product_id", "sku")
+
+#: What a group hung from a category in a separate copy is read with: its link's id there and what
+#: ``modifier.link.attach`` takes, each a column since ``0001_initial``.
+CATEGORY_LINK_FIELDS = ("id", "group_id", "category_id")
+
+
+def groups_in_copy(conn) -> list[dict]:
+    """Each group of a separate copy of the business, by id, with what ``GROUP_COPY_FIELDS`` names and its options there
+    (``options``) in the order they were added, each with what ``OPTION_COPY_FIELDS`` names and the id of its own tax
+    category (``tax_category_id``); nothing where the app's table is not there. ``conn`` is the copy's direct, read-only
+    connection: it is read by its own SQL over the models' names, never the ORM."""
+    group, option = ModifierGroup._meta, ModifierOption._meta
+    if conn.execute("SELECT to_regclass(%s)", [group.db_table]).fetchone()[0] is None:
+        return []
+    groups = [
+        dict(zip(("id", *GROUP_COPY_FIELDS), row, strict=True)) | {"options": []}
+        for row in conn.execute(_by_id(group, ("id", *GROUP_COPY_FIELDS)))
+    ]
+    by_id = {one["id"]: one for one in groups}
+    for group_id, *row in conn.execute(_by_id(option, ("group", *OPTION_COPY_FIELDS, "tax_category"))):
+        by_id[group_id]["options"].append(dict(zip((*OPTION_COPY_FIELDS, "tax_category_id"), row, strict=True)))
+    return groups
+
+
+def group_names_in_copy(conn) -> dict[UUID, str]:
+    """Every group of a separate copy of the business by id, with its name there: what pairs each with the business's
+    (``groups_standing_for``). ``conn`` is the copy's direct, read-only connection."""
+    return dict(conn.execute(_by_id(ModifierGroup._meta, ("id", "name"))).fetchall())
+
+
+def _by_id(meta, read: tuple[str, ...]) -> sql.Composed:
+    """The ``read`` columns of every row of the model ``meta`` of a copy, by id."""
+    return sql.SQL("SELECT {} FROM {} ORDER BY {}").format(
+        sql.SQL(", ").join(sql.Identifier(meta.get_field(field).column) for field in read),
+        sql.Identifier(meta.db_table),
+        sql.Identifier(meta.pk.column),
+    )
+
+
+def groups_not_in_business(groups: list[dict]) -> list[dict]:
+    """The groups of a separate copy (``groups_in_copy``) the business no longer has, in their order, each as
+    ``modifier.group.recover`` takes it, with its ``id`` there: its options with the key of each one's own tax category
+    (Taxes never deletes one). Not lacking: one the business still holds, renamed or not, with the options it has now;
+    nor one with its name, the case aside, as a group's name is unique: made again by hand or brought back already, it
+    is the business's, and none is ever made twice."""
+    if not groups:
+        return []
+    held = set(ModifierGroup.objects.filter(pk__in=[one["id"] for one in groups]).values_list("pk", flat=True))
+    names = {name.lower() for name in ModifierGroup.objects.values_list("name", flat=True)}
+    lacking = [one for one in groups if one["id"] not in held and one["name"].lower() not in names]
+    taxed = {option["tax_category_id"] for one in lacking for option in one["options"]}
+    keys = dict(TaxCategory.objects.filter(pk__in=taxed).values_list("pk", "key"))
+    return [
+        {field: one[field] for field in ("id", *GROUP_COPY_FIELDS)}
+        | {
+            "options": [
+                {field: option[field] for field in OPTION_COPY_FIELDS}
+                | {"tax_category_key": keys.get(option["tax_category_id"], "")}
+                for option in one["options"]
+            ]
+        }
+        for one in lacking
+    ]
+
+
+def groups_standing_for(copy: dict[UUID, str]) -> dict[UUID, UUID]:
+    """The business's group that stands for each of a separate copy's it no longer holds, as ``{id there: id here}``:
+    the one with its name, the case aside, that a recovery made again (``brought_back``) and that is none of the copy's,
+    which is why ``copy`` is every group of the copy by name (``group_names_in_copy``). One the business made again by
+    hand is its own, set up as it chose: it stands for none. A group still held here is itself, and is not in the
+    result. For the copy's links to hang from the group it is now."""
+    here = list(ModifierGroup.objects.values_list("pk", "name", "created_by"))
+    held = {pk for pk, _name, _by in here}
+    back = {name.lower(): pk for pk, name, created_by in here if pk not in copy and brought_back(created_by)}
+    return {there: back[name.lower()] for there, name in copy.items() if there not in held and name.lower() in back}
+
+
+def links_in_copy(conn) -> list[dict]:
+    """Each group hung from a product in a separate copy of the business, of a product Inventory had not deleted there
+    (a category's groups are ``category_links_in_copy``), with what ``LINK_FIELDS`` names and the copy's groups by name
+    (``copy_groups``, to pair a group the business deleted with the one brought back); nothing where the app's table is
+    not there. ``conn`` is the copy's direct, read-only connection."""
+    rows = _links_in_copy(conn, "product", also=("sku",))
+    if not rows:
+        return []
+    groups = group_names_in_copy(conn)
+    return [dict(zip(LINK_FIELDS, row, strict=True)) | {"copy_groups": groups} for row in rows]
+
+
+def category_links_in_copy(conn) -> list[dict]:
+    """Each group hung from a category in a separate copy of the business, of a category Inventory had not deleted
+    there, with what ``CATEGORY_LINK_FIELDS`` names, the copy's live categories by name (``copy_categories``, to pair
+    its category with the business's) and its groups by name (``copy_groups``, the same with a group); nothing where
+    the app's table is not there. ``conn`` is the copy's direct, read-only connection."""
+    rows = _links_in_copy(conn, "category")
+    if not rows:
+        return []
+    named, groups = category_names_in_copy(conn), group_names_in_copy(conn)
+    return [
+        dict(zip(CATEGORY_LINK_FIELDS, row, strict=True)) | {"copy_categories": named, "copy_groups": groups}
+        for row in rows
+    ]
+
+
+def _links_in_copy(conn, target: str, also: tuple[str, ...] = ()) -> list[tuple]:
+    """The copy's links to a live ``target`` of Inventory (``"product"`` or ``"category"``), by id: each one's id, group
+    and target there, and the target's columns ``also``; none where the app's table is not there. It is read by its own
+    SQL over the models' names, never the ORM: the copy is no business."""
+    link = ModifierLink._meta
+    model = link.get_field(target).related_model._meta
+    if conn.execute("SELECT to_regclass(%s)", [link.db_table]).fetchone()[0] is None:
+        return []
+
+    def column(meta, field: str) -> sql.Identifier:
+        return sql.Identifier(meta.get_field(field).column)
+
+    read = sql.SQL(
+        "SELECT {columns} FROM {links} l JOIN {targets} t ON t.{target_pk} = l.{target_id}"
+        " WHERE NOT t.{deleted} ORDER BY l.{link_pk}"
+    ).format(
+        columns=sql.SQL(", ").join(
+            [
+                *(sql.SQL("l.{}").format(column(link, field)) for field in ("id", "group", target)),
+                *(sql.SQL("t.{}").format(column(model, field)) for field in also),
+            ]
+        ),
+        links=sql.Identifier(link.db_table),
+        targets=sql.Identifier(model.db_table),
+        target_pk=column(model, "id"),
+        target_id=column(link, target),
+        deleted=column(model, "is_deleted"),
+        link_pk=column(link, "id"),
+    )
+    return conn.execute(read).fetchall()
+
+
+def links_not_in_business(links: list[dict]) -> list[dict]:
+    """The groups hung from a product in a separate copy (``links_in_copy``) the business no longer hangs there, in
+    their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Its product is the business's that
+    stands for the copy's (Inventory's ``products_standing_for``): the same while live, else the one a recovery made
+    again with its SKU; and its group too (``groups_standing_for``)."""
+    if not links:
+        return []
+    return _not_hung(links, "product", products_standing_for({one["product_id"]: one["sku"] for one in links}))
+
+
+def category_links_not_in_business(links: list[dict]) -> list[dict]:
+    """The groups hung from a category in a separate copy (``category_links_in_copy``) the business no longer hangs
+    there, in their order, each as ``modifier.link.attach`` takes it with its ``id`` there. Its category is the
+    business's that stands for the copy's (Inventory's ``categories_standing_for``): the same while live, else the one a
+    recovery brought back with its name; and its group too (``groups_standing_for``)."""
+    if not links:
+        return []
+    return _not_hung(links, "category", categories_standing_for(links[0]["copy_categories"]))
+
+
+def _not_hung(links: list[dict], target: str, here: dict) -> list[dict]:
+    """Of the copy's ``links`` to a ``target``, those whose group the business does not hang from the ``target`` that
+    stands for the copy's (``here``, ``{id there: id here}``), each group the one that stands for the copy's
+    (``groups_standing_for``); the copy's own id when none does, which the attach then refuses as not found. Not
+    lacking: the same link or one the business hung again, which stays as the business has it. A link never changes
+    its group nor its target, so the one the business still holds is always in its place."""
+    key = f"{target}_id"
+    groups = groups_standing_for(links[0]["copy_groups"])
+    wanted = [(one, groups.get(one["group_id"], one["group_id"]), here.get(one[key], one[key])) for one in links]
+    taken = set(
+        ModifierLink.objects.filter(group_id__in={group for _one, group, _at in wanted}).values_list("group_id", key)
+    )
+    return [{"id": one["id"], "group_id": group, key: at} for one, group, at in wanted if (group, at) not in taken]

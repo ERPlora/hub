@@ -5,33 +5,20 @@
 // positive control: the same hooks are there for who may manage.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, shot, shown } from './helpers';
+import { signedIn as signedInAt } from './flow-helpers';
+import { staffCleanUp } from './staff-helpers';
 
 type Envelope = { error?: { code: string } };
 const TAG = 'E2E';
 
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
 test.beforeAll(cleanup);
 test.afterAll(cleanup);
 
-async function signedIn(browser: Browser, next: string, credentials?: Credentials) {
-  const context = await browser.newContext({ baseURL: A, viewport: { width: 1280, height: 860 }, locale: 'en-US' });
-  const page = await context.newPage();
-  await login(page, A, next, credentials);
-  return { context, page };
-}
+/** Someone (the owner unless `credentials`) on `next` at a desk's size, in English. */
+const signedIn = (browser: Browser, next: string, credentials?: Credentials) => signedInAt(browser, next, { width: 1280, height: 860 }, credentials);
 
 test('an employee reads Staff, Roles and Schedules without a single write button, and the API agrees', async ({ browser }) => {
   const owner = await signedIn(browser, '/staff/members');

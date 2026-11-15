@@ -1,4 +1,4 @@
-"""The outbound call of a «Call another system» step (WORKBOOK FLOW-F27; the old hub's HUB-F94).
+"""The outbound call of a «Call another system» step (WORKBOOK FLOW-F27).
 
 Only ``https`` with a plain host (no user and password in the address). Before connecting, the host is
 resolved ONCE and every address it gives is checked: none may be inside the business or the cloud (private
@@ -92,7 +92,7 @@ def _decoded(raw: bytes, content_type: str, truncated: bool) -> Any:
     return text
 
 
-def call(method: str, url: str, headers: dict[str, str], body: str, timeout: float, *, max_bytes: int = MAX_BYTES) -> Reply:
+def call(method: str, url: str, headers: dict[str, str], body: str, timeout: float, *, max_bytes: int = MAX_BYTES) -> Reply:  # noqa: C901, PLR0911, PLR0913
     """Calls ``url`` once; never raises: how it ended is the reply's ``kind``."""
     if origin(url) is None or method not in METHODS:
         return Reply(INVALID, detail="Only an https address with a plain host can be called.")

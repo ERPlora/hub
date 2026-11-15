@@ -1,5 +1,5 @@
 // What the sale app's searchbars are named with. Ionic 8 names the inner input of an `ion-searchbar`
-// «search text», in English (outfitkit#182), so every searchbar of the app is named by its hint through
+// «search text», in English, so every searchbar of the app is named by its hint through
 // `@erplora/ui/components`' `syncSearchbarInputName`. A test mocks that helper with `recordSearchbarName`,
 // which writes down, at each call, the searchbar the helper names (the first one under the root it gets)
 // and the name it reads then:

@@ -1,8 +1,8 @@
-"""What the Hub reads of its registry of hubs (``base.Hub``) outside an operation (plan 2026-10-17, §1.2).
+"""What the Hub reads of its registry of hubs (``base.Hub``) outside an operation.
 
 The host gate (``base.middleware.HubHostRequiredMiddleware``) runs before any operation, so it reads the row of the
 Host's slug here: no row is 404, a hub that is gone 410, one still being prepared 503. The apps ask through
-``base.operations.is_demo_hub``, never here. Reads only, one indexed lookup by slug each; no cache in phase 1 (a
+``base.operations.is_demo_hub``, never here. Reads only, one indexed lookup by slug each; no cache (a
 cache would delay the 410 of an expired demo), but for the businesses' own domains (:func:`custom_domains`), which
 ``base.custom_domains`` keeps a moment in each process. The writes are the operations of ``base.services``.
 """
@@ -30,7 +30,7 @@ GONE_STATUSES = frozenset(
     {Hub.Status.CANCELLED, Hub.Status.ARCHIVING, Hub.Status.EXPIRED, Hub.Status.DROPPING, Hub.Status.PURGED}
 )
 #: The statuses of a hub still being prepared (its database made, its schema checked, its sign-up seeded, or a failed
-#: step waiting for its retry; PLAN-DB §6): its host answers 503 and asks to try again.
+#: step waiting for its retry): its host answers 503 and asks to try again.
 PREPARING_STATUSES = frozenset(
     {Hub.Status.REQUESTED, Hub.Status.CREATING, Hub.Status.MIGRATING, Hub.Status.SEEDING, Hub.Status.FAILED}
 )
@@ -87,6 +87,22 @@ def is_moving(hub: Hub) -> bool:
     return hub.moving_to_id is not None
 
 
+def is_restoring(hub: Hub) -> bool:
+    """Whether ``hub``'s database is being put back as it was at a moment (``control.hub.restore``,
+    ``base.tenancy.restore``; hub#1198): closed meanwhile."""
+    return hub.restoring_from_id is not None
+
+
+def is_copying(hub: Hub) -> bool:
+    """Whether ``hub``'s database is being copied, moved or restored: its host is closed and the worker leaves it."""
+    return is_moving(hub) or is_restoring(hub)
+
+
+def copying() -> Q:
+    """The rows :func:`is_copying` says are closed while their database is copied, as a query."""
+    return Q(moving_to__isnull=False) | Q(restoring_from__isnull=False)
+
+
 def is_preparing(hub: Hub) -> bool:
     """Whether ``hub`` is not ready yet (requested, being prepared, or its preparation failed and is retried)."""
     return hub.status in PREPARING_STATUSES
@@ -98,8 +114,9 @@ DROPPED_STATUSES = (Hub.Status.PURGED, Hub.Status.DROPPING)
 
 def database_is_made(hub: Hub) -> bool:
     """Whether ``hub``'s data can be entered: its own database was made (it is ready, or was once: ``ready_at``) and
-    has not been dropped. A business cancelled or failed before it was ever ready has no database, nor one of phase 1
-    not yet cut (``db_name=""``, S5): what reaches it waits on its row for the day it is made (its seeding, its cut).
+    has not been dropped. A business cancelled or failed before it was ever ready has no database, nor one that used
+    to share a database and was not yet cut (``db_name=""``): what reaches it waits on its row for the day it is made
+    (its seeding, its cut).
     :func:`own_database_made` is the same, as a query."""
     if not hub.db_name:
         return serves_hubs_without_database()
@@ -121,9 +138,9 @@ def own_database_made() -> Q:
 HUB_GONE = "base.hub_gone"
 HUB_PREPARING = "base.hub_preparing"
 HUB_SUSPENDED = "base.hub_suspended"
-#: A hub whose database is moving to another cluster (round 2026-10-30b of PLAN-DB, decision 3): a few minutes.
+#: A hub whose database is moving to another cluster: a few minutes.
 HUB_MAINTENANCE = "base.hub_maintenance"
-#: A hub whose database is not its own (``base.tenancy.identity``): nothing is served from it (phase 2, S1).
+#: A hub whose database is not its own (``base.tenancy.identity``): nothing is served from it.
 HUB_UNAVAILABLE = "base.hub_unavailable"
 
 
@@ -140,9 +157,9 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
     """Why the host of ``hub`` does not serve the app, or ``None`` while it does; in the active language.
 
     The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503, moving
-    to another cluster 503 (maintenance), a business of phase 1 without its own database 503 too (maintenance, until
-    its cut gives it one: S5, ``base.tenancy.cut``), suspended for an unpaid invoice 402. An open live stream and the
-    print socket hear it again before each run
+    to another cluster or being restored from a copy 503 (maintenance), a business that used to share a database and
+    has none of its own 503 too (maintenance, until its cut gives it one: ``base.tenancy.cut``), suspended for an unpaid
+    invoice 402. An open live stream and the print socket hear it again before each run
     (``base.operations.HubContextBuilder.refresh``). ``ended=False`` leaves out that it ended (a demo's login still
     answers then)."""
     if hub is None:
@@ -151,7 +168,7 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
         return Refusal(410, HUB_GONE, gettext("This hub is no longer available."))
     if is_preparing(hub):
         return Refusal(503, HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds."))
-    if is_moving(hub) or not (hub.db_name or serves_hubs_without_database()):
+    if is_copying(hub) or not (hub.db_name or serves_hubs_without_database()):
         return Refusal(503, HUB_MAINTENANCE, gettext("This hub is under maintenance for a few minutes; try again shortly."))
     if is_suspended(hub):
         return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))

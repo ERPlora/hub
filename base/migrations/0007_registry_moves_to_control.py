@@ -1,8 +1,8 @@
-# The registry moves to control (phase 2, S1; plan docs/plans/2026-10-22-fase-2-tenencia.md).
+# The registry moves to control.
 #
 # ``Hub`` and ``DemoCode`` leave base's state only (control/migrations/0001 took them over, tables included): their
 # tables stay as they are, now control's. ``HubIdentity`` is new: the one row of a hub's database that says which hub
-# it is (PLAN-DB §3); control's database has the table and no row.
+# it is; control's database has the table and no row.
 
 from django.db import migrations, models
 

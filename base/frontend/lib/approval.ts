@@ -1,11 +1,10 @@
-// A manager's approval on the client (BASE-G136; the old hub's HUB_SHELL-F51). An app wraps a command a manager may
-// approve (one its `LiveAppConfig.approvals` names) in `withApproval(() => command.run(input))`: when the hub answers
-// `requires_elevation`, the dialog «An approval is needed» asks who approves it (their PIN or badge) and the command is
-// repeated once with the pass, which the SDK sends in `X-Elevation-Token` while `approvalPass` returns it (`main.ts`
-// hands it to `createLiveClient`). «Cancel» hands back the original refusal, for the app to tell; a second question
-// after approving is a refusal (the pass ran out, or another copy of the hub), never a second dialog. The same command
-// repeated while the dialog is open (a double tap) gets the result of the one that opened it, and a different one is
-// refused, not stacked.
+// A manager's approval on the client. An app wraps a command a manager may approve (one its `LiveAppConfig.approvals`
+// names) in `withApproval(() => command.run(input))`: when the hub answers `requires_elevation`, the dialog asks who
+// approves it and the command is repeated once with the pass, which the SDK sends in `X-Elevation-Token` while
+// `approvalPass` returns it (`main.ts` hands it to `createLiveClient`). «Cancel» hands back the original refusal, for
+// the app to tell; a second question after approving is a refusal (the pass ran out, or another copy of the hub),
+// never a second dialog. The same command repeated while the dialog is open (a double tap) gets the result of the one
+// that opened it, and a different one is refused, not stacked.
 import { ApiError } from '@erplora/ui/sdk';
 import { shallowRef } from 'vue';
 

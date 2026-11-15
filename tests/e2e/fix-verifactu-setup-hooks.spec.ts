@@ -1,16 +1,16 @@
 // flow: HUB_HOME verifactu hooks
-// VeriFactu's hooks of the Home (FIX-VERIFACTU-SETUP-HOOKS; the old module's `setup` and `widgets`, the old hub's
-// dashboard in docs/reference/old-hub/dashboard-*.png), as the owner of hub `a` reads them in Spanish: «Configura
+// VeriFactu's hooks of the Home (its `setup` and `widgets`), as the owner of hub `a` reads them in Spanish: «Configura
 // VeriFactu» pending and «Importante» in «Termina de configurar tu negocio» while ERPlora still has no approved
 // authorisation (its «Configurar» leads to VeriFactu's Configuration), done without a reload once the account's photo
 // approves it; «Pendientes VeriFactu» on the board by default with the server's figure, and the other three panels
 // («Cola de contingencia», «Registros por estado», «Eventos AEAT recientes», whose types speak Spanish, never their
-// codes) on the board in each size, leaving the capture `FIX-VERIFACTU-SETUP-HOOKS-<width>`.
+// codes) on the board in each size, leaving a capture.
 // The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`, signed); what the run changes in
 // VeriFactu's configuration and in `a`'s photo is put back after it (or removed, if the run made it).
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, psql, shot, untilStill } from './helpers';
+import { boardWidget, setupCard, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
 import { keepVerifactu, pushPhoto, putVerifactuBack } from './verifactu-helpers';
 
 const KEY = 'FIX-VERIFACTU-SETUP-HOOKS';
@@ -22,7 +22,6 @@ const SIZES = [
   { label: '1440', width: 1440, height: 900 },
 ];
 /** Where the Home keeps this browser's board (base/frontend/lib/home.ts `BOARD_STORAGE_KEY`). */
-const BOARD = 'dashboard-hub';
 
 test.beforeAll(() => {
   keepVerifactu('e2e_fix_vf_hooks');
@@ -38,38 +37,15 @@ async function erploraWith(status: string): Promise<void> {
   psql("update verifactu_config set route = 'erplora'");
 }
 
-/** The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home. */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-  board?: string[],
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  if (board) await context.addInitScript(([key, keys]) => localStorage.setItem(key, keys), [BOARD, JSON.stringify(board)]);
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(shown(page).locator('[data-testid="setup-card"]')).toHaveAttribute('aria-busy', 'false');
-  // The owner's Spanish session with VeriFactu's four panels for the fleet's visual sweep
-  // (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (board && process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page };
-}
-
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
+const { row, doneUnderTheFold } = setupStep(STEP);
 
 /** «Ver todo» when the fold keeps the step out of sight: on a phone it shows 2 rows, and a hub without its tax details
- *  has «Los datos de tu negocio» (⛔, before VeriFactu's) pending too (FIX-INVOICE-SETUP-HOOKS). */
+ *  has «Los datos de tu negocio» (⛔, before VeriFactu's) pending too. */
 async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
+  await expect(setupCard(page)).toHaveAttribute('aria-busy', 'false');
+  const toggle = setupCard(page).locator('[data-testid="setup-toggle"]');
   if ((await row(page).count()) === 0 && (await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
 }
-const panel = (page: Page, key: string): Locator =>
-  shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
 
 test('HUB_HOME verifactu hooks: «Configura VeriFactu» pending until the authorisation is approved, and «Pendientes VeriFactu» by default', async ({ browser }) => {
   await erploraWith('submitted');
@@ -83,12 +59,12 @@ test('HUB_HOME verifactu hooks: «Configura VeriFactu» pending until the author
     await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
 
     // «Pendientes VeriFactu» on the board by default, with what the server counts.
-    const pending = panel(page, 'verifactu.pending');
+    const pending = boardWidget(page, 'verifactu.pending');
     await expect(pending.locator('[data-testid="widget-title"]')).toHaveText('Pendientes VeriFactu');
     const summary = await api<{ pending_count: number }>(context, A, 'GET', '/verifactu/stats/compliance_summary');
     expect(summary.status).toBe(200);
     await expect(pending.locator('[data-testid="widget-value"]')).toHaveText(new Intl.NumberFormat('es-ES').format(summary.data.pending_count));
-    for (const key of PANELS.slice(1)) await expect(panel(page, key)).toHaveCount(0);
+    for (const key of PANELS.slice(1)) await expect(boardWidget(page, key)).toHaveCount(0);
 
     // «Configurar» leads to VeriFactu's Configuration.
     await row(page).locator(`[data-testid="setup-configure-${STEP}"]`).click();
@@ -98,10 +74,7 @@ test('HUB_HOME verifactu hooks: «Configura VeriFactu» pending until the author
 
     // The account approves it: the step is done without a reload (it leaves the folded list; «Ver todo» says «Hecho»).
     await pushPhoto('approved');
-    await expect(row(page)).toHaveCount(0);
-    await card(page).locator('[data-testid="setup-toggle"]').click();
-    await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Hecho');
-    await expect(row(page).locator(`[data-testid="setup-configure-${STEP}"]`)).toHaveCount(0);
+    await doneUnderTheFold(page);
   } finally {
     await context.close();
   }
@@ -116,16 +89,16 @@ for (const size of SIZES) {
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
       const titles = ['Pendientes VeriFactu', 'Cola de contingencia', 'Registros por estado', 'Eventos AEAT recientes'];
       for (const [index, key] of PANELS.entries()) {
-        await expect(panel(page, key).locator('[data-testid="widget-title"]')).toHaveText(titles[index]);
-        await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
-        await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
+        await expect(boardWidget(page, key).locator('[data-testid="widget-title"]')).toHaveText(titles[index]);
+        await expect(boardWidget(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);
+        await expect(boardWidget(page, key)).toHaveAttribute('aria-busy', 'false');
       }
-      // The photo just received is the newest event: its type in Spanish, never its code (gh:verifactu#139).
-      const events = panel(page, 'verifactu.events');
+      // The photo just received is the newest event: its type in Spanish, never its code.
+      const events = boardWidget(page, 'verifactu.events');
       await expect(events.locator('[data-testid="verifactu-events-panel-type"]').first()).toHaveText('Configuración cambiada');
       await expect(events).not.toContainText('config_changed');
       await expect(events.locator('[data-testid="verifactu-events-panel-error"]')).toHaveCount(0);
-      await expect(panel(page, 'verifactu.by_status').locator('[data-testid="widget-bar"]').first()).toBeVisible();
+      await expect(boardWidget(page, 'verifactu.by_status').locator('[data-testid="widget-bar"]').first()).toBeVisible();
 
       // The checklist and the board in sight, as far as the page scrolls, with no sideways scroll.
       await row(page).evaluate((element) => element.scrollIntoView({ block: 'start' }));

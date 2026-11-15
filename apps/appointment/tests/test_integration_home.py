@@ -1,7 +1,7 @@
-"""Citas on the Home's bell (PLAN-HUB round 2026-10-21; appointments#169, hub#1678): base's ``base.bell.counters``
-shows «Appointments to confirm» while the customers' own upcoming bookings wait for confirmation in the agenda the
-person sees, and leads to the agenda; at zero it is not shown. Every change of that number records an event the
-counter is refreshed on, and a booking in hub B re-runs the bell on B's channel only.
+"""Citas on the Home's bell: base's ``base.bell.counters`` shows «Appointments to confirm» while the customers' own
+upcoming bookings wait for confirmation in the agenda the person sees, and leads to the agenda; at zero it is not shown.
+Every change of that number records an event the counter is refreshed on, and a booking in hub B re-runs the bell on B's
+channel only.
 
 base and appointment run for real: the counter comes from AppointmentConfig through base's own query, never a
 stand-in module.
@@ -138,6 +138,13 @@ def professional_leaves(salon, appointment):
     op(system_context(A), op.input.model_validate({"id": str(salon.ana.id)}))
 
 
+def restored_from_a_copy(salon, appointment):
+    """Another booking waiting for the business, deleted, back on the agenda (BASE-F114)."""
+    deleted = waiting(salon, start=at(MONDAY, "15:00"), deleted_at=timezone.now())
+    op = get("appointment.appointment.restore")
+    op(system_context(A), op.input.model_validate({"id": str(deleted.id)}))
+
+
 def ref(name):
     return lambda salon, appointment: run(name, {"id": str(appointment.id)})
 
@@ -156,6 +163,7 @@ CHANGES = {
     ),
     "appointment.appointment.unassigned": professional_leaves,
     "appointment.appointment.deleted": ref("appointment.appointment.delete"),
+    "appointment.appointment.restored": restored_from_a_copy,
 }
 
 

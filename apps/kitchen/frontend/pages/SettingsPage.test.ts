@@ -74,7 +74,7 @@ describe('SettingsPage', () => {
     expect(s.field('save-error')?.textContent).toContain(message);
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const AMBER_FIRST = 'The amber warning has to come before the red one.';
     const REFUSAL = { error: { code: 'invalid_field', message: AMBER_FIRST, fields: { warning_minutes: AMBER_FIRST, critical_minutes: AMBER_FIRST } } };
 
@@ -120,7 +120,7 @@ describe('SettingsPage', () => {
     expect(s.field('load-error')?.textContent).toContain('Could not load the settings.');
     expect(s.field('loading')).toBeNull();
     expect(s.field('retry')).not.toBeNull();
-    // kitchen#12: a full-size touch target (44 px), never the small button.
+    // A full-size touch target (44 px), never the small button.
     expect((s.field('retry') as HTMLElement & { size?: string }).size).toBeUndefined();
   });
 
@@ -135,7 +135,7 @@ describe('SettingsPage', () => {
     await s.show(SETTINGS);
     expect([s.field('warning_minutes').label, s.field('save').textContent?.trim()]).toEqual(['Aviso ámbar (minutos)', 'Guardar']);
     expect(s.field('works_from_screen').textContent?.trim()).toBe('La cocina trabaja con la pantalla');
-    // hub#1427, kitchen#159: the tone and the type are chosen by their words, never «chime» or «dine_in».
+    // The tone and the type are chosen by their words, never «chime» or «dine_in».
     const words = (name: string) => [...s.field(name).querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
     expect(words('sound_tone')).toEqual(['Campanilla', 'Timbre', 'Zumbador']);
     expect(words('default_order_type')).toEqual(['En sala', 'Para llevar', 'A domicilio']);

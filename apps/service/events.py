@@ -112,6 +112,8 @@ CUSTOMER_GONE = [
     CUSTOMER_ERASED,
     CUSTOMER_MERGED,
 ]
+#: A deleted card back, the same one, from the separate copy (CUSTOMER-F33): its vouchers say her name again.
+CUSTOMER_RESTORED = "customer.customer.restored"
 
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {

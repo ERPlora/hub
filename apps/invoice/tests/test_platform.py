@@ -1,7 +1,7 @@
 """ERPlora's own invoices as the SaaS posts them (``platform_payload()`` of saas-next/billing/services.py) → the
 fields of an ``Invoice`` and its lines (``apps.invoice.platform``, pure: no database).
 
-The qualification of each tax treatment is the old SaaS's (``fiscal/desglose.py``, ADR-0183), validated against the
+The qualification of each tax treatment is the old SaaS's (``fiscal/desglose.py``), validated against the
 AEAT: domestic S1 with its rate; OSS regime 17 and reverse charge, not subject by location (N2) with no rate nor
 quota, the whole amount as its base; exempt E1. F1 with a recipient tax ID, a simplified F2 without one up to 400 €
 (the old ``fiscal/invoice_type.py``), refused above.
@@ -254,7 +254,7 @@ def test_a_proration_credit_line_carries_its_sign_in_the_quantity():
 def test_without_spanish_vat_the_whole_amount_is_declared_without_rate_nor_quota(
     treatment, regime, qualification, exempt_reason
 ):
-    # ADR-0183 (old SaaS, fiscal/desglose.py): N1/N2 and exempt carry neither TipoImpositivo nor CuotaRepercutida
+    # The old SaaS's rule (fiscal/desglose.py): N1/N2 and exempt carry neither TipoImpositivo nor CuotaRepercutida
     # (AEAT error 1237): an OSS sale declares the other state's VAT as part of the amount not subject here.
     taxed = treatment == "oss"
     data = body(
@@ -381,7 +381,7 @@ def test_with_a_recipient_tax_id_it_is_a_full_invoice_f1():
 
 
 def test_without_a_tax_id_it_is_a_simplified_invoice_f2_up_to_400_euros():
-    # The old fiscal/invoice_type.py (saas#1070): a subscription sold to someone without a tax ID is an F2.
+    # The old fiscal/invoice_type.py: a subscription sold to someone without a tax ID is an F2.
     nobody = {**BODY["recipient"], "tax_id": ""}
     limit = line(net_cents=33058, tax_cents=6942, total_cents=40000)
 

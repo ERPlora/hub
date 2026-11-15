@@ -1,4 +1,4 @@
-"""Which business a host outside ``ALLOWED_HOSTS`` belongs to (HUBS-F17, PLAN-SAAS §37 point 2), at no read per request.
+"""Which business a host outside ``ALLOWED_HOSTS`` belongs to, at no read per request.
 
 The SaaS names a business's own domain in its photo (``custom_domain``, ``base.hub.state_apply``), and that is the only
 way the Hub learns it: it is kept on the business's row and never asked of the SaaS. The ALB's last rule sends the Hub

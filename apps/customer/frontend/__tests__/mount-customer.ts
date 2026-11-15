@@ -1,69 +1,15 @@
-// Test helper of the customer app's pages and components, copied from the demo's: the SDK's live
-// harness (fake clock, fake network serving the stream and the API) on the hub's op → route map, the
-// shell's i18n with the customer catalogues merged in, a session and a memory router.
-import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
-import { LIVE_CLIENT_KEY, type LiveClient, type OpName, stableJson } from '@erplora/ui/sdk';
-import { fillHappyDomGaps } from '@erplora/ui/testing';
-import { mount } from '@vue/test-utils';
-import { type Component, createApp, ref } from 'vue';
-import { createMemoryHistory, createRouter } from 'vue-router';
+// Test helper of the customer app's pages and components: `mountInShell` with the customer catalogues over base's,
+// its list page and its people.
+import type { SessionMe } from '@erplora/ui/shell';
+import type { Component } from 'vue';
 
-import { addIcons } from '../../../../packages/ui/node_modules/ionicons';
-import { ION_ICONS } from '../../../../packages/ui/src/shell/icons';
-
-import {
-  type ApiCall,
-  createTestClient,
-  flush,
-  resultFrame,
-  type StreamCall,
-} from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-import baseEn from '../../../../base/frontend/locale/en.json';
-import baseEs from '../../../../base/frontend/locale/es.json';
-import type { Business } from '../../../../base/frontend/operations';
-import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
+import type { ApiCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import { mountInShell, overBase } from '../../../../base/frontend/__tests__/mount-in-shell';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
-// happy-dom made to behave as a browser where Ionic's runtime reaches it, by each helper: the hub setup
-// (vitest.setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
-fillHappyDomGaps();
-// What `createShell` does at boot: `ion:` icons paint by name from this registry.
-addIcons(ION_ICONS);
-
-export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 export type { ApiCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-
-/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
- *  (the money the customer screens paint and read is the business's). */
-export function business(fields: Partial<Business> = {}): Business {
-  return {
-    name: 'Bar Pepe',
-    country: 'ES',
-    country_name: 'Spain',
-    timezone: 'Europe/Madrid',
-    language: 'es',
-    language_name: 'Spanish',
-    currency: 'EUR',
-    currency_label: 'EUR · Euro',
-    currency_decimals: 2,
-    demo: false,
-    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
-    ...fields,
-  };
-}
-
-/** A business in Poland: it sells in złoty. */
-export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
-
-/** A business in Japan: the yen has no minor units. */
-export const JAPANESE: Partial<Business> = {
-  country: 'JP',
-  country_name: 'Japan',
-  currency: 'JPY',
-  currency_label: 'JPY · Japanese Yen',
-  currency_decimals: 0,
-};
+export { business, IN_YEN as JAPANESE, POLISH } from '../../../../base/frontend/__tests__/business';
 
 const ALL = ['view', 'manage', 'configure', 'merge', 'export', 'delete', 'erase', 'record_activity'].map((p) => `customer.${p}`);
 
@@ -97,14 +43,6 @@ export interface MountOptions {
   attachTo?: HTMLElement;
 }
 
-/** The subscription id the stream holds for `op` (the first one, or the one with `params`). */
-export function subId(client: LiveClient, op: OpName, params?: unknown): string {
-  const subs = client.stream.subscriptions(op);
-  const sub = params === undefined ? subs[0] : subs.find((s) => stableJson(s.params) === stableJson(params));
-  if (!sub) throw new Error(`no live subscription for ${op}`);
-  return sub.id;
-}
-
 /** A JSON answer of the fake API. */
 export const json = (data: unknown, status = 200): Response => Response.json(data, { status });
 
@@ -120,38 +58,8 @@ export function sent(call: ApiCall): { path: string; body: unknown; query: Recor
 }
 
 export async function mountCustomer(component: Component, options: MountOptions = {}) {
-  const harness = createTestClient({ routes: OPERATION_ROUTES });
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/:path(.*)*', component: { template: '<div />' } }],
-  });
-  await router.push(options.path ?? '/customer/customers');
-  await router.isReady();
-  const app = createApp({});
-  provideSession(ref(options.session ?? OWNER), ref('live'), { app });
-  const i18n = createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } });
-  const wrapper = mount(component, {
-    props: options.props,
-    attachTo: options.attachTo,
-    global: {
-      plugins: [router, i18n],
-      provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
-      stubs: options.stubs,
-    },
-  });
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
-  /** Pushes a result for the subscription of `op` (the first, or the one with `params`) and renders. */
-  async function result(call: StreamCall, op: OpName, data: unknown, rev = 1, params?: unknown): Promise<void> {
-    call.push(resultFrame(subId(harness.client, op, params), data, rev));
-    await flush();
-  }
-  /** The live subscriptions' params of `op`. */
-  const params = (op: OpName): unknown[] => harness.client.stream.subscriptions(op).map((s) => s.params);
-  /** The person changes the app's language (the shell's selector): what is on screen follows it. */
-  async function setLocale(locale: 'en' | 'es'): Promise<void> {
-    i18n.global.locale.value = locale;
-    await flush();
-  }
-  return { ...harness, router, wrapper, live, result, params, setLocale };
+  const mounted = await mountInShell(component, options, { path: '/customer/customers', session: OWNER, messages: overBase(en, es) });
+  return { ...mounted, result: mounted.resultOn };
 }
+
+export * from '../../../../base/frontend/__tests__/mount-in-shell';

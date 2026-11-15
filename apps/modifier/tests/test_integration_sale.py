@@ -7,9 +7,9 @@ through Sales' own operations: a discount lowers the dish and never takes it bel
 as many times as it is chosen, an article sold by weight takes no priced option, and the VAT of every supplement
 —folded into the dish or on a line of its own— squares to the cent with what Sales charges.
 
-Traps of the old product: hub#1219 (no sale with a supplement could be charged: the till's read of a module that
-was no requirement of Sales was thrown away), hub#1121 (the till asked Modifiers on every tap and got a 404 for a
-product without groups).
+Traps of the old product: no sale with a supplement could be charged (the till's read of a module that
+was no requirement of Sales was thrown away), and the till asked Modifiers on every tap and got a 404 for a
+product without groups.
 """
 
 from decimal import Decimal
@@ -207,7 +207,7 @@ def test_a_dish_sold_by_weight_takes_a_free_option_but_never_a_priced_one():
 
 
 def test_an_employee_charges_a_check_with_supplements_with_her_own_session(burger):
-    """hub#1219: Sales does not require Modifiers, yet the cashier's own session reads and values the options."""
+    """Sales does not require Modifiers, yet the cashier's own session reads and values the options."""
     _, ids = burger
     asked = sell("modifier.group.for_target", {"product": "BUR"}, "hub_employee")
     assert [group.name for group in asked.groups] == ["Doneness", "Extras"]

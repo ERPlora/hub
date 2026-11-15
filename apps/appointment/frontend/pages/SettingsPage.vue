@@ -5,10 +5,10 @@
 // repaints every field the person has not touched, «Save» sends only the fields touched and changed
 // (`appointment.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
 // FormModal does. «Send reminders» is not here: the old module saved it and sent nothing.
-import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonInput, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -40,7 +40,7 @@ const settingsForm = useSettingsForm(
   useCommand('appointment.settings.update'),
   { toForm, numbers: NUMBERS },
 );
-const { form, fieldErrors, set } = settingsForm;
+const { form, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -48,9 +48,6 @@ function toForm(settings: SettingsOut): Form {
     ...(Object.fromEntries(SWITCHES.map((field) => [field, settings[field]])) as Record<SwitchField, boolean>),
   };
 }
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
 <template>
@@ -92,27 +89,21 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else
         class="appointment-settings"
         data-testid="appointment-settings"
+        novalidate
         @submit.prevent="settingsForm.save()"
       >
         <h2 class="appointment-settings__title">
           {{ $t('appointment.settings.title') }}
         </h2>
-        <ion-input
+        <SettingsNumberField
           v-for="field in NUMBERS"
           :key="field"
-          :data-testid="`appointment-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`appointment-settings-${field}`"
           :label="t(`appointment.settings.fields.${field}`)"
           :helper-text="field === 'min_booking_notice' ? t('appointment.settings.fields.min_booking_notice_help') : undefined"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          min="0"
         />
         <ion-toggle
           v-for="field in SWITCHES"

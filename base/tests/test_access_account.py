@@ -1,4 +1,4 @@
-"""BASE-G52/G53: entering a hub with the erplora.com account (the SaaS's sign-in, or its panel: the same jump).
+"""Entering a hub with the erplora.com account (the SaaS's sign-in, or its panel: the same jump).
 
 Every entry with the account makes this browser a device of the hub (``base.TrustedDevice``, the cookie
 ``hub_device``): from then on the PIN works on it. The session lasts what the device and the business allow, fixed
@@ -83,7 +83,7 @@ class TestTheDevice:
         assert (owner.device_id, owner.credential) == (TrustedDevice.objects.get().pk, SessionOwner.Credential.ACCOUNT)
 
     def test_a_demo_s_visitor_is_no_device_of_it(self, client, fake_saas, demo):
-        # A demo has no account behind it, nor a till to come back to with a PIN (plan 2026-10-17 §1.6).
+        # A demo has no account behind it, nor a till to come back to with a PIN.
         fake_saas()
         response = callback(client, {"code": a_code(demo), "next": "/"}, host=host_of(demo))
         assert response.status_code == 302

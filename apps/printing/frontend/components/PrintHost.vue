@@ -3,8 +3,8 @@
 // is signed in; PRINTING-F18): inside the installed app, the device set up to print here drains the queue of the active
 // printers of its registration — «This device» of Printing → Devices, followed live, so setting it up, changing its
 // printers or retiring it from any device takes effect at once — through the shell's print host (`/ws/print` and the
-// app's commands). A drawer that does not open after the paper says so on screen, naming its printer (PRINTING-F13,
-// hub#2724). In a browser it reads nothing: no printer is reachable from it. It paints nothing.
+// app's commands). A drawer that does not open after the paper says so on screen, naming its printer (PRINTING-F13).
+// In a browser it reads nothing: no printer is reachable from it. It paints nothing.
 import { useLive } from '@erplora/ui/sdk';
 import { nativeBridge, toastError, usePrintHost } from '@erplora/ui/shell';
 import { computed, defineComponent } from 'vue';

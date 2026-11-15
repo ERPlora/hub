@@ -241,7 +241,7 @@ def _tied_time_off():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column, schema=schema), sorted(tied()))
 

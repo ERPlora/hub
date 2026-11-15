@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e513a072dd893cd4f7a8759de620af0e020bfe2fb529ee97ea2534df3080422a -->
+<!-- generated from WORKBOOK.md sha256:69f09ba396417bad22aa31111a829e0ea8869bdd2879eb7d3a705d6451551b44 -->
 
 ## What it is for and who it is for
 
@@ -56,8 +56,8 @@ Here the official specification prevails over the market:
   is issued** (Invoicing → Issuer, INVOICE-F21); until then, Home asks for it in "Finish setting up your
   business" with the step "Your business details" and the pill "Needed to invoice", and the banner "You
   cannot issue invoices yet" warns about it above the other screens, **Invoices** and **Series** too,
-  with "Set up". The issuer is typed here, by hand: receiving it from the ERPlora account
-  (INVOICE-F22) is not in yet.
+  with "Set up". The issuer is typed here, by hand: it does not come from the
+  ERPlora account.
 - **"Today" is Madrid time** in phase 1 (the Hub does not keep the business's time zone yet): it decides
   the date of each document and, with it, the year of its series. A charge at 00:30 on 1 January numbers
   in the new year's series.
@@ -187,7 +187,6 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F01 | The ticket (simplified invoice) born when charging | done — Sales asks for it within the same charge |
 | INVOICE-F02 | The full invoice when charging a customer with a tax ID | done — Sales asks for it within the same charge |
 | INVOICE-F03 | Issue an invoice by hand | done |
-| INVOICE-F04 | The customer asks for the full invoice of their ticket | discarded — the public page where the customer types their details and the ticket's code that opens it belong to the platform and to Sales; Invoicing already issues the full invoice that page will ask for, as in INVOICE-F05 (hub#500) |
 | INVOICE-F05 | Turn a ticket into a full invoice at the counter | done |
 | INVOICE-F06 | A charged sale that could not be invoiced | done |
 | INVOICE-F07 | Void a charged sale that already has its ticket | done — Sales asks for it within the same void |
@@ -205,8 +204,7 @@ rectifying invoice already issued: Back closes its result (BASE-F05).
 | INVOICE-F19 | Mark an invoice as paid | done |
 | INVOICE-F20 | Give other apps the invoice of a sale | done |
 | INVOICE-F21 | Set up the issuer | done |
-| INVOICE-F22 | Receive the issuer from the ERPlora account | discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501) |
-| INVOICE-F23 | Issue ERPlora's invoices (platform hub) | discarded — the Invoicing part is done and tested, but the platform hub is not set up until it is born with its own database, like every business (hub#502) |
+| INVOICE-F23 | Issue ERPlora's invoices (platform hub) | done |
 
 ### INVOICE-F01 The ticket (simplified invoice) born when charging
 Status: done — Sales asks for it within the same charge
@@ -296,7 +294,10 @@ If it fails: inside the window, above the buttons: "A full invoice needs the cus
 address.", "That tax ID is not valid." (under the field), "Line {n}: the price is not an amount…", a line
 with a price that comes to 0.00, a series that is inactive, does not issue invoices or belongs to another
 year ("That series numbers another year…"), a ticket above the Sales limit ("Above €3,000.00 a ticket
-cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. Nothing is issued, no number is used,
+cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. A line with a tax category (through the API
+or the assistant) that has no rule in force in the business's territory is refused on that line's field, naming the category as Taxes names
+it in the reader's language (e.g. "Product — generic", never its key `product.generic`) and with "Create its
+rule in Taxes › Rules." (hub#1149). Nothing is issued, no number is used,
 and what was typed is kept. A field's message goes as soon as that field is corrected (also when a
 customer's card fills it, and the tax ID's when the country or the document type changes), the notice
 that only points at fields as soon as anything is changed, and both come back if the next try is refused
@@ -305,19 +306,6 @@ read the business’s tax territory: type the rate of each line."; the invoice i
 territory's tax. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up (hub#938).
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
-
-### INVOICE-F04 The customer asks for the full invoice of their ticket
-Status: discarded — the public page where the customer types their details and the ticket's code that opens it belong to the platform and to Sales; Invoicing already issues the full invoice that page will ask for, as in INVOICE-F05 (hub#500)
-Actor: customer
-Screen: public page of the platform (it does not exist yet)
-Steps:
-1. The ticket Sales prints carries a code to ask for the invoice.
-2. The customer opens it on their phone, without signing in, and types their tax details.
-3. Invoicing issues the replacing full invoice (F3), as in INVOICE-F05.
-In: the ticket (F2) and the details the customer types.
-Out: the F3 (announces `invoice.invoice.issued`).
-If it fails: as in INVOICE-F05.
-Involved: SALE-F29, INVOICE-F05
 
 ### INVOICE-F05 Turn a ticket into a full invoice at the counter
 Status: done
@@ -342,7 +330,7 @@ card fills it; the tax ID's, also when the country or the document type changes)
 next try is refused too; a document that is not a ticket, "Only a ticket (simplified invoice) can be
 replaced by a full invoice.". If the ticket already has its F3, it answers with it without issuing
 another or using a number.
-Involved: INVOICE-F04
+Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
 Status: done
@@ -410,8 +398,8 @@ Steps:
    reason, the next number of the year's "RECT" series (it is not reserved: it takes it when issued),
    today's date, its lines and the base, the taxes and the total, negative; if the invoice already had
    rectifying invoices by differences, also what is left to rectify of it.
-5. Then "Run this action?" comes with the invoice's "Number" and the "Reason" and, in "What will happen",
-   the rectifying invoice about to be born: the "Type of rectifying invoice" by its name, never by its code alone
+5. In that same answer, without you having to ask again, "Run this action?" comes with the invoice's
+   "Number" and the "Reason" and, in "What will happen", the rectifying invoice about to be born: the "Type of rectifying invoice" by its name, never by its code alone
    ("Rectifying invoice: other causes (R4)"; also when the assistant asks for it when rectifying), the series' "Next number"
    (not reserved either) and the "Tax base", the "Tax" and the "Total", negative, in the business's
    currency. Type "CONFIRM" and tap "Run". That same rectifying invoice is issued, in your name, just as
@@ -434,8 +422,9 @@ rectify the full invoice.". Two rectifications of the same invoice at once: the 
 first and is refused without using a number. Without permission the action does not appear. To the
 assistant, on a rectifying invoice, a cancelled one or a replaced ticket, it tells you why with those
 same notices and the confirmation does not come; if another rectifying invoice is issued between the
-preview and your confirmation, yours takes the next number; if another device rectifies that invoice
-before you confirm, no other is issued: "The invoice is already cancelled." comes.
+preview and your confirmation, yours is not issued: the confirmation comes again with the next number,
+and it is issued with it once you confirm (BASE-F97); if another device rectifies that invoice before
+you confirm, no other is issued: "The invoice is already cancelled." comes.
 Involved: SALE-F31
 
 ### INVOICE-F09 The rectifying invoice when refunding a whole sale
@@ -604,9 +593,12 @@ Steps:
 4. Tap "View", or the row, to open it (INVOICE-F17).
 In: the hub's invoices.
 Out: nothing; it only reads.
-If it fails: without results, "No results"; with an error, the message and "Retry". A total that is not an
-amount says "Type an amount, like 12.50" under its field, and an end date before the start date, "The end
-date cannot be before the start date."; neither of the two filters.
+If it fails: without results, "No results"; with an error, the message and "Retry". The total is read as in
+any amount field of the Hub and as in the other lists (hub#1196: "1.000,50", "1,000.50", "2 500" and
+"12,50 €" filter); one it cannot read says so under its field in the words of the amount field ("This is not
+an amount. Type a figure, for example 12.50.", "This amount cannot be negative." or, with "1.000" in euros,
+"This amount can be read in two ways…"), and an end date before the start date, "The end date cannot be
+before the start date."; neither of the two filters.
 Involved: none
 
 ### INVOICE-F17 View an invoice
@@ -619,7 +611,7 @@ Steps:
    "Disc." column with the discount without VAT), the breakdown and the totals.
 3. With **VeriFactu**, read below the "VeriFactu receipt": the status of the record at the AEAT, its
    "CSV" once the AEAT has answered and the QR, which can be scanned or opened with "Check at the tax
-   agency ↗" (in the installed app, in the device's browser, as soon as the app accepts that address: ERPlora/app#20).
+   agency ↗" (in the installed app, in the device's browser: VERIFACTU-F18).
 4. "Rectifies", "Replaces", "Replaced by" and the rectifying invoices open the linked document.
 5. "← Back" goes back to the list.
 In: the invoice and its lines and, with VeriFactu, its record.
@@ -657,13 +649,16 @@ Involved: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Mark an invoice as paid
 Status: done
-Actor: employee, manager, administrator
+Actor: employee, manager, administrator, assistant
 Screen: Invoices, Invoice detail
 Steps:
-1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice.
+1. In **Invoices** (row) or on the detail, tap "Mark as paid" on an "Issued" invoice; or ask the assistant
+   ("mark invoice FACT-2026-000001 as paid", "Carpintería Lema has paid their invoice") and go on at step 4.
 2. Confirm in "Mark {number} as paid?" ("The payment is recorded with the current date and time.") with
    "Mark as paid", or go back with "Cancel".
 3. The invoice becomes "Paid" and the detail shows "Paid on" with the date and the time.
+4. With the assistant, "Run this action?" comes with the invoice by its number; tap "Run" and it becomes
+   "Paid" as from the screen, or "Cancel" and nothing changes.
 In: the chosen invoice.
 Out: the status "Paid" and the payment date (announces `invoice.invoice.paid`). No amount changes and the
 till is not touched.
@@ -711,33 +706,23 @@ next try is refused too; a refusal that names no field shows above the form and 
 (hub#854).
 Involved: none
 
-### INVOICE-F22 Receive the issuer from the ERPlora account
-Status: discarded — the ERPlora account does not send the business's tax identity with the hub's data and the platform does not hand it to Invoicing; Invoicing already keeps it when it arrives (hub#501)
-Actor: system
-Screen: Issuer
-Steps:
-1. When the ERPlora account sends the hub's data with the business's tax identity, the platform hands it
-   to Invoicing with the version of that data.
-2. Invoicing saves the issuer and **Issuer** says "Received from your ERPlora account on {date}.".
-In: the business's tax identity the account sends (legal name, tax ID, address, postal code, city,
-province and country) and its version.
-Out: the issuer (announces `invoice.issuer.updated`). Data older than the saved one is ignored.
-If it fails: an incomplete issuer or one with an invalid tax ID is refused and the previous one stays.
-Involved: none
-
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
-Status: discarded — the Invoicing part is done and tested, but the platform hub is not set up until it is born with its own database, like every business (hub#502)
+Status: done
 Actor: system (the ERPlora account)
 Screen: none (nobody enters the platform hub)
 Steps:
-1. A customer pays their subscription; the ERPlora account numbers its invoice (`ERP-2026-00123`, credit
+1. Before charging real money, the account asks the platform hub whether it is ready: it is with its issuer
+   and VeriFactu and, in production, only while real filing with the AEAT is open on the server
+   (VERIFACTU-F08). Otherwise it answers "not ready" with the reason and the account does not charge. In pre
+   nothing changes: it files in testing and charges with test keys.
+2. A customer pays their subscription; the ERPlora account numbers its invoice (`ERP-2026-00123`, credit
    notes in `ERPR`) and sends it, signed, to ERPlora's platform hub.
-2. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
+3. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
    it), with ERPlora as issuer and that day's payer as recipient, and VeriFactu seals its record in the
    same operation. It answers "issued" with its QR.
-3. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
+4. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
    "accepted with errors" or "rejected" when it answers (with its code and its message).
-4. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
+5. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
    tributario:", "VERI*FACTU") only once the AEAT has accepted it, as in the old account.
 In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines and,
 in a credit note, the invoice it corrects.
@@ -746,7 +731,9 @@ Out: the invoice, with the account's reference (announces `invoice.invoice.issue
 If it fails: the same invoice again (or two deliveries at once) answers what there already is, without
 writing anything; a credit note of an invoice that did not arrive is refused; above €400 without the
 payer's tax ID it is refused; an invoice that does not follow the contract is refused with its reason; a
-VeriFactu refusal undoes the whole invoice.
+VeriFactu refusal undoes the whole invoice; in production with real filing with the AEAT closed, "not ready":
+"Real filing with the AEAT is closed on this server: ERPlora's invoices would not reach it.", and the account
+does not charge.
 Involved: VERIFACTU-F13
 
 ## Services: what goes in and what comes out
@@ -776,7 +763,7 @@ name, their phone or their email (as in Customers) and a series by its code.
 | The issuer | view | F21, F22 | `invoice.issuer.get` |
 | How an ERPlora invoice is going (by the SaaS's `id`) | only the system | F23 | `invoice.invoice.platform_status` |
 | The A4 of an ERPlora invoice, in its language | only the system | F23 | `invoice.invoice.platform_document` |
-| Whether the platform hub can issue now | only the system | F23 | `invoice.invoice.platform_health` |
+| Whether the platform hub can issue now (in production, only with real filing with the AEAT open) | only the system | F23 | `invoice.invoice.platform_health` |
 
 All of them can be followed live.
 
@@ -847,8 +834,7 @@ notice delivery hands it these notices afterwards and, if that one stayed "pendi
   exists (the territory the line froze when it was charged); rounding half up (`round_half_up`). The
   name of the tax of the rate of a typed line ("VAT %", "IGIC %", "IPSI %") is read by the screen from
   `tax.settings.get` (`tax_kind`, with `useTaxKind()` of Taxes), the only source:
-  `invoice.invoice.line_defaults` only gives the general rate and does not repeat the tax (round
-  2026-10-17 of PLAN-HUB). What has already been issued is labelled by what it declared (the tax of its
+  `invoice.invoice.line_defaults` only gives the general rate and does not repeat the tax. What has already been issued is labelled by what it declared (the tax of its
   breakdown; "Tax %" if it mixes), never by today's territory: the same rule as the Sales tax figure
   (SALE-F28), which says the tax of the period's sales, "Taxes" if they mix, and the territory's only
   without sales.

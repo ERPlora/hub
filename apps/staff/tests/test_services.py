@@ -1136,7 +1136,7 @@ def test_approving_over_another_approved_absence_is_refused():
 
 
 def test_whoever_approves_before_their_person_exists_signs_it_all_the_same(django_user_model):
-    # A session opened before the business's database knew them: their first write makes their person (W10).
+    # A session opened before the business's database knew them: their first write makes their person.
     boss = django_user_model.objects.create_user(username="saas:9", first_name="Marta")
     leave = make_time_off(make_member(), "2026-10-12")
 
@@ -1338,7 +1338,7 @@ def test_a_refused_command_notifies_nobody(listen):
     assert received(on_b, timeout=QUIET) == []
 
 
-# staff.member.bulk_create: the row's own problems, and the pay permission (review of 2026-10-14)
+# staff.member.bulk_create: the row's own problems, and the pay permission
 
 
 def test_a_badly_written_date_skips_only_its_row():

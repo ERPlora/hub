@@ -6,8 +6,7 @@ and its hand-over to erplora.com (door 8, after the COMMIT, with no transaction 
 erplora.com uploads it to Meta as the header's sample before registering the template. Meta asks for the sample on
 every review, so an edit and «Send to Meta again» carry it too, with the same key. The file takes the plan's space
 for files as Files counts it, and past it is refused as Files refuses. Sending such a template is F33
-(``test_template_send_header_file.py``). Cases of the old product (gh:hub#2232, gh:saas#2377) and «Meta did not
-answer» never blamed on ERPlora (gh:hub#2731).
+(``test_template_send_header_file.py``). «Meta did not answer» is never blamed on ERPlora.
 """
 
 import base64
@@ -116,8 +115,8 @@ def test_a_photo_for_the_header_is_kept_in_the_hubs_file_store(hub_files):
 
 
 def test_the_people_of_the_hub_open_the_file_and_a_visitor_never_does(client):
-    # FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES: the inbox declares its samples' folder for the hub's
-    # sessions (``members_media``), so the template's sheet can show the photo; a visitor gets what a missing file gets.
+    # The inbox declares its samples' folder for the hub's sessions (``members_media``), so the template's sheet can
+    # show the photo; a visitor gets what a missing file gets.
     from django.contrib.auth import get_user_model
 
     from base.middleware import SESSION_HOST_KEY
@@ -156,9 +155,9 @@ def sign_in(client, host: str = "a") -> None:
 
 
 def test_the_file_says_where_its_hubs_people_open_it_and_nobody_else_does(client):
-    # FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL: the sheet shows the header's photo from the
-    # address the file comes with, under the inbox's members' folder of /p/media/: a session of its hub opens it, a
-    # visitor gets a 404, and another business's file names its own hub, which this host never serves.
+    # The sheet shows the header's photo from the address the file comes with, under the inbox's members' folder of
+    # /p/media/: a session of its hub opens it, a visitor gets a 404, and another business's file names its own hub,
+    # which this host never serves.
     out = upload()
     hub = Hub.objects.get(slug="a")
     assert out.url.startswith(f"/p/media/{hub.id.hex}/whatsapp_inbox/samples/") and out.url.endswith(".jpg")
@@ -318,8 +317,8 @@ def test_without_a_space_in_its_plan_another_business_keeps_its_file(hub_files):
 
 
 def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_inbox_s(hub_files, monkeypatch):
-    # FIX-HUB-WHATSAPP-INBOX-PLAN-SPACE-CHECK-STILL-COPIED: the inbox copied Files' check and its sentence, so a change
-    # of the limit or of what it says was to be made here too. Now the header's file asks base's own check.
+    # The header's file asks base's own check, never a copy of Files' check and its sentence that a change of the limit
+    # or of what it says would miss.
     asked = []
     monkeypatch.setattr(
         files, "refuse_past_the_space", lambda store, hub, size, *, limit_bytes: asked.append((hub, size, limit_bytes))
@@ -507,7 +506,7 @@ def test_send_to_meta_again_carries_the_same_file_with_the_same_key(delivered):
 
 @respx.mock
 def test_meta_not_answering_the_upload_is_said_as_metas_never_erploras(delivered):
-    """gh:hub#2731: erplora.com's 409 ``whatsapp.meta_unreachable`` while uploading the sample reads as Meta's."""
+    """erplora.com's 409 ``whatsapp.meta_unreachable`` while uploading the sample reads as Meta's."""
     connect()
     registering(status=409, body={"error": {"code": "whatsapp.meta_unreachable", "message": "Meta could not be reached."}})
     sample = upload()
@@ -602,7 +601,7 @@ def test_metas_list_with_the_same_photo_header_keeps_the_file(delivered):
 # ── Never another business's file ───────────────────────────────────────────────────────────────
 
 
-# ── The file, read by its id (the assistant's card names it so: FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED) ──────
+# ── The file, read by its id (the assistant's card names it so) ──────
 
 
 def detail(sample_id, ctx=None):

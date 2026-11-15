@@ -1,10 +1,10 @@
-"""Django admin of the website app, read-mostly (round 12, PLAN §17), for the staff only on hubs.erplora.com.
+"""Django admin of the website app, read-mostly, for the staff only on hubs.erplora.com.
 
 The staff see each hub's site (its draft and what is published) and its images, with the hub each row belongs to
-(``hub_id``: in phase 1 every hub's rows share the tables), and may take a site offline (``is_live``:
-``/`` jumps to the team's sign-in again), for instance for content that must not be online. Nothing else is edited
-here: the content goes through the editor's operations, which validate it and write its images' URLs; a row is never
-added or deleted (the site is created by its first save, an image by its upload).
+(``hub_id``), and may take a site offline (``is_live``: ``/`` jumps to the team's sign-in again), for instance for
+content that must not be online. Nothing else is edited here: the content goes through the editor's operations, which
+validate it and write its images' URLs; a row is never added or deleted (the site is created by its first save, an image
+by its upload).
 """
 
 from django.contrib import admin

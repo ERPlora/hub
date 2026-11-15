@@ -122,7 +122,7 @@ describe('RulesPage: the live list', () => {
     const s = await setup();
     expect(s.params()).toEqual([{ status: 'active', sort: 'tax_category_key', dir: 'asc', limit: 50, offset: 0 }]);
     expect(s.find('tax-rules-loading').exists()).toBe(true);
-    // pm#611: while it loads, the list never counts «0 rules» under the spinner.
+    // While it loads, the list never counts «0 rules» under the spinner.
     expect(s.wrapper.text()).not.toMatch(/\b0 rules?\b/);
     await s.show(PAGE);
     expect(s.find('tax-rules-loading').exists()).toBe(false);
@@ -251,7 +251,6 @@ describe('RulesPage: Status (TAX-F03, F08)', () => {
 
 describe('RulesPage: the filters (TAX-F03; the jurisdiction, TAX-F11)', () => {
   it('offers Category (searched), Country (the business’s), Region, %, Type and Qualification on their columns, then Regime', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     await s.showCountries(['ES', 'PT']);
@@ -473,7 +472,7 @@ describe('RulesPage: the rest', () => {
   });
 });
 
-describe('RulesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('RulesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

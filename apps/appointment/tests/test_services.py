@@ -1,10 +1,5 @@
 """Write operations of the appointment app (one appointment at a time, blocks, settings and the platform's
 reactions): what each one writes, what it refuses, and that a refusal leaves no trace.
-
-Cases from the current product's tests (`create_overlap`, `cancel`, `reschedule*`, `history_trail`,
-`appointment_update_details`, `appointment_phone_e164`, `command_chains`, `auto_confirm`, `settings*`,
-`sale_conversion`, `customer_merge`, `customer_erasure`) and its WORKFLOW; the market decisions of the
-WORKBOOK («Cambios frente al producto actual») where they differ.
 """
 
 import datetime as dt
@@ -223,11 +218,10 @@ def test_the_customer_never_books_on_top_of_another_appointment(salon):
     )
 
 
-# gh:appointments#177, #180 · gh:hub#2113 · gh:hub#1623 — the front desk's exceptions (a time already gone,
-# inside the minimum notice, «book anyway» on an overlap, cancelling outside the policy) exist because a
-# person is looking at the agenda. Only a person (a user account) gets them: an automation — a flow's step,
-# the platform itself, an anonymous caller, any kind still to come — is judged as the customer, whatever
-# source it sends, so a message cannot talk it into the front desk's door.
+# The front desk's exceptions (a time already gone, inside the minimum notice, «book anyway» on an overlap,
+# cancelling outside the policy) exist because a person is looking at the agenda. Only a person (a user account)
+# gets them: an automation — a flow's step, the platform itself, an anonymous caller, any kind still to come — is
+# judged as the customer, whatever source it sends, so a message cannot talk it into the front desk's door.
 AUTOMATIONS = ["flow_run:0190a1b2", "system", None]
 
 
@@ -283,7 +277,7 @@ def test_an_automation_moves_and_books_a_batch_by_the_customers_rules(salon, act
             actor=actor,
         ),
     )
-    # gh:appointments#156 — the front desk writes down the hour she was really seen, even one already gone.
+    # The front desk writes down the hour she was really seen, even one already gone.
     moved = run("appointment.appointment.reschedule", {"id": str(out.id), "start": yesterday})
     assert moved.start == at(timezone.localdate() - dt.timedelta(days=1), "10:00")
 
@@ -492,7 +486,7 @@ def test_an_employee_books_for_themselves_only(salon, make_user):
         op(ctx, op.input.model_validate({**data, "staff_id": str(salon.ana.id)}))
 
 
-# FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL (APPOINTMENT-F01, APPOINTMENT-F04): a caller that is not a person
+# APPOINTMENT-F01, APPOINTMENT-F04: a caller that is not a person
 # has no staff record, so «their own» appointments would be nobody's and what it was granted would never work. It
 # takes the whole team's instead — as the customer, who books with any professional — and is judged by her rules. A
 # person keeps «their own» (above), and nothing that was not granted is lent.
@@ -597,7 +591,7 @@ def test_a_batch_books_every_time_or_none(salon):
 
 
 def test_every_booking_tells_the_same_created_event_one_per_appointment(salon):
-    # gh:appointments#174, #138 — an automation listening to «appointment created» works the same for a
+    # An automation listening to «appointment created» works the same for a
     # single booking, a batch and a series, and hears every appointment of a batch or a series.
     book(salon, "10:00")
     batch = [wall(MONDAY + dt.timedelta(weeks=n), "12:00") for n in range(2)]

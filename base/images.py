@@ -1,4 +1,4 @@
-"""The image of a row an app sells (round 2026-10-30, «blueprints con imágenes»): what Inventory, Services and Combos
+"""The image of a row an app sells: what Inventory, Services and Combos
 share to show a product, a service or a set menu on the till, in its form and in its list.
 
 A row keeps one reference, never a URL (a ``.blueprint.zip`` never changes; a URL baked into it rots):
@@ -124,6 +124,21 @@ def check(ctx: OperationContext, reference: str, *, field: str = "image") -> Non
             raise _unknown(str(IMAGE_UNKNOWN), field)
 
 
+def from_copy(ctx: OperationContext, reference: str) -> str:
+    """Of the image a row showed in a separate copy of its business, what comes back with it when it is recovered: one
+    of the library, unless the library says it no longer has it; never a photo of its own, which went with the row (a
+    copy is of the database, not of the files). While the library cannot be read it comes back as the copy had it:
+    the row is never left out for it, the library never renames an image, and the screens show the initials of one
+    they cannot load."""
+    try:
+        check(ctx, reference)
+    except InvalidPayload:
+        return ""
+    except OperationError:  # the library cannot be read now (503 base.image_library_unavailable)
+        return reference
+    return reference
+
+
 def _in_library(ctx: OperationContext, reference: str) -> bool:
     from base.queries import image_library
 
@@ -219,7 +234,7 @@ def let_go(ctx: OperationContext, reference: str) -> None:
     if name is None:
         return
     key = f"{hub_prefix(hub_id(ctx.scope))}/{name}"
-    # On the operation's own transaction (phase 2: the hub's database), never ``default``'s, where it would run at once.
+    # On the operation's own transaction (the hub's database), never ``default``'s, where it would run at once.
     on_commit(_deleter(key))
 
 

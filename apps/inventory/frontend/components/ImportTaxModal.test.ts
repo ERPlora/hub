@@ -107,8 +107,8 @@ describe('ImportTaxModal: Android Back with unsaved changes (hub#1046, BASE-F05)
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const unresolved = [{ text: 'Vino', choice: choice('create', 'Vino') }];
     const s = await setup(unresolved);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.el('inventory-import-tax'),
       change: async () => {
         await s.wrapper.setProps({ unresolved: [{ text: 'Vino', choice: { ...choice('create', 'Vino'), newKey: 'drinks.wine' } }] });

@@ -1,5 +1,5 @@
 """ATTENDANCE-F05 as the worker runs it: ``attendance.review_stale`` through ``base.scheduler`` every quarter
-of an hour, as the system on the worker's scope (phase 1: one scope, the days are shared). A forgotten day
+of an hour, as the system in the scope of the hub the worker is running. A forgotten day
 is flagged with its event before anybody clocks in again; the next pass, with nothing new, flags nothing.
 """
 

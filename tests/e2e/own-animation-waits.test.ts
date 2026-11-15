@@ -1,8 +1,9 @@
-// flow: e2e-capture — FIX of the e2e harness (FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED)
+// @vitest-environment node
+// flow: e2e-capture — the e2e harness's one wait for «nothing moves»
 // Every wait for «nothing moves» in the e2e goes through the one detector of helpers.ts (`settled`, `untilStill`,
 // `movingInPage`), which asks every open shadow root too. `document.getAnimations()` leaves shadow roots out, and Ionic
-// animates its toasts, dialogs and popovers there: the specs that asked for animations themselves let a toast still
-// entering pass for still (the FIX-HUB-*-E2E-WAIT-BLIND-TO-SHADOW-ROOTS family). Their guardrails (`<app>-wait.test.ts`)
+// animates its toasts, dialogs and popovers there: a spec that asks for animations itself lets a toast still
+// entering pass for still. The per-app guardrails (`<app>-wait.test.ts`)
 // keep the copies out of their own app's files; this one keeps them out of every file of the e2e, as a ratchet:
 // `own-animation-waits.json` holds, for each file that still asks for animations itself, how many times; a file can only
 // lose them (and then its count goes down, or its line away), never gain them, and a new file has none.
@@ -14,6 +15,9 @@ import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { NO_CLOCK } from '../../vitest.load';
+import { readTexts } from '../../vitest.offload';
 
 // The real reads, watched: the e2e's files are read (and parsed) once per run (see the warm-up).
 vi.mock('node:fs', async (importOriginal) => {
@@ -91,8 +95,8 @@ const scans = new Map<string, Promise<Record<string, number>>>();
 
 /**
  * Each file under `dir` (the e2e's folder) that reaches for `getAnimations`, and how many times: its files read at
- * once and each parsed once per run. With the machine loaded a file's first open waits on its own, and the scan read
- * and parsed the 273 files of the e2e again in each test: 22 s against Vitest's 5 s beside `pnpm test` (2026-10-30).
+ * once and each parsed once per run. With the machine loaded a file's first open waits on its own, and reading and
+ * parsing every file of the e2e again in each test outlasts Vitest's 5 s beside `pnpm test`.
  */
 function readsByFile(dir = E2E_DIR): Promise<Record<string, number>> {
   let scan = scans.get(dir);
@@ -102,7 +106,7 @@ function readsByFile(dir = E2E_DIR): Promise<Record<string, number>> {
 
 async function scanFolder(dir: string): Promise<Record<string, number>> {
   const names = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(scanned);
-  const sources = await Promise.all(names.map((name) => readFile(join(dir, name), 'utf8')));
+  const sources = await readTexts(names.map((name) => join(dir, name)));
   const found: Record<string, number> = {};
   names.forEach((name, index) => {
     const reads = animationReads(sources[index], name);
@@ -128,11 +132,12 @@ function staleInTheRatchet(found: Record<string, number>): string[] {
 }
 
 describe('the e2e waits for «nothing moves» with the one detector of helpers.ts', () => {
-  // The e2e's folder, scanned once here with the limit of the guardrails that read a whole tree (60 s, tsconfig.test.ts);
-  // each test keeps Vitest's 5 s for its own work.
+  // The e2e's folder, scanned once here without a clock (hub#1292): a read of a file of the repo ends, as late as the
+  // machine makes it, which no clock in seconds tells from one that never does; what could still not end, a wait
+  // nobody settles, only the end of the run's job cuts. Each test keeps Vitest's own budget for its own work.
   beforeAll(async () => {
     await readsByFile();
-  }, 60_000);
+  }, NO_CLOCK);
 
   it('reads and parses each file of the e2e once per run: the tests take the warm-up’s scan', async () => {
     const before = filesRead();

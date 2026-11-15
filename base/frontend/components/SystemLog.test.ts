@@ -1,7 +1,3 @@
-// System › Logs (BASE-G90, G24; the old hub's SystemPage `#logs`, HUB_SHELL-F144), for who runs the business: the live
-// `base.event.list` — the last 50 events between the hub's apps — in a table of Time, Level and Event (its name, the
-// app that recorded it and what happened to it, in the person's language; never its content), searchable, filtered by
-// level and paged by 20. No events says so in plain words; a failed read says so, with «Retry».
 import { DataTable } from '@erplora/ui/components';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Component } from 'vue';

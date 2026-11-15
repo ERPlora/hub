@@ -1,9 +1,6 @@
-"""The reads of the kitchen app: the board, what is left to cook, the tickets, a check's tickets, the
-stations, the routing, the settings and the history.
-
-Phase 1 has no relay: a round Sales fired shows up on every read (a ticket «not saved yet», with the
-number it will have), and what Sales did after (a line voided, the check voided or charged) changes the
-state read, without writing (WORKBOOK «A qué reacciona»). Sales and Inventory are the real apps.
+"""Until the relay's reaction saves it, a round Sales fired shows up on every read (a ticket «not saved yet», with the
+number it will have), and what Sales did after (a line voided, the check voided or charged) changes the state read,
+without writing (WORKBOOK «A qué reacciona»). Sales and Inventory are the real apps.
 """
 
 import datetime as dt
@@ -16,6 +13,7 @@ from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.kitchen.models import Ticket
+from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
@@ -105,7 +103,7 @@ def test_each_send_is_a_round_with_the_next_number_of_the_day(clock, product):
 
 
 def test_the_number_of_the_day_is_the_business_day_in_madrid(clock, product):
-    # 23:30 UTC on the 14th is 01:30 on the 15th in Madrid: the old module dated it the 14th.
+    # 23:30 UTC on the 14th is 01:30 on the 15th in Madrid: the 15th, never the UTC day.
     clock.now = dt.datetime(2026, 10, 14, 23, 30, tzinfo=dt.UTC)
     fired_round(product, "Burger")
     assert board().cooking[0].number == "20261015-0001"
@@ -134,8 +132,8 @@ def test_what_was_fired_before_the_kitchen_existed_never_shows(clock, product):
 def test_a_round_never_saved_of_a_check_closed_over_a_day_ago_is_no_longer_read(
     clock, product
 ):
-    # Phase 1 reads the rounds it has not saved from Sales on every read: only the ones of checks still
-    # open or closed within the last day, so a kitchen that never writes does not read a growing past.
+    # The rounds not saved yet are read from Sales on every read: only the ones of checks still open or closed within
+    # the last day, so a kitchen that never writes does not read a growing past.
     from apps.kitchen.models import KitchenSettings
 
     KitchenSettings.objects.update(works_from_screen=False, screen_changed_at=clock.now)
@@ -426,7 +424,7 @@ def test_merging_two_checks_brings_the_rounds_along(clock, product):
 def test_a_round_not_saved_yet_reads_the_title_of_the_check_it_is_on_now(
     clock, product
 ):
-    # Phase 1: Sales keeps no trace of the check a line was fired from; once saved, the label stays.
+    # Sales keeps no trace of the check a line was fired from; once saved, the label stays.
     first, _ = fired_round(product, "Burger", label="Table 5")
     clock.advance(seconds=1)
     second, _ = fired_round(product, "Soup", label="Table 6")
@@ -683,8 +681,8 @@ def test_the_history_is_newest_first_with_who_and_which_dish(clock, product):
 
 
 def test_the_history_pages_and_finds_a_reason_by_its_words(clock, product):
-    """KITCHEN-F25: ``limit`` and ``offset`` page it newest first (kitchen#1); the search finds the words of a
-    reason, in any case (kitchen#113)."""
+    """KITCHEN-F25: ``limit`` and ``offset`` page it newest first; the search finds the words of a reason, in any
+    case."""
     _, lines = fired_round(product, "Burger", label="Table 4")
     clock.advance(minutes=1)
     run("kitchen.ticket.cancel", {"ticket_id": str(lines[0].id), "reason": "Customer left"})
@@ -715,14 +713,41 @@ def test_the_history_names_who_did_it_by_their_name_never_their_session_id(clock
     ]
 
 
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it("luis", "luis"))
+def test_the_history_says_whether_a_person_or_the_platform_did_it(product, caller, who, by_platform):
+    """KITCHEN-F25: a person and an API key are named; the platform's own marks are kept, and the entry says the
+    platform did it, as what the kitchen does by itself (a round received)."""
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor=caller))
+
+    rows = run("kitchen.log.list", {}).rows
+
+    assert [(r.action, r.actor, r.by_platform) for r in rows] == [
+        ("started", who, by_platform),
+        ("received", "", True),
+    ]
+
+
+def test_a_person_named_like_a_mark_of_the_platform_is_still_a_person(product, django_user_model):
+    """KITCHEN-F25: whether the platform did it is read from who the entry saved, not from the name shown: someone
+    whose name reads as the system's mark is named, not taken for the platform."""
+    named_system = django_user_model.objects.create_user("saas:78", email="sys@example.com", first_name="system")
+    _, lines = fired_round(product, "Burger", label="Table 4")
+    run("kitchen.ticket.start", {"ticket_id": str(lines[0].id)}, ctx_for(actor=named_system))
+
+    started = run("kitchen.log.list", {}).rows[0]
+
+    assert (started.action, started.actor, started.by_platform) == ("started", "system", False)
+
+
 def test_the_history_needs_its_permission():
     with pytest.raises(PermissionDenied):
         run("kitchen.log.list", {}, ctx_for(permissions={"kitchen.view_ticket"}))
 
 
 def test_ties_go_by_id_in_the_lists_own_direction():
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
-    pages neither repeat nor lose rows."""
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its pages neither repeat nor
+    lose rows."""
     by_id = sorted(
         Ticket.objects.create(
             number=f"20261014-000{n}",

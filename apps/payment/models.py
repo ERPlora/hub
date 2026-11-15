@@ -1,15 +1,10 @@
-"""Models of the payment app: the accounts the business pays from, its outgoing payments and the
-counter that numbers them by day.
-
-- ``PaymentMethod`` is where the money leaves from (a bank account, the company card, the cash
+"""- ``PaymentMethod`` is where the money leaves from (a bank account, the company card, the cash
   drawer), never how a customer pays: that is the sale app's ``PaymentMethod``. It is deactivated,
   never deleted, and its name is unique whatever the case (the assistant names it).
 - ``Payment`` is one outgoing payment, in the minor unit of its currency (> 0), with its reference
   ``PAY-YYYYMMDD-NNNN`` and its ladder: draft → approved → sent → completed, or cancelled.
 - ``PaymentCounter`` holds the last number given on a business day; services.py raises it with
   ``UPDATE … RETURNING`` in the transaction of the payment (never a sequence).
-
-Phase 1 has no tenancy (like ``apps.demo``): phase 2 moves these tables to each hub's database.
 """
 
 from django.db import models

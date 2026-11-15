@@ -77,7 +77,7 @@ describe('the document', () => {
 
   it('what is sent to the server', () => {
     const doc = { ...emptyDocument(), name: ' Weekly ', trigger: { kind: 'schedule' as const, every: 'day' as const, time: '09:00' }, steps: [CMD] };
-    // The switch is `flow.flow.set_enabled`'s alone (review 2026-10-15, item 3).
+    // The switch is `flow.flow.set_enabled`'s alone.
     expect(toPayload(doc)).toEqual({ name: 'Weekly', trigger: { kind: 'schedule', every: 'day', time: '09:00' }, steps: [CMD] });
   });
 });

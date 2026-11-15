@@ -245,7 +245,7 @@ describe('CommissionsPage: the business\'s currency (staff-business-currency)', 
   });
 });
 
-describe('CommissionsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('CommissionsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them', async () => {
     const s = await setup();
     await s.show(REPORT);

@@ -378,7 +378,7 @@ def test_the_sample_is_the_newest_event_of_this_business():
 
 
 def test_the_sample_of_a_real_customer_carries_no_personal_data():
-    # hub#826, hub#2525: the example beside each datum is what the event brought, and an event brings
+    # The example beside each datum is what the event brought, and an event brings
     # ids, never a customer's name, city or notes (the real Customers app, not a hand-made outbox row).
     created = run(
         "customer.customer.create",
@@ -535,7 +535,7 @@ def test_the_system_context_reads_everything():
     assert run("flow.flow.list", {}, system_context(A)).total == 1
 
 
-# What needs a person in front is never offered (review 2026-10-15, item 1)
+# What needs a person in front is never offered
 
 
 def test_the_catalog_never_offers_an_action_that_needs_a_person():
@@ -649,7 +649,7 @@ def test_only_whoever_may_see_automations_reads_the_recipes():
 
 @pytest.mark.parametrize("column", ["updated_at", "name"])
 def test_ties_go_by_id_in_the_lists_own_direction(column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows."""
     flows = [make_flow("Same") for _ in range(4)]
     Flow.objects.update(updated_at=timezone.now())

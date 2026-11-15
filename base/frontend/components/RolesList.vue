@@ -1,11 +1,8 @@
 <script setup lang="ts">
-// Employees › Roles (BASE-G143, G144; the old hub's RolesPanel): the live `base.role.list` — erplora.com's four roles,
-// from the top — with where each comes from («Basic»: the business's own, always available), how many people have it
-// and how many permissions of the apps it gives. A role is given when a person is invited on erplora.com, and changed
-// there (HUBS-F24, F26): who runs the business opens its «Members». No module brings a role of its own today, so there is
-// nothing to turn on or off (the old switch of an app's role). A catalogue that cannot be read says so. The link leaves
-// the Hub by `openExternalLink` (in the installed app, the system browser: gh:hub#439) and, a way to erplora.com's
-// panel, never in the Google Play copy (`managementOffered`, gh:hub#1897).
+// Employees › Roles: erplora.com's four roles. A role is given when a person is invited on erplora.com and changed
+// there, so this list is read only. No module brings a role of its own, so there is nothing to turn on or off. The
+// link leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered
+// in the Google Play copy (`managementOffered`).
 import { DataTable, type DataTableColumn, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { openExternalLink, useSession } from '@erplora/ui/shell';

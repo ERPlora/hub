@@ -144,7 +144,8 @@ AN_ENTRY = names("reservation.waitlist.get", name=("label",))
 A_SLOT = names("reservation.time_slot.get", name=("label",))
 A_BLOCK = names("reservation.blocked_date.get", name=("label",))
 A_CUSTOMER = names("customer.customer.detail")
-A_TABLE = names("table.table.get", name=("number",))
+#: A table with its zone («5 (Terraza)»), as Tables names it: its number repeats across zones (hub#550).
+A_TABLE = names("table.table.get", name=("label",))
 D_LABEL = "The words it is named by, in the caller's language, as the book's screens say it: «{example}»."
 D_TABLE = "The table's number, e.g. «5», when its id is not known."
 D_ZONE = "The table's zone, when the same number is in several zones."

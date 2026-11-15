@@ -103,7 +103,7 @@ def test_staff_is_a_free_module_of_the_people_group():
 
 
 def test_staff_has_the_store_metadata_and_belongs_to_the_hair_salon():
-    # Round 16 (PLAN §21): a hair salon needs its team from sign-up; a restaurant may go without it.
+    # A hair salon needs its team from sign-up; a restaurant may go without it.
     config = staff()
     assert 0 < len(str(config.summary)) <= 120
     assert "\n" not in str(config.summary)
@@ -173,8 +173,8 @@ def test_the_operations_of_the_app():
     assert {name for name, op in operations.items() if op.kind == "command"} == COMMANDS
 
 
-#: The reads that are no assistant tool: the check of a new member's role before its card (hub#538), and what names a
-#: role and a time-off request on the card of a write (hub#495).
+#: The reads that are no assistant tool: the check of a new member's role before its card, and what names a role and a
+#: time-off request on the card of a write.
 INTERNAL_READS = {"staff.role.resolve", "staff.role.detail", "staff.time_off.get"}
 
 
@@ -210,8 +210,7 @@ def test_every_input_field_is_described_for_the_assistant():
     assert missing == []
 
 
-# The Home's panels (PLAN-HUB round 2026-10-21; FIX-STAFF-SETUP-HOOKS): the old module's module.json `widgets` (it had
-# no `setup` nor `bell`), on the queries Staff's own figures already read (STAFF-F20, STAFF-F23).
+# The Home's panels, on the queries Staff's own figures already read (STAFF-F20, STAFF-F23).
 
 PANELS = ["headcount", "on_leave_today", "pending_time_off", "time_off_today", "by_role"]
 #: What re-runs each query, as live.py says it: the panel follows the screen that reads the same figures.
@@ -286,7 +285,7 @@ def test_the_homes_panels_are_the_old_modules_five():
             False,
             "staff.view",
             {"sort": "-member_count", "limit": 10},
-            # Each bar in its role's colour, as the old module's `map.color` (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR).
+            # Each bar in its role's colour, as the old module's `map.color`.
             {"label": "name", "value": "member_count", "color": "color"},
             {"valueFormat": "number"},
         ),
@@ -307,7 +306,7 @@ def test_each_panel_maps_fields_its_query_gives_and_takes_its_params():
 
 
 def test_a_kpi_says_its_name_once():
-    # gh:hub#1105: the old KPIs painted their header twice (the title and options.label with its icon).
+    # Never the header twice (the title and options.label with its icon).
     for panel in staff().widgets:
         if panel.kind in {"kpi", "stat"}:
             assert not {"label", "icon"} & set(panel.options), panel.key

@@ -1,7 +1,7 @@
-"""The assistant's card for a write of reservation (FIX-HUB-RESERVATION-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is
-hub#258): in Spanish, every datum it sends by the name the Reservations screens give it, never by the title pydantic
-makes up from the field («Absorbed Id», «No Table», «Overbook»). The card is base's (``base.assistant.card``); the names
-are reservation's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of reservation (base's half is hub#258): in Spanish, every datum it sends by the
+name the Reservations screens give it, never by the title pydantic makes up from the field («Absorbed Id», «No Table»,
+«Overbook»). The card is base's (``base.assistant.card``); the names are reservation's: the titles of its schemas and
+the ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import datetime as dt
 import json
@@ -128,8 +128,8 @@ def test_the_card_names_where_a_reservation_came_from_and_the_email_rule_as_rese
 @pytest.mark.django_db
 def test_the_card_names_the_customer_a_channel_acts_for():
     """WhatsApp changing or cancelling the guest's own reservation: on behalf of her customer card, said by its name.
-    (Since hub#416 a card leaves out a record it cannot name — a datum that is no id of any card, or an automation's
-    card, which reads nothing —, so the card is asked as the person who confirms, about a card that exists.)"""
+    (A card leaves out a record it cannot name — a datum that is no id of any card, or an automation's card, which
+    reads nothing —, so the card is asked as the person who confirms, about a card that exists.)"""
     ana = make_customer("Ana García")
     for name in ("reservation.reservation.cancel", "reservation.reservation.update"):
         for language, label in (("es", "En nombre del cliente"), ("en", "On behalf of the customer")):
@@ -137,10 +137,10 @@ def test_the_card_names_the_customer_a_channel_acts_for():
             assert said(card) == [(label, "Ana García")], (name, language)
 
 
-# ── Each record a write names by its id, as its screen names it (FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS) ──
-# Since hub#416 the card leaves out every id its schema does not mark with the read that names its record (before, the
-# UUID showed). Reservation marks each one with a read by id of its own or of the app it requires (Customers, Tables),
-# run as the person who confirms: a record they may not read, or of another business, is left out — never by its id.
+# ── Each record a write names by its id, as its screen names it ──
+# The card leaves out every id its schema does not mark with the read that names its record (hub#416). Reservation
+# marks each one with a read by id of its own or of the app it requires (Customers, Tables), run as the person who
+# confirms: a record they may not read, or of another business, is left out — never by its id.
 
 #: Thursday 15 October 2026 at 21:00 as each language writes a day and a time on the card (base's CLDR words).
 WHEN = {"es": "15 oct 2026 · 21:00", "en": "Oct 15, 2026 · 9:00 PM"}
@@ -164,11 +164,13 @@ def card_for(name: str, arguments: dict, language: str, ctx=None) -> dict:
     return assistant.card(get(name), arguments, language, ctx=ctx or ctx_for(language=language))
 
 
-# RESERVATION-F06 «Tomar una reserva a mano», asked to the assistant: the card says for whom and at which table.
+# RESERVATION-F06 «Tomar una reserva a mano», asked to the assistant: the card says for whom and at which table, the
+# table with its zone («5 (Terraza)») as Tables names it, since its number repeats across zones (hub#550).
 @pytest.mark.django_db
 @pytest.mark.parametrize(("language", "customer", "table"), [("es", "Cliente", "Mesa"), ("en", "Customer", "Table")])
 def test_booking_a_table_names_the_customer_and_the_table_never_by_their_ids(language, customer, table):
     ana = make_customer("Ana García")
+    make_table("5", make_zone("Sala"))
     five = make_table("5", make_zone("Terraza"))
     arguments = {
         "customer_id": str(ana.id),
@@ -179,19 +181,25 @@ def test_booking_a_table_names_the_customer_and_the_table_never_by_their_ids(lan
     }
     card = card_for("reservation.reservation.create", arguments, language)
     named = [(label, value) for label, value in said(card) if label in (customer, table)]
-    assert named == [(customer, "Ana García"), (table, "5")]
+    assert named == [(customer, "Ana García"), (table, "5 (Terraza)")]
     assert not by_an_id(card)
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_changing_a_reservation_names_it_its_new_table_and_the_customer_it_is_changed_for(language):
+    """RESERVATION-F08: the new table with its zone, as Tables names it; table 7 of the room is another one (hub#550)."""
     ana = make_customer("Ana García")
     booked = make_reservation(customer_id=ana.id)
-    seven = make_table("7")
+    make_table("7", make_zone("Sala"))
+    seven = make_table("7", make_zone("Terraza"))
     arguments = {"id": str(booked.id), "table_id": str(seven.id), "on_behalf_of": str(ana.id)}
     card = card_for("reservation.reservation.update", arguments, language)
-    assert values(card) == {"id": f"Ana García · {WHEN[language]}", "table_id": "7", "on_behalf_of": "Ana García"}
+    assert values(card) == {
+        "id": f"Ana García · {WHEN[language]}",
+        "table_id": "7 (Terraza)",
+        "on_behalf_of": "Ana García",
+    }
     assert not by_an_id(card)
 
 
@@ -278,11 +286,11 @@ def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     """A host who books tables but may not read the customers' cards: the card names the table and leaves the customer
     out — as Customers would not show them that card."""
     ana = make_customer("Ana García")
-    five = make_table("5")
+    five = make_table("5", make_zone("Terraza"))
     host = ctx_for(language="es", permissions={"reservation.add_reservation", "table.view_table"})
     arguments = {"customer_id": str(ana.id), "date": TOMORROW.isoformat(), "time": "21:00", "party_size": 2}
     card = card_for("reservation.reservation.create", {**arguments, "table_id": str(five.id)}, "es", ctx=host)
-    assert "customer_id" not in values(card) and values(card)["table_id"] == "5"
+    assert "customer_id" not in values(card) and values(card)["table_id"] == "5 (Terraza)"
     assert not by_an_id(card)
 
 

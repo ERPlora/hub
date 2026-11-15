@@ -1,12 +1,11 @@
 <script setup lang="ts">
-// Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20, F29), the
-// old `erp-inventory-products`: the live `inventory.product.list` in a server-side DataTable — Name, SKU,
-// Price, Stock («—» without stock control) and Status (a switch, «Yes»/«No», or «Not configured ·
-// Missing tax category», which opens the form; «Sold out» beside it) —, search, sort, the filters behind
-// the table's funnel (name, SKU, price and stock ranges, status; the old table's), 50 a page. «+», import
-// and export CSV; per row the sheet, the stock dialogs (physical products), edit, «Mark sold out» / «Put
-// back on sale» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused row action (the
-// switch, delete, export) is said above the table: no dialog is open then.
+// Inventory → Products (WORKBOOK «Productos», INVENTORY-F01–F05, F08, F09, F11, F13–F15, F20, F29): the live
+// `inventory.product.list` in a server-side DataTable — Name, SKU, Price, Stock («—» without stock control) and Status
+// (a switch, «Yes»/«No», or «Not configured · Missing tax category», which opens the form; «Sold out» beside it) —,
+// search, sort, the filters behind the table's funnel (name, SKU, price and stock ranges, status), 50 a page. «+»,
+// import and export CSV; per row the sheet, the stock dialogs (physical products), edit, «Mark sold out» / «Put back on
+// sale» and delete; each only for whoever may. Writes come back through the stream; nothing here refetches. A refused
+// row action (the switch, delete, export) is said above the table: no dialog is open then.
 import {
   type DataTableAction,
   type DataTableActionEvent,
@@ -39,8 +38,8 @@ import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { useUnits } from '../composables/useUnits';
 import { saveTextFile } from '../lib/download';
-import { formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
-import { filterParams, filtersInUse, PRODUCT_STATUSES, type ProductStatus, type UnreadableEnd, unreadableEnds } from '../lib/productFilters';
+import { amountFilterErrors, formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
+import { filterParams, filtersInUse, PRICE_ENDS, PRODUCT_STATUSES, type ProductStatus, unreadableQuantities } from '../lib/productFilters';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
 /** `?status=` of a link (the till's «N articles cannot be sold» opens «unconfigured»). */
@@ -98,20 +97,12 @@ table.followResult(result);
 const rows = computed(() => result.value?.rows ?? []);
 const inactive = computed(() => error.value?.code === 'app_inactive');
 
-/** Why an end of a range cannot be read, as its field would say it. */
-function unreadableMessage({ name, problem }: UnreadableEnd): string {
-  if (problem === 'not_quantity') return t('inventory.common.noQuantity');
-  if (problem.reason === 'not_amount') return t('inventory.common.noAmount');
-  return t('inventory.common.ambiguousAmount', {
-    typed: (filters.value[name] ?? '').trim(),
-    grouped: formatMoney(problem.grouped, locale.value, business.value),
-    decimal: formatMoney(problem.decimal, locale.value, business.value),
-  });
-}
-/** Under each filter: an end it cannot read, else what the server refused (a 422 of the list). */
+/** Under each filter: an end it cannot read (a price, as every amount filter of the Hub says it: hub#1196; a stock
+ *  that is no quantity), else what the server refused (a 422 of the list). */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...(error.value?.fields ?? {}),
-  ...Object.fromEntries(unreadableEnds(filters.value, business.value).map((end) => [end.name, unreadableMessage(end)])),
+  ...amountFilterErrors(filters.value, PRICE_ENDS, { t, locale: locale.value, money: business.value }),
+  ...Object.fromEntries(unreadableQuantities(filters.value).map((name) => [name, t('inventory.common.noQuantity')])),
 }));
 /** A refused filter is said under it and the rows stay; any other failure replaces them. */
 const tableError = computed(() =>
@@ -416,8 +407,7 @@ async function exportFile(): Promise<void> {
         <span data-testid="inventory-product-stock">{{ row.tracks_stock ? formatQuantity(row.stock, locale) : '—' }}</span>
       </template>
       <template #status="{ row }">
-        <!-- The chip is the cell's own box, never inside one that clips: the table measures its whole width
-             (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED). -->
+        <!-- The chip is the cell's own box, never inside one that clips: the table measures its whole width. -->
         <ion-chip
           v-if="row.needs_tax_setup"
           color="warning"

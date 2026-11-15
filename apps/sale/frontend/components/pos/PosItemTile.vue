@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 import ItemImage from '../../../../../base/frontend/components/ItemImage.vue';
+import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 
 const props = withDefaults(
   defineProps<{
@@ -33,15 +34,21 @@ const props = withDefaults(
 
 const emit = defineEmits<{ pick: [] }>();
 const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') === true);
+// A tile that sells out or goes back on sale with the till open tells its native button too (Ionic only reads the
+// host's aria-disabled when it loads).
+const tile = useTemplateRef<{ $el: HTMLElement }>('tile');
+useNativeAriaDisabled(() => tile.value?.$el);
 </script>
 
 <template>
   <ion-button
+    ref="tile"
     class="pos-tile"
     :class="{ 'pos-tile--blocked': blocked, 'pos-tile--sold-out': soldOut }"
     fill="clear"
     :data-testid="testid"
     :aria-disabled="blocked || soldOut ? 'true' : undefined"
+    :data-aria-disabled="String(blocked || soldOut)"
     :aria-label="label"
     :title="label"
     @click="emit('pick')"
@@ -89,14 +96,16 @@ const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') 
 </template>
 
 <style scoped>
+/* In a grid that scrolls (a catalogue longer than the screen) a row is only as tall as the smallest its tiles may be.
+   With `min-height: auto` and nothing clipped on the tile itself, that smallest is the tile's whole content, never a
+   fixed height (Ionic's own is 3.1em). Its native button keeps the rounded clip. */
 .pos-tile {
   display: flex;
   flex-direction: column;
   height: auto;
-  min-height: 8.4rem;
+  min-height: auto;
   margin: 0;
   padding: 0;
-  overflow: hidden;
   font: inherit;
   text-align: left;
   text-transform: none;
@@ -126,11 +135,14 @@ const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') 
   text-align: left;
 }
 
+/* A tile in a row with a taller one fills the row: its photo stays at the top and its price at the bottom, in line with
+   the tiles beside it, instead of the button centring its content. */
 .pos-tile__content {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: stretch;
+  align-self: stretch;
   width: 100%;
   min-width: 0;
 }
@@ -227,6 +239,7 @@ const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') 
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-content: space-between;
   align-items: end;
   gap: 0.2rem 0.4rem;
   width: 100%;
@@ -290,20 +303,12 @@ const fromCatalog = computed(() => props.imageReference?.startsWith('catalog:') 
 }
 
 @media (max-width: 820px) {
-  .pos-tile {
-    min-height: 8rem;
-  }
-
   .pos-tile__price {
     font-size: 0.82rem;
   }
 }
 
 @media (max-width: 340px) {
-  .pos-tile {
-    min-height: 7.7rem;
-  }
-
   .pos-tile__thumb {
     height: 4.5rem;
   }

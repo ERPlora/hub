@@ -23,7 +23,7 @@ const t = useT();
 const locale = useLocale();
 const cancel = useCommand('printing.job.cancel');
 const reason = shallowRef('');
-useUnsavedFormOnOpen('printing-cancel-job', reason, open);
+const canDismiss = useUnsavedFormOnOpen('printing-cancel-job', reason, open);
 
 watch(
   open,
@@ -53,6 +53,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     role="alertdialog"
     phone-layout="card"

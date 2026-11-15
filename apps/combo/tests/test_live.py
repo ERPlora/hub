@@ -34,6 +34,8 @@ TREE = [
     events.OPTION_REORDERED,
     "inventory.product.updated",
     "inventory.product.deleted",
+    # A product recovered from a separate copy is the same one again (INVENTORY-F34): what showed it gone shows it back.
+    "inventory.product.restored",
 ]
 
 

@@ -3,7 +3,7 @@ session, end to end through the Hub's middleware.
 
 The page is rendered once per publication, language and deploy and kept (``website:home:…``); it carries no cookie,
 no nonce and a CSP of its own; the browser may keep it a minute. Without a live publication ``/`` jumps to the SaaS's
-login as before, and a session always gets the shell.
+login, and a session always gets the shell.
 """
 
 import re
@@ -223,8 +223,8 @@ def test_each_hub_shows_its_own_site_on_its_root(client):
 
 
 def test_with_the_module_off_in_the_hub_neither_the_root_nor_the_public_api_show_its_site(client, monkeypatch):
-    # The same guard on every public path: the module on in this hub (phase 1: every installed app,
-    # ``base.relay.active_apps``; phase 2: its activation) and a live publication of its own.
+    # The same guard on every public path: the module on in this hub (``base.relay.active_apps``) and a live
+    # publication of its own.
     publish()
     from base import relay
 

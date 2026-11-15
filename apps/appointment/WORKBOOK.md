@@ -6,10 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `appointment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
-> y páginas). Parte del `WORKFLOW.md` del módulo Citas del producto actual
-> (`modules-workspace/modules/appointments`, `origin/main` `73ab682`, v1.1.151) y de sus
-> `workflow/*.md`. Los números de flujo se conservan (`APPOINTMENTS-Fnn` → `APPOINTMENT-Fnn`). Lo que
-> cambia frente al producto actual lo dice «Cambios frente al producto actual», al final.
+> y páginas).
 
 ## Para qué sirve y para quién
 
@@ -37,6 +34,9 @@ Quién la usa:
   el bloqueo por su título, su día, su hora y su profesional («Bloqueo: Formación · lunes, 16 de
   noviembre de 2026 · 14:00 · Ana López»). Lo que quien pregunta no puede ver, o lo que ya no existe, no
   sale.
+  Por voz, un bloqueo se nombra por su título o su día («quita el bloqueo de la formación»: el asistente
+  lo busca entre los bloqueos desde hoy, sin preguntar la fecha) y una serie por su clienta («la cita
+  fija de Lucía», «la serie semanal de Lucía»).
 
 ## Referencia adoptada
 
@@ -48,7 +48,7 @@ Quién la usa:
 - **Google Calendar / RFC 5545**: editar una serie «solo esta cita» o «esta y las siguientes», nunca
   todas, y la serie conserva su hora de pared al cambiar la hora oficial.
 - **Mindbody/Booker**: el mostrador puede apuntar una cita que ya ha empezado.
-- Decisiones del producto actual que mandan aquí: el horario del negocio solo vive en Horarios, el
+- Decisiones que mandan aquí: el horario del negocio solo vive en Horarios, el
   cobro lo hace el TPV (Citas solo anota con qué venta se cobró), el reloj es siempre el del negocio y
   las series se editan con corte.
 
@@ -207,7 +207,6 @@ permite sobre ellas (reservar, mover, confirmar o editar) vale para las de cualq
 clienta reserva con quien quiera; lo que no se le permite, no lo hace (APPOINTMENT-F01 y F04).
 
 ### APPOINTMENT-F01 Reservar una cita desde la agenda
-<!-- origen: fi:modules/appointments#command-appointments-appointments-create-handler-wasm fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:appointments/workflow/agenda.md#appointments-f01 old:online_booking/WORKFLOW.md#online_booking-f01 qa:modules/appointments/chained-services qa:modules/appointments/create-appointment-without-overlap qa:modules/appointments/walk-in qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f03 wf:peluqueria-dia#rec_peluqueria-f06 -->
 Estado: hecho
 Actor: empleado (para sí), responsable, asistente
 Pantalla: Agenda
@@ -232,14 +231,16 @@ suelta, una del lote y una de la serie.
 Si falla: el motivo sale dentro del panel, sin perder lo tecleado: fuera del horario del negocio, el
 profesional no trabaja a esa hora, franja bloqueada, el profesional ya tiene una cita
 (`appointment.slot_taken`), demasiado lejos, la clienta, el servicio o el profesional no existen o no
-se pueden reservar. Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
+se pueden reservar. El de la clienta, que sale debajo de su buscador, se quita en cuanto se elige otra, sin
+volver a guardar (hub#1448). Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
 hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
 solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
-Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
+Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
+(el personal de ERPlora recupera desde una copia aparte las citas que el negocio ya no tiene, cada una por esta misma
+reserva; una borrada vuelve la misma, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 fi:modules/appointments#query-appointments-availability-check fi:modules/appointments#query-appointments-availability-slots old:appointments/workflow/agenda.md#appointments-f02 old:schedules/WORKFLOW.md#schedules-f11 qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules wf:whatsapp-cita#rec_wa_cita-f04 wf:whatsapp-cita#rec_wa_cita-f08 -->
 Estado: hecho
 Actor: empleado, asistente, clienta
 Pantalla: Agenda (alta y edición)
@@ -264,7 +265,6 @@ profesional. Puedes escribir una hora igualmente.».
 Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente
-<!-- origen: fi:modules/appointments#command-appointments-appointments-confirm old-hub:HUB_SHELL-F61 old:appointments/workflow/agenda.md#appointments-f03 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:peluqueria-dia#rec_peluqueria-f05 wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 wf:whatsapp-cita#rec_wa_cita-f07 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -280,7 +280,6 @@ Si falla: «Esta cita ya no se puede confirmar: ya no está pendiente.»; no se 
 Implicados: ninguno
 
 ### APPOINTMENT-F04 Mover una cita o cambiarle el profesional o los servicios
-<!-- origen: qa:modules/appointments/chained-services qa:verticals/beauty/03-appointments-and-whatsapp fi:modules/appointments#command-appointments-appointments-reschedule fi:modules/appointments#query-appointments-appointments-get old:appointments/workflow/agenda.md#appointments-f04 qa:modules/appointments/reschedule-appointment wf:peluqueria-dia#rec_peluqueria-f08 wf:peluqueria-dia#rec_peluqueria-f12 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -304,7 +303,6 @@ la clienta.
 Implicados: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancelar una cita desde la agenda
-<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f12 fi:modules/appointments#command-appointments-appointments-cancel old:appointments/workflow/agenda.md#appointments-f05 qa:modules/appointments/cancel-and-no-show -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
@@ -322,7 +320,6 @@ anúlala allí primero.» (`appointment.check_open`).
 Implicados: ninguno
 
 ### APPOINTMENT-F06 La clienta cancela o mueve su propia cita
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f08 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:peluqueria-dia#rec_peluqueria-f12 old:appointments/workflow/canales.md#appointments-f06 wf:whatsapp-cita#rec_wa_cita-f03 -->
 Estado: hecho
 Actor: clienta (a través de WhatsApp o la reserva online)
 Pantalla: ninguna
@@ -348,7 +345,6 @@ Si falla: `appointment.customer_cancellation_disabled`, `appointment.cancellatio
 Implicados: FLOW-F28, FLOW-F38
 
 ### APPOINTMENT-F07 Empezar el servicio
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 fi:modules/appointments#command-appointments-appointments-start old:appointments/workflow/agenda.md#appointments-f07 qa:modules/appointments/check-in-and-in-progress wf:whatsapp-cita#rec_wa_cita-f10 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -361,7 +357,6 @@ Si falla: «Esta cita no se puede iniciar en su estado actual.»
 Implicados: ninguno
 
 ### APPOINTMENT-F08 Completar la cita
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-complete old:appointments/workflow/agenda.md#appointments-f08 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -374,7 +369,6 @@ Si falla: «Esta cita no se puede completar en su estado actual.»
 Implicados: ninguno
 
 ### APPOINTMENT-F09 Marcar que la clienta no se presentó
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f12 qa:modules/appointments/cancel-and-no-show wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-no_show old:appointments/workflow/agenda.md#appointments-f09 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
@@ -389,22 +383,23 @@ con su cuenta abierta en el TPV, `appointment.check_open`.
 Implicados: ninguno
 
 ### APPOINTMENT-F10 Ver el historial de una cita
-<!-- origen: fi:modules/appointments#query-appointments-appointments-history old:appointments/workflow/agenda.md#appointments-f10 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
-2. Cada cambio con su hora en el reloj del negocio, quién lo hizo («Lo pidió la clienta» si fue ella) y
-   qué cambió (de qué profesional o servicio a cuál, y la nueva hora).
+2. Cada cambio con su hora en el reloj del negocio, quién lo hizo («Lo pidió la clienta» si fue ella; «Lo
+   hizo la plataforma» si no fue una persona: el sistema, una automatización o una recuperación desde una copia
+   aparte; una API key, por su nombre) y qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una
+   cita borrada que el personal de ERPlora devolvió desde una copia aparte conserva sus líneas y suma «Borrada» y
+   «Recuperada» (APPOINTMENT-F11).
 3. Es solo de lectura: un único botón, **Cerrar**.
 Entra: una cita en cualquier estado.
 Sale: nada (solo lee).
 Si falla: «No se pudo cargar el historial de la cita.»
-Implicados: ninguno
+Implicados: APPOINTMENT-F11, BASE-F114
 
 ### APPOINTMENT-F11 Borrar una cita
-<!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_delete-handler-wasm fi:modules/appointments#command-appointments-appointments-delete old:appointments/workflow/agenda.md#appointments-f11 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Agenda
@@ -415,11 +410,19 @@ Pasos:
 Entra: una cita pendiente, confirmada, cancelada o no presentada que no esté cobrada.
 Sale: el aviso `appointment.appointment.deleted`.
 Si falla: «Esta cita no se puede borrar: está en curso, completada o cobrada.»; con su cuenta abierta
-en el TPV, `appointment.check_open`.
-Implicados: ninguno
+en el TPV, `appointment.check_open`. Una cita borrada por error que aún no ha llegado la recupera el personal de
+ERPlora desde una copia aparte del negocio (BASE-F114): vuelve LA MISMA a la agenda, tal como estaba al borrarla, con su
+número, su clienta, sus servicios, su profesional, su hora, sus notas, su serie y su historial, que suma la línea
+«Recuperada», y con el aviso `appointment.appointment.restored`. Nunca vuelve para una clienta que el negocio ya no
+tiene. Si seguía reservada, solo vuelve si encaja como una reserva de APPOINTMENT-F01: si su hora ya no está libre o ya
+no cabe en el horario, o si uno de sus servicios o su profesional ya no se reservan, no vuelve y Recuperaciones dice por
+qué; una cancelada vuelve cancelada. Una que el negocio volvió a reservar (la misma clienta a la misma hora, o su
+serie en esa fecha) se queda como está. Solo la que el negocio ya no tiene vuelve como cita nueva, reservada como en
+APPOINTMENT-F01 (otro número y sin su historial; uno de sus servicios que el negocio volvió a crear, con su nombre en su
+categoría, cuenta como el mismo), con las mismas condiciones.
+Implicados: APPOINTMENT-F10, BASE-F114
 
 ### APPOINTMENT-F12 Crear una cita periódica
-<!-- origen: fi:modules/appointments#command-appointments-recurring-create fi:modules/appointments#query-appointments-recurring-list old:appointments/workflow/periodicas.md#appointments-f12 -->
 Estado: hecho
 Actor: empleado (para sí), responsable, asistente
 Pantalla: Periódicas
@@ -434,10 +437,11 @@ Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Persona
 Citas.
 Sale: la serie activa, sus citas y el aviso `appointment.recurring.created`.
 Si falla: el motivo en el panel; si la serie se creó y alguna fecha no cupo, se listan con su motivo.
-Implicados: SERVICE-F33
+Implicados: SERVICE-F33, BASE-F114 (el personal de ERPlora recupera desde una copia aparte la serie que el negocio ya no
+tiene con esta misma creación, después de sus citas: no reserva ninguna fecha que ya tenga cita; una borrada vuelve la
+misma, APPOINTMENT-F15)
 
 ### APPOINTMENT-F13 Reservar las citas de una serie
-<!-- origen: fi:modules/appointments#command-appointments-recurring-materialize-handler-wasm old:appointments/workflow/periodicas.md#appointments-f13 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Periódicas
@@ -461,7 +465,6 @@ cita periódica ya no tiene fechas que reservar.» (`appointment.recurring_ended
 Implicados: SCHEDULE-F11, STAFF-F16
 
 ### APPOINTMENT-F14 Editar una serie de esta cita en adelante
-<!-- origen: old:appointments/workflow/periodicas.md#appointments-f14 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas, Agenda
@@ -489,9 +492,8 @@ final no puede ser anterior al inicio.»).
 Implicados: ninguno
 
 ### APPOINTMENT-F15 Pausar, reactivar o borrar una serie
-<!-- origen: fi:modules/appointments#command-appointments-recurring-delete old:appointments/workflow/periodicas.md#appointments-f15 -->
 Estado: hecho
-Actor: empleado (las suyas), responsable
+Actor: empleado (las suyas), responsable, asistente
 Pantalla: Periódicas
 Pasos:
 1. Apaga el interruptor **Activa** para que deje de reservar; enciéndelo para reactivarla.
@@ -499,11 +501,18 @@ Pasos:
    conservan.
 Entra: una serie.
 Sale: `appointment.recurring.updated` o `appointment.recurring.deleted`.
-Si falla: «No se ha podido cambiar el estado de la cita periódica.» y la serie sigue como estaba.
-Implicados: ninguno
+Si falla: «No se ha podido cambiar el estado de la cita periódica.» y la serie sigue como estaba. Una serie borrada por
+error la recupera el personal de ERPlora desde una copia aparte del negocio (BASE-F114) si en la copia seguía
+reservando (activa, con su profesional y sin terminar): vuelve LA MISMA a **Periódicas**, activa, con su clienta, sus
+servicios, su profesional, su repetición y las citas que ya había reservado, con el aviso
+`appointment.recurring.restored`. No reserva nada por sí sola: sus fechas siguientes se reservan con **Reservar citas**
+(APPOINTMENT-F13), que salta las que ya tienen cita. Solo vuelve si hoy se podría crear (APPOINTMENT-F12): si su clienta
+ya no está en el negocio, o su profesional o uno de sus servicios ya no se reservan, no vuelve y Recuperaciones dice por
+qué. Una que el negocio volvió a crear (la misma clienta, que se repite igual el mismo día a la misma hora) se queda como
+está. La que el negocio ya no tiene se crea de nuevo como en APPOINTMENT-F12.
+Implicados: BASE-F114
 
 ### APPOINTMENT-F16 Bloquear tiempo en la agenda
-<!-- origen: fi:modules/appointments#command-appointments-blocked_times-create fi:modules/appointments#command-appointments-blocked_times-delete fi:modules/appointments#query-appointments-blocked_times-list old:appointments/workflow/canales.md#appointments-f16 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: Agenda (lo pinta)
@@ -520,7 +529,6 @@ Si falla: «El final no puede ser anterior al inicio.»; quitar uno que ya no es
 Implicados: ninguno
 
 ### APPOINTMENT-F17 Cobrar la cita en el TPV
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f10 fi:modules/appointments#command-appointments-appointments-mark_converted fi:modules/appointments#event-listen-sales-sale-created_from_appointment-appointments-appointments-mark_converted old:appointments/workflow/agenda.md#appointments-f17 qa:modules/appointments/convert-appointment-to-sale qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 wf:peluqueria-dia#rec_peluqueria-f14 -->
 Estado: hecho
 Actor: responsable, empleado (sus propias citas), con permiso de vender en Venta
 Pantalla: Agenda
@@ -552,7 +560,6 @@ el de Venta.
 Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38
 
 ### APPOINTMENT-F18 Cita que reserva la clienta
-<!-- origen: qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f06 qa:modules/appointments/whatsapp-booking-with-review-change-and-cancel wf:whatsapp-cita#rec_wa_cita-f06 wf:whatsapp-cita#rec_wa_cita-f03 old:appointments/workflow/canales.md#appointments-f18 qa:modules/appointments/whatsapp-booking-edge-cases-and-races qa:modules/appointments/whatsapp-booking-without-a-human wf:whatsapp-cita#rec_wa_cita-f05 -->
 Estado: hecho
 Actor: clienta (WhatsApp, reserva online)
 Pantalla: ninguna
@@ -574,9 +581,8 @@ tomada (`appointment.slot_taken`); la automatización ofrece otra hora.
 Implicados: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Ajustar las reglas de reserva
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f07 wf:whatsapp-cita#rec_wa_cita-f06 fi:modules/appointments#command-appointments-settings-upsert fi:modules/appointments#query-appointments-settings-get fi:modules/appointments#settings-bloque old:appointments/workflow/agenda.md#appointments-f19 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Ajustes
 Pasos:
 1. Abre la pestaña **Ajustes** de Citas.
@@ -592,7 +598,6 @@ hasta el siguiente intento (hub#854).
 Implicados: ninguno
 
 ### APPOINTMENT-F20 Ver las citas de una clienta en su ficha
-<!-- origen: old:appointments/workflow/canales.md#appointments-f20 -->
 Estado: hecho
 Actor: quien ve la agenda
 Pantalla: Historial de visitas (ficha de Clientes)
@@ -606,7 +611,6 @@ Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este clien
 Implicados: CUSTOMER-F24
 
 ### APPOINTMENT-F21 Reservar varias citas de golpe (bono o curso)
-<!-- origen: fi:modules/appointments#command-appointments-appointments-bulk_create-handler-wasm old:appointments/workflow/periodicas.md#appointments-f21 -->
 Estado: hecho
 Actor: responsable, asistente
 Pantalla: ninguna
@@ -619,7 +623,6 @@ Si falla: «{hora}: {motivo}» de la primera que no cabe; no se reserva ninguna.
 Implicados: ninguno
 
 ### APPOINTMENT-F22 Cambiar las notas o el contacto de una cita
-<!-- origen: fi:modules/appointments#command-appointments-appointments-update old-hub:HUB-F36 old:appointments/workflow/canales.md#appointments-f22 -->
 Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda (Editar) y asistente
@@ -635,7 +638,6 @@ Si falla: el teléfono no válido se rechaza sin guardar nada; una cita que no e
 Implicados: CUSTOMER-F11
 
 ### APPOINTMENT-F23 Unir las citas al fusionar dos fichas de clienta
-<!-- origen: old:appointments/workflow/canales.md#appointments-f23 old:online_booking/WORKFLOW.md#online_booking-f09 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -649,7 +651,6 @@ Si falla: no se queda a medias (todo o nada) y se reintenta solo.
 Implicados: CUSTOMER-F13, ONLINE_BOOKING-F09
 
 ### APPOINTMENT-F24 Vaciar los datos de una clienta al borrarla
-<!-- origen: old-hub:HUB-F250 old:appointments/workflow/canales.md#appointments-f24 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -665,7 +666,6 @@ Si falla: no se queda a medias (todo o nada) y se reintenta solo.
 Implicados: CUSTOMER-F16, ONLINE_BOOKING-F12
 
 ### APPOINTMENT-F25 Un profesional se da de baja con citas futuras
-<!-- origen: nuevo (el mercado: Fresha, Square, Phorest, Mindbody y Timely piden reasignar las citas de quien se va; ver «Decisiones de mercado») -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -682,7 +682,6 @@ Si falla: no se queda a medias (todo o nada) y se reintenta solo.
 Implicados: STAFF-F06
 
 ### APPOINTMENT-F26 Un servicio se archiva con citas o series que lo usan
-<!-- origen: nuevo (el mercado: Fresha, Phorest, Acuity y TimeTap conservan lo reservado al archivar un servicio; ver «Decisiones de mercado») -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -700,7 +699,6 @@ Si falla: una reserva nueva con ese servicio se rechaza (`appointment.service_no
 Implicados: SERVICE-F04
 
 ### APPOINTMENT-F27 Ver la agenda de la semana
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 fi:modules/appointments#query-appointments-appointments-list qa:verticals/beauty/02-opening-and-daily-agenda -->
 Estado: hecho
 Actor: empleado (la suya), responsable
 Pantalla: Agenda (Por profesional · Semana)
@@ -715,7 +713,6 @@ Si falla: «No se han podido cargar los profesionales.» con **Reintentar**, en 
 Implicados: ninguno
 
 ### APPOINTMENT-F28 Recibir el aviso del sistema de una cita nueva o cancelada
-<!-- origen: old-hub:HUB_SHELL-F66 -->
 Estado: hecho
 Actor: empleado (las de su agenda), responsable
 Pantalla: Aviso del sistema y Agenda
@@ -778,6 +775,7 @@ profesional, por su id o su nombre; una hora, como fecha y hora de pared del neg
 | Marca no presentada | cambiar citas | F09 | `appointment.appointment.mark_no_show` |
 | Cancela (también en nombre de la clienta) | cambiar citas | F05, F06 | `appointment.appointment.cancel` |
 | Borra una cita / varias | borrar citas | F11 | `appointment.appointment.delete`, `.bulk_delete` |
+| Devuelve a la agenda una cita borrada, la misma | solo la plataforma (al recuperar desde una copia aparte) | F11 | `appointment.appointment.restore` |
 | Abre la cuenta de la cita en el TPV | cambiar citas + vender | F17 | `appointment.appointment.charge` |
 | Crea / quita un bloqueo | gestionar bloqueos | F16 | `appointment.blocked_time.create`, `.delete` |
 | Crea una serie y reserva su ventana | reservar | F12, F13 | `appointment.recurring.create` |
@@ -795,6 +793,7 @@ confirmación antes de hacerlas.
 |---|---|---|
 | `appointment.appointment.created` | Reserva (una por cita del lote y de la serie) | La cita, su número, la clienta, el profesional y su hora |
 | `appointment.appointment.confirmed`, `.started`, `.completed`, `.marked_no_show`, `.cancelled`, `.deleted` | Cada cambio de estado | La cita |
+| `appointment.appointment.restored` | Una cita borrada vuelve a la agenda (recuperar desde una copia aparte) | La cita |
 | `appointment.appointment.rescheduled` | Mover (hora, profesional o servicios) | La cita, la hora y el profesional nuevos |
 | `appointment.appointment.updated` | Cambiar notas o contacto | La cita |
 | `appointment.appointment.charged` / `.uncharged` | Venta cobrada / anulada | La cita y la venta |
@@ -803,6 +802,7 @@ confirmación antes de hacerlas.
 | `appointment.appointment.reassigned` | Fusión de fichas | La ficha que queda y la absorbida |
 | `appointment.blocked_time.created`, `.deleted` | Bloqueos | El bloqueo |
 | `appointment.recurring.created`, `.updated`, `.deleted` | Series | La serie |
+| `appointment.recurring.restored` | Una serie borrada vuelve a Periódicas (recuperar desde una copia aparte) | La serie y su clienta |
 | `appointment.settings.updated` | Guardar ajustes con algún cambio | Nada |
 
 Los avisos llevan identificadores, nunca notas ni motivos (pueden llevar datos de salud).
@@ -853,14 +853,36 @@ agenda tuya que enseñar.».
 
 ## Para quien lo mantiene
 
+- **Recuperar desde una copia aparte** (BASE-F114, hub#1284): `apps.py` responde a la plataforma
+  (`recoverable_from_copy`, `base.tenancy.recovery`) con las citas de la copia que aún no han llegado y siguen
+  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.appointments_in_copy`, por SQL sobre los
+  nombres de los modelos: la copia no es un negocio y no tiene alias). La que el negocio aún guarda borrada vuelve la
+  misma por `appointment.appointment.restore` (`queries.appointments_deleted_in_business`, por su id, salvo que se
+  volviera a reservar: otra viva de su clienta a su hora, o de su serie en su fecha, según lo que el negocio guarda de
+  ella y no lo que dice la copia; hub#1326). La restauración bloquea primero su serie (como toda escritura: una pasada
+  de la serie no reserva esa fecha a la vez) y juzga, si sigue reservada, como una reserva: ficha viva, servicios y
+  profesional reservables y la hora libre, con las reglas de una automatización. La que el negocio no tiene
+  (`queries.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
+  crea por `appointment.appointment.create`. La clienta se casa por la regla de
+  Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
+  la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
+  de Servicios (hub#1341): `appointments_in_copy` lleva en cada cita la lista ENTERA de `service.queries.services_in_copy`
+  (leída una vez, la misma en todas) y `appointments_not_in_business` la pasa a `service.queries.services_in_business`,
+  nunca solo los servicios de las citas (los nombres no son únicos: un servicio que la copia también tenía nunca es el
+  perdido hecho otra vez); el mismo, o el que se volvió a crear, a mano o recuperado antes por Servicios (que va antes,
+  por los `requires`); sin pareja, el de la copia, que la reserva rechaza (`service.service_not_found`). El profesional,
+  por su id. Lo demás lo juzga la propia reserva con las reglas de una automatización: una hora pasada, ocupada, fuera
+  de horario o bloqueada, o una clienta que ya no está, no se crea y queda con su por qué. Lee desde `0001_initial`; una
+  migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su `reads_since`. Las
+  series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
+  negocio y su copia) y `base/tenancy/tests/test_recovery.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
 - **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo de la skill
-  `erplora-apps`, que no incluye `schedule`: Citas lee el horario del negocio en cada reserva; el README del
-  Hub ya no trae ese ejemplo).
+  `erplora-apps`, que no incluye `schedule`: Citas lee el horario del negocio en cada reserva).
   `Appointment.customer` → `customer.Customer`; `Appointment.staff` y `Recurring.staff` →
   `staff.Member`; `AppointmentService.service` y `RecurringService.service` → `service.Service`. Los
   nombres se resuelven con `find_customer`, `find_service` y `resolve_member` de esas apps. La venta es
@@ -871,8 +893,8 @@ agenda tuya que enseñar.».
   `engine.py` decide. Orden de los motivos (el primero gana): `invalid_start`, `in_past`, `too_soon`,
   `too_far`, `outside_schedule`, `outside_staff_hours`, `blocked`, `overlap`. `in_past` y `too_soon` solo
   para la clienta y las series; el mostrador los salta. Un día con `source = none` en Horarios no
-  restringe (como el producto actual); un día sin horario de Personal solo restringe por ausencias.
-- **«Las suyas» de quien no es una persona** (revisión 2026-11-03, FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL):
+  restringe; un día sin horario de Personal solo restringe por ausencias.
+- **«Las suyas» de quien no es una persona**:
   `may_book_for` y `may_change` piden `add_appointment`/`change_appointment`, o `add_own_appointment`/
   `change_own_appointment` sobre una cita de la ficha propia (`is_own`). Quien no es una persona (`by_person`: el paso
   de una automatización, una API key, la plataforma) no tiene ficha, así que con el permiso «propio» toma las de todo
@@ -937,8 +959,8 @@ agenda tuya que enseñar.».
   28/03/2027, a las 04:07). La hora de fin de `availability.slots` es la de pared real, y la ventana de la agenda
   (`calendar_end_hour`) se comprueba contra ella. La tarjeta de la agenda se pinta hasta esa hora de fin; una cita
   que acaba a una hora de pared igual o anterior a su inicio (dentro de la hora repetida) se pinta con su duración.
-  Las citas guardadas antes de este arreglo con el fin de la suma de pared las corrige la migración
-  `0003_end_in_real_minutes` (fin = inicio + minutos reales; no toca las que ya estaban bien).
+  La migración `0003_end_in_real_minutes` corrige las citas cuyo fin se guardó como suma de pared (fin =
+  inicio + minutos reales; no toca las que ya están bien).
 - **Recurrencias** con `python-dateutil` (`rrule`; mantenida, decenas de colaboradores, desde 2003):
   diaria, semanal, quincenal y mensual (mismo día del mes, el último en un mes corto), con fin por fecha
   o por número de citas contado desde el inicio de la serie.
@@ -950,14 +972,13 @@ agenda tuya que enseñar.».
   los rellena en `base.notice.list` en el idioma de quien mira y la shell de `@erplora/ui` los da una vez
   por dispositivo con `erplora_notify` de la app instalada. El toque lleva a `/appointment/agenda?date=…`,
   que la Agenda lee al abrir y al cambiar.
-- **Campana del Inicio** (ronda PLAN-HUB 2026-10-21): `apps.py` declara `bell` (un `BellCounter`,
+- **Campana del Inicio**: `apps.py` declara `bell` (un `BellCounter`,
   `appointment.to_confirm`, sobre `appointment.appointment.count_to_confirm`, con el permiso de esa consulta,
   `view_own_appointment`, y la ruta `/appointment/agenda`: no hay vista filtrada a la que llevar). Lo
   refrescan `TO_CONFIRM_EVENTS` de `events.py`, los que cambian ese número (el no-show solo llega pasada la
   hora, cuando ya no cuenta); `tests/test_integration_home.py` lo prueba evento a evento. Sin `setup` ni
-  `widgets`: el `module.json` viejo no los tenía y `setup_status.rs` solo listaba los pasos del núcleo.
-- Las reacciones (`events.py`) las reparte el relay del outbox del worker (`base/relay.py`, ya en la fase
-  1, hub#105): `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y los avisos
+  `widgets`.
+- Las reacciones (`events.py`) las reparte el relay del outbox del worker (`base/relay.py`): `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y los avisos
   reales de Venta, Clientes y Personal; `test_integration_*.py`, cada reacción con su app.
 - **Automatización de fábrica** (`recipes.py`, FLOW-F33 de Automatizaciones): «Cubrir el hueco cuando un
   cliente cancela», una tarea de prioridad alta sobre `appointment.appointment.cancelled` solo cuando lo pidió
@@ -976,22 +997,20 @@ agenda tuya que enseñar.».
 
 ## Lo que queda fuera
 
-Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa con su issue (`migration-leftover`):
+Lo que queda abierto:
 
 - Las peticiones de componentes de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`Scheduler`, `DateField`/`TimeField`, tres
   iconos y el bloqueo de la baja en Personal): ninguna rompe un flujo.
 
 Lo que no entra, a propósito o hasta otra fase:
 
-- **Volver a activar los avisos negados** desde Sistema (la fila «Los avisos están desactivados» del
-  producto actual): hoy, negados en Android, se activan en los ajustes del sistema.
-- **Recordatorios** («Enviar recordatorios»): el producto actual guardaba el ajuste sin enviar nada; aquí
-  no se porta un ajuste que no hace nada. Los mensajes son de la app de WhatsApp y de las
+- **Volver a activar los avisos negados** desde Sistema: hoy, negados en Android, se activan en los ajustes del sistema.
+- **Recordatorios** («Enviar recordatorios»): no hay ajuste, porque un ajuste visible que no hace nada es lo
+  que la regla «nada a medias ni simulado» prohíbe. Los mensajes son de la app de WhatsApp y de las
   automatizaciones.
-- **Pantalla de bloqueos**: se crean por el asistente o la API y la rejilla los pinta (como el producto
-  actual, que no tenía pantalla).
+- **Pantalla de bloqueos**: se crean por el asistente o la API y la rejilla los pinta.
 - **Reserva online pública, depósitos o cargo por no presentarse, lista de espera, salas o equipos,
-  reservas de grupo y calendario externo**: fuera del MVP, como en el producto actual.
+  reservas de grupo y calendario externo**: fuera del MVP.
 
 ## Lo que NO hace, a propósito
 
@@ -1001,44 +1020,10 @@ Lo que no entra, a propósito o hasta otra fase:
 - No cambia todas las citas de una serie: solo **Solo esta cita** o **Esta y todas las siguientes**.
 - No retiene un hueco mientras alguien decide.
 
-## Cambios frente al producto actual
-
-- **Varios servicios en una cita** (corte + color), cada uno con su precio y duración congelados (antes,
-  uno por cita; lo pedía B-04).
-- **Vista de semana** por profesional (antes, fuera del MVP).
-- **El empleado ve y gestiona su propia agenda**; el responsable, la de todos (antes el empleado veía
-  todas y solo reservaba).
-- **Las citas del mostrador nacen Confirmadas**; Iniciar acepta también una pendiente.
-- **Cobrar completa la cita** y una cita cobrada no se mueve, no se cancela ni se borra; anular la venta
-  le quita la marca de cobrada. Una cita cancelada o no presentada no se cobra.
-- **No-show solo pasada la hora** de la cita.
-- **Cancelar pide confirmación y deja escribir el motivo; Borrar pide confirmación** y ya no «responde
-  bien sin borrar» una cita en curso o completada: la rechaza.
-- **La clienta que pide sobre una cita ajena** recibe el mismo «no existe» que sobre una inexistente.
-- **El aviso del sistema de una cita de la clienta** solo lo da la aplicación instalada, una vez por
-  dispositivo (al reconectar no se repite) y solo a quien ve esa agenda; tocarlo abre la Agenda en el día de
-  la cita (antes, Citas sin más). El navegador no avisa: el mercado avisa al equipo en su aplicación, no en
-  el navegador (Fresha, Booksy, Treatwell, Mindbody, Toast, Lightspeed).
-- **La campana cuenta «Citas por confirmar»** de la agenda de quien mira: el empleado, las suyas; el
-  responsable, las de todos (antes, todas para cualquiera que viera citas). Lleva a la Agenda y cambia al
-  momento, sin recargar. Como antes, Citas no pone pasos en «Termina de configurar tu negocio» ni paneles en
-  el Inicio.
-- **Baja de un profesional**: sus citas futuras pasan a «Sin asignar» y sus series se pausan (antes, Citas
-  no escuchaba a Personal). Archivar un servicio no cambia ninguna cita (decisión de mercado).
-- **Un bloqueo de día entero** se juzga igual en la reserva y en las horas libres.
-- **Los ajustes de fábrica son uno solo** (antes cada pieza tenía los suyos).
-- Retirados: el ajuste de recordatorios; `set_auto_confirm_online` (lo hace `settings.update`, que
-  guarda solo lo enviado); `availability.day_opening` (es `schedule.hours.for_range` de Horarios); la
-  tarea `phones_to_e164` (el teléfono llega ya normalizado de Clientes y toda escritura lo normaliza);
-  las lecturas internas `own_slots`, `own_rules`, `conflicting`, `upcoming_for_staff*`,
-  `blocked_times.overlapping/upcoming`, `recurring.occurrences` (eran el reparto entre SQL y el handler
-  WASM); la tabla apartada de retenciones de hueco.
-
 ## Decisiones de mercado (2026-10-14)
 
-Las dudas abiertas del módulo viejo («Dudas abiertas» de su `WORKFLOW.md`) y las del porte, resueltas con
-la skill `market-decision` (al menos 8 referencias cada una; (F) página leída, (S) solo el extracto del
-buscador).
+Las dudas de diseño, resueltas con la skill `market-decision` (al menos 8 referencias cada una; (F) página
+leída, (S) solo el extracto del buscador).
 
 | Duda | Gana | Referencias |
 |---|---|---|
@@ -1051,7 +1036,3 @@ buscador).
 | ¿Cancelar pide motivo y confirmación? | **Confirmación con motivo opcional** | Fresha (F) …/calendar/545-manage-cancellation-reasons · Timely (S) …/27782511092759 · Phorest (S) support.phorest.com/hc/en-us/articles/360016486739 · Mangomint (F) …/cancel-or-delete-an-appointment · Vagaro (S) support.vagaro.com/hc/en-us/articles/360009686934 |
 | Solape con otra cita del profesional | En el mostrador **avisa y deja «Reservar igual»** (ajuste encendido de fábrica; apagado, bloqueo); la reserva de la clienta **nunca** solapa | Fresha (S) fresha.com/for-business/features/scheduling · Vagaro (S) support.vagaro.com/hc/en-us/articles/204347690 · Mangomint (S) mangomint.com/learn/faq-calendar-and-appointments · Timely (S) help.gettimely.com/hc/en-gb/articles/360060705974 · Mindbody (S) Repeating-Appointments |
 | ¿Se cancela, se marca no presentada o se borra una cita con su cuenta abierta (sin cobrar) en el TPV? ¿Y volver a pulsar Cobrar? | **Se rechaza** hasta cobrar o anular la cuenta en el TPV (8 de 11: cancelar no toca la caja a escondidas); volver a cobrar **va a la misma cuenta** | Timely (F) help.gettimely.com/hc/en-gb/articles/1500002197102 · Jane (F) jane.app/guide/cancel-or-delete-an-appointment-from-the-schedule · Mangomint (F) mangomint.com/learn/discard-an-existing-checkout/ y mangomint.com/learn/save-a-checkout-for-later/ · Fresha (F) fresha.com/help-center/knowledge-base/calendar/600-update-appointment-statuses · Vagaro (F) support.vagaro.com/hc/en-us/articles/360013133794 · Zenoti (F) help.zenoti.com/en/appointments/daily-tasks/faq-and-troubleshooting.html · ezyVet (S) docs.ezyvet.com (appointments troubleshooting) · Toast (F) doc.toasttab.com/doc/platformguide/adminVoidingOrders.html · Square (F, no deja una cita en dos tickets) community.squareup.com/t5/Appointments-Bookings/Can-t-save-appointments-to-open-ticket-now/m-p/752438 · en contra: Odoo y Rendezvous anulan solos un borrador que solo lleva esa cita |
-
-Los recordatorios («Enviar recordatorios») no se portan: un ajuste visible que no hace nada es lo que
-la regla «nada a medias ni simulado» prohíbe.
-

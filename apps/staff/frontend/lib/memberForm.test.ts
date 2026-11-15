@@ -107,7 +107,7 @@ describe('createPayload (New)', () => {
     for (const key of ['hourly_rate', 'commission_rate', 'notes']) expect(without).not.toHaveProperty(key);
   });
 
-  // gh:staff#64: the rate travels in the minor units of the business's currency, not on the euro's scale.
+  // The rate travels in the minor units of the business's currency, not on the euro's scale.
   it('in yen the typed rate travels as it is: «1500» is 1500, not 150000', () => {
     const form = { ...blankMemberForm(), first_name: 'A', last_name: 'B', hourly_rate: '1500' };
     expect(createPayload(form, { pay: true, money: YEN })).toMatchObject({ hourly_rate: 1500 });

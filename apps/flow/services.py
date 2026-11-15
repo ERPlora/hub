@@ -14,18 +14,22 @@ before it stay. A step runs only if the automation was granted its operation, wi
 in the language of whoever saved the automation. One run per automation and trigger key (the outbox
 event's id): the row lock and the unique constraint make a repeated delivery start nothing. A run
 started by an event that a run of the same automation caused, or by a chain of more than
-``document.MAX_CHAIN`` automations, stops before doing anything (``flow.loop_stopped``).
+``document.MAX_CHAIN`` automations, stops before doing anything (``flow.loop_stopped``). An event that a recovery
+from a separate copy recorded (``base.recovery.brought_back``: its actor) starts none: what came back is nothing new to
+the business (BASE-F114, hub#1307).
 """
 
 import datetime as dt
 import json
 import logging
+import re
 import uuid
 from typing import Any
 
 import pydantic
 from django.db import IntegrityError
-from django.db.models.functions import Coalesce
+from django.db.models import Q, TextField
+from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
@@ -34,6 +38,7 @@ from live.operations import Operation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, gateway, http, recipes, vault
+from apps.flow.apps import RUN_ACTOR
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     ASSISTANT_GONE_KEY,
@@ -84,9 +89,11 @@ from apps.flow.schemas import (
     AnswerIn,
     AssistantRoundIn,
     AssistantRoundOut,
+    ChangedOut,
     ClaimAssistantOut,
     ClaimCallOut,
     CreateIn,
+    CustomerErasedIn,
     DeletedOut,
     DraftOut,
     DraftProposeIn,
@@ -114,6 +121,7 @@ from apps.flow.schemas import (
 from base import assistant as hub_assistant
 from base import outbound
 from base.business import business_zone
+from base.recovery import brought_back
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +151,7 @@ QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
 APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «%(name)s».")
 
-#: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
+#: How long the history keeps a finished run (the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
 #: At most this many runs go per pass: bounded, never one mass delete at the busiest hour.
 PRUNE_BATCH = 500
@@ -155,10 +163,8 @@ FINISHED = (
     FlowRun.Status.CANCELLED,
 )
 
-#: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
-RUN_ACTOR = "flow_run:"
 #: A call's ``Idempotency-Key`` is ``uuid5(IDEMPOTENCY_NAMESPACE, "<run id>:<step id>")``: the same in every
-#: attempt of a run's step, another in every run (hub#2659, hub#2675).
+#: attempt of a run's step, another in every run.
 IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
 #: How long a call that left holds its run: after it, a call that never answered is sent again, with the
 #: same key (at least once; the old hub's 5 minutes).
@@ -290,6 +296,16 @@ def _decide_draft(
     input=CreateIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "create the automation from the assistant's draft",
+                "set up a new automation that runs every Monday at 9",
+            ),
+            "es": (
+                "crea la automatización a partir del borrador que me propusiste",
+                "monta una automatización nueva que arranque cada lunes a las 9",
+            ),
+        },
         "description": "Create an automation from scratch, from a gallery card or from the assistant's draft "
         "(`draft_id`, which is marked as used in the same step). It is born paused and with no permission "
         "(`flow.flow.set_enabled` turns it on); prefer `flow.draft.propose` when somebody asks you for one.",
@@ -329,6 +345,16 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
     input=UpdateIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "change the name of the welcome automation to «New customers»",
+                "change the steps of the birthday automation",
+            ),
+            "es": (
+                "cambia el nombre de la automatización de bienvenida a «Clientes nuevos»",
+                "modifica los pasos de la automatización de cumpleaños",
+            ),
+        },
         "description": "Change an automation, by its id or its name: its name, what starts it or its steps (to turn "
         "it on or pause it, `flow.flow.set_enabled`). Only what is sent changes; its permissions stay. Changing the trigger or the steps "
         "raises its version, and what is already running goes on with the version it started with. What its app fixes "
@@ -391,6 +417,17 @@ def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
     input=EnabledIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "turn on the welcome automation",
+                "pause the birthday automation",
+            ),
+            "es": (
+                "enciende la automatización que salta al cobrar una venta",
+                "pausa la automatización de cumpleaños",
+                "vuelve a encender la automatización de reseñas",
+            ),
+        },
         "description": "Turn an automation on or pause it, by its id or its name («activate the welcome "
         "automation», «pause the cash close one»). A schedule turned on counts from now. Turning on one that "
         "lacks permissions leaves it doing nothing until they are granted: say so.",
@@ -422,6 +459,16 @@ def _switch(ctx: OperationContext, flow: Flow, enabled: bool) -> None:
     input=FlowRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "make a copy of the welcome automation",
+                "duplicate the birthday automation",
+            ),
+            "es": (
+                "haz una copia de la automatización de bienvenida",
+                "duplica la automatización de cumpleaños",
+            ),
+        },
         "description": "Copy an automation: «Copy of …», paused, with the same trigger and steps and none of its "
         "permissions or history.",
         "risk": "normal",
@@ -464,8 +511,18 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     input=FlowRefIn,
     output=DeletedOut,
     ai={
+        "asks": {
+            "en": (
+                "delete the birthday automation",
+                "get rid of the welcome automation but keep its history",
+            ),
+            "es": (
+                "borra la automatización de cumpleaños",
+                "quita la automatización de bienvenida, ya no la uso",
+            ),
+        },
         "description": "Delete an automation, by its id or its name: it stops at once, what was waiting is "
-        "cancelled and its history stays. Cannot be undone: confirm it first.",
+        "cancelled and its history stays. Cannot be undone.",
         "risk": "high",
     },
 )
@@ -505,6 +562,17 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
     input=GrantIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "grant the welcome automation the permission to create tasks",
+                "give the birthday automation permission to send WhatsApp messages",
+            ),
+            "es": (
+                "dale permiso a la automatización de bienvenida para crear tareas",
+                "deja que la automatización de cumpleaños mande WhatsApp a los clientes",
+                "autoriza a la automatización de las ventas cobradas a leer los clientes",
+            ),
+        },
         "description": "Set the whole list of actions and reads an automation may run, by name: what is not in "
         "the list is withdrawn. A list that names something this business does not have is refused whole. "
         "An automation does nothing it was not allowed.",
@@ -587,6 +655,16 @@ def _apply_recipe(ctx: OperationContext, flow: Flow, recipe: recipes.Recipe, now
     input=RecipeRefIn,
     output=RecipeEnabledOut,
     ai={
+        "asks": {
+            "en": (
+                "turn on the recipe that fills a cancelled slot",
+                "activate the ready-made reminder automation",
+            ),
+            "es": (
+                "activa la receta de recordatorio de citas",
+                "enciende la receta que avisa cuando alguien cancela",
+            ),
+        },
         "description": "Turn on a ready-made automation an app brings (`flow.recipe.list`). The first time it is "
         "built and left on with exactly the permissions the recipe asks for; afterwards the one already built is "
         "switched on as the owner left it. Say what it will do and what it may do before turning it on.",
@@ -629,6 +707,16 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=RecipeRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "turn off the appointment reminder recipe",
+                "pause the ready-made cancellation recipe",
+            ),
+            "es": (
+                "apaga la receta del recordatorio de citas",
+                "desactiva la receta prefabricada de las cancelaciones",
+            ),
+        },
         "description": "Turn off a ready-made automation an app brings: it is paused, never deleted; its permissions "
         "and its history stay, and turning it on again leaves it as it was.",
         "risk": "high",
@@ -648,9 +736,19 @@ def disable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=RecipeRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "put the reminder recipe back as its app brings it",
+                "restore the original version of the cancellation recipe",
+            ),
+            "es": (
+                "deja la receta del recordatorio como la trae su app",
+                "vuelve a la versión original de la receta de cancelaciones",
+            ),
+        },
         "description": "Give a ready-made automation back the version its app brings today: its name, trigger, steps "
         "and exactly the recipe's permissions replace the owner's changes; it stays on or paused as it is and keeps "
-        "its history. Confirm it: what the owner changed is lost.",
+        "its history. What the owner changed is lost.",
         "risk": "high",
     },
 )
@@ -677,6 +775,16 @@ def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=RecipeRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "repair the old reminder recipe",
+                "fix the outdated cancellation recipe with its new conditions",
+            ),
+            "es": (
+                "arregla la receta del recordatorio de citas que se quedó vieja",
+                "pon al día la receta de cancelaciones con lo que corrigió su app",
+            ),
+        },
         "description": "Repair a ready-made automation built from an older version that started in more cases than "
         "its app meant: only the conditions of «Only when…» its app added since are added; its name, steps, "
         "permissions and switch stay. Nothing changes when there is nothing to repair.",
@@ -739,8 +847,18 @@ def set_secret(ctx: OperationContext, data: SecretSetIn) -> dict:
     input=SecretRefIn,
     output=DeletedOut,
     ai={
+        "asks": {
+            "en": (
+                "delete the secret called SHOP_TOKEN",
+                "remove the old API key secret",
+            ),
+            "es": (
+                "borra el secreto SHOP_TOKEN",
+                "elimina el secreto de la clave antigua",
+            ),
+        },
         "description": "Delete a secret by its name: the automations whose calls use it will fail with "
-        "`flow.secret_not_found` until it is saved again. Confirm it first.",
+        "`flow.secret_not_found` until it is saved again.",
         "risk": "high",
     },
 )
@@ -766,6 +884,16 @@ def delete_secret(ctx: OperationContext, data: SecretRefIn) -> dict:
     input=DraftProposeIn,
     output=DraftOut,
     ai={
+        "asks": {
+            "en": (
+                "create a flow that adds a task when a sale over 100 € is completed",
+                "automate a thank-you WhatsApp after each appointment",
+            ),
+            "es": (
+                "crea un flujo que deje una tarea cuando se cobre una venta de más de 100 €",
+                "automatiza un WhatsApp de agradecimiento después de cada cita",
+            ),
+        },
         "description": "Propose a DRAFT automation — «when X happens, do Y» — whenever somebody asks for something "
         "to happen on its own («create a flow that creates a task when a sale over 100 € is completed»). "
         "It does not run, holds no permissions and waits in Automations for a person to review it and turn "
@@ -794,6 +922,16 @@ def propose_draft(ctx: OperationContext, data: DraftProposeIn) -> dict:
     input=DraftRefIn,
     output=DraftOut,
     ai={
+        "asks": {
+            "en": (
+                "discard the assistant's draft",
+                "drop that draft, I don't want it",
+            ),
+            "es": (
+                "descarta el borrador del asistente",
+                "tira ese borrador, no lo quiero",
+            ),
+        },
         "description": "Discard a draft the assistant proposed; it stays as a record.",
         "risk": "normal",
     },
@@ -861,7 +999,24 @@ def _log(run: FlowRun, step: dict, outcome: str, now: dt.datetime, **more: Any) 
     run.log = [*run.log, {**entry, "outcome": outcome, **more, "at": now.isoformat()}]
 
 
-def _start(
+#: An id as the records of the Hub write it (UUIDv7, as text).
+ANY_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def _remember_read(run: FlowRun) -> None:
+    """Keeps the ids in what ``run``'s steps left (a customer's card, a sale…), never their data, before that is
+    forgotten: erasing a customer finds by them a run whose texts may name her once it no longer keeps her card."""
+    found = ANY_ID.findall(json.dumps(run.outputs, default=str))
+    run.read_ids = sorted({*run.read_ids, *found})
+
+
+def _end_turn(run: FlowRun) -> None:
+    """The assistant's turn is over: what it was told (what its tools read) goes, its ids are kept."""
+    _remember_read(run)
+    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+
+
+def _start(  # noqa: PLR0913
     ctx: OperationContext,
     flow: Flow,
     *,
@@ -901,7 +1056,8 @@ def _finish(
     run.finished_at = now
     run.resume_at = None
     # What the steps read (a customer's card…) is only needed while the run may go on: none is kept,
-    # except by one that stopped by an error, which may be resumed for RESUME_DAYS (FLOW-F24).
+    # except by one that stopped by an error, which may be resumed for RESUME_DAYS (FLOW-F24); its ids are.
+    _remember_read(run)
     if status != FlowRun.Status.FAILED:
         run.outputs = {}
     run.error_code = failure.code if failure else ""
@@ -985,7 +1141,7 @@ def _operation_step(
     return output, "done", {}
 
 
-def _fail(
+def _fail(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, run: FlowRun, step: dict, failure: StepFailed, now: dt.datetime, left: dict | None = None
 ) -> bool:
     """Writes a step's failure; ``True`` when the run goes on (``on_error: continue``, FLOW-F25), leaving
@@ -1022,7 +1178,7 @@ def _skipped(ctx: OperationContext, run: FlowRun, step: dict, data: dict, now: d
     return True
 
 
-def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:
+def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) -> None:  # noqa: C901, PLR0911, PLR0912
     """Runs ``run``'s steps from ``step_index`` until it ends, waits or fails."""
     steps = run.definition.get("steps", [])
     with translation.override(flow.language):
@@ -1111,7 +1267,7 @@ def _call_allowed(run: FlowRun, flow: Flow, step: dict) -> StepFailed | None:
     return None
 
 
-def _mark_calling(
+def _mark_calling(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, outcome: str, now: dt.datetime, **details
 ) -> None:
     _log(run, step, outcome, now, **details)
@@ -1142,7 +1298,7 @@ def _go_on(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) ->
     _advance(ctx, run, flow, now)
 
 
-def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:
+def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:  # noqa: PLR0913, PLR0917
     run.resume_at = None
     if _fail(ctx, run, step, failure, now, left):
         _go_on(ctx, run, flow, now)
@@ -1170,7 +1326,7 @@ def _park_assistant(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict,
     """Parks the run on its «Ask the assistant» step and answers: the model is never asked from here (a web request
     would wait for it). Its ``flow.run.parked`` reaches the worker, which asks it (``flow.run.call``); a step resumed
     (FLOW-F24) starts its conversation again."""
-    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    _end_turn(run)
     _back_to_assistant(ctx, run, flow, step, now)
 
 
@@ -1338,7 +1494,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     }
 
 
-def _propose(
+def _propose(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     run: FlowRun,
     flow: Flow,
@@ -1466,7 +1622,7 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
         return {"count": 0}
     flow = run.flow
     answered = (run.outputs.get(TURN) or {}).get("answered") or {}
-    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    _end_turn(run)
     with translation.override(flow.language):
         if data.failure:
             code = _ASSISTANT_FAILURES.get(data.failure, "flow.assistant_refused")
@@ -1479,17 +1635,17 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
     return {"count": 1}
 
 
-def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:
+def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:  # noqa: PLR0913, PLR0917
     """Stops the step when the assistant spent its turns (``max_rounds``) and says so; ``True`` when it did."""
     if rounds < int(step.get("max_rounds", 6)):
         return False
-    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    _end_turn(run)
     failure = _own("flow.assistant_too_many_rounds", n=rounds)
     _call_failed(ctx, run, flow, step, failure, now)
     return True
 
 
-def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:
+def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, answered: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """A yes to the assistant's change: it is made now, by its own operation, as the automation (what it was granted
     now, not when it was proposed), and the step goes back to the assistant with what happened — the change's result
     (or its refusal) and, for the calls of that answer behind it, that they were not made —, so it can say it or ask
@@ -1500,7 +1656,7 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     name = str(proposal.get("operation") or "")
     op = _offered(ctx, flow, step).get(name)
     if op is None:
-        run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+        _end_turn(run)
         if _fail(ctx, run, step, _own("flow.not_allowed", ASSISTANT_GONE_KEY, operation=name), now):
             _go_on(ctx, run, flow, now)
         return
@@ -1543,7 +1699,7 @@ def _who(ctx: OperationContext) -> str:
     return _actor(ctx)
 
 
-def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:
+def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
@@ -1577,7 +1733,7 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict
     )
 
 
-def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:
+def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917
     run.outputs = {**run.outputs, step["id"]: left}
     run.step_index += 1
     _go_on(ctx, run, flow, now)
@@ -1601,9 +1757,19 @@ def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
     input=AnswerIn,
     output=AnsweredOut,
     ai={
+        "asks": {
+            "en": (
+                "answer yes to the automation's question",
+                "say no to that question, the customer already paid",
+            ),
+            "es": (
+                "dile que sí a la automatización que espera mi respuesta",
+                "responde que no a la automatización de impagos, el cliente ya ha pagado",
+            ),
+        },
         "description": "Answer yes or no, with an optional note, to a question an automation asked and is waiting "
         "on (from `flow.question.list`): a yes carries it on, a no does what its step says. Only the role it was "
-        "asked of, or whoever runs the business. It is the person's decision: confirm it with them first.",
+        "asked of, or whoever runs the business. The yes or the no is the one the person said, never your own.",
         "risk": "high",
     },
 )
@@ -1892,6 +2058,10 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
     )
     if waiting_ids and data.event.split(".", 1)[0] not in active_apps(ctx.scope):
         return {"started": 0, "skipped": len(waiting_ids)}
+    if waiting_ids and brought_back(data.actor):
+        # What a recovery brought back from a separate copy is nothing new to the business (BASE-F114, hub#1307): no
+        # automation greets or announces it again.
+        return {"started": 0, "skipped": len(waiting_ids)}
     for flow_id in waiting_ids:
         flow = (
             Flow.objects.select_for_update()
@@ -1904,7 +2074,7 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         # What its recipe excludes today counts too, whenever it was built (FLOW-F36).
         wanted = recipes.fixed_filter(flow)
         if not document.readable(wanted):
-            # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
+            # Never «does not hold» in silence: the owner reads why in its history.
             run = _start(
                 ctx,
                 flow,
@@ -1945,6 +2115,117 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
                 continue
         _advance(ctx, run, flow, now)
     return {"started": started, "skipped": skipped}
+
+
+#: The runs that may still go on with what they keep (FLOW-F23, F27, F28); one stopped by an error goes on only if
+#: it is resumed (FLOW-F24, ``resume_problem``).
+GOING_ON = (FlowRun.Status.WAITING, FlowRun.Status.CALLING, FlowRun.Status.ASKING)
+
+
+def _naming(card: str):
+    """The runs whose kept data name the card ``card``: its id in what started them (the notice of Customers or of
+    another app, ``customer_id``), in what their steps read (the card itself, a sale, an appointment…) or among the
+    ids of what they read and have forgotten (``read_ids``: one that ended, started by hand or by a schedule)."""
+    return FlowRun.objects.annotate(
+        input_text=Cast("input", TextField()), outputs_text=Cast("outputs", TextField())
+    ).filter(Q(input_text__contains=card) | Q(outputs_text__contains=card) | Q(read_ids__contains=[card]))
+
+
+#: What a free text of a run's History says once a customer it named is erased (CUSTOMER-F16), in the automation's
+#: language like the rest of what it keeps.
+ERASED_TEXT = _("[erased with the customer's personal data]")
+
+
+def _forgotten_step(entry: dict, erased: str) -> dict:
+    """A step of a run's History without its free texts: an answer's note, what the assistant answered and, of a step
+    that failed, what another app answered (also of each field) and its technical text (a failure of the engine's own
+    is said again from its reason, which names no person); what happened stays."""
+    forgotten = {name: erased if name in ("note", "text") and value else value for name, value in entry.items()}
+    error = entry.get("error")
+    if isinstance(error, dict):
+        error = {name: value for name, value in error.items() if name != "technical"}
+        if not error.get("reason") and error.get("message"):
+            error["message"] = erased
+        if isinstance(error.get("fields"), dict):
+            # Which field was refused stays; what was said of it may quote what the step sent (her name).
+            error["fields"] = {field: erased if said else said for field, said in error["fields"].items()}
+        forgotten["error"] = error
+    return forgotten
+
+
+def _forget_texts(run: FlowRun) -> bool:
+    """Forgets, in the automation's language, the free texts of ``run``'s History that may name a person (its steps,
+    the title of the question in a «no» or a silence, what another app answered) and those of its questions;
+    ``True`` when something changed. Called with the run locked."""
+    erased = str(ERASED_TEXT)
+    kept = (run.log, run.error_reason, run.error_message)
+    run.log = [_forgotten_step(entry, erased) for entry in run.log]
+    values = run.error_reason.get("values") or {}
+    if values.get("title"):
+        run.error_reason = {**run.error_reason, "values": {**values, "title": erased}}
+        run.error_message = say(run.error_reason, run.error_message)
+    elif not run.error_reason and run.error_message:
+        run.error_message = erased
+    # Filled in from what the steps read (``{{steps.s1.name}}``) or written by whoever answered: she may be in them.
+    texts = Question.objects.filter(run=run).exclude(title="", details="", note="")
+    return bool(texts.update(title="", details="", note="")) or kept != (run.log, run.error_reason, run.error_message)
+
+
+@operation(
+    "flow.customer.erase",
+    kind="command",
+    permission=SYSTEM,
+    input=CustomerErasedIn,
+    output=ChangedOut,
+    ai={
+        "description": "System only: the platform's reaction to customer.customer.erased (Customers): every run that "
+        "could still go on with that customer's data (waiting, calling another system, asking someone, or stopped "
+        "by an error and resumable) is cancelled, saying why; every run naming the customer, also one that has "
+        "ended, forgets what its steps read and the free texts of its history and of its questions (an answer's "
+        "note, what the assistant or another app answered, the title of a question).",
+        "risk": "normal",
+    },
+)
+def erase_customer(ctx: OperationContext, data: CustomerErasedIn) -> dict:
+    now = timezone.now()
+    # Every run that names the card, however it is: also one that has ended keeps its History 90 days (FLOW-F16).
+    naming = _naming(str(data.id))
+    found = list(naming.values_list("pk", "flow_id"))
+    if not found:
+        return {"changed": 0}
+    # The order of every write: the automations, then their runs, then their questions.
+    list(
+        Flow.objects.select_for_update()
+        .filter(pk__in={flow_id for _pk, flow_id in found})
+        .order_by("id")
+        .values_list("pk", flat=True)
+    )
+    changed = 0
+    for run in (
+        naming.filter(pk__in=[pk for pk, _flow_id in found])
+        .select_related("flow")
+        .select_for_update(of=("self",))
+        .order_by("id")
+    ):
+        goes_on = run.status in GOING_ON or (
+            run.status == FlowRun.Status.FAILED and resume_problem(run, now) is None
+        )
+        with translation.override(run.flow.language):
+            if goes_on:
+                Question.objects.filter(run=run, status=Question.Status.PENDING).update(
+                    status=Question.Status.CANCELLED, decided_at=now
+                )
+                _forget_texts(run)
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.customer_erased"))
+                changed += 1
+                continue
+            # It can no longer go on: what its steps read and its free texts go, its history stays as it ended.
+            read = bool(run.outputs)
+            run.outputs = {}
+            if _forget_texts(run) or read:
+                run.save(update_fields=["outputs", "log", "error_reason", "error_message"])
+                changed += 1
+    return {"changed": changed}
 
 
 @operation(
@@ -2048,9 +2329,19 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
     input=RunIn,
     output=RunOut,
     ai={
+        "asks": {
+            "en": (
+                "run the weekly review automation now",
+                "launch the reminders automation right away",
+            ),
+            "es": (
+                "ejecuta ya la automatización de la revisión semanal",
+                "lanza ahora mismo la automatización de los recordatorios",
+            ),
+        },
         "description": "Run an automation now, for real, by its id or its name («run the weekly review now»), "
         "with `input` as what its steps read. Only when it is on; to see what it would do without effects, "
-        "use `flow.flow.test`. Confirm it first.",
+        "use `flow.flow.test`.",
         "risk": "high",
     },
 )
@@ -2080,10 +2371,20 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
     input=RunRefIn,
     output=RunOut,
     ai={
+        "asks": {
+            "en": (
+                "retry the failed run now that the permission is granted",
+                "resume the run that stopped with an error",
+            ),
+            "es": (
+                "vuelve a intentar la ejecución de anoche, ya he dado el permiso que faltaba",
+                "vuelve a lanzar desde el error la ejecución de ayer",
+            ),
+        },
         "description": "Resume a run that stopped by an error at the step that failed, once its cause is fixed "
         "(a permission granted, an app turned on, the other system back): the steps before it are not "
         "repeated and it goes on with the steps it started with. Only within 7 days, with the automation on. "
-        "It does things for real: confirm it first.",
+        "It does things for real.",
         "risk": "high",
     },
 )
@@ -2134,11 +2435,15 @@ def prune_runs(ctx: OperationContext, data: DueIn) -> dict:
         .order_by("ended", "id")
         .values_list("pk", flat=True)[:PRUNE_BATCH]
     )
-    # A failure older than RESUME_DAYS can no longer be resumed: what its steps read goes (FLOW-F24).
-    FlowRun.objects.filter(
+    # A failure older than RESUME_DAYS can no longer be resumed: what its steps read goes (FLOW-F24), its ids stay.
+    expired = FlowRun.objects.filter(
         status=FlowRun.Status.FAILED,
         finished_at__lt=timezone.now() - dt.timedelta(days=RESUME_DAYS),
-    ).exclude(outputs={}).update(outputs={})
+    ).exclude(outputs={})
+    for failed in expired.select_for_update(skip_locked=True).order_by("id")[:PRUNE_BATCH]:
+        _remember_read(failed)
+        failed.outputs = {}
+        failed.save(update_fields=["outputs", "read_ids"])
     if doomed:
         FlowRun.objects.filter(pk__in=doomed).delete()
         # Counted: a silent prune cannot be told from lost data the day somebody looks for an old run.

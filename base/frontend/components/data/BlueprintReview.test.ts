@@ -1,6 +1,3 @@
-// «Review what it brings» (BASE-G105): what a template or a file is (name, type, language and country by name, apps,
-// when it was made), one box per app with what it brings — an app off or this hub does not have, and personal data in
-// a template, say they stay out —, what this hub never loads, and «Import» with the apps ticked or «Choose another».
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { summary } from '../../__tests__/data-fixtures';
@@ -72,7 +69,7 @@ describe('BlueprintReview', () => {
     expect(m.wrapper.text()).toContain('Choose at least one app.');
   });
 
-  it('ticks an app off that the load turns on, saying so, and imports it (round 2026-10-27)', async () => {
+  it('ticks an app off that the load turns on, saying so, and imports it', async () => {
     const turnsOn = summary({
       apps: [
         { id: 'table', label: 'Tables', status: 'turns_on', datasets: [{ key: 'table.zone', label: 'Zones', rows: 2, personal: false, travels: true }] },

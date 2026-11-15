@@ -324,12 +324,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen(ID, form, open);
+const canDismiss = useUnsavedFormOnOpen(ID, form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :testid="ID"
     size="md"
     :title="title"

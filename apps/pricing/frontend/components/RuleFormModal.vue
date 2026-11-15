@@ -15,6 +15,7 @@ import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
@@ -209,16 +210,22 @@ function setScope(scope: RuleScope): void {
   if (scope !== form.value.scope) form.value = { ...form.value, scope, target: null };
 }
 
+/** The server refuses the tiers as a whole too (they must rise), on a line under them: a change to them takes it away. */
+const tiersChanged = useGroupChange('tiersGroup');
+
 function setTier(index: number, change: Partial<TierForm>): void {
   form.value = { ...form.value, tiers: form.value.tiers.map((tier, i) => (i === index ? { ...tier, ...change } : tier)) };
+  tiersChanged();
 }
 
 function addTier(): void {
   form.value = { ...form.value, tiers: [...form.value.tiers, { min: '', percent: '' }] };
+  tiersChanged();
 }
 
 function removeTier(index: number): void {
   form.value = { ...form.value, tiers: form.value.tiers.filter((_, i) => i !== index) };
+  tiersChanged();
 }
 
 /** Only the keys whose value the form changed (a new type brings its value, a new scope its target), its amounts in the
@@ -250,7 +257,7 @@ async function save(): Promise<void> {
 }
 
 // An untouched amount follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'pricing-rule-form',
   () => {
     const stored = moneyFieldText(props.rule?.amount ?? null, locale.value, money.value);
@@ -263,6 +270,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="pricing-rule-form"
     :title="title"
     :submit-label="rule ? $t('pricing.rules.form.save') : $t('pricing.rules.form.create')"
@@ -384,6 +392,8 @@ useUnsavedFormOnOpen(
         </div>
         <fieldset
           v-else
+          ref="tiersGroup"
+          name="tiers"
           class="pricing-form__tiers"
           data-testid="pricing-rule-form-tiers"
         >

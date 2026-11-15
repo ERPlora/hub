@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52279a27eead66e33b5468a6232c03c4953db354d8d1fdeb28632e5177bc4d43 -->
+<!-- generated from WORKBOOK.md sha256:ad24a182c25f96f53562b0d72aee74657553b9ace4bcc644ecf87d8e6d75e53c -->
 
 ## What it is for and who it is for
 
@@ -41,22 +41,21 @@ assistant, with nobody in front of it: **Ask the assistant** (FLOW-F37 to F39).
 | Zapier (consulting forum) | A Zap made with the account of someone who left keeps running with their credentials | https://alltomate.com/blogs/is-zapier-safe/ |
 | Business Central | Queued tasks run with the session of whoever set them ready and need their permissions | https://learn.microsoft.com/en-us/dynamics365/release-plan/2023wave1/smb/dynamics365-business-central/delegated-admins-job-queue-entries-are-run-user |
 | Odoo | Automated actions run with elevated access (`sudo`); it is advised not to hide missing permissions with it | https://deploymonkey.com/blog/odoo-sudo-superuser-security |
-| Current product (ERPlora) | "An automation acts with its own permissions, never with those of whoever created it"; they are granted one by one; the hub refuses to run a paused one | `modules/flows/WORKFLOW.md`, "Rules that are never broken" and FLOWS-F22 |
 
-**Winner:** the tools **inside the product** (Salesforce, HubSpot, Odoo and the current product) make the
+**Winner:** the tools **inside the product** (Salesforce, HubSpot, Odoo) make the
 automation run **as the business**, not as the person who created it; the integration ones (Zapier, Power
 Automate, Business Central) use the owner's account, and their forums tell what happens when that person
 leaves. Our user is a small business whose staff changes, so the automation acts **as the business**, but
-**only with the actions the owner has allowed it one by one** (like the current product): without a granted
+**only with the actions the owner has allowed it one by one**: without a granted
 permission, the step is refused and the history says so. And **running by hand requires it to be on**
-(HubSpot, Power Automate and the current product): to see what it would do while off there is **Try it**,
+(HubSpot and Power Automate): to see what it would do while off there is **Try it**,
 which runs nothing.
 **Why not the others:** with the permissions of whoever created it, the automation stops working the day
 that person leaves or changes role, which is the repeated complaint in the forums; with all the system's
 permissions and no list, a badly written automation could do anything.
 
-From the current product we keep, already checked there against Zapier, Make, Power Automate, Shopify
-Flow, Odoo and Business Central (`qa-hub-flows`, ADR-0461): **one column** of steps from top to bottom and
+Against Zapier, Make, Power Automate, Shopify Flow, Odoo and Business Central, it keeps **one column**
+of steps from top to bottom and
 not a canvas of nodes (on the counter's tablet a column is used with a finger); **no branches**: an "Only
 continue if…" that is not met ends the automation (that is working, not failing), and two outcomes are two
 automations; **starting from a template** of the gallery; and what the assistant writes is born a
@@ -557,11 +556,17 @@ Steps:
 In: that automation's runs of the last 90 days, and all those still waiting.
 Out: nothing. The history keeps each finished run **90 days** and then forgets it; one that is waiting or
 under way is never deleted. What its steps read (a customer's card) is not kept when it ends: only the ids
-and the amounts of the notice that started it; one stopped by an error keeps it 7 days, so that it can be
-resumed (FLOW-F24).
+and the amounts of the notice that started it and the ids of what they read, never their data; one stopped by an
+error keeps it 7 days, so that it can be resumed (FLOW-F24). If a customer's personal data are erased
+(CUSTOMER-F16), every run that names her card (what started it or what its steps read, also one started by hand or
+by a schedule or whose assistant read the card), also one that has already ended, forgets right then the free texts of its
+history that may carry her name: an answer's note, what the assistant or the app that did the action answered
+(also about each field, and its technical text) and the title of the question in a "no" or a silence. Each one says "[erased with the
+customer's personal data]"; what happened stays (how it ended, who answered and what). The other customers' runs
+do not change.
 If it fails: if the history cannot be read, the message in red with **Retry**; with no runs, "It has not
 run yet.".
-Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
+Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Ask the assistant for an automation
 Status: done
@@ -639,14 +644,19 @@ Steps:
    longer be read…", visible in History, and the other automations of that notice carry on.
 In: the notice of another app, with its data (ids, amounts and states; never names or texts), which the
 platform hands to it a few seconds after it happens, outside the request that left it. A paused automation
-does not receive what happened while it was paused.
+does not receive what happened while it was paused. What ERPlora's staff recovers from a separate copy of the
+business (BASE-F114) starts none: its notices ("customer created", "customer recovered", "appointment created"…) say
+the recovery made them, and what comes back is nothing new to the business, so nobody is welcomed again or told of a
+booking they already had; nor does what another app does with it (the WhatsApp Inbox linking her conversation to the
+card again). What the business creates afterwards starts them as always.
 Out: a run (`flow.run.started`, `flow.run.finished` or `flow.run.parked` if it waits), in the business
 where the notice happened. The same notice delivered twice starts **a single** run per automation.
 If it fails: each step that fails stops the run with its reason, visible in History; the previous steps
-stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"). An
-"Only continue if…" that can no longer be read stops the run with "This "Only continue if…" can no longer be
-read…".
-Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16
+stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"), also
+when the chain goes through another app: the WhatsApp Inbox linking the conversation of her number to the card an
+automation made does not make the next one start over. An "Only continue if…" that can no longer be read stops the
+run with "This "Only continue if…" can no longer be read…".
+Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 When the time comes, the automation starts
 Status: done
@@ -675,8 +685,13 @@ In: the runs that are waiting and the time they wake up.
 Out: the run carries on (`flow.run.resumed`) and finishes or waits again. A pass with nothing to do leaves
 no notice.
 If it fails: if the automation is paused when it wakes up, the run is cancelled ("Cancelled: the automation
-was paused while it waited."); if it is deleted, too ("Cancelled: the automation was deleted.").
-Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
+was paused while it waited."); if it is deleted, too ("Cancelled: the automation was deleted."). If, while it
+waits, the personal data of a customer it keeps something of are erased (CUSTOMER-F16: what started it or what
+its steps read names her card), it is cancelled right then, without waiting to wake up, and forgets what its
+steps read and the free texts of its history (FLOW-F16): "Cancelled: the customer's personal data were erased.". It sends her nothing and creates nothing for
+her; the same for one calling another system or asking someone (its question is closed and left without its
+texts). The other customers' runs carry on.
+Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
 Status: done
@@ -703,8 +718,12 @@ automation does not exist in this business."; one that stopped before doing any 
 unreadable "Only when…"), at something that needs a person in front or at a call to a private or badly
 written address (the same steps would fail again), "This run cannot be resumed…: run it again whole"; after
 7 days, "…can no longer be resumed…"; one already resumed, "Only a run that stopped by an error at one of its
-steps can be resumed…": it is never resumed twice. None resumes by itself.
-Involved: FLOW-F12, FLOW-F15, FLOW-F16
+steps can be resumed…": it is never resumed twice. None resumes by itself. If the personal data of a customer it
+keeps something of are erased (CUSTOMER-F16), one that could still be resumed is cancelled ("Cancelled: the
+customer's personal data were erased."), forgets what its steps read and is no longer resumed; its steps still
+show the one that had failed. One that could no longer be resumed only forgets what its steps read. Both forget
+the free texts of their history (FLOW-F16).
+Involved: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 "Only if…" and "If it fails, it carries on" on each step
 Status: done
@@ -1225,6 +1244,7 @@ question asked of another role) does not show on the card.
 | Leaves an assistant's draft | manage | F17 | `flow.draft.propose` |
 | Discards a draft | manage | F19 | `flow.draft.dismiss` |
 | Starts the automations of a notice | only the platform | F21 | `flow.run.react` |
+| When a customer's data are erased, cancels the runs that could still go on with hers and makes every run that names her card, also one that has ended, forget what it read and the free texts of its history (CUSTOMER-F16) | only the platform | F16, F23, F24 | `flow.customer.erase` |
 | Starts the scheduled or dated ones that are due | only the platform | F22 | `flow.schedule.fire_due` |
 | Carries on the runs whose wait is over | only the platform | F23 | `flow.run.resume_due` |
 | Resumes a run stopped by an error at the step that failed | manage | F24 | `flow.run.retry` |
@@ -1282,6 +1302,13 @@ Notices carry ids, never names or contents.
   business.
 - **To its own `flow.run.parked`**: when a run waits for "Call another system", the worker makes the call
   (`flow.run.call`, FLOW-F27); never the request that left it waiting.
+- **To the erasure of a customer's data** (`customer.customer.erased`, CUSTOMER-F16): before starting what waits
+  for that notice, and in the same delivery, it cancels the runs that wait, call, ask or can be resumed and whose
+  kept data name that card (`flow.customer.erase`, FLOW-F23 and F24); what their steps read and their questions'
+  texts are emptied. In the same pass, every run that names the card, also one that has already ended, forgets the
+  free texts of its history (FLOW-F16). It looks for them by the card's id (in what started them, in what their
+  steps read or among the ids of what they read and have forgotten), never by a name or a phone. Repeating the
+  notice changes nothing.
 - From the platform: the business's time zone (the schedules) and the outbox's notices (the last one of a
   kind, for Try it and the examples).
 

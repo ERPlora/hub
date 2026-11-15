@@ -1,8 +1,7 @@
 """Input and output schemas of the attendance app: what the API, the live stream and the assistant accept.
 
-The cases come from the old module's JSON schemas (clock_in, clock_out, record_correct,
-settings_update) and its batteries: a correction needs a reason of at least 3 characters and a
-clock-out after its clock-in; a position is both coordinates or none; the radius is one of five.
+A correction needs a reason of at least 3 characters and a clock-out after its clock-in; a position is both coordinates
+or none; the radius is one of five.
 """
 
 import datetime as dt
@@ -54,7 +53,7 @@ def test_clocking_in_someone_else_by_id_or_by_name():
 
 
 def test_the_device_is_not_the_payloads_to_declare():
-    # Review of 2026-10-15, finding 6: shared or personal comes from the session's device (BASE-F62).
+    # Shared or personal comes from the session's device (BASE-F62).
     assert "source" not in ClockInIn.model_fields
     assert not hasattr(ClockInIn.model_validate({"source": "personal"}), "source")
 
@@ -116,7 +115,7 @@ def test_a_correction_without_clock_out_reopens_the_day():
 
 
 def test_times_with_any_offset_are_the_same_instant():
-    # The old module refused offsets because it compared text; instants compare as instants.
+    # Instants compare as instants, never as text, so any offset is accepted.
     data = CorrectIn(
         record_id=ID,
         clock_in_at="2026-10-06T10:00:00+02:00",
@@ -128,7 +127,7 @@ def test_times_with_any_offset_are_the_same_instant():
 
 
 def test_a_time_without_offset_is_the_business_wall_clock():
-    # The assistant says «at nine»: the business's nine (phase 1, Europe/Madrid).
+    # The assistant says «at nine»: the business's nine (Europe/Madrid here).
     data = CorrectIn(record_id=ID, clock_in_at="2026-10-06T09:00", reason="At nine")
     assert data.clock_in_at == dt.datetime(2026, 10, 6, 9, tzinfo=MADRID)
 

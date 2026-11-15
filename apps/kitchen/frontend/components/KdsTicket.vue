@@ -3,7 +3,7 @@
 // the label (or the type) and «Waiter: …», the Rush/VIP, «Round N» and «Ready» marks, the clock and
 // «#0012»; each dish with its quantity large, the options chosen under its name (KITCHEN-F07), its note in
 // italics and, in «All», its station; the dishes of a menu indented under the menu's header with how many
-// there are (KITCHEN-F06, kitchen#57); a dish voided in the till struck with «Voided» and its reason, which
+// there are (KITCHEN-F06); a dish voided in the till struck with «Voided» and its reason, which
 // does not answer to a tap. The top border is green, amber or red by the minutes since the round was sent.
 // One tap marks a dish ready; a tap on a struck one recalls it; a menu's header marks its dishes on screen;
 // the card's header or «Ready» every dish on screen. No confirmation anywhere: recall is the undo.
@@ -433,7 +433,7 @@ function bumpMenu(group: DishGroup): void {
   font-size: 0.95rem;
   opacity: 0.7;
 }
-/* The dishes of a menu hang from its header along a rule (kitchen#57) drawn inside the line's own left
+/* The dishes of a menu hang from its header along a rule drawn inside the line's own left
    padding: a dish of a menu keeps the width of any other for its name (a caps word never splits there). */
 .kds-line--menu {
   border-top: none;

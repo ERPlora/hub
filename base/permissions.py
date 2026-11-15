@@ -1,8 +1,8 @@
-"""What a user may do on a host: the phase-1 session seam (plan §4.4).
+"""What a user may do on a host.
 
 Exception to "only services.py and queries.py touch the ORM": the context builder needs the
 Membership (and a fresh copy of the user) before any operation runs, so it cannot go through one.
-This module only reads. Phase 2 replaces it with the hub's staff and its roles.
+This module only reads.
 """
 
 from typing import Any
@@ -16,7 +16,7 @@ from base.tenancy.context import PLATFORM_SCOPE_KIND
 
 
 #: Everyone of the hub sees the Home; who runs it (owner, admin) is told the platform's steps and counters, and keeps
-#: its devices and the way in (APP-BASE-3). Here, not in ``base.queries``, so ``base.services`` can name them too.
+#: its devices and the way in. Here, not in ``base.queries``, so ``base.services`` can name them too.
 VIEW_HOME = "base.view_home"
 ADMINISTER_HUB = "base.administer_hub"
 #: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
@@ -30,7 +30,7 @@ def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
     """``{"*"}`` for an active superuser on the platform's scope; else the permissions of its role on ``scope``; else
     none.
 
-    A superuser is ERPlora's staff, whose place is the Hub admin on the platform host (Ioan, 2026-10-31): on a
+    A superuser is ERPlora's staff, whose place is the Hub admin on the platform host: on a
     business's host it holds only what a ``Membership`` there gives it, like anyone (the staff copy ``saas-staff:<id>``
     never has one). Owner and admin get every permission declared by every app; manager and employee get what each
     app's ``role_permissions`` gives them.

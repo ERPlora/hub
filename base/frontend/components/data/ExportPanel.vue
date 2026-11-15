@@ -1,10 +1,7 @@
 <script setup lang="ts">
-// Settings › Data › Export (BASE-G101, BASE-G102; the old hub's ExportPanel): only for who administers the hub. The
-// file's name (the business's, or the hub's address without one: the old hub's «hub» was a defect) and language, with the final file name under
-// them; «Backup of this business» (its customers too) or «Template to share» (never personal data); the apps on, each
-// with «App» (the file registers it) and «Data» (its data travels) and, under a marked «Data», one box per table with
-// its rows. While no table is unmarked, «all» is sent, so a new table never stays out unseen. «Export» asks the server
-// for the file (`base.blueprint.export`) and saves it.
+// Only for whoever administers the hub. The file is named after the business, or after the hub's address when it has
+// no name. A backup carries personal data; a template to share never does. While no table is unmarked, «all» is sent,
+// so a table added later never stays out unseen.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';

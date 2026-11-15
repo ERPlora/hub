@@ -1,6 +1,6 @@
 // flow: APPOINTMENT-F28
-// The device's notice of a booking the customer made herself (apps/appointment/WORKBOOK.md APPOINTMENT-F28; the old
-// hub's HUB_SHELL-F66, hub#2168): in the installed app, a booking by WhatsApp sends ONE system notice
+// The device's notice of a booking the customer made herself (apps/appointment/WORKBOOK.md APPOINTMENT-F28): in the
+// installed app, a booking by WhatsApp sends ONE system notice
 // (`erplora_notify`) with «New appointment · {customer}», the service, «{day} at {hour}» and the professional, while
 // one of the front desk sends none; a reload (or a reconnection) brings the last 24 hours back and tells nothing
 // again; and a tap on the notice opens the agenda on the appointment's day. Tauri does not run in Playwright: the

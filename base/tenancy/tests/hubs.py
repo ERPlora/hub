@@ -1,4 +1,4 @@
-"""The tests' hubs with a database of their own (PLAN-DB §4 «Tests»; plan 2026-10-22-fase-2-tenencia §4, step 7).
+"""The tests' hubs with a database of their own.
 
 Per test session (and xdist worker), next to its control database ``<control>``:
 
@@ -88,8 +88,8 @@ def _maintenance(dbname: str = "postgres"):
 
 #: The sessions clients hold open on a database. Only client backends: the server's own processes are listed with a
 #: ``datname`` too, and they are nobody's to close. An autovacuum worker on ``pg_database`` (every ``CREATE DATABASE`` of
-#: the suite dirties it) works from whichever database it is sent to, a database just made included: it counted as a
-#: session in hub#819's CI.
+#: the suite dirties it) works from whichever database it is sent to, a database just made included: it was once counted
+#: as a session in CI.
 CLIENT_SESSIONS_COLUMNS = "(pid, application_name, state, last query)"
 CLIENT_SESSIONS = """
     SELECT pid, application_name, state, left(query, 100) FROM pg_stat_activity
@@ -97,7 +97,7 @@ CLIENT_SESSIONS = """
 """
 #: How long ``assert_nobody_on`` waits for the sessions on a database to end, and how often it looks: a client's
 #: ``close()`` returns before its server process has left ``pg_stat_activity``, so a connection just closed is still
-#: counted for a moment (hub#484's CI); one still there after the wait is a connection left open.
+#: counted for a moment; one still there after the wait is a connection left open.
 SESSIONS_END_WAIT = 5.0
 SESSIONS_END_POLL = 0.05
 
@@ -334,7 +334,7 @@ def watched() -> Iterator[dict[str, list[str]]]:
 
 
 #: Tables of a hub's (or contextual) model that a block watched by :func:`assert_only_alias` may still name in control's
-#: database, each with its reason. None: in control's, a hub's table is phase 1's shared data (``db_name=""``), nobody's
+#: database, each with its reason. None: in control's, a hub's table is the old shared data (``db_name=""``), nobody's
 #: own, and a hub with its own database never reads it.
 CONTROL_HUB_TABLES_ALLOWED: dict[str, str] = {}
 
@@ -351,16 +351,16 @@ def _hub_tables_named(statements: list[str]) -> list[str]:
 
 @contextmanager
 def assert_only_alias(alias: str) -> Iterator[dict[str, list[str]]]:
-    """The block reaches no hub's database but ``alias``'s (PLAN-DB §14.2): whatever any thread sends to another alias
+    """The block reaches no hub's database but ``alias``'s: whatever any thread sends to another alias
     than ``alias`` fails it, whichever hub that alias is, and so does a statement to control's (``default``: the
-    registry, the sessions) that names a hub's table, phase 1's shared data (``CONTROL_HUB_TABLES_ALLOWED`` aside).
+    registry, the sessions) that names a hub's table, the old shared data (``CONTROL_HUB_TABLES_ALLOWED`` aside).
     Yields the statements by alias (:func:`watched`)."""
     with watched() as sent:
         yield sent
     strays = {other: statements[:3] for other, statements in sent.items() if other not in (alias, DEFAULT_DB_ALIAS)}
     assert not strays, f"Only {alias} and control's database may be reached here, and these were too: {strays}"
     shared = _hub_tables_named(sent.get(DEFAULT_DB_ALIAS, []))
-    assert not shared, f"Control's database was asked for phase 1's shared data of a hub's tables: {shared}"
+    assert not shared, f"Control's database was asked for the old shared data of a hub's tables: {shared}"
 
 
 # ── For the migrator's tests (base/tenancy/tests/test_migrator.py, base/tests/test_migrate_hubs.py) ───────────────
@@ -451,3 +451,126 @@ def same_server_by_another_name() -> str:
     others = {"127.0.0.1": "localhost", "localhost": "127.0.0.1"}
     assert host in others, f"the tests' database host {host!r} has no second name to stand for another cluster"
     return others[host]
+
+
+# ── A hub's database copied: moved to another cluster (test_move) or restored from a copy (test_restore) ────────────
+
+#: The table of its own a copied hub's database has: only the hub's database, never a template.
+MARKER_TABLE = "w8a_marker"
+
+
+def control_databases() -> set[str]:
+    """The databases on the session's server named after its control database."""
+    control = tenancy_connections.control_name()
+    with _maintenance() as conn:
+        return {row[0] for row in conn.execute("SELECT datname FROM pg_database") if row[0].startswith(control)}
+
+
+def marker(name: str) -> list[str]:
+    """What the hub's own table says in the database ``name``, in order."""
+    with _maintenance(name) as conn:
+        query = sql.SQL("SELECT note FROM {} ORDER BY note").format(sql.Identifier(MARKER_TABLE))
+        return [row[0] for row in conn.execute(query)]
+
+
+def says_it_is(name: str) -> list[uuid.UUID]:
+    """Whom the database ``name`` says it is (``base_hub_identity``)."""
+    with _maintenance(name) as conn:
+        return [row[0] for row in conn.execute("SELECT hub_id FROM base_hub_identity")]
+
+
+class CopiedHubs:
+    """The rows and databases of a test that copies hubs' databases (committed: no test case there): the databases of
+    the control database made after it was set up are dropped, and its rows deleted, by :meth:`clean`."""
+
+    def __init__(self, template: str):
+        self.template = template
+        self.hubs: list[Hub] = []
+        self.clusters: list[Cluster] = []
+        self._before = control_databases()
+
+    def cluster(self, name: str, **fields) -> Cluster:
+        """A cluster's row on the session's server (CI has one)."""
+        default = connections.settings["default"]
+        values = {"host": default["HOST"], "port": default["PORT"], "pooler_host": ""}
+        self.clusters.append(row := Cluster.objects.create(name=f"{name}-{uuid.uuid4().hex[:8]}", **(values | fields)))
+        return row
+
+    def database(self, hub_id: uuid.UUID, *notes: str) -> str:
+        """The hub's own database on the session's server: a clone of the template with its identity and a table of its
+        own holding ``notes``."""
+        control = tenancy_connections.control_name()
+        name = names.hub_db_name(control, hub_id)
+        with _maintenance() as conn:
+            conn.execute(
+                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                    names.identifier(name, control=control), names.identifier(self.template, control=control)
+                )
+            )
+        with _maintenance(name) as conn:
+            conn.execute("INSERT INTO base_hub_identity (hub_id) VALUES (%s)", [hub_id])
+            conn.execute(sql.SQL("CREATE TABLE {} (note text)").format(sql.Identifier(MARKER_TABLE)))
+            for note in notes:
+                conn.execute(sql.SQL("INSERT INTO {} VALUES (%s)").format(sql.Identifier(MARKER_TABLE)), [note])
+        return name
+
+    def ready_hub(self, hub_id: uuid.UUID, name: str, **fields) -> Hub:
+        """Its ready row in control, on the settings' own server unless ``fields`` say otherwise."""
+        values = {
+            "id": hub_id,
+            "slug": f"acme-{hub_id.hex[-8:]}",
+            "status": Hub.Status.READY,
+            "db_name": name,
+            "vertical": TEMPLATE_VERTICAL,
+        }
+        self.hubs.append(row := Hub.objects.create(**(values | fields)))
+        return row
+
+    def clean(self) -> None:
+        control = tenancy_connections.control_name()
+        with _maintenance() as conn:
+            for name in sorted(control_databases() - self._before):
+                _drop(conn, name, control)
+        Hub.objects.filter(pk__in=[row.pk for row in self.hubs]).delete()
+        Cluster.objects.filter(pk__in=[row.pk for row in self.clusters]).delete()
+
+
+@contextmanager
+def an_app_role() -> Iterator[str]:
+    """A login role of the test's own that plays ``hub_app`` (password ``app``), dropped after it."""
+    role = f"w8a_app_{uuid.uuid4().hex[:8]}"
+    with _maintenance() as conn:
+        conn.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD 'app'").format(sql.Identifier(role)))
+    try:
+        yield role
+    finally:
+        with _maintenance() as conn:
+            for name in sorted(control_databases()):
+                revoke = sql.SQL("REVOKE ALL ON DATABASE {} FROM {}")
+                conn.execute(revoke.format(sql.Identifier(name), sql.Identifier(role)))
+            conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(role)))
+
+
+def app_roles(role: str):
+    """The environment's roles with ``role`` as its ``hub_app`` (``base.tenancy.bootstrap.Names``)."""
+    from base.tenancy import bootstrap
+
+    return bootstrap.Names(hub_app=role, hub_admin="pg_monitor")
+
+
+def reaches(role: str, name: str) -> bool:
+    """Whether ``role`` connects to the database ``name``."""
+    default = connections.settings["default"]
+    try:
+        with psycopg.connect(
+            dbname=name, user=role, password="app", host=default["HOST"], port=default["PORT"], connect_timeout=5
+        ):
+            return True
+    except psycopg.OperationalError:
+        return False
+
+
+def grant_connect(role: str, name: str) -> None:
+    with _maintenance() as conn:
+        grant = sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
+        conn.execute(grant.format(sql.Identifier(name), sql.Identifier(role)))

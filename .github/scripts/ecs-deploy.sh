@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploys an image tag of the hub to one environment, in that environment's ECS cluster
-# (erplora-<environment>; PLAN-AWS §6), touching only its hub task families and services:
+# (erplora-<environment>), touching only its hub task families and services:
 #   prod: cluster erplora-prod, families erplora-prod-{hub,worker,hub-migrate}, services hub and
 #         worker, image erplora/hub;
 #   pre:  cluster erplora-pre, families erplora-pre-{hub,worker,hub-migrate}, services hub-pre and
@@ -23,8 +23,8 @@
 #      puts the old one back and the wait still succeeds) fails at once; a rollout that outlasts
 #      ROLLOUT_TIMEOUT_SECONDS fails too;
 #   4. records the tag in /erplora/<environment>/hub/image_tag, so the revisions Terraform registers,
-#      and with them the scheduled tasks, keep running it (aws-next README, "Imagen").
-# Never db-bootstrap: the deploy role cannot pass its roles (aws-next deploy_role.tf).
+#      and with them the scheduled tasks, keep running it (ERPlora/aws README, "Imagen").
+# Never db-bootstrap: the deploy role cannot pass its roles (ERPlora/aws stacks/prod/deploy_role.tf).
 # Rollback: the circuit breaker reverts a broken deploy; back to the previous revisions, the
 #   rollback workflow (ecs-rollback.sh); back to a release, the deploy workflow with that release.
 #
@@ -117,7 +117,7 @@ primary() {
     --query "services[0].deployments[?status=='PRIMARY'] | [0].[taskDefinition, rolloutState]" --output text
 }
 
-# migrate <family>: its container has the family's name (aws-next modules/ecs-service).
+# migrate <family>: its container has the family's name (ERPlora/aws modules/ecs-service).
 migrate() {
   local name="$1" run task status code reason waited=0
   run="$(aws ecs run-task --cluster "$CLUSTER" --launch-type FARGATE \

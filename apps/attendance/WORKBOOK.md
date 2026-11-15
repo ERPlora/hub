@@ -5,9 +5,7 @@ Estado de la app: completa (2026-10-31)
 
 > Manual de usuario y especificación de la app `attendance`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
-> y páginas). Parte del `WORKFLOW.md` del módulo Control horario del producto actual
-> (`modules-workspace/modules/attendance`, `origin/main` `944a7b1`). Hace lo mismo, se ve igual y
-> conserva toda su funcionalidad salvo lo que dice «Cambios frente al producto actual», al final.
+> y páginas).
 
 ## Para qué sirve y para quién
 
@@ -125,7 +123,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | hecho (reacción por el relay del outbox) |
 
 ### ATTENDANCE-F01 Fichar la entrada al llegar y la salida al irse
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f01 qa:modules/attendance/clock-in-and-out gh:attendance#1 gh:attendance#11 gh:attendance#18 gh:hub#2553 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
@@ -151,7 +148,6 @@ salida sí se ficha); sin conexión, el error y «Reintentar».
 Implicados: STAFF-F03, ATTENDANCE-F05, ATTENDANCE-F11
 
 ### ATTENDANCE-F02 Hacer una pausa sin salir de la jornada
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f02 qa:modules/attendance/take-a-break -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
@@ -171,7 +167,6 @@ de 12 horas y está por revisar…».
 Implicados: ATTENDANCE-F01, ATTENDANCE-F05
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f03 qa:modules/attendance/clock-in-from-mobile-with-location gh:attendance#2 gh:hub#2552 gh:hub#2554 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
@@ -206,9 +201,8 @@ mostrador.
 Implicados: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 
 ### ATTENDANCE-F04 Ajustar la ubicación del local y cuándo se revisa una jornada olvidada
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f04 gh:attendance#4 gh:hub#2588 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
 Pasos:
 1. Abre Control horario → «Ajustes».
@@ -240,7 +234,6 @@ aviso rojo y los motivos de los campos del rechazo anterior, que no vuelven hast
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f05 gh:attendance#13 gh:attendance#15 gh:hub#2612 gh:hub#2681 -->
 Estado: hecho (servidor, tarea del worker y pantalla)
 Actor: sistema
 Pantalla: ninguna (la insignia «Por revisar» sale en Fichar y en Registros)
@@ -262,7 +255,6 @@ vuelve a fichar.
 Implicados: ATTENDANCE-F04, ATTENDANCE-F08
 
 ### ATTENDANCE-F06 Ver mis jornadas del mes y quién las corrigió
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f06 gh:attendance#8 -->
 Estado: hecho (servidor y pantalla)
 Actor: empleado (y cualquiera, para las suyas)
 Pantalla: Registros
@@ -279,7 +271,6 @@ Si falla: «No se han podido cargar las jornadas.» y «Reintentar».
 Implicados: ATTENDANCE-F09, ATTENDANCE-F10
 
 ### ATTENDANCE-F07 Ver las jornadas de todo el equipo
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f07 gh:attendance#10 gh:attendance#14 gh:attendance#6 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
@@ -296,7 +287,6 @@ Si falla: «No se han podido cargar las jornadas.» y «Reintentar».
 Implicados: STAFF-F06, ATTENDANCE-F08, ATTENDANCE-F09, ATTENDANCE-F10, ATTENDANCE-F11
 
 ### ATTENDANCE-F08 Corregir una jornada mal fichada, con su motivo
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f08 qa:modules/attendance/correct-a-workday gh:attendance#12 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable
 Pantalla: Registros
@@ -323,7 +313,6 @@ corregir.
 Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 Ver quién cambió una jornada, cuándo y por qué
-<!-- origen: qa:modules/attendance/correct-a-workday old:attendance/WORKFLOW.md#attendance-f09 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable; el empleado, de las suyas
 Pantalla: Registros
@@ -338,7 +327,6 @@ Si falla: «No se ha podido cargar el historial.».
 Implicados: ATTENDANCE-F08, ATTENDANCE-F13
 
 ### ATTENDANCE-F10 Sacar el mes en CSV para la gestoría o la Inspección
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f10 qa:modules/attendance/export-the-month-as-csv gh:attendance#3 gh:attendance#5 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos (el empleado, solo sus jornadas)
 Pantalla: Registros
@@ -357,7 +345,6 @@ nuevo.».
 Implicados: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (dentro de la app)
 
 ### ATTENDANCE-F11 Ver quién está fichado ahora
-<!-- origen: old:attendance/WORKFLOW.md#attendance-f11 -->
 Estado: hecho (servidor, pantalla y panel del Inicio)
 Actor: propietario, administrador, responsable
 Pantalla: Registros («Fichados ahora») e Inicio
@@ -377,7 +364,6 @@ disponible» y los demás siguen.
 Implicados: ATTENDANCE-F01, ATTENDANCE-F02, ATTENDANCE-F08
 
 ### ATTENDANCE-F12 Fichar la entrada o la salida de otra persona
-<!-- origen: nuevo (Homebase, Deputy: el encargado ficha a alguien de su equipo) -->
 Estado: hecho (asistente y API)
 Actor: propietario, administrador, responsable
 Pantalla: ninguna (asistente y API)
@@ -397,7 +383,6 @@ varias, se dice cuáles y se pide que elija; si no existe, «Esa persona no exis
 Implicados: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Cerrar la jornada abierta de quien se da de baja
-<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
 Estado: hecho (reacción por el relay del outbox)
 Actor: sistema
 Pantalla: ninguna
@@ -492,8 +477,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   un `tests/test_<fichero>.py` por fichero, más `test_integration_staff.py` (contra Personal real, sin
   dobles), `test_relay.py` (la baja en Personal entregada por el relay real del worker) y
   `test_concurrency.py` (hilos).
-- **Orden de los registros y del CSV** (`scoped_records`, con `base.ordering.list_order`; regla hub#2355 del producto
-  viejo): la columna elegida (`columna`/`-columna`) y el desempate por `id`, en la dirección de la lista: la descendente
+- **Orden de los registros y del CSV** (`scoped_records`, con `base.ordering.list_order`): la columna elegida (`columna`/`-columna`) y el desempate por `id`, en la dirección de la lista: la descendente
   es la ascendente leída al revés, empates incluidos. Las jornadas sin salida quedan donde las pone Postgres al ordenar
   por «salida»: al final en ascendente, al principio en descendente.
 - Modelos: `Record` (la jornada), `Break` (la pausa), `Correction` (el rastro, solo se inserta) y
@@ -508,6 +492,10 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   llegara a chocar el índice, se traduce al mismo 409. Hay tests con hilos.
 - Coherencia en la base de datos: abierta o por revisar ⇒ sin salida; cerrada ⇒ con salida; la salida
   después de la entrada; la pausa termina después de empezar.
+- **Rechazos con su motivo**: cada uno lleva su código (`attendance.already_clocked_in`,
+  `attendance.outside_radius`, `attendance.location_required`, `attendance.workplace_not_set`,
+  `attendance.overlap`, `attendance.second_open_day`…) y la salida antes de la entrada es un 422 en su
+  campo.
 - La distancia al local la calcula el servidor con `geopy` (`geodesic`, WGS-84) a partir de la
   posición que manda el dispositivo; el dispositivo nunca dice si está dentro ni si es personal: eso
   sale de `services.device_source(ctx)`, que lee el modo del dispositivo de la sesión
@@ -517,8 +505,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   coordenadas exactas solo valen para quien ficha lo suyo (`mine` de `_target`): fichar a otra persona
   (F12) nunca los pide ni guarda los del responsable. La salida mide con el dispositivo que ficha la
   salida, no con el de la entrada. Las coordenadas se guardan solo si el negocio pide la ubicación y el
-  dispositivo es personal; si no, solo distancia, dentro/fuera y precisión (la migración 0002 borró las
-  de las jornadas del dispositivo compartido).
+  dispositivo es personal; si no, solo distancia, dentro/fuera y precisión.
 - **Jornada olvidada** (`queries.is_stale`): abierta y con más horas que las de Ajustes. Se lee como
   «Por revisar» al momento (estado efectivo, sin tiempo trabajado y con su pausa parada), aunque la
   tarea aún no la haya marcado; `clock_out` y las pausas la rechazan con 409
@@ -539,41 +526,45 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   `tests/test_scheduled_review.py` la pasa por `base.scheduler`) y la aplica también `clock_in` a la
   persona que ficha, para no depender del worker.
 - La reacción a `staff.member.terminated` (ATTENDANCE-F13) se la entrega el relay del outbox del worker
-  (`base.relay`, desde hub#105), una sola vez por aviso, como las de `task` o `service`:
+  (`base.relay`), una sola vez por aviso, como las de `task` o `service`:
   `tests/test_relay.py` la pasa por un tick del bucle real (`base.worker.run`), con la pausa en curso,
   la segunda entrega que no cambia nada y dos negocios (el aviso de la corrección solo se oye en el
   suyo); `tests/test_integration_staff.py` la prueba contra Personal real llamándola directamente.
-- **Panel del Inicio** (ronda PLAN-HUB 2026-10-21): `widgets` de `apps.py`, el único del módulo viejo
-  (`attendance.clocked_in_now`, KPI, `sm`, de serie, con `attendance.view_all`; sin `setup` ni `bell`, que el
-  viejo no tenía), sobre `attendance.presence.count` (`map` `value` → `count`). El recuento y la lista de
+- **Panel del Inicio**: `widgets` de `apps.py` (`attendance.clocked_in_now`, KPI, `sm`, de serie, con
+  `attendance.view_all`; sin `setup` ni `bell`), sobre `attendance.presence.count` (`map` `value` → `count`). El recuento y la lista de
   Registros comparten la regla (`queries.present_records`: abierta, dentro de las horas de revisión y de una
   ficha no dada de baja) y los eventos (`events.WHO_IS_IN`, el `refresh_on` del panel y el `live()` de las dos).
   `tests/test_integration_home.py` lo pasa por `base.widget.list` real, con dos negocios, y la e2e
   `tests/e2e/fix-attendance-setup-hooks.spec.ts`, por el Inicio del dueño en 390, 834 y 1440.
-- Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
-  en corregir) y todo campo de entrada lleva `description`.
-- **Admin de Django** (ronda 12, PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
+- Asistente: toda operación declara `ai={"asks", "description", "risk"}` (`risk` solo en las acciones; `high`
+  en corregir) y todo campo de entrada lleva `description`. Las `asks` son tres frases en `en` y tres en `es`
+  de lo que dice una persona para pedirla: Control horario está en `LIVE_ASSISTANT_ASKS_REQUIRED`, así que
+  `base/tests/test_assistant_asks.py` comprueba que cada una trae su herramienta entre las diez primeras para
+  cada rol, y `tests/test_assistant_asks.py`, que las frases reales de la QA del dueño
+  (`tests/e2e/qa/probes/owner-es-attendance-*.json`) llegan a la suya sin ser una de sus `asks` (hub#1099).
+  Ninguna descripción manda confirmar antes: la tarjeta de `attendance.record.correct` es la confirmación, y
+  pedirlo en la descripción hace que el asistente pregunte en el chat sin sacarla (lo guarda
+  `tests/test_guardrails_assistant.py` para todo el Hub).
+- **Admin de Django** (PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
   en **solo lectura** (salvo la nota interna de la jornada), sin alta ni borrado: una hora solo cambia
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
   tablas» del admin; lo impone el art. 34.9 ET, como en `invoice` lo impone el RD 1619/2012.
-- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
-  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
-  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611). El PIN y el modo de cada dispositivo
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`). El PIN y el modo de cada dispositivo
   (compartido o personal) son de `base` (BASE-F55, BASE-F62): Control horario solo lee el modo.
 
 ## Lo que queda fuera
 
 - **Suprimir las jornadas pasados los cuatro años** (y con ellas su posición): se conservan; la
-  supresión automática no está (como attendance#7 del producto actual).
+  supresión automática no está.
 - **Iconos propios** (café, play, ubicación, localizar, guardar): pedidos en `UI-REQUESTS.md`; mientras, iconos
   registrados equivalentes.
-- **Varios locales con su propia ubicación** (attendance#4 del producto actual, ATTENDANCE-F04): un Hub es
+- **Varios locales con su propia ubicación** (ATTENDANCE-F04): un Hub es
   un negocio con una ubicación; varios locales por negocio no existen en la plataforma.
-- **Botón de fichar en la cabecera del TPV** (hub#2553 del producto actual, ATTENDANCE-F01): es de la
+- **Botón de fichar en la cabecera del TPV** (ATTENDANCE-F01): es de la
   pantalla de venta; hoy se ficha desde Control horario.
 - **Informe mensual en PDF por persona** (attendance#3) y **la exportación oficial para la Inspección**
-  que traerá el nuevo real decreto (attendance#5), ATTENDANCE-F10: capacidades nuevas (el producto actual
-  tampoco las tenía) y la segunda, sin formato publicado; el CSV cumple el art. 34.9 ET.
+  que traerá el nuevo real decreto (attendance#5), ATTENDANCE-F10: capacidades nuevas y la segunda, sin formato publicado; el CSV cumple el art. 34.9 ET.
 - **Cruzar las horas con la tarifa por hora de Personal** (attendance#6, ATTENDANCE-F07): es nómina, y
   el fichaje no la calcula (ver «Lo que NO hace»).
 
@@ -581,7 +572,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 
 - `frontend/routes.ts`: `/attendance/clock`, `/attendance/records` y `/attendance/settings`; la barra
   de pestañas (`frontend/tabs.ts`) son las tres, «Ajustes» para todos (en solo lectura para quien no
-  puede guardar), como en el producto actual.
+  puede guardar).
 - Fichar se suscribe a `attendance.record.current`, `attendance.settings.get` y `base.device.current`
   (el modo de este dispositivo, que decide si se lee la posición); el reloj, el tiempo
   desde la entrada y los totales de hoy corren con un temporizador de un segundo sobre el `as_of` del
@@ -603,47 +594,6 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   e2e `tests/e2e/attendance-settings-location.spec.ts` (la ubicación sin conceder, en un fichero propio:
   `attendance-flows.spec.ts` la concede para F04).
 
-## Paridad con el producto actual (para quien lo mantiene)
-
-### Operaciones
-
-| Producto actual | Ahora | Nota |
-|---|---|---|
-| `attendance.clock_in` | `attendance.record.clock_in` | Persona opcional (F12); la distancia la mide el Hub |
-| `attendance.clock_out` (+ `break_end`) | `attendance.record.clock_out` | Termina la pausa en curso |
-| `attendance.break_start` / `break_end` | `attendance.break.start` / `attendance.break.end` | |
-| `attendance.records.correct` | `attendance.record.correct` | Riesgo alto; motivos de rechazo separados |
-| `attendance.settings.update` | `attendance.settings.update` | Solo lo enviado |
-| `attendance._auto_review_stale` | `attendance.record.review_stale` | Avisa de cada jornada marcada |
-| `attendance.settings.get` | `attendance.settings.get` | |
-| `attendance.records.mine_open` + `records.mine` + `breaks.mine` (Fichar) | `attendance.record.current` | Una sola consulta viva |
-| `attendance.records.mine` + `records.list` | `attendance.record.list` | El servidor limita al empleado |
-| `attendance.records.get` + `breaks.list` | `attendance.record.detail` | Con sus pausas |
-| `attendance.corrections.list` | `attendance.correction.list` | También para el empleado, de lo suyo |
-| `attendance.presence.count` | `attendance.presence.count` (el panel del Inicio) y `attendance.presence.list` (Registros) | Cuántos; y cuántos y quiénes |
-| `hub.users.list` (nombres del filtro) | `attendance.person.list` | Fichas de Personal, también las dadas de baja con jornadas |
-| CSV en la pantalla (`csv.ts`) | `attendance.record.export` | En el servidor, misma cabecera |
-| — | `attendance.record.close_for_terminated` | Nuevo (F13) |
-
-### Pantallas
-
-| Producto actual | Ahora |
-|---|---|
-| `erp-attendance-clock` | `frontend/pages/ClockPage.vue` (`/attendance/clock`) |
-| `erp-attendance-records` (tabla, «Corregir», «Historial», «Exportar CSV») | `frontend/pages/RecordsPage.vue` (`/attendance/records`), `components/CorrectionModal.vue`, `components/HistoryModal.vue` |
-| `erp-attendance-settings` | `frontend/pages/SettingsPage.vue` (`/attendance/settings`) |
-| Widget «Fichados ahora» del Inicio | El panel `attendance.clocked_in_now` del Inicio (`widgets` de `apps.py`), y `components/PresenceCard.vue` encima de Registros |
-| `ui/lib/geo.ts`, `device-mode.ts`, `duration.ts`, `records/zone.ts`, `minutes.ts`, `csv.ts`, `overlap.ts` | `lib/geo.ts`, `lib/device.ts`, `lib/time.ts`; los minutos, el CSV y el solape, en el servidor |
-
-### Casos de las baterías
-
-| Batería vieja | Dónde está ahora |
-|---|---|
-| `clock_cycle.hub.test.py` (día completo, rechazos, ajustes y radio, rastro, solape, presencia, permisos del empleado) | `tests/test_services.py`, `tests/test_queries.py`, `tests/test_api.py` |
-| `data.pg.test.py` (dos entradas, ámbito, radio, corrección, revisión sin usuario, salida que cierra la pausa, día del negocio, solapes de attendance#12, ajustes) | `tests/test_services.py`, `tests/test_queries.py`, `tests/test_models.py`, `tests/test_concurrency.py` |
-| `contract`, `manifest.contract`, `permissions.contract` | `tests/test_apps.py`, `tests/test_api.py`, `tests/test_live.py`, `tests/test_events.py` |
-| Vitest de `ui/` (botones según el estado, hoy en la zona del negocio, radio, CSV, minutos, zona, solape, historial, ajustes, testids) | `frontend/**/*.test.ts` (Vitest) y `tests/e2e/attendance-clock.spec.ts` |
-
 ## Lo que NO hace, a propósito
 
 - No calcula nóminas, horas extra ni horas contra contrato.
@@ -653,41 +603,3 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - No cierra sola una jornada olvidada ni inventa su salida (salvo la baja en Personal, que la cierra
   con rastro del sistema).
 - No borra jornadas.
-
-## Cambios frente al producto actual
-
-- **Quién ficha**: antes, el usuario del hub; ahora, su **ficha de Personal** (la app requiere
-  `staff`). Una cuenta sin ficha vinculada no puede fichar y lo dice.
-- **Operaciones con tres partes**: `attendance.clock_in` → `attendance.record.clock_in`,
-  `attendance.clock_out` → `attendance.record.clock_out`, `attendance.break_start/end` →
-  `attendance.break.start/end`, `attendance.records.correct` → `attendance.record.correct`,
-  `attendance._auto_review_stale` → `attendance.record.review_stale`. Los avisos igual:
-  `attendance.clocked_in/out` → `attendance.record.clocked_in/out`.
-- **Lecturas juntadas**: `records.mine_open` + `records.mine` + `breaks.mine` (lo que pinta Fichar) son
-  `attendance.record.current`; `records.mine` y `records.list` son `attendance.record.list` (el
-  servidor limita al empleado a lo suyo); `records.get` + `breaks.*` son `attendance.record.detail`;
-  `presence.count` sigue como `attendance.presence.count` (el panel del Inicio) y quiénes son, en
-  `attendance.presence.list`.
-- **Rechazos con su motivo**: el único `attendance.clock_in_rejected` y el único
-  `attendance.record_not_found` de antes se separan en `attendance.already_clocked_in`,
-  `attendance.outside_radius`, `attendance.location_required`, `attendance.workplace_not_set`,
-  `attendance.overlap`, `attendance.second_open_day`… y la salida antes de la entrada es un 422 en su
-  campo.
-- **La distancia la calcula el Hub**, no el dispositivo (antes se fiaba de `distance_m` y
-  `within_radius` del cliente).
-- **El CSV lo hace el servidor** (`attendance.record.export`), con la misma cabecera, y no se pide
-  página a página.
-- **El empleado ve el historial de sus jornadas** (attendance#8 del producto actual, cerrada aquí).
-- **Las jornadas olvidadas se marcan también al volver a fichar** y la marca avisa
-  (`attendance.record.flagged`), solo de las que marca (attendance#13 y #15).
-- **«Fichados ahora»** dice también quiénes y se ve en Registros.
-- **Fichar a otra persona** (ATTENDANCE-F12) y **cerrar la jornada al dar de baja** (ATTENDANCE-F13),
-  nuevos.
-- **Ajustes**: se guarda solo lo cambiado, no la foto entera.
-- **El dispositivo no se declara**: `clock_in` ya no acepta `source`; lo decide el Hub.
-- **Coordenadas solo si se piden**: antes se guardaban siempre que el dispositivo las mandaba.
-- **Una jornada olvidada no se cierra con «Fichar salida»** ni cuenta «hasta ahora»: antes se cerraba
-  como una jornada de 20 horas.
-- **Una corrección no puede poner horas futuras** (antes se aceptaban).
-- **Una ficha inactiva o de baja temporal no ficha la entrada** (la salida sí).
-- Las listas paginan con hasta 100 por página.

@@ -6,7 +6,12 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -226,6 +231,19 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     expect(s.field('price').label).toBe('Price');
   });
 
+  // hub#945 (SERVICE-F01): a price typed with its currency's sign and left before the business answers is neither
+  // rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['¥1600', JAPANESE, 1600],
+    ['12,50 zł', POLISH, 1250],
+  ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, price) => {
+    const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
+    await expectAmountLeftWaitsForMoney({ amount: () => s.field('price'), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(200, CUT);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', price }]);
+  });
+
   it('the business answers with the form open: the untouched price is rewritten in its decimals and not sent', async () => {
     const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
     expect(s.field('price').value).toBe('15.00');
@@ -261,7 +279,7 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
 });
 
 describe('ServiceFormModal: two rows opened one after the other', () => {
-  it('shows the second one, never what was left of the first (pm#459)', async () => {
+  it('shows the second one, never what was left of the first', async () => {
     const s = await setup(CUT);
     expect(s.field('name').value).toBe('Cut');
     await s.wrapper.setProps({ service: { ...CUT, id: 's2', name: 'Beard', price: 1200, duration_minutes: 15 } });
@@ -406,12 +424,24 @@ describe('ServiceFormModal: «Professionals who do it» while the money cannot b
   });
 });
 
+describe('ServiceFormModal: fields refused with the same words (hub#888)', () => {
+  // Name, Pricing, Price, Duration, the Category and the Tax category (the pickers) each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { duration_minutes: 'duration', category_id: 'category', tax_category_key: 'tax' };
+  itTellsTheCorrectedFieldApart(['name', 'pricing_type', 'price', 'duration_minutes', 'category_id', 'tax_category_key'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await s.result('service.settings.get', SETTINGS);
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'price');
+});
+
 describe('ServiceFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
     await s.result('service.settings.get', SETTINGS);
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('service-form'),
       change: () => ionValue(s.field('name'), 'Haircut', 'ionInput'),
       restore: () => ionValue(s.field('name'), '', 'ionInput'),

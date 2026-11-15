@@ -9,10 +9,10 @@
 // screen can judge it judges first and the server's 422 goes under each field. Whoever may not save reads them.
 // The form is every settings page's (`useSettingsForm`, hub#867): a refusal says itself as a FormModal does,
 // and the workplace's two coordinates are one value: changing either sends both and lifts both messages.
-import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, nativeBridge, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonButton, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -96,9 +96,10 @@ function set<K extends keyof Form>(field: K, value: Form[K]): void {
   settingsForm.set(field, value);
   problem.value = '';
 }
+/** The form as its number fields change it: through `set`, so typing in them also takes that message away. */
+const fields = { form, fieldErrors, set };
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 const workplaceMissing = computed(() => !!form.value?.require_location && (!form.value.workplace_lat.trim() || !form.value.workplace_lng.trim()));
 
@@ -166,6 +167,7 @@ async function useMyLocation(): Promise<void> {
         v-else
         class="attendance-settings"
         data-testid="attendance-settings-form"
+        novalidate
         @submit.prevent="save"
       >
         <header>
@@ -220,39 +222,27 @@ async function useMyLocation(): Promise<void> {
         <section>
           <h3>{{ $t('attendance.settings.workplace') }}</h3>
           <div class="attendance-settings__pair">
-            <ion-input
-              data-testid="attendance-settings-workplace_lat"
-              type="number"
+            <SettingsNumberField
+              :settings="fields"
+              field="workplace_lat"
+              testid="attendance-settings-workplace_lat"
+              :label="$t('attendance.settings.latitude')"
               inputmode="decimal"
               min="-90"
               max="90"
               step="any"
-              mode="md"
-              fill="outline"
-              label-placement="floating"
-              :label="$t('attendance.settings.latitude')"
               :disabled="!canEdit"
-              :value="form.workplace_lat"
-              :error-text="fieldErrors.workplace_lat"
-              :class="invalid(fieldErrors.workplace_lat)"
-              @ion-input="set('workplace_lat', text($event.detail.value))"
             />
-            <ion-input
-              data-testid="attendance-settings-workplace_lng"
-              type="number"
+            <SettingsNumberField
+              :settings="fields"
+              field="workplace_lng"
+              testid="attendance-settings-workplace_lng"
+              :label="$t('attendance.settings.longitude')"
               inputmode="decimal"
               min="-180"
               max="180"
               step="any"
-              mode="md"
-              fill="outline"
-              label-placement="floating"
-              :label="$t('attendance.settings.longitude')"
               :disabled="!canEdit"
-              :value="form.workplace_lng"
-              :error-text="fieldErrors.workplace_lng"
-              :class="invalid(fieldErrors.workplace_lng)"
-              @ion-input="set('workplace_lng', text($event.detail.value))"
             />
           </div>
           <div class="attendance-settings__locate">
@@ -298,23 +288,16 @@ async function useMyLocation(): Promise<void> {
         >
           {{ $t('attendance.settings.workplaceMissing') }}
         </InlineFeedback>
-        <ion-input
-          data-testid="attendance-settings-auto_close_after_hours"
-          type="number"
-          inputmode="numeric"
+        <SettingsNumberField
+          :settings="fields"
+          field="auto_close_after_hours"
+          testid="attendance-settings-auto_close_after_hours"
+          :label="$t('attendance.settings.autoClose')"
+          :helper-text="$t('attendance.settings.autoCloseHelp')"
           min="1"
           max="24"
           step="1"
-          mode="md"
-          fill="outline"
-          label-placement="floating"
-          :label="$t('attendance.settings.autoClose')"
-          :helper-text="$t('attendance.settings.autoCloseHelp')"
           :disabled="!canEdit"
-          :value="form.auto_close_after_hours"
-          :error-text="fieldErrors.auto_close_after_hours"
-          :class="invalid(fieldErrors.auto_close_after_hours)"
-          @ion-input="set('auto_close_after_hours', text($event.detail.value))"
         />
         <SettingsFormFooter
           :settings="settingsForm"

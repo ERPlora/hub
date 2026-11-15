@@ -1,24 +1,12 @@
-// The API's documentation as the page reads it (BASE-G150, G04): the OpenAPI document cut into one section per app, by
-// its name, each with its routes in path order — method, path, what it does, its parameters and the schema of its
-// body — and the file a person downloads to import it elsewhere (Postman).
 import { describe, expect, it } from 'vitest';
 
+import { OPENAPI_HEAD, TAX_CATEGORY_LIST } from '../__tests__/openapi-document';
 import { apiDocFileName, apiDocSections } from './api-docs';
 
 const DOCUMENT = {
-  openapi: '3.1.0',
-  info: { title: 'ERPlora Hub API', version: '1' },
+  ...OPENAPI_HEAD,
   paths: {
-    '/api/tax/categories': {
-      get: {
-        operationId: 'tax.category.list',
-        summary: 'Category List',
-        description: 'Lists the tax categories.',
-        tags: ['tax'],
-        parameters: [{ in: 'query', name: 'limit', required: false, schema: { type: 'integer' }, description: 'How many.' }],
-        responses: { '200': { description: 'OK' } },
-      },
-    },
+    '/api/tax/categories': { get: { ...TAX_CATEGORY_LIST, responses: { '200': { description: 'OK' } } } },
     '/api/cart_checkout/carts/cleanup_expired': {
       post: {
         operationId: 'cart_checkout.cart.cleanup_expired',

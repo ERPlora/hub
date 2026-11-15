@@ -237,6 +237,7 @@ def create_task(ctx: OperationContext, data: TaskIn) -> dict:
         "description": "Change a task's title, description, priority, due date, project or tags; only the "
         "fields sent change (null clears the due date or the project).",
         "risk": "normal",
+        "check": "task.task.detail",
         "asks": {
             "en": (
                 "move the due date of the task order ice to Friday",
@@ -288,6 +289,7 @@ def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
         "description": "Change a task's status: todo, in_progress (start it), blocked, done or cancelled. "
         "Done stamps the completion date and leaving done clears it.",
         "risk": "normal",
+        "check": "task.task.detail",
         "asks": {
             "en": (
                 "put the task tidy the cold room in progress, I have started it",
@@ -320,6 +322,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
         "description": "Mark an open task as done («complete the task clean the store room»). A task "
         "already done or cancelled is left as it was.",
         "risk": "normal",
+        "check": "task.task.detail",
         "asks": {
             "en": (
                 "complete the task scrub the patio",
@@ -353,6 +356,7 @@ def complete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
         "description": "Assign a task to a person of the team (by id or name, or to the caller with "
         "to_me), or unassign it when no person is given.",
         "risk": "normal",
+        "check": "task.task.detail",
         "asks": {
             "en": (
                 "assign the task restock the napkins to Ana",
@@ -397,6 +401,7 @@ def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
     ai={
         "description": "Delete a task for good, with its subtasks and its comments.",
         "risk": "high",
+        "check": "task.task.detail",
         "asks": {
             "en": (
                 "delete the task hang the poster",
@@ -570,6 +575,7 @@ def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
         "description": "Change a project's name, colour or owner, or take it out of use (is_active false) "
         "and back; only the fields sent change. The code never changes.",
         "risk": "normal",
+        "check": "task.project.detail",
         "asks": {
             "en": (
                 "rename the Opening project to Summer opening",
@@ -618,6 +624,7 @@ def update_project(ctx: OperationContext, data: ProjectPatchIn) -> dict:
     ai={
         "description": "Delete a project for good; its tasks stay, without a project.",
         "risk": "high",
+        "check": "task.project.detail",
         "asks": {
             "en": (
                 "delete the Opening project",

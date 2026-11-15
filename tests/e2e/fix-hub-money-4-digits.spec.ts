@@ -1,4 +1,4 @@
-// flow: formato de importes (hub#1090) en Ventas, Facturas y VeriFactu — a sale of four digits (1.234,56 €,
+// flow: the format of amounts in Sales, Invoices and VeriFactu — a sale of four digits (1.234,56 €,
 // VAT included) charged by card, as the owner reads it in Spanish: its row in Sales, its ticket in Invoices and
 // its record in VeriFactu say «1.234,56 €» with the thousands grouped, never «1234,56 €» (Spanish CLDR only
 // groups from five digits on; every other screen of the Hub groups from four), at 390, 834 and 1440.
@@ -69,7 +69,7 @@ async function groupedIn(row: Locator): Promise<void> {
 }
 
 for (const size of SIZES) {
-  test(`hub#1090 at ${size.label}: Sales, Invoices and VeriFactu paint a four-digit amount with its thousands grouped`, async ({ browser }) => {
+  test(`Sales, Invoices and VeriFactu paint a four-digit amount with its thousands grouped at ${size.label}`, async ({ browser }) => {
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
       // Sales: the sale's row, found by its number.

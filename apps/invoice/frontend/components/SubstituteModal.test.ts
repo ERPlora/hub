@@ -149,7 +149,7 @@ describe('SubstituteModal', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup('es');
-    expect(s.inDoc('invoice-substitute')?.getAttribute('aria-label')).toBe('Factura completa del ticket TICKET-2026-000004');
+    expect(s.inDoc('invoice-substitute')?.getAttribute('aria-label')).toBe('Factura completa del tique TICKET-2026-000004');
     expect(s.submitButton()?.textContent?.trim()).toBe('Emitir factura completa');
   });
 });
@@ -157,8 +157,8 @@ describe('SubstituteModal', () => {
 describe('SubstituteModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a recipient written asks; emptied again closes', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('invoice-substitute'),
       change: () => s.fill(),
       restore: () => s.fill(recipientFrom(null)),

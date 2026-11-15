@@ -38,12 +38,13 @@ function cancel(): void {
   error.value = null;
 }
 
-useUnsavedFormOnOpen('tax-category-form', form, open);
+const canDismiss = useUnsavedFormOnOpen('tax-category-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-category-form"
     :title="$t('tax.categories.form.title')"
     :submit-label="$t('tax.add')"
@@ -57,6 +58,7 @@ useUnsavedFormOnOpen('tax-category-form', form, open);
       <div class="tax-form">
         <ion-input
           data-testid="tax-category-form-key"
+          name="key"
           :value="form.key"
           :label="$t('tax.categories.columns.key')"
           :placeholder="$t('tax.categories.form.keyPlaceholder')"
@@ -71,6 +73,7 @@ useUnsavedFormOnOpen('tax-category-form', form, open);
         />
         <ion-input
           data-testid="tax-category-form-name"
+          name="name"
           :value="form.name"
           :label="$t('tax.categories.columns.name')"
           :placeholder="$t('tax.categories.form.namePlaceholder')"
@@ -84,6 +87,7 @@ useUnsavedFormOnOpen('tax-category-form', form, open);
         />
         <ion-input
           data-testid="tax-category-form-description"
+          name="description"
           :value="form.description"
           :label="$t('tax.categories.columns.description')"
           :placeholder="$t('tax.categories.form.descriptionPlaceholder')"

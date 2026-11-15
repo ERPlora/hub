@@ -1,9 +1,7 @@
 <script setup lang="ts">
-// System › Updates, the part of who runs the business (BASE-G89; the old hub's «You are on {version}», HUB_SHELL-F142):
-// the version running, from the live `base.system.status` (a deploy reconnects the stream and the new one shows by
-// itself), and when it was published, or that it is not known: never a made-up date. Until the status answers it says
-// it is reading, never an empty tab. The old list of what changed per
-// app has no place with one deployment for every app (old-hub HUB_SHELL-F143, retired).
+// The version running and when it was published, or that it is not known: never a made-up date. A deploy reconnects
+// the live stream, so the new version shows by itself. Every app ships in one deployment, so there is no per-app list
+// of changes.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';

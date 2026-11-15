@@ -201,6 +201,18 @@ def _default_changed(ctx: OperationContext, price_list: PriceList, previous: Pri
     output=PriceListOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "create a separate one for the partners' club",
+                "start a new one for hotels with code HOT-1",
+                "create the club's own one, code CLUB-1",
+            ),
+            "es": (
+                "crea una aparte para el club de socios",
+                "da de alta una nueva para hoteles con código HOT-1",
+                "crea la del club con código CLUB-1",
+            ),
+        },
         "description": "Create a price list: its code (unique, e.g. WHOLESALE) and name, and if wanted its currency, "
         "whether its prices carry the tax, the customer group whose members get it (by name, e.g. VIP), its first "
         "and last day, and whether it is the general list for everybody. It starts with no prices: add them with "
@@ -247,6 +259,18 @@ def create_price_list(ctx: OperationContext, data: PriceListIn) -> dict:
     output=PriceListOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "rename the summer one to Summer 2027",
+                "the summer one has to last until October",
+                "move the end of the summer one to October",
+            ),
+            "es": (
+                "renombra la de verano como Verano 2027",
+                "que la de verano dure hasta octubre",
+                "cambia las fechas de la de verano",
+            ),
+        },
         "description": "Change a price list, named by its id, code or name: only the fields sent (code, name, "
         "currency, tax, customer group, first and last day). null takes the group, the tax or a day off. The "
         "general list cannot get a group.",
@@ -295,6 +319,18 @@ def update_price_list(ctx: OperationContext, data: PriceListPatchIn) -> dict:
     input=PriceListDefaultIn,
     output=PriceListOut,
     ai={
+        "asks": {
+            "en": (
+                "make Distributors the general one",
+                "the normal one for everybody has to be Distributors",
+                "Distributors should stop being the general one",
+            ),
+            "es": (
+                "haz que Distribuidores sea la general",
+                "la normal para todo el mundo tiene que ser la de Distribuidores",
+                "que Distribuidores deje de ser la general",
+            ),
+        },
         "description": "Make a price list (by its id, code or name) the general one, for every customer: the list "
         "that was general stops being so. With is_default false, take the mark off it (no general list). Only an "
         "active list without customer group can be general.",
@@ -350,6 +386,18 @@ def _switch_list(ctx: OperationContext, data: PriceListRefIn, active: bool) -> d
     input=PriceListRefIn,
     output=PriceListOut,
     ai={
+        "asks": {
+            "en": (
+                "freeze the winter one and keep what it has for later",
+                "switch off the winter one during January",
+                "stop applying the summer one for now",
+            ),
+            "es": (
+                "congela la de invierno y guarda lo suyo para más adelante",
+                "apaga la de invierno durante enero",
+                "deja de aplicar la de verano por ahora",
+            ),
+        },
         "description": "Deactivate a price list (by its id, code or name) so it no longer prices new sales; its "
         "prices are kept and pricing.price_list.activate brings it back. Not the general list.",
         "risk": "high",
@@ -367,6 +415,18 @@ def deactivate_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     input=PriceListRefIn,
     output=PriceListOut,
     ai={
+        "asks": {
+            "en": (
+                "reactivate the Christmas one for the coming holidays",
+                "bring the Christmas one back for the coming sales",
+                "the winter one has to apply again",
+            ),
+            "es": (
+                "reactiva la de Navidad para las próximas fiestas",
+                "que la de Navidad vuelva a valer en las ventas",
+                "recupera la de invierno para este año",
+            ),
+        },
         "description": "Bring a deactivated price list (by its id, code or name) back, so it prices new sales again.",
         "risk": "high",
     },
@@ -406,6 +466,18 @@ def _save_item(item: PriceItem) -> None:
     output=PriceItemOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add the toast at 2 € to Hospitality",
+                "add the croissant to the partners' one",
+                "add the orange juice at 1.80 for distributors from ten on",
+            ),
+            "es": (
+                "mete la tostada a 2 € en Hostelería",
+                "añade el croissant a la de los socios",
+                "agrega el zumo de naranja a 1,80 para distribuidores desde diez",
+            ),
+        },
         "description": "Put the price of a product (by its SKU or name) or a service (by its name) in a price list "
         "(by its code or name), in cents, from a minimum quantity on (1 by default). Repeat the product with "
         "another minimum quantity for volume prices.",
@@ -478,6 +550,18 @@ def _named_item(ctx: OperationContext, data: PriceItemRefIn) -> PriceItem:
     output=PriceItemOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "raise the muffin to 1.40 for partners",
+                "change the beer in Hospitality, it is 2.20 now",
+                "change the muffin so it applies from five on",
+            ),
+            "es": (
+                "sube la magdalena a 1,40 para los socios",
+                "cambia la caña de Hostelería, que ahora vale 2,20",
+                "cambia la magdalena para que valga desde cinco",
+            ),
+        },
         "description": "Change a price of a price list, by its id (see pricing.price_item.list): its price in cents "
         "or its from quantity.",
         "risk": "normal",
@@ -512,6 +596,18 @@ def update_price_item(ctx: OperationContext, data: PriceItemPatchIn) -> dict:
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "remove the juice from the distributors' one",
+                "delete the sandwich in the hotels' one",
+                "partners should pay for the sandwich like everybody else",
+            ),
+            "es": (
+                "quita el zumo de la de distribuidores",
+                "borra lo del bocadillo en la de hoteles",
+                "que los socios paguen el bocadillo como todo el mundo",
+            ),
+        },
         "description": "Remove a price from a price list: by its id, or by the list (code or name), the product "
         "(SKU or name) or the service (name) and its from quantity (1 if not said). The article is then charged at "
         "another list's price or the catalog's.",
@@ -591,6 +687,18 @@ def _save_rule(rule: DiscountRule) -> None:
     input=RuleIn,
     output=RuleOut,
     ai={
+        "asks": {
+            "en": (
+                "create a 3-for-2 promotion on toasts",
+                "I want an automatic 10 % discount on toasts for partners",
+                "new reduction: toasts 50 cents cheaper from three on",
+            ),
+            "es": (
+                "crea una promoción 3x2 en las tostadas",
+                "quiero un descuento automático del 10 % en tostadas para socios",
+                "nueva rebaja: 50 céntimos menos en las tostadas a partir de tres",
+            ),
+        },
         "description": "Create an automatic discount rule for a line: its code and name, its type with its value "
         "(percent: a percent; fixed: cents off each unit; buy_x_get_y: buy and free units; tiered: percents by "
         "quantity), what it applies to (all, products, services, a category, a product or a service, by name), and "
@@ -649,13 +757,25 @@ _COMPARED = (
     input=RulePatchIn,
     output=RuleOut,
     ai={
+        "asks": {
+            "en": (
+                "change the summer promotion to 20 %",
+                "the summer promotion now needs a minimum of two",
+                "raise the reduction of the summer promotion",
+            ),
+            "es": (
+                "cambia la promoción de verano al 20 %",
+                "la promoción de verano ahora exige un mínimo de dos",
+                "sube la rebaja de la promoción de verano",
+            ),
+        },
         "description": "Change a discount rule, named by its id, code or name: only the fields sent. Changing its "
         "type asks for the new type's value; changing what it applies to asks for the new target. null takes the "
         "group, the minimum quantity or a day off.",
         "risk": "normal",
     },
 )
-def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:
+def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:  # noqa: C901
     rule = find_rule(data.id, data.rule, lock=True)
     sent = data.model_fields_set - {"id", "rule"}
     before = {name: getattr(rule, name) for name in _COMPARED}
@@ -686,6 +806,14 @@ def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:
     return rule_row(rule, platform.business_currency(ctx.scope))
 
 
+def _group_held(rule: DiscountRule) -> bool:
+    """Whether ``rule`` may be on as for its group: none, or one Customers still has. A deleted group's rule would apply
+    to nobody, or, without the group, to everybody. Held when it is there, so its deletion waits for the rule to be on
+    (and switches it off after)."""
+    group = rule.customer_group_id
+    return group is None or bool(held(CustomerGroup.objects.filter(pk=group)))
+
+
 def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
     rule = find_rule(data.id, data.rule, lock=True)
     if rule.is_active == active:
@@ -695,10 +823,7 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
             else (RULE_ALREADY_INACTIVE, "pricing.rule_already_inactive")
         )
         raise Conflict(str(message), code=code)
-    group = rule.customer_group_id
-    if active and group is not None and not held(CustomerGroup.objects.filter(pk=group)):
-        # Its group was deleted in Customers: it would apply to nobody, or, without the group, to everybody.
-        # Held when it is there, so its deletion waits for the rule to be on (and switches it off after).
+    if active and not _group_held(rule):
         raise Conflict(str(RULE_GROUP_DELETED), code="pricing.rule_group_deleted")
     rule.is_active = active
     rule.updated_by = _actor(ctx)
@@ -715,6 +840,18 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
     input=RuleRefIn,
     output=RuleOut,
     ai={
+        "asks": {
+            "en": (
+                "switch off the juice deal for the rest of the year",
+                "suspend the 2-for-1 juice deal for the moment",
+                "stop the juice deal but keep its settings",
+            ),
+            "es": (
+                "apaga el 2x1 de zumos hasta el año que viene",
+                "suspende el 2x1 de los zumos de momento",
+                "para el 2x1 de zumos, que ya lo retomaremos",
+            ),
+        },
         "description": "Deactivate a discount rule (by its id, code or name) so it no longer takes anything off new "
         "sales; pricing.rule.activate brings it back. Sales already made do not change.",
         "risk": "high",
@@ -732,6 +869,18 @@ def deactivate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     input=RuleRefIn,
     output=RuleOut,
     ai={
+        "asks": {
+            "en": (
+                "reactivate the summer promotion",
+                "the summer discount has to come back for new sales",
+                "bring the summer promotion back for this year",
+            ),
+            "es": (
+                "reactiva la promoción de verano",
+                "vuelve a aplicar el descuento de verano en las ventas nuevas",
+                "recupera la promoción de verano para este año",
+            ),
+        },
         "description": "Bring a deactivated discount rule (by its id, code or name) back, so it applies to new sales.",
         "risk": "normal",
     },
@@ -773,6 +922,38 @@ def forget_product(ctx: OperationContext, data: CatalogEventIn) -> dict:
         item.delete()
     rules = _switch_off(ctx, DiscountRule.objects.filter(product_id=data.id))
     return {"lists": 0, "items": len(items), "rules": rules}
+
+
+@operation(
+    "pricing.catalog.recall_product",
+    kind="command",
+    permission="pricing.system",
+    input=CatalogEventIn,
+    output=CatalogOut,
+    ai={
+        "description": "Platform reaction to inventory.product.restored: switch back on the product's rules that its "
+        "deletion switched off.",
+        "risk": "normal",
+    },
+)
+def recall_product(ctx: OperationContext, data: CatalogEventIn) -> dict:
+    if not Product.objects.filter(pk=data.id, is_deleted=False).exists():
+        # Deleted again before this reached the app: its deletion's own reaction comes next.
+        return {"lists": 0, "items": 0, "rules": 0}
+    # The platform runs every reaction as the same actor, forget_product's included: a rule the business switched off
+    # or touched since carries its own, and is left as the business left it.
+    switched_off = DiscountRule.objects.select_for_update().filter(
+        product_id=data.id, is_active=False, updated_by=_actor(ctx)
+    )
+    count = 0
+    for rule in switched_off:
+        if not _group_held(rule):
+            continue
+        rule.is_active = True
+        rule.save(update_fields=["is_active", "updated_at"])
+        record_event(ctx, events.RULE_ACTIVATED, {"id": str(rule.id)})
+        count += 1
+    return {"lists": 0, "items": 0, "rules": count}
 
 
 @operation(

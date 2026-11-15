@@ -13,7 +13,7 @@ of them (its minimum, or one when it may repeat) and, split per dish, some catal
 away is the menu's setting unless Ventas says how this line is sold (its order's ``channel``).
 """
 
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from typing import Any
 from uuid import UUID
 
@@ -22,6 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
+from psycopg import sql
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.combo.schemas import (
@@ -40,7 +41,8 @@ from apps.combo.schemas import (
     ResolveIn,
     SaleComboPage,
 )
-from apps.inventory.models import ProductCategory, Unit
+from apps.inventory.models import Product, ProductCategory, Unit
+from apps.inventory.queries import products_standing_for
 from apps.tax.models import TaxCategory
 from base import images
 from base.queries import business_language, image_library
@@ -187,7 +189,7 @@ def _product_lookups(said: str):
     )
 
 
-def find_option(
+def find_option(  # noqa: PLR0913
     option_id: UUID | None,
     *,
     combo_id: UUID | None = None,
@@ -253,7 +255,7 @@ def away_key(product, targets: frozenset[str]) -> str | None:
     return key
 
 
-def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:
+def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:  # noqa: PLR0911
     """offered, or why not: the product deleted, deactivated, sold out (INVENTORY-F29) or not sold by
     units in Inventory; with no rate to bill it at in a menu to take away; or sold out here."""
     product = option.product
@@ -434,7 +436,17 @@ def _page(rows: list, total: int, params) -> dict:
     expose_api=True,
     ai={
         "description": "List the menus and combos with their closed price, how they are sold (eaten in or to "
-        "take away) and whether they are on sale; search by name."
+        "take away) and whether they are on sale; search by name.",
+        "asks": {
+            "en": (
+                "which set menus do we have?",
+                "list all our combos and how much each one costs",
+            ),
+            "es": (
+                "¿qué menús tenemos montados?",
+                "dime los combos que tenemos y cuánto vale cada uno",
+            ),
+        },
     },
 )
 def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
@@ -468,7 +480,17 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
     expose_api=True,
     ai={
         "description": "One menu with its courses and the choices of each (product, supplement, sold out or not), "
-        "whether the till offers it and why not. Name it by id or by name («menu of the day»)."
+        "whether the till offers it and why not. Name it by id or by name («menu of the day»).",
+        "asks": {
+            "en": (
+                "what does the kids' menu come with?",
+                "show me the vegan menu with its courses, choices and supplements",
+            ),
+            "es": (
+                "¿qué lleva el menú infantil?",
+                "enséñame el menú vegano con sus platos, elecciones y suplementos",
+            ),
+        },
     },
 )
 def get_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
@@ -517,7 +539,17 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     ai={
         "description": "Propose images of ERPlora's shared image library for a menu's photo («ponle foto al menú del "
         "día»), the menu named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with combo.combo.set_image."
+        "never sets one: show them, and set the one the person picks with combo.combo.set_image.",
+        "asks": {
+            "en": (
+                "suggest a picture for the kids' menu",
+                "which library images would suit the summer menu?",
+            ),
+            "es": (
+                "sugiéreme una foto para el menú infantil",
+                "¿qué imágenes de la biblioteca le pegan al menú de verano?",
+            ),
+        },
     },
 )
 def suggest_image(ctx: OperationContext, data: ComboImageSuggestIn) -> dict:
@@ -544,7 +576,17 @@ def suggest_image(ctx: OperationContext, data: ComboImageSuggestIn) -> dict:
     expose_api=True,
     ai={
         "description": "The menus the till can sell now, with their courses and the choices on offer (product and "
-        "supplement); a menu that cannot be completed or is off sale is left out."
+        "supplement); a menu that cannot be completed or is off sale is left out.",
+        "asks": {
+            "en": (
+                "which menus can customers choose today?",
+                "which set menus are on offer at the counter today?",
+            ),
+            "es": (
+                "¿qué menús se pueden pedir ya?",
+                "¿qué menús hay hoy en el mostrador y qué ofrece cada plato?",
+            ),
+        },
     },
 )
 def list_for_sale(ctx: OperationContext, params: ForSaleIn) -> dict:
@@ -817,7 +859,17 @@ def resolve_line(combo: Combo, data: ResolveIn, targets: frozenset[str]) -> dict
     ai={
         "description": "Price a menu line with what the customer picked («menu of the day with lentils, hake and "
         "water»): checks each course, adds the supplements and says how its VAT is billed — one line, or one "
-        "line per dish with the amount split. It saves nothing; the till charges with it."
+        "line per dish with the amount split. It saves nothing; the till charges with it.",
+        "asks": {
+            "en": (
+                "how much is the tasting menu with the steak and water?",
+                "work out the kids' menu with pasta and juice, without charging it",
+            ),
+            "es": (
+                "¿cuánto sale el menú degustación con el entrecot y agua?",
+                "calcula el menú infantil con macarrones y zumo, sin cobrarlo",
+            ),
+        },
     },
 )
 def resolve(ctx: OperationContext, data: ResolveIn) -> dict:
@@ -827,3 +879,183 @@ def resolve(ctx: OperationContext, data: ResolveIn) -> dict:
         # The till's 409: a 404 also means «this app is not active here», which is another fix.
         raise Conflict(missing.message, code="combo.combo_missing") from None
     return resolve_line(combo, data, takeaway_targets())
+
+
+# ── A separate copy of the business (BASE-F114): what Menus gives back from it ──────────────────────────────────────
+
+#: What a menu of a separate copy is read with besides its id and its tax category: what ``combo.combo.recover`` takes,
+#: each a column since ``0002_combo_image`` (its image).
+COMBO_FIELDS = ("name", "kitchen_name", "price", "supply_kind", "sort_order", "is_active", "image")
+
+#: What a course of a separate copy is read with besides its id and its menu: what ``combo.group.recover`` takes, each a
+#: column since ``0001_initial``.
+GROUP_FIELDS = ("name", "min_choices", "max_choices", "allow_repeat")
+
+
+def combos_in_copy(conn) -> list[dict]:
+    """Each menu of a separate copy of the business, in the menus' order, with its id, what ``COMBO_FIELDS`` names and
+    the id there of its tax category (``tax_category_id``); nothing where the app's table is not there. ``conn`` is the
+    copy's direct, read-only connection."""
+    rows = _rows_in_copy(conn, Combo._meta, ("id", *COMBO_FIELDS, "tax_category"), ("sort_order", "name", "id"))
+    return [dict(zip(("id", *COMBO_FIELDS, "tax_category_id"), row, strict=True)) for row in rows]
+
+
+def groups_in_copy(conn) -> list[dict]:
+    """Each course of a separate copy of the business, menu by menu in its order, with its id, its menu's
+    (``combo_id``) and what ``GROUP_FIELDS`` names; nothing where the app's table is not there. ``conn`` is the copy's
+    direct, read-only connection."""
+    rows = _rows_in_copy(conn, ChoiceGroup._meta, ("id", "combo", *GROUP_FIELDS), ("combo", "sort_order", "id"))
+    return [dict(zip(("id", "combo_id", *GROUP_FIELDS), row, strict=True)) for row in rows]
+
+
+def _rows_in_copy(conn, meta, read: tuple[str, ...], order: tuple[str, ...]) -> list[tuple]:
+    """The ``read`` columns of every row of the model ``meta`` in a separate copy, by ``order``; none where its table is
+    not there. It is read by its own SQL over the model's names, never the ORM: the copy is no business."""
+    if conn.execute("SELECT to_regclass(%s)", [meta.db_table]).fetchone()[0] is None:
+        return []
+
+    def columns(fields: tuple[str, ...]) -> sql.Composed:
+        return sql.SQL(", ").join(sql.Identifier(meta.get_field(field).column) for field in fields)
+
+    query = sql.SQL("SELECT {} FROM {} ORDER BY {}")
+    return conn.execute(query.format(columns(read), sql.Identifier(meta.db_table), columns(order))).fetchall()
+
+
+def combos_not_in_business(combos: list[dict]) -> list[dict]:
+    """The menus of a separate copy (``combos_in_copy``) the business no longer has, in their order, each as
+    ``combo.combo.recover`` takes it with its ``id`` there: the key of its tax category (Taxes never deletes one; one
+    turned off since is the create's to refuse) and which of the copy's it stands for. Not lacking: one the business
+    still holds or a recovery made again for it, renamed or not; nor one the business made again by hand with its name,
+    the case and the spaces aside. Names are not unique, so each made again stands for one: the copy's oldest first."""
+    if not combos:
+        return []
+    ids = [one["id"] for one in combos]
+    here = set(Combo.objects.filter(pk__in=ids).values_list("pk", flat=True)) | set(_standing_for(Combo, ids))
+    others = Combo.objects.exclude(pk__in=ids).exclude(stands_for__in=ids).values_list("name", flat=True)
+    twins = Counter(_alike(name) for name in others)
+    for one in sorted(combos, key=lambda menu: menu["id"]):
+        if one["id"] not in here and twins[_alike(one["name"])]:
+            twins[_alike(one["name"])] -= 1
+            here.add(one["id"])
+    keys = dict(TaxCategory.objects.filter(pk__in={one["tax_category_id"] for one in combos}).values_list("pk", "key"))
+    return [
+        {field: one[field] for field in ("id", *COMBO_FIELDS)}
+        | {"tax_category_key": keys.get(one["tax_category_id"]), "stands_for": one["id"]}
+        for one in combos
+        if one["id"] not in here
+    ]
+
+
+def _alike(name: str) -> str:
+    """A name as two that are the same compare: single spaces, the case aside."""
+    return " ".join(name.split()).casefold()
+
+
+def groups_not_in_business(groups: list[dict]) -> list[dict]:
+    """The courses of a separate copy (``groups_in_copy``) their menu no longer has, in their order, each as
+    ``combo.group.recover`` takes it with its ``id`` there and which of the copy's it stands for. Its menu is the
+    business's that stands for the copy's: the same while held, else the one a recovery made again for it; the copy's
+    own where none does, which the create then refuses as not found. Not lacking: one the business still holds or a
+    recovery made again for it, renamed or not; nor one whose name its menu has again, the case aside, as the menu
+    builder takes no second one: the business's stays."""
+    if not groups:
+        return []
+    ids = [one["id"] for one in groups]
+    held = set(ChoiceGroup.objects.filter(pk__in=ids).values_list("pk", flat=True))
+    here = held | set(_standing_for(ChoiceGroup, ids))
+    menus = _standing_for(Combo, {one["combo_id"] for one in groups})
+    wanted = [(one, menus.get(one["combo_id"], one["combo_id"])) for one in groups if one["id"] not in here]
+    named = ChoiceGroup.objects.filter(combo_id__in={menu for _one, menu in wanted}).values_list("combo_id", "name")
+    taken = {(menu, name.lower()) for menu, name in named}
+    return [
+        {field: one[field] for field in ("id", *GROUP_FIELDS)} | {"combo_id": menu, "stands_for": one["id"]}
+        for one, menu in wanted
+        if (menu, one["name"].lower()) not in taken
+    ]
+
+
+def _standing_for(model, ids) -> dict[UUID, UUID]:
+    """The business's menu or course (``model``) a recovery made again for each of a separate copy's (``ids``, there),
+    as ``{id there: id here}`` (``stands_for``), renamed or not; the oldest if one was made twice. A recovery only makes
+    one the business no longer holds, so one still held is in none. One the business made again by hand is its own, set
+    up as it chose: it stands for none."""
+    made = model.objects.filter(stands_for__in=ids).order_by("created_at", "id")
+    standing: dict[UUID, UUID] = {}
+    for there, here in made.values_list("stands_for", "pk"):
+        standing.setdefault(there, here)
+    return standing
+
+
+#: What a choice of a separate copy is read with: its id there, what ``combo.option.create`` takes and its product's SKU
+#: there, each a column since ``0001_initial``.
+OPTION_FIELDS = ("id", "group_id", "product_id", "price_delta", "is_available", "sku")
+
+
+def options_in_copy(conn) -> list[dict]:
+    """Each choice of a separate copy of the business, of a product Inventory had not deleted there, with what
+    ``OPTION_FIELDS`` names, course by course in its order; nothing where the app's table is not there. ``conn`` is the
+    copy's direct, read-only connection: it is read by its own SQL over the models' names, never the ORM."""
+    option, product = ChoiceOption._meta, Product._meta
+    if conn.execute("SELECT to_regclass(%s)", [option.db_table]).fetchone()[0] is None:
+        return []
+
+    def column(meta, field: str) -> sql.Identifier:
+        return sql.Identifier(meta.get_field(field).column)
+
+    read = sql.SQL(
+        "SELECT {columns} FROM {options} o JOIN {products} p ON p.{product_pk} = o.{product_id}"
+        " WHERE NOT p.{deleted} ORDER BY o.{group_id}, o.{order}, o.{option_pk}"
+    ).format(
+        columns=sql.SQL(", ").join(
+            [
+                *(
+                    sql.SQL("o.{}").format(column(option, field))
+                    for field in ("id", "group", "product", "price_delta", "is_available")
+                ),
+                sql.SQL("p.{}").format(column(product, "sku")),
+            ]
+        ),
+        options=sql.Identifier(option.db_table),
+        products=sql.Identifier(product.db_table),
+        product_pk=column(product, "id"),
+        product_id=column(option, "product"),
+        deleted=column(product, "is_deleted"),
+        group_id=column(option, "group"),
+        order=column(option, "sort_order"),
+        option_pk=column(option, "id"),
+    )
+    return [dict(zip(OPTION_FIELDS, row, strict=True)) for row in conn.execute(read)]
+
+
+def options_not_in_business(options: list[dict]) -> list[dict]:
+    """The choices of a separate copy (``options_in_copy``) the business no longer offers, in their order, each as
+    ``combo.option.create`` takes it with its ``id`` there. Its course is the business's that stands for the copy's: the
+    same while held, else the one a recovery made again for it; the copy's own where none does, which the create then
+    refuses as not found. Its product is the business's that stands for the copy's (Inventory's
+    ``products_standing_for``): the same while live, else the one a recovery made again with its SKU. Not lacking: one
+    the business still holds, even with another product it was given since, nor one whose product the business offers
+    again in that course: it stays as the business has it."""
+    held = set(ChoiceOption.objects.filter(pk__in=[one["id"] for one in options]).values_list("pk", flat=True))
+    courses = _standing_for(ChoiceGroup, {one["group_id"] for one in options})
+    products = products_standing_for({one["product_id"]: one["sku"] for one in options})
+    wanted = [
+        (one, courses.get(one["group_id"], one["group_id"]), products.get(one["product_id"], one["product_id"]))
+        for one in options
+        if one["id"] not in held
+    ]
+    taken = set(
+        ChoiceOption.objects.filter(group_id__in={course for _one, course, _product in wanted}).values_list(
+            "group_id", "product_id"
+        )
+    )
+    return [
+        {
+            "id": one["id"],
+            "group_id": course,
+            "product_id": product,
+            "price_delta": one["price_delta"],
+            "is_available": one["is_available"],
+        }
+        for one, course, product in wanted
+        if (course, product) not in taken
+    ]

@@ -1,4 +1,4 @@
-"""A product's image (round 2026-10-30, «blueprints con imágenes»; the WORKBOOK's «duda 6»): ``Product.image``.
+"""A product's image (the WORKBOOK's «duda 6»): ``Product.image``.
 
 A product shows an image of the shared library (``catalog:<folder>/<name>``, ``base.image_catalog``) or a photo of its
 own (``file:inventory/products/<uuid7 hex>.webp`` under its hub's prefix, ``base.images``), or none: the till shows its

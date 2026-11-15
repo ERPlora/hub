@@ -2,7 +2,7 @@
 // SERVICE-F18 «Regalar sesiones, alargar la caducidad o corregir el saldo»: «Adjust this voucher» adds
 // or removes sessions (only a voucher with a limit; removing, up to what is left) and/or extends the
 // expiry (only one that expires; up to 366 days), with a required Reason and the preview «After the
-// adjustment: {remaining} session(s) left · expires {when}». Adjust sends `service.grant.adjust` with
+// adjustment: 3 sessions left · expires {when}» (one session in the singular). Adjust sends `service.grant.adjust` with
 // the sessions signed (removing is negative) and closes; a refusal stays in the dialog.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
@@ -18,7 +18,7 @@ import type { GrantOut } from '../operations';
 const props = defineProps<{ grant: GrantOut | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
+const canDismiss = useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
 
 const t = useT();
 const locale = useLocale();
@@ -61,7 +61,7 @@ const preview = computed(() => {
     ? t('service.adjust.expiresOn', { when: formatDate(expiryAfter.value, locale.value) })
     : t('service.adjust.neverExpires');
   return limited.value
-    ? t('service.adjust.preview', { remaining: remaining.value + (usesDelta.value ?? 0), expiry })
+    ? t('service.adjust.preview', { count: remaining.value + (usesDelta.value ?? 0), expiry })
     : t('service.adjust.previewUnlimited', { expiry });
 });
 const usesHelp = computed(() =>
@@ -86,6 +86,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-grant-adjust"
     :title="t('service.adjust.title')"
     :submit-label="t('service.adjust.confirm')"
@@ -117,6 +118,7 @@ async function confirm(): Promise<void> {
           </ion-segment>
           <ion-input
             data-testid="service-grant-adjust-uses"
+            name="uses_delta"
             type="number"
             inputmode="numeric"
             min="0"
@@ -134,6 +136,7 @@ async function confirm(): Promise<void> {
         <ion-input
           v-if="expires"
           data-testid="service-grant-adjust-days"
+          name="days_delta"
           type="number"
           inputmode="numeric"
           min="0"
@@ -149,6 +152,7 @@ async function confirm(): Promise<void> {
         />
         <ion-textarea
           data-testid="service-grant-adjust-reason"
+          name="reason"
           :value="reason"
           :label="t('service.adjust.reason')"
           :helper-text="t('service.adjust.reasonHelp')"

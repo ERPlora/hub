@@ -693,7 +693,7 @@ def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
             ),
             "es": (
                 "háblame del equipo Barra 2: a qué llega y cuándo se vio por última vez",
-                "¿para qué está dado de alta el equipo Barra 2?",
+                "¿quién configuró el equipo Barra 2 para imprimir?",
             ),
         },
         "description": "Get one device set up to print by its registration id (printing.device.list): its name, the "

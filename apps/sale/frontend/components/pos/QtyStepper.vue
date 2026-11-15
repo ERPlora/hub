@@ -103,9 +103,11 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
   border: 1px solid var(--ep-border);
   border-radius: 10px;
 }
+/* As high as the field: Ionic's iOS button is at least 3.1em high otherwise (57 px), which beats a `height`. */
 .pos-qty__btn {
   width: 2.75rem;
   height: 2.75rem;
+  min-height: 2.75rem;
   margin: 0;
   font-size: 1.15rem;
   font-weight: 700;

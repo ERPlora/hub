@@ -5,10 +5,7 @@ Estado de la app: completa (2026-10-23); sus avisos arrancan las automatizacione
 
 > Manual de usuario y especificación de la app `payment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Pagos del producto actual
-> (`modules-workspace/modules/payments`, `origin/main` `820c799`, v1.0.30), de sus `docs/` y de sus
-> tests. Los números de flujo se conservan (`PAYMENTS-Fnn` → `PAYMENT-Fnn`); PAYMENT-F08 es nuevo.
-> Lo que cambia frente al producto actual lo dice «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -135,7 +132,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PAYMENT-F08 | Editar, desactivar y reactivar un método de pago | hecho |
 
 ### PAYMENT-F01 Crear un método de pago
-<!-- origen: fi:modules/payments#command-payments-methods-create old:payments/WORKFLOW.md#payments-f01 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
@@ -154,7 +150,6 @@ tipo fuera de la lista. Lo tecleado se conserva. Sin ningún método activo, «N
 Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F02 Registrar un pago
-<!-- origen: fi:modules/payments#command-wasm-payments-payments-create-create_payment old:payments/WORKFLOW.md#payments-f02 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -171,7 +166,8 @@ Pasos:
    registra una sola vez.
 Entra: los datos del formulario; la moneda del negocio, la de su país (un pago que no dice su moneda se
 registra en ella, también por el asistente o la API). Mientras la app no sabe todavía la moneda del
-negocio, el campo dice «Importe» y «Registrar pago» espera. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+negocio, el campo dice «Importe» y «Registrar pago» espera; salir del importe lo deja como se escribió,
+sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar pago» se enciende (hub#938).
 Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
@@ -194,7 +190,6 @@ pago.») y no se guarda nada.
 Implicados: FLOW-F11, FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
-<!-- origen: fi:modules/payments#command-payments-payments-approve old:payments/WORKFLOW.md#payments-f03 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -210,7 +205,6 @@ puede aprobar un pago en borrador; este está Aprobado.»), encima de la tabla.
 Implicados: FLOW-F21
 
 ### PAYMENT-F04 Marcar un pago como enviado y como completado
-<!-- origen: fi:modules/payments#command-payments-payments-mark_completed fi:modules/payments#command-payments-payments-mark_sent old:payments/WORKFLOW.md#payments-f04 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -227,7 +221,6 @@ completado un pago enviado; …»). Un pago completado o cancelado no ofrece má
 Implicados: FLOW-F21
 
 ### PAYMENT-F05 Cancelar un pago
-<!-- origen: fi:modules/payments#command-payments-payments-cancel old:payments/WORKFLOW.md#payments-f05 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -245,7 +238,6 @@ motivo escrito: no cambia nada y no avisa. Una aprobación no se deshace: se can
 Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
-<!-- origen: fi:modules/payments#navigation-list-erp-payments-list fi:modules/payments#query-payments-payments-get fi:modules/payments#query-payments-payments-list old:payments/WORKFLOW.md#payments-f06 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -265,7 +257,6 @@ Si falla: si la lista no carga, la tabla lo dice («No se han podido cargar los 
 Implicados: FLOW-F11
 
 ### PAYMENT-F07 Avisar de un pago completado
-<!-- origen: fi:modules/payments#event-emitidos-payment-created-approved-sent-completed-cancelled old:payments/WORKFLOW.md#payments-f07 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (la automatización se crea en **Automatizaciones**)
@@ -285,13 +276,16 @@ nada en otro. Esta app no escucha a ninguna otra.
 Implicados: FLOW-F21
 
 ### PAYMENT-F08 Editar, desactivar y reactivar un método de pago
-<!-- origen: old:payments/WORKFLOW.md#payments-f01 fi:modules/payments#query-payments-methods-list -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Métodos
 Pasos:
-1. En **Pagos → Métodos** pulsa una fila (o su **Editar**): se abre «Editando método — {nombre}».
-2. Cambia el nombre, el tipo o la cuenta y pulsa **Guardar**.
+1. En **Pagos → Métodos** pulsa una fila (o su **Editar**): se abre «Editando método — {nombre}» con lo
+   que ya dice la fila; la **Cuenta** y **Guardar** esperan en gris mientras llega la ficha completa
+   (la lista enmascara la cuenta).
+2. Cambia el nombre, el tipo o la cuenta y pulsa **Guardar**. El nombre y el tipo se pueden cambiar
+   antes de que llegue la ficha: lo escrito se queda, y la ficha, al llegar, solo rellena lo que no se
+   ha tocado.
 3. Para dejar de usarlo, pulsa **Desactivar** en su fila: pasa a **Desactivado** y deja de salir en
    «Nuevo pago». **Activar** lo devuelve.
 Entra: el método (por el asistente, por su nombre) y lo que cambia.
@@ -348,19 +342,18 @@ completado y cancelar piden una persona: una automatización no los hace.
 | Responsable | sí | sí | sí |
 | Empleado | sí | no | no |
 
-Quien tiene los dos permisos puede aprobar lo que registró (como hoy y como QuickBooks; ver
+Quien tiene los dos permisos puede aprobar lo que registró (como QuickBooks; ver
 «Referencia adoptada»); el pago guarda quién lo registró, quién lo aprobó (`approved_by`,
 `approved_at`), cuándo se envió y se completó (`sent_at`, `completed_at`) y quién lo canceló y cuándo
 (`cancelled_by`, `cancelled_at`).
 
 ## Para quien lo mantiene
 
-### Decisión: Pagos no es Ventas (2026-10-14)
+### Decisión: Pagos no es Ventas
 
-El encargo suponía que `payment` podía ser la pantalla de gestión de las formas de cobro del TPV
-(`sale.PaymentMethod`). **No lo es**: el módulo viejo registra pagos **salientes** a proveedores y
-su «método» es la cuenta desde la que paga el negocio (su propio `WORKFLOW.md` lo dice y su catálogo
-no tiene relación con `sales_payment_method`). Comparado con lo que `apps/sale` ya tiene:
+`payment` no es la pantalla de gestión de las formas de cobro del TPV (`sale.PaymentMethod`):
+registra pagos **salientes** a proveedores y su «método» es la cuenta desde la que paga el negocio.
+Comparado con lo que `apps/sale` ya tiene:
 
 | Lo que hay | `apps/sale` | `apps/payment` |
 |---|---|---|
@@ -390,7 +383,7 @@ Mercado (8 referencias):
 
 **Gana:** cobro del TPV y pagos a proveedor como piezas separadas; métodos que se desactivan, nunca se
 borran. **Por qué no lo otro:** fundir los dos catálogos confunde «cómo me pagan» con «desde dónde
-pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ventas sin motivo.
+pago» y ata Pagos a Ventas sin motivo.
 
 ### Cómo está hecho
 
@@ -440,6 +433,20 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   que lo contiene; varios → 409 `payment.method_ambiguous` con sus nombres); un pago por su referencia.
 - Asistente: toda operación declara `ai` con `description` y `risk` (`high` en aprobar, enviar,
   completar y cancelar) y todo campo de entrada su `description`. `expose_api=True` en todas.
+- **Frases del asistente** (hub#1090): cada una de las 13 herramientas declara sus `asks`, 2–3 frases en `en`
+  y `es` como las diría quien paga a un proveedor (Pagos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`),
+  con nombres que ninguna sonda dice (Makro, Sabadell, Santander, el electricista), sin «card» en inglés (live
+  la lee como «ficha») y sin «pago» en las de los pagos, a los que ya nombra su entidad: repetido en 13
+  herramientas, ponía Pagos por delante en cada frase que dice «pagar» (los bonos de Servicios). Para el Hub
+  (`base.assistant.SYNONYMS`), una «cuenta bancaria» o «cuenta del banco» es un método de Pagos (por sus
+  frases: una «cuenta» sola es la de una mesa). `tests/test_assistant_asks.py` comprueba con las frases reales
+  de la QA del asistente (hub#1090, dueño y empleado) que cada una trae su herramienta en la primera mitad de
+  las que ofrece un turno (F01–F06, F08), que el empleado no recibe ninguna escritura, que listar o dar de alta
+  un método va por delante de la forma de cobro del TPV con la misma acción y, al revés, que pedir una forma
+  de cobro del TPV nunca pone un método de Pagos por delante de ella, que volver a activar un método va por
+  delante de encender una app (`base.app.enable`; live lee «activar» y «habilitar» también como la acción
+  `activate`, ERPlora/live#70); y una frase propia por herramienta y otra por el grupo de sinónimos que sin
+  ellos no llegan.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#674): nombra el registro que una escritura
   señala por su id con las marcas `refers` de `schemas.py` (`A_METHOD`, `A_PAYMENT`), leídas como quien
   pregunta y con su permiso (`payment.view_payment`): el método (el `id` de `MethodRefIn`, en editar,
@@ -448,7 +455,10 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   `payment.payment.get`. El id se titula con la palabra de su lista («Método», «Pago»). Sin ese permiso, o
   con el registro inexistente o de otro negocio, la tarjeta lo deja fuera. La única lista cerrada de una
   escritura, el tipo de método, sale con la etiqueta del formulario en cada idioma («Transferencia»).
-- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
+- **La fecha del pago es un día** (`AAAA-MM-DD`): la API no acepta una hora.
+- **Fuera de las plantillas**: ni la peluquería ni el restaurante la traen al darse de alta
+  (`verticals = []`); está en la tienda (`listed`), desde donde la enciende quien la quiera.
+- El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (PLAN §17); una
   escritura del admin no pasa por las reglas ni deja aviso.
 
 ### Cómo son las páginas
@@ -458,43 +468,12 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   por su lado).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
-  con `MoneyInput` y `lib/money.ts`.
+  con el `MoneyInput` de `@erplora/ui/components` y su `parseMoney` (hub#924).
 - Los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `useGrouping: 'always'` en
   `lib/format.ts`, porque el CLDR del español espera a cinco: hub#1090, que salió de payments#20), como
   Carrito y Tarifas.
 - Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md`: los iconos y las piezas que viven copiadas en
   la app (tabla de servidor viva, `useT`, dinero y avisos de página).
-
-### Tablas de paridad con el producto actual
-
-Operaciones:
-
-| Producto actual | Ahora | Nota |
-|---|---|---|
-| `payments.payments.list` | `payment.payment.list` | mismos filtros; fecha por rango con `payment_date_from/to` |
-| `payments.payments.get` | `payment.payment.get` | también por referencia |
-| `payments.methods.list` | `payment.method.list` | filtro `is_active` declarado (ya no hay `f_is_active`) |
-| `payments.hub_currency` | `base.operations.business_currency(scope)` (BASE-F50) | no es una operación de la app: la moneda del país del negocio es de la plataforma |
-| `payments.payments.create` (WASM) | `payment.payment.create` | método por id o por nombre; rechaza método inexistente o inactivo |
-| `payments._bump_counter`, `payments._insert_payment` | dentro de `payment.payment.create` | eran intenciones internas del WASM |
-| `payments.payments.approve` | `payment.payment.approve` | 409 en vez de no-op mudo |
-| `payments.payments.mark_sent` | `payment.payment.mark_sent` | 409 en vez de no-op mudo |
-| `payments.payments.mark_completed` | `payment.payment.mark_completed` | 409 en vez de no-op mudo |
-| `payments.payments.cancel` | `payment.payment.cancel` | motivo en su campo, no pegado al concepto |
-| `payments.methods.create` | `payment.method.create` | ahora con pantalla |
-| — | `payment.method.get`, `.update`, `.deactivate`, `.activate` | nuevas (PAYMENT-F08) |
-
-Tests:
-
-| Producto actual | Ahora |
-|---|---|
-| `every_string_has_its_translation.contract` | `tests/test_i18n.py` y `frontend/locale/locale.test.ts` |
-| `filter_boxes_match_the_manifest.contract` | `tests/test_queries.py` (cada filtro de la página existe en `PaymentListIn`) y `PaymentsPage.test.ts` |
-| `payment_currency.hub` / `.postgres` | `tests/test_services.py` (moneda explícita, inválida) y `tests/test_business_currency.py` (la del país del negocio, por la operación, la ruta y una API key; cada hub la suya) |
-| `text_filters_narrow_by_fragment.pg` | `tests/test_queries.py` (referencia y beneficiario por trozo, sin cruzar de negocio) |
-| `handler` (Rust): importe en céntimos, ≤ 0 rechazado, HALF_UP | `tests/test_schemas.py` y `frontend/lib/money.test.ts` |
-| `erp-payments-list.test.ts`, `list-paging.test.ts`, `form-error-in-panel.test.ts`, `list-load-error.test.ts`, `amount-filter.test.ts` | `frontend/pages/PaymentsPage.test.ts`, `components/PaymentFormModal.test.ts`, `components/CancelPaymentModal.test.ts` |
-| `lib/enums.test.ts`, `money-display-guard.test.ts` | `frontend/lib/format.test.ts` |
 
 ## Lo que queda fuera
 
@@ -510,25 +489,3 @@ propósito, abajo. Lo que aún espera de `@erplora/ui` (iconos y piezas comparti
 - No enlaza la «factura del proveedor» con ninguna factura: es texto.
 - No hay pagos parciales de un pago ni edición del importe: se cancela y se registra otro.
 - No hay datáfono ni pasarela: eso es del TPV.
-
-## Cambios frente al producto actual
-
-- **Repetir el alta no duplica el pago**: el mismo intento enviado otra vez (un reintento tras un corte,
-  un doble toque) responde el pago ya registrado; antes registraba otro, con su número (payments#8).
-- **Los rechazos ya no son mudos**: aprobar, enviar, completar o cancelar en el estado equivocado, o
-  registrar con un método que no existe o desactivado, contesta con su motivo, no cambia nada, no
-  gasta número y no avisa. Antes contestaba bien, gastaba número y emitía el aviso (incluido el de
-  pago completado que dispara automatizaciones).
-- **Pantalla Métodos** con alta, edición, desactivación y reactivación (antes solo se creaban por el
-  asistente o la API, y nunca se podían desactivar).
-- **Acciones con el nombre de lo que hacen** (Aprobar, Marcar como enviado, Marcar como completado,
-  Cancelar pago) en vez de «Avanzar», y solo las que el pago y la persona pueden usar.
-- **Cancelar pide el motivo en un formulario** (antes, una ventana del navegador) y lo guarda aparte;
-  el concepto ya no se toca.
-- **IBAN y factura del proveedor** se pueden poner en «Nuevo pago»; el IBAN se valida.
-- **La fecha del pago es un día** (`AAAA-MM-DD`); la API ya no acepta una hora. La **fecha de la
-  referencia** es el día del negocio, no el del reloj UTC del servidor.
-- **Fecha por defecto**: «Nuevo pago» viene con la de hoy.
-- **Fuera de las plantillas** (decisión del 2026-10-14): el catálogo actual la tenía retirada del MVP
-  (saas#1542), así que ni la peluquería ni el restaurante la traen al darse de alta (`verticals = []`);
-  sigue en la tienda (`listed`), desde donde la enciende quien la quiera.

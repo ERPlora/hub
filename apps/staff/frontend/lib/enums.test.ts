@@ -1,6 +1,6 @@
 // The closed lists of the staff app as the person reads them: every status, leave type and request
 // status the server knows, each with the tone of its pill. A cell and the picker next to it read the
-// same list, so they can never name one value two ways (the old module's staff#37).
+// same list, so they can never name one value two ways.
 import { describe, expect, it } from 'vitest';
 
 import {

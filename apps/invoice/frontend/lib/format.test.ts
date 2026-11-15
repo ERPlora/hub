@@ -4,6 +4,7 @@
 // hand.
 import { describe, expect, it } from 'vitest';
 
+import { itGroupsThousandsAndDashesAMissingAmount } from '../../../../base/frontend/__tests__/money-format';
 import { centsFromAmount, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, moneyOf, plain, typedRate } from './format';
 
 // An invoice's money: its currency and the decimals the server counts it in (`currency_decimals`).
@@ -25,7 +26,7 @@ describe('formatUnitPrice', () => {
     expect(formatUnitPrice(null, 'en', EUR)).toBe('—');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     expect(plain(formatUnitPrice('123456.00', 'es', EUR))).toBe('1.234,56 €');
     expect(plain(formatUnitPrice('123456.78', 'es', EUR))).toBe('1.234,5678 €');
     expect(plain(formatUnitPrice('1234567.00', 'es', EUR))).toBe('12.345,67 €');
@@ -41,20 +42,7 @@ describe('formatMoney', () => {
     expect(spaced(formatMoney(-1210, 'es', EUR))).toBe('-12,10 €');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
-    // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
-    // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
-    expect(spaced(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
-    expect(spaced(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
-    expect(spaced(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
-    expect(formatMoney(1234567, 'en', EUR)).toBe('€12,345.67');
-  });
-
-  it('a missing amount is a dash, never «NaN», and a broken language falls back to English', () => {
-    expect(formatMoney(null, 'en', EUR)).toBe('—');
-    expect(formatMoney(undefined, 'es', EUR)).toBe('—');
-    expect(formatMoney(100, 'not a tag!', EUR)).toBe('€1.00');
-  });
+  itGroupsThousandsAndDashesAMissingAmount(formatMoney, plain);
 });
 
 describe('formatPercent', () => {

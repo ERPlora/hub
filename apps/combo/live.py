@@ -15,6 +15,7 @@ from apps.combo.events import (
     OPTION_REORDERED,
     OPTION_UPDATED,
     PRODUCT_DELETED,
+    PRODUCT_RESTORED,
     PRODUCT_UPDATED,
 )
 
@@ -32,6 +33,7 @@ TREE = [
     OPTION_REORDERED,
     PRODUCT_UPDATED,
     PRODUCT_DELETED,
+    PRODUCT_RESTORED,
 ]
 
 # A row of the list counts the courses of its menu.

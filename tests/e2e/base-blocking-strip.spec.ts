@@ -1,8 +1,7 @@
 // flow: BASE-F01
 // The red strip «Todavía no puedes facturar» (BASE-F01 step 5; base's WORKBOOK «La franja…») says the sales receipt
-// as Invoicing does: «tique», never «ticket» (FIX-HUB-BASE-BLOCKING-STRIP-SAYS-TICKET-WHERE-INVOICING-SAYS-TIQUE; the
-// symptom was hub#283's `FIX-INVOICE-SETUP-HOOKS-INVOICE-F21-employee-390.png`), and it is the one notice there:
-// Invoicing no longer says the same under it (FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES). Hub `a` with
+// as Invoicing does: «tique», never «ticket» (hub#283), and it is the one notice there: Invoicing does not say the
+// same under it. Hub `a` with
 // no issuer, its owner in Spanish, on Invoicing → Invoices, at the three widths. The hub's issuer row is parked for the
 // run and put back as it was after it.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';

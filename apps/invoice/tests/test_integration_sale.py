@@ -705,7 +705,7 @@ def test_the_issued_notice_says_where_the_document_comes_from(issuer, shelf, cha
 
 
 
-# A sale line whose rule is gone (TAX-F11, pm#629 VF-17): declared with the tax family of the territory the line
+# A sale line whose rule is gone (TAX-F11): declared with the tax family of the territory the line
 # was charged in, as the line froze it, never a fixed VAT; nor the business's territory of today.
 
 

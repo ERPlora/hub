@@ -1,9 +1,8 @@
 """Django admin of the tax app: full CRUD over its tables, for the platform's staff only.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com and
-has full CRUD over every table, fiscal ones included. The database still refuses a rate outside 0–100,
-a rate on a class that charges no tax, a backwards range and a root's twin; the overlap and the
-coherence of a component are checked by the operations (services.py), which the screens and the API use.
+The Hub's admin lives only on hubs.erplora.com and has full CRUD over every table, fiscal ones included. The database
+still refuses a rate outside 0–100, a rate on a class that charges no tax, a backwards range and a root's twin; the
+overlap and the coherence of a component are checked by the operations (services.py), which the screens and the API use.
 The business's region is kept through its own operation, as its screen does (TAX-F11).
 """
 

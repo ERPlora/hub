@@ -1,4 +1,4 @@
-"""``manage.py bootstrap_databases``: the ``db-bootstrap`` task (aws-next README, «Contrato»).
+"""``manage.py bootstrap_databases``: the infrastructure's ``db-bootstrap`` task.
 
 Run once as the RDS master on ``postgres``, and again to rotate the passwords: it reads every
 ``*_PASSWORD``, prints one line per step (``created``/``exists``/``updated``/``skipped``) and
@@ -169,9 +169,9 @@ def test_a_missing_extension_fails_in_production_and_warns_locally(
 
 
 def test_the_pre_prefix_names_every_database_and_role_the_infra_expects(passwords, monkeypatch):
-    # The db-bootstrap task of pre runs `bootstrap_databases --prefix pre_` with prod's image (plan
-    # 2026-10-14-entorno-pre §1.2): these nine names are the ones its secret erplora/pre/db and the
-    # pre tasks' DB_NAME carry. A prefix, never a suffix: no `hub\_%` pattern of prod reaches them.
+    # The db-bootstrap task of pre runs `bootstrap_databases --prefix pre_` with prod's image: these
+    # nine names are the ones its secret erplora/pre/db and the pre tasks' DB_NAME carry. A prefix,
+    # never a suffix: no `hub\_%` pattern of prod reaches them.
     seen = {}
 
     def record(*, names, **kwargs):

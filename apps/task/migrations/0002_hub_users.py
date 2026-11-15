@@ -1,9 +1,9 @@
-# Tenancy W10, expand: the creator of a task and the author of a comment hang from the person in the business's own
-# database (``base.HubUser``), never from control's user, which no hub's database holds. The same four steps as
+# Expand: the creator of a task and the author of a comment hang from the person in the business's own database
+# (``base.HubUser``), never from control's user, which no hub's database holds. The same four steps as
 # ``staff/0004_hub_users``, the code of before alive all along: the new columns ``*_hub_user_id``, nullable; filled from
-# the old ones in phase 1's shared database (a hub's own has none to fill); the old fields out of the state, their
-# columns kept, nullable, without their key to ``auth_user``; the new links take the fields' names. The contract, a
-# later deploy's, drops the old columns (``base/tests/test_migration_safety.py``).
+# the old ones in the database the businesses shared before (a hub's own has none to fill); the old fields out of the
+# state, their columns kept, nullable, without their key to ``auth_user``; the new links take the fields' names. The
+# contract, a later deploy's, drops the old columns (``base/tests/test_migration_safety.py``).
 
 import uuid
 
@@ -58,7 +58,7 @@ def link_hub_users(apps, schema_editor):
 
 
 def drop_keys_to_control_users(apps, schema_editor):
-    """The old columns' keys to ``auth_user``, where the database has them (phase 1's shared one)."""
+    """The old columns' keys to ``auth_user``, where the database has them (the shared one of before)."""
     users = apps.get_model(settings.AUTH_USER_MODEL)._meta.db_table
     connection = schema_editor.connection
     for model_name, column in OLD_LINKS:

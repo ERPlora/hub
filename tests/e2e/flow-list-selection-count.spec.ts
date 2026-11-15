@@ -1,5 +1,5 @@
 // flow: FLOW-F03
-// The selection bar of a list counts the rows marked with its singular and its plural, in Spanish (ERPlora/ui#122):
+// The selection bar of a list counts the rows marked with its singular and its plural, in Spanish:
 // one marked automation reads «1 seleccionado» and two «2 seleccionados» — before, one read «1 seleccionados». The
 // count is the shared table's (`@erplora/ui` DataTable); Automations is the Hub's list with boxes to mark (FLOW-F03,
 // «marca sus casillas»), seen in the three sizes the fleet checks (the list at 1440 and 820, the cards at 375).

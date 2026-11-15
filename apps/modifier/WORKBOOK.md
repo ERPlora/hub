@@ -5,11 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `modifier`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Modificadores del producto actual
-> (`modules-workspace/modules/modifiers`, `origin/main` `eb43c64`, v0.1.14) y de lo que el TPV viejo
-> hacía con los suplementos (`modules/sales`, `origin/main` `c6cf4af`: `modifier_chain`,
-> `modifier_child_line`, `paper-modifiers`). Los números de flujo se conservan
-> (`MODIFIERS-Fnn` → `MODIFIER-Fnn`) porque Ventas y Cocina los citan.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -145,9 +141,9 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | MODIFIER-F07 | Cobrar el suplemento: precio y IVA | hecho |
 | MODIFIER-F08 | Que el suplemento salga en la comanda de cocina | hecho |
 | MODIFIER-F09 | Soltar los grupos de un producto o una categoría que se borra | hecho |
+| MODIFIER-F10 | Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte | hecho |
 
 ### MODIFIER-F01 Consultar y buscar los grupos
-<!-- origen: old:modifiers/WORKFLOW.md#modifiers-f01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Suplementos
@@ -163,7 +159,6 @@ Si falla: el aviso de la tabla con «Reintentar»; sin grupos, «Todavía no hay
 Implicados: ninguno
 
 ### MODIFIER-F02 Crear un grupo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:modifiers/WORKFLOW.md#modifiers-f02 qa:modules/modifiers/required-modifiers-and-price -->
 Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Suplementos
@@ -180,11 +175,11 @@ Entra: lo que escribe la persona.
 Sale: el grupo (avisa: grupo creado). No crea opciones ni enganches.
 Si falla: un nombre vacío o de más de 255 caracteres, un mínimo o máximo fuera de 0–50 o un máximo por
 debajo del mínimo salen debajo de su campo; un nombre que ya tiene otro grupo, «Ya hay un grupo con ese
-nombre.» debajo del Nombre. Lo escrito se queda.
+nombre.» debajo del Nombre. El motivo de un campo se quita en cuanto se corrige ese campo, aunque otro diga lo
+mismo (hub#888). Lo escrito se queda.
 Implicados: ninguno
 
 ### MODIFIER-F03 Cambiar o borrar un grupo
-<!-- origen: old:modifiers/WORKFLOW.md#modifiers-f03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos
@@ -199,11 +194,11 @@ operación (avisa: grupo borrado). Lo ya pedido o vendido no cambia: Ventas cong
 línea.
 Si falla: los mismos rechazos que al crear; bajar el máximo por debajo de las opciones que ya salen por
 defecto, «Este grupo tiene más opciones por defecto que su máximo.». Un grupo que no existe, «Este
-grupo no existe.».
+grupo no existe.». Por el asistente, un nombre que vale para varios grupos o para ninguno no saca tarjeta, y si
+antes del «sí» otro grupo encaja mejor con lo dicho no se cambia ni se borra nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F11
 
 ### MODIFIER-F04 Añadir, cambiar o quitar las opciones de un grupo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
@@ -227,14 +222,18 @@ entonces, salir del suplemento lo deja como se escribió, sin inventarle decimal
 salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938). Un
 nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
-fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo. Una
+fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo; el del nombre,
+el nombre de comanda, el suplemento, la categoría fiscal o el orden se quita en cuanto se corrige ese campo, aunque
+otro diga lo mismo (hub#888), y el de «Elegida por defecto», en cuanto se cambia ese interruptor, sin volver a
+guardar (hub#1437). Una
 opción con categoría fiscal propia se cobra en una línea aparte, que no puede valer cero ni menos: «Una
 opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor
-que cero.». Un grupo admite hasta 100 opciones.
+que cero.». Un grupo admite hasta 100 opciones. Por el asistente, al cambiar o quitar una opción, un grupo dicho por
+su nombre que vale para varios o para ninguno no saca tarjeta, y si antes del «sí» otro grupo encaja mejor con lo dicho
+no se toca nada y sale la tarjeta nueva (BASE-F97).
 Implicados: SALE-F11
 
 ### MODIFIER-F05 Enganchar un grupo a productos o categorías, y soltarlo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Suplementos (hoja del grupo)
@@ -249,11 +248,13 @@ Entra: el grupo y el producto o la categoría, de Inventario (por su id, o por s
 Sale: el enganche (avisa: enganche hecho o soltado). En el TPV, el artículo pregunta sus grupos y los
 de **todas** sus categorías, cada grupo una sola vez.
 Si falla: un producto o una categoría que no existe o está borrado, «Este producto no existe en este
-hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.».
+hub.» o «Esta categoría ya no existe.»; un enganche que ya existe, «Este grupo ya se aplica ahí.». Por el
+asistente, al soltar un grupo dicho por su nombre que vale para varios o para ninguno no sale tarjeta, y si antes del
+«sí» otro grupo encaja mejor con lo dicho no se suelta nada y sale la tarjeta nueva (BASE-F97). Un enganche a un
+producto o una categoría ya borrados tampoco saca tarjeta («Este grupo no se aplica ahí.»): lo suelta MODIFIER-F09.
 Implicados: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Elegir las opciones al vender un artículo
-<!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 wf:restaurante-dia#rec_restaurante-f17 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f06 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Ventas: Vender
@@ -278,7 +279,6 @@ Inténtalo de nuevo.» y no entra nada.
 Implicados: SALE-F11
 
 ### MODIFIER-F07 Cobrar el suplemento: precio y IVA
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old-hub:HUB_PERIPHERALS-F09 qa:modules/modifiers/required-modifiers-and-price old-hub:HUB_PERIPHERALS-F11 old:modifiers/WORKFLOW.md#modifiers-f07 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -307,7 +307,6 @@ medida: no admite una opción con suplemento.». La línea no entra.
 Implicados: SALE-F11
 
 ### MODIFIER-F08 Que el suplemento salga en la comanda de cocina
-<!-- origen: old-hub:HUB_PERIPHERALS-F10 wf:restaurante-dia#rec_restaurante-f07 old-hub:HUB_SHELL-F78 old-hub:HUB_SHELL-F72 qa:modules/modifiers/required-modifiers-and-price old:modifiers/WORKFLOW.md#modifiers-f08 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -323,7 +322,6 @@ Si falla: nada que no sea F07: si la valoración falla, la línea no entra.
 Implicados: KITCHEN-F07, SALE-F20
 
 ### MODIFIER-F09 Soltar los grupos de un producto o una categoría que se borra
-<!-- origen: nuevo (lo pide MODIFIER-F05: un enganche apunta a un producto o una categoría de Inventario, y esos se borran) -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -334,8 +332,62 @@ Pasos:
 Entra: el aviso de Inventario (producto borrado, categoría borrada).
 Sale: los enganches soltados. Mientras el aviso llega, un enganche a algo borrado ya no se ve en la hoja del
 grupo ni se pregunta en el TPV.
-Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta los enganches de otro.
-Implicados: INVENTORY-F04, INVENTORY-F07
+Si falla: repetir el aviso no cambia nada; el borrado de un negocio nunca suelta los enganches de otro. Si el personal
+de ERPlora recupera después el producto desde una copia aparte, sus grupos vuelven con él (MODIFIER-F10).
+Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
+
+### MODIFIER-F10 Recuperar los grupos de suplementos, y los de un producto o de una categoría, desde una copia aparte
+Estado: hecho
+Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
+Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de
+suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos** marcado (lo está, como todo lo
+que se puede traer)
+Pasos:
+1. El personal recupera desde una copia aparte con **Grupos de suplementos, Grupos de suplementos de categorías, Grupos
+   de suplementos de productos** marcado. Suplementos va siempre después de Inventario, se pida en el orden que se pida:
+   una categoría o un producto eliminados que vuelven ya están vivos cuando se les enganchan sus grupos.
+2. Primero, cada grupo de la copia que el negocio ya no tiene (lo borró, y borrarlo se lleva sus opciones y sus
+   enganches, F03) se vuelve a crear como lo crea la pantalla de Suplementos (F02), con su nombre, su nombre en la
+   comanda, su mínimo y su máximo, si una opción se puede repetir y su orden, y con sus opciones como las añade la hoja
+   del grupo (F04), cada una con su nombre, su nombre en la comanda, su suplemento, su categoría fiscal propia, si sale
+   elegida por defecto y su orden. Vuelve como un grupo nuevo, con otro identificador, y en los pasos siguientes sus
+   enganches de la copia se le hacen a ese: el que la recuperación trajo con su nombre.
+3. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
+   se vuelve a enganchar, como lo engancha la hoja del grupo (MODIFIER-F05): el producto vuelve a preguntar en el TPV
+   sus salsas, su punto o sus extras. Un producto que el negocio ya no tenía en absoluto vuelve como uno nuevo, con
+   otro identificador (INVENTORY-F01): sus grupos se enganchan a ese, el que la recuperación hizo con su SKU.
+4. Antes, igual, cada grupo que en la copia colgaba de una categoría viva en ella y que el negocio ya no tiene
+   enganchado a esa categoría: todos los productos de la categoría vuelven a preguntarlo. Una categoría eliminada
+   vuelve siempre como una nueva, con otro identificador (INVENTORY-F07): sus grupos se enganchan a esa, la que la
+   recuperación trajo con su nombre.
+5. Recuperaciones cuenta aparte cada cosa: «Grupos de suplementos: se creó 1», «Grupos de suplementos de categorías:
+   se crearon 2» y «Grupos de suplementos de productos: se crearon 2».
+Entra: la copia aparte y lo que el negocio tiene hoy.
+Sale: un grupo por cada uno que faltaba, con su aviso de grupo creado (`modifier.group.created`) y el de cada una de
+sus opciones (`modifier.option.created`), y un enganche por cada uno que faltaba, con su aviso de enganche hecho
+(`modifier.link.attached`), todos hechos por la recuperación, así que no arranca ninguna automatización (FLOW-F21);
+nada más. Las pantallas abiertas de Suplementos,
+el TPV y el reparto de Cocina ven al momento el producto que vuelve, como vieron que se eliminaba; las de Suplementos y
+el TPV, también cada grupo que vuelve a colgar de una categoría o de un producto.
+Si falla: un enganche que el negocio aún tiene se queda como está, y no se repite uno cuyo grupo el negocio ya volvió a
+enganchar a ese producto o a esa categoría: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo que el negocio soltó
+a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
+hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del enganche en la copia: un
+producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos, o el negocio ya hizo otro a mano
+con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró y ya volvió a crear a mano
+con su nombre («not_found: …»). Ese grupo hecho a mano se queda como el negocio lo dejó, con sus opciones y sus
+enganches: no se crea otro con su nombre ni se le añade ni engancha nada. Un grupo que el negocio conserva, aunque lo
+renombrara, también se queda con las opciones que tenga; una opción que le quitó no vuelve todavía (hub#1505). Una
+opción que la hoja del grupo no acepta hoy (su categoría fiscal propia ya no está activa en Impuestos) no vuelve: el
+grupo vuelve sin ella, su cuenta lo dice («Grupos de suplementos: se creó 1, 1 con notas») y su ficha dice en «notas»
+qué opción y por qué, por el identificador del grupo en la copia. Pedirlo otra vez no crea ningún grupo dos veces: el
+que trajo la recuperación ya es del negocio. El producto que hizo una recuperación se reconoce por su SKU la
+hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a enganchar los grupos que el negocio
+le soltó después, como a todo lo que ya no tiene. Con las categorías es igual: una que sigue eliminada (no se recuperó
+Productos) o que el negocio ya volvió a crear a mano con su nombre, que se queda con los grupos que él le enganchó, no
+recibe ninguno y Recuperaciones dice por qué («not_found: …»); la que trajo una recuperación se reconoce por su nombre,
+la trajera esta u otra anterior.
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Servicios: lo que entra y lo que sale
 
@@ -344,7 +396,28 @@ persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la 
 por su id o su nombre («grupo Salsas»), una opción por su id o su nombre y su grupo («opción Sin cebolla
 de Extras»), un producto por su id, su SKU o su nombre y una categoría por su id o su nombre. Si un
 nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`). Antes de cambiar nada, el asistente pide
-confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id.
+confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id. Un grupo
+dicho por su nombre al cambiarlo o borrarlo, al cambiar o quitar una de sus opciones o al soltarlo de un producto o una
+categoría se busca como lo buscará la acción (el mismo nombre antes que uno que lo contenga), y la tarjeta enseña el
+grupo que se va a tocar, con su nombre entero («Grupo: Salsas picantes» cuando se dijo «salsa»). Si lo dicho vale para
+varios grupos o para ninguno, no sale ninguna tarjeta: el asistente oye ««salsas» nombra varios grupos: Salsas dulces,
+Salsas picantes. Di cuál.» y pregunta cuál, o «Este grupo no existe.». El «sí» vale solo para lo que enseñó la
+tarjeta: si antes de confirmar alguien crea un grupo que encaja mejor con lo dicho («Salsa» cuando la tarjeta decía
+«Salsas picantes»), no se toca nada y sale la tarjeta nueva. Al añadir una opción a un grupo o al aplicarlo dicho por
+su nombre, la tarjeta enseña igual el grupo que encontró y el «sí» vale solo para él; si lo dicho vale para varios
+grupos, la tarjeta lo enseña tal como se dijo y la acción pregunta cuál. Una opción dicha por su nombre sale como la
+encuentra, con su grupo («Opción: Alioli (Salsas picantes)» cuando se dijo «ali»), o tal como se dijo si vale para
+varias (hub#1245). Si el grupo, la opción o el enganche llegan por su identificador junto al nombre de otro grupo,
+la tarjeta no lee ni enseña ese nombre, que la acción no usa: dice el registro del identificador (hub#1250). Una
+opción por su identificador se busca dentro del grupo que se diga a su lado, así que ese grupo sí sale. Al soltar un
+grupo por el identificador del enganche, la tarjeta tampoco enseña el grupo, el producto ni la categoría cuyo
+identificador llegue a su lado, que la acción no mira (hub#1278). Al aplicar o soltar un grupo, un producto dicho por
+su SKU o su nombre y una categoría dicha por su nombre se buscan como los buscará la acción, y la tarjeta enseña el que
+se va a tocar («Producto: Pizza» cuando se dijo «pizz»); al aplicarlo, si lo dicho vale para varios, la tarjeta lo
+enseña tal como se dijo y la acción pregunta cuál, y el «sí» vale solo para lo que enseñó: si antes de confirmar alguien
+crea uno que encaja mejor con lo dicho, no se aplica nada y sale la tarjeta nueva. Si el producto, la categoría o el
+enganche llegan por su identificador junto al nombre de otro producto o de otra categoría, la tarjeta no enseña ese
+nombre, que la acción no usa: dice el del identificador (hub#1291).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -372,7 +445,7 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 | Añade una opción a un grupo | gestionar | F04 | `modifier.option.create` |
 | Cambia una opción (lo que no se manda se queda) | gestionar | F04 | `modifier.option.update` |
 | Borra una opción | gestionar | F04 | `modifier.option.delete` |
-| Engancha un grupo a un producto o una categoría | gestionar | F05 | `modifier.link.attach` |
+| Engancha un grupo a un producto o una categoría | gestionar | F05, F10 | `modifier.link.attach` |
 | Suelta un grupo de un producto o una categoría | gestionar | F05 | `modifier.link.detach` |
 
 ### Lo que avisa
@@ -381,7 +454,7 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 |---|---|---|---|
 | Grupo creado, cambiado o borrado | F02, F03 | El grupo (`id`, `name`) | `modifier.group.created`, `.updated`, `.deleted` |
 | Opción creada, cambiada o borrada | F04 | La opción, su grupo, su nombre y su suplemento | `modifier.option.created`, `.updated`, `.deleted` |
-| Enganche hecho o soltado | F05, F09 | El grupo y el producto o la categoría | `modifier.link.attached`, `.detached` |
+| Enganche hecho o soltado | F05, F09, F10 | El grupo y el producto o la categoría | `modifier.link.attached`, `.detached` |
 
 ### A qué reacciona
 
@@ -395,6 +468,8 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 - **Inventario** (requisito): sus productos y categorías, a los que apunta cada enganche, y las
   categorías de cada producto, para saber qué grupos lleva en el TPV.
 - **Impuestos** (requisito): la categoría fiscal propia de una opción.
+- **De la plataforma**: la recuperación desde una copia aparte (BASE-F114), a la que Suplementos dice qué grupos, con
+  sus opciones, y qué enganches a categorías y productos devuelve (F10).
 
 ### Quién la usa
 
@@ -410,8 +485,7 @@ Los grupos, un grupo, las opciones, los enganches y los grupos de un producto se
 | Ver grupos, opciones y enganches; pedir los grupos de un producto y valorar una elección | sí | sí | sí | sí | `modifier.view` |
 | Crear, cambiar y borrar grupos y opciones; enganchar y soltar | sí | sí | sí | no | `modifier.manage` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado.
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 ## Para quien lo mantiene
 
@@ -428,6 +502,8 @@ cajero del producto actual es un empleado.
   `ModifierOption.tax_category` es clave ajena a `tax.TaxCategory` (`PROTECT`: Impuestos no borra
   categorías). Los productos y categorías se buscan con `find_product`/`find_category` de Inventario
   (su `requires`), que ya excluyen lo borrado y dicen 409 `inventory.*_ambiguous` con los candidatos.
+  Las tablas de Suplementos solo existen en un hub que la encendió, y el borrado físico de un producto desde
+  el admin pasa por alto la relación con una tabla que ese hub no tiene (`base/tenancy/deletion.py`).
 - **Unicidad en la base de datos**: nombre del grupo sin mirar mayúsculas (`Lower(name)`), nombre de la
   opción dentro de su grupo, y un enganche por grupo y producto o grupo y categoría. Las operaciones
   comprueban antes y, si dos escrituras chocan a la vez, la segunda recibe el mismo 409 (captura del
@@ -450,7 +526,7 @@ cajero del producto actual es un empleado.
   llamada (sin N+1 por grupo), acotada por las 100 opciones como mucho de cada grupo (409
   `modifier.group_full`). El resto de listas pagina (hasta 100); los empates de la columna se desempatan por
   nombre y por `id` en la dirección de la lista: en descendente es la ascendente leída al revés, empates
-  incluidos (`base.ordering`, nota vigente del 2026-09-28, hub#2355). El catálogo entero de opciones por
+  incluidos (`base.ordering`). El catálogo entero de opciones por
   `sort_order` va antes por el orden y el nombre de sus grupos, en los dos sentidos. Lo fijan los
   `test_tied_*` de `tests/test_queries.py`, con las filas creadas fuera de orden.
 - **Dinero**: céntimos enteros con signo, entre −99.999.999 y 99.999.999. Una opción con categoría
@@ -472,7 +548,35 @@ cajero del producto actual es un empleado.
   enganches a lo borrado se excluyen de toda lectura (`LIVE_LINK`).
 - **Reacciones** (`events.REACTIONS`): `inventory.product.deleted` → `modifier.link.drop_product`,
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
-  ningún papel tiene), sin ruta, idempotentes.
+  ningún papel tiene), sin ruta, idempotentes. A `inventory.product.restored` no reacciona: lo que el borrado soltó
+  vuelve desde la copia aparte (F10); `live.py` solo repinta con él.
+- **Desde una copia aparte** (BASE-F114, F10): `recoverable_from_copy` de `apps.py` declara tres cosas, «Modifier
+  groups», «Modifier groups of categories» y después «Modifier groups of products», cada una contada aparte.
+  `queries.groups_in_copy` lee con su propio SQL cada grupo de la copia con sus opciones, y
+  `queries.groups_not_in_business` deja los que el negocio no tiene ni por id ni con su nombre (sin mirar mayúsculas: el
+  nombre es único, `modifier_group_name_unique`), cada opción con la clave de su categoría fiscal propia (Impuestos nunca
+  borra una). Los crea `modifier.group.recover` (permiso `modifier.system`, sin ruta ni herramienta del asistente):
+  `create_group` y después `create_option` por cada opción, en una sola transacción; la opción que su alta rechaza
+  (`InvalidPayload` o `Conflict`) se devuelve en `left_out` con su código y `OPTION_LEFT`, y el grupo vuelve sin ella.
+  Las dos lecturas de enganches llevan además los grupos de la copia por su nombre (`queries.group_names_in_copy`,
+  `copy_groups`), y `_not_hung` pone cada enganche en el grupo que hace del de la copia
+  (`queries.groups_standing_for`: el mismo mientras el negocio lo tiene; si no, el de su nombre que trajo una
+  recuperación, `base.recovery.brought_back`, y que no es ninguno de la copia; uno hecho a mano no hace de ninguno).
+  `queries.category_links_in_copy` lee los `ModifierLink` de la copia que cuelgan de una categoría no borrada allí, con
+  las categorías vivas de la copia por su nombre (`apps.inventory.queries.category_names_in_copy`), y
+  `queries.category_links_not_in_business` pone cada uno en la categoría que hace de ella en el negocio
+  (`apps.inventory.queries.categories_standing_for`, la misma pareja que los enlaces de productos a categorías de
+  Inventario: la misma mientras vive; si no, la viva con su nombre que trajo una recuperación; una hecha a mano no
+  recibe nada). `queries.links_in_copy` lee con su propio SQL los `ModifierLink` de la copia que cuelgan de un
+  producto no borrado allí, con el SKU del producto allí, y
+  `queries.links_not_in_business` pone cada uno en el producto que hace de él en el negocio
+  (`apps.inventory.queries.products_standing_for`, la misma pareja que Tarifas: el mismo mientras vive; si no, el vivo
+  con su SKU que hizo una recuperación, `base.recovery.brought_back`; uno hecho a mano con su SKU no recibe nada) y deja
+  los que el negocio no tiene en su sitio (grupo y producto, el índice único `modifier_link_product_unique`; grupo y
+  categoría, `modifier_link_category_unique`; un enganche nunca cambia de grupo ni de destino, así que el mismo enganche
+  ya está en el suyo); las dos lecturas comparten `_links_in_copy` y las dos parejas `_not_hung`; la plataforma los crea
+  con `modifier.link.attach` como la recuperación (`copy_recovery:<id>`), y lo que `attach` rechaza sale «sin crear»
+  con su motivo. Pruebas: `tests/test_recovery.py`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
   un grupo o una opción) y cada campo de `schemas.py` su `description`. Los datos que ningún modelo
   nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,
@@ -480,14 +584,49 @@ cajero del producto actual es un empleado.
   tarjeta de confirmación del asistente, nunca por el título que pydantic inventa del campo
   (`tests/test_integration_assistant.py`). `kitchen_name` también lleva el suyo, «Kitchen ticket name» /
   «Nombre en la comanda», el de los formularios de grupo y opción: el modelo lo llama «kitchen name», que solo
-  queda para el admin de Django (hub#958). `expose_api` en las nueve consultas.
+  queda para el admin de Django (hub#958). `expose_api` en las nueve consultas. Cada herramienta dice además sus
+  `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`: Suplementos está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1092), con platos y opciones de ejemplo que ninguna otra app usa (pizzas,
+  salsas, el punto de la carne; nunca «Café» ni «hamburguesa», que ya dicen las frases y sondas de Ventas), y los
+  `SYNONYMS` del Hub (`base/assistant.py`) leen «predeterminada» como el `default` de una opción (nunca «por defecto»,
+  que también es el de un turno o un umbral). Así consultar los grupos, las opciones y los enganches, engancharlos y
+  soltarlos, y cambiar o borrar grupos y opciones desde el chat (MODIFIER-F03 a F07) llegan a su operación: las frases
+  reales de la QA del asistente (`tests/e2e/qa/probes/*-es-modifier-2026-11-08.json`, del dueño y del empleado) quedan
+  entre las 20 primeras herramientas del turno, y una frase propia por herramienta solo llega con sus `asks`
+  (`tests/test_assistant_asks.py`), también la de borrar un grupo «sin cambiar los pedidos antiguos», desde que live
+  deja de leer «sin cambiar» como una orden de cambiar (ERPlora/live#60).
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
   las marcas `refers` de `schemas.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
   pueden tener una opción con el mismo nombre, y el enganche por su grupo y lo que engancha. El id lleva su título
   («Grupo», «Opción», «Se aplica a»), nunca «Registro». Sin persona detrás, sin permiso, con un id de otro negocio o
-  con un enganche a algo borrado, el registro queda fuera, nunca su id (hub#672).
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
+  con un enganche a algo borrado, el registro queda fuera, nunca su id (hub#672). Dicho por su nombre, el `group` de
+  `GroupRefIn`, `OptionRefIn` y `LinkRefIn` lleva la misma marca leída por ese nombre (`A_GROUP_BY_NAME`, un grupo no
+  pertenece a nada: se busca solo por su nombre), y las cinco escrituras cuya entrada es una de ellas declaran su
+  `check` (`base.assistant.checked`): `modifier.group.update` y `modifier.group.delete`, `modifier.group.get`;
+  `modifier.option.update` y `modifier.option.delete`, `modifier.option.get`; `modifier.link.detach`,
+  `modifier.link.get` (su `id` es la opción o el enganche: `modifier.group.get` lo leería como el de un grupo). Antes
+  de dibujar la tarjeta, el turno busca el registro como lo hará la escritura, un nombre que encaja con varios grupos o
+  con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo encontrado, así que el «sí» vale solo para
+  ello (hub#1208, hub#1218; `tests/test_assistant_yes_for_its_card.py`, con el trinquete de las escrituras que
+  comprueban y las que leen el grupo o la opción por su nombre). La marca lleva `as_said` (`base.schemas.names`,
+  hub#1245): lo que no se puede leer (vale para varios, para ninguno, sin persona) sale como se dijo, así que el
+  `group` de `_OwningGroup` y de `LinkIn` (`modifier.option.create`, `modifier.link.attach`, sin lectura cuya entrada
+  quepa en la suya, `base.E012`) también la lleva: su huella lleva el grupo encontrado y el «sí» vale solo para él. El
+  `option` dicho por su nombre se lee con su grupo (`AN_OPTION_BY_NAME`, `within` `group_id` y `group`). Con ese
+  `check`, `modifier.link.detach` por el asistente rechaza antes de la tarjeta un
+  enganche a algo borrado (`modifier.link.get` solo lee `LIVE_LINK`); la operación lo sigue soltando por su id. Junto
+  al id con que la escritura toma su registro en su lugar (el del grupo, la opción o el enganche, o `group_id`), la
+  tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250); el `group` de `OptionRefIn` solo junto a
+  `group_id`, porque la opción por su id se busca en ese grupo (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
+  Junto al `id` del enganche, `modifier.link.detach` deja sin leer también `group_id`, `product_id` y `category_id`, que
+  `detach_link` no mira (hub#1278; `UNLESS_BY_ID`, que recorre todo dato leído por id). El `product` y la `category` de
+  `_Target` se leen por sus palabras como los busca `services._target`, con `as_said`: `A_PRODUCT_BY_NAME` con
+  `inventory.product.get`, que busca entre los mismos productos vivos que `find_product` (sus `rows` solo dan la fila
+  final por su id), y `A_CATEGORY_BY_NAME` con `modifier.category.get`, el mismo `find_category`. Se dejan sin leer
+  junto a `product_id` o `category_id` y, al soltar, también junto al `id` del enganche (hub#1291;
+  `UNLESS_OF_A_TARGET`, por la marca con `unless_marked`).
+- **Administrador de Django con CRUD completo** (PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
   nombres repetidos, un máximo por debajo del mínimo, una opción con IVA propio que no vale más de cero y
@@ -496,37 +635,18 @@ cajero del producto actual es un empleado.
   - `apps/modifier/tests/test_events.py` (`test_the_reaction_runs_as_the_system_scope_given`) da por bueno que la
     reacción de un ámbito B borre los enganches que creó A: solo pasa bajo el respaldo de los tests, que guarda
     `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`). En producción cada negocio tiene su BD
-    (desde el corte S5, hub#602) y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
+    y la reacción solo ve los suyos; el test tendrá que decirlo cuando se retire el
     respaldo (hub#611).
-  - ~~Las claves ajenas `CASCADE` de `ModifierLink` hacia `inventory.Product` y `inventory.Category`
-    frente a «tablas al activar» (PLAN §15)~~ — **resuelta** por hub#778: las tablas de Suplementos solo
-    existen en un hub que las encendió, y el borrado físico de un producto desde el admin pasa por alto la
-    relación con una tabla que ese hub no tiene (`base/tenancy/deletion.py`).
 
 - **Páginas** (`frontend/`): `pages/GroupsPage.vue` (la tabla, `useLiveList` en ventanas de hasta 100),
   `components/GroupSheet.vue` (la hoja: `modifier.group.get` vivo y dos `useSheetList` de 20 en 20),
   `GroupFormModal`, `OptionFormModal` (con el `MoneyInput` de `@erplora/ui` con signo, `signed`, y el `Combo` de Impuestos),
   `LinkFormModal` (Producto o Categoría, `Combo` sobre las listas de Inventario), `PageNotices`; las
   búsquedas de los `Combo` llaman a las operaciones de Inventario e Impuestos (`lib/pickers.ts`), nunca
-  a sus modelos. Icono: `lucide:sliders-horizontal` (el `options-outline` de antes, pedido en
-  `UI-REQUESTS.md`). Pruebas: Vitest por fichero, `tests/e2e/modifier-groups.spec.ts` (F01 a F05) contra
+  a sus modelos. Icono: `lucide:sliders-horizontal`, mientras `ion:options-outline` espera en
+  `UI-REQUESTS.md`. Pruebas: Vitest por fichero, `tests/e2e/modifier-groups.spec.ts` (F01 a F05) contra
   Inventario e Impuestos reales y `tests/e2e/modifier-till.spec.ts` (F06 a F09) contra Inventario,
   Impuestos, Ventas y Cocina reales, con el relay del outbox corrido como lo corre cada tick.
-
-### Paridad con la pantalla del producto actual
-
-| Producto actual (`erp-modifiers-groups`) | Aquí | Motivo si cambia |
-|---|---|---|
-| Título «Modificadores» y menú de una entrada | «Suplementos», una entrada | El nombre que ya usa Ventas |
-| Formulario de alta encima de la tabla (Nombre, Nombre en la comanda, Mínimo, Máximo, «Añadir») | «Nuevo grupo» abre el formulario con esos campos, más «Se puede repetir» y Orden | El patrón de la plataforma (`DataTable` + `FormModal`, como Impuestos y Servicios); el alta pedía repetir y orden por el asistente |
-| «Guardando…» y botón desactivado sin nombre | El botón Crear con su espera y desactivado sin nombre | — |
-| Fallo del alta bajo el formulario | Dentro del formulario, junto a su campo | — |
-| Columnas Nombre (orden y filtro), En la comanda (o el nombre), Elección (orden), Orden (orden) | Las mismas, más Opciones y «Se aplica a»; Elección se filtra por obligatorio u opcional | Las cuentas dicen si el grupo saldrá en el TPV |
-| Elección «Opcional» / «Obligatorio (mín. N)» « · máx. N» | Igual, más « · se repite» | Repetir ahora funciona |
-| Buscador «Buscar…» (nombre y nombre de comanda), páginas de 50 | Igual | — |
-| Vacío «Todavía no hay grupos de modificadores.», «Cargando…», error con reintento | «Todavía no hay grupos de suplementos.», «Cargando…», error de la tabla con «Reintentar» | El nombre |
-| El formulario sale también al empleado (el servidor pide PIN) | El alta, editar y borrar solo salen a quien gestiona | Lo que no se puede hacer no aparece (regla de las demás apps) |
-| Opciones, enganches, editar y borrar: solo asistente o API | En la hoja del grupo, además del asistente y la API | MODIFIER-F03 a F05 en pantalla |
 
 ### Contrato con Ventas
 
@@ -581,8 +701,7 @@ Suplementos encendida y el permiso de verla (hub#1121); el empleado lo tiene, y 
    `modifiers` (ver «Contrato con Cocina»).
 8. **Dividir y juntar cuentas** mueven la línea con su copia congelada; no se vuelve a valorar.
 
-Casos cubiertos, del TPV viejo (`modifier_chain`, `modifier_child_line`): la hamburguesa con queso cobra
-8,00 + 1,00 € y no 8,00 € (sales#148); lo que vale la cuenta y lo que cobra la caja son el mismo número; la
+Casos cubiertos: la hamburguesa con queso cobra 8,00 + 1,00 € y no 8,00 €; lo que vale la cuenta y lo que cobra la caja son el mismo número; la
 opción con otro IVA sale en línea hija y base + cuota cuadran en las dos; una opción sin categoría propia
 sigue siendo una sola línea (`apps/sale/tests/test_integration_modifier.py`); el descuento, el repetido, el
 plato a peso y el IVA de cada suplemento al céntimo, tres platos con queso y refresco: 27,15 € al 10 %
@@ -598,32 +717,6 @@ del worker la entrega a Cocina (`kitchen.ticket.receive`), que guarda en el plat
 comanda y la pinta debajo del nombre: en la pantalla separada por «, » y en el papel una por renglón
 (hub#1156, hub#1138). Renombrar o borrar la opción, o su grupo, después de pedirla no cambia lo que lee
 cocina (`tests/test_integration_kitchen.py`).
-
-### Cambios frente al producto actual
-
-1. **Pantalla completa**: opciones, enganches, edición y borrado se hacen en la pantalla (la hoja del
-   grupo), además de por el asistente y la API; antes solo el alta del grupo tenía pantalla.
-2. **Cambiar no reescribe lo que no se manda**: antes, un cambio sin un campo lo devolvía a su valor de
-   fábrica (mínimo 0, suplemento 0…).
-3. **El servidor hace cumplir las reglas** (mínimo, máximo, repetición y que la opción sea de un grupo
-   del artículo) al valorar, y la valoración es la puerta del precio. Antes solo la hoja del TPV las
-   miraba y la API dejaba pasar cualquier cosa.
-4. **Un grupo enganchado al producto y a su categoría sale una vez**, y cuentan **todas** las categorías
-   del artículo, no solo la primera.
-5. **Se puede repetir** funciona (antes el campo existía y nadie lo leía) y hay **opción por defecto**.
-6. **Máximo por debajo del mínimo** se rechaza; nombres de grupo únicos en el negocio y de opción
-   únicos en su grupo; una opción con categoría fiscal propia tiene que valer más de cero (antes fallaba
-   al cobrar).
-7. **Cambiar, borrar o soltar algo que no existe** responde 404 y no avisa (antes respondía bien y
-   avisaba igual).
-8. **Los enganches apuntan a productos y categorías de Inventario** con clave ajena (antes, una
-   referencia opaca que aceptaba cualquier texto), y se sueltan solos al borrarse lo enganchado.
-9. **Nombre**: «Suplementos» en español, el que ya usaba Ventas («Ponle precio en Suplementos»); en
-   inglés, «Modifiers». El permiso del empleado sigue siendo solo de consulta, y el botón de alta solo
-   sale a quien puede crear.
-10. **El catálogo completo de opciones** (`modifiers.options.all`, sin paginar) se sustituye por
-    `modifier.selection.resolve`, que valora solo lo elegido; la lista de opciones pagina como todas.
-11. **Paginación de la hoja**: de 20 en 20 con «Cargar más».
 
 ### Lo que NO hace, a propósito
 

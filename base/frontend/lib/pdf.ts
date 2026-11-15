@@ -1,4 +1,4 @@
-// The PDF of Files' preview (BASE-G84): drawn with Mozilla's pdf.js (the old hub's), loaded only when a PDF opens. It
+// The PDF of Files' preview, drawn with Mozilla's pdf.js and loaded only when a PDF opens. It
 // runs in the page's own thread — its worker module handed over as `globalThis.pdfjsWorker`, which pdf.js uses instead
 // of starting a Worker — so the strict CSP (`script-src` with a nonce and `strict-dynamic`) needs nothing new, and it
 // reads the bytes the SDK fetched (it fetches nothing itself). The legacy build, for the webviews of the installed app.

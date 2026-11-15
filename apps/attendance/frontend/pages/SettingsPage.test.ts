@@ -246,7 +246,7 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.field('auto_close_after_hours').errorText).toBe('Too many');
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const BOTH = 'Fill in both latitude and longitude, or leave both empty.';
     const HOURS = 'Ensure this value is less than or equal to 24.';
     const REFUSAL = { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { workplace_lng: BOTH, auto_close_after_hours: HOURS } } };

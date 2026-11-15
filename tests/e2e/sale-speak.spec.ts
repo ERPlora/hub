@@ -1,4 +1,4 @@
-// The till's «Speak» key (FIX-SALE-POS-NO-SPEAK-KEY; apps/sale/WORKBOOK.md «Vender», PLAN §30 point 4), end to end
+// The till's «Speak» key (apps/sale/WORKBOOK.md «Vender»), end to end
 // with its real dependencies, as base-assistant.spec.ts sets them up: the Hub of this stack, its SaaS's gateway
 // (`/internal/speech/transcribe`, `/internal/assistant/*`) and, behind it, the e2e's provider (assistant-provider.ts,
 // started here). The browser's fake microphone records, erplora.com transcribes it (`DICTATION`), the words wait in
@@ -147,7 +147,7 @@ test('SALE-F01 / BASE-F94 — offline, «Speak» stays greyed and a tap says why
   expect(transcribed()).toBe(dictations + 1);
 });
 
-// FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION: the dictation is base's (`useDictation`, PLAN-HUB §18); the key keeps
+// The dictation is base's (`useDictation`); the key keeps
 // its own offline guard, and a recording stopped once the connection is gone goes through base's `cancel`.
 test('SALE-F01 — a recording stopped once the connection is gone is thrown away untranscribed, and a toast says why', async ({ page }) => {
   await login(page, A, '/sale/pos', EMPLOYEE);

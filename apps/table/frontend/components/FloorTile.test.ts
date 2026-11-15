@@ -1,5 +1,5 @@
 // A table on the floor plan (WORKBOOK «Plano de sala»; TABLE-F09): its number, its status written with
-// its icon and colour (never the colour alone, tables#64), its seats or — occupied — the guests and
+// its icon and colour (never the colour alone), its seats or — occupied — the guests and
 // the minutes they have been there («3 pax · 35 min») and who serves them; with a reservation of today,
 // its name and its hour on one line (the name cut with «…», the hour never). Round tables are round.
 import { describe, expect, it } from 'vitest';

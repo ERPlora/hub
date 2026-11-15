@@ -118,7 +118,7 @@ describe('SettingsPage: the number and the month', () => {
   });
 
   // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
-  // nothing (gh:hub#439), so there the month says it without the link.
+  // nothing, so there the month says it without the link.
   it('«Upgrade plan» sells: never on the app surfaces, where the month still says it is spent', async () => {
     applySurface('mobile');
     try {
@@ -153,7 +153,7 @@ describe('SettingsPage: the number and the month', () => {
     expect(near.find('whatsapp-inbox-settings-near-cap').text()).toBe(said);
   });
 
-  it('a plan without WhatsApp messages says so, never «No limit» (WHATSAPP_INBOX-F13, ADR-0474: 0 = none)', async () => {
+  it('a plan without WhatsApp messages says so, never «No limit» (WHATSAPP_INBOX-F13, 0 = none)', async () => {
     const none = await setup({}, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
     expect(none.wrapper.findComponent(UsageMeter).exists()).toBe(false);
     const month = none.find('whatsapp-inbox-settings-month');

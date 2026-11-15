@@ -1,5 +1,3 @@
-// System's tabs and the reasons of a failed resend or discard (BASE-G87, G92…G94; the old hub's lib/system-tabs.ts and
-// the codes of its dead-letter queue).
 import { describe, expect, it } from 'vitest';
 
 import { BACKUPS_TARGET, failureKey, SYSTEM_TABS, TAB_HASH, tabOf, tabsFor } from './system';

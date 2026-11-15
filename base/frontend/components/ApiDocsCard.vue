@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// «API documentation» in Settings › General (BASE-G100; the old hub's HUB_SHELL-F161): «Show the API documentation»,
-// off by default and saved at once (live `base.api_doc.settings`); on, «Open the API documentation» (its page). The
-// side menu's «API» entry of the old hub needs a menu item shown on a condition, which the shell does not have yet: the
-// way in is here and from Employees › API keys. Whoever does not run the business sees it disabled, and why; a change
-// that cannot be saved says so and the switch goes back to the saved value.
+// Settings › General: whether the business shows its API documentation page, saved as soon as it is switched. A change
+// that cannot be saved puts the switch back to the saved value.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonToggle } from '@ionic/vue';

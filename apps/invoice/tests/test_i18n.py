@@ -43,7 +43,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("invoice")
     lazies = [
         *config_texts(config),
-        # The Home's steps (FIX-INVOICE-SETUP-HOOKS): base paints them in the reader's language.
+        # The Home's steps: base paints them in the reader's language.
         *(text for step in config.setup for text in (step.title, step.description)),
         *module_texts(queries, schemas, services, platform),
         *(label for _english, label in FACTORY_SERIES_NAMES.values()),
@@ -121,7 +121,6 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
 
 # Django joins every app's Spanish catalogue and the first that translates a message wins, so a text invoice says
 # with its own words reads another app's when that app comes earlier (base/tests/test_locale_modules.py).
-# FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP.
 
 
 def test_a_series_an_issuer_and_an_invoice_say_their_own_words_in_spanish():

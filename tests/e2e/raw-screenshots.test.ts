@@ -1,7 +1,7 @@
-// flow: hub-e2e-capture — FIX of the e2e harness (FIX-HUB-E2E-SHOT-BEFORE-RESIZE-UNCHECKED)
+// flow: hub-e2e-capture — the e2e harness's screenshots
 // Every capture of the e2e goes through `capture` (helpers.ts), which refuses a screenshot taken before the page was
-// painted at its size (`repeatedTop`). A raw `.screenshot(` takes it as it comes: on the demo list, 5 in 24 captures
-// right after `setViewportSize` repeated the topbar at their bottom. This keeps them from coming back as a ratchet:
+// painted at its size (`repeatedTop`). A raw `.screenshot(` takes it as it comes, and right after `setViewportSize` it
+// can repeat the topbar at its bottom. This keeps them from coming back as a ratchet:
 // `raw-screenshots.json` holds, for each file that still had raw calls when `capture` arrived, how many; a file can
 // only lose them (and then its count goes down, or its line away), never gain them, and a new file has none.
 import { readdirSync, readFileSync } from 'node:fs';

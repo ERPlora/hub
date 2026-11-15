@@ -2,7 +2,7 @@
 reads, such as the country of a phone written without prefix (hub#527, CUSTOMER-F10, CUSTOMER-F11).
 
 It is ``base.business.get``'s country, read as the platform as ``business_currency`` reads the currency (no second
-source: PLAN-HUB §21), through base's one reading of a business without one (``base.business.country_or_market``,
+source), through base's one reading of a business without one (``base.business.country_or_market``,
 hub#682): ERPlora's market, Spain. ERPlora's own hub answers its issuer's country. A scope that is no hub's has no
 country: the same ``NotFound`` as the operation, never a silent Spain. Each hub answers its own, never another's.
 """
@@ -16,9 +16,9 @@ from live.errors import NotFound, PermissionDenied
 from live.operations import get
 
 from base.models import Hub
-from base.operations import business_country, current_business_country
+from base.operations import business_country, current_business_country, current_business_scope
 from base.schemas import BusinessIn
-from base.tenancy.context import use_control, use_hub
+from base.tenancy.context import HubContextMissing, use_control, use_hub
 from base.tenancy.tests.hubs import HUB_DATABASES
 
 pytestmark = pytest.mark.django_db
@@ -47,7 +47,7 @@ def test_a_business_without_a_country_is_in_erplora_s_market(hubs):
 
 
 def test_erplora_s_own_hub_is_in_its_issuer_s_country():
-    assert not Hub.objects.filter(slug="erplora").exists()  # phase 1: no registry row
+    assert not Hub.objects.filter(slug="erplora").exists()  # it answers even without a registry row
     assert business_country(ERPLORA) == "ES"
     with override_settings(PLATFORM_ISSUER_COUNTRY="GB"):
         assert business_country(ERPLORA) == "GB"
@@ -101,3 +101,21 @@ def test_erplora_s_own_hub_at_work_is_in_its_issuer_s_country():
 def test_where_no_business_is_at_work_it_is_erplora_s_market(no_test_fallback):
     with use_control():
         assert current_business_country() == "ES"
+
+
+# ── The scope of the business at work, to ask another app as the platform (hub#1459) ────────────────────────────────
+# Price Lists, which does not require Services, asks Services which service stands for one of a separate copy's while
+# the copy is given back: no caller is at hand there, only the business whose database is at work.
+
+
+@pytest.mark.django_db(databases=HUB_DATABASES)
+def test_the_scope_at_work_is_its_business_s_never_another_hub_s(hub_a, hub_b, no_test_fallback):
+    with use_hub(hub_a):
+        assert current_business_scope() == Scope("host", hub_a.slug)
+    with use_hub(hub_b):
+        assert current_business_scope() == Scope("host", hub_b.slug)
+
+
+def test_where_no_business_is_at_work_there_is_no_scope_to_ask_in(no_test_fallback):
+    with use_control(), pytest.raises(HubContextMissing):
+        current_business_scope()

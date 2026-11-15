@@ -1,5 +1,5 @@
 """Sales charges in the business's currency (flow business-currency): its country's, as ``base.business.get`` reads it
-from this hub's registry (APP-BASE-6), never a euro fixed in the app nor a call to erplora.com. A sale keeps the
+from this hub's registry, never a euro fixed in the app nor a call to erplora.com. A sale keeps the
 currency it was charged in: what was charged is shown, refused and printed with its own, never rewritten when the
 business's changes. Its decimals are the ones the server counts (CLDR): the yen has none, the forint two. A business
 in Spain still charges in euros, with its legal limits in euros as the law writes them."""
@@ -53,7 +53,7 @@ def charge(key: str = "sale-currency-1", ctx: OperationContext | None = None, sk
 
 
 def coffee_in(scope: Scope, sku: str) -> None:
-    """A coffee of 150 in ``scope``'s catalog (phase 1: one database, a SKU is the deployment's)."""
+    """A coffee of 150 in ``scope``'s catalog (the scopes here share one database, so each takes its own SKU)."""
     data = {"name": "Coffee", "sku": sku, "price": 150, "tax_category_key": "restaurant.drink"}
     run("inventory.product.create", data, system_context(scope))
 
@@ -119,7 +119,7 @@ def test_a_charged_sale_keeps_its_currency_when_the_business_s_changes(coffee):
 
 @pytest.mark.parametrize("country", ["PL", "JP"])
 def test_erploras_own_hub_charges_in_the_currency_of_its_issuer_s_country(settings, country):
-    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub): its sales keep the
+    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its sales keep the
     # currency of its issuer's country, as its invoices do (hub#273), and the charge never fails for it.
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = country
@@ -211,7 +211,7 @@ def test_what_a_sale_can_give_back_is_said_in_its_own_currency(coffee):
     assert (options.currency, options.currency_decimals, options.refundable_total) == ("JPY", 0, 300)
 
 
-# ── One way to the currency (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY) ─────────────────────────
+# ── One way to the currency ─────────────────────────
 # Sales asks the one question every app that charges asks (``base.operations.business_currency``, BASE-F50), on
 # ERPlora's own hub too, never a copy of its own that drifts in silence (here, an answer other than the one of the
 # business's or the issuer's country). ``queries.business_currency`` stays as Sales' public answer (Cash register

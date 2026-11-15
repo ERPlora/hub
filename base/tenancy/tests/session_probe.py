@@ -65,3 +65,24 @@ def test_marked_with_no_hub_s_alias_alone():
     """Names its databases in its mark, none of them a hub's: which of the hubs' aliases it finds registered."""
     registered = sorted({hubs.HUB_A_ALIAS, hubs.HUB_B_ALIAS} & set(connections.settings))
     Path(os.environ["SESSION_PROBE_REPORT"]).write_text(json.dumps(registered))
+
+
+def test_without_the_database_first():
+    """Asks for no database, as the first test xdist hands a worker may: the checks of ``conftest.py`` run after it, as
+    after every test."""
+
+
+def test_without_the_database_that_reads_the_pool():
+    """Reads the pool of ``default`` without the database, as any code may: Django makes it the first time it is read,
+    on the database's name of that moment (hub#1332)."""
+    assert connections[DEFAULT_DB_ALIAS].pool is not None
+
+
+def test_then_one_with_the_database_says_which_it_reaches(django_db_setup, django_db_blocker):
+    """After those, as the tenancy's tests that commit control's rows (``django_db_blocker``, no ``django_db`` mark, so
+    pytest-django never moves them first): which database a query of ``default`` reaches, and which one the settings
+    name."""
+    with django_db_blocker.unblock(), connections[DEFAULT_DB_ALIAS].cursor() as cursor:
+        cursor.execute("SELECT current_database()")
+        reached = cursor.fetchone()[0]
+    Path(os.environ["SESSION_PROBE_REPORT"]).write_text(json.dumps({"default": _control(), "reached": reached}))

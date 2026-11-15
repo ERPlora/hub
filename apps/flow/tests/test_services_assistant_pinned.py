@@ -1,5 +1,4 @@
-"""Fixed data of an «Ask the assistant» step (FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF;
-WORKBOOK FLOW-F37, FLOW-F38, FLOW-F29).
+"""Fixed data of an «Ask the assistant» step (WORKBOOK FLOW-F37, FLOW-F38, FLOW-F29).
 
 A step's tool may get data the automation fixes (``pinned``: ``{tool: {input: value}}``), filled in when it runs with
 the same data as the prompt: the assistant never sees them and cannot change nor leave them out — what it sends for

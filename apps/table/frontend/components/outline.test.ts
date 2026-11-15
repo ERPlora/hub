@@ -1,4 +1,4 @@
-// tables#56: an outlined field without `mode="md"` paints nothing in iOS mode (the old floor plan's «Add zone»
+// An outlined field without `mode="md"` paints nothing in iOS mode (the old floor plan's «Add zone»
 // stayed disabled behind an invisible input). Every `ion-input`, `ion-select` and `ion-textarea` of Tables with
 // `fill="outline"` says `mode="md"`.
 import { describe, expect, it } from 'vitest';

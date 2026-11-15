@@ -1,12 +1,8 @@
 <script setup lang="ts">
-// The API's documentation (BASE-G150, G04; the old hub's ApiDocsPage). Not Swagger UI: production enforces Trusted
-// Types, which it does not support; the same document, read here and downloadable for Postman or any other tool. Live
-// `base.api_doc.get`, asked only once the live `base.api_doc.settings` says it is shown (hidden, nothing is asked, so no
-// refused request reaches the console; settings that cannot be read do not keep it away): how to call it (a key from
-// Employees › API keys, as a bearer; said too when this business cannot make keys yet), then one section per app with
-// its routes — method, path, what it does — and, on opening one, its parameters and its body. Hidden, it says so and
-// who runs the business is sent to Settings › General; a document that cannot be read says so with «Retry»; none
-// published, says so.
+// Not Swagger UI: production enforces Trusted Types, which it does not support. The same document is read here and can
+// be downloaded for Postman or any other tool. `base.api_doc.get` is asked only once `base.api_doc.settings` says the
+// documentation is shown, so a hidden one sends no refused request to the console; settings that cannot be read do
+// not keep it away.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, type OutputOf, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';

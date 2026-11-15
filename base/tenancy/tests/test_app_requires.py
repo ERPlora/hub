@@ -1,5 +1,5 @@
-"""Spec 2026-10-11 «tablas al activar» §11 and §14.11: an app's tables are made alone, with what it ``requires``, on
-the platform's template (S3: the first time a hub turns it on). That holds only while every link and every migration
+"""An app's tables are made alone, with what it ``requires``, on the platform's template the first time a hub turns
+it on. That holds only while every link and every migration
 dependency of a module goes to the platform (``base``, ``live``) or to a module of its ``requires``, closed
 transitively; a cycle in ``requires`` is ``live.E005`` (``packages/live/tests/test_checks.py``).
 

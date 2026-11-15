@@ -1,5 +1,3 @@
-// One row of a Settings card (the old hub's): its icon, its name, the line that says what it is for and, at the end,
-// either its value (read-only) or a chevron that opens another screen. The two Settings tabs of APP-BASE-6 use it.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonItem } from '@ionic/vue';
 import { afterEach, describe, expect, it } from 'vitest';

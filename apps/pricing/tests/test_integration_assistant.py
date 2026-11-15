@@ -1,7 +1,7 @@
-"""The assistant's card for a write of pricing (FIX-HUB-PRICING-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is
-hub#258): in Spanish, every datum it sends by the name the Price lists screens give it, never by the title pydantic
-makes up from the field («Customer Group», «Rule»). The card is base's (``base.assistant.card``); the names are
-pricing's: the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of pricing (base's half is hub#258): in Spanish, every datum it sends by the name
+the Price lists screens give it, never by the title pydantic makes up from the field («Customer Group», «Rule»). The
+card is base's (``base.assistant.card``); the names are pricing's: the titles of its schemas and the ``verbose_name`` of
+its models, with their Spanish in its catalog."""
 
 import dataclasses
 import json
@@ -161,13 +161,11 @@ def test_who_may_not_see_prices_reads_none_on_the_card(hub_a, no_fallback):
     assert priced(card) == {"kind": "text", "value": 1500}
 
 
-# ── The record a write names by its id, by its name (FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half
-# is hub#416) ──
-# Since hub#416 the card leaves out an id its schema does not mark: «desactiva la tarifa», «quita el precio del champú» or
-# «crea una regla para el grupo VIP» said no list, no price and no group. Now each record is named as the Price lists
-# screens show it: a list and a rule by their name, a price by its article and its list, a product, a service, a category
-# and a customer group by their names. Read as whoever asks, in the hub they ask in: never by the id, and left out when
-# nobody, or somebody who may not see prices, is behind the request.
+# ── The record a write names by its id, by its name (base's half is hub#416) ─────────────────────────────────────────
+# The card leaves out an id its schema does not mark, so each record is named as the Price lists screens show it: a list
+# and a rule by their name, a price by its article and its list, a product, a service, a category and a customer group
+# by their names. Read as whoever asks, in the hub they ask in: never by the id, and left out when nobody, or somebody
+# who may not see prices, is behind the request.
 
 #: Every record a write of pricing names by its id: the data that name one, by write.
 NAMED = {

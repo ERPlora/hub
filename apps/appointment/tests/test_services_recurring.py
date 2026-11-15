@@ -254,8 +254,8 @@ def test_editing_from_a_later_date_splits_the_series_and_moves_what_follows(salo
 
 
 def test_a_long_series_moves_every_appointment_and_each_says_who_had_it(salon):
-    # gh:appointments#251 — handing a long series over moves all of its appointments, not the first fifty;
-    # gh:appointments#253 — each one's history says from whom to whom, not just «rescheduled».
+    # Handing a long series over moves all of its appointments, not the first fifty;
+    # Each one's history says from whom to whom, not just «rescheduled».
     make_settings(max_advance_booking=0)
     out = create(salon, frequency="daily", day_of_week=None)
     run("appointment.recurring.materialize", {"id": str(out.recurring.id)})

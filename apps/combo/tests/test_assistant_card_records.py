@@ -1,8 +1,8 @@
-"""FIX-HUB-COMBO-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#669): the card of a write of Menus and combos says which
-menu, course, choice or product it acts on by its name, read as whoever asks, never by its id, and leaves it out when
-that person may not read it or it is not there. A menu and a course go by their name and a choice by its product's
-name, as the builder's «Withdraw» and «Remove» dialogs say them; a product by its name, as Inventory says it. The
-datum that names one by its id is titled with the screens' word for it («Menú», «Plato», «Elección»), never «Registro».
+"""hub#669: the card of a write of Menus and combos says which menu, course, choice or product it acts on by its name,
+read as whoever asks, never by its id, and leaves it out when that person may not read it or it is not there. A menu and
+a course go by their name and a choice by its product's name, as the builder's «Withdraw» and «Remove» dialogs say them;
+a product by its name, as Inventory says it. The datum that names one by its id is titled with the screens' word for it
+(«Menú», «Plato», «Elección»), never «Registro».
 """
 
 import dataclasses

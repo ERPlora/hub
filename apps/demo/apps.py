@@ -1,4 +1,4 @@
-"""The demo app: the reference every app of hub-next copies (plan §4.5)."""
+"""The demo app: the reference every app of the Hub copies."""
 
 from django.utils.translation import gettext_lazy as _
 from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
@@ -14,7 +14,7 @@ class DemoConfig(LiveAppConfig):
     icon = "ion:flask-outline"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _("Items with lines that show up on every tablet at once: the platform's reference app.")
     description = _(
         "Demo keeps items with a name, a status and a note, each with its own list of lines. It solves "
@@ -41,10 +41,9 @@ class DemoConfig(LiveAppConfig):
     # command's input, checked at start by base.E008).
     approvals = {"demo.item.add_line": _("Add a line to an item")}
     approval_figures = {"demo.item.add_line": [_("Add a line: {qty} × {text}")]}
-    # The Home's hooks (PLAN-HUB round 2026-10-21), the example every module copies: a step of «Finish setting up
-    # your business», a panel of the dashboard and a counter of the bell, each on a query of queries.py. Out of the
-    # store (listed = False), so base shows them only where SHOW_UNLISTED_MODULES is on or in a demo's hub: never to a
-    # customer.
+    # The Home's hooks, the example every module copies: a step of «Finish setting up your business», a panel of the
+    # dashboard and a counter of the bell, each on a query of queries.py. Out of the store (listed = False), so base
+    # shows them only where SHOW_UNLISTED_MODULES is on or in a demo's hub: never to a customer.
     setup = [
         SetupStep(
             key="first_item",

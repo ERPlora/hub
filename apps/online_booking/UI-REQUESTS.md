@@ -4,11 +4,11 @@ Lo que las páginas de Reservas online necesitan de `@erplora/ui` (y de la plata
 Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
 **Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `89eaf98` y `ERPlora/hub` `origin/main`
-`cd9f875`: no ha llegado ninguna de las tres. Ninguna rompe un flujo de esta app (todas tienen su sustituto,
-dicho abajo), así que quedan en «Fuera por ahora» (`## 6` de `MIGRATION.md`): la página pública ya está allí
-(`ONLINE_BOOKING-??`, «Puerta pública `/p/<slug>/book`»), y se proponen `online_booking:ui-date-field` y
-`online_booking:ui-icons` (las dos las pide también Citas). Quien entregue una la borra de aquí y cambia su
-sustituto en la misma PR.
+`cd9f875`: no ha llegado ninguna de las tres. Ninguna rompe un flujo de esta app (todas tienen su sustituto, dicho
+abajo), así que quedan en «Fuera por ahora» (`## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`): la
+página pública ya está allí (`ONLINE_BOOKING-??`, «Puerta pública `/p/<slug>/book`»), y se proponen
+`online_booking:ui-date-field` y `online_booking:ui-icons` (las dos las pide también Citas). Quien entregue una la
+borra de aquí y cambia su sustituto en la misma PR.
 
 ## La página pública de reservas sin sesión (`base`, puerta pública `/p/`)
 
@@ -16,7 +16,7 @@ sustituto en la misma PR.
   (`/p/<slug>/book/<token>`), en plantillas de Django en el dominio de la web pública, con el campo trampa,
   la espera mínima de envío y el aviso de privacidad. Su contrato (operaciones, contexto, visitante, errores)
   está en el `WORKBOOK.md`, «Contrato con la página pública». Es de `base` (PLAN-HUB, bloque 7 «puerta
-  pública `/p/`»), y `MIGRATION.md` §6 la tiene fuera por ahora.
+  pública `/p/`»), y `archive/migration/MIGRATION.md` de `ERPlora/erplora-next` §6 la tiene fuera por ahora.
 - **Hoy**: `frontend/pages/PreviewPage.vue` (`/online_booking/preview`, solo en desarrollo, para el
   propietario y el administrador) hace el mismo recorrido con las mismas operaciones públicas, juzgadas
   siempre como la clienta.
@@ -31,7 +31,8 @@ sustituto en la misma PR.
   bandeja (el de la `DataTable`). El valor que viaja es el mismo (`AAAA-MM-DD`).
 - Al llegar: cambiar esos campos conservando sus `data-testid`.
 
-## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
+## Ya en `@erplora/ui`, sin usar todavía
 
-- `ion:checkmark-done-outline` — acción **Completar** de la bandeja, la misma que pide Citas. Hoy:
-  `ion:checkmark-circle-outline`. Al registrarlo, cambiar `ICONS` en `frontend/pages/BookingsPage.vue`.
+- `ion:checkmark-done-outline` — acción **Completar** de la bandeja, la misma que Citas; ya registrado en
+  `packages/ui/src/shell/icons.ts`. Hoy: `ion:checkmark-circle-outline`. Al usarlo, cambiar `ICONS` en
+  `frontend/pages/BookingsPage.vue` y su test.

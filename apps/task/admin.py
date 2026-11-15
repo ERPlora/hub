@@ -1,10 +1,9 @@
 """Django admin of the task app: full CRUD on every model, for the platform's staff.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables. A raw admin write records no event and checks no business rule (no number, no completion
-date): the actions that need one call the operations of services.py. A task's or a project's «Delete»
-locks it first (``lock_tasks``, ``lock_projects``), as the operations that delete them and every write
-that names them do: it waits for the one under way and then takes what that write added.
+The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
+(no number, no completion date): the actions that need one call the operations of services.py. A task's or a project's
+«Delete» locks it first (``lock_tasks``, ``lock_projects``), as the operations that delete them and every write that
+names them do: it waits for the one under way and then takes what that write added.
 """
 
 from django.contrib import admin

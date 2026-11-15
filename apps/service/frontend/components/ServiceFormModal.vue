@@ -9,7 +9,7 @@
 // for who may edit services): a library image (Hair and Beauty first) or a photo of its own, sent once the service is
 // saved (`set_image`, `upload_image`, «Uploading photo…»); if the service saved and the photo did not, the form says so
 // with «Retry» (only the photo goes again) and the service keeps the photo it had.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -21,10 +21,8 @@ import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchServiceCategories, searchTaxCategories } from '../lib/pickers';
 import type { PricingType, ServiceOut, ServicePatchIn } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 import ServiceProfessionals from './ServiceProfessionals.vue';
 
 const PRICING: readonly PricingType[] = ['fixed', 'hourly', 'from', 'variable', 'free'];
@@ -43,7 +41,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedForm('service-form', () => ({ form: open.value ? form.value : original.value, image: image.value }), () => ({ form: original.value, image: draftOf(props.service) }));
+const canDismiss = useUnsavedForm('service-form', () => ({ form: open.value ? form.value : original.value, image: image.value }), () => ({ form: original.value, image: draftOf(props.service) }));
 
 interface Form {
   name: string;
@@ -165,7 +163,7 @@ async function save(): Promise<void> {
   const business = money.value;
   if (!business) return;
   const f = form.value;
-  const read = parseMoney(f.price, business);
+  const read = parseMoney(f.price, { money: business });
   if (!read.ok || !f.tax) return;
   const price = read.cents ?? 0;
   let saved: { id: string };
@@ -200,6 +198,7 @@ function retryPhoto(): void {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : service ? $t('service.services.form.save') : $t('service.services.form.create')"
@@ -233,6 +232,7 @@ function retryPhoto(): void {
         </InlineFeedback>
         <ion-input
           data-testid="service-form-name"
+          name="name"
           :value="form.name"
           :label="$t('service.services.form.name')"
           label-placement="floating"
@@ -245,6 +245,7 @@ function retryPhoto(): void {
         />
         <ion-select
           data-testid="service-form-pricing_type"
+          name="pricing_type"
           :value="form.pricing"
           :label="$t('service.services.form.pricingType')"
           label-placement="floating"
@@ -264,7 +265,9 @@ function retryPhoto(): void {
         </ion-select>
         <MoneyInput
           testid="service-form-price"
+          name="price"
           :model-value="form.price"
+          :money="money"
           :label="money ? t('service.services.form.priceIn', { currency: money.currency }) : t('service.services.form.price')"
           :error-text="fieldErrors.price"
           :show-error="tried"
@@ -272,6 +275,7 @@ function retryPhoto(): void {
         />
         <ion-input
           data-testid="service-form-duration"
+          name="duration_minutes"
           type="number"
           inputmode="numeric"
           min="1"
@@ -286,6 +290,7 @@ function retryPhoto(): void {
         />
         <Combo
           testid="service-form-category"
+          name="category_id"
           :model-value="form.category"
           :search="searchCategories"
           :label="t('service.services.form.category')"
@@ -295,6 +300,7 @@ function retryPhoto(): void {
         />
         <Combo
           testid="service-form-tax"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTaxes"
           :clearable="false"

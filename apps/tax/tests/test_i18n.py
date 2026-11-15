@@ -56,7 +56,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("tax")
     lazies = [
         *config_texts(config),
-        # The Home's step (FIX-TAX-SETUP-HOOKS).
+        # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
         *MESSAGES,
         *(v.message for v in TaxCategory._meta.get_field("key").validators if isinstance(v, RegexValidator)),

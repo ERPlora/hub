@@ -531,7 +531,7 @@ def _given(value: Any) -> bool:
     return value not in (None, [], "")
 
 
-def rule_problems(values: dict[str, Any]) -> dict[str, str]:
+def rule_problems(values: dict[str, Any]) -> dict[str, str]:  # noqa: C901
     """What is wrong in a rule as it would be saved (``{field: message}``; empty = coherent).
 
     Each type wants its value and nothing of another type's; each scope its target and no other one;

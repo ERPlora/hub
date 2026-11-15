@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9879914d0065cd7f95ca67ca3f4424a9b4ea2b9ec92e6e16635793e1f1951ec3 -->
+<!-- generated from WORKBOOK.md sha256:c95b41f865491e119c6c7e9c34dd7a1ba6752bf27d6de22c643a46dcf317573e -->
 
 ## What it is for and who it is for
 
@@ -98,8 +98,8 @@ Initial setup, step by step:
 ## Screens
 
 Sales & POS opens from the **Sales & POS** menu and has five entries: **Sell**, **Sales**,
-**Quick notes**, **Sections** and **Settings**. "Sections" is what the current product called
-"Departments": the short word fits in a phone's tab bar with all five in sight.
+**Quick notes**, **Sections** and **Settings**. "Sections" are the till's departments: the short
+word fits in a phone's tab bar with all five in sight.
 
 ### Sell
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
@@ -160,7 +160,8 @@ keypad", "The amount tendered does not cover the total") or, in its place, the l
 keypad, which does not move while typing (hub#456); with another method, "Exact amount" and "Charge
 <amount> on the card terminal, then confirm."; "Split the payment" and "Add this payment". Footer: the
 reason if it cannot be charged (those of the amount tendered go above the keypad) and "Charge <amount>" ("Charging…" while it goes); with the cash register closed and
-cash, the refusal and "Open a cash session".
+cash, the refusal and "Open a cash session". With an app that adds a step to the charge (today, Tips), its row
+shows between the amount and the payment methods (SALE-F39).
 
 ### Open checks
 Drop-down of the check's ticket icon: "Park this check" with its explanation, "Open checks" and "Tap a
@@ -274,6 +275,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F36 | Prepare the quick notes | common | done |
 | SALE-F37 | Add a payment method (Bizum, bank transfer…) | common | done |
 | SALE-F38 | Sell a service from Services | hair salon | done |
+| SALE-F39 | Charge with what another app adds (the tip) | common | not done |
 
 ### SALE-F01 Sell and charge in cash
 Status: done
@@ -314,7 +316,9 @@ the tiles, the search, the open checks and the floating button say "—", and th
 total is on its way, because without it the number of decimals is unknown (in yen, "Charge · 15.00" for ¥1,500;
 hub#936); as soon as it says it, the figure shows with its sign. If the server cannot value the check
 (for example, because no applicable VAT rule exists), the foot says why instead of leaving only "—";
-when it can value it, the notice clears and the total returns, and parking the check does not leave it
+without a rule, the reason names the article and its tax category by the name Taxes gives it, in the
+reader's language (e.g. "Service — generic", never its key `service.generic`), and ends with "Create its
+rule in Taxes › Rules."; the **Charge** sheet says the same (hub#1123). When it can value it, the notice clears and the total returns, and parking the check does not leave it
 on the empty till. The **Charge** sheet stays on "Working out
 the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
 it (without it, "1500" yen tendered would be charged as 150,000); if the currency cannot be read, the notice
@@ -820,11 +824,12 @@ Steps:
    the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
    them, after the lines, and "Charge" stays in view. The same goes for the side column of a screen just as low,
    such as a 1024×600 tablet with the strip (hub#787).
-   In the side column, when the heading, the tabs and "Send order" leave no room for a whole line (a 1024×600
-   tablet on its side or a 1280×560 laptop without the strip; a 1024×700 or 1024×768 tablet, or a 1280×720
-   laptop, with it), the whole column scrolls, on both tabs, as the phone's drawer does, with "Send order" pinned
-   at the bottom: a line is brought up and read whole above the bar. Where the line fits, the heading and the
-   tabs stay in place and only the lines scroll (hub#820).
+   In the side column, when the heading, the tabs and "Send order" leave no room for a whole line (a 1024×600 or
+   1024×700 tablet on its side, or a 1280×560 laptop, without the strip; a 1024×700 or 1024×768 tablet, or a
+   1280×720 or 1280×800 laptop, with it), the whole column scrolls, on both tabs, as the phone's drawer does, with
+   "Send order" pinned at the bottom: a line is brought up and read whole above the bar. Where the line fits, the
+   heading and the tabs stay in place and only the lines scroll (hub#820). At any size, both tabs are seen and
+   tapped whole (hub#1435).
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
@@ -1035,7 +1040,7 @@ Steps:
    payment, date or total, or sort.
 4. Tap a row to see its document (SALE-F29). The table reloads by itself when a sale is charged, voided
    or refunded.
-5. Today's figures are also on **Home**, on the board, as in the current product: "Today's sales" and
+5. Today's figures are also on **Home**, on the board: "Today's sales" and
    "Today's tickets" show from the start; "Sales, last 7 days" (one bar per day, from oldest to today) and
    "Recent activity" (the last eight sales, the newest on top, with their number and their customer) are
    added with ⋮ ("Customize panel"). They update by themselves when a sale is charged, voided or refunded,
@@ -1062,9 +1067,12 @@ period's "Revenue". Sales charged before stay as they were: their line counts fo
 sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
 last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
-table, without the figures. A total that is not an amount says "Type an amount, like 12.50" under its
-field, and an end date before the start one, "The end date cannot be before the start date."; neither of
-them filters and the period rules. On Home, a panel for a day with no sales says 0, and one that cannot
+table, without the figures. The total is read as in any amount field of the Hub and as in the other lists
+(hub#1196: "1.000,50", "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its field
+in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
+cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date
+before the start one, "The end date cannot be before the start date."; neither of them filters and the
+period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
 Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
 
@@ -1290,7 +1298,7 @@ Involved: none
 Status: done
 Vertical: common
 Actor: manager, assistant
-Screen: none (assistant or API), like the current product
+Screen: none (assistant or API)
 Steps:
 1. Ask the assistant to add the method and say what type it is ("add Bizum as a payment method, of type
    other"): with no type it is created as cash.
@@ -1334,7 +1342,9 @@ has not yet said its currency, because the amount is read and the price written 
 yen would go in as 150,000), and the price does not show yet: "Use —", and on the tile "—" or "From —" (never
 "From 65.00" for ¥6,500; hub#936). A service without a tax category shows "VAT missing" and does not go in
 ("Cannot be sold: no tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
-category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
+category, without touching anything else, and also on leaving **Sell**. One whose category has no rule in the
+business's country goes in, but the check is neither valued nor charged: the foot says so as in SALE-F01, with
+the category's name and where its rule is made (hub#1123). An archived one, "That service is
 no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the
 service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
 booked for this service: it is cancelled, it is another customer's, it did not book this service or it
@@ -1343,13 +1353,42 @@ If the currency cannot be read, the sheet says so ("The business's currency coul
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Add <amount>" and "Use <price>" light up (hub#938).
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
+### SALE-F39 Charge with what another app adds (the tip)
+Status: not done — the Charge sheet does not paint other apps' steps yet, nor does the sale keep what was charged on top
+(hub#1497, hub#1500, hub#1502)
+Vertical: common
+Actor: employee, manager
+Screen: Charge, Sale document
+Steps:
+1. With an app turned on that adds a step to the charge (today only Tips, with "Ask for a tip when charging"),
+   the **Charge** sheet paints its row between the amount and the payment methods (the Tips one, TIP-F02).
+   With none, the sheet is the usual one.
+2. What the step adds is charged together with the sale, but outside it: the big amount says "<total> +
+   <tip> tip"; by card, "Charge <total + tip> on the card terminal, then confirm." and the button "Charge
+   <total + tip>"; in cash, the amount tendered has to cover both and the change takes both off. With "Split
+   the payment", each payment carries its own and "Remaining" counts only the sale.
+3. Charge. The **Sale document** opens: the ticket is the usual one (lines, VAT and total of the sale) and, in
+   the payment block, below "Tendered", the line "Tip <amount>" shows before the "Change".
+In: the steps the active apps declare and what each one adds to each payment.
+Out: the sale with its base, its VAT and its total **without the tip**: the ticket, Invoicing's invoice and its
+VeriFactu record are the same as without it (INVOICE-F01), because a voluntary tip is not a price and carries no
+VAT (see "Why the tip is not on the ticket" in the Tips manual). The sale keeps apart, in each payment, what was
+charged on top and its name, to square the amount tendered and the change and for the paper, and the sale
+charged notice carries it apart; the **Sales** figures (SALE-F28) do not add it. The step's app keeps its own
+(TIP-F02).
+If it fails: if the step's app is turned off with the sheet open, the row goes away and it charges without it.
+If the sale is charged and the step cannot save its own, the sale stays charged and the sheet says the step's
+notice with "Retry" (TIP-F02); the retry uses the same attempt key and never charges twice (SALE-F06). The
+ticket's cap (€3,000) and the cash cap (€1,000) look at the sale's total, as always: the tip is no price.
+Involved: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
+
 ## What the verticals share
 
 | Shared piece | Flows that use it |
 |---|---|
 | The charge: the same server price, the same VAT, the same refusals and the same charged-sale notice Inventory and Customers listen to | F01–F06, F22, F26 |
 | The open check and its lines: the price is frozen when the line is added; parking, retrieving and appointment are the same check | F09–F18, F22–F24, F26 |
-| The **Charge** sheet: methods, keypad, ticket or invoice, customer's details | F01–F05, F22 |
+| The **Charge** sheet: methods, keypad, ticket or invoice, customer's details and other apps' steps | F01–F05, F22, F39 |
 | Marking lines: it serves to charge part and to split the check | F22, F23 |
 | The "Served by" chip and the line's stamp | F16, F20, F26 |
 | Voiding a sale: a single notice, and each app that reacts decides its effect | F30 |
@@ -1377,6 +1416,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
 | What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
+| The steps the active apps add to the charge (today, the tip from Tips), without knowing which they are | see sales | F39 | `sale.checkout.steps` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
 | The active payment methods, with the ones the business allows today | see payment methods | F02, F03 | `sale.payment_method.list` |
@@ -1388,7 +1428,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
-| The name of a record a write of Sales touches, by its id: only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F35 | `sale.record.get` |
+| The name of a record a write of Sales touches, by its id, and that of a refund, by its sale ("Refund of sale 20261014-0007"), by which Services names the one that gives sessions back (SERVICE-F26): only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F32, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
 the quick notes and what is refundable can be followed live.
@@ -1514,8 +1554,7 @@ the quick notes and what is refundable can be followed live.
 | See the figures | yes | yes | yes | no | `sale.view_reports` |
 | Settings, sections and quick notes | yes | yes | yes | no | `sale.manage_settings` |
 
-The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-current product's cashier is an employee.
+The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 
 What the employee cannot do in the POS they ask for on their own device and a manager approves it with
 their PIN or their badge ("An approval is needed", BASE-F84), once and for that very request: voiding and

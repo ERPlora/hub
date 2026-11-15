@@ -1,12 +1,12 @@
-"""BASE-G57, G63–G66 and G72: the devices of the hub.
+"""The devices of the hub.
 
-- G72: from the device itself, an administrator decides whether it is shared (a till: PIN, a shift) or personal (no
+- From the device itself, an administrator decides whether it is shared (a till: PIN, a shift) or personal (no
   PIN, 30 days); the sessions open from now on follow it, the open one keeps its end.
-- G63–G66: the administrators see the devices someone entered from (never their token), name them, remove a lost one
+- The administrators see the devices someone entered from (never their token), name them, remove a lost one
   (its sessions end at once and the PIN stops working on it) and remove at once those nobody used in 30 days.
-- G57: a plan that covers N devices (``plan.max_devices`` of the SaaS's photo) ends, at each entry, the sessions of
+- A plan that covers N devices (``plan.max_devices`` of the SaaS's photo) ends, at each entry, the sessions of
   the other devices past the N - 1 most recent; each of them says why at its next way in.
-- G81 (BASE-F40): «Usage and plan» counts the devices in use the way that cap does: those with a session open on
+- BASE-F40: «Usage and plan» counts the devices in use the way that cap does: those with a session open on
   this hub.
 """
 
@@ -240,7 +240,7 @@ class TestThePlanCoversOneDevice:
 
 
 class TestThePlanSaysTheDevicesInUse:
-    """BASE-G81: the devices «Usage and plan» counts are those the cap of BASE-G57 keeps: a session open on this hub."""
+    """The devices «Usage and plan» counts are those the plan's cap on devices keeps: a session open on this hub."""
 
     @pytest.fixture(autouse=True)
     def plan(self, db):

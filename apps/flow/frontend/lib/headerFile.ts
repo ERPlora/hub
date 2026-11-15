@@ -1,4 +1,4 @@
-// The file of a WhatsApp template's header in a «Send a message» step (WORKBOOK FLOW-F32; the old hub's HUB-F112):
+// The file of a WhatsApp template's header in a «Send a message» step (WORKBOOK FLOW-F32):
 // what each kind takes, checked here before the upload so a wrong one is said at once. The WhatsApp inbox checks it
 // again by the file's bytes when it keeps it (`whatsapp_inbox.template_sample.upload`): these are Meta's limits, the
 // same the inbox's own form says.

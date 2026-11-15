@@ -1,10 +1,10 @@
-// Money of the drawer screens: the server keeps whole cents; a person reads money in the page's language and
-// types it as she reads it («150,50», «1.250,50»). One gate reads every money field: empty, an amount,
-// or why it is not one (garbage, negative, or «1.250», which reads two ways). Money is in the business's currency
-// (flow business-currency): the one the screen passes, and until it is known only a dash, never the euro.
+// Money of the drawer screens: the server keeps whole cents; a person reads money in the page's language. What is
+// typed in a window or in the list's amount filters is read by the platform (`MoneyInput`, `parseMoney`; hub#1160,
+// hub#1196, money-fields.test.ts). Money is in the business's currency (flow business-currency): the one the screen
+// passes, and until it is known only a dash, never the euro.
 import { describe, expect, it } from 'vitest';
 
-import { formatFace, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, plain, readAmount, readMoney } from './money';
+import { formatFace, formatMoney, formatSignedMoney, plain } from './money';
 
 // The business's money as `base.business.get` says it: the currency and the decimals the server counts it in.
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -39,12 +39,6 @@ describe('formatMoney', () => {
     expect(plain(formatSignedMoney(0, 'es', EUR))).toBe('0,00 €');
     expect(formatSignedMoney(null, 'es')).toBe('—');
   });
-
-  it('prefills a field ungrouped, with the reader’s decimal sign', () => {
-    expect(moneyFieldText(125050, 'es')).toBe('1250,50');
-    expect(moneyFieldText(125050, 'en')).toBe('1250.50');
-    expect(moneyFieldText(700, 'es')).toBe('7,00');
-  });
 });
 
 describe('formatFace', () => {
@@ -67,64 +61,11 @@ describe('formatFace', () => {
   });
 });
 
-describe('readMoney', () => {
-  it('empty is no amount', () => {
-    expect(readMoney('  ')).toEqual({ ok: true, cents: null });
-  });
-
-  it('reads whole and decimal amounts with a comma or a point', () => {
-    expect(readMoney('150')).toEqual({ ok: true, cents: 15000 });
-    expect(readMoney('150,5')).toEqual({ ok: true, cents: 15050 });
-    expect(readMoney('150.50')).toEqual({ ok: true, cents: 15050 });
-    expect(readMoney(' 0,05 € ', 2, 'EUR')).toEqual({ ok: true, cents: 5 });
-  });
-
-  it('reads money as this very screen writes it: grouped thousands with their decimals', () => {
-    expect(readMoney('1.250,50')).toEqual({ ok: true, cents: 125050 });
-    expect(readMoney('1,250.50')).toEqual({ ok: true, cents: 125050 });
-    expect(readMoney('1.250.000')).toEqual({ ok: true, cents: 125000000 });
-  });
-
-  it('«1.250» reads two ways: it asks which one', () => {
-    expect(readMoney('1.250')).toEqual({ ok: false, reason: 'ambiguous', typed: '1.250', grouped: 125000, decimal: 125 });
-    expect(readMoney('12,345')).toEqual({ ok: false, reason: 'ambiguous', typed: '12,345', grouped: 1234500, decimal: 1235 });
-  });
-
-  it('refuses a negative amount and anything that is no amount', () => {
-    expect(readMoney('-12')).toEqual({ ok: false, reason: 'negative' });
-    for (const garbage of ['abc', '1..2', '12€50', '1,2,3', '12.5.0']) {
-      expect(readMoney(garbage), garbage).toEqual({ ok: false, reason: 'notAnAmount' });
-    }
-  });
-});
-
-describe('moneyRefusal', () => {
-  const t = (key: string, named?: Record<string, unknown>) => (named ? `${key} ${JSON.stringify(named)}` : key);
-
-  it('says why a field is not an amount, in the app’s words; an amount or empty says nothing', () => {
-    expect(moneyRefusal(readMoney('12'), t, 'es')).toBeNull();
-    expect(moneyRefusal(readMoney(''), t, 'es')).toBeNull();
-    expect(moneyRefusal(readMoney('abc'), t, 'es')).toBe('cash_register.money.notAnAmount');
-    expect(moneyRefusal(readMoney('-1'), t, 'es')).toBe('cash_register.money.negative');
-    expect(plain(moneyRefusal(readMoney('1.250'), t, 'es', EUR) ?? '')).toBe(
-      'cash_register.money.ambiguous {"typed":"1.250","grouped":"1.250,00 €","decimal":"1,25 €"}',
-    );
-  });
-});
-
 describe('money of other currencies', () => {
   it('writes minor units with the decimals of their currency', () => {
     expect(plain(formatMoney(5003, 'en', JPY))).toBe('¥5,003');
     expect(plain(formatMoney(515, 'en', KWD))).toBe('KWD 0.515');
     expect(plain(formatMoney(10015, 'es', EUR))).toBe('100,15 €');
-  });
-
-  it('reads what is typed with the decimals of the currency', () => {
-    expect(readMoney('5003', 0)).toEqual({ ok: true, cents: 5003 });
-    expect(readMoney('1.250', 0)).toEqual({ ok: true, cents: 1250 });
-    expect(readMoney('12,5', 0)).toEqual({ ok: false, reason: 'notAnAmount' });
-    expect(readMoney('0,515', 3)).toEqual({ ok: true, cents: 515 });
-    expect(moneyFieldText(5003, 'en', 0)).toBe('5003');
   });
 });
 
@@ -150,23 +91,5 @@ describe('money of the business (flow business-currency)', () => {
     expect(plain(formatSignedMoney(-490, 'en'))).toBe('—');
     expect(plain(formatFace('500', 'es'))).toBe('500');
     expect(plain(formatFace('0.50', 'en'))).toBe('0.50');
-  });
-
-  it('reads an amount typed with the business’s currency around it, and not with another one', () => {
-    expect(readMoney('150,50 zł', 2, 'PLN')).toEqual({ ok: true, cents: 15050 });
-    expect(readMoney('PLN 7', 2, 'PLN')).toEqual({ ok: true, cents: 700 });
-    expect(readMoney('150 €', 2, 'PLN')).toEqual({ ok: false, reason: 'notAnAmount' });
-    expect(readMoney('150 €')).toEqual({ ok: false, reason: 'notAnAmount' });
-  });
-
-  // hub#921: a window reads what was typed only in the business's money, which its type asks for (never «1500» yen as
-  // 150000 because the business had not answered yet).
-  it('reads what was typed in the business’s money: its decimals and its currency', () => {
-    expect(readAmount('1500', JPY)).toEqual({ ok: true, cents: 1500 });
-    expect(readAmount('1500', EUR)).toEqual({ ok: true, cents: 150000 });
-    expect(readAmount('0,515', KWD)).toEqual({ ok: true, cents: 515 });
-    expect(readAmount('150,50 zł', PLN)).toEqual({ ok: true, cents: 15050 });
-    expect(readAmount('150 €', PLN)).toEqual({ ok: false, reason: 'notAnAmount' });
-    expect(readAmount('', JPY)).toEqual({ ok: true, cents: null });
   });
 });

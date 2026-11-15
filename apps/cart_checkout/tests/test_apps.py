@@ -154,13 +154,14 @@ def test_the_overdue_carts_expire_every_quarter_of_an_hour():
 
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: every operation
-    # says what it does and its risk.
+    # says what it does, its risk and what a person types to ask for it (``asks``, hub#1100:
+    # cart_checkout is listed in LIVE_ASSISTANT_ASKS_REQUIRED).
     ops = operations()
     assert set(ops) == COMMANDS | QUERIES
     for name, op in ops.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
         assert op.permission == PERMISSION_OF[name], name
-        assert set(op.ai) == {"description", "risk"}, name
+        assert set(op.ai) == {"description", "asks", "risk"}, name
         assert op.ai["description"], name
         assert op.ai["risk"] == ("high" if name in HIGH_RISK else "normal"), name
         assert op.expose_api is True, name

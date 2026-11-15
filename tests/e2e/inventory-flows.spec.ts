@@ -13,7 +13,7 @@
 //     where it goes (no «Label» printer yet, then one; the ones the database already has are switched off
 //     for it, so it never skips);
 //   - INVENTORY-F26: a quantity off the unit's step is refused under its field; by the kilo, grams are fine;
-//   - on a phone (pm#478, inventory#105): a refused save is said where it can be read and «Save» is reachable.
+//   - on a phone: a refused save is said where it can be read and «Save» is reachable.
 import { execFileSync } from 'node:child_process';
 
 import { type BrowserContext, expect, test } from '@playwright/test';
@@ -29,12 +29,12 @@ import {
   productBySku,
   productRow,
   productsReady,
-  rowAction,
   searchProducts,
   shootFlow,
   stamp,
 } from './inventory-helpers';
 import { chargeByApi, cleanSales } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const printers: string[] = [];
 
@@ -77,11 +77,11 @@ test('INVENTORY-F02: «Edit» opens the product with its SKU locked and the row 
   await productsReady(page);
   await searchProducts(page, sku);
   await expect(productRow(page, sku)).toBeVisible();
-  // inventory#108: the row's stock actions are buttons with their names, not bare icons.
+  // The row's stock actions are buttons with their names, not bare icons.
   await expect(productRow(page, sku).getByRole('button', { name: /^(Receive stock|Recibir stock)$/ })).toBeVisible();
   await expect(productRow(page, sku).getByRole('button', { name: /^(Count stock|Contar stock)$/ })).toBeVisible();
 
-  await rowAction(page, tea.id, 'edit');
+  await rowAction(page, 'inventory-products', tea.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   await expect(form).toContainText(/(Editing product|Editando producto) — E2E Green tea/);
   await expect(form.locator('[data-testid=inventory-product-sku] input')).toBeDisabled();
@@ -107,7 +107,7 @@ test('INVENTORY-F03 / INVENTORY-F20: the switch deactivates; an article set to �
   await expect.poll(async () => (await productBySku(context, sku)).is_active).toBe(false);
   await shootFlow(page, 'INVENTORY-F03');
 
-  await rowAction(page, salt.id, 'edit');
+  await rowAction(page, 'inventory-products', salt.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   const track = form.locator('[data-testid=inventory-product-track-stock]');
   await expect(form.locator('[data-testid=inventory-product-track-note]')).toHaveText(/(Following the hub setting|Sigue el ajuste del hub)/);
@@ -128,7 +128,7 @@ test('INVENTORY-F04: «Delete» says what goes and what stays; the product leave
   await searchProducts(page, sku);
   await expect(productRow(page, sku)).toBeVisible();
 
-  await rowAction(page, gone.id, 'delete');
+  await rowAction(page, 'inventory-products', gone.id, 'delete');
   const confirm = page.locator('ion-modal.ep-form-modal').filter({ hasText: /Delete product|Eliminar producto/ });
   await expect(confirm).toContainText(`E2E Old soap (${sku})`);
   await shootFlow(page, 'INVENTORY-F04');
@@ -152,7 +152,7 @@ test('INVENTORY-F08: a category picked in the form groups the product, and the c
   await productsReady(page);
   await searchProducts(page, sku);
 
-  await rowAction(page, mint.id, 'edit');
+  await rowAction(page, 'inventory-products', mint.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
   await pickCombo(page, form.locator('[data-testid=inventory-product-categories]'), category, category);
   await expect(form.locator('[data-testid^=inventory-product-categories-chip-]')).toHaveText([category]);
@@ -185,7 +185,7 @@ test('INVENTORY-F16: a sale reads, and is found, by its number in Movements, wit
   await expect(rows.first()).toContainText(number);
   await expect(rows.first()).not.toContainText(sale.id);
   await shootFlow(page, 'INVENTORY-F16');
-  // inventory#130, inventory#139, inventory#144: on a tablet the date keeps its time of day and the ticket number
+  // On a tablet the date keeps its time of day and the ticket number
   // is whole: neither cell is cut (what is in the page is also what can be read).
   await page.setViewportSize({ width: 834, height: 1112 });
   const cut = async (text: string | RegExp) =>
@@ -220,7 +220,7 @@ test('INVENTORY-F19: the settings save and say so', async ({ page, context }) =>
     await expect(field).not.toHaveClass(/ion-invalid/);
     await expect(field.locator('.error-text')).toBeHidden();
     await threshold.blur();
-    // hub#2224: on a phone the threshold keeps a field's width, never one letter per line.
+    // On a phone the threshold keeps a field's width, never one letter per line.
     await page.setViewportSize({ width: 390, height: 844 });
     expect((await threshold.boundingBox())!.width).toBeGreaterThan(200);
     await shootFlow(page, 'INVENTORY-F19');
@@ -280,7 +280,7 @@ test('INVENTORY-F25: the sheet shows the barcode and each press queues one label
     const wax = await createProduct(context, { name: 'E2E Hair wax', sku, price: 1210 });
     await productsReady(page);
     await searchProducts(page, sku);
-    await rowAction(page, wax.id, 'detail');
+    await rowAction(page, 'inventory-products', wax.id, 'detail');
     const sheet = dialog(page, 'inventory-product-detail');
     await expect(sheet.locator('[data-testid=inventory-barcode] svg')).toHaveAttribute('aria-label', new RegExp(sku));
     await expect(sheet.locator('[data-testid=inventory-barcode-text]')).toHaveText(sku);
@@ -331,7 +331,7 @@ test('INVENTORY-F26: a quantity off its unit\'s step is refused under its field;
 });
 
 test('on a phone a refused save is said where it can be read, and «Save» is never under the tabbar', async ({ page, context }) => {
-  // flow: INVENTORY-F01 (pm#478, pm#513, inventory#105)
+  // flow: INVENTORY-F01
   const sku = `E2E-PHONE-${stamp()}`;
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, A, '/inventory/products');

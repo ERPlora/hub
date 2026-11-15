@@ -1,4 +1,4 @@
-"""Django admin of the inventory app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the inventory app: full CRUD on every table for support.
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations'
 rules (the SKU, the unit's step, the ledger that the screens never edit), so it warns rather than

@@ -1,7 +1,7 @@
-// gh:cart_checkout#36, gh:pm#152 (CART_CHECKOUT-F01, F10): the shell starts in iOS mode, and there an
-// `ion-input`, `ion-select` or `ion-textarea` with `fill="outline"` paints no box: on iPhone and iPad the
-// old «New cart» fields showed without a frame. Every outlined control of the app's pages and
-// components carries `mode="md"` (working-rules §2.4), and this test keeps it so.
+// The shell starts in iOS mode, and there an `ion-input`, `ion-select` or `ion-textarea` with
+// `fill="outline"` paints no box: on iPhone and iPad the «New cart» fields showed without a frame
+// (CART_CHECKOUT-F01, F10). Every outlined control of the app's pages and components carries `mode="md"`,
+// and this test keeps it so.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

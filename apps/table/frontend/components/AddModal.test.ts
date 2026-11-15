@@ -72,8 +72,8 @@ describe('AddModal', () => {
 describe('AddModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const a = await add('z1');
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => a.inDoc('table-add'),
       change: () => ionValue(a.field('zone-name'), 'Terrace', 'ionInput'),
       restore: () => ionValue(a.field('zone-name'), '', 'ionInput'),

@@ -1,11 +1,11 @@
 // @vitest-environment node
-// Guardrail of the way out of the Hub (gh:hub#439): a link that opens another page in a new tab (`target="_blank"`)
+// Guardrail of the way out of the Hub: a link that opens another page in a new tab (`target="_blank"`)
 // works in a browser by itself, but the installed app opens nothing on `_blank` (its webview spawns no window): the
 // owner tapped «Invite on erplora.com» and «Change on erplora.com» on the tablet and nothing happened. The one way
 // out is `openExternalLink` of `@erplora/ui/shell` on the link's click (ManageLink's «erplora.com»): in the app it
 // hands the address to the system browser (`open_external_url`) and says so when it cannot. Every `_blank` link of
 // base and of the apps goes that way, called on its `@click` or from the function its `@click` names; a link the code
-// builds and clicks (a table row's action: gh:hub#518) hands its click to it in the same function; a
+// builds and clicks (a table row's action) hands its click to it in the same function; a
 // `window.open(…, '_blank')` has no such way and is not written. The files still waiting, each with its issue, are
 // listed below; a fixed one leaves the list (the test fails while it stays).
 import { readdirSync, readFileSync } from 'node:fs';

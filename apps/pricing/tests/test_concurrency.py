@@ -429,3 +429,47 @@ def test_find_list_refuses_to_lock_the_rows_it_is_given(vip_list):
 
     with transaction.atomic(), pytest.raises(TypeError, match="rows"):
         find_list(vip_list.pk, None, lock=True, rows=_lists())
+
+
+# A product back from the separate copy (PRICING-F14): its rules come back on as the platform switched them off
+
+
+@contextmanager
+def changed_by_hand_just_before(statement: str, rule):
+    """The business renames ``rule`` in another session right before the first statement of this one that starts with
+    ``statement``: between the read that found the rule switched off by the platform and the write that switches it
+    on. It commits, or gives up after LOCK_TIMEOUT on the rule this session holds."""
+    changes: list = []
+
+    def change():
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
+            run("pricing.rule.update", {"id": str(rule.id), "name": "Renamed by hand"})
+
+    def wrapper(execute, sql, params, many, context):
+        if not changes and sql.lstrip().startswith(statement):
+            changes.extend(at_once(change))
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(wrapper):
+        yield changes
+
+
+def test_a_rule_switched_back_on_with_its_product_is_held_against_a_change_by_hand(world):
+    from live.context import system_context
+
+    from .conftest import A
+
+    rule = make_rule("ESP", applies_to="product", product=world.espresso)
+    reaction = get("pricing.catalog.forget_product")
+    reaction(system_context(A), reaction.input.model_validate({"id": str(world.espresso.id)}))
+    recall = get("pricing.catalog.recall_product")
+
+    with changed_by_hand_just_before('UPDATE "pricing_discountrule" SET', rule) as changes:
+        recall(system_context(A), recall.input.model_validate({"id": str(world.espresso.id)}))
+
+    # Unheld, the business's change went in between and the rule it touched came back on all the same.
+    assert held(changes), changes
+    rule.refresh_from_db()
+    assert (rule.is_active, rule.name) == (True, "Rule ESP")

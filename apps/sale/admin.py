@@ -1,13 +1,12 @@
-"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com, PLAN §17–§18).
+"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com).
 
-The open tables (payment methods, settings, departments, quick notes, open checks and their lines) have
-full CRUD. What was charged is a fiscal document (PLAN-HUB §3.2, round 2026-10-20): a sale's number is its
-simplified invoice's and the day's counter gives it, so sales, their lines and payments, the counter, and
-refunds with their lines and payments are shown whole and never added nor deleted; only the notes of a sale
-and of a refund can change. A charge is corrected by its void or its refunds, as at the till. What the admin
-saves does not go through the operations (no event, no check of the open check). The «Delete» of an open check
-locks it first (``lock_orders``), as every write on it does, and so does that of a department or a payment method
-(``lock_rows``), which a write naming it holds.
+The open tables (payment methods, settings, departments, quick notes, open checks and their lines) have full CRUD. What
+was charged is a fiscal document: a sale's number is its simplified invoice's and the day's counter gives it, so sales,
+their lines and payments, the counter, and refunds with their lines and payments are shown whole and never added nor
+deleted; only the notes of a sale and of a refund can change. A charge is corrected by its void or its refunds, as at
+the till. What the admin saves does not go through the operations (no event, no check of the open check). The «Delete»
+of an open check locks it first (``lock_orders``), as every write on it does, and so does that of a department or a
+payment method (``lock_rows``), which a write naming it holds.
 """
 
 from django.contrib import admin

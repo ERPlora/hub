@@ -42,7 +42,7 @@ msgid "Today's sales"
 msgstr "Ventas hoy"
 
 msgid "Today's tickets"
-msgstr "Tickets hoy"
+msgstr "Tiques hoy"
 
 msgid "Sales, last 7 days"
 msgstr "Ventas últimos 7 días"
@@ -485,8 +485,8 @@ msgid "That discount is bigger than what it comes off."
 msgstr "Ese descuento es mayor que el importe del que se descuenta."
 
 #, python-format
-msgid "«%(name)s» cannot be charged: no tax rule applies to its tax category («%(category)s») here."
-msgstr "«%(name)s» no se puede cobrar: ninguna regla fiscal se aplica aquí a su categoría fiscal («%(category)s»)."
+msgid "«%(name)s» cannot be charged: no tax rule applies to its tax category «%(category)s» here. Create its rule in Taxes › Rules."
+msgstr "«%(name)s» no se puede cobrar: ninguna regla fiscal se aplica aquí a su categoría fiscal «%(category)s». Crea su regla en Impuestos › Reglas."
 
 msgid "That check does not exist."
 msgstr "Esa cuenta no existe."
@@ -1017,3 +1017,9 @@ msgstr "No censado"
 
 msgid "Service"
 msgstr "Servicio"
+
+msgid "That refund does not exist."
+msgstr "Esa devolución no existe."
+
+msgid "Refund of sale %(number)s"
+msgstr "Devolución de la venta %(number)s"

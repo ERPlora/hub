@@ -17,6 +17,7 @@ from apps.customer.models import Customer
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
+from base.recovery import actor_of
 
 from .conftest import A, TASK_STEP, due_daily_flow, make_flow, make_run, run
 
@@ -306,6 +307,19 @@ def test_an_event_of_an_app_that_is_off_starts_nothing():
     assert FlowRun.objects.count() == 0
 
 
+def test_an_event_a_recovery_from_a_separate_copy_recorded_starts_nothing_and_counts_as_skipped():
+    """hub#1307 (FLOW-F21): the reaction says what it left alone, as with an app that is off; the same event of the
+    business starts its automation."""
+    make_flow()
+    make_flow("Paused", enabled=False)
+
+    result = deliver(actor=actor_of(uuid.uuid7()))
+
+    assert (result.started, result.skipped) == (0, 1)
+    assert FlowRun.objects.count() == 0
+    assert (deliver().started, FlowRun.objects.count()) == (1, 1)
+
+
 def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_callbacks):
     make_flow()
     run("base.app.disable", {"app": "task"})
@@ -543,7 +557,7 @@ def _admin():
 
 
 def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
-    # Review 2026-10-15, item 6: a read leaves a customer's card in the run; only a waiting run needs it.
+    # A read leaves a customer's card in the run; only a waiting run needs it.
     clock(NOON)
     make_flow(
         steps=[
@@ -614,7 +628,7 @@ def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, setting
 
 
 def test_a_tick_with_nothing_due_records_and_announces_nothing(clock):
-    # hub#2612: a scheduled task that finds nothing to do leaves no event, so no live list re-runs.
+    # A scheduled task that finds nothing to do leaves no event, so no live list re-runs.
     flow = make_flow(
         trigger_kind=Flow.Trigger.SCHEDULE,
         trigger_event="",
@@ -629,7 +643,7 @@ def test_a_tick_with_nothing_due_records_and_announces_nothing(clock):
     assert OutboxEvent.objects.count() == before
 
 
-# A document the engine can no longer read (hub#1766: written raw from the admin, or by an older
+# A document the engine can no longer read (written raw from the admin, or by an older
 # version): it fails visibly in its own history, and the other automations still run.
 
 
@@ -661,7 +675,7 @@ def test_a_condition_it_cannot_read_stops_the_run_with_its_reason(clock):
     assert Task.objects.count() == 0
 
 
-# The history keeps 90 days (FLOW-F16, hub#699; the old Hub's `retention.rs`, Ioan 2026-08-10): a
+# The history keeps 90 days (FLOW-F16; the old Hub's `retention.rs`): a
 # finished run older than that is deleted, in bounded passes, counted; live work is never touched.
 
 
@@ -708,7 +722,7 @@ def test_the_prune_goes_in_bounded_passes(clock, monkeypatch):
 
 
 def test_a_condition_compares_two_data_of_the_run(clock):
-    # hub#1712: saved well and then never matching is what the old engine did with a datum as the value.
+    # Saved well and then never matching is what the old engine did with a datum as the value.
     clock(NOON)
     make_flow(
         steps=[

@@ -1,7 +1,7 @@
 """WHATSAPP_INBOX-F13 with a plan that includes no WhatsApp messages.
 
 erplora.com sends the plan's ``whatsapp_messages_per_month`` as ``monthly_limit``, and 0 means the plan includes
-none (ADR-0474: there is no «unlimited», and erplora.com refuses every send with ``whatsapp.cap_reached``). So the
+none (there is no «unlimited», and erplora.com refuses every send with ``whatsapp.cap_reached``). So the
 month is spent from its first message, the inbox says so and «Send» explains it instead of sending, while what
 customers write keeps arriving (F03 step 6).
 """

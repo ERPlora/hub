@@ -4,7 +4,7 @@
 // as `fix-ui-shell-appointment-notices.spec.ts` does. The microphone is refused by Chrome itself: its fake media prompt
 // answers «Block» (`--use-fake-ui-for-media-stream=deny`, a launch option, so a file of its own: the dictation of
 // `base-assistant.spec.ts` needs the prompt that accepts).
-// And one recording per tap (FIX-HUB-BASE-ASSISTANT-MIC-DOUBLE-TAP-OPENS-TWO-RECORDINGS): a second tap while the
+// And one recording per tap: a second tap while the
 // browser still asks for the microphone opens no second one. There the browser's question takes a moment and its
 // microphone is a tone of the page's own (`getUserMedia` replaced at the edge: Chrome's fake prompt of this file
 // blocks), recorded by the browser's real `MediaRecorder`; erplora.com transcribes it with the e2e's provider

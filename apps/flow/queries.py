@@ -347,6 +347,16 @@ def action_outputs(op: Operation) -> list[str]:
     input=CatalogIn,
     output=CatalogOut,
     ai={
+        "asks": {
+            "en": (
+                "what can my automations react to, and what can they do?",
+                "which events and actions can I use in an automation?",
+            ),
+            "es": (
+                "¿qué eventos y acciones puedo usar en una automatización?",
+                "¿a qué puede reaccionar una automatización en mi negocio?",
+            ),
+        },
         "description": "What an automation can start on and do in this business: the events of the active apps "
         "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for. "
         "One with `ask_first` only goes in an «Ask the assistant» step with «Ask me first»."
@@ -381,7 +391,7 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
     }
 
 
-def operation_problem(
+def operation_problem(  # noqa: PLR0911
     scope: Scope, name: str, kind: str | None = None, *, asking: bool = False
 ) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
@@ -477,7 +487,7 @@ def pinned_problem(scope: Scope, tools: list[str], pinned: dict[str, dict[str, A
     return None
 
 
-def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
+def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:  # noqa: C901, PLR0912
     """What a document names that this business does not have, by field (``trigger.event``,
     ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
     person in front, ``invalid_payload`` otherwise."""
@@ -644,6 +654,18 @@ _FLOW_SORTS = {"name": (Lower("name"),)}
     input=FlowListIn,
     output=Page[FlowOut],
     ai={
+        "asks": {
+            "en": (
+                "what automations do I have?",
+                "which automations are switched on?",
+                "show me my automations and how their last run went",
+            ),
+            "es": (
+                "¿qué automatizaciones tengo?",
+                "¿cuáles de mis automatizaciones están encendidas?",
+                "enséñame las automatizaciones y cómo acabó la última vez",
+            ),
+        },
         "description": "The automations of this business («what automations do I have?»), each with what starts it, "
         "whether it is on, the permissions it still lacks and how its last run ended; search by name, event "
         "or action."
@@ -678,6 +700,16 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     input=FlowRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "what does the welcome automation do, and when does it start?",
+                "what permissions is the birthday automation missing?",
+            ),
+            "es": (
+                "¿qué hace la automatización de bienvenida, paso a paso?",
+                "dime los pasos y los permisos de la automatización de cumpleaños",
+            ),
+        },
         "description": "One automation by its id or its name («the welcome automation»): its trigger, its steps, "
         "the permissions it needs and the ones it lacks, and its last run."
     },
@@ -693,6 +725,16 @@ def flow_detail(ctx: OperationContext, data: FlowRefIn) -> dict:
     input=StatusIn,
     output=StatusOut,
     ai={
+        "asks": {
+            "en": (
+                "is there already an automation that listens to completed sales?",
+                "do I already have an automation for new appointments?",
+            ),
+            "es": (
+                "¿ya hay alguna automatización que escuche las ventas cobradas?",
+                "¿ya tengo montada alguna automatización para las citas nuevas?",
+            ),
+        },
         "description": "Is it already set up here? For one event and one action: how many automations start with "
         "the event and may run the action, how many of those are on, and how many listen to the event with "
         "no permission granted yet. Three numbers, no names."
@@ -726,6 +768,16 @@ def recipe_flow(ref: str, *, lock: bool = False) -> Flow | None:
     input=RecipeListIn,
     output=RecipeListOut,
     ai={
+        "asks": {
+            "en": (
+                "which ready-made automations can I turn on?",
+                "show me the recipes the apps bring",
+            ),
+            "es": (
+                "¿qué recetas de automatización traen mis apps?",
+                "enséñame las automatizaciones listas para usar",
+            ),
+        },
         "description": "The ready-made automations the active apps bring («fill the gap when a customer cancels»), "
         "with what each one does, the permissions it asks for and why, and, when it was turned on here, its "
         "automation, whether it is on, whether its app brings a newer version and what a repair would add; "
@@ -831,6 +883,7 @@ SECRETS_KEY_GONE = _(
 )
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
+CANCELLED_ERASED = _("Cancelled: the customer's personal data were erased.")
 ANSWERED_NO = _("Cancelled: %(who)s answered no to «%(title)s».")
 NOBODY_ANSWERED = _("Cancelled: nobody answered «%(title)s» in time.")
 ASSISTANT_ROUNDS = _("The assistant took its %(n)s turns without finishing, so it stopped.")
@@ -873,6 +926,7 @@ REASONS = {
     "flow.secrets_key_missing": SECRETS_KEY_GONE,
     "flow.paused": CANCELLED_PAUSED,
     "flow.deleted": CANCELLED_DELETED,
+    "flow.customer_erased": CANCELLED_ERASED,
     "flow.question_rejected": ANSWERED_NO,
     "flow.question_expired": NOBODY_ANSWERED,
     "flow.assistant_too_many_rounds": ASSISTANT_ROUNDS,
@@ -1046,6 +1100,17 @@ def run_row(run: FlowRun) -> dict[str, Any]:
     input=RunListIn,
     output=RunPageOut,
     ai={
+        "asks": {
+            "en": (
+                "what did the welcome automation do this week?",
+                "why did the birthday automation fail?",
+            ),
+            "es": (
+                "¿qué ha hecho la automatización de bienvenida esta semana?",
+                "¿por qué falló la automatización de cumpleaños?",
+                "¿qué ejecuciones de la automatización de recordatorios han fallado?",
+            ),
+        },
         "description": "What an automation did, the newest first: each run's status (finished well, stopped by a "
         "condition, stopped by an error, waiting, cancelled), each step and the reason of a failure; and how "
         "many runs failed («why did the welcome automation fail?»)."
@@ -1084,6 +1149,16 @@ def run_label(run: FlowRun, language: str) -> str:
     input=RunRefIn,
     output=RunDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "open that run and tell me which step failed",
+                "show me the details of this morning's run",
+            ),
+            "es": (
+                "¿en qué paso se paró esa ejecución y por qué?",
+                "dame el detalle de la ejecución de esta mañana",
+            ),
+        },
         "description": "One run by its id (its reference in the History): how it ended or where it waits, each step, "
         "the reason of a failure and whether it can be resumed; named by its automation and when it started."
     },
@@ -1116,6 +1191,16 @@ def draft_row(draft: Draft) -> dict[str, Any]:
     input=DraftListIn,
     output=Page[DraftOut],
     ai={
+        "asks": {
+            "en": (
+                "which drafts did the assistant leave me?",
+                "are there automation drafts waiting for me?",
+            ),
+            "es": (
+                "¿qué borradores me ha dejado el asistente?",
+                "¿hay borradores de automatizaciones pendientes?",
+            ),
+        },
         "description": "The automations the assistant proposed that are waiting for a person, the newest first."
     },
 )
@@ -1138,6 +1223,16 @@ def list_drafts(ctx: OperationContext, data: DraftListIn) -> dict:
     input=DraftRefIn,
     output=DraftOut,
     ai={
+        "asks": {
+            "en": (
+                "show me the draft you proposed",
+                "what doubts does the draft automation have?",
+            ),
+            "es": (
+                "enséñame el borrador que me propusiste",
+                "¿qué dudas tiene el borrador de la automatización?",
+            ),
+        },
         "description": "One draft the assistant proposed, by its id: its name, its steps, what it could not work out "
         "and whether it still waits, was used or was discarded."
     },
@@ -1182,6 +1277,16 @@ def sample_of(ctx: OperationContext, name: str) -> dict[str, Any]:
     input=SampleIn,
     output=SampleOut,
     ai={
+        "asks": {
+            "en": (
+                "what data does the sale event bring?",
+                "give me a real sample of the appointment confirmed event",
+            ),
+            "es": (
+                "¿qué datos trae el evento de una venta cobrada?",
+                "¿qué trae de verdad el evento de una cita confirmada?",
+            ),
+        },
         "description": "The last time an event really happened in this business, with what it brought."
     },
 )
@@ -1414,12 +1519,22 @@ def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str
     input=TestIn,
     output=TestOut,
     ai={
+        "asks": {
+            "en": (
+                "try the welcome automation without doing anything for real",
+                "test the birthday automation without it doing anything for real",
+            ),
+            "es": (
+                "prueba la automatización de bienvenida sin que haga nada de verdad",
+                "simula qué haría la automatización de cumpleaños con la última venta",
+            ),
+        },
         "description": "Try an automation without effects: walk its steps against the last time its event really "
         "happened here and say, step by step, what it would do, what would come out empty, what the action "
         "would refuse, where a condition would stop it and what it is not allowed yet. Executes nothing."
     },
 )
-def try_flow(ctx: OperationContext, data: TestIn) -> dict:
+def try_flow(ctx: OperationContext, data: TestIn) -> dict:  # noqa: C901, PLR0912, PLR0915
     grants = resolve_flow(data.id, None).grants if data.id is not None else []
     try:
         tried = TestDocumentIn.model_validate_json(data.document)
@@ -1609,6 +1724,16 @@ def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
     input=QuestionListIn,
     output=QuestionPageOut,
     ai={
+        "asks": {
+            "en": (
+                "what questions are the automations waiting for me to answer?",
+                "is any automation waiting for my answer?",
+            ),
+            "es": (
+                "¿qué preguntas de las automatizaciones tengo pendientes?",
+                "¿alguna automatización espera mi respuesta?",
+            ),
+        },
         "description": "«Waiting for your answer»: the questions automations asked and are waiting on that this person may "
         "answer (their role's, or all of them for whoever runs the business), the soonest to expire first, "
         "up to 100."
@@ -1631,6 +1756,16 @@ def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
     input=QuestionRefIn,
     output=QuestionOut,
     ai={
+        "asks": {
+            "en": (
+                "show me that automation's question",
+                "what exactly is the automation asking me?",
+            ),
+            "es": (
+                "¿qué me pregunta exactamente la automatización?",
+                "enséñame la pregunta que está esperando",
+            ),
+        },
         "description": "One question an automation asked and is waiting on, by its id, as «Waiting for your answer» "
         "shows it: what it asks, its details, the change of the assistant it waits on, if any, and until when. Only "
         "the role it was asked of, or whoever runs the business."
@@ -1669,6 +1804,16 @@ def secret_row(secret: Secret) -> dict[str, Any]:
     input=SecretListIn,
     output=SecretPageOut,
     ai={
+        "asks": {
+            "en": (
+                "which secrets can my automations use?",
+                "what secret names are saved for automations?",
+            ),
+            "es": (
+                "¿qué secretos tienen guardados las automatizaciones?",
+                "dime los nombres de los secretos de las automatizaciones",
+            ),
+        },
         "description": "The NAMES of the secrets the automations' calls to other systems can use (never their "
         "values, which nothing gives back), and whether this server can keep secrets."
     },

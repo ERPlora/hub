@@ -6,10 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `table`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Mesas del producto actual
-> (`modules-workspace/modules/tables`, `origin/main` `905eb76`, v2.2.64) y de sus `workflow/*.md`.
-> Los números de flujo se conservan (`TABLES-Fnn` → `TABLE-Fnn`) porque otras apps los citan. Lo que
-> cambia frente al producto actual lo dice «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -43,11 +40,11 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 - **Pedir los comensales al sentar, transferir y juntar cuentas, sacar una mesa del servicio** y la
   lista de cuentas cerradas con su importe (Toast y Lightspeed).
 - **Una mesa con su cuenta abierta no se libera a mano**: se cobra, se pasa a otra mesa o se elimina
-  la cuenta (Toast, Square, Lightspeed y Odoo; tables#124 del producto actual).
+  la cuenta (Toast, Square, Lightspeed y Odoo).
 - **Sentar en una mesa reservada está permitido y gasta la reserva; superar el aforo avisa pero no
   impide.**
-- **La mesa reservada se pinta Reservada solo cerca de la hora de su reserva** (decisión de mercado
-  de la duda 1 del producto actual). Antes de eso la mesa sigue Disponible y enseña la próxima reserva
+- **La mesa reservada se pinta Reservada solo cerca de la hora de su reserva** (decisión de mercado).
+  Antes de eso la mesa sigue Disponible y enseña la próxima reserva
   con su hora. Así lo hacen:
 
   | Producto | Cómo lo resuelve | Fuente |
@@ -62,10 +59,10 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   | Tabit | Desde la mesa se ven sus próximas reservas | [support-us.tabit.cloud](https://support-us.tabit.cloud/hc/en-us/article_attachments/4408025435794) |
 
   **Gana:** Reservada desde **60 minutos antes** de la hora de la reserva hasta que acaba su ventana;
-  antes, la mesa sigue Disponible con «Ana · 21:00». **Por qué no lo de antes** (Reservada desde que
-  se confirma, aunque sea dentro de una semana): bloqueaba la mesa todo el servicio y un grupo sentado
-  a mediodía «gastaba» la reserva de la noche.
-- **Una mesa o una zona desactivada sale del servicio** (decisión de la duda 7): no se pinta en el
+  antes, la mesa sigue Disponible con «Ana · 21:00». **Por qué no desde que se confirma** (aunque sea
+  dentro de una semana): bloquearía la mesa todo el servicio y un grupo sentado a mediodía «gastaría» la
+  reserva de la noche.
+- **Una mesa o una zona desactivada sale del servicio** (decisión de mercado): no se pinta en el
   plano de servicio ni se puede sentar; sigue en «Editar plano», en **Mesas** y en **Zonas**, como
   [Lightspeed — desactivar una mesa](https://k-series-support.lightspeedhq.com/hc/articles/1260804656729),
   [Toast — quitar una mesa del área de servicio](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
@@ -227,7 +224,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F32 | Poner o quitar el cliente de una mesa | hecho |
 
 ### TABLE-F01 Crear y ordenar las zonas del local
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 fi:modules/tables#command-tables-zones-create fi:modules/tables#query-tables-zones-list old:tables/workflow/plano.md#tables-f01 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Zonas
@@ -241,11 +237,11 @@ Pasos:
 Entra: el nombre, la descripción, el color y el orden.
 Sale: la zona (avisa: `table.zone.created`).
 Si falla: sin nombre, el botón no se activa. Un nombre que ya tiene otra zona: «Ya hay una zona con
-ese nombre.». Un empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
+ese nombre.». El motivo de un campo sale debajo de él y se quita en cuanto se corrige ese campo, aunque
+otro diga lo mismo (hub#888). Un empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
 Implicados: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Añadir mesas
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-create old:tables/workflow/plano.md#tables-f02 old-hub:HUB_SHELL-F27 gh:tables#24 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Inicio, Plano de sala (Editar plano), Mesas
@@ -268,11 +264,11 @@ Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa
 todas (TABLE-F04), el paso vuelve a pendiente solo. Una zona sin mesas no lo da por hecho.
 Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
 «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
-este negocio.».
+este negocio.». En la ventana de **Mesas**, el motivo de un campo sale debajo de él y se quita en cuanto
+se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Colocar las mesas en el plano
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-move old:tables/workflow/plano.md#tables-f03 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano)
@@ -288,7 +284,6 @@ Si falla: «No se pudo guardar la posición» encima del plano; la mesa vuelve a
 Implicados: TABLE-F02, TABLE-F09
 
 ### TABLE-F04 Editar o borrar una mesa
-<!-- origen: fi:modules/tables#command-handler-wasm-tables-tables-delete-delete_table fi:modules/tables#command-tables-tables-update old:tables/workflow/plano.md#tables-f04 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -303,12 +298,12 @@ Pasos:
 Entra: la mesa elegida.
 Sale: la mesa cambiada (avisa: `table.table.updated`) o borrada (avisa: `table.table.deleted`).
 Si falla: dentro de la ventana: «El número de mesa es obligatorio», «Ya hay una mesa con ese número
-en esta zona.», «Esa mesa no existe en este negocio.»; borrar una mesa con cuenta abierta: «Esa mesa
+en esta zona.», «Esa mesa no existe en este negocio.», cada motivo bajo su campo hasta que se corrige
+ese campo, aunque otro diga lo mismo (hub#888); borrar una mesa con cuenta abierta: «Esa mesa
 tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa.».
 Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Sacar una mesa del servicio (bloquearla) y devolverla
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan old:tables/workflow/plano.md#tables-f05 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
@@ -326,7 +321,6 @@ motivo.
 Implicados: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Renombrar o borrar una zona
-<!-- origen: fi:modules/tables#command-handler-wasm-tables-zones-delete-delete_zone fi:modules/tables#command-tables-zones-update fi:modules/tables#query-tables-zones-get old:tables/workflow/plano.md#tables-f06 -->
 Estado: hecho
 Actor: responsable, administrador
 Pantalla: Zonas, Plano de sala (Editar plano)
@@ -340,14 +334,14 @@ Pasos:
 Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).
 Si falla: «Esta zona todavía tiene mesas. Muévelas a otra zona o bórralas antes.» o «Esa zona no
-existe en este negocio.».
+existe en este negocio.». El motivo de un campo sale debajo de él hasta que se corrige ese campo, aunque
+otro diga lo mismo (hub#888).
 Implicados: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Crear muchas mesas de golpe
-<!-- origen: qa:modules/tables/floor-plan-zones-and-tables fi:modules/tables#command-handler-wasm-tables-tables-bulk_create-bulk_create_tables old:tables/workflow/plano.md#tables-f07 -->
 Estado: hecho
 Actor: responsable, asistente
-Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
+Pantalla: asistente y API
 Pasos:
 1. Pide al asistente «crea 12 mesas en la Terraza, de la T1 a la T12, para 4».
 2. Se crean de una vez (de 1 a 100), numeradas con el prefijo y el número inicial que se digan (1 si
@@ -359,7 +353,6 @@ ninguna y se dice cuáles.
 Implicados: TABLE-F02
 
 ### TABLE-F08 Ajustar la sala: comensales al sentar y avisos de tiempo
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 old:tables/workflow/plano.md#tables-f08 qa:modules/tables/seat-and-open-table -->
 Estado: hecho
 Actor: administrador
 Pantalla: Ajustes
@@ -380,7 +373,6 @@ intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente in
 Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala
-<!-- origen: wf:restaurante-dia#rec_restaurante-f05 qa:verticals/restaurant/04-floor-plan fi:modules/tables#query-tables-tables-list old:tables/workflow/servicio.md#tables-f09 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Plano de sala
@@ -400,7 +392,6 @@ Si falla: un fallo al cargar sale con «Reintentar».
 Implicados: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
 
 ### TABLE-F10 Sentar a un grupo en una mesa libre o reservada
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 qa:modules/reservations/waitlist-and-walk-in qa:modules/tables/seat-and-open-table fi:modules/tables#command-handler-wasm-tables-sessions-open-open_session fi:modules/tables#slot-provides_slots-sales-pos-order_context-erp-tables-pos-zones old:tables/workflow/servicio.md#tables-f10 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -425,7 +416,6 @@ no se sienta. Sentar se hace en la sala, con el grupo delante: una automatizaci�
 Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
 
 ### TABLE-F11 Volver a una mesa ocupada y cobrarla
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f08 qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f11 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -442,7 +432,6 @@ está abierta (se cobró, se anuló o no existe): el TPV sigue como estaba.».
 Implicados: TABLE-F18, SALE-F19
 
 ### TABLE-F12 Llevar a una mesa una cuenta que ya está abierta
-<!-- origen: old:tables/workflow/servicio.md#tables-f12 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Ventas → Vender («Elegir mesa», SALE-F19); asistente
@@ -468,7 +457,6 @@ hace con el grupo delante: una automatización no puede hacerlo.
 Implicados: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
 ### TABLE-F13 Quitar la mesa de una cuenta (aparcarla)
-<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f13 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio); también en Ventas → Vender, «Elegir mesa» → «Quitar de la mesa» (SALE-F19)
@@ -485,7 +473,6 @@ fusionado o aparcado.».
 Implicados: TABLE-F24, SALE-F19
 
 ### TABLE-F14 Corregir los comensales de una mesa ocupada
-<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f14 qa:modules/tables/move-and-merge-tables -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -501,7 +488,6 @@ TABLE-F13). Siempre al menos 1.
 Implicados: TABLE-F10, TABLE-F17
 
 ### TABLE-F15 Pasar la cuenta a otra mesa (transferir)
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen qa:verticals/restaurant/11-races-and-concurrency wf:restaurante-dia#rec_restaurante-f10 qa:modules/tables/move-and-merge-tables fi:modules/tables#command-handler-wasm-tables-sessions-transfer-transfer_session old:tables/workflow/servicio.md#tables-f15 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -522,7 +508,6 @@ está libre; «Esa cuenta no está abierta…» si otro ya la movió.
 Implicados: TABLE-F28, SALE-F25
 
 ### TABLE-F16 Juntar las cuentas de dos mesas ocupadas (fusionar)
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:verticals/restaurant/04-floor-plan qa:modules/tables/move-and-merge-tables old:tables/workflow/servicio.md#tables-f16 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -545,7 +530,6 @@ o es la misma mesa sin otra cuenta.
 Implicados: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Dividir la cuenta de una mesa
-<!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f10 qa:modules/sales/split-bill old:tables/workflow/servicio.md#tables-f17 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Plano de sala (Servicio); asistente
@@ -567,7 +551,6 @@ hacerlo.
 Implicados: TABLE-F16, TABLE-F18, SALE-F23, FLOW-F12
 
 ### TABLE-F18 Liberar la mesa al cobrar la cuenta entera
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/07-payment-and-fiscal wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f18 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ventas: Cobro
@@ -584,7 +567,6 @@ Si falla: nada que ver: el plano y Sesiones lo leen de Ventas en cada lectura.
 Implicados: TABLE-F17, TABLE-F22, SALE-F22
 
 ### TABLE-F19 Anular un cobro de una mesa
-<!-- origen: wf:restaurante-dia#rec_restaurante-f15 old:tables/workflow/cierre-e-historial.md#tables-f19 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ventas: Ventas
@@ -598,7 +580,6 @@ Si falla: como TABLE-F18.
 Implicados: TABLE-F22, SALE-F30
 
 ### TABLE-F20 Eliminar en Ventas la cuenta abierta de una mesa
-<!-- origen: qa:verticals/restaurant/08-incidents-voids-and-refunds wf:restaurante-dia#rec_restaurante-f14 old:tables/workflow/cierre-e-historial.md#tables-f20 -->
 Estado: hecho
 Actor: responsable
 Pantalla: Ventas: Cuentas abiertas
@@ -611,7 +592,6 @@ Si falla: como TABLE-F18.
 Implicados: TABLE-F21, SALE-F18
 
 ### TABLE-F21 Cerrar una mesa a mano
-<!-- origen: wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f21 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Sesiones, Plano de sala (Servicio)
@@ -632,7 +612,6 @@ dispositivo le cambió la cuenta); «Esa cuenta no está abierta…» (ya la cer
 Implicados: TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Consultar las cuentas de la sala (abiertas y cerradas)
-<!-- origen: wf:restaurante-dia#rec_restaurante-f16 fi:modules/tables#query-tables-sessions-list old:tables/workflow/cierre-e-historial.md#tables-f22 -->
 Estado: hecho
 Actor: responsable, empleado
 Pantalla: Sesiones
@@ -648,7 +627,6 @@ Si falla: el error de la tabla con reintento. Las devoluciones no restan del «C
 Implicados: TABLE-F18, TABLE-F19, TABLE-F23
 
 ### TABLE-F23 Borrar una cuenta cerrada del historial
-<!-- origen: fi:modules/tables#command-handler-wasm-tables-sessions-delete-delete_session old:tables/workflow/cierre-e-historial.md#tables-f23 -->
 Estado: hecho
 Actor: administrador, asistente
 Pantalla: Sesiones; asistente
@@ -664,7 +642,6 @@ borrarla.».
 Implicados: TABLE-F22
 
 ### TABLE-F24 Volver a sentar una cuenta aparcada
-<!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/cierre-e-historial.md#tables-f24 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Sesiones; también en Ventas → Vender, tocando una mesa en «Elegir mesa» con la cuenta en pantalla (SALE-F19)
@@ -681,7 +658,6 @@ una automatización no puede hacerlo.
 Implicados: TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
 
 ### TABLE-F25 Retener la mesa de una reserva confirmada
-<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f06 wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f25 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en el Plano de sala)
@@ -702,7 +678,6 @@ Si falla: una mesa borrada, desactivada o fuera de servicio no se retiene, y Res
 Implicados: RESERVATION-F07, TABLE-F09, TABLE-F28
 
 ### TABLE-F26 Mover o soltar la retención cuando cambia la reserva
-<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f26 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en el Plano de sala)
@@ -718,7 +693,6 @@ guarda el cambio y la reserva sigue retenida en la vieja.
 Implicados: RESERVATION-F08, TABLE-F25
 
 ### TABLE-F27 Soltar la mesa cuando la reserva se cancela o no se presenta
-<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f27 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en el Plano de sala)
@@ -733,7 +707,6 @@ Si falla: si se pide dos veces, no cambia nada.
 Implicados: RESERVATION-F09, RESERVATION-F10, RESERVATION-F20, TABLE-F25
 
 ### TABLE-F28 Gastar la retención al sentar a la reserva
-<!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f10 wf:restaurante-dia#rec_restaurante-f05 old:tables/workflow/reservas.md#tables-f28 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -756,7 +729,6 @@ Si falla: los de TABLE-F10.
 Implicados: RESERVATION-F11, TABLE-F10, TABLE-F25
 
 ### TABLE-F29 Caducar las retenciones vencidas
-<!-- origen: wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f29 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -771,10 +743,9 @@ Si falla: se repite en el siguiente repaso; si el hub estuvo parado, hace uno so
 Implicados: TABLE-F09, TABLE-F25
 
 ### TABLE-F30 Retener o soltar una mesa a mano
-<!-- origen: old:tables/workflow/reservas.md#tables-f30 -->
 Estado: hecho
 Actor: responsable, empleado, asistente
-Pantalla: asistente y API (el producto actual tampoco tenía pantalla para esto)
+Pantalla: asistente y API
 Pasos:
 1. Pide al asistente apartar una mesa («guarda la 6 para Pedro de 21:00 a 23:00, 4 personas»).
 2. Desde una hora antes la mesa sale Reservada, con el nombre y la hora; pedirlo otra vez con la misma
@@ -788,7 +759,6 @@ ya no está: se soltó, ha vencido, o esa reserva nunca llegó a retener una mes
 Implicados: TABLE-F09, TABLE-F28
 
 ### TABLE-F31 Olvidar el nombre de un cliente cuyos datos se borran (RGPD)
-<!-- origen: old:tables/workflow/reservas.md#tables-f31 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Plano de sala
@@ -804,7 +774,6 @@ Si falla: repetirlo no cambia nada; un aviso sin id no toca las retenciones sin 
 Implicados: CUSTOMER-F16, CUSTOMER-F13, RESERVATION-F22
 
 ### TABLE-F32 Poner o quitar el cliente de una mesa
-<!-- origen: gh:sales#569 -->
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
@@ -813,10 +782,13 @@ Pasos:
    nombre o teléfono (el buscador de Clientes, el mismo del TPV).
 2. La cuenta de la mesa queda con esa ficha: Ventas la recupera al cobrar. «Quitar cliente» la suelta.
 3. El asistente también puede sentar con cliente: «sienta a Ana García en la mesa 4, somos 3».
+4. Si en Clientes se elimina la ficha, la cuenta deja de decir su nombre; si el personal de ERPlora la recupera
+   desde la copia aparte (CUSTOMER-F33), lo vuelve a decir al momento, también en el plano y la sala que estén
+   abiertos.
 Entra: la ficha, de Clientes.
 Sale: el enlace cuenta ↔ cliente, que guarda Clientes (avisa: `customer.order.linked`).
 Si falla: el motivo de Clientes; la mesa se sienta igual.
-Implicados: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
+Implicados: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ## Mesas: lo que entra y lo que sale
 
@@ -964,8 +936,8 @@ como los de cualquier app.
 | Ver ajustes | sí | sí | sí | sí | `table.view_settings` |
 | Cambiar ajustes | sí | sí | no | no | `table.manage_settings` |
 
-Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
-cajero del producto actual es un empleado. Sentar, dividir y juntar piden además «Montar la cuenta» de
+Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+Sentar, dividir y juntar piden además «Montar la cuenta» de
 Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 
 ## Para quien lo mantiene
@@ -1000,14 +972,14 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   sentar no dicen reserva: gastan todas. Una reserva sentada más de una hora antes de su hora no gasta
   nada (su retención aún no pinta la mesa): Reservas la suelta tras sentarla, con `table.hold.release`
   en la misma operación (`apps/reservation/services.py`, el `seat` de RESERVATION-F11).
-- **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega a `events.REACTIONS`
+- **Relay del outbox** (`base/relay.py`, en el worker): entrega a `events.REACTIONS`
   lo de Ventas (`sale.order.completed`/`voided` → `table.session.close_by_order`) y lo de Clientes
   (`customer.customer.erased` → `table.hold.forget_customer`, que anota `table.table.held` por retención
   para repintar el plano). Además, las lecturas tratan como cerrada una cuenta de mesa abierta **o
   aparcada** cuya `sale.Order` está `completed` o `voided`, con la hora de cierre de la cuenta, y las
   escrituras, antes de nada, cierran esas cuentas (`settle`): el plano no espera al relay. Una cuenta que
   acaba aparcada se cierra sin mesa (restricción `table_session_table_by_status`).
-- **Reservas no es una reacción** (ronda 2026-10-21 APP-TABLE de `PLAN-HUB.md`): la llamada dentro de la operación
+- **Reservas no es una reacción**: la llamada dentro de la operación
   de Reservas es la única vía; sus avisos `reservation.reservation.status_changed` y `updated` no se
   escuchan, porque entregados después re-aplicarían una reserva vieja
   (`test_integration_relay.py::test_a_party_seated_long_before_its_time_is_not_held_again_by_a_late_confirmation`).
@@ -1034,75 +1006,34 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 - **Hora del negocio**: `base.business.business_zone` (la zona del hub); las retenciones de Reservas
   traen fecha y hora de pared y se guardan con esa zona. «Hoy» en el plano es el día del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cerrar, trasladar,
-  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`.
-- **En persona** (`ai.in_person`, revisión 2026-10-30): sentar, volver a sentar, dividir y enlazar una
+  fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`. Ninguna
+  descripción manda preguntar antes: la tarjeta es la confirmación, y el «Ask first.» que llevaban
+  cerrar, pasar, juntar y borrar una cuenta hacía que el asistente preguntara en el chat sin sacarla
+  (hub#1140; lo guarda `tests/test_guardrails_assistant.py` para todo el Hub).
+- **En persona** (`ai.in_person`): sentar, volver a sentar, dividir y enlazar una
   cuenta (`table.session.open`, `.restore`, `.split` y `.link_order`). Automatizaciones no las ofrece ni
   las concede, y un paso que se hubiera colado se rechaza al correr (`flow.high_risk`, FLOW-F12): las
   cuatro abren o retitulan la cuenta en Ventas con la sesión de quien actúa (`sale.add_sale`), y un paso
   solo lleva el permiso de su operación, así que caían siempre con `permission_denied`. El asistente, con
   una persona delante, las hace sin pedir confirmación (`risk: normal`). Mesas sigue sin ampliar los
   permisos de nadie.
-- **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): zonas, mesas, cuentas de mesa,
+- **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
+- **Administrador de Django con CRUD completo** (PLAN §17): zonas, mesas, cuentas de mesa,
   recorrido, retenciones y ajustes; ids y fechas en solo lectura. Lo que guarda no pasa por las
   operaciones ni deja aviso.
-- **Tarea programada**: `expire_table_holds` (`table.hold.expire`, cada hora, en UTC, `collapse`); hecho — la
-  corre el worker (`base/scheduler.py`, 2026-10-15), en cada negocio y con su ámbito (`base.worker._serve_hub`).
-
-### Cambios frente al producto actual
-
-1. **Se sienta también desde el plano de sala** (modo Servicio), además de desde «Elegir mesa» del TPV,
-   y sentar abre ya la cuenta de Ventas con el título de la mesa (antes se sentaba solo desde el TPV y
-   la cuenta nacía con el primer artículo).
-2. **El plano es vivo** (antes no cambiaba al sentar ni al cobrar).
-3. **Juntar y dividir hacen las dos partes en una sola operación** (antes Mesas juntaba o dividía y
-   luego el TPV movía las líneas; si fallaba, quedaban desparejadas).
-4. **El estado de la mesa se calcula** y el campo «Estado» de «Editar mesa» solo ofrece Disponible o
-   Bloqueada (antes dejaba poner Ocupada o Reservada a mano sin ninguna cuenta).
-5. **Reservada solo desde una hora antes** de la reserva, y sentar antes no la gasta (duda 1, por
-   mercado); la retención vence a su hora exacta (antes 1–2 horas tarde, TABLES-F29).
-6. **Mesas y zonas desactivadas salen del servicio** (duda 7, por mercado).
-7. **El número de mesa es único en su zona por cualquier puerta** (duda 6; antes solo lo comprobaba el
-   plano) y el nombre de zona, también.
-8. **Dos camareros a la vez sobre la misma mesa dejan una sola cuenta** (antes podían entrar las dos).
-9. **Eliminar la cuenta en Ventas libera la mesa** (TABLES-F20, antes no hecho).
-10. **Cerrar una mesa con su cuenta vacía la cierra** sin pedir a un responsable que anule la cuenta.
-11. **Volver a sentar una cuenta aparcada tiene pantalla** (Sesiones) y comprueba que la mesa está
-    libre (antes aceptaba una mesa ocupada, bloqueada, borrada o de otro negocio).
-12. **Borrar una cuenta del historial tiene pantalla** (Sesiones, solo el administrador).
-13. **Con dos cuentas en una mesa, se elige cuál** al cobrar, transferir, fusionar o corregir (antes se
-    cogía una sin elegir).
-14. **Una zona con mesas (activas o no) no se borra** (antes las desactivadas se quedaban sin zona).
-15. **El rojo no puede ser menor que el ámbar** en los ajustes.
-16. **Lo cobrado se lee de Ventas** en vez de apuntarlo en un libro propio: mismo resultado, sin
-    avisos que perder.
-17. **El camarero se copia al sentar** (su nombre, como Caja guarda quién abre), en vez de buscarlo en
-    la lista de personas cada vez que se pinta.
-18. **El cliente de la mesa** (TABLE-F32) es nuevo: el producto actual solo lo ponía desde el TPV.
-19. **El repaso de retenciones** corre cada hora y solo avisa si caducó alguna (antes cada 15 minutos
-    y avisaba siempre).
-20. **Una cuenta trasladada conserva su hora de llegada** (antes el traslado ponía el reloj a cero).
-21. **La lista Mesas edita y borra por fila** (antes solo se editaba y borraba en el plano) y borrar
-    una mesa pide confirmación (antes no la pedía).
-22. **Una división se deshace fusionando** las dos cuentas de la misma mesa (antes no se podía).
-23. **Una cuenta aparcada que Ventas cobra o anula se cierra** (antes se quedaba «Aparcada» para
-    siempre).
-24. **Fusionar no pierde lo cobrado** por la cuenta de origen antes de juntarla.
-25. **Los importes van en la moneda del negocio** (la de su país, con los decimales que cuenta el
-    servidor; lo cobrado, en la moneda en que se cobró, que no se reescribe; mientras el negocio no
-    contesta, un importe es «—»): el producto actual los pintaba siempre en euros
-    (`table-business-currency`).
-26. **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
-    `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
+- **Tarea programada**: `expire_table_holds` (`table.hold.expire`, cada hora, en UTC, `collapse`): la
+  corre el worker (`base/scheduler.py`), en cada negocio y con su ámbito (`base.worker._serve_hub`).
 
 ### Lo que NO hace, a propósito
 
 - No sabe qué se ha pedido: líneas, importes y cocina son de Ventas y Cocina.
 - No impide sentar más comensales que el aforo: avisa.
 - No toma reservas: eso es Reservas; Mesas solo aparta la mesa en el plano.
-- No tiene asiento por comensal, cursos, estado «por limpiar» (duda 2) ni mesas físicas unidas con
-  aforo sumado (duda 3): no entran en el MVP, como en el producto actual.
+- No tiene asiento por comensal, cursos, estado «por limpiar» ni mesas físicas unidas con
+  aforo sumado: no entran en el MVP.
 - No guarda planos distintos por turno.
-- No deja elegir ni cambiar el camarero de una cuenta (duda 8): es quien la sienta.
+- No deja elegir ni cambiar el camarero de una cuenta: es quien la sienta.
 
 ### Lo que queda fuera
 
@@ -1110,12 +1041,4 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
-  `ion:grid-outline` (también en el paso «Tus mesas» del Inicio, que en el producto actual llevaba el del
-  plano) y el plano `ion:apps-outline`.
-
-Las dudas del producto actual quedan cerradas: la 1, la 6 y la 7, por mercado («Referencia adoptada» y
-«Cambios frente al producto actual»); la 4 ya estaba resuelta (tables#124, TABLE-F21); la 5, con pantalla
-(Volver a sentar, elegir la cuenta de una mesa dividida y deshacer una división fusionando). La 2 («por
-limpiar»), la 3 (mesas unidas con el aforo sumado) y la 8 (elegir o cambiar el camarero), con los planos
-por turno (pm#121), se decidieron al cerrar la app (2026-10-21) como fuera de esta versión, igual que en
-el producto actual: van a «Fuera por ahora» (`## 6` de `MIGRATION.md`).
+  `ion:grid-outline` (también en el paso «Tus mesas» del Inicio) y el plano `ion:apps-outline`.

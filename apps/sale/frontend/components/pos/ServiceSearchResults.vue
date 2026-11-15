@@ -5,12 +5,12 @@
 // up, where the same rules as a tile apply. Mounted only when the till sells services.
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonItem, IonList, IonListHeader } from '@ionic/vue';
-import { computed, onMounted, onUpdated, useTemplateRef } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
-import { syncAriaDisabled } from '../../lib/ariaDisabled';
+import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{ term: string }>();
@@ -22,9 +22,7 @@ const taxName = useTaxName();
 const { data } = useLive('service.service.list_for_sale', () => ({ search: props.term, limit: 20, offset: 0 }));
 const rows = computed(() => data.value?.rows ?? []);
 const list = useTemplateRef<{ $el: HTMLElement }>('list');
-const syncDisabled = () => syncAriaDisabled(list.value?.$el);
-onMounted(syncDisabled);
-onUpdated(syncDisabled);
+useNativeAriaDisabled(() => list.value?.$el);
 </script>
 
 <template>

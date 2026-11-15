@@ -365,7 +365,7 @@ def test_a_full_invoice_replacing_a_ticket_declares_the_ticket(issuer):
 def test_production_has_its_own_chain_and_the_real_sites_qr(issuer, settings):
     open_production(settings)
     create(ticket())
-    # In production with its way to the AEAT: the approved authorisation, on any plan (PLAN §30).
+    # In production with its way to the AEAT: the approved authorisation, on any plan.
     Config.objects.filter().update(environment="production", representation_status="approved")
     record = Record.objects.get(pk=create(ticket(2000)).record.id)
     assert (record.environment, record.sequence, record.previous_fingerprint) == (
@@ -382,7 +382,8 @@ def test_production_has_its_own_chain_and_the_real_sites_qr(issuer, settings):
 def test_a_rejected_registration_is_corrected_with_a_new_one_the_aeat_does_not_hold_yet(
     issuer
 ):
-    # §9.1.3 «alta por rechazo»: the initial alta was rejected, so the invoice is not in the AEAT: S + X.
+    # «Alta por rechazo» (the AEAT's web service description, section 9.1.3): the initial alta was rejected, so the
+    # invoice is not in the AEAT: S + X.
     record = Record.objects.get(pk=create(ticket()).record.id)
     Record.objects.filter(pk=record.id).update(status="rejected", aeat_code="1100")
     result = run("verifactu.record.correct", {"invoice_number": record.invoice_number})
@@ -521,7 +522,8 @@ def test_an_invoice_issued_by_error_is_cancelled_with_a_chained_anulacion(
 
 
 def test_a_cancellation_after_a_rejected_cancellation_says_so(issuer):
-    # §9.2.2 «anulación por rechazo»: the invoice is in the AEAT, its earlier anulación was rejected.
+    # «Anulación por rechazo» (the AEAT's web service description, section 9.2.2): the invoice is in the AEAT, its
+    # earlier anulación was rejected.
     alta = Record.objects.get(pk=create(ticket()).record.id)
     Record.objects.filter(pk=alta.id).update(status="accepted")
     first = run("verifactu.record.cancel", {"record_id": str(alta.id), "reason": "Duplicated"}).record.id
@@ -832,7 +834,7 @@ def test_a_refusal_of_the_gateway_is_not_tried_again_by_itself(issuer, gateway_a
 
 
 def test_a_hub_the_saas_does_not_know_waits_for_a_change_and_says_so(issuer, settings):
-    # saas#29: the gateway's 404 ``hub_unknown`` goes through the real client, not a fake reply.
+    # The gateway's 404 ``hub_unknown`` goes through the real client, not a fake reply.
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     settings.INTERNAL_SHARED_SECRET = "test-internal-secret"
     with respx.mock:
@@ -1208,7 +1210,8 @@ def test_the_aeats_records_are_queried_and_replace_the_last_photo(
 def test_the_aeats_records_are_queried_page_by_page_to_the_last(
     issuer, gateway_answers
 ):
-    # §6.4.3: at most 10,000 per answer; the next query names the last record of the previous one.
+    # The AEAT's web service description, section 6.4.3: at most 10,000 per answer; the next query names the last record
+    # of the previous one.
     first = FIXTURES.joinpath("consulta_preproduccion_2026-08-01.xml").read_text()
     second = FIXTURES.joinpath("rotation_consult_2026-09-22.xml").read_text()
 
@@ -1536,8 +1539,8 @@ def test_going_live_through_erplora_needs_the_approved_authorisation(issuer, set
 
 
 def test_going_live_through_erplora_asks_for_no_plan_option(issuer, settings):
-    # PLAN §30 (round 2026-10-22b, VeriFactu on Free): the condition of the live option left. Until the SaaS stops
-    # sending it, an older photo still says ``live_paid: false``: it is read by nobody.
+    # The condition of the live option is gone. Until the SaaS stops sending it, an older photo still says ``live_paid:
+    # false``: it is read by nobody.
     open_production(settings)
     run(
         "verifactu.config.sync",
@@ -1548,7 +1551,7 @@ def test_going_live_through_erplora_asks_for_no_plan_option(issuer, settings):
 
 
 def test_going_live_with_the_own_certificate_needs_no_authorisation(issuer, settings):
-    # The old Hub's an_own_certificate_needs_no_grant_to_go_live (gh:hub#1314): the own route goes live with its
+    # As the old Hub's an_own_certificate_needs_no_grant_to_go_live: the own route goes live with its
     # valid certificate alone; ERPlora's approval is ERPlora filing for the business.
     open_production(settings)
     own_certificate()
@@ -1563,7 +1566,7 @@ def test_in_production_erplora_takes_over_with_the_approved_authorisation_alone(
     run("verifactu.config.go_live")
     erplora = lambda: run("verifactu.config.update", {"route": "erplora"})  # noqa: E731
     assert code_of(erplora) == "verifactu.representation_not_approved"
-    # An older SaaS still says the live option is unpaid: on any plan the approval is enough (PLAN §30).
+    # An older SaaS still says the live option is unpaid: on any plan the approval is enough.
     run(
         "verifactu.config.sync",
         {"version": 1, "live_paid": False, "representation": {"status": "approved"}},
@@ -1660,8 +1663,8 @@ def close_the_way(problem: str) -> None:
 def test_in_production_without_a_way_to_the_aeat_nothing_new_is_sealed(
     issuer, settings, problem
 ):
-    # Working-rules §15: in production nothing is charged that can never reach the AEAT (the old Hub's
-    # enforce_fiscal_road, HUB-1935). The refusal carries the route's own code and undoes the whole issue.
+    # In production nothing is charged that can never reach the AEAT. The refusal carries the route's own code and
+    # undoes the whole issue.
     open_production(settings)
     if problem == "own_certificate_missing":
         own_certificate()
@@ -1702,9 +1705,9 @@ def test_the_reaction_seals_an_invoice_issued_before_the_way_closed(
 def test_a_photo_saying_the_live_option_is_unpaid_stops_nothing_in_production(
     issuer, gateway_answers, settings
 ):
-    # PLAN §30 (round 2026-10-22b): ``live_paid`` is no condition. Until the SaaS stops sending it (expand/contract),
-    # an older SaaS's photo still says ``false``: new sales are sealed, Settings shows nothing missing and what
-    # was sealed goes out. No answer names the retired ``live_option_unpaid``.
+    # ``live_paid`` is no condition. Until the SaaS stops sending it (expand/contract), an older SaaS's photo still says
+    # ``false``: new sales are sealed, Settings shows nothing missing and what was sealed goes out. No answer names the
+    # retired ``live_option_unpaid``.
     open_production(settings)
     live_through_erplora()
     run("verifactu.config.sync", {"version": 3, "live_paid": False}, system_context(A))
@@ -1759,7 +1762,7 @@ def test_the_accounts_photo_is_applied_once_per_version(db):
 def test_the_photo_brings_the_authorisation_and_the_business_status(db):
     sync = lambda data: run("verifactu.config.sync", data, system_context(A))  # noqa: E731
     approved = {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}
-    # The SaaS still sends ``live_paid`` until the Hub's retirement is out (expand/contract, PLAN §30): the photo
+    # The SaaS still sends ``live_paid`` until the Hub's retirement is out (expand/contract): the photo
     # is applied as ever and the field is neither refused nor written (the retired column keeps its default).
     answer = sync(
         {"version": 7, "live_paid": True, "hub_status": "active", "representation": approved}

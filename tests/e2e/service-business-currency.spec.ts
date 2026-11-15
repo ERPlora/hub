@@ -1,20 +1,21 @@
-// flow: service-business-currency (FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY and
-// FIX-HUB-SERVICE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/service/WORKBOOK.md «Antes de empezar»)
+// flow: service-business-currency (apps/service/WORKBOOK.md «Antes de empezar»)
 // Services writes, saves and paints its amounts in the business's currency: its country's, as erplora.com registered
 // it (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), in that currency's minor units — the unit Sales
 // charges —, never in hundredths of a fixed euro. Hub `a` moves to Japan: «New service» names the field «Price (JPY)»,
 // «1500» is saved as 1500 yen (read back through the API). With only Spain's factory rules there is no rule for the
-// service in Japan: the till's foot says why it cannot value the check, never an unexplained «—» (hub#1069), in 390, 834
-// and 1440; once a Japanese rule exists the notice clears by itself and the till charges it at ¥1,500, never ¥150,000,
-// in 390, 834 and 1440. In Poland the run's service and voucher read in złoty in the list (captures
-// `FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY-<width>`), the form names «Price (PLN)» and its two
-// readings of «1.250» are in złoty, and «Packages» shows the voucher's closed price in złoty. Back in Spain, euros
-// (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back, also when a test fails.
+// service in Japan: the till's foot says why it cannot value the check, never an unexplained «—» (hub#1069), in 390,
+// 834 and 1440; once a Japanese rule exists the notice clears by itself and the till charges it at ¥1,500, never
+// ¥150,000, in 390, 834 and 1440. In Poland the run's service and voucher read in złoty in the list, the form names
+// «Price (PLN)» and its two readings of «1.250» are in złoty, and «Packages» shows the voucher's closed price in złoty.
+// Back in Spain, euros. What the run creates is deleted after it and `a`'s registration put back, also when a test
+// fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { openTillCart } from './sale-helpers';
 import { cleanUp as cleanServices, named, noHorizontalScroll, pick, post, settled } from './service-helpers';
+import { dropCountryRules } from './tax-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-SERVICE-PRICE-STORED-IN-HUNDREDTHS-WHATEVER-THE-CURRENCY';
 const SIZES = [
@@ -33,8 +34,6 @@ const RUN_ORDERS =
 
 /** `a`'s registration as the run found it (put back after). */
 let original: Registration;
-/** The Japanese rule the run creates for its service (any left by a killed run goes before it starts). */
-const JAPAN_RULES = "delete from tax_taxrule where country_code = 'JP'";
 /** A service and a voucher of the run, priced through the API in minor units (22,50 and 90,00 in euros). */
 let color = { id: '', name: '' };
 let voucher = { id: '', name: '' };
@@ -85,7 +84,8 @@ async function voucherRow(page: Page): Promise<Locator> {
 test.beforeAll(async ({ browser }) => {
   original = registrationOf('a');
   cleanAll();
-  psql(JAPAN_RULES);
+  // The Japanese rule the run creates for its service (any left by a killed run goes before it starts).
+  dropCountryRules('JP');
   const owner = await hostPage(browser, A, { next: '/service/services' });
   const colorName = named('Color');
   color = { id: (await post<{ id: string }>(owner.context, '/service/services', { name: colorName, price: 2250, tax_category_key: 'service.generic' })).id, name: colorName };
@@ -98,10 +98,10 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   if (original) await registerBusinessIn(original, original.country);
   cleanAll();
-  psql(JAPAN_RULES);
+  dropCountryRules('JP');
 });
 
-test(`${KEY}: service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
+test(`service-business-currency a business in Japan saves «1500» as 1500 yen and the till charges ¥1,500 in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -137,12 +137,16 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
   await expect(tile).toContainText('¥1,500');
   await tile.click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: YEN_SERVICE }).first()).toBeVisible();
-  // No rule for the service in Japan yet: the foot says why, in the server's words, and the total waits.
+  // No rule for the service in Japan yet: the foot says why, in the server's words, and the total waits. The
+  // category goes by the name Taxes gives it, never by its key, and the notice says where its rule is made (hub#1123).
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await openTillCart(page);
     const refusal = shown(page).locator('[data-testid=pos-preview-error]');
-    await expect(refusal, `refusal at ${size.name}`).toContainText('no tax rule applies');
+    await expect(refusal, `refusal at ${size.name}`).toContainText(
+      `«${YEN_SERVICE}» cannot be charged: no tax rule applies to its tax category «Service — generic» here. Create its rule in Taxes › Rules.`,
+    );
+    await expect(refusal, `refusal at ${size.name}`).not.toContainText('service.generic');
     await expect(refusal, `refusal at ${size.name}`).toBeInViewport();
     await expect(shown(page).locator('[data-testid=pos-total]'), `refusal at ${size.name}`).toHaveText('—');
     await settled(page);
@@ -173,7 +177,7 @@ test(`${KEY}: service-business-currency a business in Japan saves «1500» as 15
   }
 });
 
-test(`${KEY}: service-business-currency a business in Poland reads its services and vouchers in złoty in 390, 834 and 1440`, async ({ page }) => {
+test(`service-business-currency a business in Poland reads its services and vouchers in złoty in 390, 834 and 1440`, async ({ page }) => {
   await registerBusinessIn(original, 'PL');
   const row = await serviceRow(page, color.id, color.name);
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
@@ -202,7 +206,9 @@ test(`${KEY}: service-business-currency a business in Poland reads its services 
   await expect(price).toContainText(/could be zł\s?1,250\.00 or zł\s?1\.25/);
   await settled(page);
   await page.screenshot({ path: shot(`${KEY}-form-1440`) });
+  // The price typed is a change: «Cancel» asks first (BASE-F05) and the person discards it.
   await form.locator('[data-testid=service-form-cancel]').click();
+  await discardChanges(page);
   await expect(form).toBeHidden();
 
   // A voucher: its closed price in złoty.
@@ -217,7 +223,7 @@ test(`${KEY}: service-business-currency a business in Poland reads its services 
   }
 });
 
-test(`${KEY}: service-business-currency back in Spain the services and vouchers are in euros`, async ({ page }) => {
+test(`service-business-currency back in Spain the services and vouchers are in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   const row = await serviceRow(page, color.id, color.name);

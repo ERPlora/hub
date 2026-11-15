@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Kitchen → History, «Kitchen history» (WORKBOOK «Pantallas · Historial»; KITCHEN-F25), live
 // (`kitchen.log.list`): what happened in the kitchen, newest first — Action, Ticket (its number), Dish, Who
-// («System» for what the kitchen did by itself), Notes (a reason) and When (the business's date and time) —,
+// («System» for what the platform did: the kitchen by itself, an automation, a recovery), Notes (a reason) and When (the business's date and time) —,
 // «Search ticket or notes…» and a filter by action, 50 a page.
 import { DataTable, type DataTableColumn, type DataTableFilters, EmptyState } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
@@ -68,7 +68,7 @@ const columns = computed<DataTableColumn<LogOut>[]>(() => [
   },
   { key: 'ticket_number', label: t('kitchen.history.columns.ticket') },
   { key: 'item_name', label: t('kitchen.history.columns.dish'), format: (_, e) => [e.item_name, e.station_name && `(${e.station_name})`].filter(Boolean).join(' ') || '—' },
-  { key: 'actor', label: t('kitchen.history.columns.who'), format: (_, e) => e.actor || t('kitchen.history.system') },
+  { key: 'actor', label: t('kitchen.history.columns.who'), format: (_, e) => (e.by_platform ? t('kitchen.history.system') : e.actor) },
   { key: 'notes', label: t('kitchen.history.columns.notes'), format: (_, e) => e.notes || '—' },
   { key: 'created_at', label: t('kitchen.history.columns.when'), width: 'minmax(8.5rem,1fr)', format: (_, e) => formatDateTime(e.created_at, locale.value, timezone.value) },
 ]);

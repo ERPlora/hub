@@ -20,7 +20,7 @@ const t = useT();
 const locale = useLocale();
 const cancel = useCommand('online_booking.booking.cancel');
 const reason = ref('');
-useUnsavedFormOnOpen('ob-cancel', reason, open);
+const canDismiss = useUnsavedFormOnOpen('ob-cancel', reason, open);
 
 watch(open, (isOpen) => {
   if (!isOpen) return;
@@ -50,6 +50,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="ob-cancel"
     size="sm"
     role="alertdialog"

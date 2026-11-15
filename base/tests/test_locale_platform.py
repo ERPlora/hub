@@ -3,7 +3,7 @@
 Django joins every catalogue of a language in one, and the platform's apps (``control``, ``base``) come before the
 modules in ``INSTALLED_APPS``: their entry for a message wins over the module's own. ``msgid "state"`` was «foto del
 SaaS» (the registry's snapshot) in ``base``, so the «state» of a customer's consent or a stock line said «foto del
-SaaS» in Spanish too (APP-BASE-3, review of hub#232). A label with a sense of its own goes through ``pgettext_lazy``
+SaaS» in Spanish too (hub#232). A label with a sense of its own goes through ``pgettext_lazy``
 with its context; what is left without context must say the same as every module that also says it.
 """
 

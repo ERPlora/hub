@@ -1,6 +1,6 @@
 // How the task screens paint days, moments, tones and tags (pages never format by hand), always with
 // the page language's own format (Intl). A due date is a PURE day (`YYYY-MM-DD`): it is painted anchored
-// to UTC, so it never moves a day across time zones (tasks#23). «Today» and a moment are on the business's
+// to UTC, so it never moves a day across time zones. «Today» and a moment are on the business's
 // clock: each takes its zone (`useBusinessZone`, hub#779), required so that no screen forgets it. It is
 // `undefined` until the business answers and `Intl` then uses the device's, never a zone written here.
 import type { StatusPillTone } from '@erplora/ui/components';
@@ -80,7 +80,7 @@ export const STATUS_TONE: Readonly<Record<TaskStatus, StatusPillTone>> = Object.
   cancelled: 'danger',
 });
 
-/** The standard escalation of priority (tasks#29): urgent is red and low steps back. */
+/** The standard escalation of priority: urgent is red and low steps back. */
 export const PRIORITY_TONE: Readonly<Record<TaskPriority, StatusPillTone>> = Object.freeze({
   low: 'neutral',
   medium: 'info',

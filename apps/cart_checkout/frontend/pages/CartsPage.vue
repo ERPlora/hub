@@ -27,15 +27,14 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import {
-  amountExample,
+  amountFilterErrors,
   CART_TONE,
+  filterCents,
   formatMoney,
   formatQuantity,
   recordMoney,
   TOTAL_BOUNDS,
-  toMinor,
   toQuantity,
-  unreadableTotals,
   useBusinessMoney,
 } from '../lib/format';
 import type { CartListIn, CartOut, CartStatus } from '../operations';
@@ -66,18 +65,17 @@ const query = computed<Partial<CartListIn>>(() => {
   const bounds = {
     total_items_min: toQuantity(f.total_items_from),
     total_items_max: toQuantity(f.total_items_to),
-    total_amount_min: toMinor(f.total_amount_from, money.value),
-    total_amount_max: toMinor(f.total_amount_to, money.value),
+    total_amount_min: filterCents(f.total_amount_from, money.value),
+    total_amount_max: filterCents(f.total_amount_to, money.value),
   };
   for (const [key, value] of Object.entries(bounds)) if (value !== undefined) Object.assign(out, { [key]: value });
   return out;
 });
 
-/** An end of «Total» it cannot read as an amount, said under its box (it filters nothing). */
+/** An end of «Total» it cannot read as an amount, said under its box as every amount filter of the Hub says it
+ *  (hub#1196); it filters nothing. */
 const filterErrors = computed<Record<string, string>>(() =>
-  Object.fromEntries(
-    unreadableTotals(filters.value, money.value).map((name) => [name, t('cart_checkout.amountInvalid', { example: amountExample(locale.value, money.value) })]),
-  ),
+  amountFilterErrors(filters.value, TOTAL_BOUNDS, { t, locale: locale.value, money: money.value }),
 );
 
 function onFilters(now: DataTableFilters): void {
@@ -128,7 +126,7 @@ const columns = computed<DataTableColumn<CartOut>[]>(() => [
     sortable: true,
     align: 'right',
     format: (_, row) => formatMoney(row.total_amount, locale.value, recordMoney(row)),
-    // Typed as an amount (pm#521): a text box with the decimal keyboard, so «1.250,50» can be pasted.
+    // Typed as an amount: a text box with the decimal keyboard, so «1.250,50» can be pasted.
     filter: { type: 'range', amount: true },
   },
 ]);

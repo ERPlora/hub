@@ -1,4 +1,4 @@
-"""``base.app.list``: the Apps screen (BASE-G67…G74; PLAN §20.4.1, PLAN-HUB §1a «GET /api/modules»).
+"""``base.app.list``: the Apps screen.
 
 Every module of the deployment the scope shows (``home.shown_modules``), from its ``LiveAppConfig`` in this process
 (never the SaaS): name, icon, category, one line, whether it is paid and where its right comes from
@@ -115,14 +115,14 @@ def test_each_business_reads_its_own_country():
 
 
 def test_open_leads_to_the_first_screen_of_the_app_for_who_may_see_it():
-    """BASE-G68: «Open» only where the person has a screen to open; no permission of the app, no «Open»."""
+    """«Open» only where the person has a screen to open; no permission of the app, no «Open»."""
     with_permission = by_id(app_list("demo.view"))["demo"]
     without = by_id(app_list())["demo"]
     assert (with_permission["path"], without["path"]) == ("/demo/items", None)
 
 
 def test_what_an_app_needs_and_what_needs_it():
-    """BASE-G73: what comes along with an app (its ``requires``, transitively) and what an app is needed by."""
+    """What comes along with an app (its ``requires``, transitively) and what an app is needed by."""
     document = by_id(app_list())
     for config in module_configs():
         assert set(document[config.label]["requires"]) >= set(config.requires)
@@ -138,7 +138,7 @@ def test_the_store_of_this_business(settings):
 
 
 def test_a_paid_app_without_its_right_is_blocked_and_says_so(paid_demo):
-    """BASE-G74: bought on erplora.com; until then its state is ``blocked`` and it has no «Open»."""
+    """Bought on erplora.com; until then its state is ``blocked`` and it has no «Open»."""
     keep("a", {"modules": []})
     demo = by_id(app_list("demo.view"))["demo"]
     assert {key: demo[key] for key in ("premium", "right", "state", "path")} == {
@@ -150,7 +150,7 @@ def test_a_paid_app_without_its_right_is_blocked_and_says_so(paid_demo):
 
 
 def test_a_paid_app_says_where_its_right_comes_from(paid_demo):
-    """BASE-G70: «Included in your plan» or «Subscribed», from the SaaS's photo."""
+    """«Included in your plan» or «Subscribed», from the SaaS's photo."""
     keep("a", {"modules": [{"id": "demo", "source": "plan"}]})
     keep("b", {"modules": [{"id": "demo", "source": "purchase"}]})
     in_a, in_b = by_id(app_list("demo.view"))["demo"], by_id(app_list("demo.view", scope=B))["demo"]
@@ -189,7 +189,7 @@ def test_over_http(client, make_user):
     assert by_id(response.json())["tax"]["name"] == "Impuestos"
 
 
-# ── base.plan.usage: how much of the plan's limits the business uses (BASE-G81) ──────────────────────────────
+# ── base.plan.usage: how much of the plan's limits the business uses ─────────────────────────────────────────
 
 
 def plan_usage(*permissions, scope=A):

@@ -1,7 +1,8 @@
 """Guardrail of how the server writes money (flow money-text): only ``base.business.money_text`` writes an amount with
 its currency. Babel's ``format_currency`` skips CLDR's currency spacing and glues a code to the figure («PLN15.50»
 where the browser writes «PLN 15.50»), and a symbol put next to a figure by hand (``get_currency_symbol``) is the same
-mistake by another road (saas#1859 glued «€» so). A second formatter, or a copy of the fix, drifts from the first.
+mistake by another road (the old SaaS glued «€» that way). A second formatter, or a copy of the fix, drifts from the
+first.
 
 Static and fast, like ``tests/test_guardrails.py``: a pure function over source text, proven by a made-up offender (the
 positive control), then run over ``base/``, ``control/`` and ``apps/`` outside ``tests/``.

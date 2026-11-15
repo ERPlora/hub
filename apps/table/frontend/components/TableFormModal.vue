@@ -30,7 +30,7 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('table-form', () => form.value, open);
+const canDismiss = useUnsavedFormOnOpen('table-form', () => form.value, open);
 
 const SHAPES: readonly TableShape[] = ['square', 'round', 'rectangle'];
 const NO_ZONE = '';
@@ -140,6 +140,7 @@ async function remove(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="table-form"
     :title="editing ? $t('table.form.titleEdit') : $t('table.form.titleNew')"
     :pending="pending"
@@ -153,6 +154,7 @@ async function remove(): Promise<void> {
         <div class="table-form__pair">
           <ion-input
             data-testid="table-form-number"
+            name="number"
             :value="form.number"
             :label="$t('table.form.number')"
             :placeholder="editing ? undefined : $t('table.add.numberPlaceholder')"
@@ -166,6 +168,7 @@ async function remove(): Promise<void> {
           />
           <ion-input
             data-testid="table-form-capacity"
+            name="capacity"
             type="number"
             inputmode="numeric"
             min="1"
@@ -189,6 +192,7 @@ async function remove(): Promise<void> {
         <ion-input
           v-if="editing"
           data-testid="table-form-name"
+          name="name"
           :value="form.name"
           :label="$t('table.form.name')"
           label-placement="floating"

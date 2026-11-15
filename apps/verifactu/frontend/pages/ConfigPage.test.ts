@@ -200,8 +200,8 @@ describe('ConfigPage', () => {
     expect(s.find('verifactu-config-cert-remove').exists()).toBe(false);
   });
 
-  // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain; outside it neither the authorisation
-  // for ERPlora nor an own certificate is offered, with that one reason in sight.
+  // VeriFactu is only for Spain; outside it neither the authorisation for ERPlora nor an own certificate is offered,
+  // with that one reason in sight.
   const OUTSIDE_SPAIN = { code: 'outside_spain', message: 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT' };
 
   it('outside Spain it says VeriFactu is only for Spain and offers neither the authorisation nor a certificate', async () => {

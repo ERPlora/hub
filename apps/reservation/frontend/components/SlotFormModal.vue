@@ -15,7 +15,7 @@ import { WEEKDAYS } from '../lib/weekdays';
 const props = defineProps<{ weekday: number }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('reservation-slot-form', () => ({ day: day.value, start: start.value, end: end.value, max: max.value, maxCovers: maxCovers.value }), open);
+const canDismiss = useUnsavedFormOnOpen('reservation-slot-form', () => ({ day: day.value, start: start.value, end: end.value, max: max.value, maxCovers: maxCovers.value }), open);
 
 const t = useT();
 const create = useCommand('reservation.time_slot.create');
@@ -66,6 +66,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-slot-form"
     size="sm"
     :title="$t('reservation.availability.slotForm.title')"
@@ -100,6 +101,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-slot-form__pair">
           <ion-input
             data-testid="reservation-slot-form-start_time"
+            name="start_time"
             type="time"
             :value="start"
             :label="$t('reservation.availability.slotForm.from')"
@@ -112,6 +114,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-slot-form-end_time"
+            name="end_time"
             type="time"
             :value="end"
             :label="$t('reservation.availability.slotForm.to')"
@@ -126,6 +129,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-slot-form__pair">
           <ion-input
             data-testid="reservation-slot-form-max_reservations"
+            name="max_reservations"
             type="number"
             inputmode="numeric"
             min="1"
@@ -140,6 +144,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-slot-form-max_covers"
+            name="max_covers"
             type="number"
             inputmode="numeric"
             min="1"

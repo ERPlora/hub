@@ -1,4 +1,4 @@
-"""Django admin of the appointment app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the appointment app: full CRUD on every table, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it adds, changes and deletes every table so
 that support can repair; it does not go through the operations' rules, so it warns rather than prevents.

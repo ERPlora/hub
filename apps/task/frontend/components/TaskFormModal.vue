@@ -114,12 +114,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedForm('task-form', () => (open.value ? form.value : original.value), original);
+const canDismiss = useUnsavedForm('task-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="task-form"
     :title="title"
     :submit-label="task ? $t('task.form.save') : $t('task.form.create')"

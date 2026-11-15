@@ -18,7 +18,7 @@ import type { AppointmentRow } from '../operations';
 const props = defineProps<{ appointment: AppointmentRow | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('appointment-cancel', () => reason.value, open);
+const canDismiss = useUnsavedFormOnOpen('appointment-cancel', () => reason.value, open);
 
 const t = useT();
 const locale = useLocale();
@@ -52,6 +52,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="appointment-cancel"
     size="sm"
     role="alertdialog"

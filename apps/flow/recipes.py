@@ -166,7 +166,7 @@ def _apps_named(parsed: CreateIn) -> set[str]:
     return {name.split(".", 1)[0] for name in named} & apps
 
 
-def _problem(scope: Scope, config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str, ...]] | None:
+def _problem(scope: Scope, config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str, ...]] | None:  # noqa: PLR0911
     """``(code, message, apps it lacks)`` of why this business cannot offer ``declared``; ``None`` when it can."""
     if not isinstance(declared, dict) or not RECIPE_ID.fullmatch(str(declared.get("id", ""))):
         return INVALID, str(NOT_A_RECIPE) % {"problem": "id"}, ()

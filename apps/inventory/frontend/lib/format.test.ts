@@ -89,7 +89,7 @@ describe('formatCount', () => {
 });
 
 describe('formatShortDateTime', () => {
-  // inventory#130, inventory#139: the ledger's date on a tablet keeps its time, also for an older year.
+  // The ledger's date on a tablet keeps its time, also for an older year.
   it('is the numeric date with the year and the time, in the page language and its time zone', () => {
     const at = '2025-03-07T08:05:00Z';
     expect(formatShortDateTime(at, 'es', 'Europe/Madrid')).toBe('7/3/25, 9:05');

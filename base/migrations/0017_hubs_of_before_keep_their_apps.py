@@ -1,11 +1,11 @@
-# Round 2026-10-27 (PLAN-HUB §9): a hub is born with every app off; the business turns on what it uses (Apps, or a
-# blueprint, which turns its apps on and then loads). Until now a hub without any row of ``AppActivation`` had every
-# app on, its roots chosen (the baseline of ``base.activation`` before this round). This writes that down for every hub
-# of the registry that has no row yet, so none of them loses an app when the baseline turns off: the businesses, the
-# demos alive and the developer's local hubs. A hub that already changed its apps has rows and keeps them; a purged
-# demo is never served again. It runs where the registry is, control's database, which phase 1's hubs share (S1–S4);
-# on a hub's own database (its ``__ddl`` alias) it has nothing to do. ERPlora's own hub and the worker's scope have
-# every app on by construction (``base.activation.is_platform``), rows or not.
+# A hub is born with every app off; the business turns on what it uses (Apps, or a blueprint, which turns its apps on
+# and then loads). Until now a hub without any row of ``AppActivation`` had every app on, its roots chosen (the baseline
+# of ``base.activation`` before this change). This writes that down for every hub of the registry that has no row yet,
+# so none of them loses an app when the baseline turns off: the businesses, the demos alive and the developer's local
+# hubs. A hub that already changed its apps has rows and keeps them; a purged demo is never served again. It runs where
+# the registry is, control's database, which the hubs still without a database of their own share; on a hub's own
+# database (its ``__ddl`` alias) it has nothing to do. ERPlora's own hub and the worker's scope have every app on by
+# construction (``base.activation.is_platform``), rows or not.
 #
 # Reverting forgets the rows of every hub whose rows are still exactly every app on (back to «no row», which the
 # baseline of before read as every app on); a hub that changed something since keeps its rows.

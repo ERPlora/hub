@@ -1,8 +1,9 @@
-// flow: BASE-F05 and one create form per app of hub#1031 (hub#1020's second stage; the walk is
-// `expectBackAsksOnDirtyForm`). Time clock's only window, «Correct working day», is covered by its component test.
+// flow: BASE-F05 and one create form per app of hub#1031 (hub#1020's second stage; the walks are
+// `expectBackAsksOnDirtyForm` and, for its own ways out, `expectWaysOutAskOnDirtyForm`, hub#1156). Time clock's only
+// window, «Correct working day», is covered by its component test.
 import { test } from '@playwright/test';
 
-import { expectBackAsksOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
+import { expectBackAsksOnDirtyForm, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const CASES: UnsavedFormCase[] = [
   { app: 'cart_checkout', flow: 'CART_CHECKOUT-F01', route: '/cart_checkout/carts', add: 'cart-checkout-carts-add', form: 'cart-checkout-cart-form', field: 'cart-checkout-cart-form-name' },
@@ -17,5 +18,9 @@ const CASES: UnsavedFormCase[] = [
 for (const item of CASES) {
   test(`${item.flow} ${item.app}: Android Back asks before discarding a dirty form and closes a clean one`, async ({ page }) => {
     await expectBackAsksOnDirtyForm(page, item, 'HUB-1031');
+  });
+
+  test(`${item.flow} ${item.app}: Cancel, ×, Escape and a tap outside ask before discarding a dirty form and close a clean one (hub#1156)`, async ({ page }) => {
+    await expectWaysOutAskOnDirtyForm(page, item, 'HUB-1156');
   });
 }

@@ -1,7 +1,7 @@
 // Not a test of the hub (no `.test.ts`: the suite never collects it): vitest.setup.test.ts runs it on its own,
 // with the hub's config, and reads how each test ended. Each one ends in the state its name says, and the hub
-// setup (vitest.setup.ts) must fail exactly those that leave a real timer armed, and paint the shell's icons as the
-// app does and attach Ionic's elements as a browser would.
+// setup (vitest.setup.ts) must fail exactly those that leave a real timer armed, paint the shell's icons as the
+// app does, attach Ionic's elements as a browser would, and still end, by their budgets, those that never end.
 import { IonButton, IonIcon, IonToggle } from '@ionic/vue';
 import { mount } from '@vue/test-utils';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
@@ -146,4 +146,12 @@ it('attaches Ionic elements without the errors happy-dom alone makes them log', 
   } finally {
     error.mockRestore();
   }
+});
+
+// The time budgets (vite.config.ts and the setup, hub#765) stretch with the machine's load, and still end what never
+// ends: a test that hangs fails by its own budget, and a `vi.waitFor` gives up on what never comes, within it.
+it('never ends', () => new Promise<void>(() => {}));
+
+it('waits for what never comes', async () => {
+  await vi.waitFor(() => expect('never').toBe('there'));
 });

@@ -120,11 +120,16 @@ def model_texts(models: Iterable) -> list:
     return texts
 
 
-def catalogue_key(text) -> str:
+def catalogue_key(text) -> str | tuple[str, int]:
     """How the compiled catalogue keys a lazy text (read in the source language, as the apps' tests read it): its
     English, or ``context\\x04English`` for a ``pgettext_lazy`` — so a text that goes back to ``_()`` while its entry
     keeps the context, or whose context has a typo, is missing from its catalogue: it would say another app's
-    Spanish."""
+    Spanish. A lazy plural (``ngettext_lazy``/``npgettext_lazy``) is keyed by its first form, ``(key, 0)``: read with
+    ``str()``, one whose number comes from the formatting dict is empty."""
+    plural = getattr(text, "_kw", {})
+    if "plural" in plural:
+        singular = plural["singular"]
+        return (f"{plural['context']}\x04{singular}" if "context" in plural else singular, 0)
     args = getattr(text, "_args", ())
     return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 

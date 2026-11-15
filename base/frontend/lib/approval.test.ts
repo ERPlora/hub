@@ -1,8 +1,3 @@
-// A manager's approval on the client (BASE-G136; the old hub's HUB_SHELL-F51): `withApproval` runs a command and, when
-// the hub answers `requires_elevation`, asks who approves it (the dialog) and repeats the command once with the pass in
-// `X-Elevation-Token` (the SDK's `getElevationToken` reads `approvalPass`). «Cancel» hands back the original refusal; a
-// second question after approving is a refusal, never a second dialog; the same command repeated while the dialog is
-// open (a double tap) joins it and gets its very result, without running again; a different one is refused, not stacked.
 import { ApiError } from '@erplora/ui/sdk';
 import { modalController } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -93,8 +88,8 @@ describe('withApproval', () => {
   });
 
   it('without its own way to ask, opens «An approval is needed» fitted to its whole PIN pad, never Ionic’s fixed card', async () => {
-    // FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP: Ionic's 600×600 card cut the pad's last row (the 0 and erase)
-    // on a tablet and a desk; the class is what fits the dialog to its pad (ApprovalDialog.vue).
+    // Ionic's 600×600 card cuts the pad's last row (the 0 and erase) on a tablet and a desk; the class is what fits the
+    // dialog to its pad (ApprovalDialog.vue).
     const present = vi.fn(() => Promise.resolve());
     const onDidDismiss = vi.fn(() => Promise.resolve({ data: 'elev_pass', role: APPROVED }));
     const create = vi.spyOn(modalController, 'create').mockResolvedValue({ present, onDidDismiss } as never);

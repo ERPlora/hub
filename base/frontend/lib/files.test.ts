@@ -1,7 +1,3 @@
-// Files (APP-BASE-8, BASE-G82…G86): what the screen works out by itself — sizes as people read them, the folders of
-// the tree flattened for the narrow selector and «Move to…», where the screen goes after a rename, a move or a delete
-// of the folder it shows, the search of the open folder, a CSV for the preview, and the sentence of every refusal
-// the server can give (each code of `base/files.py`, never «check the connection» for all, hub#1776).
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -142,7 +138,7 @@ describe('reading a file', () => {
   });
 });
 
-describe('refusals (hub#1776)', () => {
+describe('refusals', () => {
   it('each code has its own sentence; one nobody knows, the general one', () => {
     expect(refusalKey('base.file_exists')).toBe('base.files.refusal.exists');
     expect(refusalKey('permission_denied')).toBe('base.files.refusal.onlyAdmin');

@@ -1,5 +1,5 @@
-// PoC §8.6: list, detail, «New item» and «Edit item» at 390×844 (phone), 834×1194 (tablet) and
-// 1440×900 (desktop) with no horizontal scroll. The hub's shell is the old hub's (PLAN-MIGRATIONS §16):
+// List, detail, «New item» and «Edit item» at 390×844 (phone), 834×1194 (tablet) and
+// 1440×900 (desktop) with no horizontal scroll. The hub's shell is the old hub's:
 // the side menu pinned from 992 px (the topbar's rail toggle) and a drawer below (its hamburger), the ⠿
 // «My apps» sheet in the topbar, and no Back on the list, the root of the app.
 import { type Page, expect, test } from '@playwright/test';

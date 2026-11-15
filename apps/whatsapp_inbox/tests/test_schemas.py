@@ -60,7 +60,7 @@ def test_the_list_s_assignment_filter_is_me_none_or_a_person():
     person = "01a16000-0000-7000-8000-0000000000a7"
     assert S.ConversationListIn.model_validate({"assigned": person}).assigned == person
     assert "assigned" in errors(S.ConversationListIn, {"assigned": "somebody"})
-    # A person is someone of the business's database (base.HubUser, W10): control's number no longer names one.
+    # A person is someone of the business's database (base.HubUser): control's number no longer names one.
     assert "assigned" in errors(S.ConversationListIn, {"assigned": "7"})
     assert "status" in errors(S.ConversationListIn, {"status": "archived"})
     assert "sort" in errors(S.ConversationListIn, {"sort": "payload"})

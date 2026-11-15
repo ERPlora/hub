@@ -7,6 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, login, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import {
   cleanUp,
   createRule,
@@ -15,18 +16,18 @@ import {
   pickCombo,
   pickSelect,
   type Rule,
-  rowAction,
   rows,
   rulesOf,
   searchFor,
   threeShots,
 } from './tax-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 test.afterAll(() => cleanUp());
 
 type Envelope = { error?: { code: string; message: string; fields?: Record<string, string> } };
 
-// flow: TAX-F01 · gh:pm#611
+// flow: TAX-F01
 test('TAX-F01: the owner finds a category by what it reads, with the rate it charges today', async ({ page }) => {
   await login(page, A, '/tax/categories');
   await listReady(page, 'categories');
@@ -60,10 +61,12 @@ test('TAX-F02: «+» creates a custom category; a repeated key is refused under 
   await dialog.locator('[data-testid=tax-category-form-name] input').fill('Again');
   await dialog.locator('[data-testid=tax-category-form-submit]').click();
   await expect(dialog.locator('[data-testid=tax-category-form-key] .error-text')).toContainText('already a tax category');
+  // «Cancel» asks before losing the refused category (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-category-form-cancel]').click();
+  await discardChanges(page);
 });
 
-// flow: TAX-F03 · gh:taxes#12
+// flow: TAX-F03
 test('TAX-F03: a component is read right under its root; Status reaches the deactivated ones', async ({ page, context }) => {
   await login(page, A, '/tax/rules');
   const key = await freshCategory(context, 'f03');
@@ -89,7 +92,7 @@ test('TAX-F03: a component is read right under its root; Status reaches the deac
   await pickSelect(page, shown(page).locator('[data-testid=tax-rules-status]'), /^Deactivated$/);
   await expect(rows(page, 'rules')).toHaveCount(1);
   await expect(rows(page, 'rules').first()).toContainText('PT');
-  // taxes#12: on a phone, a card's actions are comfortable targets (44 px or more). Crossing to 390
+  // On a phone, a card's actions are comfortable targets (44 px or more). Crossing to 390
   // turns the table into cards: the table row's Restore is still on screen for a moment and is torn
   // down while measured (its box comes back null), so the target is the card's own, once painted.
   await page.setViewportSize({ width: 390, height: 844 });
@@ -103,7 +106,7 @@ test('TAX-F03: a component is read right under its root; Status reaches the deac
     .toBeGreaterThanOrEqual(44);
 });
 
-// flow: TAX-F03 · gh:hub#2406
+// flow: TAX-F03
 test('TAX-F03: on a phone «Load more» brings the rest and the footer counts every rule on screen', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, A, '/tax/rules');
@@ -124,12 +127,12 @@ test('TAX-F03: on a phone «Load more» brings the rest and the footer counts ev
   await shown(page).locator('[data-testid=tax-rules-load-more]').click();
   await expect(rows(page, 'rules')).toHaveCount(51);
   await expect(footer).toContainText('51 rules');
-  // hub#2406: never «Showing 51–51» over 51 rules on screen.
+  // Never «Showing 51–51» over 51 rules on screen.
   await expect(footer).not.toContainText(/51\s*[–-]\s*51/);
   await expect(shown(page).locator('[data-testid=tax-rules-load-more]')).toHaveCount(0);
 });
 
-// flow: TAX-F04 · gh:pm#513 · gh:taxes#47
+// flow: TAX-F04
 test('TAX-F04: a rule is created with the Country and Category combos; an overlap is told under «Valid from» at every width', async ({
   page,
   context,
@@ -152,17 +155,19 @@ test('TAX-F04: a rule is created with the Country and Category combos; an overla
   await searchFor(page, 'rules', key);
   await expect(rows(page, 'rules').first()).toContainText('10.00%');
 
-  // The same slot again from June: refused under «Valid from», in sight on a phone too (pm#513).
+  // The same slot again from June: refused under «Valid from», in sight on a phone too.
   await fill('21', '2026-06-01');
   await dialog.locator('[data-testid=tax-rule-form-submit]').click();
   const validFrom = () => dialog.locator('[data-testid=tax-rule-form-valid_from]');
   await expect(validFrom().locator('.error-text')).toContainText('overlaps another active rule');
   await threeShots(page, 'TAX-F04', () => validFrom());
+  // «Cancel» asks before losing the refused rule (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-rule-form-cancel]').click();
+  await discardChanges(page);
   expect(await rulesOf(context, key)).toHaveLength(1);
 });
 
-// flow: TAX-F05 · gh:pm#332 · gh:hub#292
+// flow: TAX-F05
 test('TAX-F05: an exempt rule pins its rate to 0 % and keeps its cause', async ({ page, context }) => {
   await login(page, A, '/tax/rules');
   const key = await freshCategory(context, 'f05');
@@ -223,14 +228,14 @@ test('TAX-F06: a surcharge hangs from its root and charges on top of it', async 
   expect([calc.data.tax, Number(calc.data.tax_rate_pct)]).toEqual([2620, 26.2]);
 });
 
-// flow: TAX-F07 · gh:sales#529
+// flow: TAX-F07
 test('TAX-F07: «Set end date» closes the rate in force and the new one starts the next day', async ({ page, context }) => {
   await login(page, A, '/tax/rules');
   const key = await freshCategory(context, 'f07');
   const first = await createRule(context, { country_code: 'ES', tax_category_key: key, rate_pct: 10, valid_from: '2026-01-01' });
   await listReady(page, 'rules');
   await searchFor(page, 'rules', key);
-  await rowAction(page, 'rules', first.id, 'end');
+  await rowAction(page, 'tax-rules', first.id, 'end');
   const end = page.locator('ion-modal[data-testid=tax-rule-end]');
   await expect(end).toBeVisible();
   await end.locator('[data-testid=tax-rule-end-valid_to] input').fill('2026-12-31');
@@ -257,7 +262,7 @@ test('TAX-F08: «Deactivate» asks first; the rule comes back with «Restore»',
   const rule = await createRule(context, { country_code: 'ES', tax_category_key: key, rate_pct: 21 });
   await listReady(page, 'rules');
   await searchFor(page, 'rules', key);
-  await rowAction(page, 'rules', rule.id, 'deactivate');
+  await rowAction(page, 'tax-rules', rule.id, 'deactivate');
   const confirm = page.locator('ion-modal[data-testid=tax-rule-deactivate]');
   await expect(confirm).toContainText('Deactivate tax rule');
   await expect(confirm).toContainText('The rule will no longer apply to new transactions.');
@@ -269,12 +274,12 @@ test('TAX-F08: «Deactivate» asks first; the rule comes back with «Restore»',
   const refused = await api<Envelope>(context, A, 'GET', `/tax/rates/calculate?amount=1000&tax_category_key=${key}`);
   expect([refused.status, refused.data.error?.code]).toEqual([409, 'tax.no_rate']);
   await pickSelect(page, shown(page).locator('[data-testid=tax-rules-status]'), /^Deactivated$/);
-  await rowAction(page, 'rules', rule.id, 'restore');
+  await rowAction(page, 'tax-rules', rule.id, 'restore');
   await expect(shown(page).locator('[data-testid=tax-rules-empty]')).toBeVisible();
   expect((await rulesOf(context, key, 'active')).map((r) => r.id)).toEqual([rule.id]);
 });
 
-// flow: TAX-F11 · gh:pm#629
+// flow: TAX-F11
 test('TAX-F11: a Canary Islands rule is IGIC, and wins over the national one for a business there', async ({ page, context }) => {
   await login(page, A, '/tax/rules');
   const key = await freshCategory(context, 'f11');
@@ -347,7 +352,9 @@ test('TAX-F14: «+» teaches an alias, kept lowercase; a repeated one is refused
   await pickCombo(page, dialog, 'tax-alias-form-category', 'alcohol', 'restaurant.alcohol');
   await dialog.locator('[data-testid=tax-alias-form-submit]').click();
   await expect(dialog.locator('[data-testid=tax-alias-form-alias] .error-text')).toContainText('That alias already exists.');
+  // «Cancel» asks before losing the refused alias (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-alias-form-cancel]').click();
+  await discardChanges(page);
 });
 
 // flow: TAX-F17

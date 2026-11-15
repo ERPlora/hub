@@ -1,6 +1,6 @@
 // The business's API keys from end to end (BASE-F86 create and copy the token, BASE-F89 see the keys and what each
-// may do, BASE-F87 rotate, BASE-F88 revoke; registry keys BASE-G03, G05, G25, G37), in the three viewports, as the
-// owner of hub `a`, which has its own database since S2a (round 2026-10-30 of PLAN-DB): a business that still shares
+// may do, BASE-F87 rotate, BASE-F88 revoke), in the three viewports, as the
+// owner of hub `a`, which has its own database: a business that still shares
 // control's database says «Not available yet» instead (ApiKeysPanel.test.ts, base/tests/test_api_keys.py).
 //
 // Each viewport makes one read-only key, sees its token once and copies it, finds it in the list with what it may do,
@@ -11,6 +11,7 @@
 import { type APIRequestContext, type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, collectProblems, horizontalOverflow, hostPage, psql, shown, untilStill } from './helpers';
+import { rowAction } from './service-helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -47,19 +48,6 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
 
 async function signedIn(browser: Browser, viewport: { width: number; height: number }) {
   return hostPage(browser, A, { viewport, next: '/employees#apikeys' });
-}
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=api-keys-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=api-keys-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=api-keys-row-${id}-${action}]`).click();
 }
 
 /** The token the dialog shows once, read before «Done» closes it. */
@@ -126,7 +114,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     expect(await readWith(outside, first)).toBe(200);
 
     // BASE-F87: «Rotate» asks first, then shows the new token once; the old one stops at once.
-    await rowAction(page, id, 'rotate');
+    await rowAction(page, 'api-keys', id, 'rotate');
     await expect(dialog(page, 'api-key-rotate')).toContainText('gets a new token. The current one stops working at once.');
     await snap(page, 'BASE-F87-confirm', width);
     await dialog(page, 'api-key-rotate-submit').click();
@@ -140,7 +128,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     expect(await readWith(outside, second)).toBe(200);
 
     // BASE-F88: «Revoke» asks first; the key stops for good and stays listed as «Revoked», with nothing left to do.
-    await rowAction(page, id, 'revoke');
+    await rowAction(page, 'api-keys', id, 'revoke');
     await expect(dialog(page, 'api-key-revoke')).toContainText('Any system using this token loses access at once.');
     await dialog(page, 'api-key-revoke-submit').click();
     await expect(dialog(page, 'api-key-revoke')).toBeHidden();

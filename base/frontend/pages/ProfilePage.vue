@@ -1,10 +1,8 @@
 <script setup lang="ts">
-// «My profile» (`/profile`, BASE-G125, G126; the old hub's ProfilePage): the person heading it (photo, name, role in
-// this business), «Account details» (name, surname, contact email: never the email they sign in with), the photo,
-// «Preferences» (language, mode, palette and interface scale: saved for them, so they follow them to any device, and
-// applied at once) and «PIN» (their own: the current one when they have one, the new one twice). The profile comes live
-// (`base.profile.get`): a change saved elsewhere repaints what the person has not touched. A profile that cannot be
-// read offers nothing to save, only «Retry» (hub#2541).
+// The contact email shown here is never the email the person signs in with. Preferences are saved for the person, so
+// they follow them to any device, and are applied at once. The profile comes live (`base.profile.get`): a change saved
+// elsewhere repaints what the person has not touched. A profile that cannot be read offers nothing to save, only
+// «Retry».
 import { ImageUpload, type ImageUploadValue, InlineFeedback, UserAvatar } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import {
@@ -649,7 +647,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
   font-weight: 600;
 }
 
-/* Each button as wide as its words, as in the old hub: Ionic's segment is a grid of equal columns (`1fr`), which cut
+/* Each button as wide as its words: Ionic's segment is a grid of equal columns (`1fr`), which cut
    «System (auto)» into «System (au…» on a narrow card. The three fit side by side down to 375 px. */
 .profile__mode {
   grid-auto-columns: auto;

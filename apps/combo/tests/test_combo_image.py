@@ -1,10 +1,10 @@
-"""A menu's image (COMBO-F14; round 2026-10-30): ``Combo.image``, as a product's (INVENTORY-F30, F31) through
+"""A menu's image (COMBO-F14): ``Combo.image``, as a product's (INVENTORY-F30, F31) through
 ``base.images``.
 
 The market sells a set menu on the till as one more item, with its picture: Odoo POS (a combo is a product, with its
 image), Lightspeed (a combo has its own image), Toast (a combo is a menu item, which takes an image), Shopify POS (a
-bundle is a product), Loyverse (a composite item has its picture), Square and SumUp (items with photos); the old
-library already had ``menu_dia``, ``menu_infantil``, ``menu_hamburguesa`` and ``menu_kebab``. So a menu shows an image
+bundle is a product), Loyverse (a composite item has its picture), Square and SumUp (items with photos); the shared
+library has ``menu_dia``, ``menu_infantil``, ``menu_hamburguesa`` and ``menu_kebab``. So a menu shows an image
 of the shared library or a photo of its own, or its initials: ``combo.combo.set_image`` (the library or none),
 ``combo.combo.upload_image`` (a photo, kept as a 512 × 512 WebP), ``combo.combo.suggest_image`` (the library's best for
 its name, never set). Withdrawing the menu (COMBO-F04) deletes its photo once saved.

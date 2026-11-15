@@ -1,8 +1,8 @@
-// flow: base-media-app-folders — FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES
+// flow: base-media-app-folders
 // `/p/media/` serves the folders each app declares in its LiveAppConfig (base/media.py): the website's images to any
 // visitor (`public_media`), the WhatsApp inbox's template files only to the hub's people (`members_media`). The owner
 // uploads a cover and a template's photo; a visitor without a session sees the published page with its cover at
-// 390, 834 and 1440 px (`capture`: `.artifacts/FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES-<width>.png`) and gets a
+// 390, 834 and 1440 px (a `capture` at each width) and gets a
 // 404 for the template's photo, which the owner's session opens. At the end the site is taken offline again: the
 // other specs on hub `a` expect its `/` to jump to the login.
 import { createHash } from 'node:crypto';

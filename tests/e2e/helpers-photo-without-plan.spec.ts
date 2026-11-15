@@ -1,7 +1,7 @@
-// flow: ninguno — the e2e harness (hub#808)
+// flow: none — the e2e harness (hub#808)
 // `dropPlanFromPhoto` and `restorePhotoFrom` (helpers.ts): a spec that signs in from more than one browser runs with no
 // plan in `a`'s photo, whatever the seed left there (erplora.com's Free covers one device, and each entry from another
-// browser would end the others' sessions, BASE-G57: website-flows.spec.ts, WEBSITE-F10 and F11, 401), and puts the
+// browser would end the others' sessions with a 401), and puts the
 // photo back as it found it at the end. No browser: only the registry's row of `a`.
 import { expect, test } from '@playwright/test';
 

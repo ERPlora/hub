@@ -8,8 +8,8 @@ line at the menu's rate, to take away one line per dish with the amount split to
 arithmetic turns into base and tax. No doubles: Inventory's products, Taxes' categories and Sales' checks are
 made by their own operations.
 
-Traps of the old product: hub#1219 (no sale with a supplement or a menu could be charged) and combos#11 (the
-split of a pack is shown before charging, from the same arithmetic that charges it).
+Traps of the old product: no sale with a supplement or a menu could be charged; the split of a pack is shown
+before charging, from the same arithmetic that charges it.
 """
 
 import pytest
@@ -117,7 +117,7 @@ def lines_of(sale) -> list[tuple]:
 
 
 def test_combo_f08_the_till_charges_the_closed_price_plus_every_supplement_also_the_repeated_one(day_menu):
-    """hub#1219: a menu with supplements is charged; each pick of a repeated choice adds its supplement."""
+    """A menu with supplements is charged; each pick of a repeated choice adds its supplement."""
     order = open_check()
     (line,) = add_menu(order, picks(day_menu, "SAL", "STK", "WAT", "COF", "COF"), quantity="2").lines
     # 13,50 + 2,00 (steak) + 2 × 0,50 (two coffees), per menu; the dishes in the order of the courses.
@@ -233,7 +233,7 @@ def test_combo_f09_a_pack_whose_dishes_go_at_the_same_rate_is_one_line(pack):
 
 
 def test_combo_f09_the_split_shown_before_charging_is_the_split_charged(pack):
-    """combos#11: the bill shown before charging (Sales' preview) splits the pack exactly as the charge does."""
+    """The bill shown before charging (Sales' preview) splits the pack exactly as the charge does."""
     order = open_check()
     add_menu(order, [{"product": "SAN"}, {"product": "BTG"}], combo="Sandwich and beer", quantity="3")
 

@@ -8,7 +8,7 @@
 - ``PrintJob`` is a job of the print queue: the structured document the app's renderer paints (or the A4
   page for the computer's printer), its function, its printer, its state and who retried or cancelled it.
   Nobody deletes a job: the platform's hourly prune forgets the ones that ended over 30 days ago.
-- ``PrintDevice`` is a device that prints (the old hub's print host, hub#342): the one with the ERPlora app
+- ``PrintDevice`` is a device that prints (the old hub's print host): the one with the ERPlora app
   next to the printers, set up by whoever sets up the printers, with the printers it reaches. Only it takes,
   confirms and fails their jobs. Never deleted (the queue names it): it is retired.
 """
@@ -144,7 +144,7 @@ class Settings(UUIDModel):
 class PrintDevice(UUIDModel):
     """A device that prints the jobs of the printers it reaches. It is known by the digest of its own id (the
     SPA's ``X-Device-Id``, the ``deviceId`` of /ws/print's hello), never by the id itself: that id is what proves
-    the device, and a queue or a screen that showed it let anybody print as the till (hub#2551)."""
+    the device, and a queue or a screen that showed it let anybody print as the till."""
 
     name = models.CharField(_("name"), max_length=100)
     #: SHA-256 of the device's id (``key_of``); empty (null) only for one added by hand in the admin, which no

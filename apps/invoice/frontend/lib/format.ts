@@ -1,7 +1,8 @@
 // Numbers and days of the invoice screens: the server keeps money in signed cents, quantities and rates as
 // decimal strings and days as `YYYY-MM-DD`; a person reads them in the page's language and types amounts.
 // Until `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
-// place the app turns them into text (`Intl`) and amounts into cents. Money is in the invoice's own currency (the
+// place the app turns them into text (`Intl`) and the price of a line into cents (the «Total» filter is read by the
+// platform, as every amount filter of the Hub: `filterCents`, hub#1196). Money is in the invoice's own currency (the
 // business's when it was issued), with the decimals the server counts it in (`currency_decimals`; the browser's
 // Intl gives the forint none): without one, an amount is a dash, never the euro by default nor guessed decimals. A quantity is
 // written with the platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as every screen writes it.
@@ -9,7 +10,7 @@ import type { Money } from '../../../../base/frontend/lib/home';
 import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };
-export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 export { formatQuantity } from '@erplora/ui/components';
 
 const FALLBACK_LOCALE = 'en';
@@ -55,7 +56,7 @@ function moneyFormat(locale: string, money: Money | undefined, min: number, max:
 }
 
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
-// here beside «1.234,56 €» in the other screens (hub#1090).
+// here beside «1.234,56 €» in the other screens.
 /** `cents` (minor units) as `money` in `locale` («€1,234.56», «1.234,56 €», «zł 121.00», «¥12,100»); nothing to
  *  show is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {

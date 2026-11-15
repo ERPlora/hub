@@ -1,11 +1,11 @@
 // The thread of a WhatsApp conversation may show a photo and play a voice note that erplora.com serves
-// (FIX-HUB-CSP-WHATSAPP-MEDIA, asked by WHATSAPP_INBOX-F06): the Hub's CSP lets `img-src` and `media-src` reach
+// (WHATSAPP_INBOX-F06): the Hub's CSP lets `img-src` and `media-src` reach
 // the SaaS's origin, and only it. With the thread of a customer who sent a photo open, the page loads an image
 // and an audio from the SaaS (as the thread shows an attachment inline) and the same from Meta's CDN: Meta's
 // are refused, the SaaS's are not. Violations are caught by the `securitypolicyviolation` event and the console
-// («… violates the following Content Security Policy directive»). The thread in three sizes
-// (FIX-HUB-CSP-WHATSAPP-MEDIA-390|834|1440). What it creates is deleted after the file.
-// flow: ninguno — FIX base (CSP del Hub; la pide WHATSAPP_INBOX-F06, de otro carril)
+// («… violates the following Content Security Policy directive»). The thread in three sizes. What it creates is
+// deleted after the file.
+// flow: none — the Hub's CSP, which WHATSAPP_INBOX-F06 needs
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, onSaas, SAAS, shot, shown } from './helpers';

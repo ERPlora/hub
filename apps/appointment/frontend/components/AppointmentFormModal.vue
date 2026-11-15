@@ -15,6 +15,8 @@ import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -53,7 +55,7 @@ const props = withDefaults(
 const emit = defineEmits<{ saved: [appointment: AppointmentOut]; outcome: [text: string] }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('appointment-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, day: day.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, notes: notes.value, internalNotes: internalNotes.value }), open);
+const canDismiss = useUnsavedFormOnOpen('appointment-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, day: day.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, notes: notes.value, internalNotes: internalNotes.value }), open);
 
 const t = useT();
 const locale = useLocale();
@@ -66,6 +68,13 @@ const own = shallowRef(new Map<string, Terms>());
 const termsOf = (id: string): Terms | undefined => own.value.get(id) ?? facts.get(id);
 
 const customer = ref<CustomerSnapshot | null>(null);
+/** The customer is chosen in a window of her search, where no field of the form is typed in: choosing another one
+ *  takes the customer's refusal away. */
+const customerChanged = useGroupChange('customerGroup');
+function chooseCustomer(chosen: CustomerSnapshot | null): void {
+  customer.value = chosen;
+  customerChanged();
+}
 const services = ref<ComboOption[]>([]);
 const staff = ref<ComboOption | null>(null);
 const day = ref('');
@@ -315,6 +324,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="appointment-form"
     :title="title"
     :submit-label="editing ? $t('appointment.form.save') : $t('appointment.form.create')"
@@ -341,18 +351,22 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           {{ $t('appointment.form.charged') }}
         </InlineFeedback>
-        <div
+        <FieldGroup
           v-if="!editing"
-          class="appointment-form__customer"
+          ref="customerGroup"
+          name="customer"
           data-testid="appointment-form-customer"
         >
           <span class="appointment-form__label">{{ $t('appointment.form.customer') }}</span>
-          <CustomerSearch v-model="customer" />
+          <CustomerSearch
+            :model-value="customer"
+            @update:model-value="chooseCustomer"
+          />
           <small
             v-if="fieldErrors.customer"
             class="appointment-form__error"
           >{{ fieldErrors.customer }}</small>
-        </div>
+        </FieldGroup>
         <div class="appointment-form__services">
           <ServicesField
             v-model="services"

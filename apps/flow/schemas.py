@@ -432,7 +432,7 @@ DraftStep = Annotated[
 
 
 def _condition_reads(condition: dict) -> list[str]:
-    # The data it looks at and the data it compares with (hub#1712).
+    # The data it looks at and the data it compares with.
     return [*condition, *document.references(list(condition.values()))]
 
 
@@ -736,8 +736,18 @@ class ReactIn(In):
         "",
         max_length=128,
         title=gettext_noop("Actor"),
-        description="Who caused it (`flow_run:<id>` when a run did).",
+        description="Who caused it (`flow_run:<id>` when a run did; `copy_recovery:<id>` when a recovery from a "
+        "separate copy did, which starts no automation).",
     )
+
+
+class CustomerErasedIn(Schema):
+    """Customers' notice of an erased card (``customer.customer.erased``, CUSTOMER-F16), as the relay hands it over:
+    what this app reads of it (the rest is ignored)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: UUID = Field(description="The customer's card whose personal data were erased.")
 
 
 class DueIn(In):
@@ -1019,6 +1029,10 @@ class ReactOut(Schema):
 
 class DueOut(Schema):
     count: int
+
+
+class ChangedOut(Schema):
+    changed: int = Field(description="How many runs the reaction cancelled or made forget what their steps read.")
 
 
 class ClaimAssistantOut(Schema):

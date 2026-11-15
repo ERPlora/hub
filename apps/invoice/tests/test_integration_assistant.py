@@ -1,7 +1,7 @@
-"""The assistant's card for a write of invoice (FIX-HUB-INVOICE-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258):
-in Spanish, every datum it sends by the name the Facturas screens give it, never by the title pydantic makes up from
-the field («Duplicate», «Lines», «Next Number»). The card is base's (``base.assistant.card``); the names are invoice's:
-the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of invoice: in Spanish, every datum it sends by the name the Facturas screens give
+it, never by the title pydantic makes up from the field («Duplicate», «Lines», «Next Number»). The card is base's
+(``base.assistant.card``); the names are invoice's: the titles of its schemas and the ``verbose_name`` of its models,
+with their Spanish in its catalog."""
 
 import datetime as dt
 import json
@@ -22,6 +22,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_services_assistant import answered, waiting
 
 LOCALE = Path(apps.get_app_config("invoice").path) / "frontend/locale"
 SCREENS = json.loads((LOCALE / "es.json").read_text())["invoice"]
@@ -81,7 +82,7 @@ def test_the_card_names_a_series_next_number_as_its_form_does():
         assert labels(assistant.card(get(name), {"next_number": 120}, "en")) == [SCREENS_EN["series"]["form"]["nextNumber"]]
 
 
-# ── Rectifying by asking the assistant (INVOICE-F08; PLAN §30, «Cinco acciones de IA pulidas», the second) ────────
+# ── Rectifying by asking the assistant (INVOICE-F08) ──────────────────────────────────────────────────────────────
 # Against the Hub's real assistant turn (``base.assistant.turn``): «rectifica la factura … porque el precio estaba mal»
 # offers the preview and the rectification; the preview (``invoice.invoice.rectification_preview``) is a read, so it
 # runs by itself and goes back to the model with the rectifying invoice that would be born (no number taken); the
@@ -193,7 +194,7 @@ def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_th
         ("number", original.number),
         ("reason", REASON),
     ]
-    assert plan["pending"] == [rectify]
+    assert waiting(plan) == [rectify]
     assert not rectifications().exists()
 
 
@@ -201,7 +202,7 @@ def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today
     original = an_invoice()
     seen = run("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON})
     rectify = call("invoice.invoice.rectify", {"number": seen.original.number, "reason": REASON})
-    plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "})
+    plan = answered(rectify, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     rect = rectifications().get()
     assert (rect.rectifies_id, rect.number, rect.invoice_type, rect.total_amount, rect.issue_date, rect.created_by) == (
@@ -237,22 +238,22 @@ def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(i
     original = an_invoice()
     yesterday = str(today - dt.timedelta(days=1))
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON, "issue_date": yesterday})
-    plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = answered(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "invoice.rectify_date_not_allowed")]
     assert Invoice.objects.get(pk=original.id).status == "issued"
     assert not rectifications().exists()
 
 
-# ── What rectifying will do, on its card (FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW; BASE-F98's hook) ─
-# The card of the rectification listed only what it sends (the number and the reason), never the rectifying invoice it
-# issues. Through base's hook it shows, before the word is typed, what invoice.invoice.rectification_preview answers
+# ── What rectifying will do, on its card (BASE-F98's hook) ─────────────────────────────────────────────────────────
+# The card of the rectification lists not only what it sends (the number and the reason) but the rectifying invoice it
+# issues: through base's hook it shows, before the word is typed, what invoice.invoice.rectification_preview answers
 # for the person: the type, the next number of the series (NOT taken) and the amounts in negative, as money.
 
 PREVIEWED = ["invoice_type", "next_number", "base_amount", "tax_amount", "total_amount"]
 
 
 def name_of(code: str, language: str) -> str:
-    """The name the models give a kind of invoice in ``language``: the one the card says it by (hub#708)."""
+    """The name the models give a kind of invoice in ``language``: the one the card says it by."""
     with translation.override(language):
         return str(InvoiceType(code).label)
 
@@ -311,8 +312,9 @@ def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issue
 def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     original = an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
-    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}
-    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    drawn = turn(rectify)
+    said = {field["name"]: field["value"] for field in drawn["confirm"]["preview"]}
+    turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     rect = rectifications().get()
     assert (rect.number, name_of(rect.invoice_type, "es"), rect.base_amount, rect.tax_amount, rect.total_amount) == (
         said["next_number"],
@@ -323,15 +325,24 @@ def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     )
 
 
-def test_another_rectification_issued_after_the_card_takes_its_number_and_this_one_the_next(issuer, today):
-    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»)."""
+def test_another_rectification_issued_after_the_card_takes_its_number_and_the_yes_shows_the_next_first(issuer, today):
+    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»): another rectification issued
+    before the yes takes it, and the yes issues nothing — the card comes again with the next number — until it is
+    answered: a yes is for what its card showed."""
     original, other = an_invoice(), an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
-    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}["next_number"]
+    drawn = turn(rectify)
+    said = {field["name"]: field["value"] for field in drawn["confirm"]["preview"]}["next_number"]
     first = run("invoice.invoice.rectify", {"number": other.number, "reason": "otro"}).invoice
-    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
-    mine = rectifications().get(rectifies_id=original.id)
-    assert (first.number, mine.number) == (said, f"RECT-{today.year}-000002")
+    yes = {"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}
+
+    again = turn(*drawn["pending"], decision=yes)
+
+    assert again["executed"] == [] and not rectifications().filter(rectifies_id=original.id).exists()
+    shown = {field["name"]: field["value"] for field in again["confirm"]["preview"]}["next_number"]
+    assert (first.number, shown) == (said, f"RECT-{today.year}-000002")
+    turn(*again["pending"], decision=yes)
+    assert rectifications().get(rectifies_id=original.id).number == shown
 
 
 def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_says_why(issuer):
@@ -350,9 +361,9 @@ def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_say
     assert rectifications().count() == 1
 
 
-# ── The kind of a rectification, by its name (hub#708) ─────────────────────────────────────────────────────────────
-# The card said «Tipo de rectificativa: R4» twice over: in what it sends (``rectification_type``, which no field of the
-# models is called) and in what it will do (the preview's ``invoice_type``, an open text). Both now say the name the
+# ── The kind of a rectification, by its name ───────────────────────────────────────────────────────────────────────
+# The card never says «Tipo de rectificativa: R4», neither in what it sends (``rectification_type``, which no field of
+# the models is called) nor in what it will do (the preview's ``invoice_type``, an open text). Both say the name the
 # models give that kind; the write, the model and the fiscal record keep the code.
 
 RECTIFICATION_KINDS = ("R1", "R2", "R3", "R4")
@@ -412,15 +423,16 @@ def test_the_model_and_the_write_keep_the_code_the_card_names(issuer):
     arguments = {"number": original.number, "reason": REASON, "rectification_type": "R4"}
     told = json.loads(turn(call("invoice.invoice.rectification_preview", arguments))["append"][0]["content"])
     assert told["invoice_type"] == "R4"
-    plan = turn(call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = answered(
+        call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, turn_of=turn
+    )
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     assert rectifications().get().invoice_type == "R4"
 
 
-# ── The record a write names by its id, by its name (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half
-# is hub#416) ──
-# Since hub#416 the card leaves out an id its schema does not mark: «marca como pagada esa factura», «emite la factura de
-# esa venta» or «rectifica esa devolución» said no invoice, no sale and no refund. Now each record is named as the
+# ── The record a write names by its id, by its name ───────────────────────────────────────────────────────────────────
+# The card leaves out an id its schema does not mark, so «marca como pagada esa factura», «emite la factura de esa
+# venta» or «rectifica esa devolución» would say no invoice, no sale and no refund. Each record is named as the
 # Facturas screens show it: an invoice and a sale by their numbers, a refund by its sale and what it gave back, a series
 # by its code, its year and its name, and the customer by the name on their card. Read as whoever asks, in the hub they
 # ask in: never by the id, and left out when nobody, or somebody who may not see them, is behind the request. The product
@@ -667,7 +679,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
     assert unread == []
 
 
-# ── A series asked for with a code of another shape (hub#872, INVOICE-F12) ──────────────────────────────────────────
+# ── A series asked for with a code of another shape (INVOICE-F12) ───────────────────────────────────────────────────
 
 
 @pytest.mark.django_db

@@ -1,5 +1,5 @@
-"""An automation books and moves the appointment of any professional (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL;
-WORKBOOK FLOW-F12, FLOW-F28, APPOINTMENT-F01, APPOINTMENT-F04; what WHATSAPP_INBOX-F14, F21 and F22 wait for).
+"""An automation books and moves the appointment of any professional (WORKBOOK FLOW-F12, FLOW-F28, APPOINTMENT-F01,
+APPOINTMENT-F04; what WHATSAPP_INBOX-F14, F21 and F22 wait for).
 
 A step runs with the permission of its own operation and the reads of its app, never every permission (FLOW-F12).
 Booking and moving an appointment ask for «their own» ones, and an automation has no staff record: Appointments takes

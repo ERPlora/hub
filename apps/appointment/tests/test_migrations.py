@@ -1,4 +1,6 @@
-"""Migration 0003 of Citas: an appointment saved with the end the wall clock summed ends its real minutes after its start.
+"""Migrations of Citas.
+
+0003: an appointment saved with the end the wall clock summed ends its real minutes after its start.
 
 Before hub#636 the end was the start plus the duration on the business's wall clock, so a booking over the change of
 time was saved an hour longer (October) or shorter (March) than booked. The migration writes
@@ -14,9 +16,10 @@ from importlib import import_module
 
 import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.loader import MigrationLoader
 
-from apps.appointment.models import Appointment
+from apps.appointment.models import Appointment, History
 
 from .conftest import MADRID, at, make_appointment
 
@@ -50,3 +53,20 @@ def test_a_row_already_right_is_not_touched(salon):
     after = Appointment.objects.get(pk=row.pk)
     assert (after.end, after.updated_at) == (before.end, before.updated_at)
     assert after.end - after.start == dt.timedelta(minutes=90)
+
+
+def test_the_history_line_of_a_restored_appointment_comes_and_goes_with_its_migration(salon):
+    """0004 adds «restored» to the actions a history line may say (hub#1326); backwards, the check is the old one."""
+    row = make_appointment(salon.lucia, salon.ana, [salon.cut], at(dt.date(2026, 10, 19), "10:00"))
+    loader = MigrationLoader(connection)
+    migration = loader.get_migration("appointment", "0004_history_restored")
+    before = loader.project_state(("appointment", "0003_end_in_real_minutes"))
+
+    with connection.schema_editor() as editor:
+        migration.unapply(before, editor)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        History.objects.create(appointment=row, action="restored")
+    with connection.schema_editor() as editor:
+        migration.apply(before, editor)
+
+    assert History.objects.create(appointment=row, action="restored").action == "restored"

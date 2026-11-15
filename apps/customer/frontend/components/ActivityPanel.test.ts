@@ -41,6 +41,7 @@ const entry = (id: string, kind: string, extra: Partial<ActivityRow> = {}): Acti
   related_id: '',
   related_type: '',
   actor: 'Ana',
+  by_platform: false,
   created_at: '2026-10-02T10:00:00Z',
   ...extra,
 });
@@ -117,6 +118,37 @@ describe('ActivityPanel: the activity', () => {
     expect(read(4).get('.customer-activity__title').text()).toBe('Visit: haircut');
     expect(read(5).get('.customer-activity__title').text()).toBe('From the flow');
     expect(read(5).get('.customer-activity__when').text()).toContain('by Bot');
+  });
+
+  it('what the platform did says so instead of its own mark; a person, an API key and a named author keep their name (hub#1445)', async () => {
+    const run = 'flow_run:0199e7a0-0000-7000-8000-000000000001';
+    const rows = pageOf([
+      entry('a1', 'purchase_recorded', { actor: 'system', by_platform: true, data: { amount: 1250, currency: 'EUR' }, currency_decimals: 2 }),
+      entry('a2', 'note_added', { actor: run, by_platform: true, text: 'Big sale' }),
+      entry('a3', 'note_added', { actor: 'copy_recovery:0199e7a0-0000-7000-8000-000000000002', by_platform: true }),
+      entry('a4', 'note_added', { actor: '', by_platform: true }),
+      entry('a5', 'note_added', { actor: 'Ana' }),
+      entry('a6', 'note_added', { actor: 'API · Zapier' }),
+      entry('a7', 'note_added', { actor: run, by_platform: true, data: { author_name: 'Automatizaciones' } }),
+    ]);
+    const who = (s: Awaited<ReturnType<typeof setup>>, locale: string) =>
+      s.wrapper.findAll('.customer-activity__when').map((w) => w.text().replace(`${formatDateTime('2026-10-02T10:00:00Z', locale)} · `, ''));
+
+    const es = await setup({}, { locale: 'es' });
+    await es.result(es.call, ACTIVITY, rows);
+    expect(who(es, 'es')).toEqual([
+      'Lo hizo la plataforma',
+      'Lo hizo la plataforma',
+      'Lo hizo la plataforma',
+      'Lo hizo la plataforma',
+      'por Ana',
+      'por API · Zapier',
+      'por Automatizaciones',
+    ]);
+
+    const en = await setup();
+    await en.result(en.call, ACTIVITY, rows);
+    expect(who(en, 'en')[0]).toBe('Done by the platform');
   });
 
   it('«Show more» grows by 50 while there are more, never asking for more than 100 at once', async () => {

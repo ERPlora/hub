@@ -1,4 +1,4 @@
-// The AI provider of the assistant's e2e (APP-BASE-9): a real HTTP server on 127.0.0.1 that speaks OpenAI's API
+// The AI provider of the assistant's e2e: a real HTTP server on 127.0.0.1 that speaks OpenAI's API
 // (`/v1/models`, streamed `/v1/chat/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`). erplora.com's gateway
 // of the run's SaaS talks to it (`assistant_seed.py gateway http://127.0.0.1:<port>/v1`, README «El asistente»): no test
 // reaches a real provider nor writes a real key. It answers in the language the Hub asks for, as a real model does: the
@@ -10,7 +10,7 @@
 // - `E2E-CREATE <name>`: asks for the write `demo.item.create` with that name, then says it is done;
 // - `E2E-DELETE <id>`: asks for the dangerous write `demo.item.delete` of that item, then says it is done;
 // - `E2E-ASK <tool> <JSON>`: asks for any write by its tool's name with those data as written, then says how it went
-//   (the card of a datum outside the screen's own list, FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH);
+//   (the card of a datum outside the screen's own list);
 // - `E2E-CHAIN <name>`: reads the items (`demo.item.list`), then asks to create one with that name, then says so;
 // - `E2E-STEPS <name>`: the same chain, speaking in every round (`STEPS_SAID` before the read, then before the write):
 //   each round's words, their own paragraph of the one bubble (BASE-F101);

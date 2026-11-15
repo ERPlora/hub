@@ -1,11 +1,10 @@
 """What ``live`` translates without context, every app of the Hub says the same way in Spanish.
 
 Django joins every catalogue of a language in one, and ``live`` goes first in ``INSTALLED_APPS``: its entry for a
-message wins over any later app's. Customers said «Escribe un número.» and «Escribe una fecha válida.» for a custom
-field of the wrong type, and the person read live's «Introduce un número.» and «Introduce una fecha válida.»
-(FIX-HUB-CUSTOMER-ES-MSGIDS-SHADOWED-BY-LIVE). A message with a sense of its own goes through ``pgettext_lazy``
-with its context; the same message without context says the same everywhere. The platform's own catalogues against
-the modules are ``base/tests/test_locale_platform.py``.
+message wins over any later app's: Customers' «Escribe un número.» and «Escribe una fecha válida.» for a custom field
+of the wrong type would read as live's «Introduce un número.» and «Introduce una fecha válida.». A message with a
+sense of its own goes through ``pgettext_lazy`` with its context; the same message without context says the same
+everywhere. The platform's own catalogues against the modules are ``base/tests/test_locale_platform.py``.
 """
 
 from pathlib import Path

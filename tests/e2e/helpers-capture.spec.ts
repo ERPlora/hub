@@ -1,17 +1,15 @@
-// flow: hub-e2e-capture — FIX of the e2e harness (FIX-HUB-E2E-SHOT-BEFORE-RESIZE-UNCHECKED)
+// flow: hub-e2e-capture — the e2e harness's screenshots
 // A screenshot taken right after `setViewportSize` can come before the browser painted the page at its new size: the
-// area the resize uncovered still holds the top of the page, so the capture repeats the topbar at its bottom (87 rows,
-// 5 in 24 on the demo list with no wait, 2 in 24 after `settled` of service-helpers.ts, measured on main). Such a
+// area the resize uncovered still holds the top of the page, so the capture repeats the topbar at its bottom. Such a
 // capture is evidence of a screen nobody saw. `repeatedTop` (helpers.ts) spots it; `capture` (helpers.ts) waits for
 // a painted frame, takes the screenshot again while it repeats the top, and fails saying so if it never stops;
 // `settled` (service-helpers.ts) waits for a painted frame too.
-// FIX-HUB-E2E-CAPTURE-WITHOUT-WAIT-UNCHECKED: a spec that forgot to wait before `capture` got a frame of an overlay of
-// Ionic still entering (WEBSITE-F07/F08 with their toast sliding in), and nothing said so. `capture` now waits itself
-// until nothing finite moves (`untilStill`, endless spinners aside), or fails naming what still moves.
-// FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE: the assistant's panel open at 390, painted, failed every
-// capture, and so did a card over it: their first and last 8 rows are the same row, white (or the card's veil) crossed
-// by the panel's left border. A stripe of the same row over and over is a background, whatever its colours across;
-// the top a capture before the paint repeats is the topbar, rows unlike each other.
+// A spec that forgets to wait before `capture` could catch an Ionic overlay still entering (a toast sliding in), so
+// `capture` waits itself until nothing finite moves (`untilStill`, endless spinners aside), or fails naming what
+// still moves.
+// The same row over and over at both ends is a painted background, whatever its colours across: the assistant's
+// panel open at 390 (white, or a card's veil, crossed by the panel's left border) is a real screen. The top a capture
+// taken before the paint repeats is the topbar, whose rows are unlike each other.
 import { readFileSync, rmSync } from 'node:fs';
 
 import { expect, type Page, test } from '@playwright/test';

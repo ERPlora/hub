@@ -8,7 +8,20 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { answerIssuer, business, BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice, POLISH, redNotices, said } from '../__tests__/mount-invoice';
+import {
+  answerIssuer,
+  business,
+  BYE,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  MANAGER,
+  type MountOptions,
+  mountInvoice,
+  POLISH,
+} from '../__tests__/mount-invoice';
+import { expectAnAdministratorToSetUpTheIssuer, expectIssuerSaidNoMore, expectIssuerToSetUp } from '../__tests__/issuer-notice';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
@@ -147,7 +160,6 @@ describe('InvoicesPage: the live list', () => {
     expect(s.params()).toEqual([{ total_amount_from: 1250, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel: total, status, date and type on their columns, then series and source', async () => {
     const s = await setup();
     await s.show(PAGE);
@@ -237,11 +249,12 @@ describe('InvoicesPage: the live list', () => {
 
   it('an amount it cannot read, or a «to» day before its «from», is said under it and neither filters nor narrows', async () => {
     const s = await setup();
+    await s.result('base.business.get', business());
     await s.show(EMPTY);
     expect(s.prop('filterErrors')).toEqual({});
     await s.filter({ total_amount_from: 'doce', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
     expect(s.prop('filterErrors')).toEqual({
-      total_amount_from: 'Type an amount, like 12.50',
+      total_amount_from: 'This is not an amount. Type a figure, for example 12.50.',
       issue_date_to: 'The end date cannot be before the start date.',
     });
     expect(s.params()).toEqual([{ sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
@@ -346,13 +359,9 @@ describe('InvoicesPage: the states of the screen', () => {
     const s = await setup({ platformNotice: true, locale: 'es' });
     await answerIssuer(s, false, { locale: 'es' });
     await s.show(PAGE);
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
-    expect(redNotices(s)).toBe(1);
-    expect(said(s.wrapper.text(), 'Los datos de tu negocio')).toBe(1);
-    const setUp = s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar');
-    expect(setUp).toHaveLength(1);
+    const setUp = expectIssuerToSetUp(s);
     expect(s.rows()).toHaveLength(3);
-    await setUp[0].trigger('click');
+    await setUp.trigger('click');
     await flush();
     expect(s.router.currentRoute.value.path).toBe('/invoice/issuer');
   });
@@ -361,18 +370,14 @@ describe('InvoicesPage: the states of the screen', () => {
     const s = await setup({ platformNotice: true, locale: 'es' });
     await answerIssuer(s, false, { locale: 'es' });
     await answerIssuer(s, true, { locale: 'es', rev: 2 });
-    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(0);
-    expect(redNotices(s)).toBe(0);
+    expectIssuerSaidNoMore(s);
   });
 
-  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar» (gh:hub#435)', async () => {
+  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar»', async () => {
     for (const session of [EMPLOYEE, MANAGER]) {
       const s = await setup({ platformNotice: true, locale: 'es', session });
       await answerIssuer(s, false, { locale: 'es', actionable: false });
-      expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
-      expect(redNotices(s)).toBe(1);
-      expect(said(s.wrapper.text(), 'Esto lo tiene que configurar un administrador.')).toBe(1);
-      expect(s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar')).toHaveLength(0);
+      expectAnAdministratorToSetUpTheIssuer(s);
     }
   });
 
@@ -421,14 +426,31 @@ describe('InvoicesPage: the rest', () => {
     expect(s.rows()[0].findAll('[role="cell"]').slice(2, 5).map((c) => plain(c.text().trim()))).toEqual(['12,10 €', 'Emitida', '14/10/2026']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar facturas…');
     expect(s.prop<Array<{ label: string }>>('filterFields').map((f) => f.label)).toEqual(['Serie', 'Origen']);
+    await s.result('base.business.get', business());
     await s.filter({ total_amount_to: 'mil', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Escribe un importe, como 12,50', issue_date_to: 'La fecha final no puede ser anterior a la inicial.' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_amount_to: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      issue_date_to: 'La fecha final no puede ser anterior a la inicial.',
+    });
   });
 });
 
-describe('InvoicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('InvoicesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('InvoicesPage: «Total» is read as every amount of the Hub', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['total_amount_from', 'total_amount_to'],
+    params: ['total_amount_from', 'total_amount_to'],
+    async open(money) {
+      const s = await setup();
+      await s.result('base.business.get', business({ currency: money.currency, currency_decimals: money.decimals }));
+      await s.show(PAGE);
+      return { filter: s.filter, query: () => s.params().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

@@ -283,18 +283,22 @@ function park(): void {
   flex: 1 0 auto;
   overflow: visible;
 }
-/* A side column too low for a whole line beside the heading (83 px), the tabs (64 with their words in two lines, and
-   their 8 px of margin) and the send bar (67): the same, or the lines get a slit, 0 px under the red strip of a small
-   tablet (hub#787) and 14 to 105 px on a tablet on its side or a laptop of 720 or 768 (hub#820). Measured: a line is
-   115 px, so 21rem is the most that still leaves it whole (337 px leave 115); the lowest column where it fits, 343 px,
-   keeps its heading and tabs in place. The send bar stays pinned down to 13rem (KitchenSendBar). */
-@container pos-cart-middle (max-height: 21rem) {
+/* A side column too low for a whole line beside the heading (95 px), the tabs (60 with their margin) and the send bar
+   (67): the same, or the lines get a slit (hub#787, hub#820). Measured: a line is 139 px, so the heading and the tabs
+   stay in place only above 360 px; 23rem leaves the line 8 px to spare. The send bar stays pinned down to 13rem
+   (KitchenSendBar). */
+@container pos-cart-middle (max-height: 23rem) {
   .pos-cart__body {
     flex: 1 0 auto;
     overflow: visible;
   }
 }
+/* Ionic's segment clips what overflows it, so as a flex item it would give way to the lines down to its padding: 8 px,
+   with both tabs cut away under them; and it is as wide as the column, so its margin pushed «Current order» past the
+   edge (hub#1435). */
 .pos-cart__tabs {
+  flex: none;
+  width: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.25rem;
@@ -302,6 +306,14 @@ function park(): void {
   padding: 0.25rem;
   background: var(--ep-surface-muted);
   border-radius: 12px;
+}
+/* A column too low to keep «Send order» pinned (KitchenSendBar): the tabs give up 8 px of spare room around them, so
+   that a phone on its side still shows some of the first line as the check opens (hub#800). */
+@container pos-cart-middle (max-height: 13rem) {
+  .pos-cart__tabs {
+    margin-bottom: 0.25rem;
+    padding: 0.125rem;
+  }
 }
 .pos-cart__tab {
   min-width: 0;

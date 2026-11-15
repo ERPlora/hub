@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// «Activity» on the Home (BASE-G129): the last 100 sales of Sales, newest first, read by its own operation
-// (`sale.sale.list`, live: a sale anywhere in the business brings the new list) only while Sales is on in this
-// hub — base does not require Sales, so without it the table is simply empty. Searched, sorted and paged in the
-// browser (15 a page), filtered by method or status behind the funnel. The status speaks the sales history's words; one this screen does not know is «Other».
-// Each amount is in the business's currency (BASE-G98: `base.business.get`), never a fixed euro.
+// The Home's «Activity»: the last sales, read through Sales' own operation only while Sales is on in this hub. base
+// does not require Sales, so without it the table is simply empty. A status this screen does not know reads «Other».
 import { DataTable, formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -28,14 +25,13 @@ interface ActivitySale {
 }
 
 const LIMIT = 100;
-/** Rows per page: 15 first (the old hub's), and the chooser offers it, so it never shows blank. */
+/** Rows per page: 15 first, and the chooser offers it too, so it never shows blank. */
 const PAGE_SIZES = [15, 25, 50, 100];
 /** The statuses the filter offers: the sales history's own. */
 const SALE_STATUSES = ['completed', 'voided', 'refunded'] as const;
 
 const { t, locale } = useBaseI18n();
 const session = useSession();
-/** Each sale's amount, in the business's currency (BASE-G98). */
 const money = useBusinessMoney();
 const salesOn = (session.me.value?.apps ?? []).some((app) => app.label === 'sale' && app.state === 'on');
 const sales = salesOn

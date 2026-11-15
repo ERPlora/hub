@@ -1,4 +1,4 @@
-"""register_apps: the Hub writes its modules into the SaaS's ``shared`` schema (round 16, PLAN §21; spec §4.2).
+"""register_apps: the Hub writes its modules into the SaaS's ``shared`` schema.
 
 One transaction on the ``shared`` alias: the advisory lock, the tables and the columns of the mirror
 checked against the database, then the upsert of ``shared.app``, the retired apps unlisted (never deleted) and the
@@ -192,7 +192,7 @@ class TestWrite:
         with pytest.raises(CatalogError, match=r"shared\.app\.verticals.*migrate the SaaS first") as raised:
             register_apps(registry(modules))
 
-        # A contract gap (spec §3.5), not a schema still to come: the worker does not wait for it.
+        # A contract gap, not a schema still to come: the worker does not wait for it.
         assert not isinstance(raised.value, SharedSchemaNotReady)
         with connections["shared"].cursor() as cursor:
             cursor.execute('SELECT count(*) FROM "shared"."app"')

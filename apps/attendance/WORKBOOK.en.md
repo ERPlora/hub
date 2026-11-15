@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0b985f4906080544d480ce23be5f4841b5ce59698ccc5c4274ff306dfa07d38c -->
+<!-- generated from WORKBOOK.md sha256:46bd0aecd4813b9d240d10ee86f5e4cdfade2a8f77731cf7ed672f2667f881f6 -->
 
 ## What it is for and who it is for
 
@@ -195,7 +195,7 @@ Involved: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 
 ### ATTENDANCE-F04 Set the workplace location and when a forgotten working day is reviewed
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Settings
 Steps:
 1. Open Time clock → "Settings".

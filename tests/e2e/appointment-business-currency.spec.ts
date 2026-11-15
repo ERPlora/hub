@@ -9,6 +9,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, api, capture, hostPage, login, registerBusinessIn, registrationOf, type Registration, settled, shown } from './helpers';
 import { cleanUp, FLOW_VIEWPORTS, named, noHorizontalScroll, post } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'APPOINTMENT-BUSINESS-CURRENCY';
 /** An amount in `symbol` as a till writes it, before or after the figure («22,50 zł», «zł 22.50»). */
@@ -79,7 +80,7 @@ test.afterAll(async ({ browser }) => {
   cleanUp();
 });
 
-test(`${KEY}: a business in Poland books and previews its services in złoty, never euros, in 390, 834 and 1440`, async ({ page }) => {
+test(`a business in Poland books and previews its services in złoty, never euros, in 390, 834 and 1440`, async ({ page }) => {
   await registerBusinessIn(original, 'PL');
   await login(page, A, '/appointment/agenda');
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
@@ -99,7 +100,9 @@ test(`${KEY}: a business in Poland books and previews its services in złoty, ne
     await settled(page);
     await noHorizontalScroll(page, `New appointment ${where}`);
     await capture(page, `${KEY}-${size.label}`);
+    // The service chosen is a change: «Cancel» asks first (BASE-F05) and the person discards it.
     await form.locator('[data-testid=appointment-form-cancel]').click();
+    await discardChanges(page);
     await expect(form).toBeHidden();
 
     const row = await previewed(page);
@@ -111,7 +114,7 @@ test(`${KEY}: a business in Poland books and previews its services in złoty, ne
   }
 });
 
-test(`${KEY}: back in Spain the services are booked and previewed in euros`, async ({ page }) => {
+test(`back in Spain the services are booked and previewed in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/appointment/agenda');
@@ -122,5 +125,6 @@ test(`${KEY}: back in Spain the services are booked and previewed in euros`, asy
   await expect(form.locator('[data-testid=appointment-form-total]')).not.toContainText('zł');
   await capture(page, `${KEY}-es-1440`);
   await form.locator('[data-testid=appointment-form-cancel]').click();
+  await discardChanges(page);
   await expect(await previewed(page)).toContainText(inCurrency('€'));
 });

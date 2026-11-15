@@ -1,4 +1,4 @@
-"""A business's Hub while the database is cut for a moment (BASE-F111; PLAN-DB round 2026-11-04e, point 5).
+"""A business's Hub while the database is cut for a moment (BASE-F111).
 
 The whole chain of the Hub, against the real Postgres, as production runs it (``no_test_fallback``): ``pg_terminate_backend``
 is the server cutting a connection right before a statement of the request, ``default_transaction_read_only`` the old
@@ -632,8 +632,8 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
 
 
 
-#: What a try does that the ROLLBACK of its database does not undo, or a number it takes on the way (PLAN-DB, round
-#: 2026-11-04e, point 5): a command that may repeat never reaches one of them before its COMMIT (BASE-F111).
+#: What a try does that the ROLLBACK of its database does not undo, or a number it takes on the way: a command that
+#: may repeat never reaches one of them before its COMMIT (BASE-F111).
 NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.appointment.services._next_number": "numbers an appointment",
     "apps.cart_checkout.services._number": "numbers an order",
@@ -710,7 +710,7 @@ def _meant(names: dict, node):
 
 
 @functools.cache
-def _steps(fn) -> tuple[frozenset[str], tuple, frozenset[str]]:
+def _steps(fn) -> tuple[frozenset[str], tuple, frozenset[str]]:  # noqa: C901, PLR0912
     """What ``fn`` touches (by dotted name), the functions of the Hub it goes on to (and the methods its models
     override) and the operations it names. What it leaves for after the COMMIT of its operation
     (``live.operations.on_commit(...)``) is not a step; Django's own ``transaction.on_commit`` on ``default`` would run at

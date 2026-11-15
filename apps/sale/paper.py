@@ -77,7 +77,7 @@ def _dish(dish) -> str:
     return f"{dish.quantity}× {dish.product_name}" if dish.quantity > 1 else dish.product_name
 
 
-def receipt(
+def receipt(  # noqa: PLR0913
     sale: SaleOut,
     *,
     letterhead: dict,

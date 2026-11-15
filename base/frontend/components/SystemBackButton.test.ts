@@ -1,4 +1,4 @@
-// BASE-F05 · gh:hub#1906: base takes the installed app's Back button beside the pane (`chrome.background`) while a
+// BASE-F05: base takes the installed app's Back button beside the pane (`chrome.background`) while a
 // person is signed in. Its layers are pinned in `lib/system-back.test.ts`; here, the wiring: on the root of an app a
 // press goes Home the way the menu's «Home» does, on Home it leaves the app, and the button is let go when the person
 // signs out (the component goes); in a browser nothing is registered.

@@ -9,11 +9,11 @@ class TaskConfig(LiveAppConfig):
     label = "task"
     kind = "app"
     verbose_name = _("Tasks")
-    # The old module's `checkbox-outline`, registered in the shell (ION_ICONS).
+    # Registered in the shell (ION_ICONS).
     icon = "ion:checkbox-outline"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your team's to-do list: tasks with who does them, priority and due date, projects and comments."
     )

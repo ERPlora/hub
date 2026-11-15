@@ -1,5 +1,5 @@
-/* The cards of Settings › General of the way in (APP-BASE-3): «This device», «PIN pad» and «Devices»; and the cards the
- * apps put in System › «Usage and plan» (hub#683: Printing's «Your printer»). */
+/* The cards of Settings › General («This device», «PIN pad» and «Devices») and the cards the apps put in
+ * System › «Usage and plan», such as Printing's «Your printer». */
 .settings-card {
   box-sizing: border-box;
   padding: 20px;

@@ -1,16 +1,6 @@
-// Files of the business (APP-BASE-8; the old hub's FilesPage, docs/reference/old-hub/files-*.png) in the three
-// viewports, as the owner of hub `a`: from the side menu's «Files», the empty folder; a folder made and two files
-// uploaded (a third with a taken name keeps «name (1).ext», a program is refused with its sentence); the tree on the
-// left — a «Folders» selector on a narrow screen —, the path, grid and list, «Space»; an image and a text opened in
-// the preview and a file downloaded, private (`no-store`, an attachment); renamed and moved to another folder; deleted
-// after asking. The employee opens and downloads but changes nothing. Hub `b` never sees, reads nor touches `a`'s, and a
-// path that climbs out is refused. Each flow leaves its capture `APP-BASE-8-<G key>-<width>` once nothing scrolls
-// sideways.
-//
 // The stack keeps the files on disk (`MEDIA_ROOT`); every test starts and ends with the business's files emptied
 // through the product's own operations. «Space» also counts what the apps keep in the hub's store (the website's
 // images of an earlier spec), which no test of Files empties: each reads it first and expects it on screen.
-// flow: BASE-G82 BASE-G83 BASE-G84 BASE-G85 BASE-G86
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -149,11 +139,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
   const narrow = width < 768;
 
-  test(`BASE-G82 BASE-G83 — see, make a folder and upload at ${width}`, async ({ browser }) => {
+  test(`see, make a folder and upload at ${width}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
     try {
       await wipe(context, A);
-      // BASE-G82 — «Files» is in the side menu (behind the menu button on a narrow screen: the address then).
+      // «Files» is in the side menu (behind the menu button on a narrow screen: the address then).
       if (width >= 1440) {
         await page.locator('[data-testid="nav-files"]').first().click();
         await expect(page).toHaveURL(`${A}/files`);
@@ -171,7 +161,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'files-folder-select')).toBeVisible({ visible: narrow });
       await snap(page, 'BASE-G82-empty', width);
 
-      // BASE-G83 — a folder, asked by its name.
+      // A new folder, asked by its name.
       await testid(page, 'files-new-folder').click();
       const folderDialog = dialog(page, 'files-new-folder-dialog');
       await expect(folderDialog).toBeVisible();
@@ -180,7 +170,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, 'Folder created.')).toBeVisible();
       await expect(item(page, 'Invoices')).toHaveAttribute('data-kind', 'folder');
 
-      // BASE-G83 — two files uploaded at the top; a third with a taken name keeps «name (1).ext».
+      // Two files uploaded at the top; a third with a taken name keeps «name (1).ext».
       await upload(page, [
         { name: 'logo.png', mimeType: 'image/png', buffer: PNG },
         { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from(NOTE) },
@@ -192,14 +182,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, 'Uploaded as “notes (1).txt”: there was already one with that name.')).toBeVisible();
       await expect(item(page, 'notes (1).txt')).toBeVisible();
 
-      // BASE-G83 — a program is refused, and the notice says why (hub#1776), never a code.
+      // A program is refused, and the notice says why, never a code.
       await upload(page, [{ name: 'setup.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }]);
       await expect(
         toast(page, 'Could not upload “setup.exe”: Programs (.exe) can\'t be kept in Files: they could harm whoever opens them.'),
       ).toBeVisible();
       await expect(item(page, 'setup.exe')).toHaveCount(0);
 
-      // BASE-G82 — a long name wraps inside its card, and every card of the row keeps its icon at the top.
+      // A long name wraps inside its card, and every card of the row keeps its icon at the top.
       const long = 'supplier price list for the second quarter of the year.csv';
       await upload(page, [{ name: long, mimeType: 'text/csv', buffer: Buffer.from('item;price\nflour;12\n') }]);
       await expect(item(page, long)).toBeVisible();
@@ -215,7 +205,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         expect(icon, `the icon of a card at ${row}`).toBe(icons.find((other) => other.row === row)!.icon);
       }
 
-      // BASE-G82 — folders first, then the files; «Space» counts what is kept.
+      // Folders first, then the files; «Space» counts what is kept.
       await expect(shown(page).locator('[data-item]')).toHaveCount(5);
       await expect(shown(page).locator('[data-item]').first()).toHaveAttribute('data-kind', 'folder');
       await expect(testid(page, 'files-space')).toHaveText(
@@ -225,7 +215,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       if (!narrow) expect(await contrast(testid(page, 'files-root'))).toBeGreaterThanOrEqual(4.5);
       await snap(page, 'BASE-G82', width);
 
-      // BASE-G82 — the list shows each file's size and when it changed.
+      // The list shows each file's size and when it changed.
       await testid(page, 'files-view-list').click();
       await expect(testid(page, 'files-items')).toHaveClass(/files-list/);
       await expect(item(page, 'notes.txt')).toContainText(`${NOTE.length} B ·`);
@@ -260,7 +250,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await snap(page, 'BASE-G82-list', width);
       await testid(page, 'files-view-grid').click();
 
-      // BASE-G82 — into the folder: its path, and back to the top from the path.
+      // Into the folder: its path, and back to the top from the path.
       if (narrow) {
         await testid(page, 'files-folder-select').locator('ion-select').click();
         await page.locator('ion-popover ion-select-option, ion-popover ion-radio').filter({ hasText: 'Invoices' }).first().click();
@@ -279,7 +269,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(item(page, 'Invoices/march.txt')).toBeVisible();
       await snap(page, 'BASE-G83', width);
 
-      // BASE-G82 — the search looks in the open folder.
+      // The search looks in the open folder.
       await shown(page).locator('.files-crumbs [data-crumb=""]').click();
       await expect(page).toHaveURL(`${A}/files`);
       await testid(page, 'files-search').locator('input').fill('note');
@@ -287,7 +277,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'files-search').locator('input').fill('nothing like it');
       await expect(testid(page, 'files-no-match')).toHaveText('No file in this folder matches “nothing like it”.');
 
-      // BASE-G83 — two notices in a row never cover each other: the second closes the first, and it reads whole.
+      // Two notices in a row never cover each other: the second closes the first, and it reads whole.
       const refused = toast(page, 'Could not upload “setup.exe”');
       await upload(page, [{ name: 'setup.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }]);
       await expect(refused).toBeVisible();
@@ -302,7 +292,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-notices-${width}`) });
 
-      // BASE-G83 — a batch with a file kept and one refused: one notice, its sentences one after the other on one line
+      // A batch with a file kept and one refused: one notice, its sentences one after the other on one line
       // (a notice paints a line break as a bare space), what was kept first and the refusal with its reason.
       await upload(page, [
         { name: 'kept.txt', mimeType: 'text/plain', buffer: Buffer.from('kept') },
@@ -320,7 +310,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 
-  test(`BASE-G84 — open and download at ${width}`, async ({ browser }) => {
+  test(`open and download at ${width}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/files' });
     try {
       await wipe(context, A);
@@ -453,7 +443,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 
-  test(`BASE-G85 BASE-G86 — rename, move and delete at ${width}`, async ({ browser }) => {
+  test(`rename, move and delete at ${width}`, async ({ browser }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/files' });
     try {
       await wipe(context, A);
@@ -463,7 +453,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await upload(page, [{ name: 'march.txt', mimeType: 'text/plain', buffer: Buffer.from('March') }]);
       await expect(item(page, 'march.txt')).toBeVisible();
 
-      // BASE-G85 — renamed by its new name.
+      // Renamed by its new name.
       await act(page, 'march.txt', 'rename');
       const renameDialog = dialog(page, 'files-rename-dialog');
       await expect(renameDialog.locator('[data-testid="files-rename-name"] input')).toHaveValue('march.txt');
@@ -473,7 +463,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(item(page, 'april.txt')).toBeVisible();
       await expect(item(page, 'march.txt')).toHaveCount(0);
 
-      // BASE-G85 — a taken name is refused with its sentence, and the dialog stays.
+      // A taken name is refused with its sentence, and the dialog stays.
       await act(page, 'april.txt', 'rename');
       await renameDialog.locator('[data-testid="files-rename-name"] input').fill('Invoices');
       await renameDialog.locator('[data-testid="files-rename-dialog-submit"]').click();
@@ -482,7 +472,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       );
       await renameDialog.locator('[data-testid="files-rename-dialog-cancel"]').click();
 
-      // BASE-G85 — moved into a folder; the notice names it (hub#2197).
+      // Moved into a folder; the notice names it.
       await act(page, 'april.txt', 'move');
       const moveDialog = dialog(page, 'files-move-dialog');
       await expect(moveDialog).toContainText('Move “april.txt”');
@@ -495,7 +485,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, 'Moved to “Invoices”.')).toBeVisible();
       await expect(item(page, 'april.txt')).toHaveCount(0);
 
-      // BASE-G85 — a folder, with what it holds, into another: the open folder follows it.
+      // A folder, with what it holds, into another: the open folder follows it.
       await page.goto(`${A}/files?folder=Invoices`);
       await expect(item(page, 'Invoices/april.txt')).toBeVisible();
       await testid(page, 'files-folder-actions').click();
@@ -509,7 +499,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(item(page, 'Contracts/Invoices/april.txt')).toBeVisible();
       await snap(page, 'BASE-G85', width);
 
-      // BASE-G86 — a file, after asking.
+      // Deleting a file, after asking.
       await act(page, 'Contracts/Invoices/april.txt', 'delete');
       const ask = page.locator('.ep-confirm-dialog').last();
       await expect(ask).toContainText('You are about to delete “april.txt”. This cannot be undone.');
@@ -520,7 +510,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, 'File deleted.')).toBeVisible();
       await expect(testid(page, 'files-empty')).toBeVisible();
 
-      // BASE-G86 — a folder and everything in it; the screen goes back to where it was.
+      // Deleting a folder and everything in it; the screen goes back to where it was.
       await testid(page, 'files-folder-actions').click();
       await page.locator('ion-popover [data-testid="files-action-delete"]').click();
       await expect(ask).toContainText('You are about to delete “Invoices” and everything in it. This cannot be undone.');
@@ -535,7 +525,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 
-  test(`BASE-G82 BASE-G83 — the plan's space at ${width}`, async ({ browser }) => {
+  test(`the plan's space at ${width}`, async ({ browser }) => {
     // The photo of hub `a` with a plan of 1 MB of space, as erplora.com sends it (`plan.max_storage_bytes`).
     const before = psql("select state::text from base_hub where slug = 'a'");
     psql(`update base_hub set state = state || '{\\"plan\\": {\\"max_storage_bytes\\": ${1024 * 1024}}}' where slug = 'a'`);
@@ -572,7 +562,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-test('BASE-G82 BASE-G84 — the employee opens and downloads, and changes nothing', async ({ browser }) => {
+test('the employee opens and downloads, and changes nothing', async ({ browser }) => {
   const owner = await hostPage(browser, A, { viewport: VIEWPORTS[834], next: '/files' });
   const employee = await hostPage(browser, A, { viewport: VIEWPORTS[834], next: '/', credentials: EMPLOYEE });
   try {
@@ -603,7 +593,7 @@ test('BASE-G82 BASE-G84 — the employee opens and downloads, and changes nothin
   }
 });
 
-test('BASE-G82 BASE-G84 BASE-G85 BASE-G86 — hub b never sees, reads, moves nor deletes a’s files', async ({ browser }) => {
+test('hub b never sees, reads, moves nor deletes a’s files', async ({ browser }) => {
   const a = await hostPage(browser, A, { viewport: VIEWPORTS[1440], next: '/files' });
   const b = await hostPage(browser, B, { viewport: VIEWPORTS[1440], next: '/files' });
   try {

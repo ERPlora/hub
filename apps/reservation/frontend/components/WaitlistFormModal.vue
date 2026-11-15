@@ -13,12 +13,13 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { hhmm } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
+import PartyField from './PartyField.vue';
 
 const props = defineProps<{ day: string }>();
 const emit = defineEmits<{ saved: [entry: WaitlistOut] }>();
 const open = defineModel<boolean>('open', { default: false });
 
-useUnsavedFormOnOpen('reservation-waitlist-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, date: date.value, time: time.value, party: party.value, notes: notes.value }), open);
+const canDismiss = useUnsavedFormOnOpen('reservation-waitlist-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, date: date.value, time: time.value, party: party.value, notes: notes.value }), open);
 
 const create = useCommand('reservation.waitlist.create');
 const customer = ref<CustomerSnapshot | null>(null);
@@ -79,6 +80,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-waitlist-form"
     :title="$t('reservation.waitlist.form.title')"
     :submit-label="$t('reservation.waitlist.form.submit')"
@@ -97,6 +99,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         </div>
         <ion-input
           data-testid="reservation-waitlist-form-guest_name"
+          name="guest_name"
           :value="name"
           :label="$t('reservation.form.name')"
           label-placement="floating"
@@ -109,6 +112,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         />
         <ion-input
           data-testid="reservation-waitlist-form-guest_phone"
+          name="guest_phone"
           type="tel"
           :value="phone"
           :label="$t('reservation.form.phone')"
@@ -123,6 +127,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         <div class="reservation-waitlist-form__when">
           <ion-input
             data-testid="reservation-waitlist-form-date"
+            name="date"
             type="date"
             :value="date"
             :label="$t('reservation.form.date')"
@@ -135,6 +140,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-waitlist-form-preferred_time"
+            name="preferred_time"
             type="time"
             :value="time"
             :label="$t('reservation.form.time')"
@@ -145,19 +151,11 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             :class="invalid(fieldErrors.preferred_time)"
             @ion-input="time = text($event.detail.value)"
           />
-          <ion-input
+          <PartyField
+            v-model="party"
             data-testid="reservation-waitlist-form-party_size"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            :value="party"
-            :label="$t('reservation.form.party')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+            name="party_size"
             :error-text="fieldErrors.party_size"
-            :class="invalid(fieldErrors.party_size)"
-            @ion-input="party = text($event.detail.value)"
           />
         </div>
         <ion-textarea

@@ -4,13 +4,12 @@ Next to ``spa-config`` it embeds the result of ``base.session.me`` (``session-me
 paints the menu and decides on the login without a first round trip. ``spa-config`` carries
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
-Home, BASE-G127), where its plan is changed on the SaaS (``/dashboard/store/plans?business=<hub id>``, the menu's «Upgrade
-plan», BASE-G169), the SaaS's account page (the user menu's «My account», PLAN-SAAS §1.1; its «Report a problem» is the
-hub's own dialog, BASE-F108, offered where «My account» is) and this business on
-the SaaS's panel (``manage_url``, the bar's «erplora.com», BASE-F11; only with ``base.open_management``), those only
-to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
-``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). The addresses on erplora.com
-are the usual ones, which ask to sign in: their click goes with the pass ``base.saas_pass.create`` signs (BASE-F11), never
+Home), where its plan is changed on the SaaS (``/dashboard/store/plans?business=<hub id>``, the menu's «Upgrade
+plan»), the SaaS's account page (the user menu's «My account»; its «Report a problem» is the hub's own dialog) and this
+business on the SaaS's panel (``manage_url``, the bar's «erplora.com»; only with ``base.open_management``), those only
+to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock;
+``base.queries.shell_access``) and the person's own appearance (``preferences``). The addresses on erplora.com
+are the usual ones, which ask to sign in: their click goes with the pass ``base.saas_pass.create`` signs, never
 embedded here, where it would expire in a minute and any script could read it. ``widget-list`` carries
 ``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
 data goes in the same live stream as the list instead of reopening it on every load (the live answer then wins). Both
@@ -91,22 +90,22 @@ def _shell(request: HttpRequest) -> HttpResponse:
         # user menu's «Report a problem» (only for the account) and its operation (BASE-F108) say the same.
         request.session.setdefault(CREDENTIAL_SESSION_KEY, way_in["credential"])
         # erplora.com's pages only for a session opened with the account: on a shared till, the browser's erplora.com
-        # session is whoever made it a device of the hub, never the person who entered with a PIN (gh:hub#2506).
+        # session is whoever made it a device of the hub, never the person who entered with a PIN.
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,
             "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if account else "",
             "account_url": saas_url(f"{SAAS_PANEL_PATH}/account") if account else "",
-            # APP-BASE-5: «Members» of the business on erplora.com (HUBS-F24…F29), where people are invited.
+            # «Members» of the business on erplora.com, where people are invited.
             "members_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/members") if account else "",
-            # BASE-F11: the bar's «erplora.com», this business on the panel, for who runs it (gh:hub#364).
+            # The bar's «erplora.com»: this business on the panel, for who runs it.
             "manage_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}") if account and _may_manage(request) else "",
             "access": way_in,
             "preferences": queries.appearance_of(request.user),
-            # The assistant's server voice (round 2026-11-04a): without it, the panel reads with the device's voice.
+            # Without the server's voice, the assistant's panel reads with the device's voice.
             "server_voice": settings.ASSISTANT_SERVER_VOICE,
-            # hub#683: the ERPlora app of each system erplora.com publishes, always its latest build (PUBLIC-F24); public
-            # pages, so for anyone, whatever the way in.
+            # The ERPlora app of each system erplora.com publishes, always its latest build. Public pages, so they go
+            # to anyone, whatever the way in.
             "app_downloads": {platform: saas_url(f"/app/download/{platform}/") for platform in APP_PLATFORMS},
         }
         widgets = _widgets(request)

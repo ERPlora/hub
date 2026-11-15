@@ -1,8 +1,7 @@
 // Types of the combo app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/combo/schemas.py. Written by hand, as the other apps' are, until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, ids travel in the input. Money is in
-// cents; moments are ISO date-times.
+// apps/combo/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`. Keep
+// it in step with schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// no path parameters, ids travel in the input. Money is in cents; moments are ISO date-times.
 import type { CatalogImage } from '../../../base/frontend/operations';
 import type { Page } from '../../../frontend/sdk-types';
 

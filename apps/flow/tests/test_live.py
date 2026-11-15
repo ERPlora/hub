@@ -50,7 +50,7 @@ def test_each_query_and_its_events():
     assert queries["flow.recipe.list"] == events.FLOW_EVENTS
 
 
-# What a run does in a business is heard by that business only (review 2026-10-15, item 7)
+# What a run does in a business is heard by that business only
 
 
 

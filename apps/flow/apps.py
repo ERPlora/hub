@@ -8,17 +8,20 @@ condition that ends it quietly when not met, and waits.
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav
 
+#: The actor prefix of what a run does (``flow_run:<id>``): the outbox keeps it, the loop guard reads it.
+RUN_ACTOR = "flow_run:"
+
 
 class FlowConfig(LiveAppConfig):
     name = "apps.flow"
     label = "flow"
     kind = "app"
     verbose_name = _("Automations")
-    # Registered in the shell (ION_ICONS); the old module's `git-branch` waits in UI-REQUESTS.md.
+    # Registered in the shell (ION_ICONS); `git-branch` waits in UI-REQUESTS.md.
     icon = "ion:sync-outline"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Rules that run on their own when something happens, on a schedule or by hand: repetitive work, done for you."
     )
@@ -35,12 +38,15 @@ class FlowConfig(LiveAppConfig):
     # Other apps' actions and reads are called by their operation's name, never by their models: an
     # automation that names an app that is off fails with its reason, visible in its history.
     requires = []
+    # What another app's reaction records in answer to a run's work keeps the run's actor (base.relay passes it on), so
+    # the loop guard follows a chain through that app too (FLOW-F21).
+    carried_actors = [RUN_ACTOR]
     default_auto_field = "django.db.models.BigAutoField"
-    # The old module's two permissions (module.json), renamed <app>.<action>, and answering what an
-    # automation asks (FLOW-F29): what is asked of employees, and what is asked of managers.
+    # Viewing, managing, and answering what an automation asks (FLOW-F29): what is asked of employees,
+    # and what is asked of managers.
     permissions = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). An automation acts
-    # in the name of the business with nobody watching: only the owner and the admin (old module) see,
+    # in the name of the business with nobody watching: only the owner and the admin see,
     # change or run them; a manager and an employee only answer the questions asked of their role.
     role_permissions = {
         "hub_owner": ["flow.*"],

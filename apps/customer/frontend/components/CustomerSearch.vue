@@ -63,7 +63,7 @@ import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonInput, IonModal, IonTitle, IonToolbar } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+import { useSheetWaysOut, useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { refusalFields } from '../lib/apiErrors';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
@@ -118,10 +118,14 @@ function remove(): void {
 const quickOpen = ref(false);
 const quickName = ref('');
 const quickPhone = ref('');
-useUnsavedFormOnOpen(
-  'customer-search-modal',
-  () => ({ name: quickName.value, phone: quickPhone.value }),
-  () => open.value && quickOpen.value,
+/** The «×», Escape and a tap outside ask «Discard changes?» while the quick add holds what was typed (hub#1233). */
+const { canDismiss, close } = useSheetWaysOut(
+  useUnsavedFormOnOpen(
+    'customer-search-modal',
+    () => ({ name: quickName.value, phone: quickPhone.value }),
+    () => open.value && quickOpen.value,
+  ),
+  open,
 );
 const create = useCommand('customer.customer.create');
 const quickErrors = computed(() => refusalFields(create.error.value));
@@ -192,6 +196,7 @@ async function useMatch(match: { id: string; name: string }): Promise<void> {
 
   <ion-modal
     :is-open="open"
+    :can-dismiss="canDismiss"
     data-testid="customer-search-modal"
     :aria-label="$t('customer.pos.choose')"
     @did-dismiss="open = false"
@@ -201,9 +206,9 @@ async function useMatch(match: { id: string; name: string }): Promise<void> {
         <ion-title>{{ $t('customer.pos.choose') }}</ion-title>
         <ion-buttons slot="end">
           <ion-button
-            data-testid="customer-search-close"
+            data-testid="customer-search-modal-close"
             :aria-label="$t('customer.common.close')"
-            @click="open = false"
+            @click="close"
           >
             <HubIcon
               slot="icon-only"

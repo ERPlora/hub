@@ -1,7 +1,8 @@
-// flow: ui-imageupload-thumbnail-gap — FIX of @erplora/ui's ImageUpload (FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT)
+// flow: ui-imageupload-thumbnail-gap — @erplora/ui's ImageUpload
 // In Website every image field (the logo, the cover, each photo of the gallery) is an ImageUpload: its thumbnail sits
 // in an ion-item's `slot="start"`, whose 16px gap to the text (md and ios) is a `::slotted` margin of the item's shadow.
-// Tailwind's preflight (`margin: 0`, a document rule) wiped it, and the thumbnail touched «Cover photo» and «Photo 1».
+// Tailwind's preflight (`margin: 0`, a document rule) would wipe it and leave the thumbnail touching «Cover photo» and
+// «Photo 1».
 // Here, at 390, 834 and 1440, the empty cover and a gallery photo with its image: the text starts the thumbnail's own
 // margin after it (the token, at least 12px), the thumbnail stays 64×64 with its margin above and below, and nothing
 // (title, rules, «Choose image», «Replace image», «Remove») overlaps it, leaves its row or is cut. The shell pins Ionic

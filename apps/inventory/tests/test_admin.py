@@ -1,8 +1,8 @@
-"""Django admin of the inventory app: full CRUD for support (round 12, PLAN §17).
+"""Django admin of the inventory app: full CRUD for support.
 
-Round 12 derogates the «read only» that demo copies: the Hub admin, on hubs.erplora.com and for the
-staff only, adds, changes and deletes every table of a hub, the stock ledger included, so that support
-can repair; it is a second write path that warns rather than prevents (PLAN §17.1, PLAN-DB §16).
+Unlike the «read only» admin that demo carries, the Hub admin, on hubs.erplora.com and for the staff only, adds,
+changes and deletes every table of a hub, the stock ledger included, so that support can repair; it is a second write
+path that warns rather than prevents.
 """
 
 from decimal import Decimal
@@ -77,7 +77,7 @@ def test_changelists_and_change_pages_render(client, superuser):
     movement = StockMovement.objects.create(product=product, movement_type="initial", qty=3, stock_after=3)
     client.force_login(superuser)
 
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     for path, text in (
         ("/admin/inventory/product/", b"Coffee"),
         (f"/admin/inventory/product/{product.pk}/change/", b"Drinks"),

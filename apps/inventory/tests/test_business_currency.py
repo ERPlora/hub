@@ -1,7 +1,7 @@
 """Prices and costs in the business's currency (flow business-currency): its country's, as ``base.business.get`` reads
-it from this hub's registry (APP-BASE-6), never a euro fixed in the app. A business in Poland exports its catalog in
-zlotys and imports it back (also with the «zł» it types), prints its labels in zlotys; one in Spain stays in euros; each
-hub its own. The amounts keep the decimals of the currency (the yen has none)."""
+it from this hub's registry, never a euro fixed in the app. A business in Poland exports its catalog in zlotys and
+imports it back (also with the «zł» it types), prints its labels in zlotys; one in Spain stays in euros; each hub its
+own. The amounts keep the decimals of the currency (the yen has none)."""
 
 import csv
 import io
@@ -112,9 +112,9 @@ ISSUER_COUNTRIES = {
 
 @pytest.fixture(params=sorted(ISSUER_COUNTRIES))
 def erplora(request, settings):
-    """ERPlora's own hub with its issuer in the country of ``request.param``. Phase 1 gives it no business on
-    erplora.com (no registry row, create_platform_hub): its catalog is in the currency of its issuer's country, as its
-    sales, invoices and price lists are."""
+    """ERPlora's own hub with its issuer in the country of ``request.param``. It has no business on erplora.com (no
+    registry row, create_platform_hub): its catalog is in the currency of its issuer's country, as its sales, invoices
+    and price lists are."""
     settings.PLATFORM_HUB_SLUG = "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = request.param
     amounts, label = ISSUER_COUNTRIES[request.param]
@@ -144,8 +144,8 @@ def test_erploras_own_hub_labels_in_the_currency_of_its_issuer_s_country(erplora
     assert (document["price"], document["decimals"]) == label
 
 
-# One way to the currency (FIX-HUB-INVENTORY-OWN-COPY-OF-BUSINESS-CURRENCY): inventory asks the one question every app
-# that charges asks (``base.operations.business_currency``, BASE-F50), never a copy of its own that drifts in silence.
+# One way to the currency: inventory asks the one question every app that charges asks
+# (``base.operations.business_currency``, BASE-F50), never a copy of its own that drifts in silence.
 
 
 def export_with(ctx) -> list[str]:

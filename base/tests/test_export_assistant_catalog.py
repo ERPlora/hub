@@ -1,6 +1,5 @@
-"""``manage.py export_assistant_catalog``: the catalogue layer 2 of the assistant's QA reads (docs plan 2026-10-31, the
-assistant's knowledge and QA, §1.5) — a role's real tools, in a language, as ``live.assistant_qa.export_catalog``
-gives them, as JSON on the standard output.
+"""``manage.py export_assistant_catalog``: the catalogue layer 2 of the assistant's QA reads — a role's real tools, in
+a language, as ``live.assistant_qa.export_catalog`` gives them, as JSON on the standard output.
 
 The export names no business: it is the catalogue of a business with every app on (``--apps`` narrows it), which is
 what the e2e business ``a`` has, so it needs no database.

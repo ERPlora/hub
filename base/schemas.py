@@ -1,6 +1,6 @@
 """Schemas of base's operations. ``SessionMeOut`` mirrors ``SessionMe`` of packages/ui (shell/session.ts).
 
-The registry's (``Hub…``) are the bodies of the SaaS's ``/internal/hubs/{id}`` calls (plan 2026-10-17, §1.5):
+The registry's (``Hub…``) are the bodies of the SaaS's ``/internal/hubs/{id}`` calls:
 ``HubRegistryIn`` is ``hubs.queries.hub_registry`` of the SaaS, ``HubOut`` what the Hub answers to it. The demos'
 (``Demo…``) are those of ``POST /internal/demos`` and ``POST /internal/demos/{slug}/codes``, as the SaaS's
 ``hubs.hub_client.create_demo`` and ``create_demo_code`` send and read them.
@@ -19,16 +19,57 @@ from ninja import Schema
 from pydantic import AfterValidator, Field, field_validator
 
 
-def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
+def names(  # noqa: PLR0913
+    read: str,
+    by: str = "id",
+    name: tuple[str, ...] = ("name",),
+    *,
+    within: tuple[str, ...] = (),
+    as_said: bool = False,
+    unless: tuple[str, ...] = (),
+) -> dict:
     """The mark of a datum that names a record by its id (base/assistant.py ``REFERS``): the assistant's card names it
-    as ``read`` answers it (the first of ``name`` not empty), never by the id."""
-    return {"refers": {"read": read, "by": by, "name": list(name)}}
+    as ``read`` answers it (the first of ``name`` not empty), never by the id. ``within``: the data of its own object
+    ``read`` takes beside it, when the record is found inside another (a course by its name with its menu; hub#1245).
+    ``as_said``: a datum the person says in words, which the card says as said when it cannot be read (several fit,
+    none does, nobody is at hand) rather than leaving it out; never an id (``base.E009``). ``unless``: the data of its
+    own object any of which, when it comes, makes the write take its record by it and not by this datum (a course's
+    menu said by its name beside the course's id): the card then neither reads nor shows it (hub#1250)."""
+    refers: dict = {"read": read, "by": by, "name": list(name)}
+    if within:
+        refers["within"] = list(within)
+    if as_said:
+        refers["as_said"] = True
+    if unless:
+        refers["unless"] = list(unless)
+    return {"refers": refers}
+
+
+def unless_given(mark: dict, *data: str) -> dict:
+    """``mark`` (``names``) left unread when any of ``data`` of its own object comes (``unless``): one mark declared
+    once, beside the datum each object takes its record by instead (a course's ``id``, a menu's ``combo_id``)."""
+    return {"refers": {**mark["refers"], "unless": list(data)}}
 
 
 def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
     """The mark of a datum that names a record in a currency of its own, a cart or a price list (base/assistant.py
     ``CURRENCY``): the assistant's card says the amounts beside it in the currency ``read`` answers (its ``code``)."""
     return {"currency": {"read": read, "by": by, "code": code}}
+
+
+def exactly_one(data: Any, message: Any) -> Any:
+    """``data``, the input of an app's read of the names its assistant's card shows (``sale.record.get``,
+    ``service.record.get``): one field per kind of record, of which exactly one is given; else ``message``, in the
+    app's own words, refuses it (a 422). For a ``model_validator(mode="after")``."""
+    if sum(getattr(data, name) is not None for name in type(data).model_fields) != 1:
+        raise ValueError(str(message))
+    return data
+
+
+class RecordNameOut(Schema):
+    """What an app's read of the names its assistant's card shows answers for a record (``exactly_one``)."""
+
+    name: str = Field(description="What the screens of its app call it, in the reader's language.")
 
 
 #: A device by its name or, with none, by what it is («Chrome · macOS»), as Settings › Devices says it.
@@ -64,12 +105,12 @@ class MenuGroup(Schema):
 class AppState(Schema):
     label: str
     # "off": no right to it (base.entitlement), turned off by the business, or its tables could not be made
-    # (base.activation); "activating" while the hub's own database gets its tables (S3).
+    # (base.activation); "activating" while the hub's own database gets its tables.
     state: Literal["on", "activating", "off"]
 
 
 class SessionDemo(Schema):
-    """The demo the session is in: when it ends (the shell's banner, plan 2026-10-17 §1.6)."""
+    """The demo the session is in: when it ends (the shell's banner)."""
 
     expires_at: dt.datetime
 
@@ -227,7 +268,7 @@ class HubRestoreIn(Schema):
 
 
 class HubCutFinishIn(Schema):
-    """The last step of the cut of a business of phase 1 (``base.tenancy.cut``): its database made, its rows copied
+    """The last step of the cut of a business that shared a database (``base.tenancy.cut``): its database made, its rows copied
     (``copied``: rows per table, none when it was made again) and seeded with the SaaS's photo of ``seeded_version``."""
 
     id: UUID
@@ -281,7 +322,7 @@ SESSION_KEY_PATTERN = r"^[0-9a-f]{64}$"
 
 
 class DemoCreateIn(Schema):
-    """``POST /internal/demos``: a demo for this browser; ``vertical`` is only noted (no seed in phase 1)."""
+    """``POST /internal/demos``: a demo for this browser; ``vertical`` is only noted, never seeded."""
 
     session_key: str = Field(pattern=SESSION_KEY_PATTERN)
     vertical: str | None = Field(None, max_length=63)
@@ -324,7 +365,7 @@ class DemoStatusOut(Schema):
     expires_at: dt.datetime | None
 
 
-# --- The Home (PLAN-HUB round 2026-10-21): base.setup.status, base.widget.list, base.bell.counters ---------------
+# --- The Home: base.setup.status, base.widget.list, base.bell.counters ------------------------------------------
 
 
 class SetupStatusIn(Schema):
@@ -443,7 +484,7 @@ class NoticeListOut(Schema):
     )
 
 
-# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 class AppListIn(Schema):
@@ -459,7 +500,7 @@ class AppOut(Schema):
     category: str
     category_label: str
     summary: str
-    #: Bought on erplora.com (``premium``): no price here, the Store has it (PLAN §20.4.3).
+    #: Bought on erplora.com (``premium``): no price here, the Store has it.
     premium: bool
     #: Where its right comes from: ``free``, ``plan``, ``purchase``, ``required`` (with an app that needs it) or
     #: ``missing``.
@@ -685,7 +726,7 @@ class UsageListOut(Schema):
     next_cursor: str | None
 
 
-# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+# ── Data: blueprints, imports and reset ───────────────
 
 #: A file uploaded in base64: 20 MB of zip (``base.blueprint.MAX_FILE_BYTES``) is 27 962 028 characters.
 FILE_BASE64_MAX = 28_000_000
@@ -948,7 +989,7 @@ class HubResetOut(Schema):
     dry_run: bool
     confirm_with: str = Field(description="What to type to confirm: the business's name (its address without one).")
     available: bool = Field(
-        description="False in phase 1: the business shares its database with other hubs, so nothing can be emptied."
+        description="False while the business shares its database with other hubs, so nothing can be emptied."
     )
     sections: list[ResetSectionOut] = Field(description="The apps with rows: what each one would lose.")
     apps: list[RemovalOut] = Field(
@@ -1036,7 +1077,7 @@ class InternalDumpsOut(Schema):
     dumps: list[InternalDumpOut]
 
 
-# ── Business settings and the hub's context (APP-BASE-6) ──
+# ── Business settings and the hub's context ───────────────
 
 
 class BusinessIn(Schema):
@@ -1062,7 +1103,7 @@ class BusinessOut(Schema):
     )
 
 
-# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+# ── System ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 class SystemStatusIn(Schema):
@@ -1071,13 +1112,13 @@ class SystemStatusIn(Schema):
 
 class SystemStatusOut(Schema):
     """``base.system.status``: what runs and where the business's data lives. No usage figures: one service runs every
-    business, so CPU, memory and connections have no figure per business (PLAN-HUB §1a)."""
+    business, so CPU, memory and connections have no figure per business."""
 
     #: The release running: its commit, short (``APP_VERSION``); ``dev`` without one (local development).
     version: str
     #: When that release was published (``APP_RELEASED_AT``); ``None`` when it is not known, never made up.
     released_at: dt.datetime | None
-    #: Phase 1: every business on the one shared database; ``False`` once the hub has its own.
+    #: Whether the business still shares one database with others; ``False`` once the hub has its own.
     shared_database: bool
 
 
@@ -1161,7 +1202,7 @@ class FailedEventCountOut(Schema):
     count: int
 
 
-# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
 
 
 class AccessDoorIn(Schema):
@@ -1322,7 +1363,7 @@ class AvatarRemoveIn(Schema):
     """No input: one's own photo."""
 
 
-# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+# ── People and permissions: people, roles ───────────────────────────────────────────────────────────────────────────
 
 
 class PersonListIn(Schema):
@@ -1405,7 +1446,7 @@ class RoleListOut(Schema):
     roles: list[RoleOut]
 
 
-# ── People and permissions: the business's API keys and its API's documentation (APP-BASE-5) ──────────────────────
+# ── People and permissions: the business's API keys and its API's documentation ───────────────────────────────────
 
 
 class ApiKeyListIn(Schema):
@@ -1463,7 +1504,7 @@ class ApiKeyRevokeOut(Schema):
     key: ApiKeyOut
 
 
-# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+# ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
 
 
 class ApprovalIn(Schema):
@@ -1553,7 +1594,7 @@ class ApprovalExportOut(Schema):
     csv: str
 
 
-# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+# ── People and permissions: the API's documentation ────────────────────────────────────────────────────────────────
 
 
 class ApiDocIn(Schema):
@@ -1579,7 +1620,7 @@ class ApiDocSettingsUpdateIn(Schema):
     docs_enabled: bool
 
 
-# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
+# ── Files ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 #: How the Files screen shows a file: «image», «pdf», «text», «table» (CSV, TSV), «json», «audio», «video», or «»
 #: when it does not (it is downloaded).
@@ -1725,16 +1766,24 @@ class FileDeletedOut(Schema):
     folder: bool
 
 
-# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+# ── Assistant ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 class AssistantCallIn(Schema):
     """A tool the model asked for, as the gateway gave it: its id, its name (``demo__item__create``) and its
-    arguments as the model wrote them (JSON text)."""
+    arguments as the model wrote them (JSON text); ``shown``, set by the Hub on the one whose card waits, the
+    fingerprint of what that card showed, which the panel gives back with the calls that wait (hub#1208: the yes is
+    for that card)."""
 
     call_id: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=200)
     arguments: str = Field(default="{}", max_length=1_000_000)
+    shown: str = Field(
+        default="",
+        max_length=64,
+        description="The fingerprint of what the card of this call showed (``base.assistant.fingerprint``); empty "
+        "while no card was drawn for it.",
+    )
 
 
 class AssistantDecisionIn(Schema):
@@ -1892,6 +1941,12 @@ class DocsExcerptOut(Schema):
     text: str
     score: float = Field(description="How close it is to the question: 1 the same meaning, 0 nothing in common.")
     lang: str
+    #: Written by the Hub, not by erplora.com (hub#1079): the model ends its answer with it as it comes.
+    cite: str = Field(
+        default="",
+        description="The line the answer ends with to say where it comes from: «Source: <its headings>», in the "
+        "person's language.",
+    )
 
 
 class DocsSearchOut(Schema):
@@ -1906,8 +1961,8 @@ class AssistantReportIn(Schema):
     comment: str = Field(default="", max_length=20_000)
     question: str = Field(default="", max_length=200_000)
     answer: str = Field(min_length=1, max_length=200_000)
-    #: Whether the answer's turn brought pages of the web (its ``done.web``): erplora.com then does not mail its text
-    #: (saas#287). None, a browser that does not know.
+    #: Whether the answer's turn brought pages of the web (its ``done.web``): erplora.com then does not mail its text.
+    #: None, a browser that does not know.
     web: bool | None = None
 
 
@@ -1982,7 +2037,7 @@ class AssistantSpeakOut(Schema):
     content_base64: str = Field(description="The text read aloud, an mp3 in base64.")
 
 
-# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+# ── Locations ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 class LocationListIn(Schema):
@@ -2000,7 +2055,7 @@ class LocationListOut(Schema):
     locations: list[LocationOut] = Field(description="The default first, then by name.")
 
 
-# ── The shared image library (round 2026-10-30, base.image_catalog) ────────────────────────────────────────────────
+# ── The shared image library (base.image_catalog) ──────────────────────────────────────────────────────────────────
 
 from typing import Annotated  # noqa: E402
 

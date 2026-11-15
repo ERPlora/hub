@@ -7,6 +7,7 @@
 import { Combo, ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { freeTable, reservationRow } from '../__tests__/rows';
@@ -73,7 +74,7 @@ describe('ReservationFormModal: New reservation', () => {
     expect(s.submit().disabled).toBe(true);
   });
 
-  it('draws every field with its box: outlined in md mode, never a bare line (reservations#71, pm#479)', async () => {
+  it('draws every field with its box: outlined in md mode, never a bare line', async () => {
     const s = await setup();
     const controls = ['guest_name', 'guest_phone', 'guest_email', 'date', 'time', 'party_size', 'duration_minutes', 'notes', 'internal_notes'];
     const drawn = (name: string) => s.field(name) as Control & { fill?: string; mode?: string };
@@ -261,11 +262,26 @@ describe('ReservationFormModal: why it was cancelled (RESERVATION-F09, F13)', ()
   });
 });
 
+describe('ReservationFormModal: fields refused with the same words (hub#888)', () => {
+  // A new reservation's fields, each refused under its own key; the table picker (a Combo) says the refusal of
+  // `table_id`.
+  const FIELD_OF: Record<string, string> = { table_id: 'table' };
+  const KEYS = ['guest_name', 'guest_phone', 'guest_email', 'date', 'time', 'party_size', 'duration_minutes', 'table_id', 'notes', 'internal_notes'];
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await fillNew(s);
+    s.tablePicker().vm.$emit('update:modelValue', { id: 't5', label: '5 (Terrace)' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
+  }, 'table_id');
+});
+
 describe('ReservationFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup();
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('reservation-form'),
       change: () => ionValue(s.field('guest_name'), 'Ana', 'ionInput'),
       restore: () => ionValue(s.field('guest_name'), '', 'ionInput'),

@@ -71,12 +71,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('sale-quick-note-form', () => ({ text: text.value, order: order.value }), open);
+const canDismiss = useUnsavedFormOnOpen('sale-quick-note-form', () => ({ text: text.value, order: order.value }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="sale-quick-note-form"
     :title="editing ? $t('sale.quickNotes.form.editTitle') : $t('sale.quickNotes.form.createTitle')"
     :submit-label="editing ? $t('sale.quickNotes.form.save') : $t('sale.quickNotes.form.add')"

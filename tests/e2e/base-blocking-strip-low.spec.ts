@@ -6,7 +6,7 @@
 // bar (568x264, 640x304) a row (143 px) cannot fit even with no strip at all (264 − 60 − 66 = 138): there the measure is a
 // floor, with the cart button whole. On a screen of normal height the strip is as it was, sentence and steps named.
 // Hub `a` with no issuer (parked for the run), its owner in Spanish, on the till, then in English at the narrowest
-// phone on its side (568 px wide): the one line holds in both catalogues. Last, with a touch pointer (hub#1074, ui#131):
+// phone on its side (568 px wide): the one line holds in both catalogues. Last, with a touch pointer (hub#1074):
 // «Configurar» grows to 44 px there and the strip still keeps its one line of 48 px and the till its room. The product
 // `E2E-STRIPLOW-<run>` and the cash register switched off for the run are put back after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -43,9 +43,9 @@ const NORMAL = [
   { label: '820x1180', width: 820, height: 1180 },
   { label: '375x667', width: 375, height: 667 },
 ] as const;
-/** One line: «Configurar» and 4 px above and under it, or by touch its 44 px target alone (ui#131): 48 px at most. */
+/** One line: «Configurar» and 4 px above and under it, or by touch its 44 px target alone: 48 px at most. */
 const ONE_LINE = 48;
-/** The touch target of `@erplora/ui` for a small button with a coarse pointer (ui#131). */
+/** The touch target of `@erplora/ui` for a small button with a coarse pointer. */
 const TOUCH_TARGET = 44;
 /** A fraction of a pixel of rounding between two boxes that touch. */
 const EDGE = 0.5;

@@ -3,7 +3,7 @@
 // configures. The number lives in erplora.com (the WhatsApp Business account and Meta's permission): «Your
 // number» shows what it reports — connected with the number and the name, not connected or to reconnect — and
 // connects, reconnects or disconnects it through erplora.com (NumberConnection); «This month» — messages sent against the plan's,
-// the cap when reached, that the plan includes none (0, ADR-0474), or that erplora.com has not said it yet, and
+// the cap when reached, that the plan includes none (0), or that erplora.com has not said it yet, and
 // «Upgrade plan» (erplora.com's plans) at the cap —; «Meta templates» — the live `whatsapp_inbox.template.list` with
 // Name, Language, Category, Status in Meta (Meta's reason, where it is on its way to Meta, and that one made in
 // WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;

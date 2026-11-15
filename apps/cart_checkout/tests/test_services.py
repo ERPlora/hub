@@ -131,7 +131,7 @@ def test_an_explicit_currency_wins_and_an_empty_one_is_the_business_one(currency
 
 
 def test_a_cart_without_a_currency_takes_the_business_one_never_a_literal_euro():
-    # cart_checkout#32, #34: a hub that does not work in euros got euro carts from the screen, the
+    # A hub that does not work in euros got euro carts from the screen, the
     # assistant and the API. The cart follows the business's country (test_business_currency.py).
     Hub.objects.filter(slug="a").update(country="GB")
     cart = run("cart_checkout.cart.create", {"session_token": "sess_1"})

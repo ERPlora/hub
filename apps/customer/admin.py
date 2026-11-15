@@ -1,9 +1,9 @@
 """Django admin of the customer app: full CRUD over every table, for the platform's staff.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub admin, only on ``hubs.erplora.com``, has
-full CRUD over a hub's tables; what each staff member may do is Django's own permissions. A change
-made here writes no event to the outbox: the screens see it on their next re-run. The «Delete» of a card, a
-group, a tag or a custom field locks it first (``lock_customers``, ``lock_rows``), as every write on it does.
+The Hub admin, only on ``hubs.erplora.com``, has full CRUD over a hub's tables; what each staff member may do is
+Django's own permissions. A change made here writes no event to the outbox: the screens see it on their next re-run. The
+«Delete» of a card, a group, a tag or a custom field locks it first (``lock_customers``, ``lock_rows``), as every write
+on it does.
 """
 
 from django.contrib import admin

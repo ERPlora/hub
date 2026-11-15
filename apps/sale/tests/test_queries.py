@@ -2,6 +2,7 @@
 
 import datetime as dt
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid7
 
 import pytest
@@ -11,7 +12,9 @@ from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
 
 from apps.sale.models import PaymentMethod, Sale
+from apps.sale.schemas import BreakdownOut, PreviewLineOut, PreviewOut
 from apps.sale.tests.conftest import ctx_for, run
+from base.tests.typed_operations import ts_fields
 
 pytestmark = pytest.mark.django_db
 
@@ -302,7 +305,7 @@ def give_back(sale, amount: int, *lines: dict):
 
 
 def test_by_professional_a_refund_comes_off_who_sold_what_came_back(catalog):
-    # flow: ninguno — FIX sale/cash_register (de STAFF-F21 y REC_PELUQUERIA-F15): what each one sold
+    # flow: STAFF-F21: what each one sold
     # squares with the period's revenue to the cent, refunds taken off, so a commission is never paid
     # on money that went back.
     ana, luis, bea = uuid7(), uuid7(), uuid7()
@@ -626,6 +629,20 @@ def test_the_preview_says_what_a_ticket_percent_takes_off_not_zero(product):
     assert loose.ticket_discount_amount == 55
 
 
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
+
+
+@pytest.mark.parametrize(
+    ("interface", "schema"),
+    [("PreviewOut", PreviewOut), ("PreviewLineOut", PreviewLineOut), ("BreakdownOut", BreakdownOut)],
+)
+def test_the_typed_preview_declares_its_schema_fields(interface, schema):
+    # The till and the checkout read the preview through these TypeScript types (vue-tsc checks them): a field
+    # the schema answers and the type does not declare is invisible to them, as the limits' currency was
+    # (hub#1122, as hub#942 in Cart and checkout and Pricing).
+    assert ts_fields(interface, OPERATIONS_TS) == set(schema.model_fields)
+
+
 # ── Open checks ─────────────────────────────────────────────────────────────────────────────────
 
 
@@ -759,7 +776,7 @@ def _quick_note(text: str):
 def test_rows_tied_on_the_column_go_by_their_label_then_id_in_the_lists_own_direction(
     listing, create
 ):
-    """hub#684 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included."""
+    """hub#684: a descending list is the ascending one read backwards, ties included."""
     tied = sorted(create("Tied") for _ in range(3))
     ascending = [create("Another"), *tied]
 
@@ -775,7 +792,7 @@ def test_rows_tied_on_the_column_go_by_their_label_then_id_in_the_lists_own_dire
 
 
 def test_the_sales_list_settles_its_ties_by_id_in_its_own_direction(catalog):
-    """hub#684: the sales list already followed hub#2355, and holds it now through the shared order."""
+    """hub#684: the sales list already settled its ties this way; now the shared order keeps it so."""
     by_id = sorted(charge(f"list-key-{n:04}").id for n in range(3))
 
     def listed(direction):

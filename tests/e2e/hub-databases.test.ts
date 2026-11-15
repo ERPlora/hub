@@ -1,4 +1,4 @@
-// Where a spec's SQL goes since every hub has its own database (round 2026-10-30 of PLAN-DB, S2a): control's tables
+// Where a spec's SQL goes now that every hub has its own database: control's tables
 // (the registry, Django's users and sessions, the memberships) to the stack's control database, every other table to
 // the hub's own (`a` unless the spec names another), read from the registry once per hub. A statement that names both
 // cannot run anywhere now (no query crosses two databases): it is refused, saying how to split it.

@@ -3,7 +3,7 @@
 // id and company in sight; the rest behind «More details» when adding; in «Edit» everything, the
 // custom fields with their own control and «Active». The server's 422 lands under its field, and so does
 // a number or a date the browser cannot read, which stops the save. The
-// country is the shared Combo (the product's `ok-combo`, customers#72): typed to filter, stored as
+// country is the shared Combo (the product's `ok-combo`): typed to filter, stored as
 // its ISO code, clearable.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonTextarea } from '@ionic/vue';

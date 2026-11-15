@@ -1,10 +1,10 @@
-// flow: kitchen-e2e-wait — FIX of the Kitchen specs' wait (FIX-HUB-KITCHEN-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: kitchen-e2e-wait — the Kitchen specs' wait
 // Before a capture or a measurement, the Kitchen specs (kitchen-*.spec.ts) and their helpers wait with the harness's
-// one wait, `untilStill(page)` (helpers.ts), which asks every open shadow root too. Their own wait asked the document
-// alone for its animations, blind to Ionic's overlays (`kitchen-settled.spec.ts` shows it let the till's «Order
-// tickets» sheet pass for still while it slid in). Swapping one of them back left every spec green: this keeps them
-// from coming back in the Kitchen files. The same rule for every spec of the e2e is
-// FIX-HUB-E2E-OWN-ANIMATION-WAIT-UNGUARDED's (hub:base); printing-kitchen.spec.ts is the Printing app's.
+// one wait, `untilStill(page)` (helpers.ts), which asks every open shadow root too. A wait of their own that asks the
+// document alone for its animations is blind to Ionic's overlays (`kitchen-settled.spec.ts` shows the till's «Order
+// tickets» sheet passing for still while it slides in), and swapping one back would leave every spec green: this
+// keeps them out of the Kitchen files. own-animation-waits.test.ts holds the same rule for every spec of the e2e;
+// printing-kitchen.spec.ts is the Printing app's.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

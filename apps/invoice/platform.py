@@ -1,14 +1,14 @@
-"""ERPlora's own invoices, as the SaaS posts them to its platform hub (PLAN-SAAS §4; ``platform_payload()`` of
-saas-next/billing/services.py): the body → the fields of an ``Invoice`` and its lines. Pure: it reads and writes
-nothing (``services.issue_platform`` writes, ``base.internal`` is the door).
+"""ERPlora's own invoices, as the SaaS posts them to its platform hub (``platform_payload()`` of the SaaS's
+billing/services.py): the body → the fields of an ``Invoice`` and its lines. Pure: it reads and writes nothing
+(``services.issue_platform`` writes, ``base.internal`` is the door).
 
 - The number is the SaaS's own (``ERP-2026-00123``, ``ERPR-…`` for a credit note): its series, its year (of the issue
   date) and its sequence (the number's last digits). No series of the Hub is ever counted for it.
 - The type: F1 with a recipient tax ID; without one, a simplified F2 up to 400 € (RD 1619/2012 art. 4), refused
   above (the old SaaS's ``fiscal/invoice_type.py``). A credit note is a rectifying invoice by differences with the
   SaaS's type (R1–R4), or R5 when it rectifies a simplified invoice.
-- The breakdown: one entry per fiscal key, as the old SaaS declared it to the AEAT (``fiscal/desglose.py``,
-  ADR-0183): a domestic sale is subject (S1) at its rate; OSS (regime 17), reverse charge and not subject are not
+- The breakdown: one entry per fiscal key, as the old SaaS declared it to the AEAT (``fiscal/desglose.py``):
+  a domestic sale is subject (S1) at its rate; OSS (regime 17), reverse charge and not subject are not
   subject by location (N2) and exempt is E1, all without rate nor quota, the whole amount of the line as its base
   (AEAT error 1237). The header is the sum of the breakdown, as every document of Invoicing.
 - The notes: the tax notice the old invoice printed (reverse charge, OSS, not subject), in the document's language.

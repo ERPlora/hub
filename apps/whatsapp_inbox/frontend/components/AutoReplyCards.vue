@@ -3,7 +3,7 @@
 // «Book appointments» (with Citas) and «Book a table» (with Reservas). A card turns on, in Automatizaciones
 // (`flow.recipe.enable`), its answer and the notice that goes with it, and off (`flow.recipe.disable`, a pause, never a
 // delete) the notice first and the answer last, so no answer is left on behind a card that is off. Only one answer
-// answers on the number (whatsapp_inbox#284): turning one on turns the other off first, and when a step fails what it
+// answers on the number: turning one on turns the other off first, and when a step fails what it
 // turned on is paused and what it turned off is on again. A card is on when its answer is on, from here or from
 // Automatizaciones; both on warns. A newer version of what it turned on is offered with «Update» (`flow.recipe.restore`,
 // F18). Under a card that is on, how the bookings confirm (AutoReplyRule, F16). Without Citas (Reservas) its card does

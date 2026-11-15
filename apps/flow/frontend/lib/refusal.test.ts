@@ -1,4 +1,4 @@
-// What a person reads when something of Automations fails (hub#2320): the server's own sentence when it
+// What a person reads when something of Automations fails: the server's own sentence when it
 // worded one; when it did not — the network, an answer that is not the API's, the server's own failure,
 // anything that is not an API error — the screen's sentence, never «Network error (Failed to fetch)».
 import { ApiError } from '@erplora/ui/sdk';

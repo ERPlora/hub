@@ -179,7 +179,8 @@
         "unassigned": "Profesional dado de baja: hay que reasignarla",
         "charged": "Cobrada",
         "uncharged": "Venta anulada",
-        "deleted": "Borrada"
+        "deleted": "Borrada",
+        "restored": "Recuperada"
       }
     },
     "series": {

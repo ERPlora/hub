@@ -1,4 +1,4 @@
-// flow: BASE-F110, WEBSITE-F10 — a business's own domain opens its public website and nothing else (HUBS-F17, saas#195)
+// flow: BASE-F110, WEBSITE-F10 — a business's own domain opens its public website and nothing else (HUBS-F17)
 // The SaaS names the domain in the photo, signed as it sends it; the browser reaches it through the ALB's stand-in (its
 // resolver sends `www.minegocio.test` to the stack), so this is what a visitor gets: the published page with its bundle,
 // its menu on a phone and its images, no call to `/api`, «Log in» on the business's own address, and a 404 on the app, the

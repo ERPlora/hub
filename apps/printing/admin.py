@@ -1,10 +1,9 @@
 """Django admin of the printing app: full CRUD over its tables, for the platform's staff only.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com and has
-full CRUD over every table. What it saves does not go through the operations (no event, no wake for the
-devices); the database still refuses two printers with one name, a port out of range, an address the
-connection cannot have, more than five copies and an A4 job without its page. A device that prints is set
-up from the device itself (its key is the digest of the device's own id): the admin never types or shows a key.
+The Hub's admin lives only on hubs.erplora.com and has full CRUD over every table. What it saves does not go through the
+operations (no event, no wake for the devices); the database still refuses two printers with one name, a port out of
+range, an address the connection cannot have, more than five copies and an A4 job without its page. A device that prints
+is set up from the device itself (its key is the digest of the device's own id): the admin never types or shows a key.
 """
 
 from django.contrib import admin

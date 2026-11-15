@@ -44,12 +44,13 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
-useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
+const canDismiss = useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cart-checkout-fail"
     size="sm"
     role="alertdialog"

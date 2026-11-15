@@ -1,7 +1,3 @@
-// Employees (BASE-G11; the old hub's EmployeesPage): the footer tabbar of its sections, the tab in the hash so a link
-// opens it and Back leaves the page — «Staff» (the people), «Roles», «API keys» and «Approvals», in the old hub's
-// order. «API keys» and «Approvals» are only for who runs the business: anyone else has no such tab, and their hash
-// opens «Staff» (the old hub left a blank page there). Only the open tab's panel is painted, so only it asks the hub.
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -30,7 +26,7 @@ afterEach(() => {
 });
 
 describe('EmployeesPage', () => {
-  it('is «Employees» with its four tabs, in the old hub’s order, «Staff» first', async () => {
+  it('is «Employees» with its four tabs, «Staff» first', async () => {
     const m = await employees('/employees', 'es');
     const page = m.wrapper.getComponent(AppPage);
     expect(page.props('title')).toBe('Empleados');

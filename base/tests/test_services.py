@@ -101,7 +101,7 @@ def test_a_local_copy_raised_to_staff_is_lowered_on_its_next_entry(request_):
     assert (user.is_staff, user.is_superuser) == (False, False)
 
 
-# The staff's jump to the Hub admin (audience hub-admin, round 13, PLAN §18.1).
+# The staff's jump to the Hub admin (audience hub-admin).
 ROOT = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="platform_admin")
 HELP = RedeemedUser(user_id="8", email="help@erplora.com", name="Help", locale="es", role="platform_support")
 

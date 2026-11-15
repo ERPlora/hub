@@ -1,11 +1,6 @@
 <script setup lang="ts">
-// Settings (the old hub's `/settings`; BASE-G96): the footer tabbar of its sections, the tab in the hash (`#general`,
-// `#business`, `#tickets`, `#data`) so a link opens it and Back leaves the page instead of walking its tabs. In the old
-// hub's order: «General» first (APP-BASE-3), with «This device» (BASE-G72), «PIN pad» (G151, G62) and «Devices»
-// (G63…G66), whose list is an administrator's: whoever does not run the hub reads why instead, and no list is asked
-// for. Then «Business» and «Printing» (APP-BASE-6) and «Data and backups» (BASE-G101–G109, APP-BASE-2); the old `#hub`
-// opens General and `#tax` Business. General ends with «API documentation» (APP-BASE-5, BASE-G100). Permissions arrives
-// with its flows, never painted empty.
+// The tab goes in the hash, replaced, so a link opens it and Back leaves the page instead of walking its tabs. The list
+// of devices is an administrator's: whoever does not run the hub reads why instead, and no list is asked for.
 import { AppPage, type ShellTab, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -28,12 +23,9 @@ const session = useSession();
 const canManage = computed(() => session.can('base.administer_hub'));
 
 const tabs = computed<ShellTab[]>(() => [
-  // ── General: this device, the PIN pad and the devices (APP-BASE-3) ──
   { id: 'general', label: t('base.settings.tabs.general'), icon: 'ion:settings-outline' },
-  // ── Business settings (APP-BASE-6) ──
   { id: 'business', label: t('base.settings.tabs.business'), icon: 'ion:wallet-outline' },
   { id: 'tickets', label: t('base.settings.tabs.tickets'), icon: 'lucide:receipt' },
-  // ── Data (APP-BASE-2) ──
   { id: 'data', label: t('base.settings.tabs.data'), icon: 'ion:swap-vertical-outline' },
 ]);
 const tab = computed<SettingsTab>({
@@ -66,7 +58,6 @@ const tab = computed<SettingsTab>({
           {{ t('base.devices.adminOnly') }}
         </p>
       </section>
-      <!-- ── The API's documentation, shown or hidden (APP-BASE-5) ── -->
       <ApiDocsCard />
     </template>
     <BusinessPanel v-else-if="tab === 'business'" />

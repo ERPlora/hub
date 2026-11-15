@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e6df85425a482c3abfddc5a4e03d1ed8dda7d5c0346757090ca70dfd7625883 -->
+<!-- generated from WORKBOOK.md sha256:7cbe30dab4c6551c2ff8653c6eb99a7c079161461fa9a0baff5d645071351b05 -->
 
 ## What it is for and who it is for
 
@@ -78,7 +78,7 @@ Here the reference is not a competitor: it is the AEAT's rules.
   itself: it binds the business to the AEAT until the end of the calendar year, so the owner turns it on (BASE-F01,
   hub#997).
 - **The software producer's data** (ERPlora) go fixed in every record (its responsible declaration declares them),
-  also "Serves several taxpayers", always "S" (contradiction 7, closed).
+  also "Serves several taxpayers", always "S".
 
 Initial setup, step by step:
 
@@ -158,7 +158,7 @@ for confirmation ("Confirm recovery" / "Cancel"). When done: "Operation complete
 
 ### Configuration
 Menu **VeriFactu → Configuration**. Title "VeriFactu configuration". Two tabs, the two routes:
-- **"ERPlora files for you"** (opens by default), like the old module's `erp-verifactu-grant`: "Representation
+- **"ERPlora files for you"** (opens by default): "Representation
   authorisation" with its status ("Not signed", "Under review since {date}", "Approved on {date}", "Returned on
   {date}" with "Note of the review", "Revoked on {date}"); "What you sent" ("Submission no. {n}, sent on {date}" and
   the documents: "Signed model", "Copy of the identity document", "Signature sample", "Proof of representation");
@@ -217,14 +217,13 @@ Screen notices: the result of each action in a strip on top (green if it went we
 
 | ID | Flow | Status |
 |---|---|---|
-| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
+| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing |
 | VERIFACTU-F02 | Upload the business's own certificate | done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Remove the own certificate | done — in the Hub |
 | VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done |
-| VERIFACTU-F05 | Sign and upload the representation authorisation so ERPlora files | done — uploaded in the Hub, reviewed by staff in the SaaS (`fiscal/`) and the status comes back in the snapshot (round §25) |
+| VERIFACTU-F05 | Sign and upload the representation authorisation so ERPlora files | done — uploaded in the Hub, reviewed by staff in the SaaS (`fiscal/`) and the status comes back in the snapshot |
 | VERIFACTU-F06 | Send the authorisation again | done — in the Hub, like VERIFACTU-F05 |
-| VERIFACTU-F07 | Request or renew the secure connection with ERPlora | discarded — no identity per hub (round 5); the Hub signs every call with HMAC |
-| VERIFACTU-F08 | Go live | done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid certificate \| ERPlora route with an approved authorisation) ∧ active account, in every plan (round 2026-10-22b: VeriFactu in Free); the server keeps it closed until ERPlora opens it (under Ioan's supervision) |
+| VERIFACTU-F08 | Go live | done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid certificate \| ERPlora route with an approved authorisation) ∧ active account, in every plan (Free included); the server keeps it closed until ERPlora opens it (under Ioan's supervision) |
 | VERIFACTU-F09 | Go back to testing | done |
 | VERIFACTU-F10 | Test the connection with the AEAT | done — with the SaaS gateway's probe (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Create a test invoice | done |
@@ -234,12 +233,11 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F15 | Send the record to the AEAT and collect its answer | done — the worker sends it through the SaaS gateway; without `VERIFACTU_GATEWAY_URL` the records wait in the queue |
 | VERIFACTU-F16 | Look up the records and their status | done |
 | VERIFACTU-F17 | See the detail of a record and why it waits | done |
-| VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20) |
+| VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — a record has yet to be checked in the installed app, which opens the AEAT's site since version 1.1.34 |
 | VERIFACTU-F19 | Give the QR and the fiscal status to the ticket and the invoice | done (Sales and Printing ask for it by name) |
 | VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute, in each business |
 | VERIFACTU-F21 | Process the queue by hand | done |
 | VERIFACTU-F22 | Retry a queue entry | done |
-| VERIFACTU-F23 | Discard a queue entry | discarded — a generated record is never discarded |
 | VERIFACTU-F24 | Act on a record rejected by the AEAT | done |
 | VERIFACTU-F25 | Resend a given record | done — through the SaaS gateway |
 | VERIFACTU-F26 | Verify the fingerprint chain | done |
@@ -248,13 +246,12 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F29 | Continue the chain of another application (migration) | done |
 | VERIFACTU-F30 | Cancel a record sent by error | done |
 | VERIFACTU-F31 | Watch the submissions from the screens | done — also from the four Home panels |
-| VERIFACTU-F32 | Prevent turning the app off once on | done — VeriFactu's `can_disable` and 409 `base.app_vetoed` from `base.app.disable` (hub#267); in Spain it never goes off (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON) |
-| VERIFACTU-F33 | Cease the activity | discarded — the census deregistration belongs to the business, outside ERPlora; a deregistered business does not open (410) |
+| VERIFACTU-F32 | Prevent turning the app off once on | done — VeriFactu's `can_disable` and 409 `base.app_vetoed` from `base.app.disable` (hub#267); in Spain it never goes off |
 | VERIFACTU-F34 | Renew the own certificate | done — in the Hub (uploading the renewed one replaces the previous one) |
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
-Status: done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
+Status: done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
 Actor: administrator
 Screen: Hub: Apps
 Steps:
@@ -350,8 +347,7 @@ the real route.
 Involved: VERIFACTU-F02, VERIFACTU-F05
 
 ### VERIFACTU-F05 Sign and upload the representation authorisation so ERPlora files
-Status: done — uploaded in the Hub (like the old module), reviewed by staff in the SaaS and the status comes back in
-the snapshot (round §25, PLAN-SAAS §4)
+Status: done — uploaded in the Hub, reviewed by staff in the SaaS and the status comes back in the snapshot
 Actor: administrator ("configure" permission)
 Screen: Configuration
 Steps:
@@ -404,23 +400,10 @@ Out: like VERIFACTU-F05; the submission carries the next number.
 If it fails: like VERIFACTU-F05.
 Involved: VERIFACTU-F05
 
-### VERIFACTU-F07 Request or renew the secure connection with ERPlora
-Status: discarded — no identity per hub (round 5): the Hub signs every call to ERPlora's gateway with HMAC, so
-there is no secure connection to request or renew
-Actor: none
-Screen: none
-Steps:
-1. There is nothing to request or renew.
-2. The Hub and the ERPlora account talk over their signed internal channel.
-In: nothing.
-Out: nothing.
-If it fails: does not apply.
-Involved: none
-
 ### VERIFACTU-F08 Go live
 Status: done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid
 certificate | ERPlora route with an approved authorisation) ∧ active account (`status` of the snapshot), in every
-plan (round 2026-10-22b: VeriFactu in Free, with no paid option); the server keeps it closed until ERPlora opens it (under Ioan's supervision). In `pre` it never opens: everything goes to testing. A
+plan (Free included, with no paid option); the server keeps it closed until ERPlora opens it (under Ioan's supervision). In `pre` it never opens: everything goes to testing. A
 demo hub never goes live (`verifactu.go_live_forbidden`).
 Actor: administrator
 Screen: Settings
@@ -465,10 +448,8 @@ reach it now:", the reason and "Fix it in VeriFactu → Settings and try again."
 and invoices are refused until this is fixed:" (`issue_blocker`). What was already sealed with no approved
 authorisation or no valid certificate waits, because the gateway could not file it. Switching to the ERPlora route
 in production without the approved authorisation is refused the same way.
-From the old Hub (`fiscal_profile::go_live`): the order (closed → demo → route → ready), the own certificate without
-an authorisation, the 409 with the cause's code and VeriFactu with no separate payment. New from Ioan's model of
-2026-10-15: the account's status, which before only held back the gateway's token in the SaaS. The paid option that
-model added was withdrawn by round 2026-10-22b (VeriFactu in Free).
+It is checked in this order and the first cause gives the 409 with its code: the closed server → a demo
+business → the issuer → the route (the own certificate needs no authorisation) → the account.
 Involved: VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Go back to testing
@@ -563,7 +544,7 @@ If it fails: if it does not add up or the XML does not pass the schema, nothing 
 **the whole issuing is undone** (Invoicing gives the number back to its series): retrying would fail the same. An
 invoice that already has a record answers the same one: never two records or two numbers, not even with two
 deliveries at once. An invoice that does not exist does nothing.
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F04, INVOICE-F05
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F05
 
 ### VERIFACTU-F14 Record a rectifying invoice
 Status: done — same as F13
@@ -622,7 +603,11 @@ Steps:
    errors", red "Rejected"; and its environment, so as not to mix testing up with production.
 In: the records.
 Out: nothing; it is a lookup.
-If it fails: the message with "Retry".
+If it fails: the message with "Retry". The total is read as in any amount field of the Hub and as in the other
+lists (hub#1247: "1.000,50", "1,000.50", "2 500" and "12,50 €" filter); one it cannot read says so under its
+field in the words of the amount field ("This is not an amount. Type a figure, for example 12.50.", "This amount
+cannot be negative." or, with "1.000" in euros, "This amount can be read in two ways…"), and an end date before
+the start date, "The end date cannot be before the start date."; neither of the two filters.
 Involved: INVOICE-F16
 
 ### VERIFACTU-F17 See the detail of a record and why it waits
@@ -649,7 +634,8 @@ If it fails: "Record not found" or the failure's message.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F18 Verify the QR at the AEAT's site
-Status: partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20)
+Status: partial — a record has yet to be checked in the installed app: since version 1.1.34 the app opens the AEAT's site in
+the device's browser, but it has not been tried on a device yet
 Actor: employee, manager, administrator, customer
 Screen: Records
 Steps:
@@ -724,20 +710,6 @@ If it fails: an accepted or rejected record is not in the queue: "This record is
 AEAT rejected it.".
 Involved: VERIFACTU-F21
 
-### VERIFACTU-F23 Discard a queue entry
-Status: discarded — a generated record is never discarded: it leaves the queue when it is sent (VERIFACTU-F25),
-because the AEAT already has it (VERIFACTU-F35) or corrected with a new one (VERIFACTU-F24)
-Actor: none
-Screen: none
-Steps:
-1. A record that is in the queue has to reach the AEAT (FAQ §5); an accepted one is no longer in the queue.
-2. The only thing that leaves the queue without a new submission is what the AEAT **already has**, by asking it
-   (VERIFACTU-F35); a rejection is corrected with a new record (VERIFACTU-F24).
-In: nothing.
-Out: nothing.
-If it fails: does not apply.
-Involved: VERIFACTU-F24, VERIFACTU-F35
-
 ### VERIFACTU-F24 Act on a record rejected by the AEAT
 Status: done
 Actor: administrator
@@ -789,8 +761,9 @@ Steps:
 1. In **VeriFactu → Recovery**, with the "Issuer tax ID", tap "Validate chain" ("Working…").
 2. The system recomputes the fingerprint of each record of the current environment's chain and checks that each one
    carries the previous one's.
-3. "Operation completed." and the verdict show: "Fingerprint chain intact: {total} record(s) with their SHA-256
-   chaining verified ({tax ID})." or "Fingerprint chain BROKEN at sequence {seq} ({tax ID}).".
+3. "Operation completed." and the verdict show: "Fingerprint chain intact: {total} records with their SHA-256
+   chaining verified ({tax ID})." (with one, "1 record with its"; never "record(s)") or "Fingerprint chain BROKEN
+   at sequence {seq} ({tax ID}).".
 In: the chain's records.
 Out: the verdict as an event (it announces `verifactu.chain.validated`). It only reads: it repairs nothing and does
 not re-audit the amounts.
@@ -890,8 +863,7 @@ Involved: none
 
 ### VERIFACTU-F32 Prevent turning the app off once on
 Status: done — the platform asks when turning off (`base.app.disable`, hub#256) and VeriFactu answers with its
-`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); in Spain, once on, it never goes off
-(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), and Apps no longer offers "Turn off" (hub#618)
+`can_disable` (hub#267); in Spain, once on, it never goes off, and Apps does not offer "Turn off" (hub#618)
 Actor: system
 Screen: Hub: Apps
 Steps:
@@ -913,19 +885,6 @@ Out: nothing in Spain with the app on; otherwise, the app off.
 If it fails: "VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the
 AEAT.".
 Involved: BASE-F21, BASE-F23, BASE-F25
-
-### VERIFACTU-F33 Cease the activity
-Status: discarded — ceasing before the tax agency is the business's census deregistration (form 036/037), outside
-ERPlora; and a business deregistered at ERPlora no longer opens (410), so it neither issues nor goes live
-Actor: administrator
-Screen: none
-Steps:
-1. Ceasing before the tax agency is the census deregistration (form 036/037), outside ERPlora.
-2. The software sends nothing.
-In: nothing.
-Out: nothing.
-If it fails: does not apply.
-Involved: none
 
 ### VERIFACTU-F34 Renew the own certificate
 Status: done — in the Hub (uploading the renewed one replaces the previous one)
@@ -964,7 +923,7 @@ In the detail "The AEAT already has {number}: it is out of the queue." shows or,
 If it fails: an accepted or rejected record is not in the queue (the detail does not offer the button; through the
 API, "This record is not in the queue: it is already in the AEAT, or the AEAT rejected it."); with no gateway or if the AEAT does not answer, the reason, above the
 buttons, and the record stays in the queue.
-Involved: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
+Involved: VERIFACTU-F22, VERIFACTU-F27
 
 ## Services: what goes in and what comes out
 

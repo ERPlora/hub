@@ -1,12 +1,12 @@
-"""``manage.py create_platform_hub [--execute]``: ERPlora's own hub, brought up repeatably (plan 2026-10-15, task 4.8).
+"""``manage.py create_platform_hub [--execute]``: ERPlora's own hub, brought up repeatably.
 
-Ported from the old SaaS's ``ensure_platform_hub`` (hubs/main/tests/test_ensure_platform_hub.py): idempotent, a dry
-run unless ``--execute``, it names what it found and refuses rather than guesses — one hub is one issuer is one chain,
-so it never writes over another identity. The platform hub is its reserved slug (``PLATFORM_HUB_SLUG``, which no
-business can take): since S5 a row of the registry (``is_platform``) with a database of its own, which ``--execute``
-makes when it is missing, as a sign-up does; then it gives it its issuer (``PLATFORM_ISSUER_*``) and pins VeriFactu to
-the deployment's environment, inside that database. The tests below keep its rows on control's test database (the
-suite's fallback, ``base/tenancy/tests/legacy.py``); the last ones make its database for real.
+Idempotent, a dry run unless ``--execute``, it names what it found and refuses rather than guesses — one hub is one
+issuer is one chain, so it never writes over another identity. The platform hub is its reserved slug
+(``PLATFORM_HUB_SLUG``, which no business can take): a row of the registry (``is_platform``) with a database of its
+own, which ``--execute`` makes when it is missing, as a sign-up does; then it gives it its issuer
+(``PLATFORM_ISSUER_*``) and pins VeriFactu to the deployment's environment, inside that database. The tests below keep
+its rows on control's test database (the suite's fallback, ``base/tenancy/tests/legacy.py``); the last ones make its
+database for real.
 """
 
 from io import StringIO
@@ -95,7 +95,7 @@ def test_it_sets_the_issuer_from_the_environment(deployment):
     [
         ("pre", True, Environment.TESTING),
         ("prod", True, Environment.PRODUCTION),
-        # Working-rules §15: closed on the server, ERPlora's own hub files in testing like any business.
+        # With production closed on the server, ERPlora's own hub files in testing like any business.
         ("prod", False, Environment.TESTING),
     ],
 )
@@ -127,7 +127,7 @@ def test_running_it_twice_writes_nothing_the_second_time(deployment):
 
 
 def test_another_identity_on_the_database_is_never_overwritten(deployment):
-    # Phase 1 has one database: an issuer that is not ERPlora's is a business's, and its chain is its own.
+    # Every hub shares the suite's test database: an issuer that is not ERPlora's is a business's, with its own chain.
     run(
         "invoice.issuer.update",
         {**ISSUER, "tax_id": "B27593136"},
@@ -171,7 +171,7 @@ def test_with_production_open_its_dry_run_pins_production(deployment):
     assert "would pin VeriFactu to production" in out
 
 
-# ── Its own database (S5), for real: no test case around, the database made and dropped ───────────────────────────
+# ── Its own database, for real: no test case around, the database made and dropped ────────────────────────────────
 
 
 @pytest.fixture

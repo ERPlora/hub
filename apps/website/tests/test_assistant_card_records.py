@@ -1,10 +1,10 @@
-"""FIX-HUB-WEBSITE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#679): the card of a save of the website says each image
-it keeps — the logo, the cover, the photo of «About us», each photo of the gallery — by the name of its file, as it was
-uploaded, and each category of the catalog by its name, read as whoever asks, never by its id; one this person may not
-read or that is not there is left out. Each value of a closed list of the theme or the content (the palette, the page's
-background, what the catalog shows, the days of the opening hours) is said by the word the editor shows
-(``test_choices``), never by its code. The detailed fields keep that contract underneath hub#693's visible summary of
-what changed (design, theme, sections and content), tested here in both languages.
+"""The card of a save of the website (hub#679) says each image it keeps — the logo, the cover, the photo of «About us»,
+each photo of the gallery — by the name of its file, as it was uploaded, and each category of the catalog by its name,
+read as whoever asks, never by its id; one this person may not read or that is not there is left out. Each value of a
+closed list of the theme or the content (the palette, the page's background, what the catalog shows, the days of the
+opening hours) is said by the word the editor shows (``test_choices``), never by its code. The detailed fields keep that
+contract underneath hub#693's visible summary of what changed (design, theme, sections and content), tested here in both
+languages.
 """
 
 import gettext

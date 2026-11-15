@@ -1,0 +1,236 @@
+"""What layer 1 of the assistant's QA says of Appointments: how many tools it offers, and that the owner's requests
+of the real-model QA (hub#1097), in the owner's own words, are offered their existing operation, ahead of Online
+booking's twin when both could do it.
+
+Every ask of every tool of appointment bringing its tool among the first ten, role by role, in both languages, is
+``base/tests/test_assistant_asks.py``'s (appointment is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020``
+over the asks and the guard that no ask copies a probe of layer 2.
+"""
+
+import json
+from pathlib import Path
+
+import pytest
+from django.conf import settings
+from live import assistant as shared
+from live.operations import AI, Operation, registry
+
+from base import assistant
+from base.models import Membership
+from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import offered_place, place_of_no_ask, probe_phrases
+from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
+from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+#: The requests of hub#1097's QA (``tests/e2e/qa/probes/owner-es-appointment-2026-11-08.json``), as the owner said them,
+#: and nothing of the tools' ``asks``: before Appointments said its asks, the blocks of the agenda and generating the
+#: dates of a series were not offered at all, and checking whether a time can be booked neither (not in the issue's
+#: table, measured with it); deleting a series came 11th.
+REPORTED = [
+    ("appointment.blocked_time.list", "¿qué bloqueos de agenda afectan a esta semana, incluido Bloqueo QA?"),
+    ("appointment.blocked_time.delete", "quita Bloqueo QA para volver a permitir reservas ese día"),
+    (
+        "appointment.appointment.bulk_delete",
+        "borra a la vez las dos citas de Ana QA del 11 de noviembre a las 10:00 y a las 11:00",
+    ),
+    ("appointment.appointment.confirm", "confirma la cita pendiente de Ana QA de mañana para dejarla reservada"),
+    ("appointment.recurring.delete", "elimina la serie semanal de Ana QA pero conserva las citas sueltas que ya generó"),
+    (
+        "appointment.recurring.materialize",
+        "genera ahora las citas de la serie semanal de Ana QA que falten dentro de la ventana de reservas",
+    ),
+    (
+        "appointment.settings.update",
+        "exige al menos dos horas de antelación para reservar y no confirmes automáticamente las citas de la web",
+    ),
+    (
+        "appointment.availability.check",
+        "comprueba si Camarera Ventas QA puede atender un Corte QA mañana a las 13:00 y, si no puede, dime el motivo",
+    ),
+]
+#: How far down the tools a turn offers the requests the issue reports bring their tool: the first ten; every other
+#: probe, the first ``WITH_ROOM``.
+REPORTED_TOP = TOP
+#: Every probe of layer 2 of Appointments, the owner's real phrases of the QA: the ones above and the ones the model got
+#: right.
+PROBES = json.loads(
+    (Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes" / "owner-es-appointment-2026-11-08.json").read_text(
+        encoding="utf-8"
+    )
+)["probes"]
+#: The reported requests the model answered with Online booking's twin (``online_booking.booking.confirm``,
+#: ``online_booking.settings.update``): an appointment the customer booked online is still an appointment of the
+#: agenda, and the booking rules are the agenda's, so Appointments' own tool is offered before.
+TWINS = [
+    ("appointment.appointment.confirm", "online_booking.booking.confirm"),
+    ("appointment.settings.update", "online_booking.settings.update"),
+]
+#: What Appointments' groups of ``base.assistant.SYNONYMS`` are for, in a turn: a request nobody wrote as an ask nor as
+#: a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without «bloqueo», a block put
+#: on a professional is not offered at all; without «citas fijas», deleting them comes 15th, behind the appointments'
+#: own tools. The group of «puede atender» is ``REPORTED``'s: without it, checking a time is the 40th.
+BY_GROUP = [
+    ("appointment.blocked_time.create", "pon un bloqueo a Inés el lunes de 9:00 a 11:00", "bloqueo"),
+    ("appointment.recurring.delete", "quita las citas fijas de los martes de Lola", "citas fijas"),
+]
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, for the twenty-eight tools whose
+#: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among
+#: the first ten, so asks that stop reading as people speak fail. None says a word of ``base.assistant.SYNONYMS`` that
+#: names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
+OWN_WORDS = [
+    ("appointment.agenda.lanes", "¿qué tiene cada peluquera el jueves, en columnas?"),
+    ("appointment.appointment.bulk_create", "Lola quiere las cinco sesiones de golpe, todas o ninguna"),
+    ("appointment.appointment.bulk_delete", "fuera de una vez las tres duplicadas de Lola"),
+    ("appointment.appointment.cancel", "a Lola le ha surgido un viaje, que no venga el lunes"),
+    ("appointment.appointment.charge", "cobra lo de Julia de esta mañana"),
+    ("appointment.appointment.confirm", "acepta lo que pidió Lola para el jueves"),
+    (
+        "appointment.appointment.count_active_for_service",
+        "¿alguien lleva todavía el alisado de keratina en lo que tiene por delante?",
+    ),
+    ("appointment.appointment.count_to_confirm", "¿cuántas quedan pendientes de mi confirmación?"),
+    ("appointment.appointment.create", "Lola quiere venir el lunes a las 12:00 a hacerse un tinte con Inés"),
+    ("appointment.appointment.delete", "fuera del todo la de prueba del viernes"),
+    ("appointment.appointment.get", "¿de quién es la APT-0042 y qué teléfono dejó?"),
+    ("appointment.appointment.list", "¿quién viene el viernes?"),
+    ("appointment.appointment.list_for_customer", "¿Lola ha estado antes con nosotros? ¿y cuándo vuelve?"),
+    ("appointment.appointment.notices", "¿qué han reservado o anulado por sí mismas las clientas?"),
+    ("appointment.appointment.reschedule", "lo de Lola del jueves, una hora más tarde"),
+    ("appointment.appointment.start", "Lola ya ha llegado, que empiece lo suyo"),
+    ("appointment.appointment.update", "Lola no tolera el amoniaco, déjalo anotado en lo suyo"),
+    ("appointment.availability.check", "¿se puede citar a Lola el lunes a las 9:30?"),
+    ("appointment.availability.slots", "¿cuándo le cabe a Inés una manicura este sábado?"),
+    ("appointment.blocked_time.create", "que nadie reserve con Inés el viernes por la tarde, tiene formación"),
+    ("appointment.blocked_time.delete", "ya no hace falta cerrar el viernes por la tarde, desbloquéalo"),
+    ("appointment.blocked_time.list", "¿cuándo está cerrada la agenda este mes?"),
+    ("appointment.recurring.activate", "Teresa vuelve después del parón, que siga lo suyo"),
+    ("appointment.recurring.create", "Lola vendrá todos los martes a las 18:00"),
+    ("appointment.recurring.deactivate", "deja parado lo de Carmen hasta septiembre"),
+    ("appointment.recurring.delete", "Carmen deja de venir cada semana: bórralo, pero sin tocar lo ya reservado"),
+    ("appointment.recurring.list", "¿qué clientas siguen en marcha con hora fija?"),
+    ("appointment.recurring.update", "Teresa vendrá los miércoles en vez de los martes de aquí en adelante"),
+]
+
+
+def appointment_tools() -> dict[str, Operation]:
+    return {name: op for name, op in registry.items() if op.app_label == "appointment" and assistant.is_tool(op)}
+
+
+def test_appointments_is_listed_so_layer_1_sweeps_every_ask_of_it():
+    """Appointments is in ``LIVE_ASSISTANT_ASKS_REQUIRED``: ``base/tests/test_assistant_asks.py`` ranks each of its asks
+    for every role and language, and ``live.E020`` requires them of each of its tools."""
+    assert "appointment" in settings.LIVE_ASSISTANT_ASKS_REQUIRED
+
+
+def test_appointment_offers_its_thirty_five_tools():
+    """Appointments' tools are its thirty-five operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
+    tools = appointment_tools()
+    assert all(isinstance(op.ai_spec(), AI) for op in tools.values())
+    assert len(tools) == 35
+    assert {name for name, _ in REPORTED} <= set(tools)
+
+
+def test_the_reported_requests_are_the_probes_of_layer_2():
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [
+        f"owner.es.{name}" for name, _ in REPORTED
+    ]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), REPORTED)
+def test_the_reported_appointment_request_offers_its_existing_operation(catalog_of, name, phrase):
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=REPORTED_TOP)
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
+def test_every_probe_of_appointments_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
+    """The owner's thirty-five phrases of layer 2, the ones the model answered right too: a tool of Appointments that a
+    new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees
+    it."""
+    assert (probe["app"], probe["role"], probe["language"]) == ("appointment", "owner", "es")
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "twin"), TWINS)
+def test_the_reported_request_offers_appointments_tool_before_online_bookings_twin(catalog_of, name, twin):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert twin in tools  # positive control: Online booking is on in business a, so its twin competes
+    phrase = dict(REPORTED)[name]
+    place, twins = place_of_no_ask(tools, name, phrase), offered_place(tools, twin, phrase)
+    assert place is not None and (twins is None or place < twins), (place, twins)
+
+
+test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups = by_group_test(BY_GROUP)
+
+
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+
+
+#: What the owner says in English in words of their own for each tool of Appointments that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("appointment.agenda.lanes", "show Thursday split per hairdresser"),
+    ("appointment.appointment.bulk_create", "Marisa wants all five sessions at once, every Monday, all or none"),
+    ("appointment.appointment.bulk_delete", "those three of Marisa's, out at once"),
+    ("appointment.appointment.cancel", "Marisa can't make it on Friday, call it off"),
+    ("appointment.appointment.charge", "send Marisa's appointment to checkout"),
+    ("appointment.appointment.complete", "Marisa's colour appointment is finished, mark it"),
+    ("appointment.appointment.confirm", "accept what Marisa asked for on Thursday"),
+    ("appointment.appointment.count_active_for_service", "does anyone still have highlights coming up?"),
+    ("appointment.appointment.count_to_confirm", "how many are left unconfirmed?"),
+    ("appointment.appointment.create", "put Marisa down for a colour on Friday at noon"),
+    ("appointment.appointment.delete", "delete that test from Friday"),
+    ("appointment.appointment.get", "what phone number is on APT-0077?"),
+    ("appointment.appointment.history", "who moved hers? Marisa's, I mean"),
+    ("appointment.appointment.list", "who's coming on Friday?"),
+    ("appointment.appointment.list_for_customer", "has Marisa been here in the past? anything upcoming?"),
+    ("appointment.appointment.mark_no_show", "Marisa never showed up yesterday"),
+    ("appointment.appointment.notices", "anything booked or cancelled by customers themselves lately?"),
+    ("appointment.appointment.reschedule", "push Marisa's Thursday one back an hour"),
+    ("appointment.appointment.start", "Marisa just walked in, get hers going"),
+    ("appointment.appointment.update", "Marisa can't stand ammonia, note it on hers"),
+    ("appointment.availability.check", "is 9:30 on Friday bookable for Marisa?"),
+    ("appointment.availability.slots", "what free times are left on Saturday for a colour?"),
+    ("appointment.blocked_time.create", "nobody should book Inés on Friday afternoon, she has training"),
+    ("appointment.blocked_time.delete", "no need to close Friday afternoon anymore, unblock it"),
+    ("appointment.blocked_time.list", "anything off next month?"),
+    ("appointment.recurring.activate", "resume Marisa's weekly one"),
+    ("appointment.recurring.create", "Marisa will come every Tuesday at 6 pm"),
+    ("appointment.recurring.deactivate", "stop Marisa's weekly one until September"),
+    ("appointment.recurring.delete", "Marisa stops coming every week: remove it, but keep what's booked"),
+    ("appointment.recurring.get", "when's the next date of Marisa's weekly one?"),
+    ("appointment.recurring.list", "which repeating ones are still running?"),
+    ("appointment.recurring.materialize", "fill in what's missing for Marisa's weekly one"),
+    ("appointment.recurring.update", "Marisa will come on Wednesdays instead of Tuesdays from now on"),
+    ("appointment.settings.get", "how much notice do we need for a booking?"),
+    ("appointment.settings.update", "they should book at least two hours ahead, require that"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_each_tool_has_its_own_english_words = english_coverage_test("appointment", OWN_WORDS_EN)
+
+
+def test_every_tool_is_caught_by_a_probe_or_by_words_of_its_own():
+    """Each tool of Appointments is in ``OWN_WORDS`` or its probe falls out of its room without its asks (the seven
+    whose probe ``REPORTED``, ``PROBES`` or ``TWINS`` already need them): a tool added later without either is seen."""
+    without_own = set(appointment_tools()) - {name for name, _ in OWN_WORDS}
+    assert without_own == {
+        "appointment.appointment.complete",
+        "appointment.appointment.history",
+        "appointment.appointment.mark_no_show",
+        "appointment.recurring.get",
+        "appointment.recurring.materialize",
+        "appointment.settings.get",
+        "appointment.settings.update",
+    }
+
+
+def test_removing_a_block_named_by_its_title_points_at_the_list_that_finds_it():
+    """A block is removed by its id, and a person names it by its title («quita el bloqueo de la formación»): the
+    description sends the model to ``appointment.blocked_time.list`` from today on, instead of asking the person for its
+    date (hub#1097: «Pide la fecha, sin tarjeta»)."""
+    tools = appointment_tools()
+    assert "appointment.blocked_time.list" in tools  # the tool it names is one the model can call
+    assert "appointment.blocked_time.list" in shared.description(tools["appointment.blocked_time.delete"])

@@ -11,7 +11,7 @@
   answer, as the gateway hands it back, settles each one. Nothing is ever taken as accepted without that answer.
 - A sealed record is never edited in its figures nor its XML: it is corrected with a new one.
 
-The clock is the Hub's time zone (Madrid in phase 1): ``FechaHoraHusoGenRegistro`` carries its offset.
+The clock is the Hub's time zone (Madrid): ``FechaHoraHusoGenRegistro`` carries its offset.
 """
 
 import base64
@@ -140,7 +140,8 @@ AEAT_REFUSED = _("The AEAT refused the query: %(detail)s")
 AEAT_UNREACHABLE = _("The AEAT could not be asked: %(detail)s")
 SAME_PAGE = _("it named the same page of records again")
 TOO_MANY_PAGES = _("it has more than %(pages)s pages of records")
-#: A query's pages followed at most (10,000 records each, §6.4.3): far beyond any business's month.
+#: A query's pages followed at most (10,000 records each, by the AEAT's web service description, section 6.4.3):
+#: far beyond any business's month.
 MAX_QUERY_PAGES = 50
 NOTHING_TO_RECOVER = _(
     "The AEAT has no records of that issuer this month: there is nothing to recover."
@@ -214,7 +215,7 @@ def _actor(ctx: OperationContext) -> str:
     return str(getattr(actor, "username", None) or actor or "")[:128]
 
 
-def _event(
+def _event(  # noqa: PLR0913
     ctx: OperationContext,
     kind: str,
     key: str,
@@ -522,9 +523,9 @@ def _seal(ctx: OperationContext, config: Config, record: Record) -> Record:
 
 
 def _rechazo_previo(corrects: Record) -> str:
-    """RechazoPrevio of a correction (Descripción del servicio web VERI*FACTU §9.1.2–§9.1.3): «X» while the AEAT
-    holds no registration of the invoice (every alta of it was rejected); «S» when it holds one and what is
-    corrected was a later correction it rejected; «N» for the usual correction of a record it holds."""
+    """RechazoPrevio of a correction (the AEAT's «Descripción del servicio web VERI*FACTU», sections 9.1.2 and
+    9.1.3): «X» while the AEAT holds no registration of the invoice (every alta of it was rejected); «S» when it holds
+    one and what is corrected was a later correction it rejected; «N» for the usual correction of a record it holds."""
     held = Record.objects.filter(
         invoice_id=corrects.invoice_id,
         environment=corrects.environment,
@@ -537,9 +538,9 @@ def _rechazo_previo(corrects: Record) -> str:
 
 
 def _refuse_without_a_way(config: Config, environment: str, scope: Scope) -> None:
-    """In production nothing is sealed that can never reach the AEAT (working-rules §15; the old Hub's
-    ``enforce_fiscal_road``, HUB-1935): 409 with the route's own code, inside the transaction of the sale or
-    invoice, so the document is undone and the series gives its number back. Testing never refuses."""
+    """In production nothing is sealed that can never reach the AEAT: 409 with the route's own code, inside the
+    transaction of the sale or invoice, so the document is undone and the series gives its number back. Testing never
+    refuses."""
     if environment != Environment.PRODUCTION:
         return
     problem = route_problem(config, environment, scope)
@@ -550,7 +551,7 @@ def _refuse_without_a_way(config: Config, environment: str, scope: Scope) -> Non
         )
 
 
-def _seal_alta(
+def _seal_alta(  # noqa: PLR0913
     ctx: OperationContext,
     config: Config,
     invoice: Invoice,
@@ -619,6 +620,16 @@ def _seal_alta(
         "when an invoice is issued; asking again answers the same record. In production it is refused while the "
         "business has no way to the AEAT (the route's own code), so the sale or invoice is not issued.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "chain the registration of the last invoice we issued",
+                "make the VeriFactu QR an issued invoice is missing",
+            ),
+            "es": (
+                "encadena el registro de la última factura que emitimos, con su sitio en la cola",
+                "genera el QR de VeriFactu que le falta a una factura emitida",
+            ),
+        },
     },
 )
 def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOut:
@@ -649,6 +660,16 @@ def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOu
         "invoice's number): a new record of the same invoice, read again, marked as a correction, enters the queue; "
         "the old one is kept as it is. If the invoice itself is wrong, rectify it in Invoicing instead.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "correct the registration the AEAT rejected",
+                "fix the registration accepted with errors",
+            ),
+            "es": (
+                "subsana el registro que rechazó la AEAT",
+                "corrige el registro aceptado con errores",
+            ),
+        },
     },
 )
 def correct_record(ctx: OperationContext, data: RecordCorrectIn) -> RecordCreateOut:
@@ -675,6 +696,17 @@ def correct_record(ctx: OperationContext, data: RecordCorrectIn) -> RecordCreate
         "number), with the reason: a chained cancellation record (RegistroAnulacion) is sealed and sent. A refund or "
         "a correction is never this: it is a rectifying invoice in Invoicing. The invoice stays in Invoicing.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "cancel the VeriFactu registration of an invoice issued by mistake",
+                "cancel the registration of an invoice we should not have issued",
+            ),
+            "es": (
+                "anula el registro de una factura que se emitió por error",
+                "anula en Hacienda la factura que emitimos sin querer",
+                "esa factura fue una equivocación, anula su registro",
+            ),
+        },
     },
 )
 def cancel_record(ctx: OperationContext, data: RecordCancelIn) -> RecordCreateOut:
@@ -695,7 +727,8 @@ def cancel_record(ctx: OperationContext, data: RecordCancelIn) -> RecordCreateOu
         invoice_number=target.invoice_number,
         issue_date=target.issue_date,
         description=data.reason,
-        # §9.2.2 «anulación por rechazo»: an earlier anulación of the same registration was rejected.
+        # «Anulación por rechazo» (the AEAT's web service description, section 9.2.2): an earlier anulación of the
+        # same registration was rejected.
         previous_rejection="S"
         if Record.objects.filter(cancels=target, status=Record.Status.REJECTED).exists()
         else "",
@@ -751,7 +784,7 @@ def _mark(ctx: OperationContext, records, code: str, detail: str, tally: _Tally)
 def _outlast_the_gateway() -> None:
     """A call to the gateway waits inside its operation's transaction, whose locks keep two passes from sending the same
     chain, and it can take longer than the cluster lets a transaction sit idle: without this, the cut comes first and
-    what the AEAT answered is lost with the transaction (hub#623). Said before every call, for that transaction only."""
+    what the AEAT answered is lost with the transaction. Said before every call, for that transaction only."""
     platform.allow_idle_wait(gateway.LONGEST_WAIT_SECONDS)
 
 
@@ -771,7 +804,7 @@ def _back_in_the_queue(records=None) -> None:
     )
 
 
-def _failed(
+def _failed(  # noqa: PLR0913
     ctx,
     batch,
     code: str,
@@ -870,7 +903,7 @@ def _settle(ctx, batch, answer: aeat.SubmissionAnswer, now, tally: _Tally) -> No
         )
 
 
-def _send_chain(
+def _send_chain(  # noqa: C901, PLR0912, PLR0913, PLR0915, PLR0917
     ctx,
     config: Config,
     system,
@@ -1134,6 +1167,16 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
         "pending ones of its chain, through ERPlora's gateway, respecting the AEAT's waiting time. It is never taken as "
         "accepted without the AEAT's answer; without the gateway it stays in the queue.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "send VeriFactu entry 12 to the AEAT now",
+                "file that queued registration with the AEAT",
+            ),
+            "es": (
+                "manda a la AEAT el registro 12 con sus anteriores",
+                "remite a Hacienda ese registro que espera",
+            ),
+        },
     },
 )
 def transmit_record(ctx: OperationContext, data: RecordTransmitIn) -> TransmitOut:
@@ -1154,6 +1197,16 @@ def transmit_record(ctx: OperationContext, data: RecordTransmitIn) -> TransmitOu
         "description": "Process the VeriFactu queue now: every chain whose turn has come goes to the AEAT in order, "
         "declared as late when it failed before. It is what the scheduled task does every minute.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "process the VeriFactu queue",
+                "send everything due in the queue to the AEAT",
+            ),
+            "es": (
+                "procesa la cola de envíos de VeriFactu",
+                "despacha a Hacienda todo lo que toque de la contingencia",
+            ),
+        },
     },
 )
 def process_queue(ctx: OperationContext, data: NoInput) -> TransmitOut:
@@ -1183,6 +1236,16 @@ def process_queue(ctx: OperationContext, data: NoInput) -> TransmitOut:
         "description": "Put a record of the VeriFactu queue (by its id or its invoice's number) out with the next pass, "
         "with the earlier ones of its chain; its attempts are kept.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "retry VeriFactu entry 12 on the next round",
+                "push that stuck registration out of the queue sooner",
+            ),
+            "es": (
+                "reintenta el registro 12 en la próxima pasada",
+                "adelanta el envío del registro que espera en la cola",
+            ),
+        },
     },
 )
 def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSummaryOut:
@@ -1220,6 +1283,16 @@ def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSumma
         "record (same fingerprint) does it leave the queue as registered; otherwise nothing changes and it is sent "
         "again. Nothing the AEAT does not hold ever leaves the queue.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "reconcile VeriFactu entry 12 with the AEAT",
+                "ask the AEAT whether it holds that unanswered filing",
+            ),
+            "es": (
+                "concilia con la AEAT el registro 12 que no tuvo respuesta",
+                "mira en Hacienda si consta el registro que nunca tuvo respuesta",
+            ),
+        },
     },
 )
 def reconcile_record(ctx: OperationContext, data: RecordReconcileIn) -> ReconcileOut:
@@ -1303,6 +1376,16 @@ def _fingerprint_of(record: Record) -> str:
         "every record's SHA-256 fingerprint is recomputed and must carry the previous one's. It repairs nothing and "
         "does not re-audit amounts.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "check that the fingerprint chain is not broken",
+                "verify every fingerprint of the VeriFactu chain",
+            ),
+            "es": (
+                "comprueba que cada huella enlaza con la anterior y la cadena no está rota",
+                "valida la cadena recalculando todas las huellas",
+            ),
+        },
     },
 )
 def validate_chain(ctx: OperationContext, data: ChainValidateIn) -> ChainValidationOut:
@@ -1367,7 +1450,7 @@ def validate_chain(ctx: OperationContext, data: ChainValidateIn) -> ChainValidat
     )
 
 
-def _anchor(
+def _anchor(  # noqa: PLR0913
     ctx,
     nif: str,
     environment: str,
@@ -1403,6 +1486,16 @@ def _anchor(
         "the given last fingerprint (64 hex), invoice number and issue date. Only during a migration, and only with no "
         "pending records.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "carry on the chain from our previous software's last fingerprint",
+                "we migrated: chain on from the old program's last invoice",
+            ),
+            "es": (
+                "sigue la cadena desde la última huella del programa de antes",
+                "tras la migración, encadena desde la última factura del software anterior",
+            ),
+        },
     },
 )
 def recover_manual(ctx: OperationContext, data: RecoverManualIn) -> RecoveryOut:
@@ -1446,7 +1539,7 @@ def recover_manual(ctx: OperationContext, data: RecoverManualIn) -> RecoveryOut:
     )
 
 
-def _query_page(
+def _query_page(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     config: Config,
     nif: str,
@@ -1501,7 +1594,7 @@ def _query_page(
         ) from None
 
 
-def _query_aeat(
+def _query_aeat(  # noqa: PLR0913, PLR0917
     ctx, config: Config, nif: str, environment: str, year: int, month: int
 ) -> list[aeat.QueriedRecord]:
     """Ask the AEAT, through the gateway, for the records of ``nif`` in a month; replace the last photo."""
@@ -1587,6 +1680,16 @@ def _query_aeat(
         "description": "Ask the AEAT which records of an issuer (Invoicing's by default) it holds in a month (this one "
         "by default), through ERPlora's gateway; the answer replaces the last photo. It does not touch the chain.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "ask the AEAT what it holds of ours for October",
+                "refresh what the AEAT has on file for September",
+            ),
+            "es": (
+                "consulta a la AEAT qué registros nuestros tiene de octubre",
+                "pide a Hacienda la relación de lo remitido en octubre",
+            ),
+        },
     },
 )
 def query_aeat(ctx: OperationContext, data: AeatQueryIn) -> AeatQueryOut:
@@ -1618,6 +1721,16 @@ def query_aeat(ctx: OperationContext, data: AeatQueryIn) -> AeatQueryOut:
         "description": "After restoring a backup: anchor the VeriFactu chain of an issuer (Invoicing's by default) on the "
         "last record the AEAT holds this month, asked through ERPlora's gateway. Only with no pending records.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "rebuild the chain from what the AEAT holds",
+                "re-anchor the VeriFactu chain on the AEAT's last entry",
+            ),
+            "es": (
+                "reconstruye la cadena con lo último que tenga Hacienda",
+                "recupera la cadena de VeriFactu desde la AEAT tras la copia",
+            ),
+        },
     },
 )
 def recover_from_aeat(ctx: OperationContext, data: RecoverFromAeatIn) -> RecoveryOut:
@@ -1683,6 +1796,16 @@ def recover_from_aeat(ctx: OperationContext, data: RecoverFromAeatIn) -> Recover
         "description": "Test whether this business can send VeriFactu records now, presenting nothing to the AEAT: the "
         "issuer, the producer's details, the route and, with ERPlora's gateway, its own answer.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "test the connection to the AEAT without filing anything",
+                "run a VeriFactu sending diagnostic",
+            ),
+            "es": (
+                "prueba si la conexión con la AEAT funciona sin enviar nada",
+                "comprueba si podríamos remitir registros, sin mandar nada",
+            ),
+        },
     },
 )
 def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
@@ -1764,6 +1887,16 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
         "description": "Create the VeriFactu test invoice (only in the test environment): a real ticket (F2) of one line "
         "«Prueba VeriFactu», 1.00 € plus 21 % VAT, issued by Invoicing in its TICKET series, and its record.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "run the one-euro VeriFactu trial in testing",
+                "issue VeriFactu's official trial in testing",
+            ),
+            "es": (
+                "lanza la prueba de un euro de VeriFactu",
+                "emite la prueba oficial de VeriFactu en el entorno de pruebas",
+            ),
+        },
     },
 )
 def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
@@ -1849,6 +1982,16 @@ def _route_refusal(
         "its seal; in production it needs the approved signed authorisation) or «own» (the business's own certificate, "
         "uploaded in VeriFactu → Configuration).",
         "risk": "high",
+        "asks": {
+            "en": (
+                "let ERPlora file for us on our behalf",
+                "switch the filing route to our own certificate",
+            ),
+            "es": (
+                "que ERPlora remita los registros por nosotros",
+                "cambia la vía de envío a nuestro certificado propio",
+            ),
+        },
     },
 )
 def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
@@ -1886,6 +2029,16 @@ def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
         "approved signed authorisation) and an active ERPlora account; it cannot "
         "go back once a production record is sealed.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "file for real with the AEAT from now on",
+                "with the signed authorisation, take VeriFactu out of testing",
+            ),
+            "es": (
+                "con la autorización firmada, pasa al envío real a Hacienda",
+                "quiero remitir de verdad a la AEAT a partir de ahora",
+            ),
+        },
     },
 )
 def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
@@ -1920,6 +2073,16 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
     ai={
         "description": "Go back to the AEAT's test environment; only while no VeriFactu record was sealed in production.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "go back to the AEAT's test environment",
+                "put VeriFactu back in testing",
+            ),
+            "es": (
+                "regresa al entorno de pruebas de la AEAT",
+                "deja VeriFactu otra vez en pruebas",
+            ),
+        },
     },
 )
 def back_to_testing(ctx: OperationContext, data: NoInput) -> ConfigOut:
@@ -2027,6 +2190,16 @@ def upload_certificate(ctx: OperationContext, data: CertificateUploadIn) -> Conf
         "description": "Remove the business's own certificate from this Hub. With the «own» route, records wait in the "
         "queue until another certificate is uploaded or ERPlora files for the business.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "remove our own certificate from the Hub",
+                "delete the digital certificate we uploaded",
+            ),
+            "es": (
+                "quita nuestro certificado digital del Hub",
+                "borra la firma electrónica que subimos",
+            ),
+        },
     },
 )
 def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
@@ -2073,7 +2246,7 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
     return ConfigSyncOut(applied=True, version=data.version)
 
 
-# ── ERPlora's own hub (PLAN-SAAS §4) ───────────────────────────────────────────────────────────────────────────
+# ── ERPlora's own hub ───────────────────────────────────────────────────────────────────────────
 
 
 @operation(
@@ -2161,7 +2334,7 @@ def _representation_step(ctx: OperationContext, config: Config, data) -> None:
     )
 
 
-def _representation_payload(
+def _representation_payload(  # noqa: C901, PLR0912
     data: RepresentationSubmitIn, taxpayer_tax_id: str, taxpayer_name: str
 ) -> dict:
     """The contract's body, or ``InvalidPayload`` naming every broken rule with the first one's code: the SaaS's

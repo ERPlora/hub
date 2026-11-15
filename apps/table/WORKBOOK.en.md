@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e5a8e199cb5b542183ee9301377c396bb2c84bb4df6e67d149f4165c4b14d942 -->
+<!-- generated from WORKBOOK.md sha256:a728971217d04a8096d8e5376a5a053f4b391b690bbc91638dca78cc7f917cae -->
 
 ## What it is for and who it is for
 
@@ -34,11 +34,11 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 - **Asking for the guests when seating, transferring and joining checks, taking a table out of service**
   and the list of closed checks with their amount (Toast and Lightspeed).
 - **A table with its check open is not freed by hand**: it is charged, moved to another table or the
-  check is deleted (Toast, Square, Lightspeed and Odoo; tables#124 of the current product).
+  check is deleted (Toast, Square, Lightspeed and Odoo).
 - **Seating at a reserved table is allowed and spends the booking; going over the capacity warns but does
   not prevent it.**
-- **A reserved table is painted Reserved only close to the time of its booking** (market decision on
-  question 1 of the current product). Before that the table stays Available and shows the next booking
+- **A reserved table is painted Reserved only close to the time of its booking** (market decision).
+  Before that the table stays Available and shows the next booking
   with its time. This is how they do it:
 
   | Product | How it solves it | Source |
@@ -53,10 +53,10 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   | Tabit | The table's upcoming bookings can be seen from it | [support-us.tabit.cloud](https://support-us.tabit.cloud/hc/en-us/article_attachments/4408025435794) |
 
   **Wins:** Reserved from **60 minutes before** the booking's time until its window ends; before that,
-  the table stays Available with "Ana · 21:00". **Why not the old way** (Reserved from the moment it is
-  confirmed, even a week ahead): it blocked the table the whole service and a party seated at noon
-  "spent" the evening's booking.
-- **A deactivated table or zone leaves service** (decision on question 7): it is not painted on the
+  the table stays Available with "Ana · 21:00". **Why not from the moment it is confirmed** (even a
+  week ahead): it would block the table the whole service and a party seated at noon would "spend" the
+  evening's booking.
+- **A deactivated table or zone leaves service** (market decision): it is not painted on the
   service plan and cannot be seated; it stays in "Edit plan", in **Tables** and in **Zones**, like
   [Lightspeed — deactivating a table](https://k-series-support.lightspeedhq.com/hc/articles/1260804656729),
   [Toast — removing a table from the service area](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
@@ -229,8 +229,9 @@ Steps:
 In: the name, the description, the colour and the order.
 Out: the zone (announces: `table.zone.created`).
 If it fails: without a name, the button does not turn on. A name another zone already has: "There is
-already a zone with that name.". An employee does not see the "+"; if they ask for it through the API,
-it is refused for lack of permission.
+already a zone with that name.". The reason of a field shows under it and goes away as soon as that field
+is corrected, even if another one says the same (hub#888). An employee does not see the "+"; if they ask
+for it through the API, it is refused for lack of permission.
 Involved: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Add tables
@@ -257,7 +258,8 @@ all switched off or deleted (TABLE-F04), the step goes back to pending by itself
 does not tick it.
 If it fails: a number repeated in the zone (regardless of case and spaces), through any door: "There is
 already a table with that number in this zone.". A zone deleted in the meantime: "That zone does not
-exist in this business.".
+exist in this business.". In the **Tables** window, the reason of a field shows under it and goes away as
+soon as that field is corrected, even if another one says the same (hub#888).
 Involved: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Place the tables on the plan
@@ -291,7 +293,8 @@ In: the chosen table.
 Out: the changed table (announces: `table.table.updated`) or the deleted one (announces:
 `table.table.deleted`).
 If it fails: inside the window: "The table number is required", "There is already a table with that
-number in this zone.", "That table does not exist in this business."; deleting a table with an open
+number in this zone.", "That table does not exist in this business.", each reason under its field until
+that field is corrected, even if another one says the same (hub#888); deleting a table with an open
 check: "That table has an open check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
@@ -327,13 +330,14 @@ In: the chosen zone.
 Out: the changed zone (announces: `table.zone.updated`) or the deleted one (announces:
 `table.zone.deleted`).
 If it fails: "That zone still has tables. Move them to another zone or delete them first." or "That zone
-does not exist in this business.".
+does not exist in this business.". The reason of a field shows under it until that field is corrected,
+even if another one says the same (hub#888).
 Involved: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Create many tables at once
 Status: done
 Actor: manager, assistant
-Screen: assistant and API (the current product had no screen for this either)
+Screen: assistant and API
 Steps:
 1. Ask the assistant "create 12 tables on the Terrace, from T1 to T12, for 4".
 2. They are created at once (from 1 to 100), numbered with the prefix and the starting number that are
@@ -742,7 +746,7 @@ Involved: TABLE-F09, TABLE-F25
 ### TABLE-F30 Hold or release a table by hand
 Status: done
 Actor: manager, employee, assistant
-Screen: assistant and API (the current product had no screen for this either)
+Screen: assistant and API
 Steps:
 1. Ask the assistant to set a table aside ("keep table 6 for Pedro from 21:00 to 23:00, 4 people").
 2. From an hour before, the table shows Reserved, with the name and the time; asking for it again with
@@ -780,10 +784,12 @@ Steps:
 2. The check of the table stays with that card: Sales gets it back when charging. "Remove customer" lets
    it go.
 3. The assistant can also seat with a customer: "seat Ana García at table 4, there are 3 of us".
+4. If the card is deleted in Customers, the check stops saying her name; if ERPlora's staff recover it from the
+   separate copy (CUSTOMER-F33), it says it again at once, also on the floor plan and the room that are open.
 In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
-Involved: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
+Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ## Tables: what goes in and what comes out
 
@@ -932,6 +938,6 @@ hears every notice of Tables, like those of any app.
 | View settings | yes | yes | yes | yes | `table.view_settings` |
 | Change settings | yes | yes | no | no | `table.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`);
-the cashier of the current product is an employee. Seating, splitting and joining also ask for "Build the
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+Seating, splitting and joining also ask for "Build the
 check" of Sales (`sale.add_sale`), which the four roles have.

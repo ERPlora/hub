@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// Settings › Data and backups (BASE-G101–G109): the old hub's selector of its three sections — Import (what opens),
-// Export and Reset — with the section in the address (`?data=export`), replaced and not pushed, so Back leaves the
-// page instead of walking its sections.
+// The section goes in the address (`?data=export`), replaced and not pushed, so Back leaves the page instead of
+// walking its sections.
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';

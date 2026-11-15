@@ -1,7 +1,6 @@
 // Staff → Settings (WORKBOOK «Pantallas · Ajustes de Personal»; STAFF-F22): the default working day,
 // only for whoever may save it — Working day starts/ends (HH:MM) and Break duration, which a new
-// schedule proposes (STAFF-F13). The old module's other eight settings changed nothing and are gone
-// (FIX-STAFF-SETTINGS-ORPHANS). «Save» sends only what changed (`staff.settings.update`). The values come
+// schedule proposes (STAFF-F13). «Save» sends only what changed (`staff.settings.update`). The values come
 // live (`staff.settings.get`: the proposed ones until the business saves); a value the server refuses is
 // said under its field and nothing is saved.
 import { AppPage } from '@erplora/ui/shell';
@@ -108,7 +107,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(between(s.field('default_break_duration'), s.find('staff-settings-save-error').element, s.save())).toBe(true);
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const REFUSAL = {
       error: {
         code: 'invalid_payload',
@@ -173,7 +172,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.save().disabled).toBe(true);
   });
 
-  // gh:hub#2541: a read that failed never passes for the business's settings (no proposed values to save).
+  // A read that failed never passes for the business's settings (no proposed values to save).
   it('a read that fails says so with «Retry» instead of «Loading…», with no form; «Retry» asks again', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId('staff.settings.get'), 'boom'));

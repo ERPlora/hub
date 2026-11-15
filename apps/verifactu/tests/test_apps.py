@@ -53,11 +53,11 @@ def test_verifactu_is_a_free_module_of_the_sales_group_in_no_template():
     assert config in module_configs()
     assert config.category is Category.SALES
     assert config.premium is False
-    # The old module's shield, registered in the shell (packages/ui/src/shell/icons.ts, ui#34).
+    # The old module's shield, registered in the shell (packages/ui/src/shell/icons.ts).
     assert config.icon == "ion:shield-checkmark-outline"
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
-    # Its owner turns it on, never a template (PLAN-HUB round 2026-11-07, hub#998): it lists no vertical.
+    # Its owner turns it on, never a template: it lists no vertical.
     assert config.verticals == []
     assert config.listed is True
 
@@ -207,14 +207,13 @@ def test_the_system_alone_receives_the_accounts_photo():
     assert "verifactu.sync_config" not in verifactu().permissions
 
 
-# The Home's hooks (PLAN-HUB round 2026-10-21; FIX-VERIFACTU-SETUP-HOOKS): the old module's module.json `setup` and
-# `widgets` (it had no `bell`), ported to the ways a business reaches the AEAT now (PLAN §30, VeriFactu on Free).
+# The Home's hooks: the setup step and the panels, on the ways a business reaches the AEAT.
 
 
 def test_the_homes_step_is_the_old_set_up_verifactu_on_the_way_to_production():
     """«Set up VeriFactu»: done once the chosen way could carry the records to the AEAT of production (ERPlora's with
     the signed authorisation approved, or the business's own valid certificate), read from the configuration's own
-    query; whoever configures VeriFactu sets it up in Configuration. Only a business in Spain is asked (hub#682)."""
+    query; whoever configures VeriFactu sets it up in Configuration. Only a business in Spain is asked."""
     (step,) = verifactu().setup
     assert isinstance(step, SetupStep)
     assert (
@@ -248,10 +247,9 @@ def registry_output(name: str) -> set[str]:
 
 
 def test_the_step_is_important_in_testing_and_its_text_never_says_it_stops_the_sale():
-    """gh:hub#1726: the old checklist painted VeriFactu as «Necesario para vender» while the till sold without it.
-    Testing files without the step, so there it is functional («Important»); base's legal level («Needed to
-    invoice») is only where the hub files in production, which refuses the sale without it. Its text names what it
-    is for, not a wall, in both."""
+    """The step never says «Necesario para vender» while the till sells without it. Testing files without the step,
+    so there it is functional («Important»); base's legal level («Needed to invoice») is only where the hub files in
+    production, which refuses the sale without it. Its text names what it is for, not a wall, in both."""
     (step,) = verifactu().setup
     key = f"verifactu.{step.key}"
     assert step.required is True
@@ -265,8 +263,8 @@ def test_the_step_is_important_in_testing_and_its_text_never_says_it_stops_the_s
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():
-    """gh:verifactu#143: with the app in English the old Home said «Configura VeriFactu»; the Spanish reader keeps
-    the title they already knew, and the description says the ways of today."""
+    """The step is in the reader's language: the Spanish reader keeps the title they already knew («Configura
+    VeriFactu»), and the description says the ways of today."""
     (step,) = verifactu().setup
     with translation.override("en"):
         english = (str(step.title), str(step.description))
@@ -296,7 +294,7 @@ PANELS = ["pending", "contingency", "by_status", "events"]
 def test_the_homes_panels_are_the_old_modules_four():
     """What is not in the AEAT yet on by default, the contingency queue, the records by status and the latest AEAT
     events to turn on, each on the query of the old one; the events in a component of the app, which names each
-    event's type in the reader's language (gh:verifactu#139: never its code)."""
+    event's type in the reader's language, never its code."""
     panels = verifactu().widgets
     assert all(isinstance(panel, Widget) for panel in panels)
     with translation.override("en"):  # the label is a lazy translation
@@ -337,7 +335,7 @@ def test_the_homes_panels_are_the_old_modules_four():
                 "verifactu.view_record",
                 {},
                 {"value": "queued_count", "severity": "severity"},
-                # Under its figure, what it counts, as the old one (FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT).
+                # Under its figure, what it counts, as the old one.
                 {"format": "number", "label": "In contingency queue"},
             ),
             (
@@ -406,7 +404,7 @@ def test_each_panel_is_refreshed_by_the_events_that_re_run_its_query():
 
 
 def test_the_hooks_icons_are_registered_in_the_shell():
-    # Registered icons only (an unregistered one paints nothing): the old `shield-checkmark-outline` is registered (ui#34);
+    # Registered icons only (an unregistered one paints nothing): the old `shield-checkmark-outline` is registered;
     # `stats-chart-outline` waits in UI-REQUESTS.md.
     (step,) = verifactu().setup
     icons = [step.icon, *(panel.icon for panel in verifactu().widgets)]

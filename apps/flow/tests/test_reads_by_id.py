@@ -1,8 +1,7 @@
-"""FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: one record of Automations by its id — a draft the assistant
-proposed, a run of the History, a question waiting for an answer —, with the words its screen names it by. The
-assistant's card names by them what a write of flow names by its id (an automation, by ``flow.flow.detail``), never by
-the id; the API reads them too. Each is read with the permission of its list (a question, only by whom it was asked
-of), and each is of the business that asks.
+"""One record of Automations by its id — a draft the assistant proposed, a run of the History, a question waiting for an
+answer —, with the words its screen names it by. The assistant's card names by them what a write of flow names by its id
+(an automation, by ``flow.flow.detail``), never by the id; the API reads them too. Each is read with the permission of
+its list (a question, only by whom it was asked of), and each is of the business that asks.
 """
 
 import datetime as dt
@@ -20,7 +19,7 @@ from base.tenancy.tests import hubs
 
 from .conftest import ctx_for, make_draft, make_flow, make_run, run
 
-#: Thursday 15 October 2026 at 21:00 in Madrid, the business's clock in phase 1 (an instant: 19:00 UTC).
+#: Thursday 15 October 2026 at 21:00 in Madrid, the test business's clock (an instant: 19:00 UTC).
 STARTED = dt.datetime(2026, 10, 15, 19, 0, tzinfo=dt.UTC)
 #: …as each language writes a day and a time (the card's own CLDR words: a medium day and a short time).
 WHEN = {"es": "15 oct 2026, 21:00", "en": "Oct 15, 2026, 9:00\u202fPM"}

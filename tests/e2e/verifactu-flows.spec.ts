@@ -1,4 +1,4 @@
-// VeriFactu flow by flow (APP-VERIFACTU; apps/verifactu/WORKBOOK.md), in Chrome against the real Hub, Invoicing and
+// VeriFactu flow by flow (apps/verifactu/WORKBOOK.md), in Chrome against the real Hub, Invoicing and
 // Sales, no mocks. Each flow with a screen leaves its evidence in the three sizes of the migration
 // (`APP-VERIFACTU-<flow>-390|834|1440` in `.artifacts`):
 //   - VERIFACTU-F01: «My apps» opens VeriFactu on Records, with its six tabs;

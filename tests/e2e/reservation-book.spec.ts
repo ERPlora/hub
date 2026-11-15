@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, HUB_DIR, psql, settled, shot, shown, untilStill } from './helpers';
+import { A, api, capture, HUB_DIR, psql, scrolledTo, settled, shot, shown, untilStill } from './helpers';
 import { liveStreamsSettled, watchLiveStreams } from './live-streams';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
 
@@ -28,7 +28,7 @@ const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-/** The business's wall clock (Madrid in phase 1), `now + minutes`, rounded up to 5 minutes. */
+/** The business's wall clock (Madrid, hub `a`'s zone), `now + minutes`, rounded up to 5 minutes. */
 function madrid(minutes = 0): { date: string; time: string; weekday: number } {
   const at = new Date(Date.now() + minutes * 60_000);
   const parts = Object.fromEntries(
@@ -140,12 +140,14 @@ async function openTheBook(context: BrowserContext): Promise<void> {
 }
 
 /** A cancelled reservation says why next to «Cancelled» (hub#862), at every size: in its row — its card on a phone —
- *  (`<flow>-<width>`) and on top of its panel, opened from the book (`<flow>-form-<width>`). */
+ *  (`<flow>-<width>`) and on top of its panel, opened from the book (`<flow>-form-<width>`). The book paints its card
+ *  as a row (and back) a frame or more after the resize, so the reason is scrolled to as the new size paints it
+ *  (`scrolledTo`, hub#1303). */
 async function saysWhy(page: Page, id: string, flow: string, why: string): Promise<void> {
   const reason = shown(page).locator(`[data-testid=reservation-list-row][data-id="${id}"] [data-testid=reservation-list-reason]`);
   await shots(page, flow, async () => {
     await expect(reason).toHaveText(why);
-    await reason.scrollIntoViewIfNeeded();
+    await scrolledTo(reason);
   });
   const form = page.locator('[data-testid=reservation-form]');
   await rowAction(page, 'reservation-list', id, 'edit');
@@ -500,10 +502,9 @@ test('A pending reservation nobody confirmed turns Cancelled on the open book th
     expect(detail.data).toMatchObject({ status: 'cancelled', cancellation_reason: 'unconfirmed' });
     await shots(page, 'RESERVATION-F13', async () => {
       // On a phone the book is cards, painted again on the resize: the status, at the card's foot, is brought into view
-      // once they stand still.
+      // as the new size paints it (`scrolledTo`, hub#1303).
       await expect(row).toContainText('Cancelled');
-      await untilStill(page);
-      await row.getByText('Cancelled').scrollIntoViewIfNeeded();
+      await scrolledTo(row.getByText('Cancelled'));
     });
   } finally {
     await context.close();

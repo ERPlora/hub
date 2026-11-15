@@ -159,7 +159,7 @@ def test_only_get_and_head(client, a):
 
 @pytest.mark.parametrize("name", ["exports/invoice-0001.pdf", "website/private.png", "website/imgs/3f2a9c.png"])
 def test_a_file_outside_the_public_folders_is_never_served(client, a, hub_files, name):
-    # The store keeps the modules' private documents too (PLAN-HUB block 7): only what a module publishes is served.
+    # The store keeps the modules' private documents too: only what a module publishes is served.
     hub_files.save(f"{hub_prefix(a.id)}/{name}", ContentFile(PNG))
     assert get(client, media_url(a.id, name)).status_code == 404
 
@@ -186,7 +186,7 @@ def test_the_image_on_disk_is_served(client, on_disk):
     assert get(client, media_url(on_disk.id, "website/img/3f2a9c.png")).status_code == 200
 
 
-# ── The folders each app declares (FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES) ──────────────────────────
+# ── The folders each app declares ───────────────────────────────────────────────────────────────────────────────────
 #
 # An app says which folders of its own it serves in its LiveAppConfig: ``public_media`` (anyone, as the website's
 # images) and ``members_media`` (only a session of this hub, as the people's photos). base gathers them from the apps

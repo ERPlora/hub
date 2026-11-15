@@ -1,12 +1,11 @@
 // The filters of the Sales list (SALE-F28: status, payment, date, total) as the table's funnel holds them
 // (by the list's parameter names, as typed) and as `sale.sale.list` takes them: the total in euros typed →
-// cents (sales#428); an amount that is not one, or a «to» day before its «from», never reaches the server
+// cents; an amount that is not one, or a «to» day before its «from», never reaches the server
 // (the table says so under it); a date range, when there is one, replaces the period. «Payment» searches
 // the business's methods on the server, shown as the reader reads them, sent by their stored name.
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
 import { describe, expect, it, vi } from 'vitest';
 
-import { filterQuery, filtersInUse, hasDateRange, invalidAmounts, paymentMethodSearch, reversedDates, SALE_STATUSES } from './salesFilters';
+import { filterQuery, filtersInUse, hasDateRange, paymentMethodSearch, reversedDates, SALE_STATUSES } from './salesFilters';
 
 describe('sales filters', () => {
   it('offer the three statuses of a sale', () => {
@@ -36,14 +35,13 @@ describe('sales filters', () => {
 
   it('an amount that is not one, or a status that is not one, never goes', () => {
     expect(filterQuery({ total_min: 'abc', total_max: '-5', status: 'open' })).toEqual({});
-    expect(invalidAmounts({ total_min: 'abc', total_max: '-5' })).toEqual(['total_min', 'total_max']);
-    expect(invalidAmounts({ total_min: '12.50', total_max: ' ' })).toEqual([]);
+    expect(filterQuery({ total_min: '12.50', total_max: ' ' })).toEqual({ total_min: 1250 });
   });
 
   it('«Total» is typed in the business’s currency, with its decimals: yen without them (flow business-currency)', () => {
     const yen = { currency: 'JPY', decimals: 0 };
     expect(filterQuery({ total_min: '1000', total_max: '2500' }, yen)).toEqual({ total_min: 1000, total_max: 2500 });
-    expect(invalidAmounts({ total_min: '10,5' }, yen)).toEqual(['total_min']);
+    expect(filterQuery({ total_min: '10,5' }, yen)).toEqual({});
     expect(filtersInUse({ total_min: '1000' }, yen)).toBe(1);
   });
 
@@ -67,7 +65,7 @@ describe('sales filters', () => {
     expect(hasDateRange({ date_to: '2026-10-14' })).toBe(true);
   });
 
-  it('«Payment» searches the methods on the server: the reader’s name shown, the stored one sent (sales#181)', async () => {
+  it('«Payment» searches the methods on the server: the reader’s name shown, the stored one sent', async () => {
     const call = vi.fn().mockResolvedValue({
       rows: [
         { id: 'm1', name: 'Cash', display_name: 'Efectivo' },
@@ -87,7 +85,7 @@ describe('sales filters', () => {
     expect(call).toHaveBeenLastCalledWith('sale.payment_method.list', { limit: 20 });
   });
 
-  it('a search that fails is the lookup’s error, never a box of free text (sales#260)', async () => {
+  it('a search that fails is the lookup’s error, never a box of free text', async () => {
     const load = paymentMethodSearch({ api: { call: vi.fn().mockRejectedValue(new Error('offline')) } } as never);
     await expect(load('efe')).rejects.toThrow('offline');
   });

@@ -1,7 +1,7 @@
 """Two devices at once (TABLE-F10, F15, F16): real sessions in threads, real row locks.
 
-Two waiters seating the same table at the same instant leave one check (the old module let both in:
-TABLES-F10 «sin ejecutar»); two transfers to the same free table, one; two crossed merges never deadlock.
+Two waiters seating the same table at the same instant leave one check;
+two transfers to the same free table, one; two crossed merges never deadlock.
 
 A detail (a zone, a table, a check) that a deletion lands in the middle of answers what it read or 404,
 never a 500.
@@ -112,7 +112,7 @@ def test_two_transfers_to_the_same_free_table_leave_one_there():
 
 
 @contextmanager
-def crossing_after_the_first_lock(other, table: str):
+def crossing_after_the_first_lock(other, table: str):  # noqa: C901
     """Forces two lock orders to cross instead of hoping two threads interleave (rv-121: released together
     at a barrier, a merge locking its two checks one by one in the order of the call still passed 5 of 5).
 

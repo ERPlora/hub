@@ -1,4 +1,4 @@
-// flow: combo-e2e-wait — FIX of the Menus specs' wait (FIX-HUB-COMBO-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: combo-e2e-wait — the Menus specs' wait
 // Before a capture or a measurement, the Menus specs (combo-*.spec.ts) wait for the screen to stop moving with the
 // harness's one wait, `untilStill` (helpers.ts). Their own wait asked the document alone for its animations, which
 // leaves shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come

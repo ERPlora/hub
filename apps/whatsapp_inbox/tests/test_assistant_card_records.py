@@ -1,8 +1,8 @@
-"""FIX-HUB-WHATSAPP_INBOX-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#571): the card of a write of the WhatsApp inbox
-says which conversation, customer card, message, note or template it acts on by its name, read as whoever asks, never
-by its id, and leaves it out when that person may not read it or it is not there. A conversation goes by what the
-inbox calls it, a message and a note by their text, a template by its name and its language, as its sheet says
-«¿Borrar esta plantilla?»; the customer card is Customers', which the inbox requires, by its own read.
+"""The card of a write of the WhatsApp inbox (hub#571) says which conversation, customer card, message, note or template
+it acts on by its name, read as whoever asks, never by its id, and leaves it out when that person may not read it or it
+is not there. A conversation goes by what the inbox calls it, a message and a note by their text, a template by its name
+and its language, as its sheet says «¿Borrar esta plantilla?»; the customer card is Customers', which the inbox
+requires, by its own read.
 """
 
 import dataclasses

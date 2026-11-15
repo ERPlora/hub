@@ -148,11 +148,11 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
     from live.operations import registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("whatsapp_inbox.")}
-    # FLOW-F31 added message.notify, the narrow send an automation may be granted; WHATSAPP_INBOX-F09 the bell's
-    # count and the device's notices; WHATSAPP_INBOX-F29 template_sample.upload, the file of a header; WHATSAPP_INBOX-F20
-    # and F21 message.get and conversation.flag, what the automatic answers read and mark; template_sample.detail, the
-    # read the assistant's card names a header's file by (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED); note.get and
-    # template.get, what it names a note and a template by (hub#571).
+    # FLOW-F31 added message.notify, the narrow send an automation may be granted; WHATSAPP_INBOX-F09 the bell's count
+    # and the device's notices; WHATSAPP_INBOX-F29 template_sample.upload, the file of a header; WHATSAPP_INBOX-F20 and
+    # F21 message.get and conversation.flag, what the automatic answers read and mark; template_sample.detail, the read
+    # the assistant's card names a header's file by; note.get and template.get, what it names a note and a template by
+    # (hub#571).
     assert len(ops) == 50
     for name, op in ops.items():
         if name in CARD_ONLY:
@@ -167,8 +167,8 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
 
 
 def test_the_worker_resumes_what_was_left_for_erplora():
-    # Phase 2: the worker reaches every hub (hub_due) and claims, with SKIP LOCKED, the messages and
-    # erasures whose delivery after the COMMIT never ended (WORKBOOK «Contrato con el SaaS»).
+    # The worker reaches every hub (hub_due) and claims, with SKIP LOCKED, the messages and erasures whose delivery
+    # after the COMMIT never ended (WORKBOOK «Contrato con el SaaS»).
     assert inbox().scheduled_tasks == [
         {
             "name": "resume_deliveries",
@@ -179,7 +179,7 @@ def test_the_worker_resumes_what_was_left_for_erplora():
     ]
 
 
-# ── The Home's hooks (PLAN-HUB round 2026-10-21) and the device's notices (round 2026-10-23) ──────────────────
+# ── The Home's hooks and the device's notices ────────────────────────────────────────────────────────────────
 
 #: What changes whether a conversation waits for an answer (open, its last message the customer's, not erased): a
 #: message arrives (the customer's, or the echo of one sent from the business's phone), one is sent from the Hub, its
@@ -194,9 +194,8 @@ AWAITING = [
 
 
 def test_the_bell_counts_the_customers_waiting_for_an_answer():
-    """WHATSAPP_INBOX-F09: the old module's counter of the bell (its module.json ``bell``, whatsapp_inbox#244,
-    hub#1678), «WhatsApp customers waiting for an answer», on what the inbox calls waiting for an answer, leading
-    to the inbox; whoever may read the inbox sees it."""
+    """WHATSAPP_INBOX-F09: «WhatsApp customers waiting for an answer», on what the inbox calls waiting for an answer,
+    leading to the inbox; whoever may read the inbox sees it."""
     [counter] = inbox().bell
     assert isinstance(counter, BellCounter)
     assert (
@@ -234,9 +233,9 @@ def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
 
 
 def test_it_tells_the_device_of_each_customer_left_waiting():
-    """hub#2303 (whatsapp_inbox#244): the installed app tells the device, with a system notice, of each message of a
-    customer that is left waiting for an answer: «WhatsApp · {display_name}» with what the customer wrote; a tap opens that
-    conversation in the inbox. Refreshed by a message arriving and by a conversation opened again."""
+    """The installed app tells the device, with a system notice, of each message of a customer that is left waiting for
+    an answer: «WhatsApp · {display_name}» with what the customer wrote; a tap opens that conversation in the inbox.
+    Refreshed by a message arriving and by a conversation opened again."""
     [notice] = inbox().notices
     assert isinstance(notice, DeviceNotice)
     assert (notice.key, notice.operation, list(notice.when), dict(notice.params)) == (
@@ -263,5 +262,4 @@ def test_the_notice_falls_back_to_the_old_words_in_spanish():
 
 
 def test_the_inbox_has_no_setup_steps_nor_panels():
-    # The old module declared neither (its module.json has only `bell`).
     assert (inbox().setup, inbox().widgets) == ([], [])

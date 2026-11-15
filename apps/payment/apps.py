@@ -14,7 +14,7 @@ class PaymentConfig(LiveAppConfig):
     icon = "lucide:send"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Outgoing payments to suppliers, with their reference and an approval step before they leave."
     )
@@ -25,7 +25,7 @@ class PaymentConfig(LiveAppConfig):
         "it, who approved it and when each step happened. You choose the account or the cash it is "
         "paid from. It moves no money and talks to no bank: you mark each step when it happened."
     )
-    # In no template: the old catalogue retired it from the MVP; a business turns it on from the store.
+    # In no template: a business turns it on from the store.
     verticals = []
     # Nothing: the till's tenders are the sale app's and nothing here reads them (WORKBOOK «Decisión»).
     requires = []
@@ -35,8 +35,8 @@ class PaymentConfig(LiveAppConfig):
         "payment.add_payment",
         "payment.approve_payment",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). As in the old
-    # module: the manager has all three; the employee only looks.
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The manager has
+    # all three; the employee only looks.
     role_permissions = {
         "hub_owner": ["payment.*"],
         "hub_admin": ["payment.*"],
@@ -51,8 +51,8 @@ class PaymentConfig(LiveAppConfig):
     ]
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: Its outgoing payments here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        its outgoing payments are documents nothing archives yet, so the database stays."""
         from apps.payment import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

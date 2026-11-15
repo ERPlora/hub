@@ -1,11 +1,10 @@
-// flow: MODIFIER-F04 (FIX-HUB-MODIFIER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/modifier/WORKBOOK.md «Hoja del grupo»)
+// flow: MODIFIER-F04 (apps/modifier/WORKBOOK.md «Hoja del grupo»)
 // Modifiers paints and reads a supplement in the business's currency: its country's, as erplora.com registered it
 // (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: the
-// group's sheet reads the supplement of an option of the run in złoty and no «€», in 390, 834 and 1440 (captures
-// `FIX-HUB-MODIFIER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`); «Add option» names the field «Supplement (PLN)»
-// and «2,50» is saved as 250 minor units of złoty (read back through the API). Back in Spain the same supplement
-// reads in euros and the field says EUR (`…-es-1440`). What the run creates is deleted after it and `a`'s
-// registration put back, also when a test fails.
+// group's sheet reads the supplement of an option of the run in złoty and no «€», in 390, 834 and 1440; «Add option»
+// names the field «Supplement (PLN)» and «2,50» is saved as 250 minor units of złoty (read back through the API). Back
+// in Spain the same supplement reads in euros and the field says EUR. What the run creates is deleted after it and
+// `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
@@ -73,7 +72,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: MODIFIER-F04 a business in Poland reads and types the supplements of a group in złoty in 390, 834 and 1440`, async ({
+test(`MODIFIER-F04 a business in Poland reads and types the supplements of a group in złoty in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -119,7 +118,7 @@ test(`${KEY}: MODIFIER-F04 a business in Poland reads and types the supplements 
   );
 });
 
-test(`${KEY}: MODIFIER-F04 back in Spain the supplements of a group are in euros`, async ({ page }) => {
+test(`MODIFIER-F04 back in Spain the supplements of a group are in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await openSheet(page);
   await expect(cheese(page)).toContainText(EUROS);

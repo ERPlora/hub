@@ -1,10 +1,10 @@
 // flow: KITCHEN-F09, KITCHEN-F21, KITCHEN-F22, KITCHEN-F23 — Kitchen → Tickets in Chrome, with the real Sales,
 // Inventory, Kitchen and Printing apps: a round sent from a check of Sales is moved from its row — «Fire», «Ready»,
 // «Recall», «Ready» again and «Served» — and «⋮ → Reprint» queues its copy (F21, F09); another is cancelled after a
-// dialog that says the check in the till does not change, with its reason (F22, kitchen#166); «New ticket» makes one
-// by hand from page 2 and the list comes back to page 1 to show it (F23, kitchen#133); a dish refused by the server is
+// dialog that says the check in the till does not change, with its reason (F22); «New ticket» makes one
+// by hand from page 2 and the list comes back to page 1 to show it (F23); a dish refused by the server is
 // marked with its reason, in English and in Spanish, and what no field shows the dialog says itself (F23, hub#833). On a
-// tablet the ticket's number reads whole (kitchen#134). Each screen in 390×844, 834×1112 and 1440×900 (`APP-KITCHEN-<flow>-<size>`). What a
+// tablet the ticket's number reads whole. Each screen in 390×844, 834×1112 and 1440×900 (`APP-KITCHEN-<flow>-<size>`). What a
 // run creates — the printer «e2e KTK <run>», products `E2E-KTK-<run>-…`, checks and tickets «e2e ktk <run> …» — is
 // deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -122,7 +122,7 @@ test('KITCHEN-F21, F09: a ticket is moved from its row up to «Served», and «R
     await expect(row(page, sent.number)).toContainText('Served');
     expect(await statusOf(context, sent.id)).toBe('served');
 
-    // kitchen#134: from a tablet upright to a laptop, table or cards, the number reads whole, never «20261021-00…»
+    // From a tablet upright to a laptop, table or cards, the number reads whole, never «20261021-00…»
     // on every row: its text fits every box that clips it, up to its row.
     for (const width of [820, 1024, 1112, 1280]) {
       await page.setViewportSize({ width, height: 834 });
@@ -173,7 +173,7 @@ test('KITCHEN-F22: «Cancel» asks first, says the check in the till does not ch
     await rowAction(page, 'kitchen-tickets', sent.id, 'cancel');
     const dialog = page.locator('ion-modal[data-testid=kitchen-tickets-cancel]');
     await expect(dialog).toContainText(`Cancel ticket ${sent.number}?`);
-    // kitchen#166: what cancelling does and does not do, before doing it.
+    // What cancelling does and does not do, before doing it.
     await expect(dialog).toContainText('The check in the till does not change: its dishes stay on it.');
     await dialog.locator('[data-testid=kitchen-tickets-cancel-reason] input').fill('Guest left');
     await capture(page, 'KITCHEN-F22', async () => {
@@ -325,7 +325,7 @@ test('KITCHEN-F23: «New ticket» from page 2 makes one by hand and the list com
     });
     await form.locator('[data-testid=kitchen-ticket-form-submit]').click();
     await expect(form).toBeHidden();
-    // kitchen#133: the new one is seen, newest first, on page 1.
+    // The new one is seen, newest first, on page 1.
     await expect(row(page, `${CHECK} by hand`)).toContainText('To prepare');
     await expect(row(page, `${CHECK} fill 0`)).toHaveCount(0);
   } finally {

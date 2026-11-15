@@ -1,5 +1,5 @@
 // Types of base's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from base/schemas.py. Written by
-// hand, as the apps', until V3 generates them from `/api/openapi.json`. Keep it in step with schemas.py and
+// hand, as the apps'. Keep it in step with schemas.py and
 // `frontend/generated/operations.json`. The Home's take no input: each one answers for the person and the hub of the request.
 
 type NoInput = Record<string, never>;
@@ -102,7 +102,7 @@ export interface DeviceNoticeRow {
   route: string;
 }
 
-// ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────
+// ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Where a module's right comes from (`base.entitlement`): free, the plan, a purchase, with an app that needs it,
  *  or none (it needs a subscription, bought on erplora.com). */
@@ -273,7 +273,7 @@ export interface PlanUsage {
   meters: PlanMeter[];
 }
 
-// ── Data: blueprints, imports and reset (APP-BASE-2) ──
+// ── Data: blueprints, imports and reset ───────────────
 
 export type BlueprintPurpose = 'backup' | 'template';
 /** How a dataset of a load went (`base.DatasetStatus`). */
@@ -316,7 +316,7 @@ export interface BlueprintDataset extends BlueprintPart {
 }
 
 export interface BlueprintAppSummary extends BlueprintApp {
-  /** «turns_on»: off here, the load turns it on first and then loads it (round 2026-10-27); «inactive»: left off. */
+  /** «turns_on»: off here, the load turns it on first and then loads it; «inactive»: left off. */
   status: 'on' | 'turns_on' | 'inactive' | 'unknown';
   datasets: BlueprintDataset[];
 }
@@ -426,7 +426,7 @@ export interface HubReset {
   dry_run: boolean;
   /** What to type to confirm: the business's name. */
   confirm_with: string;
-  /** False in phase 1: the business shares its database with other hubs. */
+  /** False while the business shares its database with other hubs. */
   available: boolean;
   sections: ResetSection[];
   /** Always empty: the worker empties after copying (`base.hub.dumps` says how it went). */
@@ -464,11 +464,11 @@ export interface HubDumps {
   dumps: HubDump[];
 }
 
-// ── Business settings (APP-BASE-6) ──
+// ── Business settings ───────────────
 
 /** `base.BusinessOut`: the business as erplora.com registered it, each value named in the person's language. */
 
-// ── The shared image library (round 2026-10-30, base/image_catalog.py) ──
+// ── The shared image library (base/image_catalog.py) ──
 
 /** An image of the library: what a product, a service or a set menu keeps is its `reference`. */
 export interface CatalogImage {
@@ -519,7 +519,7 @@ export interface Business {
   settings_url: string;
 }
 
-// ── System (APP-BASE-7) ──
+// ── System ───────────────
 
 /** `base.SystemStatusOut`: the release running and where the business's data lives. */
 export interface SystemStatus {
@@ -527,7 +527,7 @@ export interface SystemStatus {
   version: string;
   /** When it was published (ISO 8601), or null: never made up. */
   released_at: string | null;
-  /** Phase 1: the database every business shares. */
+  /** Whether the business still shares one database with others. */
   shared_database: boolean;
 }
 
@@ -565,7 +565,7 @@ export interface FailedEventPage {
   total: number;
 }
 
-// ── Files (APP-BASE-8) ──
+// ── Files ───────────────
 
 /** How the screen shows a file (`base.schemas.FilePreview`); `''`: it does not, it is downloaded. */
 export type FilePreview = 'image' | 'pdf' | 'text' | 'table' | 'json' | 'audio' | 'video' | '';
@@ -602,7 +602,7 @@ export interface FilesListing {
   can: { upload: boolean; delete: boolean };
 }
 
-// ── The way in (APP-BASE-3) ────────────────────────────────────────────────────────────────────────────────────
+// ── The way in ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** `base.PinPersonOut`: a face of the PIN pad's grid; `id` is what a PIN entry names, never the account. */
 export interface PinPerson {
@@ -686,7 +686,7 @@ export interface Preferences {
   ui_scale: ProfileUiScale;
 }
 
-// ── People and permissions (APP-BASE-5) ──
+// ── People and permissions ───────────────
 
 /** `base.PersonWaysOut`: the account always; at the shared tills, a PIN and a badge. */
 export interface PersonWays {
@@ -836,7 +836,7 @@ export interface ApprovalPass {
   expires_in: number;
 }
 
-// ── Assistant (APP-BASE-9) ──
+// ── Assistant ───────────────
 
 /** `base.AssistantUsageOut`: this month's messages of the assistant, as erplora.com counts them. */
 export interface AssistantUsage {
@@ -862,8 +862,7 @@ export interface AssistantReportInput {
   comment?: string;
   question?: string;
   answer: string;
-  /** Whether its turn brought pages of the web (the turn's `done.web`); left out when the chat does not know
-   *  (saas#287). */
+  /** Whether its turn brought pages of the web (the turn's `done.web`); left out when the chat does not know. */
   web?: boolean;
 }
 
@@ -873,7 +872,7 @@ declare module '@erplora/ui/sdk' {
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
     'base.bell.counters': { input: NoInput; output: BellCounters };
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
-    // Apps (APP-BASE-4)
+    // Apps
     'base.app.list': { input: NoInput; output: AppList };
     'base.app.enable': { input: AppChangeIn; output: AppChange };
     'base.app.disable': { input: AppChangeIn; output: AppChange };
@@ -881,7 +880,7 @@ declare module '@erplora/ui/sdk' {
     'base.app.retry': { input: AppChangeIn; output: AppChange };
     'base.plan.usage': { input: NoInput; output: PlanUsage };
     'base.system.cards': { input: NoInput; output: { cards: SystemCardDef[] } };
-    // ── Data (APP-BASE-2) ──
+    // ── Data ───────────────
     'base.blueprint.list': { input: NoInput; output: { templates: Template[]; empty: boolean } };
     'base.blueprint.inspect': { input: BlueprintSource; output: BlueprintSummary };
     'base.blueprint.import': { input: BlueprintImportInput; output: ImportRow };
@@ -899,19 +898,19 @@ declare module '@erplora/ui/sdk' {
     'base.hub.dumps': { input: NoInput; output: HubDumps };
     // 503 `base.dumps_unavailable` when the copy cannot be linked now; 404 when it is no longer kept.
     'base.hub.dump_link': { input: { id: string }; output: { url: string; expires_at: string } };
-    // ── Business settings (APP-BASE-6) ──
+    // ── Business settings ───────────────
     'base.business.get': { input: NoInput; output: Business };
-    // The shared image library (round 2026-10-30): 503 `base.image_library_unavailable` when it cannot be read.
+    // The shared image library: 503 `base.image_library_unavailable` when it cannot be read.
     'base.catalog_image.search': { input: CatalogImageSearchIn; output: CatalogImagePage };
     'base.catalog_image.get': { input: { reference: string }; output: CatalogImage };
-    // System (APP-BASE-7)
+    // System
     'base.system.status': { input: NoInput; output: SystemStatus };
     'base.event.list': { input: NoInput; output: { entries: EventLogEntry[] } };
     'base.failed_event.list': { input: { limit?: number; offset?: number }; output: FailedEventPage };
     'base.failed_event.retry': { input: { id: string }; output: { id: string } };
     'base.failed_event.retry_all': { input: NoInput; output: { count: number } };
     'base.failed_event.discard': { input: { id: string; reason?: string }; output: { id: string } };
-    // ── Files (APP-BASE-8) ──
+    // ── Files ───────────────
     'base.file.list': { input: { folder?: string }; output: FilesListing };
     'base.file.read': {
       input: { path: string; inline?: boolean };
@@ -926,7 +925,7 @@ declare module '@erplora/ui/sdk' {
     'base.file.move': { input: { path: string; to?: string }; output: { path: string; name: string } };
     'base.file.delete': { input: { path: string }; output: { path: string; folder: boolean } };
 
-    // The way in (APP-BASE-3)
+    // The way in
     'base.access.door': { input: NoInput; output: AccessDoor };
     'base.access.faces': { input: NoInput; output: AccessDoor };
     'base.pin.set': { input: { pin: string; current?: string }; output: { set: boolean } };
@@ -950,7 +949,7 @@ declare module '@erplora/ui/sdk' {
     };
     'base.profile.avatar_remove': { input: NoInput; output: { avatar_url: string } };
 
-    // People and permissions (APP-BASE-5)
+    // People and permissions
     'base.person.list': { input: NoInput; output: { people: Person[]; seats: Seats } };
     'base.person.detail': { input: { person: string }; output: PersonDetail };
     'base.person.pin_remove': { input: { person: string }; output: PersonDetail };
@@ -968,14 +967,14 @@ declare module '@erplora/ui/sdk' {
     'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
     'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };
     'base.api_doc.settings_update': { input: { docs_enabled: boolean }; output: { docs_enabled: boolean; can_change: boolean } };
-    // Assistant (APP-BASE-9); its turn is a stream the shared panel reads itself (@erplora/ui, Assistant/stream.ts).
+    // Assistant; its turn is a stream the shared panel reads itself (@erplora/ui, Assistant/stream.ts).
     'base.assistant.usage': { input: NoInput; output: AssistantUsage };
     'base.assistant.report': { input: AssistantReportInput; output: { sent: boolean; duplicate: boolean } };
     'base.assistant.transcribe': {
       input: { audio: string; mime_type: string; language?: string };
       output: { text: string; language: string };
     };
-    // «Read aloud» in a server voice (round 2026-11-03n): its route answers the mp3 itself (assistant-hub.ts
+    // «Read aloud» in a server voice: its route answers the mp3 itself (assistant-hub.ts
     // `speakAloud`); this output is what an integration that accepts only JSON gets.
     'base.assistant.speak': {
       input: { text: string; language?: string; voice?: string };

@@ -1,4 +1,4 @@
-"""The business's own data as the Hub shows it (APP-BASE-6): its clock, its currency and the names of what the SaaS
+"""The business's own data as the Hub shows it: its clock, its currency and the names of what the SaaS
 registered.
 
 The SaaS owns the business's name, country, time zone and language (CLAUDE.md, «Contrato SaaS ↔ Hub»): it pushes them
@@ -91,7 +91,7 @@ def money_text(cents: int | Decimal, currency: str, *, language: str | None = No
     money, the same as the browser (``Intl.NumberFormat``): «PLN 15.50», «€15.50», «15,50 PLN», «¥1,500».
 
     CLDR's pattern for ``language`` (the active one by default) with CLDR's currency spacing, which Babel skips (flow
-    money-text). The thousands are grouped as every screen paints them (hub#1090), but with ``grouped=False``, for an
+    money-text). The thousands are grouped as every screen paints them, but with ``grouped=False``, for an
     export its import reads back. A fraction of a minor unit (a unit price without VAT, 0.8264 €) keeps its decimals.
     """
     cents = Decimal(cents)

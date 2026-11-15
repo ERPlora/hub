@@ -191,7 +191,7 @@ describe('ThreadView', () => {
     });
   });
 
-  // gh:hub#439: the installed app opens nothing on a `_blank` link; its system browser does (`open_external_url`).
+  // The installed app opens nothing on a `_blank` link; its system browser does (`open_external_url`).
   it('in the installed app, an attachment and a photo open in the system browser', async () => {
     const invoke = vi.fn(async () => undefined);
     (window as { __TAURI__?: unknown }).__TAURI__ = { core: { invoke } };

@@ -11,8 +11,8 @@ Sales refuses, nothing of the table changes either.
 
 Concurrency: a write that seats a check locks the table first (``select_for_update``) and checks it is
 still free under the lock, so two waiters seating the same table at once leave one check; a write on a
-check locks the check. Phase 1 has no relay: before deciding, a write closes the checks whose check of
-Sales already ended (``settle``), as the reads already show them.
+check locks the check. Before deciding, a write closes the checks whose check of Sales already ended
+(``settle``), as the reads already show them, without waiting for the relay.
 """
 
 import datetime as dt
@@ -114,7 +114,7 @@ SYSTEM = "table.system"
 GAP = 16
 CELL = BOX + GAP
 COLS = 5
-#: How long a reservation holds its table when it does not say (the old module's default).
+#: How long a reservation holds its table when it does not say.
 DEFAULT_RESERVATION_MINUTES = 120
 
 ZONE_NAME_TAKEN = _("There is already a zone with that name.")
@@ -214,8 +214,8 @@ def retitle(ctx: OperationContext, order_id: UUID | None, table: Table) -> None:
 
 def settle(sessions) -> None:
     """Closes the open and parked checks of ``sessions`` whose check of Sales already ended (charged in
-    full or voided), at the hour Sales closed it: what the reads already show (no relay in phase 1). A
-    parked one has no stretch at a table left to end; it stays without a table."""
+    full or voided), at the hour Sales closed it: what the reads already show. A parked one has no
+    stretch at a table left to end; it stays without a table."""
     ending = list(
         sessions.filter(status__in=LIVE, is_deleted=False, order_id__in=ended_orders())
     )
@@ -459,7 +459,7 @@ def _number_taken(number: str, zone: Zone | None, *, except_id=None) -> bool:
 
 
 def _next_number(zone: Zone | None) -> str:
-    """The first free number of the zone, from its count of tables plus one (the old canvas' rule)."""
+    """The first free number of the zone, from its count of tables plus one."""
     numbers = {
         n.strip().lower()
         for n in Table.objects.filter(is_deleted=False, zone=zone).values_list(
@@ -847,7 +847,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     ai={
         "description": "Close a table's check by hand and free the table if nothing else sits there. A check with "
         "something ordered still open in Sales is refused (charge it, move it or delete it first); an empty one is "
-        "voided in Sales. Ask first.",
+        "voided in Sales.",
         "risk": "high",
         "asks": {
             "en": (
@@ -906,7 +906,7 @@ def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
         "description": "Move a table's check to a free or reserved table («move table 4 to 6»): same check of Sales "
         "(retitled), guests, waiter and notes; the old table frees if nothing else sits there. Use this, not "
         "sale.order.set_label: retitling a check moves nobody. Both tables go by their number (and zone); at a table "
-        "with two checks, the check's id comes from table.table.get. Ask first.",
+        "with two checks, the check's id comes from table.table.get.",
         "risk": "high",
         "asks": {
             "en": (
@@ -985,7 +985,7 @@ def _merge_target(data: SessionMergeIn, source: TableSession) -> TableSession:
     ai={
         "description": "Join a table's check into the open check of another table (or the other check of a split "
         "table): its lines move to that check in Sales, and its table frees if nothing else sits there. Tables go by "
-        "their number (and zone); the two checks of a split table, by the ids table.table.get lists. Ask first.",
+        "their number (and zone); the two checks of a split table, by the ids table.table.get lists.",
         "risk": "high",
         "asks": {
             "en": (
@@ -1299,7 +1299,7 @@ def link_order(ctx: OperationContext, data: SessionLinkOrderIn) -> dict:
     ai={
         "description": "Delete a finished table check from the history (an open or parked one is refused). It is kept "
         "as deleted, with its trail through the tables. It goes by its id: find the closed check the person names (its "
-        "table, its time) with table.session.list(status=closed), never ask them for it. Ask first.",
+        "table, its time) with table.session.list(status=closed), never ask them for it.",
         "risk": "high",
         "asks": {
             "en": (
@@ -1483,7 +1483,7 @@ def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
         hold.status = Hold.Status.EXPIRED
         hold.label = ""
         hold.save(update_fields=["status", "label", "updated_at"])
-        # One notice per hold, saying its table (hub#2681): never one for the whole sweep.
+        # One notice per hold, saying its table: never one for the whole sweep.
         _hold_event(ctx, events.TABLE_HOLD_RELEASED, hold)
     return {"expired": len(over)}
 

@@ -1,8 +1,6 @@
-"""The invoice app's events (``invoice.<entity>.<fact>``) and its reactions to the Sales app's events.
-
-There is no outbox relay yet (phase 2 runs it in the worker); a reaction is tested by handing ``react``
-the event as the relay will: its name, its scope and its payload. The full flows (charge → invoice,
-refund → rectification, void → rectification) are in ``test_integration_sale.py``.
+"""A reaction is tested by handing ``react`` the event as the worker's outbox relay does: its name, its scope and its
+payload. The full flows (charge → invoice, refund → rectification, void → rectification) are in
+``test_integration_sale.py``.
 """
 
 import re

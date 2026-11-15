@@ -331,7 +331,7 @@ def test_a_local_number_typed_with_her_card_chosen_tells_her_once(restaurant_clo
 
 
 def test_a_guest_of_another_country_with_the_same_digits_is_never_taken_for_the_local_one(restaurant_clock, tick, door):
-    # erplora-old/whatsapp_inbox#199: +33 600 111 222 (France) and 600 111 222 (Spain) share their national digits.
+    # +33 600 111 222 (France) and 600 111 222 (Spain) share their national digits.
     restaurant()
     receive("wamid.FR", phone="33600111222", sent_at=(NOW - dt.timedelta(minutes=5)).isoformat())
     french = book(guest_name="Camille Martin", guest_phone="+33 6 00 11 12 22")

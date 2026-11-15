@@ -140,7 +140,7 @@ async function save(): Promise<void> {
 }
 
 // An untouched supplement follows the business's money when it answers after the window opened: that is no change.
-useUnsavedFormOnOpen(
+const canDismiss = useUnsavedFormOnOpen(
   'modifier-option-form',
   () => {
     const stored = props.option ? moneyFieldText(props.option.price_delta, locale.value, money.value) : '';
@@ -153,6 +153,7 @@ useUnsavedFormOnOpen(
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-option-form"
     :title="title"
     :submit-label="option ? $t('modifier.options.form.save') : $t('modifier.options.form.create')"
@@ -166,6 +167,7 @@ useUnsavedFormOnOpen(
         <BusinessMoneyError />
         <ion-input
           data-testid="modifier-option-form-name"
+          name="name"
           :value="form.name"
           :label="$t('modifier.options.form.name')"
           label-placement="floating"
@@ -178,6 +180,7 @@ useUnsavedFormOnOpen(
         />
         <ion-input
           data-testid="modifier-option-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('modifier.options.form.kitchenName')"
           label-placement="floating"
@@ -192,6 +195,7 @@ useUnsavedFormOnOpen(
           v-model="form.price"
           signed
           testid="modifier-option-form-price_delta"
+          name="price_delta"
           :label="money ? $t('modifier.options.form.priceIn', { currency: money.currency }) : $t('modifier.options.form.price')"
           :money="money"
           :helper-text="$t('modifier.options.form.priceHint')"
@@ -200,6 +204,7 @@ useUnsavedFormOnOpen(
         />
         <Combo
           testid="modifier-option-form-tax_category_key"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTax"
           :label="$t('modifier.options.form.tax')"
@@ -210,6 +215,7 @@ useUnsavedFormOnOpen(
         />
         <ion-toggle
           data-testid="modifier-option-form-is_default"
+          name="is_default"
           :checked="form.isDefault"
           label-placement="end"
           justify="start"
@@ -226,6 +232,7 @@ useUnsavedFormOnOpen(
         </p>
         <ion-input
           data-testid="modifier-option-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

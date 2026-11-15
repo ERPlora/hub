@@ -1,6 +1,3 @@
-// «API documentation» in Settings › General (BASE-G100; the old hub's HUB_SHELL-F161): «Show the API documentation»,
-// off by default and saved at once (live `base.api_doc.settings`); on, «Open the API documentation». Whoever does not
-// run the business sees it disabled and why; a change that cannot be saved says so and the switch shows the saved value.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';

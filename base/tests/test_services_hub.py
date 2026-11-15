@@ -1,9 +1,9 @@
-"""The registry's operations (plan 2026-10-17, §1.5): what ``/internal/hubs/{id}`` runs, as the platform only.
+"""The registry's operations: what ``/internal/hubs/{id}`` runs, as the platform only.
 
 ``base.hub.register`` (``PUT``), ``base.hub.state_apply`` (``PUT …/state``), ``base.hub.cancel`` (``DELETE``),
 ``base.hub.restore`` (``POST …/restore``) and the query ``base.hub.get`` (``GET``). A sign-up is ``requested`` with a
-database of its own that the worker makes (round 2026-10-30 of PLAN-DB, S2a; ``base/tenancy/tests/test_provision.py``),
-and the SaaS hears ``ready`` from it (``report_ready``).
+database of its own that the worker makes (``base/tenancy/tests/test_provision.py``), and the SaaS hears ``ready``
+from it (``report_ready``).
 """
 
 import datetime as dt
@@ -200,7 +200,7 @@ class TestReportReady:
 class TestStateApply:
     @pytest.fixture
     def hub(self, every_app_on):
-        """``acme`` with VeriFactu on (a new business is born with every app off, round 2026-10-27)."""
+        """``acme`` with VeriFactu on (a new business is born with every app off)."""
         hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
         every_app_on("acme")
         return hub

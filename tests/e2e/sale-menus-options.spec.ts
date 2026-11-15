@@ -8,7 +8,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, expectFirstTile, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-SMO-${RUN}`;
@@ -166,7 +166,7 @@ test('SALE-F12: a menu from «All» is composed course by course, charged by car
   await expect(tile).toContainText(MENU);
   await expect(tile.locator(`[data-testid=pos-menu-${comboId}-badge]`)).toHaveText('Menu');
   // Menus go first in «All», before the products.
-  await expect(shown(page).locator('.pos-grid > button').first()).toHaveAttribute('data-testid', `pos-menu-${comboId}`);
+  await expectFirstTile(page, `pos-menu-${comboId}`);
   await tile.click();
   const sheet = page.locator('ion-modal[data-testid=pos-menu]');
   await expect(sheet).toBeVisible();

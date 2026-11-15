@@ -193,7 +193,7 @@ def test_erplora_out_of_reach_is_said_with_the_old_hub_s_words():
 
 @respx.mock
 def test_a_demo_or_a_business_erplora_does_not_know_cannot_connect_a_number():
-    # gh:saas#2604: a demo connected a number it could never send from.
+    # A demo connected a number it could never send from.
     respx.post(CONFIG).mock(return_value=envelope(404, "hub_unknown", "No such business."))
     error = refusal("whatsapp_inbox.channel.prepare")
     assert (error.status, error.code) == (409, "whatsapp_inbox.hub_unknown")
@@ -385,7 +385,7 @@ def test_a_disconnection_erplora_did_not_confirm_changes_nothing_here():
     [("whatsapp_inbox.channel.prepare", {}), ("whatsapp_inbox.channel.connect", WINDOW), ("whatsapp_inbox.channel.disconnect", {})],
 )
 def test_only_the_owner_and_the_administrators_connect_or_disconnect(role, name, payload):
-    # gh:saas#2538: an employee could disconnect the business's WhatsApp.
+    # An employee could disconnect the business's WhatsApp.
     with pytest.raises(PermissionDenied):
         run(name, payload, ctx_for(role))
 

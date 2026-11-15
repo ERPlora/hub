@@ -134,7 +134,7 @@ def a_device(**more) -> PrintDevice:
 
 
 def test_a_device_is_known_by_the_digest_of_its_own_id_never_by_the_id():
-    # hub#2551: the id a device sends is its credential; the database keeps its SHA-256, which proves nothing.
+    # The id a device sends is its credential; the database keeps its SHA-256, which proves nothing.
     assert PrintDevice.key_of("till-1") == hashlib.sha256(b"till-1").hexdigest()
     assert PrintDevice.key_of("  till-1 ") == PrintDevice.key_of("till-1")
     a_device()

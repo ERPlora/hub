@@ -1,10 +1,10 @@
-"""``manage.py demo_expire <slug>``: end the demo ``<slug>`` now and purge it at once (plan 2026-10-17, §1.7).
+"""``manage.py demo_expire <slug>``: end the demo ``<slug>`` now and purge it at once.
 
 Support's tool (a demo to close by hand) and the e2e's clock (a demo that ended, without waiting an hour), in every
 environment. All through operations: ``base.demo.expire`` (its host answers 410 from now on), one pass of the reaper
 (``reap_demos``, which purges it with ``base.demo.purge``), then ``base.demo.get`` to say how it was left.
 
-While the platform is frozen for a database upgrade (``control.freeze.set``; hub#930) the demo ends all the same but its
+While the platform is frozen for a database upgrade (``control.freeze.set``) the demo ends all the same but its
 database is left where it is (a ``DROP DATABASE`` would never reach the upgrade's copy): the worker's reaper drops it on
 its first tick after the freeze is lifted, and the command says so.
 """

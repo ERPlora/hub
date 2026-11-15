@@ -1,6 +1,6 @@
-"""The Hub admin's site (``hubs.erplora.com/admin``, PLAN §18): Django's, but a hub's model only where a business is.
+"""The Hub admin's site (``hubs.erplora.com/admin``): Django's, but a hub's model only where a business is.
 
-Since S5 every business keeps its data in its own database and there is no shared one: on the platform host, without a
+Every business keeps its data in its own database and there is no shared one: on the platform host, without a
 business chosen for the session (``/admin/hub/<slug>/``, ``base.admin.open_hub``), the admin works on control
 (``base.middleware.HubDatabaseMiddleware``), where only control's models live. There the index and every app's page list
 control's models alone (the registry, the accounts, the sessions); a hub's model (``base.tenancy.inventory``) appears

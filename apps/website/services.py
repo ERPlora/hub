@@ -14,9 +14,9 @@
   new place (a save) or that publishes (what was kept is dropped first), never inside a transaction; the public home
   asks too when nothing is kept (:func:`refresh_reviews`). A fresh answer is kept in the site's row.
 
-Every write acts on the site of the request's hub only (``hub_id``, phase 1: the tables are shared, models.py) and
-locks its row first, so two editors never interleave a save and a publication; the first save or publication of a hub
-creates its row, and another one at the same moment waits for it rather than failing on the duplicate.
+Every write acts on the site of the request's hub only (``hub_id``) and locks its row first, so two editors never
+interleave a save and a publication; the first save or publication of a hub creates its row, and another one at the
+same moment waits for it rather than failing on the duplicate.
 """
 
 import base64

@@ -94,6 +94,30 @@ test('KITCHEN-F25: the History finds a cancelled ticket by part of its number an
   }
 });
 
+// What an automation's step does in Kitchen says «System», never its mark (hub#1445). The entry is written here as such a
+// step records it, because the e2e stack runs no automation.
+test('KITCHEN-F25: «Who» says «System» for what an automation did, never its own mark', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/kitchen/history', { width: 1440, height: 900 });
+  try {
+    const ticket = await post<{ id: string; number: string }>(context, '/kitchen/tickets', { label: LABEL, items: [{ name: 'Salmon' }] }, 201);
+    psql(
+      `insert into kitchen_logentry (id, ticket_id, action, actor, notes, created_at) values ` +
+        `(gen_random_uuid(), '${ticket.id}', 'rushed', 'flow_run:0199e7a0-0000-7000-8000-000000000001', '', now())`,
+    );
+    await page.reload();
+    const view = shown(page);
+    await view.locator('[data-testid=kitchen-history-search] input').fill(ticket.number);
+    const rows = view.locator('[data-testid=kitchen-history-row]').filter({ hasText: ticket.number });
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText('Rush');
+    await expect(rows.first()).toContainText('System');
+    await expect(rows.first()).not.toContainText('flow_run:');
+    await expect(rows.last()).toContainText('owner@example.com');
+  } finally {
+    await context.close();
+  }
+});
+
 test('KITCHEN-F26: Settings saves the amber minutes and the default type, and says so', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/kitchen/settings', { width: 1440, height: 900 });
   const read = await api<Settings>(context, A, 'GET', '/kitchen/settings');

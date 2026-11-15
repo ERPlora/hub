@@ -1,6 +1,8 @@
 // hub#549: the dangerous card titles the reservation, slot, blocked date or waitlist entry it acts on,
-// in Spanish and English, never «Registro»/«Record». Every confirmation is cancelled: nothing changes.
-// flow: RESERVATION-F01 RESERVATION-F02 RESERVATION-F09 RESERVATION-F10 RESERVATION-F15 RESERVATION-F20 BASE-F97
+// in Spanish and English, never «Registro»/«Record». hub#550: booking or changing a reservation names its table with
+// its zone («7 (Terraza)»), as Tables does, since table 7 repeats across zones. Every confirmation is cancelled: nothing
+// changes.
+// flow: RESERVATION-F01 RESERVATION-F02 RESERVATION-F06 RESERVATION-F08 RESERVATION-F09 RESERVATION-F10 RESERVATION-F15 RESERVATION-F20 RESERVATION-F23 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
@@ -17,6 +19,9 @@ const WORDS = {
   en: { reservation: 'Reservation', slot: 'Time slot', blocked: 'Blocked date', entry: 'Waitlist entry' },
 };
 const GENERIC = { es: 'Registro:', en: 'Record:' };
+const TABLE = { es: 'Mesa', en: 'Table' };
+const ROOM = `${TAG} Sala`;
+const TERRACE = `${TAG} Terraza`;
 
 function dayAfter(days: number): { date: string; weekday: number } {
   const at = new Date(Date.now() + days * 86_400_000);
@@ -29,9 +34,11 @@ const LATER = dayAfter(2);
 
 function cleanUp(): void {
   const reservations = `select id from reservation_reservation where guest_name like '${TAG}%'`;
+  const tables = `select id from table_table where zone_id in (select id from table_zone where name like '${TAG}%')`;
   psql(
     [
       `delete from table_hold where source_ref in (select id::text from reservation_reservation where guest_name like '${TAG}%')`,
+      `delete from table_hold where table_id in (${tables})`,
       `update reservation_waitlistentry set reservation_id = null where guest_name like '${TAG}%'`,
       `delete from reservation_waitlistentry where guest_name like '${TAG}%'`,
       `delete from reservation_reservation where id in (${reservations})`,
@@ -39,6 +46,8 @@ function cleanUp(): void {
       `delete from reservation_timeslot where max_reservations = ${SENTINEL}`,
       `delete from schedule_overrideinterval where override_id in (select id from schedule_override where reason like '${TAG}%')`,
       `delete from schedule_override where reason like '${TAG}%'`,
+      `delete from table_table where id in (${tables})`,
+      `delete from table_zone where name like '${TAG}%'`,
     ].join('; '),
   );
   customersCleanUp();
@@ -105,8 +114,62 @@ async function makeBooks(context: BrowserContext): Promise<Books> {
   };
 }
 
+/** Table 7 of the room and table 7 of the terrace: the same number in two zones, as Tables reads them. */
+async function makeSevens(context: BrowserContext): Promise<[RecordOut, RecordOut]> {
+  const sevens: RecordOut[] = [];
+  for (const name of [ROOM, TERRACE]) {
+    const zone = await post<RecordOut>(context, '/table/zones', { name });
+    const table = await post<RecordOut>(context, '/table/tables', { zone_id: zone.id, number: '7', capacity: 4 });
+    sevens.push(await detail(context, '/table/tables/detail', table.id));
+  }
+  return [sevens[0], sevens[1]];
+}
+
 for (const language of ['es', 'en'] as const) {
   const words = WORDS[language];
+
+  test(`reservation-assistant-card — in ${language}, booking and changing a reservation name its table with its zone`, async ({
+    browser,
+  }) => {
+    const [context, page] = await ownerIn(browser, language);
+    const books = await makeBooks(context);
+    const [room, terrace] = await makeSevens(context);
+    expect([room.label, terrace.label]).toEqual([`7 (${ROOM})`, `7 (${TERRACE})`]);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openPanel(page);
+
+    // A normal write paints its first three data in one line (BASE-F97): booking carries its table as its fifth datum,
+    // a change says its reservation and, right after it, the new table.
+    const booking = await datumOf(
+      page,
+      'reservation__reservation__create',
+      { guest_name: `${TAG} Marta`, date: TOMORROW.date, time: '21:30', party_size: 2, table_id: terrace.id },
+      'table_id',
+    );
+    expect([booking.label, booking.value]).toEqual([TABLE[language], terrace.label]);
+    await cancel(page);
+
+    const change = await datumOf(
+      page,
+      'reservation__reservation__update',
+      { id: books.reservation.id, table_id: terrace.id },
+      'table_id',
+    );
+    expect([change.label, change.value]).toEqual([TABLE[language], terrace.label]);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(`${books.reservation.label} · ${terrace.label}`);
+      await expect(card(page)).not.toContainText(room.label);
+      await capture(page, `hub-550-update-table-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await cancel(page);
+
+    const left = await api<{ table_id: string | null }>(context, A, 'GET', `/reservation/reservations/detail?id=${books.reservation.id}`);
+    expect(left.data.table_id).toBeNull();
+    expect(psql(`select count(*) from reservation_reservation where guest_name = '${TAG} Marta'`)).toBe('0');
+    await context.close();
+  });
 
   test(`reservation-assistant-card — in ${language}, every dangerous write titles its record`, async ({ browser }) => {
     const [context, page] = await ownerIn(browser, language);

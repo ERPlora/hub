@@ -1,4 +1,4 @@
-// flow: ninguno — arnés e2e del Hub (hub#1048)
+// flow: ninguno — arnés e2e del Hub (hub#1048, hub#1061)
 // A second pass of demo.spec.ts in the same hour waited 15 s for the demo's host and failed with
 // «page.waitForURL: Timeout 15000ms exceeded»: the SaaS of the stack had answered «Try the demo» with its door's
 // `?state=throttled` (3 new demos an hour per address, `DEMO_SPAWN_RATELIMIT`, and every pass starts two from
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { doorOutcome, E2E_DEMO_SPAWN_RATELIMIT, noDemoBecause } from './demo-door';
+import { doorOutcome, E2E_DEMO_SPAWN_RATELIMIT, noDemoBecause, NOT_READY, whyNoDemo } from './demo-door';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DOOR = 'http://localhost:30481/demo/';
@@ -59,6 +59,32 @@ describe('noDemoBecause(): the failure of a run whose door refused the demo', ()
 
   it('gives that advice for throttled only', () => {
     expect(noDemoBecause('unavailable')).not.toContain('DEMO_SPAWN_RATELIMIT');
+  });
+});
+
+describe('whyNoDemo(): after the door answered, whether the run waits again or fails saying why (hub#1061)', () => {
+  const preparing = { slug: 'demo-0a1b2c3d', status: 'creating', lastError: '' };
+
+  it('waits again for a demo the Hub is still preparing when the door’s own 30 s ran out (not_ready)', () => {
+    expect(whyNoDemo(NOT_READY, preparing)).toBeNull();
+    expect(whyNoDemo(NOT_READY, { ...preparing, status: 'requested' })).toBeNull();
+    expect(whyNoDemo(NOT_READY, { ...preparing, status: 'ready' })).toBeNull();
+  });
+
+  it('fails at once with the Hub’s reason for a demo it could not prepare', () => {
+    const said = whyNoDemo(NOT_READY, { ...preparing, status: 'failed', lastError: 'template_missing: no template' });
+    expect(said).toContain('demo-0a1b2c3d');
+    expect(said).toContain('template_missing: no template');
+    expect(said).toContain('state=not_ready');
+  });
+
+  it('fails at once when the registry has no demo for the door to wait for', () => {
+    expect(whyNoDemo(NOT_READY, null)).toContain('no demo');
+  });
+
+  it('fails at once with any other outcome, as noDemoBecause says it', () => {
+    expect(whyNoDemo('throttled', preparing)).toBe(noDemoBecause('throttled'));
+    expect(whyNoDemo('unavailable', null)).toBe(noDemoBecause('unavailable'));
   });
 });
 

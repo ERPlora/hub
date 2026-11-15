@@ -1,6 +1,3 @@
-// Settings › Printing (BASE-G96; the old hub's «Impresión», HUB_SHELL-F165): one row, «Printers and ticket», that opens
-// the Printing app, where printers are added and the ticket is set up; while Printing is not on, it says to install it
-// and opens Apps.
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 

@@ -1,20 +1,20 @@
-"""The SaaS's door into the Hub (PLAN-SAAS §2, §2.2): ``/internal`` calls signed with HMAC-SHA256 and a timestamp.
+"""The SaaS's door into the Hub: ``/internal`` calls signed with HMAC-SHA256 and a timestamp.
 
 A call is heard by its v2 signature when it carries one (method, path and body; v2 alone decides), else by its v1
 (the body only), within five minutes and with the current secret or, during a rotation, the previous one. The
 signature is the authentication: the ALB never publishes ``/internal``, so the door answers on any host (the
 SaaS reaches it by the private name).
 
-The demos (§1.5, §1.6; round 2026-10-30, S2a): ``POST /internal/demos`` gives a browser of the SaaS its demo (202 new,
-``requested`` until the worker makes its database; 200 its live one; 503 ``base.demo_full`` with ``Retry-After`` at the
-cap) and ``POST /internal/demos/{slug}/codes`` a one-time code into it for that browser only (201; 403 another
-browser's, 410 once it ended, 503 while it is being prepared, 404 none), as the SaaS's ``hub_client`` reads them.
+The demos: ``POST /internal/demos`` gives a browser of the SaaS its demo (202 new, ``requested`` until the worker makes
+its database; 200 its live one; 503 ``base.demo_full`` with ``Retry-After`` at the cap) and
+``POST /internal/demos/{slug}/codes`` a one-time code into it for that browser only (201; 403 another browser's, 410
+once it ended, 503 while it is being prepared, 404 none), as the SaaS's ``hub_client`` reads them.
 
-The registry (plan 2026-10-17, §1.5; round 2026-10-30, S2a): ``PUT /internal/hubs/{id}`` registers a business (202
-``requested`` with its own database to make, which the worker makes and then tells the SaaS ``ready``; 200 when it
-updates one that is ready), ``GET`` reads it (its status and control's active freeze, never where its database is),
-``DELETE`` cancels it and ``POST …/restore`` brings it back. ``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and
-applies its VeriFactu block and the business's status through ``verifactu.config.sync`` on the hub's slug.
+The registry: ``PUT /internal/hubs/{id}`` registers a business (202 ``requested`` with its own database to make, which
+the worker makes and then tells the SaaS ``ready``; 200 when it updates one that is ready), ``GET`` reads it (its status
+and control's active freeze, never where its database is), ``DELETE`` cancels it and ``POST …/restore`` brings it back.
+``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and applies its VeriFactu block and the
+business's status through ``verifactu.config.sync`` on the hub's slug.
 """
 
 import datetime as dt
@@ -88,8 +88,8 @@ def code(answer) -> str:
 
 @pytest.fixture(autouse=True)
 def registered(request):
-    """The business of ``HUB_ID`` in the registry (``acme``), with VeriFactu on (every app, as a hub of before round
-    2026-10-27: a new one is born with every app off), for the tests that use the database."""
+    """The business of ``HUB_ID`` in the registry (``acme``), with VeriFactu on (every app on, as hubs created before
+    new hubs started with every app off had), for the tests that use the database."""
     if "db" not in request.fixturenames:
         return None
     request.getfixturevalue("db")
@@ -288,9 +288,9 @@ def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
     ],
 )
 def test_a_key_of_the_verifactu_block_the_hub_does_not_read_never_refuses_the_photo(client, db, block, registered):
-    # PLAN §30 (round 2026-10-22b): the Hub reads ``live_paid`` no more (hub#205) and the SaaS stopped sending it
-    # (saas#108). A photo from a SaaS before that, or one carrying a key added later, applies whole: the door only
-    # checks that the block is an object, and ``verifactu.config.sync`` ignores what it does not know.
+    # The Hub does not read ``live_paid`` (hub#205) and the SaaS no longer sends it. A photo from an older SaaS that
+    # still carries it, or one carrying a key added later, applies whole: the door only checks that the block is an
+    # object, and ``verifactu.config.sync`` ignores what it does not know.
     answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": "acme", "version": 2, "verifactu": block})
     assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 2}
     registered.refresh_from_db()
@@ -307,7 +307,7 @@ def test_the_business_status_travels_on_its_own(client, db):
 
 
 def test_the_photo_that_reactivates_a_suspended_business_opens_it_again(client, db):
-    # BILLING-F17 of the SaaS: the way back of a suspended business is this photo, which its own 402 never blocks.
+    # The way back of a suspended business is this photo, which its own 402 never blocks.
     Hub.objects.filter(id=HUB_ID).update(state={"status": "suspended"}, state_version=1)
     host = "acme.localhost:8000"
     assert client.get("/api/me", HTTP_HOST=host).status_code == 402
@@ -402,7 +402,7 @@ def test_a_body_naming_another_hub_is_refused(client, db):
 
 
 
-# The registry: PUT, GET and DELETE /internal/hubs/{id}, POST …/restore (plan 2026-10-17, §1.5)
+# The registry: PUT, GET and DELETE /internal/hubs/{id}, POST …/restore
 
 NEW_ID = "0199c4b0-0000-7000-8000-000000000010"
 HUB_PATH = f"/internal/hubs/{NEW_ID}"
@@ -476,7 +476,7 @@ def test_a_new_business_is_requested_with_a_database_of_its_own_to_make_and_the_
     assert body["ready_at"] is None and "created" not in body and "db_name" not in body
     hub = Hub.objects.get(pk=NEW_ID)
     assert (hub.status, hub.name, hub.country) == ("requested", "Bar Pepe", "ES")
-    # Never born sharing control's database (round 2026-10-30, decision 1): its own, made by the worker.
+    # Never born sharing control's database: its own, made by the worker.
     assert hub.db_name == names.hub_db_name(connection_name(), hub.id)
     assert HubDue.objects.filter(pk=hub.pk).exists()
     assert saas_hears.calls == []
@@ -700,9 +700,10 @@ def test_restore_brings_a_cancelled_hub_back(client, db, registered):
     assert answer.status_code == 200 and answer.json()["status"] == "ready"
 
 
-def test_restore_of_a_business_of_phase_1_without_its_own_database_makes_one_from_nothing(client, db, registered):
-    """A business cancelled before the cut of S5 (``--skip``: no database was made for it) comes back as a sign-up
-    does: its own database's name, ``requested`` and due; the worker makes it. Nothing of control's is copied."""
+def test_restore_of_a_business_without_its_own_database_makes_one_from_nothing(client, db, registered):
+    """A business cancelled while it still shared one database with others, which the cut to a database per business
+    skipped (``--skip``: no database was made for it), comes back as a sign-up does: its own database's name,
+    ``requested`` and due; the worker makes it. Nothing of control's is copied."""
     from base.tenancy import connections as tenancy_connections
     from base.tenancy import names
 
@@ -763,7 +764,7 @@ def test_each_registry_route_takes_only_its_methods(client, db):
     assert signed(client, "get", f"{HUB_PATH}/restore", b"").status_code == 405
 
 
-# The demos: POST /internal/demos and POST /internal/demos/{slug}/codes (plan 2026-10-17, §1.5 and §1.6)
+# The demos: POST /internal/demos and POST /internal/demos/{slug}/codes
 
 DEMOS_PATH = "/internal/demos"
 #: Two browsers of the SaaS, as it names them: the sha256 of a random token of each session.

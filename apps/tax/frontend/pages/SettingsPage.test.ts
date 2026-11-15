@@ -1,4 +1,4 @@
-// Taxes → Settings (TAX-F11, pm#629 VF-17; the WORKBOOK's «Ajustes»): «Your business's tax region» with the
+// Taxes → Settings (TAX-F11; the WORKBOOK's «Ajustes»): «Your business's tax region» with the
 // business's country (read only: it is the one of its ERPlora account) and «Tax region» — «Whole country
 // (VAT)», «Canary Islands (IGIC)», «Ceuta (IPSI)» or «Melilla (IPSI)» —, and «Save» → «Tax region saved.».
 // The values are the business's (`tax.settings.get`, live): «Loading the tax settings…» first; a failed load

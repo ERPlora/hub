@@ -3,9 +3,9 @@
 services.py records them in the outbox, in the command's transaction; live.py names the ones that
 re-run each live query. They carry ids, codes, quantities and prices, never a customer.
 
-Reactions: a product or a category Inventory deletes, a customer group Customers deletes, and a service
-Services changes, each through an operation of this app run as the system, in its own transaction
-(WORKBOOK PRICING-F14). The worker's outbox relay (``base/relay.py``) hands each delivered event to
+Reactions: a product or a category Inventory deletes, a product it brings back from a separate copy, a customer
+group Customers deletes, and a service Services changes, each through an operation of this app run as the system, in
+its own transaction (WORKBOOK PRICING-F14). The worker's outbox relay (``base/relay.py``) hands each delivered event to
 ``react``; the operations are idempotent, so a repeated delivery changes nothing (tests/test_relay.py).
 """
 
@@ -54,6 +54,7 @@ RULE_EVENTS = [RULE_CREATED, RULE_UPDATED, RULE_DEACTIVATED, RULE_ACTIVATED]
 # Other apps' events (their WORKBOOKs fix the payload: ``{"id": …}`` and more).
 PRODUCT_UPDATED = "inventory.product.updated"
 PRODUCT_DELETED = "inventory.product.deleted"
+PRODUCT_RESTORED = "inventory.product.restored"
 CATEGORY_UPDATED = "inventory.category.updated"
 CATEGORY_DELETED = "inventory.category.deleted"
 GROUP_UPDATED = "customer.group.updated"
@@ -63,6 +64,7 @@ SERVICE_UPDATED = "service.service.updated"
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {
     PRODUCT_DELETED: "pricing.catalog.forget_product",
+    PRODUCT_RESTORED: "pricing.catalog.recall_product",
     CATEGORY_DELETED: "pricing.catalog.forget_category",
     GROUP_DELETED: "pricing.catalog.forget_group",
     SERVICE_UPDATED: "pricing.catalog.refresh_service",

@@ -1,5 +1,4 @@
-"""The worker's data pass (round 2026-10-30 of PLAN-DB, decision 2 and proposals (a), (f)): a reset and a business that
-leaves, each copied first.
+"""The worker's data pass: a reset and a business that leaves, each copied first.
 
 Every tick the worker takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease):
 
@@ -145,7 +144,7 @@ class SlowUpload:
 
 
 def test_a_slow_upload_keeps_its_lease_and_the_reset_is_done_with_one_copy(hub_a, dumps_bucket, moto_s3, monkeypatch):
-    """Review of round 3: the upload renews the lease as it goes (boto3's Callback) and right after it, so the reset
+    """The upload renews the lease as it goes (boto3's Callback) and right after it, so the reset
     is never left «copying» with another copy in the bucket at every pass."""
     owner = loaded_and_asked(ready(hub_a), ["table"])
     real = dumps.client
@@ -257,7 +256,7 @@ def test_a_reset_still_to_do_stays_due_when_the_provisioning_pass_gives_its_leas
     loaded_and_asked(ready(hub_a), ["table"])
     now = timezone.now()
     with use_control():
-        # S3: the provisioning's pass never takes a ready hub's ring (its data work's or its apps' to set up).
+        # The provisioning's pass never takes a ready hub's ring (its data work's or its apps' to set up).
         assert services.claim_next_due_hub(now, provision.LEASE) is None
         assert services.claim_next_data_hub(now, provision.LEASE) == hub_a.pk
         services.release_hub(hub_a.pk, now)
@@ -273,8 +272,8 @@ def test_the_worker_empties_only_through_its_own_operation(hub_a):
 
 
 def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_databases, monkeypatch):
-    """The platform's alone, refused before anything else (review of hub#490, OPEN_OPERATIONS «platform»). The local
-    ``a`` has no database of its own: since S5 only the suite's fallback enters such a business."""
+    """The platform's alone, refused before anything else (OPEN_OPERATIONS «platform»). The local ``a`` has no
+    database of its own: only the suite's fallback enters such a business."""
     from base.tenancy import context
     from base.tenancy.tests.legacy import LEGACY
 
@@ -290,7 +289,7 @@ def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_d
 
 
 def test_the_emptying_is_never_run_on_a_shared_database(dumps_bucket, monkeypatch):
-    # Since S5 production never enters a business without its own database: only the suite's fallback does.
+    # Production never enters a business without its own database: only the suite's fallback does.
     from base.tenancy import context
     from base.tenancy.tests.legacy import LEGACY
 
@@ -303,7 +302,7 @@ def test_the_emptying_is_never_run_on_a_shared_database(dumps_bucket, monkeypatc
     assert refused.value.code == "base.reset_shared_database"
 
 
-# ── A business that leaves (proposal (a)) ────────────────────────────────────────────────────────────────────────
+# ── A business that leaves ───────────────────────────────────────────────────────────────────────────────────────
 
 
 def cancel(hub: Hub) -> None:
@@ -367,7 +366,7 @@ def test_a_copy_of_a_business_that_left_that_fails_is_tried_again_later(hub_a, d
 
 
 def test_a_business_brought_back_forgets_its_failed_copy_and_leaving_again_is_copied_at_once(hub_a, dumps_bucket, settings):
-    """Review of round 3: a restore clears the copy that failed (attempts, last error, next attempt), so a second
+    """A restore clears the copy that failed (attempts, last error, next attempt), so a second
     leaving starts from the first wait, not from the long one."""
     hub = ready(hub_a)
     cancel(hub)

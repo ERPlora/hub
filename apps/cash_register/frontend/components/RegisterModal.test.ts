@@ -3,7 +3,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { click, ionValue, mountCash, settle } from '../__tests__/mount-cash-register';
 import RegisterModal from './RegisterModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -18,8 +19,8 @@ beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 
-async function setup(register: { id: string; name: string } | null = null) {
-  const m = await mountCash(RegisterModal, { props: { open: true, register } });
+async function setup(register: { id: string; name: string } | null = null, locale: 'en' | 'es' = 'en') {
+  const m = await mountCash(RegisterModal, { props: { open: true, register }, locale });
   const name = () => m.inDoc('cash-register-register-name');
   const submit = () => click(m.inDoc('cash-register-register-submit'));
   return { ...m, name, submit };
@@ -60,11 +61,46 @@ describe('RegisterModal', () => {
   });
 });
 
+describe('RegisterModal: a refused name, corrected, loses its mark without saving again (hub#1470)', () => {
+  const TAKEN = 'There is already a drawer with that name.';
+
+  it('a taken name: typing another one takes its mark and the notice away, before «Save» is pressed again', async () => {
+    const s = await setup();
+    await ionValue(s.name(), 'bar', 'ionInput');
+    s.answer(409, { error: { code: 'cash_register.register_exists', message: TAKEN, fields: { name: TAKEN } } });
+    await s.submit();
+    expect(prop(s.name(), 'errorText')).toBe(TAKEN);
+    expect(s.inDoc('cash-register-register-error')?.textContent).toContain(TAKEN);
+    s.name()?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(s.name(), 'terrace', 'ionInput');
+    expect(prop(s.name(), 'errorText') ?? '').toBe('');
+    expect(s.name()?.classList.contains('ion-invalid')).toBe(false);
+    expect(s.inDoc('cash-register-register-error')).toBeNull();
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('an empty name: typing one takes «Type the drawer’s name.» away', async () => {
+    const s = await setup();
+    await s.submit();
+    expect(prop(s.name(), 'errorText')).toBe("Type the drawer's name.");
+    await ionValue(s.name(), 'Bar', 'ionInput');
+    expect(prop(s.name(), 'errorText') ?? '').toBe('');
+    expect(s.sent()).toEqual([]);
+  });
+
+  itTellsTheCorrectedFieldApart(['name'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.name(), 'Bar', 'ionInput');
+    s.answer(422, refusal);
+    return { field: () => s.name(), send: s.submit, settle };
+  });
+});
+
 describe('RegisterModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
   it('renaming: as opened closes; a change asks; restored as opened closes again', async () => {
     const s = await setup({ id: 'r1', name: 'Bar' });
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('cash-register-register'),
       change: () => ionValue(s.name(), 'Terrace', 'ionInput'),
       restore: () => ionValue(s.name(), 'Bar', 'ionInput'),

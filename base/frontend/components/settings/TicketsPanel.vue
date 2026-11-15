@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// Settings › Printing (BASE-G96; the old hub's «Impresión», HUB_SHELL-F165): «Printers and ticket» opens the Printing
-// app, where printers are added and the ticket is set up; while Printing is not on, it says to install it and opens
-// Apps. The printers and the ticket are Printing's, never the shell's: nothing is kept here.
+// Settings › Printing only leads to the Printing app, or to Apps while it is not on: the printers and the ticket
+// belong to Printing, so nothing is kept here.
 import { useSession } from '@erplora/ui/shell';
 import { IonList } from '@ionic/vue';
 import { computed } from 'vue';

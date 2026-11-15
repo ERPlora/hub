@@ -211,7 +211,7 @@ describe('PreviewPage', () => {
     expect(s.el('form-error')?.textContent).toContain('Invalid payload');
   });
 
-  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const NAME = 'Enter the full name.';
     const PHONE = 'That mobile is not a valid number.';
 

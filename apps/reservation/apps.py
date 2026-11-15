@@ -11,12 +11,11 @@ class ReservationConfig(LiveAppConfig):
     label = "reservation"
     kind = "app"
     verbose_name = _("Reservations")
-    # The old module's first menu icon, registered in the shell (ION_ICONS); a restaurant table of its
-    # own waits in UI-REQUESTS.md.
+    # Registered in the shell (ION_ICONS); a restaurant table of its own waits in UI-REQUESTS.md.
     icon = "ion:calendar-outline"
     category = Category.RESTAURANT
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your book of table reservations: slots, covers, the table held for each guest and a waitlist."
     )
@@ -33,7 +32,6 @@ class ReservationConfig(LiveAppConfig):
     # and a booking fits the opening hours of Schedules.
     requires = ["table", "customer", "schedule"]
     default_auto_field = "django.db.models.BigAutoField"
-    # The old module's twelve permissions (module.json), renamed <app>.<action>.
     permissions = [
         "reservation.view_reservation",
         "reservation.add_reservation",
@@ -80,7 +78,7 @@ class ReservationConfig(LiveAppConfig):
         ],
     }
     # RESERVATION-F13: the pending reservations nobody confirmed are released a few minutes after their
-    # time, every quarter of an hour, by the phase-2 worker on every hub as the system (cron in UTC).
+    # time, every quarter of an hour, by the worker on every hub as the system (cron in UTC).
     scheduled_tasks = [
         {
             "name": "release_unconfirmed_reservations",
@@ -90,8 +88,8 @@ class ReservationConfig(LiveAppConfig):
         }
     ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =`
-    # as the module's own icon. The old module's three sections with its icons; Settings is a tab of
-    # the pages (frontend/tabs.ts), shown only to whoever may save them.
+    # as the module's own icon. Three sections; Settings is a tab of the pages (frontend/tabs.ts), shown
+    # only to whoever may save them.
     navigation = [
         Nav(
             "reservations",

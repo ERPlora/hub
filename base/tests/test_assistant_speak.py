@@ -1,4 +1,4 @@
-"""«Read aloud» in the server's voice (round 2026-11-03n, PLAN-HUB §73): ``base.assistant.speak`` asks erplora.com
+"""«Read aloud» in the server's voice: ``base.assistant.speak`` asks erplora.com
 (``POST /internal/speech/synthesize``, signed as every ``/internal`` call) for the mp3 of an answer in the voice the
 person chose, and ``POST /api/assistant/speak`` hands it to the panel as ``audio/mpeg``. When erplora.com cannot read
 it (no voice configured, down, too slow), the Hub says so in its own envelope and the panel reads with the device's
@@ -34,7 +34,7 @@ A_VOICE = "a-voice"
 @pytest.fixture(autouse=True)
 def server_voice(settings):
     """The server's voice turned on (``ASSISTANT_SERVER_VOICE``), as a deployment with a voice provider has it; the
-    default (off, round 2026-11-04a) is tested by name below."""
+    default (off) is tested by name below."""
     settings.ASSISTANT_SERVER_VOICE = True
 
 
@@ -155,7 +155,7 @@ def test_its_refusals_are_said_in_the_persons_language(gateway):
 
 
 def test_with_the_server_voice_off_nothing_is_asked_of_erplora_com(settings, gateway):
-    """Round 2026-11-04a: no voice provider for now, so the Hub never asks (the panel reads with the device's voice)."""
+    """Off, as by default without a voice provider: the Hub never asks (the panel reads with the device's voice)."""
     settings.ASSISTANT_SERVER_VOICE = False
     with pytest.raises(OperationError) as caught:
         speak(text="Hola")
@@ -186,7 +186,7 @@ def test_the_hub_waits_longer_than_erplora_com_waits_for_its_provider():
 
 @pytest.mark.django_db(transaction=True)
 def test_waiting_for_the_voice_holds_no_transaction(gateway, monkeypatch):
-    """The till waits on the hub's connection (one transaction at a time on the Free plan, PLAN §14.2): none is open
+    """The till waits on the hub's connection (one transaction at a time on the Free plan): none is open
     while erplora.com reads the answer."""
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     seen = []

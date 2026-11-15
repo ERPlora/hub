@@ -10,7 +10,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 failures=0
 
 # A task definition as `describe-task-definition --include TAGS` returns it, with the roles and the
-# Environment tag Terraform gives it (aws-next modules/ecs-service: erplora-<env>-<name>-task and
+# Environment tag Terraform gives it (ERPlora/aws modules/ecs-service: erplora-<env>-<name>-task and
 # -execution); the tag and the roles may be overridden.
 # task_definition <family> <containers JSON> [<Environment tag, "" = none> [<task role> [<execution role>]]]
 task_definition() {
@@ -231,7 +231,7 @@ check "prod's services keep their desired count" '! grep -q "desired-count" "$CA
 check "every revision is read before any is registered" \
   '[ "$(last_line_of "describe-task-definition")" -lt "$(line_of "register-task-definition")" ]'
 
-# The calls of a prod deploy before pre existed (2026-10-14): the same calls with the same arguments;
+# The calls of a prod deploy before pre existed: the same calls with the same arguments;
 # only the reads moved, so the three revisions are read (and checked) before any is registered.
 check "prod: the calls are exactly today's" \
   '[ "$(sed -E "s|file://[^ ]*/|file://<workdir>/|" "$CALLS_LOG")" = "$(cat <<'"'"'CALLS'"'"'

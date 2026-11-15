@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// «Your printer», Printing's card in System › «Usage and plan» (hub#683; the old hub's of «Resources», HUB_SHELL-F137
-// and F138), which base mounts while Printing is on, for everybody with Printing (`system_cards` in apps.py). It says
+// «Your printer», Printing's card in System › «Usage and plan» (hub#683),
+// which base mounts while Printing is on, for everybody with Printing (`system_cards` in apps.py). It says
 // who prints — the ERPlora app on the device next to the printer, PRINTING-F18 — and leads to Printing with «Set up
 // printing». In a browser it says where to get that app: erplora.com's door of each system it publishes (base's
 // `useAppDownloads`), Windows first, each opening outside the hub (`openExternalLink`); inside the installed app there

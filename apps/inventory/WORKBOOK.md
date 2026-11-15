@@ -6,10 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
-> verde. Parte del `WORKFLOW.md` del módulo Inventario del producto actual (`modules-workspace`,
-> `origin/main` `272e57f`, 08/10/2026). La app hace lo mismo y se ve igual; corrige los fallos que
-> ese documento tenía anotados (lista en [Cambios frente al producto actual](#cambios-frente-al-producto-actual))
-> y deja en [Dudas abiertas](#dudas-abiertas) lo que el producto todavía no ha decidido.
+> verde. Lo que el producto todavía no ha decidido está en [Dudas abiertas](#dudas-abiertas).
 
 ## Para qué sirve y para quién
 
@@ -74,7 +71,7 @@ pero no la cantidad restante en el TPV, que aquí no existe. Además:
 - **La foto del artículo en la baldosa del TPV y, sin foto, sus iniciales sobre un color**: Square (la
   imagen del artículo o, sin ella, su color y su abreviatura), Loyverse (imagen, o color y forma) y
   Shopify POS (la imagen del producto en la rejilla). La foto se elige de la librería de ERPlora o se
-  sube desde la ficha, y viaja en la copia del negocio, como en el producto actual.
+  sube desde la ficha, y viaja en la copia del negocio.
 
 ## Antes de empezar
 
@@ -125,8 +122,10 @@ configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio 
 menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
 ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
 producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
-desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por página; vista de tabla o de
-tarjetas.
+desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
+de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
+puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;
+vista de tabla o de tarjetas.
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
 tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
@@ -180,9 +179,10 @@ de la ventana.
 Tres ventanas seguidas:
 
 1. «Revisa la importación»: un desplegable por columna del fichero («No importar» o el campo;
-   Nombre y SKU llevan asterisco), «Primeras {n} filas de {total}», el resumen «{ready} fila(s)
-   listas · {failed} con problemas» con hasta 10 motivos, e «Importar {n} producto(s)» y
-   «Cancelar».
+   Nombre y SKU llevan asterisco), «Primeras {n} filas de {total}», el resumen «{ready} filas
+   listas · {failed} con problemas» con hasta 10 motivos, e «Importar {n} productos» y
+   «Cancelar»; con una sola fila o un solo producto, en singular («Primera fila de {total}», «1 fila
+   lista», «Importar 1 producto»).
 2. Si hace falta, «Categorías fiscales del CSV»: un bloque por texto fiscal no reconocido (o
    «Filas sin categoría fiscal») con «Elegir» / «Crear» / «Omitir», y «Confirmar e importar».
 3. Mientras crea, encima de la tabla: «Importando {done}/{total}…» con «Parar». Al final,
@@ -232,6 +232,8 @@ fueran los del negocio.
 En las ventanas de categoría y de movimientos de stock (recibir, recuento y merma), el botón atrás del móvil pregunta «¿Descartar los cambios?»
 cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
 cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el alta y la edición de producto preguntan igual (INVENTORY-F01, INVENTORY-F02).
+En el alta y la edición de producto preguntan lo mismo, también en el navegador, «Cancelar» («Cancelar edición»), la «×» del panel,
+Escape y tocar fuera del panel (hub#1023).
 
 ## Flujos
 
@@ -247,6 +249,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | INVENTORY-F07 | Eliminar una categoría | hecho |
 | INVENTORY-F08 | Agrupar productos en categorías para el TPV | hecho |
 | INVENTORY-F29 | Marcar un artículo como agotado | hecho |
+| INVENTORY-F34 | Recuperar un producto eliminado | hecho |
 | | **Importar y exportar** | |
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
@@ -279,7 +282,6 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
 ### INVENTORY-F01 Dar de alta un producto
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:verticals/restaurant/03-menu-and-prices fi:modules/inventory#command-inventory-products-create old:inventory/workflow/catalogo.md#inventory-f01 qa:modules/inventory/create-product-with-vat wf:peluqueria-dia#rec_peluqueria-f04 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -299,32 +301,37 @@ Pasos:
    una: cada una sale debajo del campo, con su botón para quitarla.
 6. Pulsa «Guardar» («Guardando…»). El panel se cierra y el producto sale en la tabla con Estado
    «Sí».
-7. En la aplicación de Android, el botón atrás del móvil con algo escrito o elegido sin guardar (la foto
-   también) no cierra el panel: pregunta «¿Descartar los cambios?» («Lo que has escrito en esta ventana no
-   se ha guardado.»). «Seguir editando», o atrás otra vez, deja el panel con lo escrito; «Descartar
-   cambios» lo cierra sin guardar nada. Con el panel como se abrió, atrás lo cierra sin preguntar
-   (hub#1015).
+7. Con algo escrito o elegido sin guardar (la foto también), ni «Cancelar», ni la «×» del panel, ni Escape, ni
+   tocar fuera del panel, ni en la aplicación de Android el botón atrás del móvil, lo cierran: preguntan
+   «¿Descartar los cambios?» («Lo que has escrito en esta ventana no se ha guardado.»). «Seguir editando»,
+   o atrás otra vez, deja el panel con lo escrito; «Descartar cambios» lo cierra sin guardar nada y sin
+   volver a preguntar. Con el panel como se abrió, cualquiera de ellos lo cierra sin preguntar (hub#1015,
+   hub#1023).
 Entra: las categorías fiscales y su tipo, de Impuestos; las unidades de medida y las categorías de
 producto, de Inventario.
 Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso: o se guarda
 entero o no se guarda nada. Si se dio stock inicial, queda en **Movimientos** como «Inicial».
 Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrece en la rejilla del
-TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
+TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28). Por el asistente o la API
+se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTORY-F03), como vuelve uno
+que estaba desactivado al recuperarse desde una copia aparte (BASE-F114).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
-como 150 000. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
-por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…». Una cantidad que no encaja en
+por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…»; uno negativo: «Este importe no puede ser
+negativo.». Una cantidad que no encaja en
 la unidad: «La cantidad no respeta el incremento permitido para esta unidad». Un SKU que ya tiene
 otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: «Ese EAN-13 ya lo tiene
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
 llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada.
-Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (el personal de ERPlora recupera desde una copia aparte
+los productos que el negocio ya no tiene en absoluto, cada uno por esta misma alta; uno eliminado vuelve el mismo,
+INVENTORY-F34)
 
 ### INVENTORY-F02 Editar un producto
-<!-- origen: fi:modules/inventory#command-inventory-products-update fi:modules/inventory#query-inventory-products-get old:inventory/workflow/catalogo.md#inventory-f02 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -334,9 +341,9 @@ Pasos:
 2. Cambia lo que haga falta. El SKU está bloqueado («El SKU es la identidad del producto: no se
    edita»). El stock no se edita aquí: se recibe (INVENTORY-F13) o se cuenta (INVENTORY-F14). El
    «Tipo» y el «Stock inicial» no salen.
-3. Pulsa «Guardar cambios». «Cancelar edición» o cerrar el panel lo deja como estaba. En la aplicación de
-   Android, el botón atrás con un cambio sin guardar pregunta antes, como en el alta (INVENTORY-F01, paso 7);
-   sin cambios, cierra el panel.
+3. Pulsa «Guardar cambios». Con un cambio sin guardar, «Cancelar edición», la «×», Escape, tocar fuera del panel
+   y, en la aplicación de Android, el botón atrás preguntan antes, como en el alta (INVENTORY-F01, paso 7), y
+   «Descartar cambios» lo deja como estaba; sin cambios, cierran el panel.
 4. La fila enseña los datos nuevos.
 Entra: el producto tal como está guardado; las categorías fiscales, de Impuestos; las unidades y
 las categorías de producto.
@@ -349,7 +356,6 @@ un producto con stock. Cuenta su stock a cero y cámbiala después.».
 Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F03 Activar y desactivar un producto
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:inventory/workflow/catalogo.md#inventory-f03 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -366,7 +372,6 @@ app). Sin permiso de cambio se ve «Sí»/«No» sin interruptor.
 Implicados: SALE-F01
 
 ### INVENTORY-F04 Eliminar un producto
-<!-- origen: fi:modules/inventory#command-inventory-products-delete old:inventory/workflow/catalogo.md#inventory-f04 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -381,10 +386,10 @@ EAN-13 quedan libres para otro producto. Sus movimientos siguen en **Movimientos
 Inventario avisa de que el producto ya no está. No mira si tiene stock ni si está en una cuenta
 abierta: Ventas rechaza al cobrar la línea de un producto que ya no está en el catálogo.
 Si falla: «No se pudo eliminar el producto» (o el motivo) encima de la tabla.
-Implicados: SALE-F01
+Implicados: SALE-F01, BASE-F114, INVENTORY-F34 (desde una copia aparte, el personal de ERPlora devuelve el producto
+eliminado: el mismo, con su stock y sus movimientos)
 
 ### INVENTORY-F05 Revisar los productos que no se pueden vender por falta de IVA
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 qa:modules/inventory/create-product-with-vat old:inventory/workflow/catalogo.md#inventory-f05 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -404,7 +409,6 @@ Si falla: los rechazos del formulario (INVENTORY-F02).
 Implicados: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Crear y editar una categoría
-<!-- origen: fi:modules/inventory#command-inventory-categories-create-update fi:modules/inventory#query-inventory-categories-list old:inventory/workflow/catalogo.md#inventory-f06 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
@@ -426,23 +430,34 @@ motivo.
 Implicados: KITCHEN-F04, SALE-F01, TAX-F01
 
 ### INVENTORY-F07 Eliminar una categoría
-<!-- origen: fi:modules/inventory#command-inventory-categories-delete old:inventory/workflow/catalogo.md#inventory-f07 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
 Pasos:
 1. En **Categorías**, pulsa «Eliminar» en la fila.
-2. La ventana «Eliminar categoría» dice «<nombre> — N producto(s) quedarán sin esta categoría (se
-   desvinculan; los productos no se borran)». N cuenta los productos activos.
+2. La ventana «Eliminar categoría» dice «<nombre> — N productos quedarán sin esta categoría (se
+   desvinculan; los productos no se borran)»; con uno, «<nombre> — 1 producto quedará sin esta
+   categoría (se desvincula; el producto no se borra)». N cuenta los productos activos.
 3. Pulsa «Eliminar y desvincular» (o «Cancelar»).
 Entra: la categoría elegida.
 Sale: la categoría queda eliminada y todos sus productos, activos o no, desvinculados en el mismo
 paso; los productos siguen. El TPV deja de agruparlos bajo ella.
+Una categoría eliminada por error la recupera el personal de ERPlora desde una copia aparte (BASE-F114): vuelve como
+una nueva, con su nombre, slug, descripción, icono, color, orden y categoría fiscal, antes que los productos, y con lo
+que tenía dentro en la copia: los productos que el negocio eliminó y aún guarda (los mismos, INVENTORY-F34), los que ya
+no tiene (creados de nuevo) y, al final, los que el negocio conserva vivos, que vuelven a ella sin perder ninguna otra
+categoría. Recuperaciones cuenta aparte esos enlaces («Enlaces de productos a categorías»). Una categoría que el negocio
+conserva, aunque la haya renombrado o le haya quitado productos, es la misma: no se repite ni se rellena; tampoco una
+que volvió a crear con su nombre (sin distinguir mayúsculas ni espacios): se usa la suya, tal como está, y solo entran
+en ella los productos que se crean de nuevo. Un producto eliminado que vuelve (INVENTORY-F34) no entra en la que el
+negocio rehízo a mano. La categoría que vuelve recupera también sus grupos de suplementos, si se recupera también
+Suplementos (MODIFIER-F10); la que el negocio rehízo a mano se queda con los que él le enganchó.
+Si la recuperación se pide otra vez desde una copia anterior a la categoría que trajo, esa categoría sigue contando
+como traída: los productos vivos que el negocio le quitó después vuelven a ella.
 Si falla: «No se pudo eliminar la categoría» (o el motivo) encima de la tabla.
-Implicados: KITCHEN-F04, SALE-F01
+Implicados: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Agrupar productos en categorías para el TPV
-<!-- origen: wf:restaurante-dia#rec_restaurante-f03 fi:modules/inventory#query-inventory-product_categories old:inventory/workflow/catalogo.md#inventory-f08 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -463,7 +478,6 @@ categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Importar productos desde un CSV
-<!-- origen: qa:modules/inventory/create-product-with-vat fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-products-bulk_create-handler-wasm-bulk_create old:inventory/workflow/importar-y-exportar.md#inventory-f09 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Importar productos
@@ -475,9 +489,9 @@ Pasos:
    inglés y con o sin tildes («Nombre», «Código», «Precio», «IVA»…). Cámbialo o pon «No importar».
    Se pueden importar Nombre, SKU, Precio, Coste, Stock, Umbral, EAN-13, Descripción, Unidad y
    Categoría fiscal; Nombre y SKU son obligatorias.
-3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} fila(s) listas
-   · {failed} con problemas», con la línea y el motivo de las diez primeras.
-4. Pulsa «Importar {n} producto(s)» (o «Cancelar», que no deja rastro).
+3. Mira las «Primeras {n} filas de {total}» y el ensayo de todo el fichero: «{ready} filas listas
+   · {failed} con problemas» («1 fila lista» con una), con la línea y el motivo de las diez primeras.
+4. Pulsa «Importar {n} productos» («Importar 1 producto» con uno; o «Cancelar», que no deja rastro).
 5. Si algún texto fiscal no se reconoce, o hay filas sin columna fiscal («Filas sin categoría
    fiscal»), sale «Categorías fiscales del CSV». Para cada uno: «Elegir» una categoría, «Crear» una
    (Clave y Nombre) u «Omitir». Pulsa «Confirmar e importar». Lo que se elige para un texto se guarda
@@ -506,7 +520,6 @@ estaba.».
 Implicados: TAX-F02, TAX-F14, TAX-F15
 
 ### INVENTORY-F10 Importar categorías desde un CSV
-<!-- origen: old:inventory/workflow/importar-y-exportar.md#inventory-f10 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Categorías
@@ -526,7 +539,6 @@ fiscal no reconocida: <texto>».
 Implicados: TAX-F15
 
 ### INVENTORY-F11 Exportar el catálogo a CSV
-<!-- origen: old:inventory/workflow/importar-y-exportar.md#inventory-f11 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -548,7 +560,6 @@ fórmula (empieza por =, +, -, @…) sale con un apóstrofo delante, que la impo
 Implicados: BASE-F112 (dentro de la app)
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
-<!-- origen: old-hub:HUB_SHELL-F26 old-hub:HUB-F235 old:inventory/workflow/importar-y-exportar.md#inventory-f12 wf:alta#rec_alta-f08 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
@@ -580,7 +591,6 @@ cargado se puede deshacer entero (BASE-F34).
 Implicados: BASE-F29, BASE-F31, BASE-F32, BASE-F34, BASE-F38, INVENTORY-F05, INVENTORY-F09, INVENTORY-F33
 
 ### INVENTORY-F13 Recibir mercancía
-<!-- origen: fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-stock-receive-handler-wasm-receive_stock old:inventory/workflow/stock.md#inventory-f13 qa:modules/inventory/waste-and-adjustment -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Recepción
@@ -597,7 +607,8 @@ albarán. Si se escribió coste, pasa a ser el coste del producto. Se aplica aun
 lleve control de stock. Si un artículo con control sube por encima de su umbral, avisa del cruce
 (INVENTORY-F18). Inventario avisa de que el stock cambió.
 Si falla: «Registrar recepción» está apagado sin cantidad, y mientras el negocio no haya dicho todavía su
-moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000. Si la moneda no se
+moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000; hasta entonces, salir del
+coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se
 puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el motivo) y ofrece
 «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar recepción» se enciende (hub#946). El
 recuento y la baja no leen importes: no la esperan. «La cantidad no respeta el incremento
@@ -609,7 +620,6 @@ falla: no entra ninguna.
 Implicados: ninguno
 
 ### INVENTORY-F14 Contar el stock de un producto
-<!-- origen: qa:modules/inventory/waste-and-adjustment fi:modules/inventory#command-inventory-stock-adjust old:inventory/workflow/stock.md#inventory-f14 qa:verticals/restaurant/08-incidents-voids-and-refunds -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Recuento
@@ -634,7 +644,6 @@ de la ventana, también el motivo de cualquier otro rechazo.
 Implicados: ninguno
 
 ### INVENTORY-F15 Dar de baja stock sin venta (merma, rotura, consumo propio)
-<!-- origen: qa:modules/inventory/waste-and-adjustment qa:verticals/restaurant/08-incidents-voids-and-refunds fi:modules/inventory#command-inventory-stock-decrease old:inventory/workflow/stock.md#inventory-f15 -->
 Estado: hecho
 Actor: administrador, responsable (pantalla); asistente
 Pantalla: ficha y tabla de Productos (ventana «Baja»); asistente
@@ -658,7 +667,6 @@ stock con «Este artículo no controla su stock: no hay nada que dar de baja.» 
 Implicados: ninguno
 
 ### INVENTORY-F16 Consultar el historial de movimientos
-<!-- origen: old:inventory/workflow/stock.md#inventory-f16 -->
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Movimientos
@@ -676,10 +684,10 @@ también quién lo hizo, aunque esta pantalla no lo enseña.
 Si falla: una venta cuyo número Inventario no llegó a apuntar deja vacía la celda Referencia. Un tique
 que Facturación numera más tarde (por ejemplo, sin los datos del negocio al cobrar) se lee y se busca
 por el número de la venta. Error de carga: el aviso de la tabla con «Reintentar».
-Implicados: INVOICE-F20, SALE-F28
+Implicados: INVOICE-F20, SALE-F28, INVENTORY-F34 (los movimientos de un producto eliminado que se recupera siguen
+siendo suyos: el historial no se parte en dos)
 
 ### INVENTORY-F17 Ver el panel y los productos con stock bajo
-<!-- origen: fi:modules/inventory#query-inventory-products-low_stock fi:modules/inventory#query-inventory-products-stats fi:modules/inventory#widget-inventory-low_stock_count-kpi-inventory-value-kpi-inventory-in_stock-stat-inventory-low_stock_products-bar-list old:inventory/workflow/stock.md#inventory-f17 -->
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Panel
@@ -704,7 +712,6 @@ ajustes. Los paneles del Inicio los ve quien puede ver los productos.
 Implicados: ninguno
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
-<!-- origen: old:inventory/workflow/stock.md#inventory-f18 qa:modules/inventory/stock-deduction-on-sale -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -727,7 +734,6 @@ aviso ni se pierde ni sale dos veces. Si el movimiento no llega a guardarse, tam
 Implicados: FLOW-F21
 
 ### INVENTORY-F19 Ajustar el inventario
-<!-- origen: fi:modules/inventory#command-inventory-settings-update fi:modules/inventory#query-inventory-settings-get old:inventory/workflow/stock.md#inventory-f19 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ajustes
@@ -759,7 +765,6 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 Implicados: SALE-F01
 
 ### INVENTORY-F20 Decidir qué artículos llevan control de stock
-<!-- origen: old:inventory/workflow/stock.md#inventory-f20 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -779,7 +784,6 @@ Si falla: los rechazos del formulario (INVENTORY-F01). Una vez decidido, el art�
 Implicados: SALE-F01
 
 ### INVENTORY-F21 Bajar el stock al cobrarse una venta
-<!-- origen: qa:verticals/beauty/05-sale-upsell-and-payment wf:peluqueria-dia#rec_peluqueria-f09 qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/08-incidents-voids-and-refunds fi:modules/inventory#command-inventory-stock-decrease qa:modules/inventory/stock-deduction-on-sale fi:modules/inventory#command-inventory-stock-decrease_on_sale-handler-wasm-decrease_on_sale fi:modules/inventory#event-listen-sale-completed-inventory-stock-decrease_on_sale old-hub:HUB-F51 old:inventory/workflow/con-otros-modulos.md#inventory-f21 wf:restaurante-dia#rec_restaurante-f17 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -806,7 +810,6 @@ encendido, queda en negativo.
 Implicados: SALE-F01, SALE-F11, SALE-F15
 
 ### INVENTORY-F22 Bajar el stock de los componentes de un menú o un pack
-<!-- origen: wf:restaurante-dia#rec_restaurante-f11 old:inventory/workflow/con-otros-modulos.md#inventory-f22 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -824,7 +827,6 @@ Si falla: como INVENTORY-F21.
 Implicados: COMBO-F10, SALE-F12
 
 ### INVENTORY-F23 Reponer el stock al anularse una venta
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void qa:verticals/restaurant/08-incidents-voids-and-refunds qa:modules/inventory/stock-deduction-on-sale fi:modules/inventory#event-listen-sale-voided-inventory-_restock_on_void old:inventory/workflow/con-otros-modulos.md#inventory-f23 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -844,7 +846,6 @@ después ya no baja nada. Un artículo eliminado después de la venta no recuper
 Implicados: SALE-F30
 
 ### INVENTORY-F24 Reponer el stock de una devolución
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 qa:verticals/restaurant/08-incidents-voids-and-refunds qa:modules/inventory/stock-deduction-on-sale old:inventory/workflow/con-otros-modulos.md#inventory-f24 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -868,7 +869,6 @@ aviso de la devolución no los trae; si vuelven a la estantería, se cuentan (IN
 Implicados: SALE-F31
 
 ### INVENTORY-F25 Imprimir la etiqueta del código de barras
-<!-- origen: old-hub:HUB_PERIPHERALS-F12 old:inventory/workflow/con-otros-modulos.md#inventory-f25 -->
 Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
@@ -896,7 +896,6 @@ ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
 Implicados: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Vender al peso o por medida: unidades y escalón
-<!-- origen: qa:verticals/restaurant/03-menu-and-prices old:inventory/workflow/con-otros-modulos.md#inventory-f26 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -920,7 +919,6 @@ con stock no se cambia (INVENTORY-F02).
 Implicados: SALE-F10
 
 ### INVENTORY-F27 Entregar el catálogo al TPV, a Cocina y a Menús
-<!-- origen: qa:verticals/restaurant/03-menu-and-prices wf:restaurante-dia#rec_restaurante-f06 fi:modules/inventory#query-inventory-products-list old:inventory/workflow/con-otros-modulos.md#inventory-f27 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -949,7 +947,6 @@ reparto.
 Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
-<!-- origen: old-hub:HUB_SHELL-F27 old-hub:HUB_SHELL-F31 old:inventory/workflow/con-otros-modulos.md#inventory-f28 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Inicio: Termina de configurar tu negocio
@@ -965,7 +962,6 @@ recargar.
 Implicados: ninguno
 
 ### INVENTORY-F29 Marcar un artículo como agotado
-<!-- origen: qa:modules/sales/sold-out-item-86 -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos; Ficha del producto
@@ -992,7 +988,6 @@ acciones. Un artículo que ya no existe da «Este producto no existe en este hub
 Implicados: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Elegir la imagen de un artículo desde la librería
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: una librería de imágenes compartida por todos los negocios, con título y sinónimos en español y en inglés; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) old:inventory/WORKFLOW.md (Foto del artículo en la ficha, duda 6) -->
 Estado: hecho
 Actor: administrador, responsable, asistente
 Pantalla: Productos
@@ -1008,7 +1003,8 @@ Pasos:
 3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
    foto».
 4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
-   panel la descarta.
+   panel pregunta antes «¿Descartar los cambios?» y, con «Descartar cambios», la descarta (INVENTORY-F01,
+   paso 7).
 5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
    enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
    Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
@@ -1018,8 +1014,10 @@ Sale: el artículo con su imagen de la librería. El negocio no guarda una copia
 es, así que no gasta espacio de su plan. Inventario avisa del cambio (`inventory.product.updated`) y el
 TPV la enseña sin recargar (INVENTORY-F32). Elegir otra la sustituye; si la anterior era una foto
 propia (INVENTORY-F31), se borra de la carpeta del negocio. «Quitar foto» deja el artículo con sus
-iniciales. Las candidatas las da `inventory.product.suggest_image`, el buscador es
-`base.catalog_image.search` y la foto la pone o la quita `inventory.product.set_image`.
+iniciales. Eliminar el artículo le deja la imagen de la librería (solo la foto propia se borra), y si el personal de
+ERPlora lo recupera desde una copia aparte vuelve con la que tenía (INVENTORY-F34, BASE-F114). Las candidatas las da
+`inventory.product.suggest_image`, el buscador es `base.catalog_image.search` y la foto la pone o la quita
+`inventory.product.set_image`.
 Si falla: si la librería no contesta, «No se pudo cargar la librería de imágenes.» con «Reintentar», y
 el producto se sigue pudiendo guardar sin foto. Sin resultados: «Ninguna imagen coincide con tu
 búsqueda. Prueba con otra palabra o sube una foto.». El asistente que no encuentra candidatas lo dice y
@@ -1028,10 +1026,9 @@ la foto: el panel dice «El producto se ha guardado, pero la foto no: Esa imagen
 Elige otra.» con «Reintentar», y el artículo se queda con la foto que tenía (por el asistente o la API no
 se guarda nada). Quien no puede cambiar productos no ve «Foto», y la app lo rechaza también por el
 asistente o la API.
-Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Subir una foto propia del artículo
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda las fotos de sus artículos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
@@ -1058,7 +1055,6 @@ plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
 ### INVENTORY-F32 La foto en la ficha del TPV
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30; hoy la baldosa del TPV pinta las iniciales sobre un degradado, SALE-F01) -->
 Estado: hecho
 Actor: empleado, cajero
 Pantalla: Ventas: Vender; Productos; Ficha del producto
@@ -1081,7 +1077,6 @@ sin aviso; el TPV vende igual.
 Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
 
 ### INVENTORY-F33 Las fotos viajan en el blueprint
-<!-- origen: nuevo (decisión de Ioan del 2026-10-30: las fotos propias viajan dentro del archivo exportado y las de la librería como referencia) gh:hub#1008 gh:hub#1006 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias
@@ -1107,6 +1102,36 @@ informe. El archivo pesa 20 MB como mucho, 100 MB descomprimido, con 1 000 entra
 50 MB y 200): caben 300 fotos de 60 KB. Una foto de dentro que no es un WebP de hasta 2 MB hace que el archivo no
 se pueda leer («El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así que no se puede leer.»).
 Implicados: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
+
+### INVENTORY-F34 Recuperar un producto eliminado
+Estado: hecho
+Actor: el personal de ERPlora, cuando el negocio lo pide (en el negocio ninguna pantalla deshace una eliminación)
+Pantalla: ninguna del negocio; el admin de Hubs › Copias aparte › «Recuperar en el negocio…» (BASE-F114)
+Pasos:
+1. El negocio eliminó por error uno o varios productos (INVENTORY-F04) y pide recuperarlos.
+2. El personal de ERPlora hace una copia aparte del negocio de un momento anterior y recupera desde ella los
+   productos (BASE-F114, pasos 6 a 11).
+3. Cada producto que el negocio eliminó y aún guarda vuelve a **Productos**, al TPV y al catálogo de venta: EL MISMO
+   producto, con su SKU, su EAN-13, sus categorías que siguen vivas y la que vuelve con la recuperación si el negocio
+   la eliminó después (INVENTORY-F07), su categoría fiscal, su stock y su imagen de la librería, y en
+   **Movimientos** su historial entero (inicial, recepciones, ventas, recuentos y bajas) sigue siendo suyo.
+   Vuelve activo y a la venta, como al desarchivar en Odoo o Square: si estaba desactivado o marcado como agotado
+   antes de eliminarse, se vuelve a hacer a mano (INVENTORY-F03, INVENTORY-F29). Recuperaciones lo cuenta entre los
+   restaurados de Productos.
+Entra: el producto eliminado, por su identificador, y la imagen que tenía en la copia.
+Sale: el producto vivo otra vez, activo y a la venta, sin cambiar ninguno de sus demás datos (salvo la imagen de la
+librería que recupera si no tenía ninguna), y el aviso de producto recuperado (`inventory.product.restored`), con el
+producto tal como vuelve.
+Si falla: no vuelve si el negocio ya hizo otro producto con su SKU o su EAN-13 desde que lo eliminó: se queda el que
+hizo, y la recuperación no lo cuenta ni lo crea. Un producto que el negocio ya no tiene en absoluto se crea de nuevo
+(INVENTORY-F01), sin stock, con la imagen de la librería que tenía en la copia. Sobre un producto vivo no falla:
+responde bien y vuelve a avisar. Su foto propia no vuelve: se borró al eliminarlo (INVENTORY-F31). La imagen de la
+librería sí, porque eliminar se la deja; uno eliminado antes de que se la dejara, que se quedó sin ninguna, recupera
+la que tenía en la copia, salvo una que la librería ya no tiene. Sus reglas de descuento de Tarifas se vuelven a activar solas (PRICING-F14) y sus precios en las tarifas vuelven si se
+recupera también Tarifas (PRICING-F15), sus grupos de suplementos, si se recupera también Suplementos
+(MODIFIER-F10), y sus elecciones en los menús, si se recupera también Menús (COMBO-F15).
+Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
+PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ## Qué comparten los verticales
 
@@ -1169,15 +1194,17 @@ puede ver, o lo que ya no existe, no sale.
 | Da de alta muchos productos de una vez y dice qué fila entró, cuál se omitió y cuál falló | importar productos | un clic | F09 | `inventory.product.bulk_create` |
 | Cambia un producto: datos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
+| Devuelve al catálogo un producto eliminado, tal como era (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F34 | `inventory.product.restore` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
 | Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F30 | `inventory.product.set_image` |
 | Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31 | `inventory.product.upload_image` |
-| Añade un producto a una categoría | cambiar productos | un clic | F08 | `inventory.product_category.add` |
+| Añade un producto a una categoría (también la plataforma, al recuperar desde una copia aparte una categoría eliminada con los productos que el negocio conserva) | cambiar productos | un clic | F08, F07 | `inventory.product_category.add` |
 | Quita un producto de una categoría | cambiar productos | un clic | F08 | `inventory.product_category.remove` |
 | Crea una categoría | crear categorías | un clic | F06 | `inventory.category.create` |
 | Crea muchas categorías de una vez, con informe por fila | crear categorías | un clic | F10 | `inventory.category.bulk_create` |
 | Cambia una categoría | cambiar categorías | un clic | F06 | `inventory.category.update` |
 | Elimina una categoría y desvincula sus productos | eliminar categorías | escribir para confirmar | F07 | `inventory.category.delete` |
+| Devuelve una categoría eliminada, como una nueva, con los productos eliminados que tenía (solo el sistema, al recuperar desde una copia aparte) | sistema | no es del asistente: solo lo hace la plataforma | F07, F34 | `inventory.category.recover` |
 | Exporta productos o categorías a CSV | exportar productos | un clic | F11 | `inventory.product.export`, `inventory.category.export` |
 | Registra una recepción de mercancía (uno o varios productos, coste y albarán) | mover stock | un clic | F13 | `inventory.stock.receive` |
 | Aplica un recuento: el saldo pasa a ser lo contado, con motivo | mover stock | un clic | F14 | `inventory.stock.count` |
@@ -1192,6 +1219,7 @@ puede ver, o lo que ya no existe, no sale.
 | Producto nuevo | Alta por pantalla, importación, plantilla, asistente o API | El producto y sus categorías | Flujos; paneles del Inicio | `inventory.product.created` |
 | Producto cambiado | Cambio, activar o desactivar, marcar agotado o volver a la venta | El producto como queda, también si está agotado | Flujos; paneles del Inicio; el TPV, Cocina y Menús | `inventory.product.updated` |
 | Producto eliminado | Eliminar | Cuál era (SKU y nombre) | Flujos; paneles del Inicio | `inventory.product.deleted` |
+| Producto recuperado | Recuperar un producto eliminado (también la repetición) | El producto como vuelve | Flujos; paneles del Inicio | `inventory.product.restored` |
 | Producto añadido a una categoría | Alta, cambio o enlace suelto | Producto y categoría | Flujos | `inventory.product.categorized` |
 | Producto quitado de una categoría | Cambio, enlace suelto o categoría eliminada | Producto y categoría | Flujos | `inventory.product.uncategorized` |
 | Stock cambiado | Cualquier movimiento: inicial, recepción, recuento, baja, venta, anulación | Producto, cantidad, saldo y tipo de movimiento | Panel y paneles del Inicio | `inventory.stock.changed` |
@@ -1245,22 +1273,66 @@ factura se lo da Ventas, no Facturación.
 | Gestionar ajustes | sí | sí | no | no | `inventory.manage_settings` |
 
 Son los permisos de fábrica de cada perfil; el administrador los puede cambiar en Roles. El
-administrador lo puede todo. La app los comprueba en todas las puertas (pantalla, asistente y
+administrador lo puede todo. Ningún perfil devuelve al catálogo un producto ni una categoría eliminados: lo hace el sistema
+cuando el personal de ERPlora recupera desde una copia aparte (INVENTORY-F07, INVENTORY-F34, `inventory.system`, que
+tampoco tiene ningún rol). La app los comprueba en todas las puertas (pantalla, asistente y
 API), no solo en la pantalla.
 
 ## Para quien lo mantiene
 Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
-- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): productos, los de poco
+- **Orden de las listas** (`base.ordering.list_order_for`): productos, los de poco
   stock, categorías y movimientos van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
   descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
   `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
 
-## El servidor (fase de servidor, 2026-10-14)
+- **Recuperar desde una copia aparte** (BASE-F114): `apps.py` responde a la plataforma (`recoverable_from_copy`,
+  `base.recovery.Recoverable`) con tres declaraciones, por este orden, leídas de la copia por SQL sobre los nombres de los
+  modelos (la copia no es un negocio y no tiene alias). Primero las categorías vivas de la copia
+  (`queries.categories_in_copy`, con sus productos vivos en `product_ids`): cada una que el negocio no tiene
+  (`queries.categories_not_in_business`) se crea por `inventory.category.recover` (permiso `inventory.system`, sin
+  ruta; el alta de la pantalla más, en el mismo paso, el enlace de los productos de la copia que el negocio guarda
+  eliminados y se pueden restaurar, para que vuelvan dentro). Una categoría
+  de la copia es la del negocio por su id mientras siga viva (aunque se renombrara); si no, una viva con su nombre
+  (`_same_name`) que no sea ninguna de la copia, cada una por una sola, la más antigua por la más antigua
+  (`_categories_held`). Después los productos vivos de la copia (`queries.products_in_copy`, con todas las categorías
+  vivas de la copia en `copy_categories`, la misma en cada uno): los que el negocio aún guarda eliminados vuelven
+  primero, los mismos, por `inventory.product.restore` (`queries.products_deleted_in_business` y `_restorable`: nunca
+  uno cuyo SKU o EAN-13 tiene ya otro vivo; INVENTORY-F34, avisa `inventory.product.restored`, que está en
+  `events.PRODUCT_EVENTS`); y los que ya no tiene en absoluto (`queries.products_not_in_business`: ni guardado, vivo o
+  eliminado, ni otro vivo con su SKU o su EAN-13) se crean, cada uno por `inventory.product.create` con la clave de su
+  categoría fiscal y sus categorías aquí por la misma regla (`_categories_held`: la misma, o la que acaba de volver o
+  el negocio volvió a crear con su nombre), activo o no como estaba (`ProductIn.is_active`), sin stock (el saldo de la
+  copia es de otro día). No es `inventory.product.create` sino `inventory.product.recover` (permiso `inventory.system`,
+  sin ruta, `ProductRecoverIn`): el alta de la pantalla y, en el mismo paso, la imagen que tenía en la copia, como la
+  pone la pantalla con `set_image` (`base.images.from_copy`, la misma regla que Servicios: la de la librería, salvo una
+  que la librería dice que ya no tiene; nunca una foto propia; con la librería sin leer, tal como estaba, para no dejar
+  el producto fuera). El
+  eliminado vuelve con la suya porque `inventory.product.delete` no le quita la de la librería, solo la foto propia;
+  al que se eliminó antes de eso, sin ninguna, `inventory.product.restore` le devuelve la de la copia en el mismo paso
+  y con la misma regla (`ProductRestoreIn`: el `id` y la `image` del registro leído, que es lo que la plataforma le
+  da de la copia, `base.tenancy.recovery._restore_input`). Uno que el negocio tiene vivo no cambia.
+  Al final, los enlaces vivos de la copia (`queries.product_links_in_copy`:
+  producto y categoría vivos allí, con el id del enlace y `copy_categories`): cada uno que le falta a una categoría que
+  trajo una recuperación (`queries.product_links_not_in_business`: la de la copia ya no está viva aquí y la que ocupa su
+  sitio por `_categories_held` la creó una recuperación, `created_by` según `base.recovery.brought_back`; el producto
+  sigue vivo aquí y fuera de ella) se crea por la operación de la pantalla, `inventory.product_category.add`, que añade
+  sin quitar ninguna otra categoría. Va aparte, con su propia cuenta, porque toca lo que el negocio tiene. Una categoría
+  rehecha a mano (`created_by` de una persona) o conservada no se rellena. Las categorías y los enlaces se leen desde `0001_initial` y los
+  productos desde `0005_product_image`, la que les dio la imagen (a una copia anterior se le niegan los productos con
+  `recover_copy_behind`); una migración que añada, quite o renombre una columna que se lee cambia también la lectura
+  y su `reads_since`. Tests: `tests/test_recovery.py`, de punta a punta
+  incluido, y el contrato de `base/tenancy/tests/test_recovery.py`.
+  Las apps cuyos registros de la copia cuelgan de un producto (Tarifas, Suplementos, Menús) no emparejan a su manera:
+  piden a `queries.products_standing_for` (`{id allí: SKU allí}`) el producto del negocio que hace de cada uno que ya
+  no está vivo aquí: el vivo con su SKU que hizo una recuperación (`base.recovery.brought_back`), la de esta pasada u
+  otra anterior. Uno vivo es él mismo y no sale; uno hecho a mano con su SKU es del negocio y no hace de ninguno.
+
+## El servidor
 
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero.
-  Las páginas (`frontend/`) son las del módulo viejo: Panel, Productos, Movimientos, Categorías y Ajustes.
+  Las páginas (`frontend/`): Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
   rutas no llevan parámetros: el producto o la categoría viajan en la entrada. Después llegaron las tres de la
@@ -1300,12 +1372,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Libro de movimientos**: `_move` escribe saldo y movimiento juntos con la fila del producto
   bloqueada; varios productos se bloquean por orden de id. El cruce del mínimo se decide una vez por
   operación sobre el total (también suelto + dentro de un menú).
-- **Inicio** (ronda PLAN-HUB 2026-10-21): `setup` y `widgets` de `apps.py`, los del `module.json` viejo (sin
-  `bell`). El paso `inventory.catalog` lee `active_products` de `inventory.stock.get_summary` (orden 30,
+- **Inicio**: `setup` y `widgets` de `apps.py` (sin `bell`). El paso `inventory.catalog` lee `active_products` de `inventory.stock.get_summary` (orden 30,
   `required`, permiso `inventory.add_product`, `events.PRODUCT_EVENTS`); los cuatro paneles leen
   `inventory.stock.get_summary` y `inventory.product.list_low_stock` (`limit` 5) con permiso
   `inventory.view_product` y `events.FIGURE_EVENTS`, las mismas que re-ejecutan el Panel (`live.py`). Ningún
-  panel fija moneda ni idioma (gh:inventory#123) ni categoría (gh:inventory#126); un KPI no repite su nombre en
+  panel fija moneda, idioma ni categoría; un KPI no repite su nombre en
   `options.label` (gh:hub#1105).
 - **Ventas**: `events.REACTIONS` lleva `sale.sale.completed` → `inventory.stock.apply_sale`,
   `sale.sale.voided` → `inventory.stock.restore_sale` y `sale.sale.refunded` →
@@ -1315,7 +1386,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   devuelto. Los tests usan el evento real de Ventas, importando `apps.sale` solo en los tests. Su permiso, `inventory.system`, no lo tiene ningún rol. La nota por venta
   (`SaleStock`: `moved`, `unmoved`, `voided`) hace que la venta baje una vez, que la anulación reponga
   una vez lo que dice el libro y que una anulación que llega antes deje la venta sin efecto. Los entrega
-  el relay del outbox del worker (`base/relay.py`, desde hub#105): `tests/test_relay.py` cobra, anula y
+  el relay del outbox del worker (`base/relay.py`): `tests/test_relay.py` cobra, anula y
   devuelve con las operaciones reales de Ventas (y Menús) y pasa un tick real del worker. La forma del evento de Ventas (`sale_id`, `items[]` con `product_id`, `quantity`,
   `is_service` y `components[]`) la fija el WORKBOOK de Ventas.
 - **Importar**: el servidor es la autoridad: recibe las celdas como texto ya mapeadas a nuestros
@@ -1335,7 +1406,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
   agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
   el resto, inactivos o agotados) y `list_for_sale`; la cifra de cada categoría cuenta los activos,
-  agotados incluidos (lo que enseña el TPV, FIX-INVENTORY-SOLD-OUT-GREYED-IN-POS); `include_sold_out=true`
+  agotados incluidos (lo que enseña el TPV); `include_sold_out=true`
   hace que `is_active` sea solo el interruptor (la rejilla, el buscador y el «Todos» del TPV, que enseñan
   lo agotado en gris (SALE-F07), y los selectores de Menús, que configuran y no venden); `status=sold_out` filtra la marca y la fila lleva `is_sold_out`. Menús lee
   `Product.is_sold_out` directamente (`requires`): estado `product_sold_out` y 409 `combo.option_sold_out`. `inventory.product.set_sold_out`
@@ -1358,24 +1429,15 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   navegador es una hoja solo para papel (`@media print`), hecha con el DOM.
 - **Avisos añadidos** a la lista del producto: `inventory.category.*` e `inventory.config.updated`, solo
   para refrescar las consultas vivas.
-- **Administrador de Django**: CRUD completo de todas las tablas para soporte (ronda 12, PLAN §17), el
+- **Administrador de Django**: CRUD completo de todas las tablas para soporte (PLAN §17), el
   libro incluido: es un segundo camino de escritura que avisa y no impide; ids y fechas automáticas se
   ven pero no se editan. Las pantallas, el asistente y la API siguen sin editar el libro.
 - **Pruebas que bloquean**: dos ventas de la última unidad, la misma venta dos veces, una venta y su
   anulación, y dos bajas del saldo entero, a la vez y en dos hilos (`test_services.py`). Con Impuestos
   real, sin dobles (`test_integration_tax.py`): categoría de fábrica y su tipo calculado, categoría
   desactivada rechazada por toda puerta, y textos fiscales leídos por sus alias.
-- **Categorías**: nacen con el icono `ion:cube-outline` y el color `#3880ff`, como en el módulo viejo.
-- **Roles**: el `cashier` viejo no existe; lo que tenía (ver productos, categorías y stock) es del
-  empleado (`hub_employee`).
-- **Del módulo viejo se queda fuera, a propósito**: almacenes (`inventory_location`) y variantes
-  (`inventory_product_variant`), que este WORKBOOK excluye; la imagen de la categoría (duda 6; la
-  foto del producto vuelve con F30 a F33); el SKU autogenerado `PROD-NNN` de su alta en lote (aquí el SKU es obligatorio,
-  INVENTORY-F09); desactivar una categoría (cambio 5); `inventory.products.unit_of` y
-  `inventory.products.stock_levels`, que eran lecturas internas de los handlers (aquí la unidad sale en
-  la ficha y en `inventory.unit.list`, y el saldo se lee dentro de la transacción).
-- **La foto del artículo (INVENTORY-F30 a F33, hechas el 2026-10-30; decisión de Ioan del 2026-10-30, encargo
-  `docs/plans/2026-10-30-blueprints-imagenes-prompt.md` de erplora-next)**:
+- **Categorías**: nacen con el icono `ion:cube-outline` y el color `#3880ff`.
+- **La foto del artículo (INVENTORY-F30 a F33)**:
   - `Product.image`: texto validado con una referencia lógica, nunca una URL (un `.blueprint.zip` es inmutable
     y una URL horneada se pudre si cambia el dominio, el bucket o la CDN): `catalog:<carpeta>/<nombre>` (la
     librería compartida, repo `ERPlora/blueprints`, `img/<carpeta>/<nombre>.webp`, con el manifiesto bilingüe
@@ -1390,9 +1452,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     productos: ≤ 2 MB, Pillow a WebP 512×512 recortada al centro, el espacio del plan con
     `base.files.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
     en `base`, `base.catalog_image.search` (consulta: título y `tags` del manifiesto en `es` y `en`; título en
-    el idioma del negocio). Reutilizan `inventory.product.updated`. Al hacerlas entran en «Lo que ofrece» y,
-    la de `base`, en «Lo que necesita de otras apps» (`tests/test_workbook.py` exige que esa tabla nombre
-    solo lo que el código llama, por eso no está ya).
+    el idioma del negocio). Reutilizan `inventory.product.updated`.
   - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs
     (`shared/catalog/…`, de solo lectura para los hubs) con caché inmutable, la misma vista genérica que
     `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por
@@ -1418,72 +1478,18 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     («ProductFormModal: photo»), `ProductDetailModal.test.ts`, `frontend/pages/ProductsPage.test.ts`, las baldosas
     en `apps/sale/frontend/components/pos/*Tile*.test.ts`, y en Chrome `tests/e2e/inventory-photo.spec.ts` (F30, F31
     y F32 a 390, 834 y 1440). F33: `base/tests/test_blueprint_images.py`.
-  - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip (como hub#1008 del producto
-    viejo) y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
-    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites desde el 2026-10-30
+  - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
+    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites
     (`base/tests/test_blueprint_images.py`): `MAX_FILE_BYTES` 20 MB, `MAX_INFLATED_BYTES` 100 MB, `MAX_ENTRIES` 1 000
-    y cada `media/` un WebP de `MAX_PHOTO_BYTES` 2 MB (motivo `bad_photo`); antes 5 MB, 50 MB y 200.
-  - Supersede la «una copia por paquete o por negocio» del producto viejo (ADR-0121, hub#1006, README de
-    `erplora-old/blueprints`): la librería es una sola copia para todos los hubs.
-  - Choque en la referencia: el `WORKFLOW.md` viejo de inventario dice «no hay campo de imagen» (F01) mientras
-    su esquema (`migrations/postgres/001_init.sql`) tiene `image TEXT` en producto y en categoría: la columna
-    existía y solo se llenaba por el asistente, la API o una plantilla.
-
-## Cambios frente al producto actual
-
-La app hace lo mismo que el módulo Inventario actual y se ve igual, salvo estos arreglos de fallos
-que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir su flujo.
-
-1. **La app comprueba en todas las puertas lo que antes solo comprobaba la pantalla**: que la
-   categoría fiscal existe en Impuestos (F01, F02), el escalón de la unidad en la recepción y el
-   recuento (F13, F14), los permisos de importar y de exportar (F09, F11) y que un servicio no se
-   recibe ni se cuenta (F13, F14).
-2. **El stock inicial deja movimiento «Inicial»**, venga del alta, de un CSV o de una plantilla
-   (F01, F09, F12, F16). Antes el saldo no se explicaba por el libro.
-3. **El producto y sus categorías se guardan juntos**: o todo o nada (F02, F08). Antes las
-   categorías se guardaban después, una a una.
-4. **La unidad de un producto con stock no se cambia** (F02, F26). Antes 3 unidades pasaban a ser
-   3 kg sin convertir.
-5. **Editar una categoría no borra lo que la pantalla no enseña** (descripción, icono, color, orden),
-   y **las categorías no se desactivan**: antes una categoría desactivada por la API desaparecía sin
-   forma de volver (F06).
-6. **Importar productos**: acepta coma o punto y coma (el CSV de Excel en español); el texto fiscal
-   se compara también con el nombre traducido; si Impuestos no puede guardar un texto o una
-   categoría, se dice en el informe (F09).
-7. **Importar categorías** da el mismo informe que la de productos, omite las que ya existen por
-   nombre y no deja categorías sin tipo en silencio (F10).
-8. **Exportar** baja todo el catálogo filtrado, con las cifras como se leen, todos los campos y las
-   cabeceras que la importación reconoce (F11). Antes bajaba solo la página, con cifras internas.
-9. **Todo movimiento avisa de stock cambiado**, así el Panel y los paneles del Inicio se refrescan
-   también tras una venta, una anulación o una recepción (F17, F21, F23).
-10. **El aviso de cruce de mínimo es exacto**: solo con lo que de verdad se movió, también al anular,
-    y ni se pierde ni se duplica con dos movimientos a la vez (F18, F21, F23).
-11. **La anulación repone bien llegue antes o después que la venta** (F23). Antes, si la venta se
-    reintentaba después de la anulación, el stock quedaba bajado por una venta anulada.
-12. **Todas las consultas y acciones están en la API y en el asistente** (F13, F15). Antes recibir y
-    dar de baja no estaban en la API pública.
-13. **Dar de baja stock pide el permiso de mover stock**, no el de cambiar productos (F15).
-14. **Una recepción con una línea mala se rechaza entera** diciendo qué línea falla (F13). Antes esa
-    línea no movía nada y no se avisaba.
-15. **Un SKU o un EAN-13 repetido se dice siempre con su mensaje** (F01). Antes dependía del texto
-    del error de la base de datos.
-16. **Cada pulsación de «Imprimir código de barras» saca una etiqueta**, y si ninguna impresora
-    tiene la función «Etiqueta» se dice (F25). Antes, por la cola, cada producto sacaba su etiqueta
-    una sola vez en toda su vida y sin aviso. Es lo que hacen Square y Shopify POS (imprimir
-    etiquetas bajo demanda).
-17. **Los avisos solo llevan los datos del flujo** (sección «Lo que avisa»). Antes copiaban también
-    la identidad fiscal del negocio y quién lanzó la acción.
-18. **La foto del artículo se pone desde la ficha** (F30, F31): antes la columna existía, pero la ficha no
-    tenía campo y cada paquete llevaba su propia copia de la imagen; ahora se elige de una librería común
-    (una sola copia para todos los negocios) o se sube a la carpeta del negocio, y viaja en la copia
-    exportada (F33).
+    y cada `media/` un WebP de `MAX_PHOTO_BYTES` 2 MB (motivo `bad_photo`).
+  - La librería es una sola copia para todos los hubs.
 
 ## Cobertura contra la referencia
 
 | Elemento de la referencia | Qué hará la app | Flujo |
 |---|---|---|
 | Ficha con nombre, SKU, precio, coste, categoría fiscal, código de barras y unidad | sí | F01, F02 |
-| Foto del artículo en la ficha, la lista y el TPV | sí: de la librería común o propia, con las iniciales si no hay (duda 6 resuelta el 2026-10-30) | F30, F31, F32 |
+| Foto del artículo en la ficha, la lista y el TPV | sí: de la librería común o propia, con las iniciales si no hay (duda 6) | F30, F31, F32 |
 | Fotos de los artículos en la copia o la plantilla exportada | sí: las propias dentro del archivo, las de la librería como referencia | F33 |
 | Precio por una cantidad distinta de la unidad (por 100 g, por kg con stock en g) | parcial: solo por el asistente o la API (duda 12) | F01, F26 |
 | Categoría fiscal obligatoria y existente al guardar | sí | F01, F02 |
@@ -1572,7 +1578,7 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
-  un flujo, cada una tiene su sustituto en uso y su clave `inventory:ui-…` en el registro de la migración.
+  un flujo y cada una tiene su sustituto en uso.
 
 ## Lo que NO hace, a propósito
 
@@ -1600,21 +1606,12 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
 1. Con «Permitir vender sin stock» apagado (el de fábrica), una venta que supera el saldo se cobra y
    el stock no baja nada, sin aviso (F21). ¿Debe el TPV avisar o impedir la venta, o la venta debe
    bajar a negativo igualmente y el ajuste solo gobernar el aviso?
-2. ~~¿Debe la devolución de una venta reponer stock, con una casilla «devolver al stock» por línea
-   como Square y Toast (F24, SALE-F31)?~~ Resuelta (2026-10-14): sí; Ventas dice qué líneas y cuántas
-   unidades vuelven y Inventario las repone (F24).
-3. ~~¿Hace falta una pantalla de baja con motivo (merma, rotura, consumo propio) o basta el recuento
-   (F15)?~~ Resuelta (2026-10-14): sí, la ventana «Baja» en la fila y la ficha de Productos, como
-   Square (ajustes con motivo «dañado», «perdido»), Odoo («Desechar»), Shopify y Lightspeed.
 4. El «Tipo de IVA / Impuesto» de una categoría no lo usa nadie (F06): ¿se quita, o los productos de
    la categoría deben heredarlo?
 5. El «Umbral de stock bajo» de Ajustes solo lo hereda un producto creado por el asistente o la API
    sin umbral (F19): ¿debe el formulario dejar el campo vacío para heredarlo, y debe un cambio del
    ajuste alcanzar a los productos que lo heredaron?
-6. ~~¿Entra en el MVP la foto del artículo en la ficha (F01)?~~ Resuelta (2026-10-30, decisión de
-   Ioan): sí, elegida de la librería común o subida, en el TPV y en la copia exportada (F30 a F33).
-   Sigue abierta la otra mitad: ¿entran el orden, el color, el icono y la imagen de las categorías en
-   el TPV (F06, F08)?
+6. ¿Entran el orden, el color, el icono y la imagen de las categorías en el TPV (F06, F08)?
 7. ¿Debe la etiqueta llevar el EAN-13 cuando lo hay, y el TPV buscar por código de barras (F25,
    F27)?
 8. ¿Debe un artículo poder volver a «Sigue el ajuste del hub» después de haber decidido (F20)?

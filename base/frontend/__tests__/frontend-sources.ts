@@ -2,12 +2,16 @@
 // (base's, each app's and, when asked, the shared `ui`), their sources (`.ts` and `.vue`, without tests, their helpers,
 // declarations or builds), the code of each (a `.vue`, its `<script>` blocks at their own lines) and what a guard finds
 // in them, as `<path>:<line>` by app; and, for the guards that parse the code (TypeScript's AST), `linesWhere`, the
-// lines of the nodes a guard looks for, and `bare`, which they read an expression with.
-import { readdirSync, readFileSync } from 'node:fs';
+// lines of the nodes a guard looks for, and `bare`, which they read an expression with. The frontends are listed and
+// read without holding the worker (hub#1315): some 2,000 files, and on a loaded machine each first open waits on its own.
+import { readdirSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
+
+import { readTexts } from '../../../vitest.offload';
 
 /** The hub's root: base/frontend/__tests__ is three levels down. */
 export const HUB = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -57,10 +61,12 @@ export function linesWhere(text: string, name: string, holds: (node: ts.Node) =>
   });
 }
 
-/** The sources under `dir`: `.ts` and `.vue`, without tests, their helpers, declarations or builds. */
-export function frontendSources(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true })
-    .flatMap((entry) => {
+/** The sources under `dir`: `.ts` and `.vue`, without tests, their helpers, declarations or builds. Each folder is
+ *  listed by Node's own pool of threads, all of a level at once. */
+export async function frontendSources(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const found = await Promise.all(
+    entries.map((entry): string[] | Promise<string[]> => {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) {
         return entry.name.startsWith('.') || ['node_modules', '__tests__', 'generated', 'dist'].includes(entry.name)
@@ -69,8 +75,9 @@ export function frontendSources(dir: string): string[] {
       }
       if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.d.ts')) return [];
       return entry.name.endsWith('.ts') || entry.name.endsWith('.vue') ? [path] : [];
-    })
-    .sort();
+    }),
+  );
+  return found.flat().sort();
 }
 
 /** base's frontend, the shared `ui`'s (when `ui`) and each app's. */
@@ -83,24 +90,30 @@ export function hubFrontends({ ui }: { ui: boolean }): Frontend[] {
 }
 
 /** The lines `find` gives for each source of `frontends`, as `<path>:<line>` from `root`, by app; a frontend that does
- *  not exist (an app without one) is skipped. */
-export function findingsByApp(
+ *  not exist (an app without one) is skipped. The sources are listed and read at once, without holding the worker
+ *  (`readTexts`); what is left here is `find`'s own work, file by file. */
+export async function findingsByApp(
   frontends: Frontend[],
   find: (text: string, file: string) => number[],
   root: string = HUB,
-): Record<string, string[]> {
+): Promise<Record<string, string[]>> {
+  const sources = await Promise.all(
+    frontends.map(async ({ app, dir }) => {
+      try {
+        return { app, files: await frontendSources(dir) };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { app, files: [] };
+        throw error;
+      }
+    }),
+  );
+  const texts = await readTexts(sources.flatMap(({ files }) => files));
   const found: Record<string, string[]> = {};
-  for (const { app, dir } of frontends) {
-    let files: string[];
-    try {
-      files = frontendSources(dir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw error;
-    }
+  let index = 0;
+  for (const { app, files } of sources) {
     for (const file of files) {
       const where = relative(root, file);
-      for (const line of find(readFileSync(file, 'utf8'), file)) (found[app] ??= []).push(`${where}:${line}`);
+      for (const line of find(texts[index++], file)) (found[app] ??= []).push(`${where}:${line}`);
     }
   }
   return found;

@@ -2,7 +2,7 @@
 // one way on every screen, with the platform's `formatQuantity` (`@erplora/ui/components`): a stock of 12500 says
 // «12.500» in Inventory (it said «12500»), and a ticket of 1500 units says «1.500» on its invoice line, as the till's
 // own paper and the assistant's card write it. The till's quantity field holds what a person types and edits: «1500»,
-// ungrouped, as a till's quantity field does (PLAN-HUB: what is typed is not grouped). At 1440; the fleet's sweep
+// ungrouped, as a till's quantity field does (what is typed is not grouped). At 1440; the fleet's sweep
 // shoots the three sizes. What this file creates is deleted after it.
 import { expect, test } from '@playwright/test';
 

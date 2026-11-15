@@ -1,9 +1,9 @@
-// Types of the cart_checkout app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`),
-// from apps/cart_checkout/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py (tests/test_queries.py compares the list inputs and ItemOut)
-// and `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
-// parameters, an id travels in the input. On the wire: money in whole minor units of its currency,
-// quantities as decimal strings (`"2.500"`), moments ISO 8601.
+// Types of the cart_checkout app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
+// apps/cart_checkout/schemas.py. Written by hand, as the other apps' are: nothing generates them from
+// `/api/openapi.json`. Keep it in step with schemas.py (tests/test_queries.py compares the list inputs and ItemOut) and
+// `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters, an id travels in
+// the input. On the wire: money in whole minor units of its currency, quantities as decimal strings (`"2.500"`),
+// moments ISO 8601.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type CartStatus = 'active' | 'abandoned' | 'converted' | 'expired';

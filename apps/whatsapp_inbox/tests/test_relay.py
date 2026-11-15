@@ -1,5 +1,5 @@
 """The inbox's reactions to Customers, end to end through the worker's real outbox relay (WHATSAPP_INBOX-F04,
-F11, F12, F37; ``base/relay.py``, which delivers in phase 1 since hub#105).
+F11, F12, F37; ``base/relay.py``).
 
 Customers' own operations write the cards and record their events; the worker's loop takes them and runs the
 inbox's reaction as the system, once. Nothing is called by hand: before the tick nothing has changed, after it
@@ -16,7 +16,7 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run
+from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run, system
 from base import catalog, worker
 from base.catalog import RegisterResult
 from base.models import EventDelivery
@@ -126,6 +126,21 @@ def test_deleting_her_card_lets_another_card_of_her_number_claim_the_conversatio
     tick()
     assert conversation().customer_id == second.id
 
+
+def test_her_card_recovered_from_the_separate_copy_takes_her_conversation_back_through_the_relay(tick):
+    """hub#1324: deleting her card let the conversation go; the same card back (CUSTOMER-F33) claims it, once."""
+    receive("wamid.1")
+    ana = card()
+    tick()
+    run("customer.customer.delete", {"id": str(ana.id)}, owner())
+    tick()
+    assert conversation().customer_id is None
+    system("customer.customer.restore", {"id": str(ana.id)})
+    assert conversation().customer_id is None  # nothing in line: the relay does it
+    tick()
+    assert conversation().customer_id == ana.id
+    tick()  # again: nothing changes
+    assert conversation().customer_id == ana.id
 
 def test_a_card_made_from_the_conversation_is_joined_once_and_the_relay_changes_nothing(tick):
     """F37: «Create card» joins it in its own transaction; the card's creation, relayed, finds it joined."""

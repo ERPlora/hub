@@ -16,7 +16,7 @@ class InvoiceConfig(LiveAppConfig):
     icon = "ion:receipt-outline"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Every charged sale becomes a numbered ticket or invoice, corrected only by rectifying invoices."
     )
@@ -61,14 +61,12 @@ class InvoiceConfig(LiveAppConfig):
         Nav("series", _("Series"), "ion:layers-outline", "/invoice/series"),
         Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer"),
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old hub's ⛔ «Your business details» (a core item there,
-    # ``BLOCKING_KEYS``; here the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``) and the old module's
-    # «Your invoice numbering» (it had no `widgets` nor `bell`), on the queries the Issuer and Series screens read.
-    # The first is done with what issuing refuses to go without (``Issuer.configured``). The year's series are born
-    # with the first document, so the second is recommended and only waits while the business has no series at all:
-    # before its first document, the one moment to choose a prefix or continue another system's numbering; a new
-    # year's series inherit the last one's (INVOICE-F14). Registered icons only: the old `business-outline` and
-    # `bookmark-outline` wait in UI-REQUESTS.md.
+    # The Home's steps: ⛔ «Your business details» (the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``)
+    # and «Your invoice numbering», on the queries the Issuer and Series screens read. The first is done with what
+    # issuing refuses to go without (``Issuer.configured``). The year's series are born with the first document, so the
+    # second is recommended and only waits while the business has no series at all: before its first document, the one
+    # moment to choose a prefix or continue another system's numbering; a new year's series inherit the last one's
+    # (INVOICE-F14). Registered icons only: the old `business-outline` and `bookmark-outline` wait in UI-REQUESTS.md.
     setup = [
         SetupStep(
             key="business_identity",
@@ -102,8 +100,8 @@ class InvoiceConfig(LiveAppConfig):
     ]
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: Its invoices here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        its invoices here are documents nothing archives yet, so the database stays."""
         from apps.invoice import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

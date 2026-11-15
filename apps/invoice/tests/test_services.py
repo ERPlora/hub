@@ -20,6 +20,7 @@ from live.models import OutboxEvent
 from apps.invoice import services
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
 from apps.invoice.tests.conftest import A, ISSUER, ctx_for, run
+from apps.sale.tests.test_integration_tax import where_rules_are_made
 
 pytestmark = pytest.mark.django_db
 
@@ -292,7 +293,7 @@ def test_a_line_with_a_tax_category_takes_its_rule_not_the_rate_typed(issuer):
 
 
 def test_a_line_with_a_tax_category_takes_the_rule_of_the_business_region(issuer):
-    # TAX-F11 (pm#629 VF-17): a business of the Canary Islands declares the IGIC of its rule, never the
+    # TAX-F11: a business of the Canary Islands declares the IGIC of its rule, never the
     # national VAT of the same category.
     run(
         "tax.rule.create",
@@ -334,6 +335,42 @@ def test_a_line_of_a_category_without_the_territorys_rule_is_refused_not_declare
         manual(lines=[line])
     assert refused.value.code == "invoice.no_tax_rule"
     assert list(refused.value.fields) == ["lines.0.tax_category_key"]
+
+
+# ── A line without a rule: its tax category as Taxes names it, and where its rule is made (hub#1149) ──
+
+
+def refused_line(category: str) -> Conflict:
+    """What a manual invoice with one line of ``category`` is refused with; nothing is issued."""
+    line = {"description": "Shirt", "quantity": "1", "unit_price": 10000, "tax_category_key": category}
+    with pytest.raises(Conflict) as refused:
+        manual(lines=[line])
+    assert not Invoice.objects.exists()
+    return refused.value
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_line_without_a_rule_names_its_tax_category_as_taxes_does_and_where_its_rule_is_made(issuer, language):
+    # INVOICE-F03: a factory category by its name in the reader's language, never by its key, below its line.
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    shown = run("tax.category.get", {"key": "product.generic"}, ctx_for(language=language)).display_name
+    assert shown != "product.generic"
+    with translation.override(language):
+        refusal = refused_line("product.generic")
+        where = where_rules_are_made()
+    assert refusal.code == "invoice.no_tax_rule"
+    assert refusal.fields == {"lines.0.tax_category_key": refusal.message}
+    assert f"«{shown}»" in refusal.message
+    assert "product.generic" not in refusal.message
+    assert where in refusal.message
+
+
+def test_a_tax_category_of_the_business_without_a_rule_is_named_as_it_was_typed(issuer):
+    run("tax.category.create", {"key": "own.flowers", "name": "Fresh flowers"})
+    refusal = refused_line("own.flowers")
+    assert refusal.code == "invoice.no_tax_rule"
+    assert "«Fresh flowers»" in refusal.message
+    assert "own.flowers" not in refusal.message
 
 
 def test_an_unknown_tax_category_is_refused_on_its_line(issuer):
@@ -536,7 +573,7 @@ def test_a_manual_ticket_stops_at_the_tickets_limit(issuer):
 
 
 def test_the_tickets_limit_is_said_with_its_thousands_grouped(issuer):
-    # hub#1090: «3.000,00 €» in Spanish and «€3,000.00» in English, never «3000.00 €».
+    # «3.000,00 €» in Spanish and «€3,000.00» in English, never «3000.00 €».
     over = [{"description": "Course", "quantity": "1", "unit_price": 247935, "tax_rate": "21"}]
     for language, amount in (("es", "3.000,00 €"), ("en", "€3,000.00")):
         with translation.override(language), pytest.raises(Conflict) as refused:

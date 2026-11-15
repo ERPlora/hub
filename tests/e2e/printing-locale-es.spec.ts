@@ -1,14 +1,15 @@
-// flow: printing-locale — FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP (PRINTING-F14): Django joins every
-// app's Spanish catalogue and the first that translates a message wins, so printing's job «Cancelled» read
-// appointment's «Cancelada». The owner opens «Cancel» on a job of the queue, someone else cancels it meanwhile (by
-// the API), and the cancel window says the server's refusal as it came: «… este está cancelado.», a job's word,
-// never «cancelada». In Spanish, at 390, 834 and 1440. What this file makes carries its own reference and goes away.
+// flow: printing-locale (PRINTING-F14) — Django joins every app's Spanish catalogue and the first that translates a
+// message wins, so printing's job «Cancelled» could read appointment's «Cancelada». The owner opens «Cancel» on a job
+// of the queue, someone else cancels it meanwhile (by the API), and the cancel window says the server's refusal as it
+// came: «… este está cancelado.», a job's word, never «cancelada». In Spanish, at 390, 834 and 1440. What this file
+// makes carries its own reference and goes away.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';
 import { dialog } from './inventory-helpers';
 import { FLOW_VIEWPORTS } from './printing-helpers';
 import { stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 const KEY = 'FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP';
 const PREFIX = 'e2e-locale';
@@ -32,17 +33,6 @@ async function spanishOwner(browser: Browser): Promise<{ context: BrowserContext
   return { context, page };
 }
 
-async function cancelAction(page: Page, id: string): Promise<void> {
-  const hook = `printing-jobs-row-${id}-cancel`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-jobs-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
-}
-
 test('printing-locale: a job cancelled meanwhile is refused as «cancelado» in the cancel window', async ({ browser }) => {
   const { context, page } = await spanishOwner(browser);
   try {
@@ -59,7 +49,7 @@ test('printing-locale: a job cancelled meanwhile is refused as «cancelado» in 
     await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
     const row = shown(page).locator('[data-testid=printing-jobs-row]').filter({ hasText: REF });
     await expect(row).toContainText('Pendiente');
-    await cancelAction(page, id);
+    await rowAction(page, 'printing-jobs', id, 'cancel');
     const modal = dialog(page, 'printing-cancel-job');
     await expect(modal).toBeVisible();
 

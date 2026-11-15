@@ -1,4 +1,4 @@
-"""The Hub's side of a cut of the database (``live.database_cut``; BASE-F111, PLAN-DB round 2026-11-04e, point 5).
+"""The Hub's side of a cut of the database (``live.database_cut``).
 
 ``live`` decides what a cut is, what may run again and who waits; the Hub answers it. :func:`server_error` is the
 ``handler500``: a cut that escaped a view or a middleware (the host's business read on control, the session) is 503 with

@@ -3,7 +3,9 @@
 // day (Staff › Settings, STAFF-F22), its break in the middle of the day; a day off proposes the same
 // hours for when it is switched on. Only the working days travel, in weekday order (a weekday not sent
 // is a day off). The server judges the hours; its 422 names a day by its position in what was sent
-// (`days.<i>.<field>`), turned back into the weekday here so the message sits under that day's row.
+// (`days.<i>.<field>`): the window says one line per day, under that day's row.
+import type { FormModalError } from '@erplora/ui/components';
+
 import type { DayIn, ScheduleOut, SettingsOut } from '../operations';
 import { timeValue } from './format';
 import { WEEKDAYS } from './enums';
@@ -109,14 +111,25 @@ export function daysPayload(week: readonly WeekRow[]): DayIn[] {
     }));
 }
 
-/** The 422's `days.<i>.<field>` messages by the weekday they belong to (the first one per day). */
-export function dayErrors(fields: Readonly<Record<string, string>>, sent: readonly DayIn[]): Record<number, string> {
-  const out: Record<number, string> = {};
-  for (const [key, message] of Object.entries(fields)) {
-    const match = /^days\.(\d+)\./.exec(key);
-    if (!match) continue;
-    const day = sent[Number(match[1])];
-    if (day && out[day.weekday] === undefined) out[day.weekday] = message;
+/** The refusal as the window says it: a day's problems (`days.<i>.end_time`, `days.<i>.break_end`) go under one key
+ *  for that day (`days.<i>`, with the first one's words), so FormModal takes the day's line away whole as soon as
+ *  the person changes that day; the other keys stay as they came. */
+export function refusalByDay(error: FormModalError | null | undefined): FormModalError | null {
+  if (!error) return null;
+  const { message, code, status } = error;
+  const said = { message, ...(code === undefined ? {} : { code }), ...(status === undefined ? {} : { status }) };
+  if (!error.fields) return said;
+  const fields: Record<string, string> = {};
+  for (const [key, reason] of Object.entries(error.fields)) {
+    const day = /^(days\.\d+)\./.exec(key)?.[1] ?? key;
+    fields[day] ??= reason;
   }
-  return out;
+  return { ...said, fields };
+}
+
+/** The key a weekday's refusal goes under: its position among the days sent (`days.<i>`), or nothing when it was not
+ *  sent. */
+export function dayKey(weekday: number, sent: readonly DayIn[]): string | undefined {
+  const at = sent.findIndex((day) => day.weekday === weekday);
+  return at < 0 ? undefined : `days.${at}`;
 }

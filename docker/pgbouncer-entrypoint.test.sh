@@ -102,7 +102,7 @@ teardown
 
 setup
 run_entrypoint
-check "writes the PLAN-DB settings" '
+check "writes the pool settings of the hub databases" '
   [[ $status -eq 0 ]] &&
   has_line "pool_mode=transaction" && has_line "auth_type=scram-sha-256" &&
   has_line "default_pool_size=3" && has_line "max_db_connections=3" &&

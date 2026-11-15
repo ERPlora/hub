@@ -1,11 +1,11 @@
 // Shared steps of the service e2e (service-*.spec.ts): an owner's page in English, the apps' APIs for
 // setup and server-side evidence (never the check itself), a Combo pick, a row action (a button, or
-// inside «⋮» when the row folds them), a column filter through the table's «Filters» panel and the
-// cleanup every spec runs before and after it: what a run creates is named «E2E Svc …» and deleted from
-// the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
-import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
+// inside «⋮» when the row folds them: the one every spec of the e2e takes, hub#1302) and the icon it wears, a column
+// filter through the table's «Filters» panel and the cleanup every spec runs before and after it: what a run creates is
+// named «E2E Svc …» and deleted from the hub's database, the appointments of its customers included.
+import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
 
 /** Every name a service spec gives starts like this. */
 export const TAG = 'E2E Svc';
@@ -20,7 +20,7 @@ export const VIEWPORTS = {
   phone: { width: 390, height: 844 },
 } as const;
 
-/** The three sizes every flow with a screen is walked and captured at (brief APP-SERVICE). */
+/** The three sizes every flow with a screen is walked and captured at. */
 export const FLOW_VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -35,6 +35,23 @@ export async function noHorizontalScroll(page: Page, label: string): Promise<voi
   await expect
     .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
+}
+
+/** `name` captured at each of `sizes` once `ready` has set the page there, with nothing scrolling sideways; back to
+ *  1280×860 after. */
+export async function capturedAtSizes(
+  page: Page,
+  name: string,
+  sizes: readonly { label: string; width: number; height: number }[],
+  ready: (viewport: { label: string; width: number; height: number }) => Promise<void>,
+): Promise<void> {
+  for (const viewport of sizes) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await ready(viewport);
+    await noHorizontalScroll(page, `${name} ${viewport.label}`);
+    await capture(page, `${name}-${viewport.label}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 }
 
 export async function ownerPage(browser: Browser, next: string, viewport: { width: number; height: number } = VIEWPORTS.desktop) {
@@ -60,17 +77,95 @@ export async function pick(page: Page, testid: string, query: string, text: stri
   await expect(page.locator(`[data-testid^=${testid}-option-]`)).toHaveCount(0);
 }
 
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
+/**
+ * Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. The table folds them by
+ * measuring its box, a frame or more after a resize or new rows (`DataTable`), so what the row showed a moment ago
+ * is not what the click finds: the click goes to whichever of the two the row shows when it lands, and the entry is
+ * looked for in «⋮» only when that is where it landed. Deciding first and clicking after waited for an «Edit» the table
+ * had folded meanwhile until the test's time ran out (hub#1279; service-helpers.spec.ts). It is the one every spec of the
+ * e2e takes, with its table's hook prefix (`inventory-products`, `tax-rules`, `members`…): nineteen copies of the old
+ * one hung the same way, and row-action.test.ts keeps a second one from coming back (hub#1302).
+ */
 export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
+  const { hook, menuHook } = rowHooks(table, id, action);
+  const landed = await clickLanding(page, shown(page).locator(`[data-testid=${hook}]`).or(shown(page).locator(`[data-testid=${menuHook}]`)).first());
+  if (landed === hook) return;
+  if (landed !== menuHook) throw new Error(`rowAction ${hook}: the click landed on ${landed ?? 'nothing'}, neither the button nor «⋮»`);
+  await page.locator(`ion-popover [data-testid=${hook}]`).click();
+}
+
+/** The hooks `DataTable` gives a row action of `table`: its button (and its entry inside «⋮»), and the row's «⋮». */
+function rowHooks(table: string, id: string, action: string): { hook: string; menuHook: string } {
+  return { hook: `${table}-row-${id}-${action}`, menuHook: `${table}-row-${id}-menu` };
+}
+
+/** What a check of an icon reads of an `ion-icon`: the shell registered `name` (Ionicons' map), the icon names it (its
+ *  `name`, or in `icon` the data URL registered for it, which a DataTable action hands), its SVG is drawn and it is
+ *  visible as Playwright's `toBeVisible` reads it (not hidden by CSS, laid out, with a box). */
+export interface IconPaint {
+  registered: boolean;
+  named: boolean;
+  drawn: boolean;
+  visible: boolean;
+}
+
+/** An icon painted as it should be. */
+export const PAINTED: IconPaint = { registered: true, named: true, drawn: true, visible: true };
+
+/** What `paintIn` found: the icon's paint, the action only inside a closed «⋮», or nothing on the page. */
+export type IconShown = IconPaint | 'in «⋮»' | 'not shown';
+
+/** In the page, in one go: the paint of the icon `name` on the first of `found` that is not «⋮» (`menu`), `found`
+ *  being `ion-icon`s or what holds one; `'in «⋮»'` when «⋮» is all there is. */
+function paintIn(found: Element[], { name, menu }: { name: string; menu: string | null }): IconShown {
+  const holder = found.find((el) => menu === null || el.getAttribute('data-testid') !== menu);
+  if (!holder) return found.length > 0 ? 'in «⋮»' : 'not shown';
+  const ion = (holder.localName === 'ion-icon' ? holder : holder.querySelector('ion-icon')) as (HTMLElement & { name?: string; icon?: string }) | null;
+  const src = (window as unknown as { Ionicons?: { map?: Map<string, string> } }).Ionicons?.map?.get(name);
+  const svg = ion?.shadowRoot?.querySelector('.icon-inner svg');
+  const box = ion?.getBoundingClientRect();
+  return {
+    registered: typeof src === 'string',
+    named: ion !== null && (ion.name === name || (src !== undefined && ion.icon === src)),
+    drawn: (svg?.childElementCount ?? 0) > 0,
+    visible: (ion?.checkVisibility({ visibilityProperty: true }) ?? false) && (box?.width ?? 0) > 0 && (box?.height ?? 0) > 0,
+  };
+}
+
+/** The paint of the icon `name` on `icon` (an `ion-icon`, or what holds one), or `'not shown'` while it is not there. */
+export function iconPaint(icon: Locator, name: string): Promise<IconShown> {
+  return icon.evaluateAll(paintIn, { name, menu: null });
+}
+
+/**
+ * Reads the icon `name` of a row action without running it, for `expect.poll`: on its button, or on the same entry
+ * inside «⋮» when the row folds its actions. The table can fold the button away before its icon is drawn, so each call
+ * finds the action and reads its icon in one go in the page. When the action is only inside a closed «⋮», the call
+ * opens «⋮» (it stays open; Escape shuts it) and says `'in «⋮»'`; the next call reads the entry.
+ */
+export async function rowActionIcon(page: Page, table: string, id: string, action: string, name: string): Promise<IconShown> {
+  const { hook, menuHook } = rowHooks(table, id, action);
+  const menu = shown(page).locator(`[data-testid=${menuHook}]`);
+  const where = shown(page).locator(`[data-testid=${hook}]`).or(page.locator(`ion-popover [data-testid=${hook}]`)).or(menu);
+  const seen = await where.evaluateAll(paintIn, { name, menu: menuHook });
+  if (seen === 'in «⋮»') await menu.click();
+  return seen;
+}
+
+/** Clicks `target` and says the `data-testid` of what the click landed on. A locator that matches either of two things
+ *  (`a.or(b)`) is resolved again on each try, so the answer is what was there when the click went through: a click
+ *  Playwright held back, because something else was under the pointer, never reaches the page's listeners. */
+async function clickLanding(page: Page, target: Locator): Promise<string | null> {
+  type Landing = Window & { e2eClickLanding?: string | null };
+  await page.evaluate(() => {
+    const record = (event: Event) => {
+      (window as Landing).e2eClickLanding = (event.target as Element | null)?.closest('[data-testid]')?.getAttribute('data-testid') ?? null;
+    };
+    (window as Landing).e2eClickLanding = undefined;
+    document.addEventListener('click', record, { capture: true, once: true });
+  });
+  await target.click();
+  return page.evaluate(() => (window as Landing).e2eClickLanding ?? null);
 }
 
 /** Picks `option` in the column filter `filter` of `table`, through its «Filters» panel, and applies it. */
@@ -126,4 +221,15 @@ export function cleanUp(): void {
       `delete from customer_customer where name like '${TAG}%'`,
     ].join('; '),
   );
+}
+
+/** The customer `customerId` deleted in Customers: her voucher `voucherId` shows among the ones with no customer, with
+ *  her reference and its 5 sessions left. That sheet, open. */
+export async function voucherWithNoCustomer(page: Page, context: BrowserContext, customerId: string, voucherId: string): Promise<Locator> {
+  await post(context, '/customer/customers/delete', { id: customerId }, 200);
+  await shown(page).locator('[data-testid=service-packages-orphans-open]').click();
+  const orphans = page.locator('ion-modal[data-testid=service-orphans]');
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText(`Customer reference: ${customerId}`);
+  await expect(orphans.locator(`[data-testid=service-orphans-row-${voucherId}]`)).toContainText('5 sessions left');
+  return orphans;
 }

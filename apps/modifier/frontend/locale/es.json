@@ -66,8 +66,8 @@
       "delete": {
         "title": "Borrar grupo",
         "message": "{name} — el grupo desaparece con sus opciones y deja de preguntarse en el TPV. Lo ya pedido lo conserva.",
-        "options": "Se borrarán {count} opción(es) con él.",
-        "links": "Dejará de aplicarse a {count} producto(s) o categoría(s).",
+        "options": "Se borrará {count} opción con él. | Se borrarán {count} opciones con él.",
+        "links": "Dejará de aplicarse a {count} producto o categoría. | Dejará de aplicarse a {count} productos o categorías.",
         "confirm": "Borrar"
       }
     },
@@ -79,7 +79,7 @@
       "addLink": "Añadir producto o categoría",
       "noOptions": "Este grupo todavía no tiene opciones.",
       "noLinks": "Este grupo todavía no se aplica a nada: no saldrá en el TPV.",
-      "short": "Pide al menos {min} pero tiene {count} opción(es) que no se repiten: el TPV no podría completarlo.",
+      "short": "Pide al menos {min} pero tiene {count} opción que no se repite: el TPV no podría completarlo. | Pide al menos {min} pero tiene {count} opciones que no se repiten: el TPV no podría completarlo.",
       "default": "Por defecto",
       "ownTax": "IVA propio: {name}",
       "product": "Producto · {name} ({sku})",

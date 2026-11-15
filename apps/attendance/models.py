@@ -1,12 +1,8 @@
-"""Models of the attendance app: the working day, its breaks, the trail of its corrections and the
-settings (WORKBOOK «Para quien lo mantiene»).
-
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
-per scope. A working day belongs to a staff record (``staff.Member``, the app this one requires) and is
+"""A working day belongs to a staff record (``staff.Member``, the app this one requires) and is
 never deleted: the law asks for four years of records (art. 34.9 ET), so the foreign keys PROTECT and
 there is no delete operation. Times are stored in UTC; ``work_date`` is the business day of the clock-in. Who
 clocked, corrected or changed a day hangs from the person in the business's own database (``base.HubUser``), never
-from control's user (tenancy W10): the columns ``*_hub_user_id`` are new, the old ones wait empty for a later deploy to
+from control's user: the columns ``*_hub_user_id`` are new, the old ones wait empty for a later deploy to
 drop them (``migrations/0003_hub_users``).
 """
 
@@ -20,7 +16,7 @@ from live.models import UUIDModel
 #: «slot» a schedule's slot): without it the Hub said them the other app's way («día de trabajo», «ranura»).
 NAMES = "attendance"
 
-#: The radii a personal device may be asked to be within (metres), as the old module.
+#: The radii a personal device may be asked to be within (metres).
 RADII = (50, 100, 250, 500, 1000)
 
 

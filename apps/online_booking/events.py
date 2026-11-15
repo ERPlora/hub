@@ -4,11 +4,11 @@ services.py records them in the outbox, in the command's transaction; live.py na
 live query. They carry ids, the number and the time, never the customer's note. A booking's later life
 (confirmed, cancelled, completed, no-show, deleted) is announced by Citas: it happens to the appointment.
 
-Reaction (WORKBOOK «A qué reacciona»): an erased card revokes the customer's links and forgets the device she
-booked with (``customer.customer.erased``), through this app's own operation run as the system, in its own
-transaction. Merging two cards needs nothing here: Citas moves the appointments and this app keeps no card.
-The worker's outbox relay (``base/relay.py``, already in phase 1) hands each delivered event to ``react``; the
-reaction is idempotent, so a repeated delivery changes nothing.
+Reaction (WORKBOOK «A qué reacciona»): an erased card revokes the customer's links and forgets the device she booked
+with (``customer.customer.erased``), through this app's own operation run as the system, in its own transaction. Merging
+two cards needs nothing here: Citas moves the appointments and this app keeps no card. The worker's outbox relay
+(``base/relay.py``) hands each delivered event to ``react``; the reaction is idempotent, so a repeated delivery changes
+nothing.
 """
 
 from typing import Any

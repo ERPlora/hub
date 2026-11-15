@@ -5,9 +5,9 @@ del Hub está en 07b4392):
 
 - **`SearchSelect`** ha llegado como `Combo` (ya está en 07b4392, el puntero del Hub) y Personal lo usa en sus
   cuatro selectores; su copia propia se ha borrado (CLOSE-STAFF, segunda vuelta).
-- **Fecha y hora** y la **tarjeta de cifra** siguen abiertas: ninguna ha llegado a `ui`. Sus sustitutos
-  funcionan y ningún flujo está roto; van propuestas para `## 6` de `MIGRATION.md` como
-  `staff:ui-time-date-fields` (la misma petición que `schedule:ui-time-date-fields`) y `staff:ui-kpi-card`.
+- **Fecha y hora** y la **tarjeta de cifra** siguen abiertas: ninguna ha llegado a `ui`. Sus sustitutos funcionan y
+  ningún flujo está roto; van propuestas para `## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next`
+  como `staff:ui-time-date-fields` (la misma petición que `schedule:ui-time-date-fields`) y `staff:ui-kpi-card`.
 
 ## Iconos
 

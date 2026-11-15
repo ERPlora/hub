@@ -193,8 +193,8 @@
         "body": "Has llegado al límite de {max} app de tu plan. Mejora el plan o desactiva una. | Has llegado al límite de {max} apps de tu plan. Mejora el plan o desactiva una."
       },
       "counter": {
-        "limited": "{enabled} de {max} apps activadas",
-        "unlimited": "1 app activada · Sin límite | {enabled} apps activadas · Sin límite"
+        "limited": "1 app activada · {chosen} de {max} de tu plan | {on} apps activadas · {chosen} de {max} de tu plan",
+        "unlimited": "1 app activada · Sin límite | {on} apps activadas · Sin límite"
       }
     },
     "appBlocked": {
@@ -1508,7 +1508,12 @@
     },
     "money": {
       "unreadable": "No se ha podido leer la moneda del negocio",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "filter": {
+        "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo {amount}.",
+        "negative": "Este importe no puede ser negativo.",
+        "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
+      }
     },
     "unsavedChanges": {
       "title": "¿Descartar los cambios?",

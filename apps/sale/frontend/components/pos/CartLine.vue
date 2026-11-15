@@ -255,10 +255,13 @@ function onRow(): void {
   background: color-mix(in srgb, var(--ion-color-primary, #0091ce) 7%, var(--ion-card-background, #fff));
   border-color: var(--ion-color-primary, #0091ce);
 }
+/* Ionic's iOS button is at least 3.1em high, which beats a `height`: without the minimum the line's buttons stood 55 px
+   instead of 44 and the line 163 px, too high for a low check (hub#1435). */
 .pos-line__mark {
   flex: none;
   width: 2.75rem;
   height: 2.75rem;
+  min-height: 2.75rem;
   margin: 0;
   font-size: 1.35rem;
   --color: var(--ion-color-primary);
@@ -373,6 +376,7 @@ function onRow(): void {
 .pos-line__icon {
   width: 2.75rem;
   height: 2.75rem;
+  min-height: 2.75rem;
   margin: 0;
   font-size: 1.1rem;
   --color: var(--ion-color-medium);

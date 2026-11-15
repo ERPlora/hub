@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints the next release tag of a project (PLAN-AWS §6): CalVer per project,
+# Prints the next release tag of a project: CalVer per project,
 #   <project>-vYYYY.MM.DD.N, with N = 1, 2, 3… within that day for that project.
 # Pure: the existing tags come on stdin (one per line, any project, any order);
 # it reads no git state and creates nothing.
