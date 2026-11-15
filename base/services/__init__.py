@@ -127,7 +127,7 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
-from . import demos, relay_runs
+from . import demos as demos, relay_runs as relay_runs
 from .hub_registry import LEFT_STATUSES, _locked_hub
 from .photo import _sync_photo_blocks
 from .provisioning import (
