@@ -107,7 +107,6 @@ def test_the_reason_is_in_the_language_of_whoever_turns_it_on():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("provisioned")
 @pytest.mark.parametrize("country", ["ES", "es", ""])
 def test_in_spain_or_without_a_country_it_goes_on(country):
     business_in(country)
@@ -141,7 +140,6 @@ def test_in_spain_the_list_offers_it(country):
 
 
 @HUB_DB
-@pytest.mark.usefixtures("provisioned")
 def test_outside_spain_what_verifactu_needs_goes_on_all_the_same():
     business_in("PL")
     verifactu_off()
@@ -151,7 +149,6 @@ def test_outside_spain_what_verifactu_needs_goes_on_all_the_same():
 
 
 @HUB_DB
-@pytest.mark.usefixtures("provisioned")
 def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_the_rest():
     """A blueprint turns on its apps through ``base.app.enable``: one that refuses stays off, the rest load."""
     business_in("PL")
@@ -166,7 +163,6 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
 
 
 @HUB_DB
-@pytest.mark.usefixtures("provisioned")
 @pytest.mark.parametrize("key", [seed.key for seed in blueprint.catalog()])
 def test_a_template_in_spain_leaves_verifactu_off_for_the_home_to_ask_and_turns_on_the_rest(born, load, key):
     """The review does not announce it and the load leaves it off, so «Finish setting up your business» asks its owner
@@ -200,5 +196,5 @@ def test_each_hub_reads_its_own_business_country(hub_a, hub_b, poland_and_spain)
     with context.use_hub(hub_b):
         verifactu_off(hub_b.slug)
         assert row_of(scope=of_b)["refusal"] is None
-        assert enable(admin(of_b))["state"] in ("on", "creating")
+        assert enable(admin(of_b))["state"] == "on"
         assert activation.states_of(of_b)["verifactu"].wanted

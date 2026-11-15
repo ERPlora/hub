@@ -123,20 +123,6 @@ def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
 
 
 @pytest.fixture
-def provisioned(hub_a, hub_databases):
-    """Control's row of the business ``A`` lists what its database has, as the alta leaves it (``Hub.schema_apps``:
-    the last migration of each app): an app it has goes on at once, never «creating» first."""
-    from base import activation
-    from base.tenancy import migrator
-    from control.models import Hub
-
-    leaves = migrator.code_migrations().leaves
-    has = {*migrator.platform_apps(), *hub_databases.apps}
-    Hub.objects.filter(pk=hub_a.pk).update(schema_apps={label: leaves[label] for label in has if label in leaves})
-    activation.forget(hub_a.slug)
-
-
-@pytest.fixture
 def in_business_b(hub_b):
     """``in_business_b()``: the business ``B`` (``hub_b``) entered until the block ends."""
     assert hub_b.slug == B.key, f"hub_b is {hub_b.slug!r}, not the scope B of these tests"

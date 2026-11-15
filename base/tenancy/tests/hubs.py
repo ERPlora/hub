@@ -17,7 +17,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
 from unittest import mock
 
@@ -55,6 +55,8 @@ class HubDatabases:
     a: str
     b: str
     apps: tuple[str, ...]
+    #: ``Hub.schema_apps`` of each hub's database by its name, as its sign-up notes it.
+    schema_apps: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 def _hub_classes(model) -> bool:
@@ -261,13 +263,21 @@ def _build() -> HubDatabases:
                     names.identifier(name, control=control), names.identifier(hubs.template, control=control)
                 )
             )
-    for hub_id, name in ((HUB_A_ID, hubs.a), (HUB_B_ID, hubs.b)):
+    both = ((HUB_A_ID, hubs.a), (HUB_B_ID, hubs.b))
+    for hub_id, name in both:
         alias = tenancy_connections.register_ddl_alias(name)
         try:
             identity.write(alias, hub_id)
         finally:
             connections[alias].close()
-    return hubs
+    return replace(hubs, schema_apps={name: _noted_at_sign_up(hub_id, name) for hub_id, name in both})
+
+
+def _noted_at_sign_up(hub_id: uuid.UUID, name: str) -> dict[str, str]:
+    """What a sign-up notes of the database ``name`` once cloned: the migrator's run, here with nothing to apply."""
+    hub = Hub(id=hub_id, db_name=name)
+    migrator.ensure_schema(hub)
+    return hub.schema_apps
 
 
 @contextmanager

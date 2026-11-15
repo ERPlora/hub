@@ -71,12 +71,10 @@ def test_a_business_of_spain_with_it_off_is_asked_to_turn_it_on_and_one_of_polan
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_once_on_the_step_goes_and_verifactus_own_follows_without_touching_the_other_hub(hub_a, hub_b, no_test_fallback):
     business_in("ES", hub_a.slug)
-    # Its database has every app's tables, as one cloned from the template: turning VeriFactu on puts it on at once.
-    Hub.objects.filter(pk=hub_a.pk).update(schema_apps={label: "0001_initial" for label in activation.module_graph()})
     of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)  # b has no country: Spain too
     with context.use_hub(hub_b):
         verifactu_off(hub_b.slug)
-    with context.use_hub(Hub.objects.get(pk=hub_a.pk)):
+    with context.use_hub(hub_a):
         verifactu_off(hub_a.slug)
         assert "verifactu.sending_route" not in checklist(of_a)
 
@@ -95,7 +93,10 @@ def test_once_on_the_step_goes_and_verifactus_own_follows_without_touching_the_o
 def test_while_its_tables_are_being_made_it_is_not_on_yet_and_the_step_stays(hub_a, no_test_fallback):
     business_in("ES", hub_a.slug)
     of_a = Scope("host", hub_a.slug)
-    with context.use_hub(hub_a):  # control knows of no table of its database: turning an app on makes them first
+    # Its database lacks VeriFactu's tables, as one made before VeriFactu was ported: turning it on makes them first.
+    lacking = {label: name for label, name in hub_a.schema_apps.items() if label != "verifactu"}
+    Hub.objects.filter(pk=hub_a.pk).update(schema_apps=lacking)
+    with context.use_hub(Hub.objects.get(pk=hub_a.pk)):
         verifactu_off(hub_a.slug)
 
         enable(of_a, "verifactu")
