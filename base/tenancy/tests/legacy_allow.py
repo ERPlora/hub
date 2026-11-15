@@ -6,12 +6,18 @@ leaning on it there fails as it fails in production (``HubContextMissing``, ``Hu
 its file and name, whatever its cases: the CI's shards spread the cases of a file, and of a test, over several jobs, and
 each case finds its own line. The list only shrinks: ``tests/test_guardrails_legacy_fallback.py`` refuses a line
 origin/main does not have, and a run that ran every case of a listed test, every one passing, without leaning on the
-fallback once fails, naming the line to remove.
+fallback once fails, naming the line to remove. A shard of the CI does not run the cases of a test that went to another
+shard, so each shard writes what it saw (``--legacy-fallback-report``) and ``python -m base.tenancy.tests.legacy_allow``
+judges the views of every shard together.
 """
 
+import argparse
+import json
 import re
+import sys
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import pytest
 
@@ -21,6 +27,7 @@ STALE_TITLE = (
 )
 ENTRY = re.compile(r"[\w./-]+\.py(::\w+)+")
 _LEANINGS_BEFORE = pytest.StashKey[int]()
+REPORT_OPTION = "--legacy-fallback-report"
 
 
 def entry_of(nodeid: str) -> str:
@@ -64,16 +71,37 @@ def _leanings() -> int:
 
 @dataclass
 class _Seen:
-    """What the run saw of a listed test: its cases selected, the ones done, and whether all passed and any leaned."""
+    """What a run saw of a listed test: the cases the suite has, the ones done, and whether all passed and any leaned."""
 
     cases: int
-    complete: bool
     done: int = 0
     passed: bool = True
     leaned: bool = False
 
     def is_stale(self) -> bool:
-        return self.complete and self.done == self.cases and self.passed and not self.leaned
+        return self.done == self.cases and self.passed and not self.leaned
+
+    def __add__(self, other: "_Seen") -> "_Seen":
+        return _Seen(
+            cases=self.cases,
+            done=self.done + other.done,
+            passed=self.passed and other.passed,
+            leaned=self.leaned or other.leaned,
+        )
+
+
+def stale_in(seen: dict[str, _Seen]) -> list[str]:
+    return sorted(entry for entry, one in seen.items() if one.is_stale())
+
+
+def join(views: list[dict[str, dict]]) -> dict[str, _Seen]:
+    """What several shards saw of the listed tests, as if one run had run them all: each collects every case."""
+    seen: dict[str, _Seen] = {}
+    for view in views:
+        for entry, fields in view.items():
+            one = _Seen(**fields)
+            seen[entry] = seen[entry] + one if entry in seen else one
+    return seen
 
 
 class LegacyAllow:
@@ -84,16 +112,15 @@ class LegacyAllow:
             raise pytest.UsageError("\n".join(errors))
         self.narrowed = any("::" in arg for arg in config.args)
         self.on_a_worker = hasattr(config, "workerinput")
-        self.partial: set[str] = set()
+        self.report = config.getoption(REPORT_OPTION)
         self.cases: Counter[str] = Counter()
         self.seen: dict[str, _Seen] = {}
         self.stale: list[str] = []
 
-    def pytest_deselected(self, items) -> None:
-        self.partial.update(entry_of(item.nodeid) for item in items)
-
-    def pytest_collection_finish(self, session: pytest.Session) -> None:
-        self.cases = Counter(entry_of(item.nodeid) for item in session.items)
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
+        """Counts every case the suite has, before a shard, ``-k`` or ``--lf`` deselects any."""
+        self.cases = Counter(entry_of(item.nodeid) for item in items)
 
     @pytest.hookimpl(wrapper=True)
     def pytest_runtest_protocol(self, item: pytest.Item, nextitem):
@@ -115,7 +142,6 @@ class LegacyAllow:
             report.legacy_fallback = {
                 "entry": entry,
                 "cases": self.cases[entry],
-                "complete": entry not in self.partial,
                 "leaned": _leanings() > item.stash[_LEANINGS_BEFORE],
             }
         return report
@@ -124,7 +150,7 @@ class LegacyAllow:
         listed = getattr(report, "legacy_fallback", None)
         if listed is None:
             return
-        seen = self.seen.setdefault(listed["entry"], _Seen(cases=listed["cases"], complete=listed["complete"]))
+        seen = self.seen.setdefault(listed["entry"], _Seen(cases=listed["cases"]))
         seen.passed = seen.passed and not (report.failed or report.skipped)
         if report.when == "teardown":
             seen.done += 1
@@ -133,7 +159,11 @@ class LegacyAllow:
     def pytest_sessionfinish(self, session: pytest.Session) -> None:
         if self.on_a_worker or self.narrowed:
             return
-        self.stale = sorted(entry for entry, seen in self.seen.items() if seen.is_stale())
+        if self.report:
+            path = Path(self.report)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({entry: asdict(seen) for entry, seen in self.seen.items()}), encoding="utf-8")
+        self.stale = stale_in(self.seen)
         if self.stale:
             session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
@@ -145,5 +175,29 @@ class LegacyAllow:
                 terminalreporter.line(f"  {entry}")
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        REPORT_OPTION,
+        metavar="PATH",
+        help=f"write what this run saw of the tests {ALLOW_FILE} names to PATH, to judge it with other shards' views",
+    )
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.pluginmanager.register(LegacyAllow(config), "legacy_allow")
+
+
+def main(argv: list[str]) -> int:
+    """Judges the views several shards wrote together, and fails naming the lines whose tests are no longer leaning."""
+    parser = argparse.ArgumentParser(prog="python -m base.tenancy.tests.legacy_allow", description=main.__doc__)
+    parser.add_argument("views", nargs="+", type=Path, help=f"the files each shard wrote with {REPORT_OPTION}")
+    views = [json.loads(path.read_text(encoding="utf-8")) for path in parser.parse_args(argv).views]
+    stale = stale_in(join(views))
+    if stale:
+        print(STALE_TITLE)
+        print("\n".join(f"  {entry}" for entry in stale))
+    return 1 if stale else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -3,8 +3,9 @@ name: test
 # The tests of every push (ci.yml on any branch but main and pre; deploy.yml on main and pre before
 # it deploys), in three jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
 # each spread over its runner's CPUs with pytest-xdist), frontend (the SPA's lint, typecheck, Vitest and build) and
-# scripts (workflow and script lints and the script tests). The job `test` waits for the three: called
-# as the job `test`, its check is "test / test", the one main and pre require.
+# scripts (workflow and script lints and the script tests); after python, legacy-fallback joins what its shards saw of
+# the tests .legacy-fallback-allow names. The job `test` waits for the four: called as the job `test`, its check is
+# "test / test", the one main and pre require.
 
 on:
   workflow_call:
@@ -112,12 +113,53 @@ jobs:
       # --locked: uv.lock must match pyproject.toml.
       - run: uv sync --locked
       # This job's shard, with one xdist worker per vCPU of the runner (4), each on its own test database, and its
-      # slowest tests at the end of the log.
+      # slowest tests at the end of the log. It writes what it saw of the tests .legacy-fallback-allow names for the job
+      # legacy-fallback, also when one of its tests fails.
       - name: pytest, this job's shard of the suite
         env:
           SHARD_INDEX: ${{ strategy.job-index }}
           SHARD_TOTAL: ${{ strategy.job-total }}
-        run: bash .github/scripts/pytest-shard.sh "$SHARD_INDEX" "$SHARD_TOTAL" 20 -q -n 4 --durations=20
+        run: >-
+          bash .github/scripts/pytest-shard.sh "$SHARD_INDEX" "$SHARD_TOTAL" 20 -q -n 4 --durations=20
+          --legacy-fallback-report "$RUNNER_TEMP/legacy-fallback.json"
+      - name: This shard's view of the tests .legacy-fallback-allow names
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: legacy-fallback-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/legacy-fallback.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+  # base/tenancy/tests/legacy_allow.py fails a run that ran every case of a test .legacy-fallback-allow names, all
+  # passing, without leaning on the suite's fallback once, so its line leaves the list. The shards spread the cases of a
+  # test over several jobs and none of them runs them all: this job judges the views of every shard together. It also
+  # runs when a shard is red, so its lines show with the other failures.
+  legacy-fallback:
+    needs: python
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      # packages/live is part of the uv project.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: legacy-fallback-*
+          path: ${{ runner.temp }}/legacy-fallback
+      - name: The lines of .legacy-fallback-allow whose tests no longer lean on the fallback
+        run: uv run --locked python -m base.tenancy.tests.legacy_allow "$RUNNER_TEMP"/legacy-fallback/*/legacy-fallback.json
 
   frontend:
     runs-on: ubuntu-24.04
@@ -175,10 +217,10 @@ jobs:
       - name: Script tests
         run: for t in .github/scripts/*.test.sh; do bash "$t"; done
 
-  # The check main and pre require ("test / test"): green only when the three jobs are. It runs even
+  # The check main and pre require ("test / test"): green only when the four jobs are. It runs even
   # when one fails or the run is cancelled, so the check never ends up skipped (which counts as passed).
   test:
-    needs: [python, frontend, scripts]
+    needs: [python, frontend, scripts, legacy-fallback]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -187,7 +229,9 @@ jobs:
     steps:
       - name: Every test job passed
         env:
-          RESULTS: python=${{ needs.python.result }} frontend=${{ needs.frontend.result }} scripts=${{ needs.scripts.result }}
+          RESULTS: >-
+            python=${{ needs.python.result }} frontend=${{ needs.frontend.result }} scripts=${{ needs.scripts.result }}
+            legacy-fallback=${{ needs.legacy-fallback.result }}
         run: |
           failed=""
           for result in $RESULTS; do
@@ -199,4 +243,4 @@ jobs:
             echo "::error::not every test job passed:$failed"
             exit 1
           fi
-          echo "python, frontend and scripts passed"
+          echo "python, frontend, scripts and legacy-fallback passed"

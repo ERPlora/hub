@@ -212,7 +212,10 @@ del Hub» de erplora-next.
   test corre como producción y, si se apoya en el respaldo, falla (`HubContextMissing`, `HubWithoutDatabase`). La lista
   solo encoge: no gana líneas frente a `origin/main` (una línea sí puede moverse con su test a otro fichero) y la de un
   test que ya no existe sale (`tests/test_guardrails_legacy_fallback.py`); y una pasada que corre todos los casos de un
-  test de la lista, todos en verde, sin que se apoye ni una vez en el respaldo, cae y dice qué línea quitar. Pasarlos a
+  test de la lista, todos en verde, sin que se apoye ni una vez en el respaldo, cae y dice qué línea quitar. La CI
+  reparte los casos de un test entre varios trabajos y ninguno los corre todos: cada trabajo guarda lo que vio
+  (`--legacy-fallback-report`) y el trabajo `legacy-fallback` lo junta (`python -m base.tenancy.tests.legacy_allow`) y
+  cae igual. Pasarlos a
   una BD por negocio y borrar la lista con el respaldo es hub#611.
 
 
