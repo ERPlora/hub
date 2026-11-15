@@ -4,11 +4,10 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
-from live.operations import get, registry
+from live.operations import get
 
 from apps.invoice import platform, queries, schemas, services
 from apps.invoice.models import (
