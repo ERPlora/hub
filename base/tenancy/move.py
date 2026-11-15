@@ -49,8 +49,8 @@ The copies are dropped after :data:`MOVED_COPY_DAYS` (:func:`drop_old_copies`, i
 one that cannot be dropped now is tried again on the next pass. A restore's kept copies go the same way.
 
 Its steps are a restore's too (``base.tenancy.restore``): the same move with its origin and destination the
-other way round, the copy coming from a temporary cluster and the hub staying on its own, through a file of the worker
-(:func:`_dump`, :func:`_restore`).
+other way round, the copy coming from a temporary cluster and the hub staying on its own, through the bucket the same
+way (:func:`_dump_to_bucket`, :func:`_restore_from_bucket`).
 
 Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Identifier``; control is written through
 ``control.services`` only (its doors to the ORM).
@@ -87,9 +87,6 @@ logger = logging.getLogger(__name__)
 LEASE = provision.LEASE
 #: How long the copy a hub leaves behind is kept before it is dropped.
 MOVED_COPY_DAYS = 7
-#: How long a restore's copy through a file may run before it is stopped (the dump has its own,
-#: ``dumps.DUMP_TIMEOUT_SECONDS``).
-RESTORE_TIMEOUT_SECONDS = dumps.DUMP_TIMEOUT_SECONDS
 #: How long each half of a move's copy may run before it is stopped: the dump to the bucket, and the restore from it.
 #: The business is closed meanwhile, so a large one is moved at night (from 03:00 to 05:00 on its clock): both halves
 #: end before 07:00, and an hour takes tens of GiB even at 10 MB/s. The move can be cancelled at any time.
@@ -215,7 +212,8 @@ def move_hub(
             _bucket_named()
             _close_and_rename(hub, copy_name, origin, roles, ours)
             # Their heartbeat checks the move is still this worker's: a cancel or a lease lost stops them.
-            key = _dump_to_bucket(hub, copy_name, origin, ours, cancelled)
+            key = dumps.key_for(hub, MOVE_DUMP_KIND, timezone.now())
+            _dump_to_bucket(key, copy_name, origin, ours, cancelled)
             _make_destination(hub, target, roles, ours)
             _restore_from_bucket(key, hub.db_name, target, ours, cancelled)
             heartbeat()
@@ -423,25 +421,12 @@ def _bucket_named() -> None:
         raise MoveFailed("move_dump_failed", "no bucket is named for the copies (HUB_DUMPS_BUCKET)")
 
 
-def _dump_to_bucket(hub, source: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> str:
-    """Step 3, on the origin: ``pg_dump`` of ``source`` sent to the dumps bucket as it is made
-    (``dumps.stream_to_bucket``); its key."""
-    key = dumps.key_for(hub, MOVE_DUMP_KIND, timezone.now())
+def _dump_to_bucket(key: str, source: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> None:
+    """Step 3, on the origin: ``pg_dump`` of ``source`` sent to the dumps bucket at ``key`` as it is made
+    (``dumps.stream_to_bucket``; ``dumps.key_for`` names it after its hub)."""
     copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
     try:
         dumps.stream_to_bucket(copied, key, timeout=COPY_TIMEOUT_SECONDS, heartbeat=heartbeat, cancelled=cancelled)
-    except dumps.DumpError as failed:
-        raise MoveFailed("move_dump_failed", failed) from failed
-    return key
-
-
-def _dump(source: str, cluster, path: Path, heartbeat: Callable[[], None], cancelled=None) -> None:
-    """Step 3, on the origin: ``pg_dump`` of ``source`` as the migrator (``base.tenancy.dumps``' own run)."""
-    copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
-    try:
-        dumps.run_pg_dump(
-            copied, path, timeout=dumps.DUMP_TIMEOUT_SECONDS, heartbeat=heartbeat, cancelled=cancelled
-        )
     except dumps.DumpError as failed:
         raise MoveFailed("move_dump_failed", failed) from failed
 
@@ -519,22 +504,10 @@ def pg_restore() -> str:
     return found
 
 
-def _restore(path: Path, name: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> None:
-    """Step 3, on the destination: ``pg_restore`` of the dump into ``name``, in one transaction, as the migrator, its
-    extensions and its public schema left out (:data:`SKIPPED_ENTRIES`)."""
-    tool = pg_restore()
-    try:
-        listing = subprocess.run([tool, "--list", str(path)], check=True, capture_output=True, text=True).stdout
-    except subprocess.CalledProcessError as failed:
-        raise MoveFailed("move_restore_failed", f"its copy could not be read: {failed.stderr.strip()}") from failed
-    entries = _entries(listing, path.with_suffix(".list"))
-    command, password = _restore_command(tool, name, cluster, entries, str(path))
-    _run(command, password, path.with_suffix(".restore.err"), heartbeat, cancelled, what=f"the restore of {name}")
-
-
 def _restore_from_bucket(key: str, name: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> None:
-    """Step 3, on the destination: ``pg_restore`` of the copy at ``key`` into ``name``, read from the bucket on its
-    input and never written to a file (its listing first, the same way), as :func:`_restore` does with a file."""
+    """Step 3, on the destination: ``pg_restore`` of the copy at ``key`` into ``name``, in one transaction, as the
+    migrator, its extensions and its public schema left out (:data:`SKIPPED_ENTRIES`); the copy is read from the
+    bucket on its input and never written to a file (its listing first, the same way)."""
     tool = pg_restore()
     with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
         listing = Path(folder) / "listing"
@@ -577,9 +550,9 @@ def _entries(listing: str, path: Path) -> Path:
     return path
 
 
-def _restore_command(tool: str, name: str, cluster, entries: Path, *archive: str) -> tuple[list[str], str]:
+def _restore_command(tool: str, name: str, cluster, entries: Path) -> tuple[list[str], str]:
     """``pg_restore`` of the entries in ``entries`` into ``name`` on ``cluster``, as the migrator, in one transaction,
-    from ``archive`` (none: its input); and the password, which goes in its environment only."""
+    reading the copy on its input; and the password, which goes in its environment only."""
     conninfo = tenancy_connections.migrator_conninfo(name, cluster=cluster)
     password = str(conninfo.pop("password", "") or "")
     dsn = make_conninfo(**{key: str(value) for key, value in conninfo.items() if value not in (None, "")})
@@ -593,7 +566,6 @@ def _restore_command(tool: str, name: str, cluster, entries: Path, *archive: str
         "--single-transaction",
         f"--use-list={entries}",
         f"--dbname={dsn}",
-        *archive,
     ]
     return command, password
 
@@ -615,9 +587,9 @@ def _run(  # noqa: PLR0913
     timeout: float | None = None,
 ) -> None:
     """Run ``command`` with ``password`` in its environment only, within ``timeout`` (default
-    :data:`RESTORE_TIMEOUT_SECONDS`), its heartbeat every ``dumps.POLL_SECONDS``; a stop kills it. ``feed``: the parts
+    :data:`COPY_TIMEOUT_SECONDS`), its heartbeat every ``dumps.POLL_SECONDS``; a stop kills it. ``feed``: the parts
     of its input, written to it as it reads them (a program that ends before reading them all just ends)."""
-    timeout = RESTORE_TIMEOUT_SECONDS if timeout is None else timeout
+    timeout = COPY_TIMEOUT_SECONDS if timeout is None else timeout
     env = {key: value for key, value in os.environ.items() if not key.startswith("PG")}
     env["PGPASSWORD"] = password
     env["PGGSSENCMODE"] = "disable"

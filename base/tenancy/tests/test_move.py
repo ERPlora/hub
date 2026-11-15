@@ -22,7 +22,6 @@ server (moto's, ``s3.py``).
 
 import datetime as dt
 import re
-import subprocess
 import time
 import uuid
 from zoneinfo import ZoneInfo
@@ -37,8 +36,8 @@ from base import services
 from base.tenancy import bootstrap, dumps, identity, move, names
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
-from base.tenancy.tests.s3 import aws_test_credentials, body, client, dumps_bucket, moto_s3, objects  # noqa: F401
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, objects  # noqa: F401
 from control.models import Cluster, Hub, HubDue, HubDump, LeftoverDatabase, MovedCopy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
@@ -331,9 +330,9 @@ class TestTheOriginIsClosedToTheApp:
         seen: list[bool] = []
         real = move._dump_to_bucket
 
-        def dump(hub, source, cluster, heartbeat, cancelled=None):
+        def dump(key, source, cluster, heartbeat, cancelled=None):
             seen.append(hubs.reaches(app_role, source))
-            return real(hub, source, cluster, heartbeat, cancelled)
+            real(key, source, cluster, heartbeat, cancelled)
 
         monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
@@ -596,32 +595,17 @@ class TestTheCopyGoesThroughTheBucket:
         self, moves, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = moves.hub(to=moves.cluster())
-        commands = []
-        real = subprocess.Popen
-
-        def watched(command, **kwargs):
-            if command[0].endswith(("pg_dump", "pg_restore")):
-                commands.append((command, kwargs))
-            return real(command, **kwargs)
-
-        monkeypatch.setattr(subprocess, "Popen", watched)
+        started = s3.copy_programs(monkeypatch)
 
         assert run() == 1
 
-        monkeypatch.undo()
         hub = fresh(hub)
         assert (hub.moving_to_id, hub.last_error) == (None, "") and marker(hub.db_name) == [MARKER]
         [key] = objects(moto_s3, dumps_bucket)
         assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-move\.dump", key)
         assert body(moto_s3, dumps_bucket, key).startswith(b"PGDMP")
         assert not HubDump.objects.exists()
-        tools = [command[0].rsplit("/", 1)[-1] for command, _ in commands]
-        assert tools == ["pg_dump", "pg_restore", "pg_restore"]  # the dump, its listing and the restore
-        for command, kwargs in commands:
-            assert not any(part.endswith(".dump") for part in command), command
-        [(_, dumped), *restored] = commands
-        assert dumped["stdout"] == subprocess.PIPE
-        assert all(kwargs["stdin"] == subprocess.PIPE for _, kwargs in restored)
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
 
     def test_a_business_larger_than_a_part_moves_whole(self, moves, monkeypatch):
         monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
@@ -650,23 +634,14 @@ class TestTheCopyGoesThroughTheBucket:
     ):
         target = moves.cluster()
         hub = moves.hub(to=target)
-        stopping = {"now": False}
-        real = dumps._pg_dump_command
 
-        def stops_as_the_dump_starts(*args, **kwargs):
-            stopping["now"] = True
-            return real(*args, **kwargs)
-
-        monkeypatch.setattr(dumps, "_pg_dump_command", stops_as_the_dump_starts)
-
-        run(cancelled=lambda: stopping["now"])
+        run(cancelled=s3.stopping_as(monkeypatch, dumps, "_pg_dump_command"))
 
         # Not a failure: the move is neither undone nor noted as failed, and half a copy is never kept.
         stopped = fresh(hub)
         assert (stopped.moving_to_id, stopped.last_error) == (target.pk, "")
         assert objects(moto_s3, dumps_bucket) == {}
 
-        monkeypatch.setattr(dumps, "_pg_dump_command", real)
         assert run() == 1
 
         hub = fresh(hub)
@@ -701,13 +676,7 @@ class TestTheCopyGoesThroughTheBucket:
         self, moves, moto_s3, dumps_bucket, monkeypatch
     ):
         hub = moves.hub(to=moves.cluster())
-        real = move._restore_from_bucket
-
-        def lost(key, name, cluster, heartbeat, cancelled=None):
-            client(moto_s3).delete_object(Bucket=dumps_bucket, Key=key)
-            return real(key, name, cluster, heartbeat, cancelled)
-
-        monkeypatch.setattr(move, "_restore_from_bucket", lost)
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
 
         assert run() == 1
 
@@ -988,14 +957,13 @@ class TestTwoWorkers:
         real_dump = move._dump_to_bucket
         state = {"nested": False}
 
-        def dump(hub_row, source, cluster, heartbeat, cancelled=None):
-            key = real_dump(hub_row, source, cluster, heartbeat, cancelled)
+        def dump(key, source, cluster, heartbeat, cancelled=None):
+            real_dump(key, source, cluster, heartbeat, cancelled)
             if not state["nested"]:
                 state["nested"] = True
                 move.move_hub(hub.id)  # the other worker, all the way to its switch
                 with hubs._maintenance(fresh(hub).db_name) as conn:
                     conn.execute("INSERT INTO w8a_marker VALUES ('written after the switch')")
-            return key
 
         monkeypatch.setattr(move, "_dump_to_bucket", dump)
 
@@ -1046,11 +1014,10 @@ class TestTwoWorkers:
         hub = moves.hub(to=target)
         real = move._dump_to_bucket
 
-        def cancelled_meanwhile(hub_row, source, cluster, heartbeat, cancelled=None):
-            key = real(hub_row, source, cluster, heartbeat, cancelled)
+        def cancelled_meanwhile(key, source, cluster, heartbeat, cancelled=None):
+            real(key, source, cluster, heartbeat, cancelled)
             with use_control():
                 Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
-            return key
 
         with monkeypatch.context() as patched:
             patched.setattr(move, "_dump_to_bucket", cancelled_meanwhile)

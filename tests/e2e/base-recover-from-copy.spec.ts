@@ -153,7 +153,8 @@ function anAppointment(label: string): string {
 }
 
 /** Control's side, by `step`: `setup` makes the staff member and the temporary cluster once and opens the staff
- *  member's session (its key), `make` runs the worker's pass of the separate copies (the latest copy of `a`, made),
+ *  member's session (its key), `make` runs the worker's pass of the separate copies (the latest copy of `a`, made;
+ *  its copy goes through a dumps bucket of its own, on the tests' S3 server),
  *  `recover` runs its pass of the recoveries, and `clean` drops the copies of `a` with their rows and the temporary
  *  cluster. */
 function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
@@ -176,7 +177,19 @@ function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
       '    client.force_login(root)',
       '    print(client.cookies["sessionid"].value)',
       'elif step == "make":',
-      '    restore.run_aside_due(source=lambda copied: copied.db_name)',
+      '    import os',
+      '    from moto.server import ThreadedMotoServer',
+      '    from base.tenancy.tests.s3 import FAKE_CREDENTIALS, REGION, client',
+      '    s3 = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)',
+      '    s3.start()',
+      '    try:',
+      '        endpoint = "http://%s:%d" % s3.get_host_and_port()',
+      '        os.environ.pop("AWS_PROFILE", None)',
+      '        os.environ.update(FAKE_CREDENTIALS, AWS_REGION=REGION, HUB_DUMPS_BUCKET="e2e-copies", HUB_DUMPS_ENDPOINT_URL=endpoint)',
+      '        client(endpoint).create_bucket(Bucket="e2e-copies", CreateBucketConfiguration={"LocationConstraint": REGION})',
+      '        restore.run_aside_due(source=lambda copied: copied.db_name)',
+      '    finally:',
+      '        s3.stop()',
       '    made = RestoredCopy.objects.filter(hub=hub).order_by("-asked_at").first()',
       '    assert made.status == "made", made.last_error',
       '    print(made.pk)',

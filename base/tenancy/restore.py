@@ -8,7 +8,9 @@ from then on, ``base.registry``); the worker restores it here (:func:`run_due`, 
 time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewed while it copies).
 
 1. **Copied**: ``pg_dump`` of the hub's database on the temporary cluster (:func:`source_name`; nobody uses it), before
-   the business is closed.
+   the business is closed, sent to the dumps bucket as it is made, as a move's copy (``move._dump_to_bucket``:
+   ``<hex>/<AAAAMMDDTHHMMSSZ>-restore.dump``, kept the bucket's 90 days and listed to nobody), never to a file of the
+   worker: no size stops a restore. Without a bucket nothing is closed and the restore ends there, with why.
 2. **Checked, fiscal**: every app whose records reach the tax authority answers what each of them says in its database
    and in the copy (``fiscal_record_states`` on its ``LiveAppConfig``, through a direct connection: both are closed to
    the app and the copy has no alias), and the answers are compared: a record the copy lacks (made after the moment)
@@ -23,9 +25,10 @@ time, under the hub's lease (``hub_due``, provisioning's: ``move.LEASE``, renewe
    (``MovedCopy`` without ``moved_at``: the hub's data is in it while the restore goes on).
 5. **Made**: a new database of its name on its own cluster, cloned from its vertical's template there, emptied of the
    template's tables (only while the kept copy is there with its note: what has the hub's name then is never its data)
-   and closed to the app until the end; filled with the copy's ``pg_restore`` in one transaction; its identity
-   (``base_hub_identity``) checked and its schema brought to the code's leaf (``migrator.ensure_schema``: it learns the
-   apps the copy has).
+   and closed to the app until the end; filled in one transaction by ``pg_restore`` reading the copy from the bucket on
+   its input (``move._restore_from_bucket``); its identity (``base_hub_identity``) checked and its schema brought to
+   the code's leaf (``migrator.ensure_schema``: it learns the apps the copy has). Each half of the copy has
+   ``move.COPY_TIMEOUT_SECONDS``; the host answers «maintenance» for both.
 6. **Ended**: opened to the app, and control ends the restore and dates the kept copy in one transaction.
 
 Every step that drops, renames or ends first checks that the restore is still this worker's: it holds the hub's lease
@@ -44,9 +47,10 @@ whose staff only wants back what it lost. The Hub admin asks (``control.hub.rest
 ``<control>_copy_<its hex>``); the worker makes it here (:func:`run_aside_due`, in the moves' thread), one a pass, under
 the row's own lease (``LEASE``, renewed while it copies), never the hub's: the business is never closed nor changed, its
 host answers and its own work goes on, so its fiscal records are not compared. The hub's copy is dumped from the
-temporary cluster; on the hub's cluster a database of the row's name is cloned from its vertical's template granted to
-nobody (``ops.clone_database(aside=True)``), emptied, filled with ``pg_restore`` in one transaction, its identity
-checked, closed to the app once more and noted made, the temporary cluster let go. Nothing in it reaches the tax
+temporary cluster to the dumps bucket under a key of the row's own (:func:`aside_dump_kind`); on the hub's cluster a
+database of the row's name is cloned from its vertical's template granted to nobody
+(``ops.clone_database(aside=True)``), emptied, filled with ``pg_restore`` reading the copy from the bucket in one
+transaction, its identity checked, closed to the app once more and noted made, the temporary cluster let go. Nothing in it reaches the tax
 authority, by construction: no hub's row names it (the worker serves the hubs of the registry only), none of the app's
 roles may connect to it, and its name is a copy left behind's (``names.is_left_behind``), which no process registers an
 alias for (``connections.register_hub_alias``). Its schema stays the moment's. A failure drops what it made and notes
@@ -56,10 +60,8 @@ makes it anew. The copies are dropped after :data:`ASIDE_COPY_DAYS` with their r
 
 import datetime as dt
 import logging
-import tempfile
 import uuid
 from collections.abc import Callable
-from pathlib import Path
 
 import psycopg
 from django.utils import timezone
@@ -78,6 +80,8 @@ LEASE = move.LEASE
 UNDO_FAILED_MARK = " (restore_undo_failed: "
 #: How long a separate copy is kept once made (and a failed one's row): as a move's copies.
 ASIDE_COPY_DAYS = move.MOVED_COPY_DAYS
+#: The kind of a restore's copy in the dumps bucket (``<hex>/<AAAAMMDDTHHMMSSZ>-restore.dump``).
+RESTORE_DUMP_KIND = "restore"
 
 
 def source_name(hub) -> str:
@@ -144,13 +148,12 @@ def restore_hub(
             _back(hub, kept_name, roles, ours, reason=reason)
             return
         try:
-            with tempfile.TemporaryDirectory(prefix="hub-restore-") as folder:
-                path = Path(folder) / "restore.dump"
-                copy = source(hub)
-                move._dump(copy, origin, path, ours, cancelled)
-                _close_and_keep(hub, kept_name, roles, ours, copy, origin)
-                _make_new(hub, kept_name, roles, ours)
-                move._restore(path, hub.db_name, hub.cluster, ours, cancelled)
+            copy = source(hub)
+            key = dumps.key_for(hub, RESTORE_DUMP_KIND, timezone.now())
+            move._dump_to_bucket(key, copy, origin, ours, cancelled)
+            _close_and_keep(hub, kept_name, roles, ours, copy, origin)
+            _make_new(hub, kept_name, roles, ours)
+            move._restore_from_bucket(key, hub.db_name, hub.cluster, ours, cancelled)
             heartbeat()
             move._verify_identity(hub.db_name, hub.cluster, hub.id)
             move._ensure_schema(hub, hub.cluster, heartbeat)
@@ -245,12 +248,11 @@ def make_aside(
     try:
         if row.source is None:
             raise move.MoveFailed("move_source_missing", "its temporary cluster is gone")
-        with tempfile.TemporaryDirectory(prefix="hub-restore-aside-") as folder:
-            path = Path(folder) / "aside.dump"
-            move._dump(source(hub), row.source, path, ours, cancelled)
-            ours()
-            move._clone_emptied(hub, cluster, roles, aside=name)
-            move._restore(path, name, cluster, ours, cancelled)
+        key = dumps.key_for(hub, aside_dump_kind(row), timezone.now())
+        move._dump_to_bucket(key, source(hub), row.source, ours, cancelled)
+        ours()
+        move._clone_emptied(hub, cluster, roles, aside=name)
+        move._restore_from_bucket(key, name, cluster, ours, cancelled)
         move._verify_identity(name, cluster, hub.id)
         ours()
         with ops.connect_ops(cluster=cluster) as conn:
@@ -265,6 +267,13 @@ def make_aside(
         _aside_failed(row, ours, reason)
         return
     logger.info("base.tenancy.restore.aside_made hub=%s copy=%s at=%s", hub.slug, name, row.restore_point.isoformat())
+
+
+def aside_dump_kind(row) -> str:
+    """The kind of the separate copy ``row``'s dump in the bucket: named after the row, since a copy aside holds its
+    row's lease and never the hub's, so two of one business (or one beside its restore in place) may be dumped in the
+    same second by two workers, and none may read another's back."""
+    return f"aside-{row.pk.hex}"
 
 
 def _made(row, now: dt.datetime) -> None:
