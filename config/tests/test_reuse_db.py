@@ -21,7 +21,7 @@ from config import testing
 
 CASES = Path(__file__).with_name("reuse_db_cases.py")
 
-#: Seconds a run may take: making its database takes seconds, and minutes on a machine under load.
+#: How long a test waits for a process it starts: seconds on an idle machine, minutes on one under load.
 RUN_TIMEOUT = 1200
 
 

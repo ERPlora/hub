@@ -48,9 +48,9 @@ def open_price(ctx):
 
 
 # Transactional: the notice leaves after a real COMMIT. A flush between transactional tests empties Taxes'
-# factory catalogue (seeded by its migrations): `factory_data` plants it again.
+# factory catalogue (seeded by its migrations): `factory_data` and `factory_data_b` plant it again.
 @pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("factory_data")
+@pytest.mark.usefixtures("factory_data", "factory_data_b")
 def test_a_check_opened_and_charged_in_hub_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     with use_hub(hub_b):

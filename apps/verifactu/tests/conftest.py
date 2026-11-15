@@ -26,21 +26,21 @@ from django.utils import translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
-from pytest_django.fixtures import validate_django_db
 
 from apps.verifactu import gateway
-from base.tenancy.context import current_alias, use_hub
-from base.tenancy.tests import hubs
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import (
+    HOST,
+    HUB_DB,
+    HUB_DB_COMMITTED,
+    A,
+    B,
+    factory_data,
+    factory_data_b,
+    in_business_a,
+)
+from base.tenancy.tests.concurrency import plan_with_room
 
-#: The businesses of the root conftest's ``hub_a`` and ``hub_b``, each with its own database.
-A = Scope("host", "tenant-a")
-B = Scope("host", "tenant-b")
-#: The host of the business ``A``'s pages and API.
-HOST = f"{A.key}.localhost"
-#: The mark of a verifactu test that uses the database: both businesses' databases next to control's, each in the
-#: test's transaction.
-HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 FIXTURES = Path(__file__).parent / "fixtures"
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -120,29 +120,6 @@ def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
     business_in("PL", hub_a.slug)
     business_in("ES", hub_b.slug)
     return Scope("host", hub_a.slug), Scope("host", hub_b.slug)
-
-
-def _uses_the_database(request) -> bool:
-    marked = request.node.get_closest_marker("django_db") is not None
-    return marked or bool({"db", "transactional_db"} & set(request.fixturenames))
-
-
-@pytest.fixture(autouse=True)
-def in_business_a(request, no_test_fallback):
-    """The business ``A`` (``hub_a``), entered for the whole test, if the test uses the database.
-
-    The test's mark must name both businesses' databases (``HUB_DB``): one that does not would commit what it writes
-    in a business's database, outside the test's transaction."""
-    if not _uses_the_database(request):
-        yield None
-        return
-    marker = request.node.get_closest_marker("django_db")
-    databases = validate_django_db(marker)[2] if marker else None
-    assert databases and hubs.HUB_A_ALIAS in databases, f"{request.node.nodeid} uses the database: mark it HUB_DB"
-    hub = request.getfixturevalue("hub_a")
-    assert hub.slug == A.key, f"hub_a is {hub.slug!r}, not the scope A of these tests"
-    with use_hub(hub):
-        yield hub
 
 
 @pytest.fixture
@@ -234,35 +211,17 @@ def at_emission(monkeypatch):
     return install
 
 
-def plant_factory_data(scope: Scope = A) -> None:
-    """Tax's factory catalogue and the factory payment methods planted again in the business at work, as their
-    migrations do (idempotent); then its issuer."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-    from django.db import connections
-
-    with connections[current_alias()].schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
-    run("invoice.issuer.update", ISSUER, ctx_for(scope=scope))
-
-
 @pytest.fixture
-def committed_factory_data(transactional_db, in_business_a):
+def committed_factory_data(factory_data):
     """A transactional test starts from flushed businesses: the business ``A``'s factory data and issuer."""
-    plant_factory_data()
+    run("invoice.issuer.update", ISSUER)
 
 
 @pytest.fixture
-def committed_factory_data_b(transactional_db, in_business_b):
+def committed_factory_data_b(factory_data_b, in_business_b):
     """The business ``B``'s factory data and issuer, for a transactional test that works in it too."""
     with in_business_b():
-        plant_factory_data(B)
+        run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
 
 
 @pytest.fixture

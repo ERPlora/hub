@@ -13,10 +13,8 @@ it as one that never was.
 import threading
 import time
 from collections.abc import Callable
-from contextlib import contextmanager
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.db import connections
 from django.test import Client
 from django.utils import timezone
@@ -37,59 +35,20 @@ from apps.sale.models import (
     SaleLine,
 )
 from apps.sale.tests.conftest import A, run
-from base.tenancy import context, limits
-from base.tenancy.tests import hubs
+from base.tenancy import context
+from base.tenancy.tests.business import HUB_DB_COMMITTED
+from base.tenancy.tests.concurrency import (
+    HOW,
+    PLATFORM_HOST,
+    WAIT_LIMIT,
+    admin_delete,
+    at_once,
+    in_a_thread,
+    meanwhile,
+)
 
-pytestmark = [pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("factory_data")]
-
-#: A plan with room for several tills at once: Free's one place in each process would queue them, and the one that
-#: waits too long would get 503 ``base.hub_busy`` instead of meeting the other at the row's lock.
-ROOM_FOR_EVERY_TILL = {"slug": "standard", "max_db_connections": 6, "statement_timeout_seconds": 15}
-
-
-@pytest.fixture(autouse=True)
-def tills_at_once(monkeypatch, in_business_a):
-    """The business ``A`` on that plan, in a limiter of the test's own: a bigger plan is never left to the next test."""
-    monkeypatch.setattr(limits, "_limiters", {})
-    monkeypatch.setattr(in_business_a, "state", {"plan": ROOM_FOR_EVERY_TILL})
-    monkeypatch.setattr(in_business_a, "state_version", (in_business_a.state_version or 0) + 1)
-    with context.use_hub(in_business_a):
-        yield
-
-
-def in_a_thread(call, outcomes: list, index: int = 0) -> threading.Thread:
-    """A thread that runs ``call`` in the business at work here and leaves its outcome (an error raised, a 500
-    included, is the outcome) at ``outcomes[index]``. It starts without a context and with sessions of its own,
-    closed when it ends."""
-    active = context.current()
-
-    def target():
-        try:
-            with context.use_again(active):
-                outcomes[index] = call()
-        except Exception as error:  # reported to the test
-            outcomes[index] = error
-        finally:
-            connections.close_all()
-
-    return threading.Thread(target=target)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def released(call):
-        barrier.wait(5)
-        return call()
-
-    threads = [in_a_thread(lambda call=call: released(call), results, i) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Several tills of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("factory_data", "plan_with_room")]
 
 
 def codes(results) -> list:
@@ -435,23 +394,6 @@ def test_two_charges_of_one_appointment_at_once_open_one_check(coffee):
 # till. Locked first (``lock_orders``), it waits for the write and then takes what the write left, or answers
 # «Cannot delete» when a sale charged the check; a write that comes second finds it gone.
 
-#: How the platform staff delete: from the check's delete page, or with the list's «Delete selected».
-HOW = ["page", "list"]
-
-#: How long a session waits for another one to queue behind its lock.
-WAIT_LIMIT = 10
-
-
-def _waited_for() -> bool:
-    """Whether another session waits for a lock this one holds."""
-    with connections[context.current_alias()].cursor() as cursor:
-        cursor.execute("SELECT pg_stat_clear_snapshot()")
-        cursor.execute(
-            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pg_backend_pid() = ANY (pg_blocking_pids(pid)))"
-        )
-        return cursor.fetchone()[0]
-
-
 def _waiting() -> int:
     """How many other sessions on this database wait for a lock."""
     with connections[context.current_alias()].cursor() as cursor:
@@ -466,69 +408,6 @@ def _waiting() -> int:
 def locks(table: str) -> Callable[[str], bool]:
     """Whether a statement locks rows of ``table``."""
     return lambda sql: f'FROM "{table}"' in sql and "FOR UPDATE" in sql
-
-
-@pytest.fixture
-def hub_staff(db) -> Client:
-    """The platform staff, signed in to the Hub admin with the business ``A`` chosen."""
-    staff = get_user_model().objects.create_superuser(
-        username="root", password="pw", email="root@example.com"
-    )
-    client = Client()
-    client.force_login(staff)
-    assert client.get(f"/admin/hub/{A.key}/", HTTP_HOST="hubs.localhost").status_code == 302
-    return client
-
-
-def admin_delete(client: Client, how: str, *targets):
-    """The Hub admin's «Delete» of ``targets`` (one for its page), ``how`` it says (see ``HOW``); it returns
-    the answer."""
-    meta = type(targets[0])._meta
-    changelist = f"/admin/{meta.app_label}/{meta.model_name}/"
-    if how == "page":
-        [target] = targets
-        url, data = f"{changelist}{target.pk}/delete/", {"post": "yes"}
-    else:
-        url, data = changelist, {
-            "action": "delete_selected",
-            "_selected_action": [str(target.pk) for target in targets],
-            "post": "yes",
-        }
-    return lambda: client.post(
-        url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"
-    )
-
-
-@contextmanager
-def meanwhile(when: Callable[[str], bool], call, *, first: bool = False):
-    """Runs ``call`` in another session right after the first statement of this one for which ``when`` holds, or
-    right before it if ``first``; this one goes on once ``call`` waits for what it holds (or has ended). Yields its
-    outcome (an error raised, a 500 included, is the outcome)."""
-    outcome: list = [None]
-    thread = in_a_thread(call, outcome)
-
-    def let_it_run():
-        thread.start()
-        deadline = time.monotonic() + WAIT_LIMIT
-        while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
-            time.sleep(0.02)
-
-    def wrapper(execute, sql, params, many, executing):
-        starts = thread.ident is None and when(sql)
-        if starts and first:
-            let_it_run()
-        result = execute(sql, params, many, executing)
-        if starts and not first:
-            let_it_run()
-        return result
-
-    try:
-        with connections[context.current_alias()].execute_wrapper(wrapper):
-            yield outcome
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "this session never locked"
 
 
 def in_turn(row, *calls) -> list:
@@ -555,7 +434,7 @@ def delete_page_while_held(row, hub_staff: Client) -> tuple[bool, object]:
     meta = type(row)._meta
     url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
     outcome: list = [None]
-    thread = in_a_thread(lambda: hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"), outcome)
+    thread = in_a_thread(lambda: hub_staff.get(url, HTTP_HOST=PLATFORM_HOST, HTTP_ACCEPT_LANGUAGE="en"), outcome)
     with atomic():
         list(type(row).objects.select_for_update().filter(pk=row.pk))
         thread.start()
