@@ -1,6 +1,6 @@
 """The verifactu app's routes: each bound to its operation, the SPA's map in step, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's transaction.
+Requests go to the business ``A``'s host (``HOST``) with Django's sync test client, which sees the test's transaction.
 Receiving the account's photo (``verifactu.config.sync``) has no route: only the system calls it.
 """
 
@@ -13,7 +13,7 @@ from live.ninja import ensure_api_parity
 from apps.verifactu import certificates
 from apps.verifactu.api import router
 from apps.verifactu.models import OwnCertificate, Record
-from apps.verifactu.tests.conftest import b64, make_p12, manual
+from apps.verifactu.tests.conftest import HOST, HUB_DB, A, B, b64, make_p12, manual
 from config.api import api
 
 ROUTES = {
@@ -61,11 +61,11 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
+def get(client, path, host=HOST, **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data=None, host="a.localhost"):
+def post(client, path, data=None, host=HOST):
     return client.post(
         f"/api{path}",
         json.dumps(data or {}),
@@ -76,13 +76,13 @@ def post(client, path, data=None, host="a.localhost"):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("bea", host="a", role="hub_employee"))
+    client.force_login(make_user("bea", host=A.key, role="hub_employee"))
     return client
 
 
@@ -112,7 +112,7 @@ def test_the_spas_map_has_every_route():
     assert mine == ROUTES
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/verifactu/records"),
@@ -122,7 +122,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_issued_invoice_is_recorded_and_read_over_http(admin_client, issuer):
     invoice = manual(series_code="TICKET")
     created = post(admin_client, "/verifactu/records", {"invoice_id": str(invoice.id)})
@@ -137,7 +137,7 @@ def test_an_issued_invoice_is_recorded_and_read_over_http(admin_client, issuer):
     assert detail.json()["status"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_gateway_sending_is_a_clear_409_never_accepted(
     admin_client, issuer, settings
 ):
@@ -152,7 +152,7 @@ def test_without_a_gateway_sending_is_a_clear_409_never_accepted(
     assert Record.objects.get().status == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_employee_reads_but_does_not_send(employee_client, issuer):
     assert get(employee_client, "/verifactu/records").status_code == 200
     assert get(employee_client, "/verifactu/config").status_code == 200
@@ -160,7 +160,7 @@ def test_the_employee_reads_but_does_not_send(employee_client, issuer):
     assert response.status_code == 403
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_bad_fingerprint_is_a_422_on_its_field(admin_client, issuer):
     response = post(
         admin_client,
@@ -171,25 +171,25 @@ def test_a_bad_fingerprint_is_a_422_on_its_field(admin_client, issuer):
     assert "fingerprint" in response.json()["error"]["fields"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_another_hubs_records_are_not_seen_from_this_one(client, make_user, issuer):
     invoice = manual(series_code="TICKET")
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     post(client, "/verifactu/records", {"invoice_id": str(invoice.id)})
     # Both hubs share this test's database: the host only scopes who may act. A user of another hub
     # has no permission here.
-    other = make_user("eve", host="b", role="hub_admin")
+    other = make_user("eve", host=B.key, role="hub_admin")
     client.force_login(other)
     assert get(client, "/verifactu/records").status_code == 403
 
 
 @pytest.fixture
 def manager_client(client, make_user):
-    client.force_login(make_user("mia", host="a", role="hub_manager"))
+    client.force_login(make_user("mia", host=A.key, role="hub_manager"))
     return client
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_certificate_is_uploaded_and_removed_over_http(
     admin_client, issuer, settings
 ):
@@ -210,7 +210,7 @@ def test_the_certificate_is_uploaded_and_removed_over_http(
     assert not OwnCertificate.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_certificate_of_another_holder_is_a_409_with_its_code(
     admin_client, issuer, settings
 ):
@@ -224,7 +224,7 @@ def test_a_certificate_of_another_holder_is_a_409_with_its_code(
     assert response.json()["error"]["code"] == "verifactu.certificate_holder_mismatch"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_configure_the_certificate_is_a_403(manager_client, issuer, settings):
     settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
     body = {"p12_base64": b64(make_p12()), "password": "secret"}
@@ -255,7 +255,7 @@ def linked(issuer, settings):
     run("verifactu.config.sync", {"version": 1, "hub_id": HUB_ID}, system_context(A))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_authorisation_travels_over_http_beyond_djangos_upload_ceiling(admin_client, linked):
     import httpx
     import respx
@@ -283,20 +283,20 @@ def test_the_authorisation_travels_over_http_beyond_djangos_upload_ceiling(admin
     assert signed[:64] not in response.content.decode()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_body_beyond_the_uploads_ceiling_is_a_413_before_it_is_read(admin_client, linked):
     response = admin_client.post(
         "/api/verifactu/representation",
         "{}",
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         CONTENT_LENGTH=str(33 * 1024 * 1024),
     )
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "payload_too_large"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_422_never_echoes_the_documents(admin_client, linked):
     signed = pdf_b64(text=b"Ana's signed model")
     response = post(
@@ -308,7 +308,7 @@ def test_a_422_never_echoes_the_documents(admin_client, linked):
     assert signed not in response.content.decode()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_model_is_served_as_a_pdf_to_download(admin_client, linked):
     import httpx
     import respx
@@ -326,7 +326,7 @@ def test_the_model_is_served_as_a_pdf_to_download(admin_client, linked):
     assert response.content == b"%PDF-1.4 Anexo I"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_spas_client_asking_json_gets_the_operations_output(admin_client, linked):
     import base64
 
@@ -338,7 +338,7 @@ def test_the_spas_client_asking_json_gets_the_operations_output(admin_client, li
             return_value=httpx.Response(200, content=b"%PDF-1.4 Anexo I")
         )
         response = admin_client.get(
-            "/api/verifactu/representation/model", HTTP_HOST="a.localhost", HTTP_ACCEPT="application/json"
+            "/api/verifactu/representation/model", HTTP_HOST=HOST, HTTP_ACCEPT="application/json"
         )
     assert response.status_code == 200
     model = response.json()
@@ -349,7 +349,7 @@ def test_the_spas_client_asking_json_gets_the_operations_output(admin_client, li
     assert base64.b64decode(model["content_base64"]) == b"%PDF-1.4 Anexo I"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_model_without_the_saas_is_a_503_envelope(admin_client, linked):
     import httpx
     import respx
@@ -361,14 +361,14 @@ def test_the_model_without_the_saas_is_a_503_envelope(admin_client, linked):
     assert response.json()["error"]["code"] == "verifactu.saas_unreachable"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_configure_the_authorisation_is_a_403(manager_client, linked):
     body = {"signer_document_type": "dni", "signed_model_base64": pdf_b64(), "id_copy_base64": pdf_b64()}
     assert post(manager_client, "/verifactu/representation", body).status_code == 403
     assert get(manager_client, "/verifactu/representation/model").status_code == 403
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_422_never_echoes_the_password(admin_client, issuer):
     response = post(
         admin_client,

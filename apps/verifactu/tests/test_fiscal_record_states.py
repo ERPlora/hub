@@ -11,22 +11,28 @@ app's own (``queries.record_states``); its config's ``fiscal_record_states`` ans
 
 import datetime as dt
 
-import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import timezone
 
 from apps.verifactu import queries
 from apps.verifactu.models import Environment, Record
+from apps.verifactu.tests.conftest import HUB_DB
 from apps.verifactu.tests.test_fiscal_backlog import record
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
+
+
+def business_database():
+    return connections[current_alias()]
 
 
 def direct():
-    """The raw connection of the tests' database, as the restore's direct one reads it."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of the business's database, as the restore's direct one reads it."""
+    database = business_database()
+    database.ensure_connection()
+    return database.connection
 
 
 def test_each_production_record_says_its_status_when_it_was_sent_and_when_it_last_changed():
@@ -50,7 +56,7 @@ def test_a_record_of_the_aeats_test_environment_never_counts():
 
 
 def test_a_database_without_its_table_has_nothing_to_say():
-    with connection.cursor() as cursor:
+    with business_database().cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE verifactu_record CASCADE")
 

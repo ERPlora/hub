@@ -17,10 +17,10 @@ from django.utils import timezone
 
 from apps.verifactu import gateway
 from apps.verifactu.models import Record, SendControl
-from apps.verifactu.tests.conftest import aeat_answer, manual, records_of, run
+from apps.verifactu.tests.conftest import A, HUB_DB, aeat_answer, manual, records_of, run
 from base import scheduler
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 URL = "http://saas.internal:8001"
 ANSWER = "rotation_a_2026-09-22.xml"
@@ -30,7 +30,7 @@ QUEUE = "verifactu.process_queue"
 @pytest.fixture
 def worker(settings, monkeypatch):
     """The worker's scope and the gateway's address; the scheduler's tasks, as the worker schedules them."""
-    settings.WORKER_SCOPE_SLUG = "a"
+    settings.WORKER_SCOPE_SLUG = A.key
     settings.VERIFACTU_GATEWAY_URL = URL
     # Inside the test's transaction a released connection could not be opened again.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
@@ -81,7 +81,7 @@ def test_the_worker_sends_the_queue_on_its_minute_and_takes_the_aeats_acceptance
 
     assert aeat.call_count == 1
     sent = json.loads(aeat.calls.last.request.content)
-    assert (sent["hub"], sent["environment"]) == ("a", "testing")
+    assert (sent["hub"], sent["environment"]) == (A.key, "testing")
     record.refresh_from_db()
     assert (record.status, record.csv) == ("accepted", "A-86MZ448LPLEBV7")
 

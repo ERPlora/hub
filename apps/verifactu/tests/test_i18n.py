@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
@@ -21,6 +20,7 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
+from apps.verifactu.tests.conftest import HOST, HUB_DB, A
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -120,17 +120,17 @@ def test_verifactu_says_its_fields_with_the_aeats_words():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(
     client, make_user, issuer, settings
 ):
     settings.VERIFACTU_GATEWAY_URL = ""
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/verifactu/contingency/retry",
         json.dumps({"invoice_number": "NOPE"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

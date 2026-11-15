@@ -18,8 +18,9 @@ from django.utils import timezone
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.verifactu import queries
 from apps.verifactu.models import Environment, Record
+from apps.verifactu.tests.conftest import HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 _numbers = count(1)
 

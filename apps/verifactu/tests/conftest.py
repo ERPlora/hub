@@ -5,6 +5,10 @@ reaction, in place of the relay.
 The only stand-in is the SaaS's gateway (``gateway_answers``): its transport is replaced and it answers with the
 AEAT's **real** answers kept in ``fixtures/`` (accepted, accepted with errors, duplicate, fault), rewritten only
 to name the invoices of the test. Nothing the AEAT says is invented.
+
+Every test that uses the database works as production does: inside the business ``A``'s own database
+(``in_business_a``), never on control's. A test of two businesses also enters the business ``B``'s
+(``in_business_b``).
 """
 
 import base64
@@ -22,11 +26,21 @@ from django.utils import translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
+from pytest_django.fixtures import validate_django_db
 
 from apps.verifactu import gateway
+from base.tenancy.context import current_alias, use_hub
+from base.tenancy.tests import hubs
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The businesses of the root conftest's ``hub_a`` and ``hub_b``, each with its own database.
+A = Scope("host", "tenant-a")
+B = Scope("host", "tenant-b")
+#: The host of the business ``A``'s pages and API.
+HOST = f"{A.key}.localhost"
+#: The mark of a verifactu test that uses the database: both businesses' databases next to control's, each in the
+#: test's transaction.
+HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 FIXTURES = Path(__file__).parent / "fixtures"
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -93,7 +107,7 @@ def manual(lines=None, **more):
     return run("invoice.invoice.create", data)
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     from base.models import Hub  # the models are not loaded yet when this module is
 
@@ -108,6 +122,50 @@ def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
     return Scope("host", hub_a.slug), Scope("host", hub_b.slug)
 
 
+def _uses_the_database(request) -> bool:
+    marked = request.node.get_closest_marker("django_db") is not None
+    return marked or bool({"db", "transactional_db"} & set(request.fixturenames))
+
+
+@pytest.fixture(autouse=True)
+def in_business_a(request, no_test_fallback):
+    """The business ``A`` (``hub_a``), entered for the whole test, if the test uses the database.
+
+    The test's mark must name both businesses' databases (``HUB_DB``): one that does not would commit what it writes
+    in a business's database, outside the test's transaction."""
+    if not _uses_the_database(request):
+        yield None
+        return
+    marker = request.node.get_closest_marker("django_db")
+    databases = validate_django_db(marker)[2] if marker else None
+    assert databases and hubs.HUB_A_ALIAS in databases, f"{request.node.nodeid} uses the database: mark it HUB_DB"
+    hub = request.getfixturevalue("hub_a")
+    assert hub.slug == A.key, f"hub_a is {hub.slug!r}, not the scope A of these tests"
+    with use_hub(hub):
+        yield hub
+
+
+@pytest.fixture
+def provisioned(hub_a, hub_databases):
+    """Control's row of the business ``A`` lists what its database has, as the alta leaves it (``Hub.schema_apps``:
+    the last migration of each app): an app it has goes on at once, never «creating» first."""
+    from base import activation
+    from base.tenancy import migrator
+    from control.models import Hub
+
+    leaves = migrator.code_migrations().leaves
+    has = {*migrator.platform_apps(), *hub_databases.apps}
+    Hub.objects.filter(pk=hub_a.pk).update(schema_apps={label: leaves[label] for label in has if label in leaves})
+    activation.forget(hub_a.slug)
+
+
+@pytest.fixture
+def in_business_b(hub_b):
+    """``in_business_b()``: the business ``B`` (``hub_b``) entered until the block ends."""
+    assert hub_b.slug == B.key, f"hub_b is {hub_b.slug!r}, not the scope B of these tests"
+    return lambda: use_hub(hub_b)
+
+
 @pytest.fixture(autouse=True)
 def english():
     with translation.override("en"):
@@ -116,7 +174,7 @@ def english():
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = "hub_admin"):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = "hub_admin"):
         from django.contrib.auth import get_user_model
 
         from base.models import Membership
@@ -176,28 +234,41 @@ def at_emission(monkeypatch):
     return install
 
 
-@pytest.fixture
-def committed_factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and the factory payment
-    methods are planted again, as their migrations do (idempotent); then the issuer."""
+def plant_factory_data(scope: Scope = A) -> None:
+    """Tax's factory catalogue and the factory payment methods planted again in the business at work, as their
+    migrations do (idempotent); then its issuer."""
     from importlib import import_module
 
     from django.apps import apps as registry
-    from django.db import connection
+    from django.db import connections
 
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         for module in (
             "apps.tax.migrations.0002_factory_catalogue",
             "apps.tax.migrations.0005_retail_alcohol",
             "apps.sale.migrations.0002_factory_payment_methods",
         ):
             import_module(module).plant(registry, editor)
-    run("invoice.issuer.update", ISSUER)
+    run("invoice.issuer.update", ISSUER, ctx_for(scope=scope))
+
+
+@pytest.fixture
+def committed_factory_data(transactional_db, in_business_a):
+    """A transactional test starts from flushed businesses: the business ``A``'s factory data and issuer."""
+    plant_factory_data()
+
+
+@pytest.fixture
+def committed_factory_data_b(transactional_db, in_business_b):
+    """The business ``B``'s factory data and issuer, for a transactional test that works in it too."""
+    with in_business_b():
+        plant_factory_data(B)
 
 
 @pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, for raw psycopg sessions: every business's live notices are sent there, each on
+    its scope's channel (``live.outbox.notify``)."""
     from django.db import connections
     from psycopg.conninfo import make_conninfo
 
