@@ -2112,19 +2112,19 @@ def test_a_money_only_refund_moves_nothing_and_is_noted_once():
 
 def test_the_real_refund_of_sales_reaches_the_stock():
     """With the payload Sales really records (its app is imported here only, in the tests)."""
-    from apps.sale.tests.conftest import run as sale_run
+    from apps.sale.tests.conftest import ctx_for as sale_ctx_for, run as sale_run
 
     run("inventory.product.create", ProductIn(name="Coffee", sku="COF", price=1210, tax_category_key="product.generic", initial_stock="10"))
-    sale = sale_run("sale.sale.complete", {"idempotency_key": "inv-svc-refund-01", "lines": [{"product": "COF", "quantity": "2"}], "payments": [{"method": "card"}]})
+    sale = sale_run("sale.sale.complete", {"idempotency_key": "inv-svc-refund-01", "lines": [{"product": "COF", "quantity": "2"}], "payments": [{"method": "card"}]}, sale_ctx_for(scope=A))
     events.react(A, "sale.sale.completed", OutboxEvent.objects.filter(name="sale.sale.completed").latest("created_at").payload)
     sale_run(
         "sale.sale.refund",
         {
-            "sale_id": str(sale.id),
-            "reason": "a cup back",
+            "sale_id": str(sale.id), "reason": "a cup back",
             "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 1210}],
             "lines": [{"line_id": str(sale.lines[0].id), "quantity": "1"}],
         },
+        sale_ctx_for(scope=A),
     )
     payload = OutboxEvent.objects.filter(name="sale.sale.refunded").latest("created_at").payload
     op = get("inventory.stock.restore_refund")

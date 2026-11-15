@@ -87,9 +87,9 @@ def test_an_event_it_does_not_react_to_does_nothing():
 
 
 def _sale_run(name: str, data: dict):
-    from apps.sale.tests.conftest import run
+    from apps.sale.tests.conftest import ctx_for, run
 
-    return run(name, data)
+    return run(name, data, ctx_for(scope=A))
 
 
 def _last_payload(name: str) -> dict:

@@ -10,11 +10,14 @@ from uuid import uuid7
 
 import pytest
 from django.utils import timezone, translation
+from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.sale.models import Order, OrderLine, PaymentMethod, Sale, SaleCounter
-from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, B, ctx_for, run
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = HUB_DB
 
@@ -192,6 +195,21 @@ def test_the_same_attempt_charges_once(catalog):
     again = complete(lines=[{"product": "COF"}], payments=[cash(500)])
     assert again.id == first.id and again.already is True and first.already is False
     assert Sale.objects.count() == 1 and events() == []
+
+
+def test_a_charge_in_one_business_never_reaches_the_database_of_another(catalog, hub_b):
+    # The other business sells a coffee by the same code at another price and numbers its own sales: a charge here
+    # takes this business's price and number, and leaves nothing there.
+    with use_hub(hub_b):
+        coffee = {"name": "Coffee", "sku": "COF", "price": 999, "tax_category_key": "product.generic"}
+        run("inventory.product.create", coffee, system_context(B))
+        complete(ctx_for(scope=B), key="pos-attempt-in-b", lines=[{"product": "COF"}])
+    with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
+        sale = complete(lines=[{"product": "COF"}])
+    assert (sale.total, sale.number[-5:]) == (121, "-0001")
+    assert [(row.id, row.total) for row in Sale.objects.all()] == [(sale.id, 121)]
+    with use_hub(hub_b):
+        assert [row.total for row in Sale.objects.all()] == [999]
 
 
 def test_without_payments_it_is_cash_for_the_exact_amount(catalog):
