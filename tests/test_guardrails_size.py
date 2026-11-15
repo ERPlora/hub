@@ -52,7 +52,7 @@ DOOR_MODULES = frozenset({"services.py", "queries.py", "schemas.py"})
 GENERATED_DIRS = frozenset({"migrations", "node_modules", "dist", "generated"})
 TEST_DIRS = frozenset({"tests", "__tests__", "e2e"})
 ALLOW_LINE = re.compile(r"([0-9]+)\s+(\S+)\s+((?:[\w.-]+/)?[\w.-]*#[0-9]+)")
-TRACKING_ISSUE = "hub#1542"
+TRACKING_ISSUE = "ERPlora/erplora-next#74"
 NEW_PATH = "new in {allow}; the list only shrinks, so split the file instead"
 
 
