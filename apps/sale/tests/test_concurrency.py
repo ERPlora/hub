@@ -649,7 +649,7 @@ def test_the_hub_admin_confirmation_page_of_a_check_a_write_holds_does_not_wait(
     """The check's delete page (a GET, before the staff confirm) does not lock the check: it answers while a
     write still holds it; only the confirmed deletion (a POST) waits for the write."""
     check = a_check()
-    answered_while_held, answer = delete_page_while_held(check, hub_staff)
+    answered_while_held, answer = delete_page_while_held(Order.objects.get(pk=check.id), hub_staff)
     assert answered_while_held, "the delete page waited for the write that held the check"
     assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
     assert Order.objects.filter(pk=check.id).exists()
