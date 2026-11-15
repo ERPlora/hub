@@ -1677,8 +1677,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   herramienta entre las diez primeras, por rol: el propietario y el administrador las 30, el encargado y el empleado
   solo las tres de las preguntas). Sin ellos, abrir un borrador o descartarlo, el detalle, las ejecuciones, conceder
   permisos, activar, ejecutar y renombrar quedaban fuera de las 40 herramientas que se ofrecen en un turno (FLOW-F03,
-  F09, F12, F14 a F19 y F34) y el asistente decía que no podía o buscaba cuentas del TPV. `base.assistant.SYNONYMS`
-  (bloque `# flow`) lee «la automatización» como una automatización, «la ejecución» como una ejecución, «los pasos»
+  F09, F12, F14 a F19 y F34) y el asistente decía que no podía o buscaba cuentas del TPV. `assistant_synonyms`
+  (en `apps.py`) lee «la automatización» como una automatización, «la ejecución» como una ejecución, «los pasos»
   como sus pasos, «la pregunta» como la de una automatización, «el borrador» como un borrador y «la receta» o «la
   prefabricada» como una receta. La automatización, los pasos y la pregunta se nombran por frase y nunca por la palabra
   suelta: «automatización» comparte raíz con «automático» («la respuesta automática» subía Automatizaciones en la

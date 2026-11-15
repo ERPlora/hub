@@ -10,8 +10,8 @@ import pytest
 from live import assistant as shared
 from live.operations import AI, registry
 
-from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
@@ -47,18 +47,20 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_units_as_units_and_a_delivery_note_as_goods_received():
-    """``base.assistant.SYNONYMS``: «unidades» are the units of measure of ``inventory.unit.*`` and «el albarán» or
-    «la mercancía que entra» what ``inventory.stock.receive`` records, so the owner's words reach those tools without
-    their own asks; without the Hub's groups, none of them does (positive control)."""
+    """``InventoryConfig.assistant_synonyms`` (gathered by ``base.assistant.synonyms``): «unidades» are the
+    units of measure of ``inventory.unit.*`` and «el albarán» or «la mercancía que entra» what
+    ``inventory.stock.receive`` records, so the owner's words reach those tools without their own asks; the platform's
+    own words (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive
+    control)."""
     unit, receive = shared.stem("unit"), shared.stem("receive")
-    for phrase, wanted in (
-        ("¿qué unidades tengo configuradas?", unit),
-        ("registra el albarán del proveedor", receive),
-        ("entran 20 cafés más", receive),
-    ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
-        assert any(wanted in concept for concept in concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "inventory",
+        [
+            ("¿qué unidades tengo configuradas?", unit),
+            ("registra el albarán del proveedor", receive),
+            ("entran 20 cafés más", receive),
+        ],
+    )
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -68,8 +70,8 @@ def test_the_reported_inventory_request_offers_its_existing_operation(catalog_of
 
 
 #: Goods received said as a business says it, in words that are none of the tool's asks nor a probe: «la mercancía» is
-#: what ``inventory.stock.receive`` records only through ``base.assistant.SYNONYMS`` (37th of 40 without them), and
-#: «han entrado» is read as its present «entran» (152nd, behind the cart's items, before live read it so).
+#: what ``inventory.stock.receive`` records only through Inventory's ``assistant_synonyms`` (37th of 40 without them),
+#: and «han entrado» is read as its present «entran» (152nd, behind the cart's items, before live read it so).
 GOODS_IN = [
     ("inventory.stock.receive", "apunta la mercancía que nos ha traído hoy el proveedor"),
     ("inventory.stock.receive", "apunta que han entrado 12 unidades de tarta"),

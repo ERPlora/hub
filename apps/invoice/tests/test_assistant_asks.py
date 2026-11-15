@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -113,7 +114,7 @@ PROBES = [
 ]
 ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
 
-#: A paid invoice in the Hub's words (``base.assistant.SYNONYMS``): «pagada» or «pagado», as «paid», and one marked
+#: A paid invoice in Invoicing's own words (its ``assistant_synonyms``): «pagada» or «pagado», as «paid», and one marked
 #: «como cobrada», by its phrases; «cobrar» and «cobro» alone stay a sale's charge (live's own group of a sale).
 PAID = (
     "pagada", "pagadas", "pagado", "pagados", "paid", "como cobrada", "como cobradas", "como cobrado", "como cobrados",
@@ -253,10 +254,11 @@ def test_every_probe_of_invoicing_offers_its_tool_without_being_one_of_its_asks(
 
 @pytest.mark.parametrize("words", [words for words in PAID if words != "paid"])  # «paid» is its own stem already
 def test_the_hub_reads_a_paid_invoice_as_paid(words):
+    own_words = apps.get_app_config("invoice").assistant_synonyms
     phrase = f"la factura de Talleres Mercedes {words}"
     paid = shared.stem("paid")
     assert any(paid in concept for concept in shared.asked(["the invoice is paid"]).concepts)  # positive control
-    assert any(paid in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+    assert any(paid in concept for concept in shared.asked([phrase], own_words).concepts), phrase
     assert not any(paid in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
@@ -264,15 +266,16 @@ def test_the_hub_reads_a_paid_invoice_as_paid(words):
 def test_a_charge_of_the_till_is_never_read_as_a_paid_invoice(phrase):
     """«cobrar» and «cobro» alone are a sale's charge (live's group of a sale): only «como cobrada» marks one paid."""
     sale = shared.stem("sale")
-    concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
+    concepts = shared.asked([phrase], assistant.synonyms()).concepts
     assert any(sale in concept for concept in concepts)  # positive control: it names a sale
     assert not any(shared.stem("paid") in concept for concept in concepts)
 
 
 def without_the_paid_group():
-    """The Hub's ``SYNONYMS`` without the group of a paid invoice."""
-    kept = tuple(group for group in assistant.SYNONYMS if not set(PAID) & set(group))
-    assert len(kept) == len(assistant.SYNONYMS) - 1  # positive control: the group is there, and only one
+    """The Hub's words (``base.assistant.synonyms``) without the group of a paid invoice."""
+    every = assistant.synonyms()
+    kept = tuple(group for group in every if not set(PAID) & set(group))
+    assert len(kept) == len(every) - 1  # positive control: the group is there, and only one
     return kept
 
 

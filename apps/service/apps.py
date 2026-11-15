@@ -34,6 +34,13 @@ class ServiceConfig(LiveAppConfig):
     # The services' own photos (SERVICE-F35; base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["service/services/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.synonyms). A «bono» (a voucher, a pack) is the
+    # voucher of the catalogue (service.package) or the one sold to a customer (service.grant), and an «asignación»
+    # (what one «asigna») is a professional's assignment to a service (service.assignment).
+    assistant_synonyms = (
+        ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+        ("asignacion", "asignaciones", "assignment", "assignments"),
+    )
     permissions = [
         "service.view_service",
         "service.add_service",

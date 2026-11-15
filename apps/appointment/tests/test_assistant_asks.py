@@ -65,18 +65,18 @@ TWINS = [
     ("appointment.appointment.confirm", "online_booking.booking.confirm"),
     ("appointment.settings.update", "online_booking.settings.update"),
 ]
-#: What Appointments' groups of ``base.assistant.SYNONYMS`` are for, in a turn: a request nobody wrote as an ask nor as
-#: a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without «bloqueo», a block put
-#: on a professional is not offered at all; without «citas fijas», deleting them comes 15th, behind the appointments'
-#: own tools. The group of «puede atender» is ``REPORTED``'s: without it, checking a time is the 40th.
+#: What Appointments' own groups of words (its ``assistant_synonyms``) are for, in a turn: a request nobody wrote as an
+#: ask nor as a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without «bloqueo», a
+#: block put on a professional is not offered at all; without «citas fijas», deleting them comes 15th, behind the
+#: appointments' own tools. The group of «puede atender» is ``REPORTED``'s: without it, checking a time is the 40th.
 BY_GROUP = [
     ("appointment.blocked_time.create", "pon un bloqueo a Inés el lunes de 9:00 a 11:00", "bloqueo"),
     ("appointment.recurring.delete", "quita las citas fijas de los martes de Lola", "citas fijas"),
 ]
 #: What a person says in words of their own, neither an ask nor a probe of layer 2, for the twenty-eight tools whose
-#: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among
-#: the first ten, so asks that stop reading as people speak fail. None says a word of ``base.assistant.SYNONYMS`` that
-#: names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
+#: probe a turn already offers by their name and description alone: here it is their asks that bring the tool among the
+#: first ten, so asks that stop reading as people speak fail. None says a word of Appointments' ``assistant_synonyms``
+#: that names the tool's own thing («bloqueo», «cita fija», «puede atender»): that word alone brings it.
 OWN_WORDS = [
     ("appointment.agenda.lanes", "¿qué tiene cada peluquera el jueves, en columnas?"),
     ("appointment.appointment.bulk_create", "Lola quiere las cinco sesiones de golpe, todas o ninguna"),

@@ -438,7 +438,7 @@ pago» y ata Pagos a Ventas sin motivo.
   con nombres que ninguna sonda dice (Makro, Sabadell, Santander, el electricista), sin «card» en inglés (live
   la lee como «ficha») y sin «pago» en las de los pagos, a los que ya nombra su entidad: repetido en 13
   herramientas, ponía Pagos por delante en cada frase que dice «pagar» (los bonos de Servicios). Para el Hub
-  (`base.assistant.SYNONYMS`), una «cuenta bancaria» o «cuenta del banco» es un método de Pagos (por sus
+  (`assistant_synonyms`, en `apps.py`), una «cuenta bancaria» o «cuenta del banco» es un método de Pagos (por sus
   frases: una «cuenta» sola es la de una mesa). `tests/test_assistant_asks.py` comprueba con las frases reales
   de la QA del asistente (hub#1090, dueño y empleado) que cada una trae su herramienta en la primera mitad de
   las que ofrece un turno (F01–F06, F08), que el empleado no recibe ninguna escritura, que listar o dar de alta

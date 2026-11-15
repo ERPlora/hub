@@ -597,7 +597,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   entre las diez primeras, por rol). Sin ellos, guardar y desconectar quedaban fuera de las 40 herramientas que se
   ofrecen en un turno y el asistente decía que no podía. `tests/test_assistant_asks.py` mide con las frases reales de
   la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-website-2026-11-08.json`), nunca con los propios `asks`, y que el
-  encargado solo recibe `website.site.get` y el empleado nada. «Borrador» no lleva sinónimo en `base.assistant.SYNONYMS`:
+  encargado solo recibe `website.site.get` y el empleado nada. «Borrador» no lleva sinónimo propio (`assistant_synonyms`):
   su raíz es la del verbo «borrar» y convertiría cada «borra …» en una mención del borrador. Las ocho que no son
   herramienta, a propósito, declaran `ai=INTERNAL` (`live.E017` exige a toda operación su `ai=`): la vista previa
   (HTML para el marco del editor), el QR (una imagen en base64), la subida (un fichero en base64 de hasta 5 MB), las

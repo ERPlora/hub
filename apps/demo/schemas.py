@@ -57,7 +57,7 @@ class ItemRefIn(Schema):
     in any case before one that contains it: ``queries.find_item``). The id wins.
 
     The name travels as ``called``, not as ``item``: a turn ranks a tool 1 higher for each datum it takes that the
-    question names (``live.assistant.relevant``), and «item» (and «elemento», ``base.assistant.SYNONYMS``) is what the
+    question names (``live.assistant.relevant``), and «item» (and «elemento», Demo's ``assistant_synonyms``) is what the
     cart's and the price lists' items are called too (``cart_checkout``, ``pricing``), so an ``item`` datum would lift
     Demo's four tools in their requests (measured on hub#1162: three asks of ``inventory.product.bulk_create`` went
     from 4th to 8th); ``called`` moves no ask nor probe of the Hub."""

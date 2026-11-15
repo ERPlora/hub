@@ -31,6 +31,13 @@ class CashRegisterConfig(LiveAppConfig):
     # The shift's sale lines are sale's own charges, voids and refunds (read from its models).
     requires = ["sale"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.synonyms). An «arqueo», a «recuento» or a «conteo» of
+    # the drawer is a count (cash_register.count), and the «moneda» or «divisa» of the business is its currency
+    # (cash_register.currency).
+    assistant_synonyms = (
+        ("arqueo", "recuento", "conteo", "count"),
+        ("divisa", "moneda", "currency"),
+    )
     permissions = [
         "cash_register.view_session",
         "cash_register.add_session",

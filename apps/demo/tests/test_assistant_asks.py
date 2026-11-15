@@ -17,6 +17,7 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
@@ -95,13 +96,11 @@ def test_the_probes_of_demo_are_read():
 
 
 def test_the_hub_reads_an_elemento_as_an_item():
-    """``base.assistant.SYNONYMS``: «el elemento», as Demo's screens name one, is the item its operations are of
-    (``demo.item``), so the person's words reach those tools by their entity and not only by the words of their asks;
-    without the Hub's group, it does not (positive control)."""
+    """Demo's own words (its ``assistant_synonyms``): «el elemento», as Demo's screens name one, is the item its
+    operations are of (``demo.item``), so the person's words reach those tools by their entity and not only by the words
+    of their asks; without the Hub's group, it does not (positive control)."""
     item = shared.stem("item")
-    for phrase in ("borra el elemento Ensayo 7", "¿qué elementos están hechos?"):
-        assert any(item in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
-        assert not any(item in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name("demo", [("borra el elemento Ensayo 7", item), ("¿qué elementos están hechos?", item)])
 
 
 #: Phrases that are neither asks nor probes, each with the tool of Demo it asks for: the Hub's «elemento» brings it

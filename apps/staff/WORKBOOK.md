@@ -767,7 +767,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1103), con personas inventadas y nunca un dato de la QA.
   `tests/test_assistant_asks.py` comprueba que las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/*-es-staff-*.json`) llegan a su herramienta entre las que ofrece un turno sin ser sus
-  `asks`, y `base.assistant.SYNONYMS` lee «desactiva» como la desactivación y «pido» o «una solicitud» como la
+  `asks`, y sus palabras propias (`assistant_synonyms`, en `apps.py`) leen «desactiva» como la desactivación y «pido» o «una solicitud» como la
   solicitud de una ausencia, acciones que ningún verbo del asistente nombra.
   La tarjeta de confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su
   `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`

@@ -3777,7 +3777,10 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
   `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
-  preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
+  preguntas; `base.setup.status` y `base.business.get` siempre; `ranking` lo ordena con las palabras propias del
+  Hub: las de la plataforma, `SYNONYMS` («placa», «empleado»), y las que cada app declara en `assistant_synonyms` de
+  su `LiveAppConfig`, con su forma comprobada por `base.E018`; cuentan en todo turno, salvo las de una app fuera de
+  la tienda, `listed = False` como Demo, que solo cuentan donde se ofrecen sus herramientas), la tarjeta (`card`: `ai={"risk": "high"}` pide
   `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `assistant` del catálogo de `live`, o el número de `ids`; sin `ids`, `blocked`; cada
   dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
   cual en inglés; si no, el `verbose_name` del campo del mismo nombre en los modelos de su app, primero el de la
