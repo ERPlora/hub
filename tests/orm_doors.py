@@ -55,7 +55,7 @@ def star_imports(source: str) -> list[int]:
 
 def package_problems(root: Path, package: PurePosixPath) -> list[str]:
     """What is wrong with the door package ``package`` of the tree at ``root``: a package inside it, an ``import *``, a
-    module its ``__init__.py`` never imports, or no ``__init__.py`` at all."""
+    module its ``__init__.py`` never imports, the door's file left beside it, or no ``__init__.py`` at all."""
     folder = root / package
     init = folder / "__init__.py"
     if not init.is_file():
@@ -63,6 +63,11 @@ def package_problems(root: Path, package: PurePosixPath) -> list[str]:
     modules = sorted(folder.glob("*.py"))
     imported = imported_modules(init.read_text())
     problems = [
+        f"{package}.py is still there beside {package}/, which is the one Python loads: delete the file"
+        for file in [folder.with_suffix(".py")]
+        if file.is_file()
+    ]
+    problems += [
         f"{package}/{inner.name}: a package inside a door, which is one level deep: make it a module of {package}"
         for inner in sorted(folder.iterdir())
         if any(inner.rglob("*.py"))

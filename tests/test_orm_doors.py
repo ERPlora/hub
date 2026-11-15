@@ -165,6 +165,15 @@ def test_a_door_package_without_its_init_is_caught(shop):
     ]
 
 
+def test_a_door_file_left_beside_its_package_is_caught(shop):
+    # Python loads the package, so the file is dead code that still reads as a door.
+    write(shop, "apps/shop/services.py", ORM_READ)
+
+    assert package_problems(shop, SERVICES) == [
+        "apps/shop/services.py is still there beside apps/shop/services/, which is the one Python loads: delete the file"
+    ]
+
+
 def test_every_door_package_of_the_hub_is_one_level_deep_and_imports_each_of_its_modules_by_name():
     problems = [problem for package in door_packages(HUB_DIR) for problem in package_problems(HUB_DIR, package)]
 
