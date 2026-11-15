@@ -67,11 +67,14 @@ def scores(cache: Path, cwd: Path = REPO) -> dict[Key, int]:
     # It exits with 1 both when a function is over the limit and when it cannot run; only a run prints the report.
     assert result.returncode in (0, 1) and result.stdout.lstrip().startswith("["), result.stderr
     found: dict[Key, int] = {}
+    # The report comes sorted by score, so the functions are put back in the order they are written.
     for function in sorted(json.loads(result.stdout), key=lambda function: (function["path"], function["line_start"])):
-        path, name, times = function["path"], function["function_name"], 1
-        while (path, name if times == 1 else f"{name}#{times}") in found:
+        path, name = function["path"], function["function_name"]
+        key, times = (path, name), 1
+        while key in found:
             times += 1
-        found[(path, name if times == 1 else f"{name}#{times}")] = function["complexity"]
+            key = (path, f"{name}#{times}")
+        found[key] = function["complexity"]
     return found
 
 
@@ -124,8 +127,7 @@ def carrier(key: Key, score: int, left: dict[Key, int]) -> Key | None:
 def gained(now: dict[Key, int], before: dict[Key, int]) -> list[str]:
     """The entries of ``now`` that no entry of ``before`` carries: new ones, ones that score more, and copies."""
     left, found = dict(before), []
-    # A function that stayed in its file keeps its own entry before any moved one is matched.
-    for key, score in sorted(now.items(), key=lambda item: (item[0] not in before, item[0])):
+    for key, score in sorted(now.items()):
         old = carrier(key, score, left)
         if old is None:
             found.append(f"{key[0]}::{key[1]} at {score}")
@@ -135,8 +137,7 @@ def gained(now: dict[Key, int], before: dict[Key, int]) -> list[str]:
 
 
 def test_no_function_scores_more_than_the_limit_or_its_frozen_entry(tmp_path):
-    snapshot = REPO / SNAPSHOT
-    frozen = entries(snapshot.read_text(encoding="utf-8")) if snapshot.exists() else {}
+    frozen = entries((REPO / SNAPSHOT).read_text(encoding="utf-8"))
     found = against_snapshot(over_limit(scores(tmp_path)), frozen)
     assert found == [], (
         f"Functions over the cognitive complexity limit of {LIMIT}, or {SNAPSHOT} out of step with them. Split a new "
@@ -210,9 +211,9 @@ def test_a_new_entry_a_higher_score_a_move_elsewhere_a_rename_or_a_copy_is_gaine
     ]
 
 
-def test_a_function_that_stays_keeps_its_own_entry_before_a_moved_one_takes_it():
-    before = {("base/services/__init__.py", "run"): 30, ("base/services/relay.py", "run"): 20}
-    now = {("base/services/__init__.py", "run"): 30, ("base/services/relay.py", "run"): 20}
+def test_a_function_that_stays_keeps_its_own_entry_and_leaves_the_others_to_the_moved_ones():
+    before = {("base/services/__init__.py", "run"): 30, ("base/services/demos.py", "run"): 20}
+    now = {("base/services/demos.py", "run"): 20, ("base/services/relay_runs.py", "run"): 30}
     assert gained(now, before) == []
 
 
@@ -229,13 +230,14 @@ def configured_tree(root: Path) -> None:
 
 def test_the_configuration_scores_every_function_but_the_generated_and_the_submodules_and_reads_no_ignore(tmp_path):
     """The configuration this test asks of pyproject.toml, on a small tree: an ignore marker hides nothing, two
-    functions of one name are keyed apart, and the migrations and the submodules are not read."""
+    functions of one name are keyed apart in the order they are written, and the migrations and the submodules are not
+    read."""
     configured_tree(tmp_path / "tree")
     write_tree(
         tmp_path / "tree",
         {
             "apps/sale/services.py": (
-                f"def close(a, b, c, d):  # complexipy: ignore\n{NESTED}\n\ndef close(a, b, c, d):\n{NESTED}"
+                f"def close(a, b, c, d):  # complexipy: ignore\n{NESTED}\n\ndef close(a):\n    return a\n"
             ),
             "apps/sale/migrations/0002_close.py": f"def forwards(a, b, c, d):\n{NESTED}",
             "packages/live/live/run.py": f"def run(a, b, c, d):\n{NESTED}",
@@ -243,7 +245,8 @@ def test_the_configuration_scores_every_function_but_the_generated_and_the_submo
         },
     )
     found = scores(tmp_path / "cache", cwd=tmp_path / "tree")
-    assert over_limit(found) == {("apps/sale/services.py", "close"): 21, ("apps/sale/services.py", "close#2"): 21}
+    assert over_limit(found) == {("apps/sale/services.py", "close"): 21}
+    assert found[("apps/sale/services.py", "close#2")] == 0
     assert found[("base/flat.py", "flat")] == 1
 
 
