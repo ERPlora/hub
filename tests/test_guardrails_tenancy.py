@@ -170,8 +170,8 @@ def fallback_touches(source: str) -> list[tuple[int, str]]:
 
 
 def router_question_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every ``router.allow_migrate…(`` call. In a migration of a business's app it only ever
-    runs where its hints send it, so the router's answer is fixed there: a branch on it runs always or never."""
+    """``(line, what)`` for every ``router.allow_migrate…(`` call. A ``RunPython`` already runs only where the router
+    lets its hints through: asking it again inside is a branch that, on a business's database, always goes one way."""
     return sorted(
         {
             (node.lineno, f"router.{node.func.attr}(")
