@@ -21,11 +21,15 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import (
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    in_hubs,
+)
+from apps.verifactu.tests.conftest import HUB_DB
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probe_phrases
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-verifactu-2026-11-08.json``), as the owner said
 #: them, and nothing of the tools' ``asks``: before VeriFactu said its asks, none of these tools was among the ones a
@@ -191,13 +195,13 @@ def test_the_reported_requests_are_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED + SAID_SHORT)
 def test_the_owners_request_offers_its_existing_operation_among_the_first_eight(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=FIRST)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_test_invoice(catalog_of):
     """The owner asked to seal the record of the test invoice already issued, and the model created another
     test invoice (``verifactu.test_invoice.create``): sealing the record of an issued invoice goes ahead of it."""
@@ -209,7 +213,7 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
     assert ranked.index("verifactu.record.create") < later
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(
     "probe",
     [
@@ -233,7 +237,7 @@ def test_every_probe_of_verifactu_offers_its_tool_to_whoever_may_run_it(catalog_
     assert_offered_with_room(tools, probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_going_live_is_offered_although_the_account_is_read_as_a_check(catalog_of):
     """Before VeriFactu said its asks, going live was not offered at all for the owner's request; now it is, behind the
     writes of a check that «activa … la cuenta» brings (``GO_LIVE``)."""
@@ -242,7 +246,7 @@ def test_going_live_is_offered_although_the_account_is_read_as_a_check(catalog_o
     assert_offered_with_room(tools, probe["tool"], probe["phrase"], room=shared.MAX_TOOLS)
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of VeriFactu that needs one, neither
@@ -280,7 +284,7 @@ OWN_WORDS_EN = [
     ("verifactu.stats.records_by_status", "break them down: accepted, rejected and queued"),
     ("verifactu.test_invoice.create", "run the one-euro trial while we're still in testing"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("verifactu", OWN_WORDS_EN)
 
 

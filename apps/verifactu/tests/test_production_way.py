@@ -16,6 +16,7 @@ from apps.invoice.models import Invoice, InvoiceSeries
 from apps.verifactu import certificates, queries
 from apps.verifactu.models import Chain, Config, Environment, Record
 from apps.verifactu.tests.conftest import (
+    HUB_DB,
     A,
     answering,
     b64,
@@ -25,7 +26,7 @@ from apps.verifactu.tests.conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture

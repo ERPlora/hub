@@ -1,16 +1,24 @@
 """The verifactu app's migrations: declarative (no SQL, no RunPython), in step with the models, and reversible
-(the app's tables come and go with its migrations, which the migrator runs per hub)."""
+(the app's tables come and go with its migrations, which the migrator runs per hub, on its own alias of the
+business's database: a business's database of the test's own, cloned from the template as an alta clones it)."""
 
 import io
+import uuid
 from pathlib import Path
 
 import pytest
+
 from django.core.management import call_command
-from django.db import connection
+from django.db import connections
+from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.operations import RunPython, RunSQL
 
 from apps.verifactu.migrations import __path__ as MIGRATIONS
+from apps.verifactu.tests.conftest import HUB_DB
+from base.tenancy import connections as tenancy_connections
+from base.tenancy import names
+from base.tenancy.tests import hubs
 
 TABLES = {
     "verifactu_config",
@@ -38,7 +46,8 @@ def test_there_is_no_sql_and_no_data_migration():
             assert not isinstance(operation, (RunSQL, RunPython)), migration.name
 
 
-def test_the_migrations_are_in_step_with_the_models(db):
+@HUB_DB
+def test_the_migrations_are_in_step_with_the_models():
     output = io.StringIO()
     call_command("makemigrations", "verifactu", "--check", "--dry-run", stdout=output)
     assert "No changes detected" in output.getvalue()
@@ -58,17 +67,33 @@ def test_the_first_migration_depends_on_invoicing():
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_the_app_is_unmigrated_and_migrated_again():
+@pytest.fixture
+def migrator(hub_databases, django_db_blocker):
+    """The migrator's alias of a business's database cloned for the test, dropped after it. No test case around it:
+    one refuses the migrator's alias (``…__ddl``), which is not among its databases."""
+    name = names.hub_db_name(hub_databases.control, uuid.uuid7())
+    with django_db_blocker.unblock(), hubs.clone_of_the_template(hub_databases, name):
+        alias = tenancy_connections.register_ddl_alias(name)
+        try:
+            yield alias
+        finally:
+            connections[alias].close()
+
+
+def test_the_app_is_unmigrated_and_migrated_again(migrator):
     def tables():
         return {
             name
-            for name in connection.introspection.table_names()
+            for name in connections[migrator].introspection.table_names()
             if name.startswith("verifactu_")
         }
 
+    def migrate(target):
+        MigrationExecutor(connections[migrator]).migrate([target])
+
+    leaf = max(migration.name for migration in migrations())
     assert tables() == TABLES
-    call_command("migrate", "verifactu", "zero", verbosity=0)
+    migrate(("verifactu", None))
     assert tables() == set()
-    call_command("migrate", "verifactu", verbosity=0)
+    migrate(("verifactu", leaf))
     assert tables() == TABLES

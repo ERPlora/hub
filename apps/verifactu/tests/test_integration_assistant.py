@@ -17,7 +17,7 @@ from live.operations import get, registry
 from pydantic import BaseModel, SecretBytes, SecretStr
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import ctx_for
+from apps.verifactu.tests.conftest import HUB_DB, ctx_for
 from base import assistant
 from base.tests.test_assistant import technical_names
 
@@ -110,7 +110,7 @@ def test_the_certificate_and_its_password_are_never_asked_for_in_a_chat():
     assert not assistant.is_tool(upload)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin"])
 def test_not_even_who_may_configure_verifactu_is_offered_them(role):
     """What the assistant hands the model: verifactu's other tools, none of its writes with a secret."""
@@ -134,7 +134,7 @@ def test_a_secret_inside_a_nested_schema_is_seen_too():
     assert secret_data(Upload) == ["holder.password", "others.password"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_turn_that_still_names_the_certificate_upload_builds_no_card_and_runs_nothing():
     """The way the chat really takes (``base.assistant.turn``): a model that calls the write by its name anyway,
     password included, is refused as «not available»; no card is built, so the password is painted nowhere the person
