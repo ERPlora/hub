@@ -13,7 +13,7 @@ from apps.flow import events
 from apps.flow.models import FlowRun
 from apps.task.models import Task
 
-from .conftest import A, make_flow, run
+from .conftest import A, HUB_DB, make_flow, run
 
 PAST_FACT = re.compile(r"^flow\.[a-z_]+\.[a-z_]+ed$")
 
@@ -71,7 +71,7 @@ def test_it_reacts_to_every_event_to_its_own_parked_runs_and_to_an_erased_card()
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_starts_the_flows_of_a_real_event_as_the_platform():
     flow = make_flow()
     run("customer.customer.create", {"name": "Ana López"}, system_context(A))
@@ -84,7 +84,7 @@ def test_react_starts_the_flows_of_a_real_event_as_the_platform():
     assert Task.objects.filter(title="Welcome the new customer").count() == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_passes_the_id_and_the_actor_of_the_event():
     make_flow()
     result = events.react(

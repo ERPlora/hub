@@ -32,7 +32,7 @@ from base.tenancy.tests import hubs
 
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import A, ctx_for, make_run, run
+from .conftest import A, HUB_DB, ctx_for, make_run, run
 from .test_services_assistant_step import CHAT, said, wants
 
 EVA = {"name": "Eva Ruiz", "phone": "+34600111222", "email": "eva@example.com"}
@@ -103,7 +103,7 @@ def started_by_her_erasure(worker, steps: list[dict]) -> tuple[FlowRun, str]:
     return FlowRun.objects.get(event_name="customer.customer.erased"), str(eva.id)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_waiting_run_that_read_her_card_is_cancelled_and_never_sends_her_anything(worker, clock):
     welcome_a_day_later()
     eva = worker.request("customer.customer.create", EVA)
@@ -129,7 +129,7 @@ def test_a_waiting_run_that_read_her_card_is_cancelled_and_never_sends_her_anyth
     assert not Task.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_history_says_why_in_the_readers_language(worker):
     welcome_a_day_later()
     eva = worker.request("customer.customer.create", EVA)
@@ -142,7 +142,7 @@ def test_the_history_says_why_in_the_readers_language(worker):
     assert row.error_message == "Cancelada: se borraron los datos personales del cliente."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_runs_of_other_customers_go_on(worker, clock):
     welcome_a_day_later()
     eva = worker.request("customer.customer.create", EVA)
@@ -160,7 +160,7 @@ def test_the_runs_of_other_customers_go_on(worker, clock):
     assert list(Task.objects.values_list("title", flat=True)) == ["Welcome Ana López"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_stopped_by_an_error_that_could_be_resumed_is_cancelled_and_cannot_be_resumed(worker):
     # The task is not granted: the run reads her card and stops at the task, resumable for 7 days (FLOW-F24).
     automation([READ_HER_CARD, WELCOME_TASK | {"id": "s2"}], ["customer.customer.detail"])
@@ -187,7 +187,7 @@ def test_a_run_stopped_by_an_error_that_could_be_resumed_is_cancelled_and_cannot
     assert not Task.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_stopped_at_its_first_step_about_her_is_cancelled_too(worker):
     # Nothing read yet, but resumable: resumed, it would go on about her.
     automation([WELCOME_TASK | {"id": "s1", "params": {"title": "Follow up"}}], [],
@@ -205,7 +205,7 @@ def test_a_run_stopped_at_its_first_step_about_her_is_cancelled_too(worker):
     assert FlowRun.objects.get().status == FlowRun.Status.CANCELLED
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_stopped_by_an_error_too_long_ago_only_forgets_what_it_read(worker):
     automation([READ_HER_CARD, WELCOME_TASK | {"id": "s2"}], ["customer.customer.detail"])
     eva = worker.request("customer.customer.create", EVA)
@@ -223,7 +223,7 @@ def test_a_run_stopped_by_an_error_too_long_ago_only_forgets_what_it_read(worker
     assert old.outputs == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_asking_about_her_closes_its_question_and_forgets_its_texts(worker):
     ask = {
         "id": "s2",
@@ -250,7 +250,7 @@ def test_a_run_asking_about_her_closes_its_question_and_forgets_its_texts(worker
     assert not Task.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_started_by_another_apps_notice_about_her_is_cancelled_too(worker):
     # What the run keeps names her card only by its id in the notice that started it (no card read).
     automation([A_DAY, WELCOME_TASK | {"params": {"title": "Follow up"}}], ["task.task.create"],
@@ -267,7 +267,7 @@ def test_a_run_started_by_another_apps_notice_about_her_is_cancelled_too(worker)
     assert FlowRun.objects.get().status == FlowRun.Status.CANCELLED
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_that_only_read_her_card_is_cancelled_too():
     # Started by something else (by hand, a schedule): only what its steps read names her.
     flow = Flow.objects.create(name="Morning list", trigger_kind=Flow.Trigger.MANUAL, steps=[A_DAY], enabled=True)
@@ -286,7 +286,7 @@ def test_a_run_that_only_read_her_card_is_cancelled_too():
     assert (waiting.status, waiting.outputs) == (FlowRun.Status.CANCELLED, {})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_calling_another_system_with_her_card_is_cancelled_and_a_late_answer_changes_nothing():
     # The call left with no lock held (FLOW-F27): its answer comes back after the erasure and finds the run closed.
     call = {"id": "s2", "kind": "http", "method": "POST", "url": "https://example.com/orders", "timeout": 5}
@@ -301,7 +301,7 @@ def test_a_run_calling_another_system_with_her_card_is_cancelled_and_a_late_answ
     assert (calling.status, calling.error_code, calling.outputs) == (FlowRun.Status.CANCELLED, "flow.customer_erased", {})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_question_of_the_run_answered_before_forgets_its_note_and_keeps_its_answer():
     # Two «Ask someone first» steps: the first was answered yes with a note about her, the second still waits.
     note = {"step": "s2", "kind": "ask", "outcome": "answered", "approved": True, "by": "tester",
@@ -326,7 +326,7 @@ def test_a_question_of_the_run_answered_before_forgets_its_note_and_keeps_its_an
     assert [(e["outcome"], e["approved"], e["by"]) for e in asking.log] == [("answered", True, "tester")]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_that_ended_on_a_no_about_her_forgets_her_name_and_keeps_who_said_no(worker):
     # The issue's: «When a customer is created → read her card → ask "Call {name}?"», answered no with a note.
     ask = {"id": "s2", "kind": "ask", "title": "Call {{steps.s1.name}}?", "details": "Her phone: {{steps.s1.phone}}"}
@@ -363,7 +363,7 @@ def by_hand(worker, steps: list[dict], operations: list[str]) -> FlowRun:
     return FlowRun.objects.get(pk=ran.id)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_by_hand_that_read_her_card_forgets_her_name_once_it_has_ended(worker):
     # The issue's: «By hand → find "Eva" → ask "Call {name}?"», answered no with a note: it ended, so it no longer
     # keeps what its steps read, and nothing that started it names her card.
@@ -385,7 +385,7 @@ def test_a_run_by_hand_that_read_her_card_forgets_her_name_once_it_has_ended(wor
     assert (asking.status, asking.error_code) == (FlowRun.Status.CANCELLED, "flow.question_rejected")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_whose_assistant_read_her_card_forgets_what_it_answered_about_her(gateway, worker):
     # «By hand → ask the assistant», which reads her card with its tool and answers with her name: once its turn is
     # over and the run has ended, nothing it keeps names her card by its id.
@@ -405,7 +405,7 @@ def test_a_run_whose_assistant_read_her_card_forgets_what_it_answered_about_her(
     assert [entry["outcome"] for entry in answered.log] == ["thinking", "assistant_used", "assistant_answered"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_stopped_by_an_error_whose_card_the_hourly_pass_forgot_is_still_found():
     # Stopped 8 days ago by another app: the hourly pass forgets what its steps read (FLOW-F24); the erasure still
     # finds it, and a run that read another customer's card is left as it was.
@@ -482,7 +482,7 @@ ENDINGS = {
 }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ERASED)
 @pytest.mark.parametrize("ending", ENDINGS.values(), ids=ENDINGS.keys())
 def test_a_run_about_her_that_has_ended_forgets_every_free_text_of_its_history(ending, language):
@@ -516,7 +516,7 @@ def test_a_run_about_her_that_has_ended_forgets_every_free_text_of_its_history(e
     assert run("flow.customer.erase", {"id": str(eva.id)}, system_context(A)).changed == 0
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_the_erasure_itself_starts_is_not_cancelled_by_it(worker, clock):
     # The erasure first stops what kept her data and only then starts what waits for it: the run it starts, which
     # names the card by its id and waits a day, is not one of those it cancels.
@@ -528,14 +528,14 @@ def test_a_run_the_erasure_itself_starts_is_not_cancelled_by_it(worker, clock):
     assert list(Task.objects.values_list("title", flat=True)) == [f"Erased {her_id}"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_automation_that_starts_on_the_erasure_still_starts(worker):
     started, her_id = started_by_her_erasure(worker, [ERASED_TASK])
     assert started.status == FlowRun.Status.SUCCEEDED
     assert list(Task.objects.values_list("title", flat=True)) == [f"Erased {her_id}"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_repeated_delivery_changes_nothing(worker):
     welcome_a_day_later()
     eva = worker.request("customer.customer.create", EVA)
@@ -551,7 +551,7 @@ def test_a_repeated_delivery_changes_nothing(worker):
     assert OutboxEvent.objects.filter(name=events.RUN_FINISHED).count() == finished
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_only_the_platform_runs_it():
     from live.errors import PermissionDenied
 
@@ -559,7 +559,7 @@ def test_only_the_platform_runs_it():
         run("flow.customer.erase", {"id": "0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f"}, ctx_for("hub_owner"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_run_of_a_card_of_the_same_id_in_the_history_finished_well_is_left_as_it_was():
     # A finished run keeps no card (FLOW-F16 shows it): nothing to cancel nor to forget.
     flow = Flow.objects.create(name="Done", trigger_kind=Flow.Trigger.MANUAL, steps=[], enabled=True)
@@ -570,7 +570,7 @@ def test_a_run_of_a_card_of_the_same_id_in_the_history_finished_well_is_left_as_
     assert (done.status, done.input) == (FlowRun.Status.SUCCEEDED, {"id": str(customer.id)})
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_an_erasure_in_another_business_leaves_this_ones_runs_alone(hub_a, hub_b):
     """Each business in its own database, as production: the same id erased in B cancels nothing in A."""

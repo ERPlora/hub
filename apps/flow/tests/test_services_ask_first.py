@@ -22,9 +22,9 @@ from apps.flow import queries, recipes
 from apps.flow.models import Flow, FlowRun, Question
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import A, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, ctx_for, make_flow, run
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("no_pauses")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("no_pauses")]
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

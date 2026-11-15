@@ -19,10 +19,10 @@ from apps.flow.services import RUN_ACTOR
 from apps.task.models import Task
 from apps.whatsapp_inbox.tests.conftest import receive
 
-from .conftest import A, run
+from .conftest import A, HUB_DB, run
 from .test_integration_apps import create_automation
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: Her number, as WhatsApp gives it and as the business writes it on her card.
 WHATSAPP_NUMBER, PHONE = "34600111222", "600111222"

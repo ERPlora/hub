@@ -23,12 +23,12 @@ from apps.flow.queries import TURN
 from base import relay
 from base.models import Hub, Membership
 from base.schemas import names
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import ctx_for, make_flow, run
+from .conftest import HUB_DB, A, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -105,11 +105,11 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
 
     def tick():
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return relay.run(timezone.now())
 
     def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return run(name, data, ctx)
 
     tick.request = request
@@ -120,7 +120,7 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
 def eva():
     """Eva Gil, an employee of the business, as erplora.com names her (``saas:3``)."""
     user = get_user_model().objects.create_user(username="saas:3", password="pw", first_name="Eva", last_name="Gil")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.EMPLOYEE)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.EMPLOYEE)
     return user
 
 
@@ -200,12 +200,12 @@ def test_a_record_is_named_only_for_whoever_may_read_it(gateway, clock, worker, 
     assert "saas:3" not in json.dumps(other, ensure_ascii=False)
 
 
-def test_a_moment_is_said_at_the_businesss_hour(gateway, clock, worker, plan, eva):
+def test_a_moment_is_said_at_the_businesss_hour(gateway, clock, worker, plan, eva, in_business_a):
     """The business's own zone (Settings › Business), in the hub whoever opens the inbox works in."""
     clock(NOON)
-    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
+    Hub.objects.filter(pk=in_business_a.pk).update(name="Bar A", timezone="Atlantic/Canary")
     question = waiting(worker, gateway, PLAN.name, CHORE)
-    with use_hub(hub):
+    with use_hub(Hub.objects.get(pk=in_business_a.pk)):
         assert values(row_of(question, OWNER))["due_at"] == "2 nov 2026, 9:00"
 
 

@@ -22,11 +22,12 @@ from apps.flow import queries, services
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 from base import relay
+from base.tenancy.context import current_alias
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 
-from .conftest import A, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -46,11 +47,11 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
 
     def tick():
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return relay.run(timezone.now())
 
     def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return run(name, data, ctx)
 
     tick.request = request

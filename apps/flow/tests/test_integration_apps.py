@@ -23,9 +23,9 @@ from apps.flow.models import FlowRun
 from apps.reservation.models import Reservation
 from apps.task.models import Task
 
-from .conftest import A, ctx_for, run
+from .conftest import A, HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

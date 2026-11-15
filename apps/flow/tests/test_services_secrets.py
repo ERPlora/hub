@@ -18,9 +18,9 @@ from live.models import OutboxEvent
 from apps.flow import vault
 from apps.flow.models import Secret
 
-from .conftest import ctx_for, run
+from .conftest import HOST, HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 VALUE = "sk_live_51HxYz"
 
@@ -100,15 +100,15 @@ def test_only_who_manages_automations_touches_secrets():
 
 
 def test_the_route_never_gives_the_value_back(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_owner"))
+    client.force_login(make_user("boss", host=A.key, role="hub_owner"))
     answer = client.post(
         "/api/flow/secrets",
         json.dumps({"name": "KEY", "value": VALUE}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
     assert answer.status_code == 200, answer.content
     assert VALUE.encode() not in answer.content
-    listed = client.get("/api/flow/secrets", HTTP_HOST="a.localhost")
+    listed = client.get("/api/flow/secrets", HTTP_HOST=HOST)
     assert listed.status_code == 200 and VALUE.encode() not in listed.content
     assert json.loads(listed.content)["rows"][0]["name"] == "KEY"

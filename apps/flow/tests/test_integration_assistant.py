@@ -19,7 +19,7 @@ from live.context import Scope
 from live.operations import get, registry
 
 from apps.flow.queries import SYSTEM
-from apps.flow.tests.conftest import ctx_for, make_draft, make_flow, make_run
+from apps.flow.tests.conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run
 from base import assistant
 from base.tenancy import context
 from base.tenancy.context import use_hub
@@ -59,7 +59,7 @@ def test_a_secrets_value_is_never_asked_for_in_a_chat():
     assert not assistant.is_tool(secret)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("permissions", [None, {"*"}], ids=["owner", "superuser"])
 def test_not_even_who_may_do_everything_is_offered_them(permissions):
     tools = assistant.catalog(ctx_for("hub_owner", permissions=permissions))
@@ -130,7 +130,7 @@ def test_the_card_names_how_it_starts_and_the_draft_as_the_list():
         assert labels(assistant.card(get(name), arguments, "es")) == [SCREENS["list"]["filterTrigger"]]
         assert labels(assistant.card(get(name), arguments, "en")) == [SCREENS_EN["list"]["filterTrigger"]]
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_draft_an_automation_is_created_from_as_the_list():
     """Its label as the list's badge, and the draft by its name. (Since hub#416 a card leaves out a record it cannot
     name — an automation's card reads nothing —, so the card is asked as the person who confirms, about a draft that
@@ -181,7 +181,7 @@ def test_the_card_names_how_a_call_ended_with_the_words_of_its_step():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_flow_f17_the_assistant_may_leave_a_draft_automation_and_only_a_draft():
     """FLOW-F17: «create a flow that creates a task when a sale over 100 € is completed», said in the Hub's chat, is
     ``flow.draft.propose`` run as the person: a draft waits in Automations; nothing is created, granted or run."""
@@ -239,7 +239,7 @@ def card_for(name: str, arguments: dict, language: str, ctx=None) -> dict:
 
 
 # FLOW-F03 «Encender o pausar», asked to the assistant: the card says which automation, by its name.
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "on"), [("es", "Encendida"), ("en", "On")])
 def test_turning_an_automation_on_names_it_never_by_its_id(language, on):
     """A yes or no goes as it is: the card paints it in the person's words."""
@@ -250,7 +250,7 @@ def test_turning_an_automation_on_names_it_never_by_its_id(language, on):
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_every_write_of_an_automation_names_it_by_its_name(language):
     welcome = make_flow("Welcome")
@@ -261,7 +261,7 @@ def test_every_write_of_an_automation_names_it_by_its_name(language):
 
 
 # FLOW-F23/F24: discarding a draft the assistant proposed, or creating the automation from it.
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_discarding_a_draft_or_creating_an_automation_from_it_names_the_draft(language):
     draft = make_draft("Call who did not come")
@@ -272,7 +272,7 @@ def test_discarding_a_draft_or_creating_an_automation_from_it_names_the_draft(la
 
 
 # FLOW-F24: resuming a run that stopped by an error names it as the History does, with its automation.
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_resuming_a_run_names_its_automation_and_when_it_started(language):
     ran = make_run(make_flow("Welcome"), status="failed", started_at=STARTED)
@@ -282,7 +282,7 @@ def test_resuming_a_run_names_its_automation_and_when_it_started(language):
 
 
 # FLOW-F29: answering a question an automation asked names it by what it asks.
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_answering_a_question_names_it_by_what_it_asks(language):
     from apps.flow.models import Question
@@ -297,7 +297,7 @@ def test_answering_a_question_names_it_by_what_it_asks(language):
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     """Someone who may only answer questions is shown no automation nor run (Automations is not theirs to read): the
     card leaves the run out."""
@@ -308,7 +308,7 @@ def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 def test_a_record_of_another_business_is_left_out_never_by_its_id(hub_a, hub_b, monkeypatch):
     """Each business reads its own automations: one of business B named to business A's assistant is not there."""
     monkeypatch.setattr(context, "_test_fallback", None)

@@ -33,9 +33,9 @@ from apps.flow.models import Flow, FlowRun, Question
 from base import assistant as hub_assistant
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import ctx_for, make_flow, run
+from .conftest import HUB_DB, ctx_for, make_flow, run
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime", "no_pauses")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime", "no_pauses")]
 
 CHAT = "/internal/assistant/chat"
 QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}

@@ -14,10 +14,11 @@ from django.utils import translation
 
 from apps.flow import events, queries
 from apps.flow.models import Flow, FlowRun, Question
+from base.tenancy.context import current_alias
 
-from .conftest import A, TASK_STEP, make_flow, make_run, run, ctx_for
+from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOT_ALLOWED = {
     "en": "It tried to do something you have not allowed it to do («task.task.create»), so it stopped. "

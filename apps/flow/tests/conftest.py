@@ -1,6 +1,10 @@
 """Fixtures of the flow tests: contexts per role and scope, a frozen clock, a raw DSN, and builders of
 the data a test starts from (straight to the models: the operations are under test).
 
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
+of B asks for ``hub_b`` and enters it.
+
 The builders import the models lazily, so that the tests of apps.py still collect while models.py
 does not exist. Other apps are always the real ones (task, customer, sale…), never a double.
 """
@@ -17,9 +21,10 @@ from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
+from base.tenancy.context import current_alias
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
 MADRID = dt.timezone(dt.timedelta(hours=2))
 
 
@@ -81,11 +86,11 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
 
     def tick():
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return relay.run(timezone.now())
 
     def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return run(name, data, ctx)
 
     tick.request = request
@@ -94,7 +99,7 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN, first_name: str = ""):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = Membership.Role.ADMIN, first_name: str = ""):
         user = get_user_model().objects.create_user(username=username, password="pw", first_name=first_name)
         if host is not None:
             Membership.objects.create(user=user, host=host, role=role)
@@ -116,7 +121,7 @@ def clock(monkeypatch):
 
 @pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
     params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],
@@ -199,6 +204,14 @@ def make_run(flow, **fields):
     fields.setdefault("definition", {"steps": flow.steps})
     fields.setdefault("flow_version", flow.version)
     return FlowRun.objects.create(flow=flow, **fields)
+
+
+def whatsapp_connected(templates: list | None = None):
+    """erplora.com says business A's WhatsApp number is connected (and, when given, which templates Meta has)."""
+    from apps.whatsapp_inbox.tests.conftest import system
+
+    body = {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150, "templates": templates}
+    return system("whatsapp_inbox.channel.sync", body, A)
 
 
 def make_draft(name: str = "Call who did not come", **fields):

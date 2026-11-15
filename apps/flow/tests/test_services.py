@@ -17,10 +17,11 @@ from live.models import OutboxEvent
 
 from apps.flow.models import Draft, Flow, FlowRun
 from apps.task.models import Task
+from base.tenancy.context import current_alias
 
-from .conftest import TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
+from .conftest import HUB_DB, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

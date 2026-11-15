@@ -25,7 +25,7 @@ from apps.flow import queries
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
 
-from .conftest import A, ctx_for, run
+from .conftest import A, HUB_DB, ctx_for, run
 from .test_recipes import declaration, declared  # noqa: F401 - the fixture
 from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     CANCEL,
@@ -42,7 +42,7 @@ from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     worker,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 REF = "reservation/table"
 #: What today's version fixes: whose card a change or a cancellation is, the one the run says.
