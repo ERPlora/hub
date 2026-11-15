@@ -14,12 +14,9 @@ The business is ``hub_a``, on a database of its own as every business is; ``B`` 
 
 import importlib
 import uuid
-from types import SimpleNamespace
 
 import pytest
-from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.db import connections
 from live.context import OperationContext, Scope, system_context
 from live.errors import NotFound, PermissionDenied
 from live.operations import get
@@ -271,18 +268,13 @@ def test_a_person_who_leaves_a_hub_with_its_own_database_is_no_longer_active_the
 
 
 class TestTheMigration:
-    """``base/migrations/0020_hub_user`` runs on each business's own database, which holds no control users nor roles
-    to read: its people come at their entry and from the SaaS's photo."""
+    """``base/migrations/0020_hub_user`` only makes the table: a business's own database holds no control users nor
+    roles to read, so its people come at their entry and from the SaaS's photo."""
 
-    migration = importlib.import_module("base.migrations.0020_hub_user")
+    def test_it_only_makes_the_table(self):
+        migration = importlib.import_module("base.migrations.0020_hub_user").Migration
 
-    def test_a_hub_s_own_database_has_nobody_to_read(self, hub_a):
-        Membership.objects.create(user=account_copy(ANA_ID), host=A, role="hub_employee")
-
-        self.migration.make_hub_users(django_apps, SimpleNamespace(connection=connections[hubs.HUB_A_ALIAS]))
-
-        with use_hub(hub_a):
-            assert not HubUser.objects.exists()
+        assert [operation.describe() for operation in migration.operations] == ["Create model HubUser"]
 
 
 class TestTheReadThatNamesThem:
