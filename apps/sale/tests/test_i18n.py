@@ -9,6 +9,7 @@ from django.utils import translation
 from django.utils.functional import Promise
 
 from apps.sale import models, pricing, queries, schemas, services
+from apps.sale.tests.conftest import HUB_DB
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
@@ -132,7 +133,7 @@ def test_a_line_names_the_product_data_it_freezes_as_inventory_names_them():
             assert shown == {name: said[msgid] for name, msgid in fields.items()}, model.__name__
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
     client.force_login(make_user("boss", host="a", role="hub_admin"))
     response = client.post(

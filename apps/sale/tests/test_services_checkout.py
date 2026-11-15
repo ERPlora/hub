@@ -14,9 +14,9 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.sale.models import Order, OrderLine, PaymentMethod, Sale, SaleCounter
-from apps.sale.tests.conftest import ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 KEY = "pos-attempt-0001"

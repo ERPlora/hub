@@ -10,9 +10,9 @@ from live.models import OutboxEvent
 
 from apps.customer import events as customer_events
 from apps.customer.models import Customer
-from apps.sale.tests.conftest import A, run
+from apps.sale.tests.conftest import HUB_DB, A, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def deliver(name: str):

@@ -12,8 +12,9 @@ from django.apps import apps as global_apps
 from django.db import connection
 
 from apps.sale.models import PaymentMethod
+from apps.sale.tests.conftest import HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 seed = import_module("apps.sale.migrations.0002_factory_payment_methods")
 

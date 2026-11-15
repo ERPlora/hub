@@ -20,7 +20,7 @@ from pydantic import ValidationError
 
 from apps.customer.tax_ids import ID_TYPES
 from apps.sale.models import ForeignIdType, OrderLine, QuickNote
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -73,7 +73,7 @@ def sale(shampoo):
 # ── Sales' own records ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Section"), ("es", "Sección")])
 def test_a_section_is_said_by_its_name_and_titled_as_its_screen(language, title):
     section = run("sale.department.create", {"name": "Fruit", "tax_category_key": "product.generic"})
@@ -82,7 +82,7 @@ def test_a_section_is_said_by_its_name_and_titled_as_its_screen(language, title)
         assert (field["value"], field["label"]) == ("Fruit", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Quick note"), ("es", "Nota rápida")])
 def test_a_quick_note_is_said_by_its_text_and_titled_as_its_screen(language, title):
     note = run("sale.quick_note.create", {"text": "No salt"})
@@ -91,45 +91,45 @@ def test_a_quick_note_is_said_by_its_text_and_titled_as_its_screen(language, tit
         assert (field["value"], field["label"]) == ("No salt", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_check_is_said_by_its_title(order):
     assert shown("sale.order.void", {"order_id": str(order.id)})["order_id"] == "Table 4"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "total"), [("en", "€12.10"), ("es", "12,10 €")])
 def test_a_check_with_no_title_is_said_by_its_amount_as_the_open_checks_list_does(shampoo, language, total):
     untitled = run("sale.order.open", {"lines": [{"product_id": str(shampoo.id)}]})
     assert flat(shown("sale.order.void", {"order_id": str(untitled.id)}, language)["order_id"]) == total
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_two_checks_of_a_merge_are_said(shampoo, order):
     other = run("sale.order.open", {"label": "Table 9", "lines": [{"product_id": str(shampoo.id)}]})
     said = shown("sale.order.merge", {"from_order_id": str(order.id), "to_order_id": str(other.id)})
     assert said == {"from_order_id": "Table 4", "to_order_id": "Table 9"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_line_of_a_check_is_said_by_its_name(order):
     line = str(order.lines[0].id)
     assert shown("sale.order.remove_line", {"order_id": str(order.id), "line_id": line})["line_id"] == "Shampoo"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_lines_a_split_moves_are_said_one_by_one(order):
     field = fields_of("sale.order.split", {"order_id": str(order.id), "line_ids": [str(order.lines[0].id)]})["line_ids"]
     assert field["value"] == ["Shampoo"]
     assert field[NAMED] is True
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_sale_is_said_by_its_number(sale):
     said = shown("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong one"})
     assert said["sale_id"] == sale.number
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "method"), [("en", "Cash"), ("es", "Efectivo")])
 def test_a_refund_says_the_tender_the_method_and_the_line_of_the_sale(sale, language, method):
     tender = sale.payments[0]
@@ -149,7 +149,7 @@ def test_a_refund_says_the_tender_the_method_and_the_line_of_the_sale(sale, lang
     assert said["lines"] == [{"line_id": "Shampoo"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "method"), [("en", "Cash"), ("es", "Efectivo")])
 def test_a_charge_says_the_payment_method_in_the_persons_language(shampoo, language, method):
     cash = next(row for row in run("sale.payment_method.list", {}).rows if row.type == "cash")
@@ -161,7 +161,7 @@ def test_a_charge_says_the_payment_method_in_the_persons_language(shampoo, langu
     assert said["payments"] == [{"method_id": method}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_charge_says_the_customer_by_their_name(shampoo, customer):
     ana = customer("Ana López")
     said = shown(
@@ -174,7 +174,7 @@ def test_a_charge_says_the_customer_by_their_name(shampoo, customer):
 # ── What the apps Sales does not require name ─────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_line_says_its_product_and_who_serves_it(shampoo, order):
     bea = setup("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"})
     said = shown(
@@ -184,14 +184,14 @@ def test_a_line_says_its_product_and_who_serves_it(shampoo, order):
     assert (said["product_id"], said["staff_id"], said["order_id"]) == ("Shampoo", "Bea Ruiz", "Table 4")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_line_says_the_professional_a_write_gives_it(order):
     bea = setup("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"})
     arguments = {"order_id": str(order.id), "line_id": str(order.lines[0].id), "staff_id": str(bea.id)}
     assert shown("sale.order.set_line_staff", arguments)["staff_id"] == "Bea Ruiz"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_line_says_its_modifiers_one_by_one(shampoo, order):
     setup("modifier.group.create", {"name": "Extras", "max_choices": 4})
     cheese = setup("modifier.option.create", {"group": "Extras", "name": "Cheese", "price_delta": 100})
@@ -203,7 +203,7 @@ def test_a_line_says_its_modifiers_one_by_one(shampoo, order):
     assert field[NAMED] is True
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_section_of_an_open_price_line_is_said(order):
     section = run("sale.department.create", {"name": "Fruit", "tax_category_key": "product.generic"})
     said = shown(
@@ -213,14 +213,14 @@ def test_a_section_of_an_open_price_line_is_said(order):
     assert said["department_id"] == "Fruit"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_service_line_says_its_service(order):
     haircut = setup("service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"})
     said = shown("sale.order.add_service_line", {"order_id": str(order.id), "service_id": str(haircut.id)})
     assert said["service_id"] == "Haircut"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Section"), ("es", "Sección")])
 def test_the_section_of_an_open_price_line_is_titled_as_its_screen(order, language, title):
     """Its model calls it a department; the screen and the card of the write that deletes one, a section."""
@@ -229,7 +229,7 @@ def test_the_section_of_an_open_price_line_is_titled_as_its_screen(order, langua
     assert fields_of("sale.order.add_open_line", arguments, language)["department_id"]["label"] == title
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Service"), ("es", "Servicio")])
 def test_the_service_of_a_line_is_titled_by_what_it_is_never_as_an_id(order, language, title):
     haircut = setup("service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"})
@@ -237,7 +237,7 @@ def test_the_service_of_a_line_is_titled_by_what_it_is_never_as_an_id(order, lan
     assert fields_of("sale.order.add_service_line", arguments, language)["service_id"]["label"] == title
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_menu_line_says_its_menu_and_its_dishes(product, order):
     product("Lentils", "LEN", 500, "restaurant.food", initial_stock="10")
     setup("combo.combo.create", {"name": "Menu of the day", "price": 1350, "tax_category_key": "restaurant.food"})
@@ -252,7 +252,7 @@ def test_a_menu_line_says_its_menu_and_its_dishes(product, order):
     assert said["choices"] == [{"option_id": "Lentils"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_voucher_is_said_by_its_package(order, customer):
     haircut = setup("service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"})
     package = setup(
@@ -267,7 +267,7 @@ def test_a_voucher_is_said_by_its_package(order, customer):
     assert shown("sale.order.apply_voucher", arguments)["grant_id"] == "Five cuts"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_appointment_is_said_by_its_number(order, customer):
     haircut = setup("service.service.create", {"name": "Haircut", "price": 2000, "tax_category_key": "service.generic"})
     ana = setup("staff.member.create", {"first_name": "Ana", "last_name": "López"})
@@ -293,14 +293,14 @@ def test_an_appointment_is_said_by_its_number(order, customer):
 # ── Never by its id ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_that_is_not_there_is_left_out_never_by_its_id(order):
     gone = str(uuid.uuid4())
     said = shown("sale.order.remove_line", {"order_id": gone, "line_id": gone})
     assert said == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id(order):
     """The read of another app runs as whoever asks: without Staff's permission, its member stays out of the card."""
     bea = setup("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"})
@@ -328,7 +328,7 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
 # ── The read that names them ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_needs_the_right_to_see_sales():
     note = run("sale.quick_note.create", {"text": "No salt"})
     # Everything but this right, so it is this one the read asks for.
@@ -344,7 +344,7 @@ def test_the_read_takes_one_record(data):
         get("sale.record.get").input.model_validate(data)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_says_not_found_for_a_retired_record():
     note = run("sale.quick_note.create", {"text": "No salt"})
     QuickNote.objects.filter(pk=note.id).update(is_deleted=True)
@@ -352,7 +352,7 @@ def test_the_read_says_not_found_for_a_retired_record():
         run("sale.record.get", {"quick_note_id": str(note.id)})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_says_not_found_for_a_voided_line(order):
     line = order.lines[0].id
     OrderLine.objects.filter(pk=line).update(removed_at=timezone.now())
@@ -360,7 +360,7 @@ def test_the_read_says_not_found_for_a_voided_line(order):
         run("sale.record.get", {"line_id": str(line)})
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "said"), [("en", "Refund of sale {}"), ("es", "Devolución de la venta {}")])
 def test_the_read_says_a_refund_by_the_sale_it_gives_back(sale, language, said):
     """A refund has no number of its own: «Sales» lists it under its sale (SALE-F31, SALE-F32). Services' card names by it
@@ -373,7 +373,7 @@ def test_the_read_says_a_refund_by_the_sale_it_gives_back(sale, language, said):
     assert named.name == said.format(sale.number)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_says_not_found_for_a_refund_that_is_not_there(sale):
     """The id of a sale is no refund: the card of a void asks for the sale."""
     for missing in (str(uuid.uuid4()), str(sale.id)):
@@ -405,7 +405,7 @@ def test_an_input_the_read_does_not_take_is_refused():
         ("es", "delivery", "A domicilio"),
     ],
 )
-@pytest.mark.django_db
+@HUB_DB
 def test_the_order_type_of_a_round_is_said_as_the_kitchen_says_it(order, language, value, word):
     said = shown("sale.order.fire", {"order_id": str(order.id), "channel": value}, language)
     assert said["channel"] == word

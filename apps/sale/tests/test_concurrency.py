@@ -24,7 +24,12 @@ from live.context import system_context
 from live.errors import OperationError
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
+from apps.customer.tests.conftest import (
+    card_deleted_on_screen,
+    card_protected,
+    reads,
+    writes,
+)
 from apps.sale.models import (
     Department,
     Order,
@@ -36,8 +41,9 @@ from apps.sale.models import (
     SaleLine,
 )
 from apps.sale.tests.conftest import A, run
+from base.tenancy.tests import hubs
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.usefixtures("factory_data")]
+pytestmark = [pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("factory_data")]
 
 
 def at_once(*calls):

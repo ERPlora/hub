@@ -9,10 +9,10 @@ from django.utils import translation
 
 from apps.printing import documents
 from apps.sale import paper
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HUB_DB, run
 from base.models import Hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: The business as ``sale.letterhead.get`` names it (``test_letterhead.py``).
 LETTERHEAD = {"name": "Bar Ana SL", "tax_id": "B12345674", "lines": ["Calle Mayor 1", "28001 Madrid"]}

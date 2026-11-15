@@ -12,10 +12,17 @@ import pytest
 from live.assistant import asks_of
 from live.operations import registry
 
-from apps.sale.tests.conftest import ctx_for
+from apps.sale.tests.conftest import HUB_DB, ctx_for
 from base import assistant
-from base.tests.test_assistant_asks import assert_its_asks_bring, comparable, offered_place, offered_to, probe_phrases
-from base.tests.test_assistant_asks import probes_of_layer_2, without_its_asks
+from base.tests.test_assistant_asks import (
+    assert_its_asks_bring,
+    comparable,
+    offered_place,
+    offered_to,
+    probe_phrases,
+    probes_of_layer_2,
+    without_its_asks,
+)
 
 LANGUAGES = ("en", "es")
 #: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
@@ -29,7 +36,7 @@ def test_every_phrase_of_sale_is_one_of_at_least_200():
     assert sum(len(asks_of(op).get(language, ())) for op in sale for language in LANGUAGES) >= MIN_PHRASES
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     """The till's settings are the manager's (``sale.manage_settings``), and no manager approves them on the spot:
     the employee's turn never offers them, whatever they ask; the figures of the business are not theirs either."""
@@ -109,7 +116,7 @@ def test_the_reported_requests_of_layer_2_are_its_probes_word_for_word():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "name", "phrase"), QA_PROBES)
 def test_the_reported_sales_request_offers_its_existing_operation(language, name, phrase):
     tools = assistant.catalog(ctx_for("hub_owner", language=language))
@@ -117,7 +124,7 @@ def test_the_reported_sales_request_offers_its_existing_operation(language, name
     assert name in offered_to(tools, phrase, language)[:10]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the_customers_and_the_till():
     """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till: they come among
     the first eight, ahead of every tool of Customers and of Cash register its words name."""
@@ -134,7 +141,7 @@ def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the
 ROLE_OF = {"owner": "hub_owner", "admin": "hub_admin", "manager": "hub_manager", "employee": "hub_employee"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_payments_methods():
     """The payment methods of the till are no accounts the business pays its suppliers from (``payment.method.*``):
     each probe of layer 2 of Payments that brings its tool among the first ten brings it at the same place with the
@@ -198,7 +205,7 @@ OWN_WORDS = [
 ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
     assert_its_asks_bring(assistant.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)

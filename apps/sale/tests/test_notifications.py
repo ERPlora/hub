@@ -10,6 +10,7 @@ from live.errors import Conflict
 from live.outbox import channel_for
 
 from apps.sale.tests.conftest import A, B, ctx_for, run
+from base.tenancy.tests import hubs
 
 WAIT = 1.0
 QUIET = 0.3
@@ -47,7 +48,7 @@ def open_price(ctx):
 
 # Transactional: the notice leaves after a real COMMIT. A flush between transactional tests empties Taxes'
 # factory catalogue (seeded by its migrations): `factory_data` plants it again.
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
 @pytest.mark.usefixtures("factory_data")
 def test_a_check_opened_and_charged_in_hub_b_notifies_the_channel_of_b_only(listen):
     on_a, on_b = listen(A), listen(B)
@@ -65,7 +66,7 @@ def test_a_check_opened_and_charged_in_hub_b_notifies_the_channel_of_b_only(list
     assert received(on_a, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
 @pytest.mark.usefixtures("factory_data")
 def test_a_refused_write_notifies_nobody(listen):
     order = open_price(ctx_for())

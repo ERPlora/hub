@@ -20,9 +20,10 @@ from apps.sale.models import (
     Settings,
     sale_number,
 )
+from apps.sale.tests.conftest import HUB_DB
 from apps.tax.models import TaxCategory
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make):

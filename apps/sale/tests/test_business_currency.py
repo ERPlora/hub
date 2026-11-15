@@ -13,11 +13,11 @@ from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.queries import business_currency as sales_business_currency
 from apps.sale.queries import money_text
-from apps.sale.tests.conftest import A, B, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run
 from base import operations as base_operations
 from base.models import Hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ISSUER = {
     "legal_name": "Bar Ana SL",

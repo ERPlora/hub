@@ -15,9 +15,9 @@ from live.operations import registry
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.sale.models import Sale
-from apps.sale.tests.conftest import ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ISSUER = {
     "legal_name": "Bar Ana SL",

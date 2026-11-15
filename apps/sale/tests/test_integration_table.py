@@ -9,9 +9,9 @@ from live.context import system_context
 from live.errors import PermissionDenied
 
 from apps.sale.models import Order
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 
