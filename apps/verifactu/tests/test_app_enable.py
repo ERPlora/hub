@@ -196,5 +196,5 @@ def test_each_hub_reads_its_own_business_country(hub_a, hub_b, poland_and_spain)
     with context.use_hub(hub_b):
         verifactu_off(hub_b.slug)
         assert row_of(scope=of_b)["refusal"] is None
-        assert enable(admin(of_b))["state"] in ("on", "creating")
+        assert enable(admin(of_b))["state"] == "on"
         assert activation.states_of(of_b)["verifactu"].wanted
