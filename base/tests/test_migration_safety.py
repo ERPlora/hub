@@ -146,7 +146,7 @@ ACCEPTED = {
     # more, leave the database through
     # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state, and
     # nothing is linked again first: an old column keeps forever what it said before the move, so filling the new
-    # links from it again (link_hub_users overwrites them) would undo every reassignment made since and could break
+    # links from it again (overwriting them) would undo every reassignment made since and could break
     # staff_member_hub_user_unique. A row the code of before linked during the move's own deploy keeps no person: it
     # is linked again on its screen. The columns:
     #   staff_member.user_id, staff_timeoff.approved_by_id,

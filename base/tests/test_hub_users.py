@@ -14,12 +14,9 @@ The business is ``hub_a``, on a database of its own as every business is; ``B`` 
 
 import importlib
 import uuid
-from types import SimpleNamespace
 
 import pytest
-from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.db import connections
 from live.context import OperationContext, Scope, system_context
 from live.errors import NotFound, PermissionDenied
 from live.operations import get
@@ -147,6 +144,17 @@ class TestTheCaller:
             made = services.ensure_hub_user(user)
             assert queries.hub_user_of(as_person(user)) == made
 
+    def test_hub_user_of_is_the_caller_s_own_and_never_a_colleague_s(self, hub_a):
+        ana, olga = account_copy(ANA_ID, name="Ana"), account_copy(OLGA_ID, name="Olga", email="olga@example.com")
+        newcomer = account_copy(uuid.uuid7(), name="Eva", email="eva@example.com")
+        with use_hub(hub_a):
+            ana_s, olga_s = services.ensure_hub_user(ana), services.ensure_hub_user(olga)
+
+            found = [queries.hub_user_of(as_person(user)) for user in (ana, olga, newcomer)]
+
+        assert found == [ana_s, olga_s, None]
+        assert [person._state.db for person in found[:2]] == [hubs.HUB_A_ALIAS] * 2
+
 
 class TestTheWaysIn:
     def test_the_code_of_erplora_com_makes_the_hub_user(self, client, fake_saas, hub_a):
@@ -271,18 +279,13 @@ def test_a_person_who_leaves_a_hub_with_its_own_database_is_no_longer_active_the
 
 
 class TestTheMigration:
-    """``base/migrations/0020_hub_user`` runs on each business's own database, which holds no control users nor roles
-    to read: its people come at their entry and from the SaaS's photo."""
+    """``base/migrations/0020_hub_user`` only makes the table: a business's own database holds no control users nor
+    roles to read, so its people come at their entry and from the SaaS's photo."""
 
-    migration = importlib.import_module("base.migrations.0020_hub_user")
+    def test_it_only_makes_the_table(self):
+        migration = importlib.import_module("base.migrations.0020_hub_user").Migration
 
-    def test_a_hub_s_own_database_has_nobody_to_read(self, hub_a):
-        Membership.objects.create(user=account_copy(ANA_ID), host=A, role="hub_employee")
-
-        self.migration.make_hub_users(django_apps, SimpleNamespace(connection=connections[hubs.HUB_A_ALIAS]))
-
-        with use_hub(hub_a):
-            assert not HubUser.objects.exists()
+        assert [operation.describe() for operation in migration.operations] == ["Create model HubUser"]
 
 
 class TestTheReadThatNamesThem:
