@@ -10,9 +10,9 @@ from live.errors import Conflict
 from live.operations import registry
 
 from apps.sale.models import Sale, SaleCounter
-from apps.sale.tests.conftest import ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

@@ -33,7 +33,9 @@ from apps.sale.models import (
     Settings,
     VoucherSession,
 )
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HUB_DB, A, run
+
+pytestmark = HUB_DB
 
 OPEN = [PaymentMethod, Settings, Department, QuickNote, Order, OrderLine]
 CHARGED = [Sale, SaleLine, SalePayment, SaleCounter, Refund, RefundPayment, RefundLine, VoucherSession]
@@ -51,8 +53,10 @@ def superuser(db):
 
 @pytest.fixture
 def staff(client, superuser):
-    """The platform staff, signed in to the Hub admin."""
+    """The platform staff, signed in to the Hub admin with the business ``A`` chosen, as «Open in the Hub admin» of
+    erplora.com's admin leaves them: its pages read and write that business's own database."""
     client.force_login(superuser)
+    assert client.get(f"/admin/hub/{A.key}/", **HOST).status_code == 302
     return client
 
 

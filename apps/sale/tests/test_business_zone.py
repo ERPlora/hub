@@ -8,10 +8,10 @@ import uuid
 
 import pytest
 
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HUB_DB, run
 from apps.tax.models import TaxCategory, TaxRule
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: The day of a sale at night in another zone (``night_elsewhere``): the deployment's, until hub#772.
 SALE_DAY = dt.date(2026, 11, 3)

@@ -12,7 +12,7 @@ from django.apps import apps
 from live.context import system_context
 from live.operations import get, registry
 
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from base import assistant
 from base.tests.test_assistant import technical_names
 
@@ -55,7 +55,7 @@ def test_the_card_names_the_lines_a_check_starts_with_by_their_kind():
     assert labels(assistant.card(open_check, arguments, "en")) == ["Open-price lines", SCREENS_EN["pos"]["services"], "Menus"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "expected"), [("es", ["Línea", "Bono"]), ("en", ["Line", "Voucher"])])
 def test_the_card_names_a_line_of_the_check_and_the_voucher_that_pays_it(product, customer, language, expected):
     """With real records: a record the card cannot name is left out (BASE-F97), so an id that is none has no label."""
@@ -86,7 +86,7 @@ def test_the_card_names_what_goes_to_the_kitchen_as_the_kitchen_reads_it():
     assert labels(assistant.card(fire, arguments, "en")) == ["Order type", "Priority", "Served by"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_two_checks_of_a_merge_and_the_lines_of_a_split(product):
     scissors = product("Scissors", "SCI", 1210, "product.generic")
     first, second = (run("sale.order.open", {"lines": [{"product_id": str(scissors.id)}]}) for _ in range(2))

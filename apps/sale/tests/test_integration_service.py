@@ -18,12 +18,12 @@ from live.models import OutboxEvent
 from live.operations import get, registry
 
 from apps.sale.models import Order, OrderLine, Refund, Sale, SaleCounter, SaleLine, VoucherSession
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from apps.service.models import Grant, Redemption
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

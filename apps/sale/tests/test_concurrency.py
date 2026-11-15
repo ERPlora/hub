@@ -17,14 +17,15 @@ from contextlib import contextmanager
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connection, transaction
+from django.db import connections
 from django.test import Client
 from django.utils import timezone
 from live.context import system_context
 from live.errors import OperationError
+from live.operations import atomic
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
+from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.sale.models import (
     Department,
     Order,
@@ -36,8 +37,42 @@ from apps.sale.models import (
     SaleLine,
 )
 from apps.sale.tests.conftest import A, run
+from base.tenancy import context, limits
+from base.tenancy.tests import hubs
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.usefixtures("factory_data")]
+pytestmark = [pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("factory_data")]
+
+#: A plan with room for several tills at once: Free's one place in each process would queue them, and the one that
+#: waits too long would get 503 ``base.hub_busy`` instead of meeting the other at the row's lock.
+ROOM_FOR_EVERY_TILL = {"slug": "standard", "max_db_connections": 6, "statement_timeout_seconds": 15}
+
+
+@pytest.fixture(autouse=True)
+def tills_at_once(monkeypatch, in_business_a):
+    """The business ``A`` on that plan, in a limiter of the test's own: a bigger plan is never left to the next test."""
+    monkeypatch.setattr(limits, "_limiters", {})
+    monkeypatch.setattr(in_business_a, "state", {"plan": ROOM_FOR_EVERY_TILL})
+    monkeypatch.setattr(in_business_a, "state_version", (in_business_a.state_version or 0) + 1)
+    with context.use_hub(in_business_a):
+        yield
+
+
+def in_a_thread(call, outcomes: list, index: int = 0) -> threading.Thread:
+    """A thread that runs ``call`` in the business at work here and leaves its outcome (an error raised, a 500
+    included, is the outcome) at ``outcomes[index]``. It starts without a context and with sessions of its own,
+    closed when it ends."""
+    active = context.current()
+
+    def target():
+        try:
+            with context.use_again(active):
+                outcomes[index] = call()
+        except Exception as error:  # reported to the test
+            outcomes[index] = error
+        finally:
+            connections.close_all()
+
+    return threading.Thread(target=target)
 
 
 def at_once(*calls):
@@ -45,20 +80,11 @@ def at_once(*calls):
     barrier = threading.Barrier(len(calls))
     results: list = [None] * len(calls)
 
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
+    def released(call):
+        barrier.wait(5)
+        return call()
 
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
+    threads = [in_a_thread(lambda call=call: released(call), results, i) for i, call in enumerate(calls)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -71,17 +97,8 @@ def codes(results) -> list:
 
 
 @pytest.fixture
-def coffee():
-    return run(
-        "inventory.product.create",
-        {
-            "name": "Coffee",
-            "sku": "COF",
-            "price": 150,
-            "tax_category_key": "restaurant.drink",
-        },
-        system_context(A),
-    )
+def coffee(product):
+    return product()
 
 
 def charge(key, **data):
@@ -311,7 +328,7 @@ def test_a_second_voucher_on_a_line_waits_for_the_first_and_does_not_fit(coffee,
     granted, finish = threading.Event(), threading.Event()
 
     def first():
-        with transaction.atomic():
+        with atomic():
             svc("service.grant.create", for_lucia)
             granted.set()
             finish.wait(10)
@@ -427,7 +444,7 @@ WAIT_LIMIT = 10
 
 def _waited_for() -> bool:
     """Whether another session waits for a lock this one holds."""
-    with connection.cursor() as cursor:
+    with connections[context.current_alias()].cursor() as cursor:
         cursor.execute("SELECT pg_stat_clear_snapshot()")
         cursor.execute(
             "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pg_backend_pid() = ANY (pg_blocking_pids(pid)))"
@@ -437,7 +454,7 @@ def _waited_for() -> bool:
 
 def _waiting() -> int:
     """How many other sessions on this database wait for a lock."""
-    with connection.cursor() as cursor:
+    with connections[context.current_alias()].cursor() as cursor:
         cursor.execute("SELECT pg_stat_clear_snapshot()")
         cursor.execute(
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
@@ -453,12 +470,13 @@ def locks(table: str) -> Callable[[str], bool]:
 
 @pytest.fixture
 def hub_staff(db) -> Client:
-    """The platform staff, signed in to the Hub admin."""
+    """The platform staff, signed in to the Hub admin with the business ``A`` chosen."""
     staff = get_user_model().objects.create_superuser(
         username="root", password="pw", email="root@example.com"
     )
     client = Client()
     client.force_login(staff)
+    assert client.get(f"/admin/hub/{A.key}/", HTTP_HOST="hubs.localhost").status_code == 302
     return client
 
 
@@ -482,33 +500,30 @@ def admin_delete(client: Client, how: str, *targets):
 
 
 @contextmanager
-def meanwhile(after: Callable[[str], bool], call):
-    """Runs ``call`` in another session right after the first statement of this one for which ``after``
-    holds; this one goes on once ``call`` waits for what it holds (or has ended). Yields its outcome (an
-    error raised, a 500 included, is the outcome)."""
-    outcome: list = []
+def meanwhile(when: Callable[[str], bool], call, *, first: bool = False):
+    """Runs ``call`` in another session right after the first statement of this one for which ``when`` holds, or
+    right before it if ``first``; this one goes on once ``call`` waits for what it holds (or has ended). Yields its
+    outcome (an error raised, a 500 included, is the outcome)."""
+    outcome: list = [None]
+    thread = in_a_thread(call, outcome)
 
-    def other():
-        try:
-            outcome.append(call())
-        except Exception as error:  # reported to the test
-            outcome.append(error)
-        finally:
-            connection.close()
+    def let_it_run():
+        thread.start()
+        deadline = time.monotonic() + WAIT_LIMIT
+        while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
+            time.sleep(0.02)
 
-    thread = threading.Thread(target=other)
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if thread.ident is None and after(sql):
-            thread.start()
-            deadline = time.monotonic() + WAIT_LIMIT
-            while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
-                time.sleep(0.02)
+    def wrapper(execute, sql, params, many, executing):
+        starts = thread.ident is None and when(sql)
+        if starts and first:
+            let_it_run()
+        result = execute(sql, params, many, executing)
+        if starts and not first:
+            let_it_run()
         return result
 
     try:
-        with connection.execute_wrapper(wrapper):
+        with connections[context.current_alias()].execute_wrapper(wrapper):
             yield outcome
     finally:
         if thread.ident is not None:
@@ -521,17 +536,8 @@ def in_turn(row, *calls) -> list:
     wait for a lock, so they queue for ``row`` in that order; then lets it go. Their outcomes (an error raised,
     a 500 included, is the outcome)."""
     outcomes: list = [None] * len(calls)
-
-    def other(index, call):
-        try:
-            outcomes[index] = call()
-        except Exception as error:  # reported to the test
-            outcomes[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=other, args=(i, call)) for i, call in enumerate(calls)]
-    with transaction.atomic():
+    threads = [in_a_thread(call, outcomes, i) for i, call in enumerate(calls)]
+    with atomic():
         list(type(row).objects.select_for_update().filter(pk=row.pk))
         for queued, thread in enumerate(threads, start=1):
             thread.start()
@@ -541,6 +547,23 @@ def in_turn(row, *calls) -> list:
     for thread in threads:
         thread.join(30)
     return outcomes
+
+
+def delete_page_while_held(row, hub_staff: Client) -> tuple[bool, object]:
+    """The Hub admin's delete page of ``row`` asked in another session while this one holds ``row`` locked: whether it
+    answered before this one let go, and its answer (an error raised is the answer)."""
+    meta = type(row)._meta
+    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
+    outcome: list = [None]
+    thread = in_a_thread(lambda: hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"), outcome)
+    with atomic():
+        list(type(row).objects.select_for_update().filter(pk=row.pk))
+        thread.start()
+        thread.join(WAIT_LIMIT)
+        answered = not thread.is_alive()
+    thread.join(30)
+    assert not isinstance(outcome[0], Exception), outcome[0]
+    return answered, outcome[0]
 
 
 def a_check(label: str = "", quantity: str = "2"):
@@ -626,28 +649,8 @@ def test_the_hub_admin_confirmation_page_of_a_check_a_write_holds_does_not_wait(
     """The check's delete page (a GET, before the staff confirm) does not lock the check: it answers while a
     write still holds it; only the confirmed deletion (a POST) waits for the write."""
     check = a_check()
-    meta = Order._meta
-    url = f"/admin/{meta.app_label}/{meta.model_name}/{check.id}/delete/"
-    outcome: list = []
-
-    def other():
-        try:
-            outcome.append(hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
-        except Exception as error:  # reported to the test
-            outcome.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=other)
-    with transaction.atomic():
-        list(Order.objects.select_for_update().filter(pk=check.id))
-        thread.start()
-        thread.join(WAIT_LIMIT)
-        answered_while_held = not thread.is_alive()
-    thread.join(30)
+    answered_while_held, answer = delete_page_while_held(Order.objects.get(pk=check.id), hub_staff)
     assert answered_while_held, "the delete page waited for the write that held the check"
-    [answer] = outcome
-    assert not isinstance(answer, Exception), answer
     assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
     assert Order.objects.filter(pk=check.id).exists()
 
@@ -721,11 +724,6 @@ def a_method(name: str = "Bizum") -> PaymentMethod:
 def inserts(table: str) -> Callable[[str], bool]:
     """Whether a statement writes rows of ``table``."""
     return lambda sql: sql.startswith(f'INSERT INTO "{table}"')
-
-
-def reads(table: str) -> Callable[[str], bool]:
-    """Whether a statement reads rows of ``table`` (the deletion looking for what protects a row)."""
-    return lambda sql: sql.startswith("SELECT") and f'FROM "{table}"' in sql
 
 
 def open_price(department: Department, cents: int = 250) -> dict:
@@ -902,28 +900,8 @@ def test_the_hub_admin_delete_page_of_a_row_a_write_holds_does_not_wait(coffee, 
     """The delete page of a department or a payment method (a GET, before the staff confirm) does not lock it: it
     answers while a write still holds it; only the confirmed deletion (a POST) waits for the write."""
     row = make()
-    meta = type(row)._meta
-    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
-    outcome: list = []
-
-    def other():
-        try:
-            outcome.append(hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
-        except Exception as error:  # reported to the test
-            outcome.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=other)
-    with transaction.atomic():
-        list(type(row).objects.select_for_update().filter(pk=row.pk))
-        thread.start()
-        thread.join(WAIT_LIMIT)
-        answered_while_held = not thread.is_alive()
-    thread.join(30)
+    answered_while_held, answer = delete_page_while_held(row, hub_staff)
     assert answered_while_held, "the delete page waited for the write that held the row"
-    [answer] = outcome
-    assert not isinstance(answer, Exception), answer
     assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
     assert type(row).objects.filter(pk=row.pk).exists()
 
@@ -954,10 +932,10 @@ CARD_CHARGES = {"counter": counter_charge, "check": check_charge}
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("charge_of", sorted(CARD_CHARGES))
-def test_the_hub_admin_cannot_delete_a_card_a_charge_links_meanwhile(coffee, charge_of, how):
+def test_the_hub_admin_cannot_delete_a_card_a_charge_links_meanwhile(coffee, hub_staff, charge_of, how):
     card = Customer.objects.create(name="Ana García")
     charge_it = CARD_CHARGES[charge_of](card)
-    with card_deleted_on_screen(card, how, writes("sale_sale")) as answers:
+    with meanwhile(writes("sale_sale"), admin_delete(hub_staff, how, card), first=True) as answers:
         charge_it()
     [answer] = answers
     assert card_protected(answer)
@@ -966,10 +944,10 @@ def test_the_hub_admin_cannot_delete_a_card_a_charge_links_meanwhile(coffee, cha
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("charge_of", sorted(CARD_CHARGES))
-def test_a_charge_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(coffee, charge_of, how):
+def test_a_charge_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(coffee, hub_staff, charge_of, how):
     card = Customer.objects.create(name="Ana García")
     charge_it = CARD_CHARGES[charge_of](card)
-    with card_deleted_on_screen(card, how, reads("customer_customer")) as answers:
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, how, card), first=True) as answers:
         with pytest.raises(OperationError) as refused:
             charge_it()
     [answer] = answers
@@ -994,9 +972,9 @@ def _merged_into_marta(coffee):
 
 
 @pytest.mark.parametrize("how", HOW)
-def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_sales_to_meanwhile(coffee, how):
+def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_sales_to_meanwhile(coffee, hub_staff, how):
     _, sale, marta, move = _merged_into_marta(coffee)
-    with card_deleted_on_screen(marta, how, writes("sale_sale")) as answers:
+    with meanwhile(writes("sale_sale"), admin_delete(hub_staff, how, marta), first=True) as answers:
         move()
     [answer] = answers
     assert card_protected(answer)

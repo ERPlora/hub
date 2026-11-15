@@ -2,29 +2,30 @@
 never clobbering the owner's own, reversible.
 
 The functions of the ``RunPython`` are called the way the migration runs them, with the app registry
-and a schema editor whose connection is the test database.
+and a schema editor whose connection is the business's own database, as ``migrate_hubs`` runs them.
 """
 
 from importlib import import_module
 
-import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import connections
 
 from apps.sale.models import PaymentMethod
+from apps.sale.tests.conftest import HUB_DB
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 seed = import_module("apps.sale.migrations.0002_factory_payment_methods")
 
 
 def run_forward():
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         seed.plant(global_apps, editor)
 
 
 def run_backward():
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         seed.uproot(global_apps, editor)
 
 
