@@ -73,6 +73,15 @@ CONTROL_DATABASE = DatabaseContext(kind=CONTROL, alias=DEFAULT_DB_ALIAS)
 _current: ContextVar[DatabaseContext | None] = ContextVar("tenancy_database_context", default=None)
 #: Set only by the tests' conftest.py: what a test written before the tenancy runs on without a context.
 _test_fallback: DatabaseContext | None = None
+#: How many times the code leaned on the fallback where production refuses or behaves otherwise: the suite's
+#: conftest.py reads it to tell the tests that still need the fallback from the ones that only have it on.
+_test_fallback_entries = 0
+
+
+def _leaning_on_the_fallback() -> DatabaseContext:
+    global _test_fallback_entries
+    _test_fallback_entries += 1
+    return _test_fallback
 
 
 @contextmanager
@@ -93,7 +102,7 @@ def use_hub(hub) -> Iterator[DatabaseContext]:
         alias = connections.open_hub_alias(hub)
     elif _test_fallback is not None:
         # The suite's tests written before the tenancy: their businesses' rows are in control's test database.
-        alias = _test_fallback.alias
+        alias = _leaning_on_the_fallback().alias
     else:
         raise HubWithoutDatabase(
             f"The business {hub.slug or hub.id} has no database of its own yet: it is not served until "
@@ -112,13 +121,16 @@ def use_admin_without_a_business() -> AbstractContextManager[DatabaseContext]:
     """Where the admin works with no business chosen (``base.middleware``): control. Under the suite's fallback, the
     fallback itself: control's test database, with the rows of every business of the tests written before the
     tenancy, as the admin showed them before every business had a database of its own."""
-    return use_control() if _test_fallback is None else _entered(_test_fallback)
+    return use_control() if _test_fallback is None else _entered(_leaning_on_the_fallback())
 
 
 def serves_hubs_without_database() -> bool:
     """Whether a business without a database of its own is entered and served: never in production, only under
     the suite's fallback (``_test_fallback``), where the tests written before the tenancy keep their businesses."""
-    return _test_fallback is not None
+    if _test_fallback is None:
+        return False
+    _leaning_on_the_fallback()
+    return True
 
 
 def use_again(active: DatabaseContext) -> AbstractContextManager[DatabaseContext]:
@@ -137,7 +149,9 @@ def peek() -> DatabaseContext | None:
 
 def current() -> DatabaseContext:
     """The active context; ``HubContextMissing`` without one."""
-    active = peek()
+    active = _current.get()
+    if active is None and _test_fallback is not None:
+        active = _leaning_on_the_fallback()
     if active is None:
         raise HubContextMissing(
             "No database context: wrap this in use_hub(hub) or use_control() (base.tenancy.context)."

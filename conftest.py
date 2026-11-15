@@ -9,6 +9,9 @@ from django.utils import timezone, translation
 
 from config import testing
 
+# The suite's fallback, on only for the tests .legacy-fallback-allow names (base/tenancy/tests/legacy_allow.py).
+pytest_plugins = ["base.tenancy.tests.legacy_allow"]
+
 ENTRY = "frontend/main.ts"
 
 
@@ -86,10 +89,13 @@ def local_hubs(request):
         return
     request.getfixturevalue("transactional_db" if "transactional_db" in request.fixturenames else "db")
     from base.models import Hub
+    from base.tenancy.tests.legacy import use_legacy
 
-    for slug in LOCAL_HUBS:
-        Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
-        _every_app_on(slug)
+    # Written in the fallback's tables explicitly: a test that only finds them there does not lean on the fallback.
+    with use_legacy():
+        for slug in LOCAL_HUBS:
+            Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
+            _every_app_on(slug)
 
 
 def _every_app_on(slug):
@@ -197,38 +203,25 @@ def worker_slow_passes(request, monkeypatch):
 # ── The tenancy: a control database and one database per hub ───────────────────────────────────────────────────────
 
 
-@pytest.fixture(autouse=True, scope="session")
-def legacy_fallback():
-    """The tests written before the tenancy run without a context of their own, every business of theirs on control's
-    test database (``base/tenancy/tests/legacy.py``).
-
-    In production a hub's model or operation without ``use_hub`` fails (``HubContextMissing``) and a business without
-    its own database is not served. The suite's older tests call operations and the ORM directly, in their own
-    threads too, for the local hubs ``a`` and ``b`` (``db_name=""``): here they fall back on control's test database,
-    which also holds the tables of the hubs' apps (``LegacyTablesRouter``). The tenancy's own tests turn it off
-    (``no_test_fallback``) and so do the ones of every way in (requests, the live executor, the print socket,
-    ``/internal``, the worker, the commands), which must open their context themselves.
-    """
-    from base.tenancy import context
-    from base.tenancy.tests.legacy import LEGACY
-
-    context._test_fallback = LEGACY
-    yield
-    context._test_fallback = None
-
-
 @pytest.fixture(autouse=True)
 def legacy_worker(request, monkeypatch):
-    """The worker's loop serves only the hubs with their own database. A test written before the tenancy that runs
-    it on its businesses (on control's test database) gets a pass of its own instead of the one over control's outbox:
-    their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test that runs as
-    production (``no_test_fallback``) nor for the worker's own (``production_worker``)."""
-    if "no_test_fallback" in request.fixturenames or request.node.get_closest_marker("production_worker"):
+    """The worker's loop serves only the hubs with their own database. A test that still leans on the suite's fallback
+    and runs it on its businesses (on control's test database) gets a pass of its own instead of the one over control's
+    outbox: their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test
+    that runs as production (not listed in ``.legacy-fallback-allow``, or ``no_test_fallback``) nor for the worker's
+    own (``production_worker``)."""
+    from base.tenancy import context
+
+    if (
+        context._test_fallback is None
+        or "no_test_fallback" in request.fixturenames
+        or request.node.get_closest_marker("production_worker")
+    ):
         return
     from base import worker
-    from base.tenancy.tests import legacy
+    from base.tenancy.tests import legacy_allow
 
-    monkeypatch.setattr(worker, "_relay", legacy.worker_pass)
+    monkeypatch.setattr(worker, "_relay", legacy_allow.worker_pass)
 
 
 @pytest.fixture
