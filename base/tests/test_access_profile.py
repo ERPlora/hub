@@ -3,6 +3,9 @@
 The profile is always the person's who has the session. The name and the contact email are this business's: the
 contact email is not the one to sign in with and never gives nor takes any access. The language and the appearance
 follow the person on any device of the hub; empty = the business's.
+
+The hub is ``hub_a``, on a database of its own as every business is: its profiles, PINs and events are read there,
+inside its context.
 """
 
 import base64
@@ -16,10 +19,10 @@ from live.models import OutboxEvent
 from PIL import Image as PILImage
 
 from base.models import Credential, Hub, Membership, Profile
+from base.tenancy.context import use_hub
+from base.tests.test_auth_views import A, HOST, ON_HUB_A
 
-pytestmark = pytest.mark.django_db
-
-HOST = "a.localhost:8000"
+pytestmark = ON_HUB_A
 
 
 def get(client):
@@ -43,7 +46,7 @@ def ana(client, make_user, settings):
     # ``storages["hub_files"]`` in memory, empty for each test (as apps/website/tests/conftest.py does).
     settings.STORAGES = {**settings.STORAGES, "hub_files": {"BACKEND": "django.core.files.storage.InMemoryStorage"}}
     storages._storages.pop("hub_files", None)
-    user = make_user("saas:1", host="a", role=Membership.Role.MANAGER, first_name="Ana", email="ana@erplora.test")
+    user = make_user("saas:1", host=A, role=Membership.Role.MANAGER, first_name="Ana", email="ana@erplora.test")
     client.force_login(user)
     yield user
     storages._storages.pop("hub_files", None)
@@ -57,12 +60,13 @@ def test_without_a_profile_it_is_the_account_s_name_and_the_business_s_preferenc
     assert (answer["role"], answer["has_pin"], answer["pin_length"]) == ("hub_manager", False, 4)
 
 
-def test_saving_my_data_names_me_so_in_this_hub(client, ana):
+def test_saving_my_data_names_me_so_in_this_hub(client, ana, hub_a):
     response = post(client, "/me/profile/update", {"first_name": " Ana María ", "last_name": "López", "contact_email": "ana@bar.example"})
     assert response.status_code == 200
     assert (response.json()["first_name"], response.json()["last_name"]) == ("Ana María", "López")
     assert client.get("/api/me", HTTP_HOST=HOST).json()["user"]["label"] == "Ana María López"
-    assert OutboxEvent.objects.filter(name="base.profile.updated").count() == 1
+    with use_hub(hub_a):
+        assert OutboxEvent.objects.filter(name="base.profile.updated").count() == 1
 
 
 def test_a_wrong_contact_email_says_so_in_its_own_words_never_taking_django_s_message_from_other_apps(client, ana):
@@ -87,23 +91,25 @@ def test_the_contact_email_must_be_an_email_and_gives_no_access(client, ana):
     assert ana.__class__.objects.get(pk=ana.pk).email == "ana@erplora.test"
 
 
-def test_the_language_and_the_appearance_are_kept_and_the_language_applies_at_once(client, ana):
+def test_the_language_and_the_appearance_are_kept_and_the_language_applies_at_once(client, ana, hub_a):
     response = post(client, "/me/preferences", {"language": "en", "theme_mode": "dark", "palette": "forest", "ui_scale": 100})
     assert response.status_code == 200
     assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == "en"
-    profile = Profile.objects.get(username="saas:1")
+    with use_hub(hub_a):
+        profile = Profile.objects.get(username="saas:1")
     assert (profile.language, profile.theme_mode, profile.palette) == ("en", "dark", "forest")
     back = post(client, "/me/preferences", {"language": "", "theme_mode": "", "palette": "", "ui_scale": 100})
-    business = Hub.objects.get(slug="a").language or settings.LANGUAGE_CODE
+    business = Hub.objects.get(pk=hub_a.pk).language or settings.LANGUAGE_CODE
     assert back.cookies[settings.LANGUAGE_COOKIE_NAME].value == business
 
 
 @pytest.mark.parametrize("scale", [80, 90, 100, 110, 120])
-def test_every_interface_scale_is_saved_returned_and_read_back(client, ana, scale):
+def test_every_interface_scale_is_saved_returned_and_read_back(client, ana, hub_a, scale):
     response = post(client, "/me/preferences", {"language": "", "theme_mode": "", "palette": "", "ui_scale": scale})
     assert response.status_code == 200
     assert response.json()["ui_scale"] == scale
-    assert Profile.objects.get(username="saas:1").ui_scale == scale
+    with use_hub(hub_a):
+        assert Profile.objects.get(username="saas:1").ui_scale == scale
     assert get(client)["ui_scale"] == scale
 
 
@@ -147,8 +153,9 @@ def test_removing_the_photo(client, ana):
     assert get(client)["avatar_url"] == ""
 
 
-def test_it_says_whether_i_have_a_pin(client, ana):
-    Credential.objects.create(username="saas:1", pin_hash="argon2$x")
+def test_it_says_whether_i_have_a_pin(client, ana, hub_a):
+    with use_hub(hub_a):
+        Credential.objects.create(username="saas:1", pin_hash="argon2$x")
     assert get(client)["has_pin"] is True
 
 

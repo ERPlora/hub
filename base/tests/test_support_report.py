@@ -24,6 +24,13 @@ from base.tests.test_access_spa import a_device, enter_with_pin, with_pin
 pytestmark = pytest.mark.django_db
 
 HOST = "a.localhost:8000"
+
+
+def bea_enters_with_her_pin(client, make_user):
+    """Bea enters this browser, a shared till of the business, with her PIN."""
+    bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
+    a_device(client)
+    enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
 URL = "/api/support/report"
 SAAS_PATH = "/internal/support/report"
 BROWSER = "Mozilla/5.0 (iPad; CPU OS 18_0) ERPlora/1.4"
@@ -49,7 +56,7 @@ def account(client, ana, fake_saas):
     makes it a shared device of the hub): ``_log_in`` keeps the session's credential in it. A test's own
     ``fake_saas`` then answers the report."""
     fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
-    assert enter(client).status_code == 302
+    assert enter(client, host=HOST).status_code == 302
     return ana
 
 
@@ -115,10 +122,8 @@ class TestSent:
 class TestOnlyWithTheAccount:
     def test_a_pin_session_on_a_till_cannot_report_and_nothing_leaves(self, client, ana, make_user, fake_saas):
         saas = fake_saas(body=SENT)
-        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
-        a_device(client)
         with_pin(ana, "4826")
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        bea_enters_with_her_pin(client, make_user)
 
         response = report(client)
 
@@ -132,9 +137,7 @@ class TestOnlyWithTheAccount:
         # A PIN session of a shift opened before the deploy has no credential in the session; its SessionOwner says PIN.
         # Without the key it is no account's: never the account's by default.
         saas = fake_saas(body=SENT)
-        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
-        a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        bea_enters_with_her_pin(client, make_user)
         forget_the_credential(client)
         assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.PIN
 
@@ -169,9 +172,7 @@ class TestOnlyWithTheAccount:
 
     def test_a_pin_session_from_before_stays_refused_once_the_shell_loads(self, client, ana, make_user, fake_saas):
         saas = fake_saas(body=SENT)
-        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
-        a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        bea_enters_with_her_pin(client, make_user)
         forget_the_credential(client)
 
         load_the_shell(client)
@@ -203,7 +204,7 @@ class TestOnlyWithTheAccount:
         bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
         with_badge(bea, "04a1b2c3")
-        assert badge(client, "04a1b2c3").status_code == 200
+        assert badge(client, "04a1b2c3", host=HOST).status_code == 200
         assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.BADGE
 
         response = report(client)

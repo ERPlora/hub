@@ -7,6 +7,8 @@ that started it; the callback refuses a code that comes back without it (login C
 On the platform host (``hubs.localhost``) the same jump is the staff's to the Hub admin of a hub, with
 the ``hub-admin`` audience: it starts on the Hub too
 (``/auth/login?hub=<slug>&next=/admin/hub/<slug>/``, the SaaS admin's button) and needs its state.
+
+As in production, every business is on a database of its own: the business is ``hub_a``, another one ``hub_b``.
 """
 
 import datetime as dt
@@ -30,16 +32,24 @@ from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
 from base.services import demo_code_create, demo_create
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 from base.tests.test_middleware import through_the_jump
 
-pytestmark = pytest.mark.django_db
+#: How a test of the way in runs: as production does, the business ``hub_a`` on a database of its own.
+ON_HUB_A = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
-HOST = "a.localhost:8000"
+#: The slugs of the root conftest's ``hub_a`` and ``hub_b``.
+A = "tenant-a"
+B = "tenant-b"
+HOST = f"{A}.localhost:8000"
+B_HOST = f"{B}.localhost:8000"
 SAAS_LOGIN = "http://localhost:8001/hub-login/"
 PLATFORM = "hubs.localhost:8000"
 SAAS_HUBS = "http://localhost:8001/admin/accounts/hubs/"
 ROOT = {"user_id": "7", "email": "root@erplora.com", "name": "Root", "locale": "es", "role": "platform_admin"}
-DEEP_LINK = "/admin/hub/a/"
+DEEP_LINK = f"/admin/hub/{A}/"
 STATE_COOKIE = "hub_login_state"
 
 
@@ -75,18 +85,18 @@ class TestCallback:
         fake = fake_saas()
         response = callback(client, {"code": "c1", "next": "/demo/items"})
         assert (response.status_code, response["Location"]) == (302, "/demo/items")
-        assert json.loads(fake.calls[0]["body"]) == {"code": "c1", "hub": "a"}
+        assert json.loads(fake.calls[0]["body"]) == {"code": "c1", "hub": A}
         body = me(client)
-        assert (body["user"]["label"], body["scope"]["key"]) == ("Ana", "a")
+        assert (body["user"]["label"], body["scope"]["key"]) == ("Ana", A)
         assert "demo.view" in body["permissions"]
         assert Membership.objects.get().role == "hub_manager"
         assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == "es"
         assert body["language"] == "es"
 
-    def test_the_session_is_only_for_the_hub_of_the_code(self, client, fake_saas):
+    def test_the_session_is_only_for_the_hub_of_the_code(self, client, fake_saas, hub_b):
         fake_saas()
         callback(client, {"code": "c1", "next": "/"})
-        assert me(client, "b.localhost:8000")["permissions"] == []
+        assert me(client, B_HOST)["permissions"] == []
 
     def test_is_csrf_exempt_because_the_saas_posts_it_cross_site(self, fake_saas):
         fake_saas()
@@ -110,14 +120,15 @@ class TestCallback:
 
     @pytest.mark.parametrize(("own", "cookie"), [("es", "es"), ("", "en")])
     def test_the_language_of_my_profile_wins_over_the_account_s_and_without_one_the_account_s(
-        self, client, fake_saas, settings, own, cookie
+        self, client, fake_saas, settings, hub_a, own, cookie
     ):
         # The language chosen in «My profile» is the one every entry speaks, the account's too; without one, the
         # account's language on erplora.com, never the browser's (a PIN entry, without the account, takes the
         # business's: test_access_pin).
         from base.models import Profile
 
-        Profile.objects.create(username="saas:42", first_name="Ana", language=own)
+        with use_hub(hub_a):
+            Profile.objects.create(username="saas:42", first_name="Ana", language=own)
         fake_saas(body={"user_id": "42", "email": "ana@example.com", "name": "Ana", "locale": "en", "role": "hub_admin"})
         response = callback(client, {"code": "c1", "next": "/"})
         assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == cookie
@@ -136,7 +147,7 @@ class TestCallback:
         response = callback(client, {"code": "c1", "next": "/demo/items"})
         assert (response.status_code, response["Location"]) == (
             302,
-            f"{SAAS_LOGIN}?hub=a&next=/demo/items&error={error}&state={state_of(response)}",
+            f"{SAAS_LOGIN}?hub={A}&next=/demo/items&error={error}&state={state_of(response)}",
         )
         assert me(client)["user"] is None
 
@@ -154,14 +165,14 @@ class TestCallback:
     def test_a_missing_code_never_reaches_the_saas(self, client, fake_saas):
         fake = fake_saas()
         response = callback(client, {"next": "/"})
-        assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/&error=invalid_code&state={state_of(response)}"
+        assert response["Location"] == f"{SAAS_LOGIN}?hub={A}&next=/&error=invalid_code&state={state_of(response)}"
         assert fake.calls == []
 
     def test_a_user_deactivated_on_the_hub_is_sent_back(self, client, fake_saas):
         fake_saas()
         get_user_model().objects.create_user("saas:42", is_active=False)
         response = callback(client, {"code": "c1", "next": "/"})
-        assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/&error=user_inactive&state={state_of(response)}"
+        assert response["Location"] == f"{SAAS_LOGIN}?hub={A}&next=/&error=user_inactive&state={state_of(response)}"
         assert me(client)["user"] is None
 
     def test_only_post(self, client, saas):
@@ -171,9 +182,9 @@ class TestCallback:
     def test_a_platform_role_never_opens_a_customer_session(self, client, fake_saas, role):
         fake = fake_saas(body={**ROOT, "role": role})
         response = callback(client, {"code": "c1", "next": DEEP_LINK})
-        assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next={DEEP_LINK}&error=unknown_role&state={state_of(response)}"
+        assert response["Location"] == f"{SAAS_LOGIN}?hub={A}&next={DEEP_LINK}&error=unknown_role&state={state_of(response)}"
         # A hub host always redeems as a customer (hub-session), whatever next says.
-        assert json.loads(fake.calls[0]["body"]) == {"code": "c1", "hub": "a"}
+        assert json.loads(fake.calls[0]["body"]) == {"code": "c1", "hub": A}
         assert not get_user_model().objects.filter(is_staff=True).exists()
 
 
@@ -185,7 +196,7 @@ class TestLoginStart:
         state = state_of(response)
         assert (response.status_code, response["Location"]) == (
             302,
-            f"{SAAS_LOGIN}?hub=a&next=/demo/items%3Fq%3D1&state={state}",
+            f"{SAAS_LOGIN}?hub={A}&next=/demo/items%3Fq%3D1&state={state}",
         )
         assert len(state) >= 43  # secrets.token_urlsafe(32)
         cookie = response.cookies[STATE_COOKIE]
@@ -210,11 +221,11 @@ class TestLoginStart:
 
     @pytest.mark.parametrize("next_path", ["", "https://evil.example.com/x", "//evil.example.com", "demo"])
     def test_next_is_only_a_path_of_this_hub(self, client, saas, next_path):
-        assert start_login(client, next_path)["Location"].startswith(f"{SAAS_LOGIN}?hub=a&next=/&state=")
+        assert start_login(client, next_path)["Location"].startswith(f"{SAAS_LOGIN}?hub={A}&next=/&state=")
 
     def test_without_next_lands_on_the_home(self, client, saas):
         response = client.get("/auth/login", HTTP_HOST=HOST)
-        assert response["Location"].startswith(f"{SAAS_LOGIN}?hub=a&next=/&state=")
+        assert response["Location"].startswith(f"{SAAS_LOGIN}?hub={A}&next=/&state=")
 
     @pytest.mark.parametrize("host", ["www.localhost:8000", "hub.localhost:8000"])
     def test_a_host_that_is_no_hub_is_not_found(self, client, saas, host):
@@ -246,7 +257,7 @@ class TestCallbackState:
         assert (response.status_code, response.has_header("Location")) == (403, False)
         assert fake.calls == []
         assert me(victim)["user"] is None
-        assert any(r.name == "base.auth_views" and r.levelno == logging.WARNING and "'a'" in r.getMessage() for r in caplog.records)
+        assert any(r.name == "base.auth_views" and r.levelno == logging.WARNING and f"'{A}'" in r.getMessage() for r in caplog.records)
 
     @pytest.mark.parametrize("posted", [{"state": "not-the-one"}, {"state": ""}, {}])
     def test_a_state_that_is_not_this_browser_s_is_forbidden(self, client, fake_saas, caplog, posted):
@@ -333,12 +344,12 @@ class TestAdminLoginStart:
     @pytest.mark.parametrize(
         "query",
         [
-            {"hub": "a", "next": DEEP_LINK},
-            {"hub": "a"},
+            {"hub": A, "next": DEEP_LINK},
+            {"hub": A},
             # The hub of the deep link when hub is missing; hub wins over another deep link.
             {"next": DEEP_LINK},
-            {"hub": "a", "next": "/admin/hub/b/"},
-            {"hub": "a", "next": "https://evil.example.com/"},
+            {"hub": A, "next": f"/admin/hub/{B}/"},
+            {"hub": A, "next": "https://evil.example.com/"},
         ],
     )
     def test_jumps_to_the_saas_login_with_the_hub_admin_audience_and_a_state(self, client, saas, query):
@@ -346,7 +357,7 @@ class TestAdminLoginStart:
         state = state_of(response)
         assert (response.status_code, response["Location"]) == (
             302,
-            f"{SAAS_LOGIN}?hub=a&audience=hub-admin&next={DEEP_LINK}&state={state}",
+            f"{SAAS_LOGIN}?hub={A}&audience=hub-admin&next={DEEP_LINK}&state={state}",
         )
         cookie = response.cookies[STATE_COOKIE]
         assert (cookie["httponly"], cookie["samesite"], cookie["secure"], cookie["max-age"], cookie["path"]) == (
@@ -369,8 +380,8 @@ class TestAdminLoginStart:
         assert STATE_COOKIE not in response.cookies
 
     def test_a_hub_host_never_asks_for_the_hub_admin_audience(self, client, saas):
-        response = client.get("/auth/login", {"hub": "b", "next": DEEP_LINK}, HTTP_HOST=HOST)
-        assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next={DEEP_LINK}&state={state_of(response)}"
+        response = client.get("/auth/login", {"hub": B, "next": DEEP_LINK}, HTTP_HOST=HOST)
+        assert response["Location"] == f"{SAAS_LOGIN}?hub={A}&next={DEEP_LINK}&state={state_of(response)}"
 
 
 def staff_session(client) -> int:
@@ -384,7 +395,7 @@ class TestAdminCallback:
         response = callback(client, {"code": "c1", "next": DEEP_LINK}, PLATFORM)
         assert (response.status_code, response["Location"]) == (302, DEEP_LINK)
         [call] = fake.calls
-        assert json.loads(call["body"]) == {"code": "c1", "hub": "a", "audience": "hub-admin"}
+        assert json.loads(call["body"]) == {"code": "c1", "hub": A, "audience": "hub-admin"}
         user = get_user_model().objects.get(username="saas-staff:7")
         assert (user.is_staff, user.is_superuser, user.email) == (True, True, "root@erplora.com")
         assert client.session["saas_user_id"] == "7"
@@ -393,11 +404,11 @@ class TestAdminCallback:
         assert (chosen.status_code, chosen["Location"]) == (302, "/admin/")
         index = client.get("/admin/", HTTP_HOST=PLATFORM)
         assert index.status_code == 200
-        assert "Hub: a" in index.content.decode()
+        assert f"Hub: {A}" in index.content.decode()
 
     def test_the_state_of_this_browser_s_jump_opens_the_staff_session(self, client, fake_saas):
         fake = fake_saas(body=ROOT)
-        state = state_of(client.get("/auth/login", {"hub": "a", "next": DEEP_LINK}, HTTP_HOST=PLATFORM))
+        state = state_of(client.get("/auth/login", {"hub": A, "next": DEEP_LINK}, HTTP_HOST=PLATFORM))
         response = client.post("/auth/callback", {"code": "c1", "next": DEEP_LINK, "state": state}, HTTP_HOST=PLATFORM)
         assert (response.status_code, response["Location"]) == (302, DEEP_LINK)
         assert len(fake.calls) == 1
@@ -411,11 +422,11 @@ class TestAdminCallback:
         fake = fake_saas(body=ROOT)
         attacker, victim = Client(), Client()
         callback(attacker, {"code": "c0", "next": DEEP_LINK}, PLATFORM)
-        victim.get("/auth/login", {"hub": "a"}, HTTP_HOST=PLATFORM)
+        victim.get("/auth/login", {"hub": A}, HTTP_HOST=PLATFORM)
         with caplog.at_level(logging.WARNING, logger="base.auth_views"):
             response = victim.post("/auth/callback", {"code": "c1", "next": DEEP_LINK, **posted}, HTTP_HOST=PLATFORM)
         assert response.status_code == 403
-        assert 'href="/auth/login?next=%2Fadmin%2Fhub%2Fa%2F"' in response.content.decode()
+        assert f'href="/auth/login?next=%2Fadmin%2Fhub%2F{A}%2F"' in response.content.decode()
         assert len(fake.calls) == 1  # the attacker's own, never the victim's
         assert victim.get("/admin/", HTTP_HOST=PLATFORM)["Location"] == SAAS_HUBS
         assert any(r.name == "base.auth_views" and r.levelno == logging.WARNING for r in caplog.records)
@@ -556,10 +567,10 @@ SAAS_DEMO_FAILED = "http://localhost:8001/demo/?state=failed"
 def new_demo(session_key: str = DEMO_OWNER) -> str:
     """A demo of the browser ``session_key``, as ``POST /internal/demos`` leaves it, ready; its slug.
 
-    Its own database is made by the worker (``base/tenancy/tests/test_provision.py``, on real databases): here, where
-    the door is tested, it stays on the tests' shared database (``db_name`` empty), which a test case may reach."""
+    Its own database is made by the worker (``base/tenancy/tests/test_provision.py``) and nothing here enters it: only
+    its codes are asked for. The demo whose door is tested is ``demo``."""
     slug = demo_create(system_context(REGISTRY_SCOPE), DemoCreateIn(session_key=session_key, language="es")).slug
-    Hub.objects.filter(slug=slug).update(status=Hub.Status.READY, db_name="")
+    Hub.objects.filter(slug=slug).update(status=Hub.Status.READY)
     return slug
 
 
@@ -574,8 +585,12 @@ def host_of(slug: str) -> str:
 
 
 @pytest.fixture
-def demo(saas) -> str:
-    return new_demo()
+def demo(saas, hub_b) -> str:
+    """This browser's demo, ready on a database of its own (``hub_b``'s), as the worker leaves one; its slug."""
+    Hub.objects.filter(pk=hub_b.pk).update(
+        is_demo=True, demo_session_key=DEMO_OWNER, language="es", expires_at=timezone.now() + dt.timedelta(hours=1)
+    )
+    return hub_b.slug
 
 
 class TestDemoLoginStart:
@@ -597,7 +612,7 @@ class TestDemoLoginStart:
         assert STATE_COOKIE in response.cookies
 
     def test_a_business_still_jumps_to_the_saas_login(self, client, demo):
-        assert start_login(client, "/", host=HOST)["Location"].startswith(f"{SAAS_LOGIN}?hub=a&")
+        assert start_login(client, "/", host=HOST)["Location"].startswith(f"{SAAS_LOGIN}?hub={A}&")
 
 
 class TestDemoCallback:

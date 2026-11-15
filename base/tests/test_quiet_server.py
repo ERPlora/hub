@@ -5,7 +5,7 @@ what a request raises to stderr from a daemon thread, and a daemon thread caught
 interpreter closes is fatal. The Hub's assistant tests cut conversations on purpose: a turn the Hub stops reading, a
 voice it stops waiting for (``test_assistant_speak.py``: the Hub waits 0.2 s, the door answers in 1 s). The SaaS had
 the same harm and has the same cure (its own ``base/tests/quiet_server.py``). That every double answering in threads
-runs on it is ``tests/test_guardrails.py`` (j).
+runs on it is ``tests/test_guardrails_suite.py`` (j).
 """
 
 import socket

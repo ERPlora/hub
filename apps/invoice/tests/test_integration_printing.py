@@ -11,10 +11,10 @@ import pytest
 from django.utils.html import escape
 from live.operations import registry
 
-from apps.invoice.tests.conftest import ctx_for, run
+from apps.invoice.tests.conftest import IN_HUBS, ctx_for, run
 from apps.printing.models import PrintJob
 
-pytestmark = pytest.mark.django_db
+pytestmark = IN_HUBS
 
 LINE = {"description": "Haircut course", "quantity": "2", "unit_price": 5000, "tax_rate": "21"}
 RECIPIENT = {

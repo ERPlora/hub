@@ -144,7 +144,7 @@ class TestTheWaysIn:
             body={"user_id": str(ANA_ID), "email": "ana@example.com", "name": "Ana", "locale": "es", "role": "hub_admin"}
         )
 
-        callback(client, {"code": "c1", "next": "/"})
+        callback(client, {"code": "c1", "next": "/"}, host="a.localhost:8000")
 
         person = HubUser.objects.get(username=f"saas:{ANA_ID}")
         assert (person.account_id, person.name, person.email) == (ANA_ID, "Ana", "ana@example.com")
@@ -169,7 +169,7 @@ class TestTheWaysIn:
         a_device(client)
         credential = with_pin(user, "4826")
 
-        assert pin(client, credential.pk, "4826").status_code == 200
+        assert pin(client, credential.pk, "4826", host="a.localhost:8000").status_code == 200
         assert HubUser.objects.get(username=f"saas:{ANA_ID}").name == "Ana María"
 
 

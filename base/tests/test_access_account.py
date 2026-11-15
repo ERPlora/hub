@@ -4,6 +4,9 @@ Every entry with the account makes this browser a device of the hub (``base.Trus
 ``hub_device``): from then on the PIN works on it. The session lasts what the device and the business allow, fixed
 when it opens (12 h on a shared device, 30 days on a personal one, at most 1 h when the business always asks), and
 its note (``base.SessionOwner``) says on which device and with which credential it was opened.
+
+The hub is ``hub_a``, on a database of its own as every business is: its devices and settings are read and written
+there, inside its context.
 """
 
 import datetime as dt
@@ -15,11 +18,11 @@ from django.utils import timezone
 
 from base import access
 from base.models import AccessSettings, SessionOwner, TrustedDevice
-from base.tests.test_auth_views import a_code, callback, demo, host_of  # noqa: F401 (demo: a fixture)
+from base.tenancy.context import use_hub
+from base.tests.test_auth_views import HOST, ON_HUB_A, a_code, callback, demo, host_of  # noqa: F401 (demo: a fixture)
 
-pytestmark = pytest.mark.django_db
+pytestmark = ON_HUB_A
 
-HOST = "a.localhost:8000"
 ANDROID = "Mozilla/5.0 (Linux; Android 14; SM-T220) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
 
 
@@ -37,58 +40,67 @@ def device_cookie(response):
 
 
 class TestTheDevice:
-    def test_entering_with_the_account_makes_this_browser_a_shared_device_of_the_hub(self, client, fake_saas):
+    def test_entering_with_the_account_makes_this_browser_a_shared_device_of_the_hub(self, client, fake_saas, hub_a):
         fake_saas()
         response = enter(client)
         cookie = device_cookie(response)
         assert cookie["httponly"] and cookie["samesite"] == "Lax" and cookie["path"] == "/"
         assert int(cookie["max-age"]) == access.DEVICE_COOKIE_MAX_AGE
         assert not cookie["domain"]  # this hub's host only: another hub never sees it
-        device = TrustedDevice.objects.get()
+        with use_hub(hub_a):
+            device = TrustedDevice.objects.get()
         assert device.token_digest == access.token_digest(cookie.value)
         assert cookie.value not in device.token_digest
         assert (device.mode, device.agent) == (access.SHARED, "Chrome · Android")
         assert (device.last_username, device.last_user_label) == ("saas:42", "Ana")
         assert timezone.now() - device.last_entry_at < dt.timedelta(seconds=30)
 
-    def test_entering_again_from_it_keeps_the_device_and_its_mode(self, client, fake_saas):
+    def test_entering_again_from_it_keeps_the_device_and_its_mode(self, client, fake_saas, hub_a):
         fake_saas()
         enter(client)
-        device = TrustedDevice.objects.get()
-        TrustedDevice.objects.filter(pk=device.pk).update(mode=access.PERSONAL, name="Bar")
+        with use_hub(hub_a):
+            device = TrustedDevice.objects.get()
+            TrustedDevice.objects.filter(pk=device.pk).update(mode=access.PERSONAL, name="Bar")
         again = enter(client)
-        assert TrustedDevice.objects.count() == 1
-        device.refresh_from_db()
+        with use_hub(hub_a):
+            assert TrustedDevice.objects.count() == 1
+            device.refresh_from_db()
         assert (device.mode, device.name) == (access.PERSONAL, "Bar")
         assert device.token_digest == access.token_digest(device_cookie(again).value)
 
-    def test_a_browser_whose_device_was_removed_becomes_a_new_device(self, client, fake_saas):
+    def test_a_browser_whose_device_was_removed_becomes_a_new_device(self, client, fake_saas, hub_a):
         fake_saas()
         first = device_cookie(enter(client)).value
-        TrustedDevice.objects.all().delete()
+        with use_hub(hub_a):
+            TrustedDevice.objects.all().delete()
         second = device_cookie(enter(client)).value
         assert second != first
-        assert TrustedDevice.objects.get().token_digest == access.token_digest(second)
+        with use_hub(hub_a):
+            assert TrustedDevice.objects.get().token_digest == access.token_digest(second)
 
-    def test_another_browser_is_another_device(self, client, fake_saas):
+    def test_another_browser_is_another_device(self, client, fake_saas, hub_a):
         fake_saas()
         enter(client)
         enter(Client())
-        assert TrustedDevice.objects.count() == 2
+        with use_hub(hub_a):
+            assert TrustedDevice.objects.count() == 2
 
-    def test_the_session_s_note_says_on_which_device_and_with_the_account(self, client, fake_saas):
+    def test_the_session_s_note_says_on_which_device_and_with_the_account(self, client, fake_saas, hub_a):
         fake_saas()
         enter(client)
         owner = SessionOwner.objects.get()
-        assert (owner.device_id, owner.credential) == (TrustedDevice.objects.get().pk, SessionOwner.Credential.ACCOUNT)
+        with use_hub(hub_a):
+            device = TrustedDevice.objects.get()
+        assert (owner.device_id, owner.credential) == (device.pk, SessionOwner.Credential.ACCOUNT)
 
-    def test_a_demo_s_visitor_is_no_device_of_it(self, client, fake_saas, demo):
+    def test_a_demo_s_visitor_is_no_device_of_it(self, client, fake_saas, demo, hub_b):
         # A demo has no account behind it, nor a till to come back to with a PIN.
         fake_saas()
         response = callback(client, {"code": a_code(demo), "next": "/"}, host=host_of(demo))
         assert response.status_code == 302
         assert access.DEVICE_COOKIE not in response.cookies
-        assert not TrustedDevice.objects.exists()
+        with use_hub(hub_b):
+            assert not TrustedDevice.objects.exists()
 
 
 class TestHowLongTheSessionLasts:
@@ -100,18 +112,21 @@ class TestHowLongTheSessionLasts:
         enter(client)
         assert dt.timedelta(hours=11, minutes=59) < self.lasts(client) <= dt.timedelta(hours=12)
 
-    def test_thirty_days_on_a_personal_device(self, client, fake_saas):
+    def test_thirty_days_on_a_personal_device(self, client, fake_saas, hub_a):
         fake_saas()
         enter(client)
-        TrustedDevice.objects.update(mode=access.PERSONAL)
+        with use_hub(hub_a):
+            TrustedDevice.objects.update(mode=access.PERSONAL)
         enter(client)
         assert dt.timedelta(days=29, hours=23) < self.lasts(client) <= dt.timedelta(days=30)
 
-    def test_at_most_an_hour_when_the_business_always_asks(self, client, fake_saas):
+    def test_at_most_an_hour_when_the_business_always_asks(self, client, fake_saas, hub_a):
         fake_saas()
-        AccessSettings.objects.create(pin_policy=access.ALWAYS)
+        with use_hub(hub_a):
+            AccessSettings.objects.create(pin_policy=access.ALWAYS)
         enter(client)
-        TrustedDevice.objects.update(mode=access.PERSONAL)
+        with use_hub(hub_a):
+            TrustedDevice.objects.update(mode=access.PERSONAL)
         enter(client)
         assert dt.timedelta(minutes=59) < self.lasts(client) <= dt.timedelta(hours=1)
 

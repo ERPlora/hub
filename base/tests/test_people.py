@@ -210,12 +210,12 @@ class TestRemoveAPin:
         with_pin("saas:3")
         a_device(client)
         client.force_login(adam)
-        assert [face["name"] for face in door(client)["people"]] == ["Eva"]
+        assert [face["name"] for face in door(client, HOST)["people"]] == ["Eva"]
         response = post(client, "/people/pin/remove", {"person": "saas:3"})
         assert response.status_code == 200, response.content
         assert response.json()["ways"] == {"account": True, "pin": False, "badge": False}
         assert Credential.objects.get(username="saas:3").pin_hash == ""
-        assert door(client)["people"] == []
+        assert door(client, HOST)["people"] == []
         assert OutboxEvent.objects.filter(name="base.person.pin_removed").count() == 1
 
     def test_the_badge_stays(self, client, adam, eva):
