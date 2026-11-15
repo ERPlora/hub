@@ -14,17 +14,10 @@ from live.operations import registry
 from apps.printing.models import PrintJob
 from apps.sale.models import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from apps.sale.tests.test_integration_invoice import ISSUER
 
 pytestmark = HUB_DB
 
-ISSUER = {
-    "legal_name": "Bar Ana SL",
-    "tax_id": "B12345674",
-    "address": "Calle Mayor 1",
-    "postal_code": "28001",
-    "city": "Madrid",
-    "province": "Madrid",
-}
 CASH = [{"method": "cash", "tendered": 500}]
 
 

@@ -549,6 +549,23 @@ def in_turn(row, *calls) -> list:
     return outcomes
 
 
+def delete_page_while_held(row, hub_staff: Client) -> tuple[bool, object]:
+    """The Hub admin's delete page of ``row`` asked in another session while this one holds ``row`` locked: whether it
+    answered before this one let go, and its answer (an error raised is the answer)."""
+    meta = type(row)._meta
+    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
+    outcome: list = [None]
+    thread = in_a_thread(lambda: hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"), outcome)
+    with atomic():
+        list(type(row).objects.select_for_update().filter(pk=row.pk))
+        thread.start()
+        thread.join(WAIT_LIMIT)
+        answered = not thread.is_alive()
+    thread.join(30)
+    assert not isinstance(outcome[0], Exception), outcome[0]
+    return answered, outcome[0]
+
+
 def a_check(label: str = "", quantity: str = "2"):
     """An open check with two coffees on one line."""
     return run("sale.order.open", {"label": label, "lines": [{"product": "COF", "quantity": quantity}]})
@@ -632,19 +649,8 @@ def test_the_hub_admin_confirmation_page_of_a_check_a_write_holds_does_not_wait(
     """The check's delete page (a GET, before the staff confirm) does not lock the check: it answers while a
     write still holds it; only the confirmed deletion (a POST) waits for the write."""
     check = a_check()
-    meta = Order._meta
-    url = f"/admin/{meta.app_label}/{meta.model_name}/{check.id}/delete/"
-    outcome: list = [None]
-    thread = in_a_thread(lambda: hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"), outcome)
-    with atomic():
-        list(Order.objects.select_for_update().filter(pk=check.id))
-        thread.start()
-        thread.join(WAIT_LIMIT)
-        answered_while_held = not thread.is_alive()
-    thread.join(30)
+    answered_while_held, answer = delete_page_while_held(check, hub_staff)
     assert answered_while_held, "the delete page waited for the write that held the check"
-    [answer] = outcome
-    assert not isinstance(answer, Exception), answer
     assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
     assert Order.objects.filter(pk=check.id).exists()
 
@@ -894,19 +900,8 @@ def test_the_hub_admin_delete_page_of_a_row_a_write_holds_does_not_wait(coffee, 
     """The delete page of a department or a payment method (a GET, before the staff confirm) does not lock it: it
     answers while a write still holds it; only the confirmed deletion (a POST) waits for the write."""
     row = make()
-    meta = type(row)._meta
-    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
-    outcome: list = [None]
-    thread = in_a_thread(lambda: hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"), outcome)
-    with atomic():
-        list(type(row).objects.select_for_update().filter(pk=row.pk))
-        thread.start()
-        thread.join(WAIT_LIMIT)
-        answered_while_held = not thread.is_alive()
-    thread.join(30)
+    answered_while_held, answer = delete_page_while_held(row, hub_staff)
     assert answered_while_held, "the delete page waited for the write that held the row"
-    [answer] = outcome
-    assert not isinstance(answer, Exception), answer
     assert (answer.status_code, str(answer.context["title"])) == (200, "Delete")
     assert type(row).objects.filter(pk=row.pk).exists()
 
