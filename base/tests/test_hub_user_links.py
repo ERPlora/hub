@@ -3,7 +3,8 @@
 A staff record, its time off, a clock-in, a task, its comments and the WhatsApp inbox's assignments and messages hang
 from ``base.HubUser``, never from control's ``auth.User``: a key between two databases does not exist
 (``tests/test_guardrails.py``, «(h)»). So every app fits, every vertical's template holds its whole list, and the
-expand migrations that moved those links fill the new ones in the shared database and nothing in a hub's own.
+expand migrations that moved those links, run on a business's own database, find no control users to fill them from
+and no key to control's users to drop.
 """
 
 import datetime as dt
@@ -13,13 +14,15 @@ from types import SimpleNamespace
 import pytest
 from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import connection, connections
 from django.db.migrations.loader import MigrationLoader
 
 from base import catalog
 from base.models import HubUser
 from base.tenancy import inventory, migrator, names
+from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tests.test_auth_views import ON_HUB_A
 
 #: The apps whose links to control's users moved to ``base.HubUser``, and those that waited for them.
 PEOPLE_APPS = {"staff", "attendance", "task", "whatsapp_inbox"}
@@ -169,69 +172,43 @@ def _migration(app: str, name: str):
     return importlib.import_module(f"apps.{app}.migrations.{name}")
 
 
-@pytest.mark.django_db
+def _keys(database, table: str) -> dict[str, str]:
+    """The foreign keys of ``table`` in ``database``: each one's name and the table it points to."""
+    with database.cursor() as cursor:
+        constraints = database.introspection.get_constraints(cursor, table)
+    return {key: details["foreign_key"][0] for key, details in constraints.items() if details["foreign_key"]}
+
+
 @pytest.mark.parametrize(("app", "name", "previous", "links"), EXPANDS, ids=[expand[0] for expand in EXPANDS])
 class TestTheExpand:
-    def _rows(self, historical, app, links, user):
-        """One row per old link of ``app``, named by control's ``user``, made through the historical models."""
-        return {(model, old): _row(historical, app, model, old, user) for model, old, _new, _column in links}
+    """Each expand migration runs on a business's own database, which holds no control users: nothing to fill from
+    them and no key to them to drop. Here it runs on the hub's own alias, inside the test's transaction, which sees the
+    test's rows and takes back whatever it would change; the migrator's alias reaches the same database."""
 
-    def test_it_fills_the_new_links_with_each_control_user_s_person(self, app, name, previous, links):
-        historical = _before_the_new_links_take_their_names(app, name, previous)
-        ana = get_user_model().objects.create_user(
-            username="saas:0199c4b0-0000-7000-8000-00000000a0a0", first_name="Ana", email="ana@example.com"
-        )
-        rows = self._rows(historical, app, links, ana)
+    pytestmark = ON_HUB_A
 
-        _migration(app, name).link_hub_users(historical, SimpleNamespace(connection=connection))
-
-        person = HubUser.objects.get(username=ana.username)
-        assert (str(person.account_id), person.name, person.email) == (ana.username[5:], "Ana", "ana@example.com")
-        for model, old, new, _column in links:
-            row = historical.get_model(app, model).objects.get(pk=rows[(model, old)].pk)
-            assert getattr(row, f"{new}_id") == person.pk, (model, old)
-
-    def test_a_person_the_database_already_has_is_used_again(self, app, name, previous, links):
-        historical = _before_the_new_links_take_their_names(app, name, previous)
-        ana = get_user_model().objects.create_user(username="saas:x", first_name="Ana")
-        known = HubUser.objects.create(username="saas:x", name="Ana from the photo")
-        self._rows(historical, app, links, ana)
-
-        _migration(app, name).link_hub_users(historical, SimpleNamespace(connection=connection))
-
-        assert list(HubUser.objects.values_list("pk", "name")) == [(known.pk, "Ana from the photo")]
-
-    def test_a_hub_s_own_database_has_nothing_to_fill(self, app, name, previous, links, monkeypatch):
+    def test_a_hub_s_own_database_has_nothing_to_fill(self, app, name, previous, links, hub_a):
         historical = _before_the_new_links_take_their_names(app, name, previous)
         ana = get_user_model().objects.create_user(username="saas:x")
-        self._rows(historical, app, links, ana)
-        migration = _migration(app, name)
-        monkeypatch.setattr(migration.router, "allow_migrate_model", lambda alias, model: False)
+        with use_hub(hub_a):
+            rows = {(model, old): _row(historical, app, model, old, ana) for model, old, _new, _column in links}
 
-        migration.link_hub_users(historical, SimpleNamespace(connection=connection))
+        _migration(app, name).link_hub_users(historical, SimpleNamespace(connection=connections[hubs.HUB_A_ALIAS]))
 
-        assert not HubUser.objects.exists()
+        with use_hub(hub_a):
+            assert not HubUser.objects.exists()
+            for model, old, new, _column in links:
+                row = historical.get_model(app, model).objects.get(pk=rows[(model, old)].pk)
+                assert getattr(row, f"{new}_id") is None, (model, old)
 
-    def test_it_drops_the_old_columns_keys_to_control_s_users(self, app, name, previous, links):
-        # A database migrated before these links moved to HubUser has those columns; the tests' one, made by this
-        # history, does not.
+    def test_a_hub_s_own_database_keeps_its_own_keys(self, app, name, previous, links, hub_a):
         historical = _before_the_new_links_take_their_names(app, name, previous)
-        users = get_user_model()._meta.db_table
-        for model, _old, _new, column in links:
-            table = historical.get_model(app, model)._meta.db_table
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f'ALTER TABLE "{table}" ADD CONSTRAINT "{table}_{column}_w10_fk" FOREIGN KEY ("{column}") '
-                    f'REFERENCES "{users}" ("id") DEFERRABLE INITIALLY DEFERRED'
-                )
+        database = connections[hubs.HUB_A_ALIAS]
+        tables = {historical.get_model(app, model)._meta.db_table for model, _old, _new, _column in links}
+        before = {table: _keys(database, table) for table in tables}
 
-        with connection.schema_editor() as editor:
+        with database.schema_editor() as editor:
             _migration(app, name).drop_keys_to_control_users(historical, editor)
 
-        for model, _old, _new, column in links:
-            table = historical.get_model(app, model)._meta.db_table
-            with connection.cursor() as cursor:
-                keys = connection.introspection.get_constraints(cursor, table)
-            assert not [
-                key for key, details in keys.items() if details["foreign_key"] and details["foreign_key"][0] == users
-            ], table
+        assert {table: _keys(database, table) for table in tables} == before
+        assert all("base_hubuser" in keys.values() for keys in before.values()), before
