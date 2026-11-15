@@ -20,7 +20,6 @@ from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noq
 from apps.whatsapp_inbox.tests.test_template_header_file import upload
 
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
 from .conftest import A, HUB_DB, ctx_for, run, whatsapp_connected
 

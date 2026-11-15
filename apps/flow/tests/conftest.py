@@ -23,8 +23,9 @@ from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
 from base.tenancy.context import current_alias
-from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
-from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+# The marks, scopes and fixtures of the businesses' own databases, for these tests to take from here.
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a  # noqa: F401
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room  # noqa: F401
 
 MADRID = dt.timezone(dt.timedelta(hours=2))
 #: The frozen «now» of a test that sets the clock: noon of 15 October 2026 in Madrid.

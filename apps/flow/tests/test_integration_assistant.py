@@ -23,7 +23,6 @@ from apps.flow.tests.conftest import HUB_DB, ctx_for, make_draft, make_flow, mak
 from base import assistant
 from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
 from base.tests.test_assistant_card_values import AN_ID
 

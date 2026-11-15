@@ -105,7 +105,7 @@ def test_what_the_business_does_not_have_is_refused_by_field():
 
 def test_an_event_or_a_step_of_an_app_that_is_off_says_so_and_how_to_bring_it_back(django_capture_on_commit_callbacks):
     """Off is not «does not exist» (hub#1054): the refusal names the app and says where it is turned on."""
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("base.app.disable", {"app": "task"})
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", {"trigger": {"kind": "event", "event": "task.task.created"}, "steps": [TASK_STEP]})

@@ -15,7 +15,6 @@ from apps.flow.models import Draft, Flow, FlowRun, Question
 from base.models import Membership
 from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
 from .conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run, run
 

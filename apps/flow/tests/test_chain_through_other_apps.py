@@ -9,7 +9,6 @@ doing anything, as it is in a direct chain.
 The real apps and the worker's relay (``base.relay.run``), which hands every event over as it does every tick.
 """
 
-import pytest
 from live.context import system_context
 from live.models import OutboxEvent
 

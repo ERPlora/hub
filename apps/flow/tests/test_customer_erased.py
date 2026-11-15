@@ -28,7 +28,6 @@ from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.schemas import RunRefIn
 from apps.task.models import Task
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 

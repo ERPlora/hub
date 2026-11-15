@@ -9,7 +9,6 @@ import datetime as dt
 import uuid
 from zoneinfo import ZoneInfo
 
-import pytest
 from live.models import OutboxEvent
 from live.operations import get
 

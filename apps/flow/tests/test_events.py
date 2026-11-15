@@ -4,7 +4,6 @@ operation, as the worker's outbox relay does.
 
 import re
 
-import pytest
 from live.context import system_context
 from live.models import OutboxEvent
 from live.operations import NAME_RE
