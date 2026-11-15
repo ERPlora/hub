@@ -9,12 +9,12 @@ from django.utils import translation
 from live.context import system_context
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.conftest import A, B, IN_HUBS, ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import A, B, HUB_DB, ISSUER, ctx_for, run
 from base import operations as base_operations
 from base.models import Hub
 from base.tenancy.context import use_hub
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",

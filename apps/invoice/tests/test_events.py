@@ -11,7 +11,7 @@ from live.models import OutboxEvent
 from live.operations import NAME_RE, registry
 
 from apps.invoice import events
-from apps.invoice.tests.conftest import A, IN_HUBS, deliver, run
+from apps.invoice.tests.conftest import A, HUB_DB, deliver, run
 from apps.sale.models import Sale
 
 PAST_FACT = re.compile(r"^invoice\.[a-z_]+\.([a-z_]+ed|paid)$")
@@ -56,7 +56,7 @@ def test_an_event_it_does_not_react_to_is_ignored():
     assert events.react(A, "sale.order.opened", {"order_id": "x"}) is None
 
 
-@IN_HUBS
+@HUB_DB
 def test_a_reaction_runs_as_the_system_and_refuses_what_does_not_exist():
     with pytest.raises(NotFound):
         events.react(
@@ -72,7 +72,7 @@ def test_a_reaction_runs_as_the_system_and_refuses_what_does_not_exist():
         )
 
 
-@IN_HUBS
+@HUB_DB
 def test_a_refund_of_a_sale_without_its_invoice_waits_for_it(charge, product):
     # Charged without an issuer, the sale has no document yet (INVOICE-F06).
     product()

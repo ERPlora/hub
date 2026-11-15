@@ -13,9 +13,9 @@ from django.utils import translation
 from live.operations import atomic
 
 from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries, Issuer
-from apps.invoice.tests.conftest import IN_HUBS
+from apps.invoice.tests.conftest import HUB_DB
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 TODAY = dt.date(2026, 10, 14)
 

@@ -18,7 +18,7 @@ from apps.invoice.models import (
     InvoiceType,
     Issuer,
 )
-from apps.invoice.tests.conftest import A, IN_HUBS, ctx_for, run
+from apps.invoice.tests.conftest import A, HUB_DB, ctx_for, run
 from base import assistant
 from base.tests.po import (
     catalogue_key,
@@ -93,7 +93,7 @@ def test_spanish_texts():
         assert str(queries.DOC_SIMPLIFIED) == "Factura simplificada"
 
 
-@IN_HUBS
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
     client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
@@ -166,7 +166,7 @@ def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_th
         ) == ("NIF", "Domicilio"), name
 
 
-@IN_HUBS
+@HUB_DB
 def test_the_printed_breakdown_says_exempt_and_not_subject_as_the_invoice_screen_does(issuer):
     """The A4 paper's breakdown (INVOICE-F18) in Spanish: an exempt line «Exento» and one not subject «No sujeto», as
     the invoice's screen says them, never taxes' «Exenta» and «No sujeta»."""

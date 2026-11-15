@@ -135,9 +135,9 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT. A flush between transactional tests empties Taxes'
-# factory catalogue (seeded by its migrations): `factory_data` plants it again.
+# factory catalogue (seeded by its migrations): `factory_data` and `factory_data_b` plant it again.
 @pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("factory_data")
+@pytest.mark.usefixtures("factory_data", "factory_data_b")
 def test_a_charge_in_hub_b_re_runs_the_panels_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     in_b = ctx_for(scope=B)

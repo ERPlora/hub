@@ -10,10 +10,10 @@ from django.utils import translation
 from live.errors import Conflict, OperationError, PermissionDenied
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import IN_HUBS, ctx_for, run
+from apps.invoice.tests.conftest import HUB_DB, ctx_for, run
 from apps.invoice.tests.test_services import MADRID, at, events, manual
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 
 # ── Numbering (INVOICE-F11) ─────────────────────────────────────────────────────────────────────

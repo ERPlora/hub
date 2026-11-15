@@ -10,11 +10,11 @@ import time
 import pytest
 from django.db import connections
 
-from apps.invoice.tests.conftest import at_once, plan_with_room  # noqa: F401 (plan_with_room: a fixture)
 from apps.verifactu import gateway
 from apps.verifactu.models import Record
 from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, answering, manual, run
 from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once
 
 # Business A on a plan with room for the sessions of the test at once: Free's lets one transaction in at a time, and
 # the devices would queue for it instead of racing for the chain's row locks.

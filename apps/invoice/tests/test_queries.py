@@ -9,9 +9,9 @@ import pytest
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import IN_HUBS, ctx_for, run
+from apps.invoice.tests.conftest import HUB_DB, ctx_for, run
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",

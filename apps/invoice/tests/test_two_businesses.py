@@ -7,12 +7,12 @@ of ``hub_b`` is numbered and kept in ``hub_b``'s database alone, never in ``hub_
 import pytest
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import B, IN_HUBS, ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import B, HUB_DB, ISSUER, ctx_for, run
 from base.tenancy import context
 from base.tenancy.context import HubContextMismatch, use_hub
 from base.tenancy.tests import hubs
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 LINE = {"description": "Haircut course", "quantity": "1", "unit_price": 5000, "tax_rate": "21"}
 RECIPIENT = {
