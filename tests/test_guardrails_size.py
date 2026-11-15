@@ -15,9 +15,11 @@ change but never grows past its number, the change that shrinks it lowers the nu
 list once it fits its cap, and compared with the list where the branch left origin/main it gains no path and raises no
 number. Two paths may enter it: a ``services.py``, ``queries.py`` or ``schemas.py`` moved whole to
 ``<name>/__init__.py`` takes its number along, and when a cap comes down the files already over it where the branch
-left origin/main enter at most at their size there.
+left origin/main enter at most at their size there. The caps only come down too: against that same point none rises
+and no measured suffix stops being measured.
 """
 
+import ast
 import functools
 import re
 import subprocess
@@ -28,6 +30,8 @@ import pytest
 from allow_list_base import REPO, comparison_point, file_at_base, git
 
 ALLOW_FILE = ".file-size-allow"
+SELF = "tests/test_guardrails_size.py"
+BASE_NAME = "where the branch left origin/main"
 
 SCRIPT_CAPS = (300, 500)
 OTHER_CAPS = (1000, 1500)
@@ -195,6 +199,41 @@ def sizes_at_base(paths: Iterable[str], repo: Path = REPO) -> dict[str, int]:
     return sizes
 
 
+def caps_in(source: str) -> dict[str, tuple[int, int]] | None:
+    """The ``CAPS`` table as ``source``, the text of this test, sets it; None when it has no such table."""
+    pairs: dict[str, tuple[int, int]] = {}
+    for node in ast.parse(source).body:
+        if not isinstance(node, ast.Assign) or not isinstance(node.targets[0], ast.Name):
+            continue
+        if node.targets[0].id == "CAPS":
+            return {
+                key.value: pairs[value.id] if isinstance(value, ast.Name) else ast.literal_eval(value)
+                for key, value in zip(node.value.keys, node.value.values, strict=True)
+            }
+        if isinstance(node.value, ast.Tuple):
+            pairs[node.targets[0].id] = ast.literal_eval(node.value)
+    return None
+
+
+def base_caps(repo: Path = REPO) -> dict[str, tuple[int, int]] | None:
+    """The caps where the branch left origin/main, or None while this test had no caps by language there."""
+    source = file_at_base(SELF, repo)
+    return None if source is None else caps_in(source)
+
+
+def raised_caps(caps: dict[str, tuple[int, int]], before: dict[str, tuple[int, int]]) -> list[str]:
+    """Caps above the ones at the comparison point, and suffixes it measured that are no longer measured."""
+    found = []
+    for suffix, then in before.items():
+        if suffix not in caps:
+            found.append(f"{suffix}: no longer measured, capped {BASE_NAME}")
+            continue
+        for kind, now, was in zip(("production", "test"), caps[suffix], then, strict=True):
+            if now > was:
+                found.append(f"{suffix}: {kind} cap {now}, {was} {BASE_NAME}")
+    return found
+
+
 def base_ceilings() -> dict[str, int] | None:
     """The list where the branch left origin/main, or None where there was no list yet (the commit that brings it)."""
     text = file_at_base(ALLOW_FILE)
@@ -241,6 +280,14 @@ def test_the_allow_list_never_gains_a_path_nor_raises_a_number():
     ceilings = current_ceilings()
     found = loosened(ceilings, before, sizes_at_base(path for path in ceilings if path not in before))
     assert not found, "The allow list only shrinks:\n" + "\n".join(found)
+
+
+def test_no_cap_rises_against_main():
+    before = base_caps()
+    if before is None:
+        pytest.skip("this test had no caps by language where the branch left origin/main: this is the commit that brings them")
+    found = raised_caps(CAPS, before)
+    assert not found, "A cap only comes down:\n" + "\n".join(found)
 
 
 def test_every_exception_points_to_the_issue_that_tracks_splitting_the_files():
@@ -428,6 +475,25 @@ def test_an_exception_that_points_to_another_issue_is_reported():
     ]
 
 
+def test_a_cap_may_not_rise_nor_stop_being_measured():
+    before = {".py": (500, 1000), ".ts": (300, 500), ".js": (300, 500), ".sh": (100, 1500)}
+    caps = {".py": (501, 1000), ".ts": (300, 501), ".js": (299, 400), ".css": (1000, 1500)}
+    assert raised_caps(caps, before) == [
+        ".py: production cap 501, 500 where the branch left origin/main",
+        ".ts: test cap 501, 500 where the branch left origin/main",
+        ".sh: no longer measured, capped where the branch left origin/main",
+    ]
+    assert raised_caps(before, before) == []
+
+
+def test_the_caps_are_read_from_the_source_of_this_test():
+    assert caps_in(Path(__file__).read_text(encoding="utf-8")) == CAPS
+
+
+def test_a_source_without_caps_by_language_has_none_to_compare():
+    assert caps_in("PRODUCTION_LIMIT = 1000\nTEST_LIMIT = 1500\n") is None
+
+
 def run_git(repo: Path, *args: str) -> None:
     """Git in a scratch repository, without the machine's hooks or signing."""
     command = ["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "user.name=t"]
@@ -458,3 +524,12 @@ def test_the_sizes_where_the_branch_left_main_are_read_there(tmp_path):
     run_git(tmp_path, "checkout", "-q", "-b", "work")
     commit_files(tmp_path, {"base/models.py": "a\n" * 700, "base/admin.py": "a\n"})
     assert sizes_at_base(["base/models.py", "base/admin.py", "base/gone.py"], tmp_path) == {"base/models.py": 600}
+
+
+def test_the_caps_where_the_branch_left_main_are_read_there(tmp_path):
+    run_git(tmp_path, "init", "-q", "-b", "main")
+    commit_files(tmp_path, {SELF: 'BOTH = (500, 1000)\nCAPS = {".py": BOTH, ".sh": (100, 1500)}\n'})
+    run_git(tmp_path, "update-ref", "refs/remotes/origin/main", "HEAD")
+    run_git(tmp_path, "checkout", "-q", "-b", "work")
+    commit_files(tmp_path, {SELF: 'CAPS = {".py": (600, 1000)}\n'})
+    assert base_caps(tmp_path) == {".py": (500, 1000), ".sh": (100, 1500)}
