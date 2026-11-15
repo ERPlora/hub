@@ -12,20 +12,20 @@ import-linter checks the contracts of pyproject.toml's ``[tool.importlinter]`` (
 
 Tests are out of every contract (``**.tests.** -> **``): they may import whatever they check. What broke a contract
 when it came in is frozen in that contract's ``ignore_imports``, which import-linter fails as soon as an entry matches
-no import any more, and compared with where the branch left origin/main the frozen imports gain no entry. One change
-may carry entries along: a module moved whole into its package (``base/services.py`` to ``base/services/``) takes its
-frozen imports with it, now from or to its submodules.
+no import any more, and compared with where the branch left origin/main the frozen imports gain no entry between two
+modules that had none. An entry may follow its code: when part of a frozen module moves into a submodule of its own
+(``base/services/__init__.py`` into ``base/services/relay.py``), ``base.relay -> base.services`` may become, or come
+with, ``base.relay -> base.services.relay``. It is the same dependency between the same two siblings.
 """
 
 import json
 import subprocess
 import sys
 import tomllib
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from allow_list_base import REPO, comparison_point, file_at_base, git
+from allow_list_base import REPO, file_at_base
 from django.apps import apps as django_apps
 
 CONFIG = "pyproject.toml"
@@ -150,11 +150,11 @@ def frozen(config: dict) -> dict[str, set[str]]:
     }
 
 
-def carried(entry: str, before: set[str], was_module: Callable[[str], bool]) -> bool:
-    """Whether ``entry`` is one of ``before`` whose module, a plain module then, moved whole into its package."""
+def carried(entry: str, before: set[str]) -> bool:
+    """Whether ``entry`` joins the modules of one of ``before``, or submodules of them its code moved into."""
 
     def within(module: str, frozen_module: str) -> bool:
-        return module == frozen_module or (module.startswith(f"{frozen_module}.") and was_module(frozen_module))
+        return module == frozen_module or module.startswith(f"{frozen_module}.")
 
     importer, imported = entry.split(" -> ")
     return any(
@@ -163,19 +163,13 @@ def carried(entry: str, before: set[str], was_module: Callable[[str], bool]) -> 
     )
 
 
-def gained(now: dict[str, set[str]], before: dict[str, set[str]], was_module: Callable[[str], bool]) -> list[str]:
-    """The frozen imports ``now`` holds that ``before`` did not, leaving out those a moved module carried along."""
+def gained(now: dict[str, set[str]], before: dict[str, set[str]]) -> list[str]:
+    """The frozen imports ``now`` holds that ``before`` did not, leaving out those that followed their code."""
     found = []
     for contract, entries in sorted(now.items()):
         old = before.get(contract, set())
-        found += [f"{contract}: {entry}" for entry in sorted(entries - old) if not carried(entry, old, was_module)]
+        found += [f"{contract}: {entry}" for entry in sorted(entries - old) if not carried(entry, old)]
     return found
-
-
-def module_file_at_base(module: str) -> bool:
-    """Whether ``module`` was a plain ``.py`` module, not a package, where the branch left origin/main."""
-    path = f"{module.replace('.', '/')}.py"
-    return git(REPO, "cat-file", "-e", f"{comparison_point()}:{path}").returncode == 0
 
 
 def test_every_import_contract_is_kept():
@@ -195,6 +189,8 @@ def test_base_and_the_cycles_keep_their_contracts_and_the_tests_stay_out():
     config = current_config()
     contracts = contracts_by_id(config)
     assert config["root_packages"] == ROOT_PACKAGES
+    # Any other setting, like leaving out the imports under TYPE_CHECKING, would take imports out of every contract.
+    assert set(config) == {"root_packages", "contracts"}
     base, cycles = base_contract(), cycles_contract()
     for key in ("type", "source_modules", "forbidden_modules", "allow_indirect_imports"):
         assert contracts[BASE_CONTRACT][key] == base[key], key
@@ -211,7 +207,7 @@ def test_the_frozen_imports_never_gain_an_entry():
     before = importlinter_config(text) if text is not None else None
     if before is None:
         pytest.skip(NO_CONTRACTS_AT_BASE)
-    assert gained(frozen(current_config()), frozen(before), module_file_at_base) == [], (
+    assert gained(frozen(current_config()), frozen(before)) == [], (
         "The frozen imports only shrink: remove the import instead of freezing it."
     )
 
@@ -237,23 +233,30 @@ def test_a_changed_requires_or_a_new_app_without_its_contract_is_reported():
 def test_an_entry_new_to_a_contract_is_gained_and_the_tests_exemption_never_is():
     before = {"cycles": {"base.a -> base.b"}}
     now = {"cycles": {"base.a -> base.b", "base.c -> base.d"}, "app-x": set()}
-    assert gained(now, before, lambda module: True) == ["cycles: base.c -> base.d"]
+    assert gained(now, before) == ["cycles: base.c -> base.d"]
     config = {"contracts": [{"id": "app-x", "ignore_imports": [TESTS_OUT, "apps.x.api ->  apps.y"]}]}
     assert frozen(config) == {"app-x": {"apps.x.api -> apps.y"}}
 
 
-def test_a_module_moved_whole_into_its_package_carries_its_frozen_imports():
+def test_a_frozen_import_follows_its_code_into_the_submodules_of_its_modules():
     before = {"cycles": {"base.relay -> base.services", "base.services -> base.middleware"}}
-    now = {"cycles": {"base.relay -> base.services.relay", "base.services.usage -> base.middleware"}}
-    assert gained(now, before, lambda module: module == "base.services") == []
+    now = {
+        "cycles": {
+            "base.relay -> base.services",
+            "base.relay -> base.services.relay",
+            "base.services.usage -> base.middleware",
+        }
+    }
+    assert gained(now, before) == []
 
 
-def test_a_package_frozen_whole_or_another_module_carries_nothing():
-    before = {"cycles": {"base.relay -> base.tenancy"}}
-    now = {"cycles": {"base.relay -> base.tenancy.move", "base.usage -> base.tenancy"}}
-    assert gained(now, before, lambda module: False) == [
-        "cycles: base.relay -> base.tenancy.move",
-        "cycles: base.usage -> base.tenancy",
+def test_another_module_a_longer_name_or_the_package_above_carries_nothing():
+    before = {"cycles": {"base.relay -> base.tenancy.move"}}
+    now = {"cycles": {"base.usage -> base.tenancy.move", "base.relay -> base.tenancy.moves", "base.relay -> base.tenancy"}}
+    assert gained(now, before) == [
+        "cycles: base.relay -> base.tenancy",
+        "cycles: base.relay -> base.tenancy.moves",
+        "cycles: base.usage -> base.tenancy.move",
     ]
 
 
