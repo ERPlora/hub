@@ -44,6 +44,7 @@ dev = [
     "pytest-split>=0.11",
     "ruff>=0.17.5",
     "import-linter>=2.16",
+    "complexipy>=9.0.0",
 ]
 
 # ruff checks how big and how branchy each function is, and the common mistakes of the rule families E4, E7, E9, F, B
@@ -153,6 +154,15 @@ max-statements = 50
 "tests/packaged_doors/apps/shop/queries/__init__.py" = ["F401"]
 "tests/packaged_doors/apps/shop/services/__init__.py" = ["F401"]
 "tests/test_guardrails_permissions.py" = ["F601"]
+
+# complexipy (`uv run complexipy`; tests/test_guardrails_complexity.py runs it): no function's cognitive complexity
+# goes over 15, and no ignore comment switches that off. complexipy-snapshot.json froze the functions over it when it
+# came in: it only shrinks. Migrations are generated, and the live and ui submodules are checked in their own repos.
+[tool.complexipy]
+paths = ["."]
+exclude = ["**/migrations/**", "packages/**"]
+max-complexity-allowed = 15
+no-ignore = true
 
 # import-linter (`uv run lint-imports`; tests/test_guardrails_imports.py runs it): each app imports only itself, base,
 # live and the apps its LiveAppConfig requires, base imports no app, and no sibling modules import each other in a

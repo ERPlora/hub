@@ -12,6 +12,7 @@ uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # d
 uv run python manage.py runserver    # Django en a.localhost:8000 y Vite (`pnpm run dev`)
 uv run pytest -q                     # Postgres de compose.yaml (`docker compose up -d`)
 uv run lint-imports                  # cada app importa solo lo que requiere; contratos en pyproject.toml (la suite lo corre)
+uv run complexipy                    # complejidad cognitiva ≤ 15; lo de antes, congelado en complexipy-snapshot.json (la suite lo corre)
 ```
 
 `DEBUG` está apagado si no se define: sin `DEBUG=True` en `.env` (o en el entorno), los ajustes
