@@ -9,12 +9,12 @@ the asks and the guard that no ask copies a probe of layer 2.
 import json
 
 import pytest
-from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room, comparable, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
@@ -65,14 +65,14 @@ def test_the_hub_reads_desactivar_as_a_deactivation_and_pido_as_a_request():
     «pido» or «una solicitud» what ``staff.time_off.request`` records, so the owner's words reach those tools, whose
     actions no verb of the assistant reads; without the Hub's groups, none of them does (positive control)."""
     deactivate, request = shared.stem("deactivate"), shared.stem("request")
-    for phrase, wanted in (
-        ("desactiva a Pablo", deactivate),
-        ("pido el viernes libre", request),
-        ("mira mi solicitud de vacaciones", request),
-    ):
-        concepts = shared.asked([phrase], apps.get_app_config("staff").assistant_synonyms).concepts
-        assert any(wanted in concept for concept in concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "staff",
+        [
+            ("desactiva a Pablo", deactivate),
+            ("pido el viernes libre", request),
+            ("mira mi solicitud de vacaciones", request),
+        ],
+    )
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

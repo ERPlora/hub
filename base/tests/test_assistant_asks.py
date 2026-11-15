@@ -25,6 +25,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.assistant_qa import Miss, misses, report, uncovered
@@ -193,6 +194,17 @@ def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", *
     return [
         op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.ranking(tools), **ranking})
     ]
+
+
+def assert_its_words_name(label: str, cases: Iterable[tuple[str, str]]) -> None:
+    """That in each ``(phrase, stem)`` of ``cases`` the words app ``label`` declares (its ``assistant_synonyms``) name
+    ``stem``, and that neither the platform's own words (``base.assistant.SYNONYMS``) nor live alone do: the app's words
+    are what names it."""
+    own = apps.get_app_config(label).assistant_synonyms
+    for phrase, wanted in cases:
+        assert any(wanted in concept for concept in shared.asked([phrase], own).concepts), phrase
+        for without in (assistant.SYNONYMS, ()):
+            assert not any(wanted in concept for concept in shared.asked([phrase], without).concepts), phrase
 
 
 def place_in(offered: list[str], name: str) -> int | None:

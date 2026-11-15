@@ -9,12 +9,12 @@ Every ask of every tool of whatsapp_inbox bringing its tool among the first ten,
 import json
 
 import pytest
-from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
 from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
@@ -119,16 +119,16 @@ def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message(
     """The inbox's own words (its ``assistant_synonyms``): a «plantilla» and a «mensaje» are what an English «template»
     and «message» are, the inbox's (``whatsapp_inbox.template``, ``whatsapp_inbox.message``, the only ones a tool of the
     Hub acts on); without the Hub's groups, Spanish names neither (positive control)."""
-    own_words = apps.get_app_config("whatsapp_inbox").assistant_synonyms
     template, message = shared.stem("template"), shared.stem("message")
-    for phrase, wanted in (
-        ("borra la plantilla de bienvenida", template),
-        ("¿qué plantillas tengo aprobadas?", template),
-        ("reenvía el mensaje de Nuria", message),
-        ("¿han leído nuestros mensajes?", message),
-    ):
-        assert any(wanted in concept for concept in shared.asked([phrase], own_words).concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "whatsapp_inbox",
+        [
+            ("borra la plantilla de bienvenida", template),
+            ("¿qué plantillas tengo aprobadas?", template),
+            ("reenvía el mensaje de Nuria", message),
+            ("¿han leído nuestros mensajes?", message),
+        ],
+    )
 
 
 test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups = by_group_test(BY_GROUP)

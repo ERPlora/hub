@@ -14,13 +14,13 @@ import re
 from pathlib import Path
 
 import pytest
-from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
 from base.tests.test_assistant_asks import probe_phrases
@@ -314,15 +314,16 @@ def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_a
     """Services' own words (its ``assistant_synonyms``): «el bono» names Services' voucher, the one of the catalogue and
     the one sold (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's
     assignment to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
-    for phrase, wanted in (
-        ("anula el bono de Marta", "grant"),
-        ("¿qué bonos ofrecemos?", "package"),
-        ("asigna los peinados a Lucas", "assignment"),
-        ("cambia la asignación de Lucas", "assignment"),
-    ):
-        concepts = shared.asked([phrase], apps.get_app_config("service").assistant_synonyms).concepts
-        assert any(shared.stem(wanted) in concept for concept in concepts), phrase
-        assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
+    grant, package, assignment = shared.stem("grant"), shared.stem("package"), shared.stem("assignment")
+    assert_its_words_name(
+        "service",
+        [
+            ("anula el bono de Marta", grant),
+            ("¿qué bonos ofrecemos?", package),
+            ("asigna los peinados a Lucas", assignment),
+            ("cambia la asignación de Lucas", assignment),
+        ],
+    )
 
 
 #: Requests in the owner's words that are neither an ask nor a probe of layer 2: each brings its tool among the first

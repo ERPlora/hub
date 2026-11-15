@@ -10,13 +10,13 @@ over the asks and the guard that no ask copies a probe of layer 2.
 import re
 
 import pytest
-from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
+    assert_its_words_name,
     TOP,
     assert_offered_with_room,
     comparable,
@@ -97,16 +97,16 @@ def test_the_hub_reads_an_arqueo_as_a_count_and_the_moneda_as_the_currency():
     (``cash_register.currency``), so the person's words reach those tools without their own asks; without the Hub's
     groups, none does (positive control)."""
     count, currency = shared.stem("count"), shared.stem("currency")
-    for phrase, wanted in (
-        ("haz el arqueo del cajón", count),
-        ("¿hay algún recuento de cierre?", count),
-        ("apunta el conteo de la mañana", count),
-        ("¿en qué moneda trabaja el negocio?", currency),
-        ("¿cuál es la divisa del negocio?", currency),
-    ):
-        concepts = shared.asked([phrase], apps.get_app_config("cash_register").assistant_synonyms).concepts
-        assert any(wanted in concept for concept in concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "cash_register",
+        [
+            ("haz el arqueo del cajón", count),
+            ("¿hay algún recuento de cierre?", count),
+            ("apunta el conteo de la mañana", count),
+            ("¿en qué moneda trabaja el negocio?", currency),
+            ("¿cuál es la divisa del negocio?", currency),
+        ],
+    )
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role

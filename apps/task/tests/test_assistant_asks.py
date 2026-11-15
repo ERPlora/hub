@@ -11,13 +11,13 @@ import json
 from pathlib import Path
 
 import pytest
-from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import comparable, probe_phrases
 from base.tests.test_assistant_asks import probes_test, reported_test
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
@@ -77,16 +77,15 @@ def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentari
     and «comenta» name what Tasks' operations are of (``task.task``, ``task.project``, ``task.comment``), so the owner's
     words reach those tools by their entity and not only by the words of their asks; the platform's own words
     (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive control)."""
-    for phrase, wanted in (
-        ("borra la tarea de colgar el cartel", "task"),
-        ("¿qué proyectos tenemos?", "project"),
-        ("comenta que el técnico viene el lunes", "comment"),
-    ):
-        concepts = shared.asked([phrase], apps.get_app_config("task").assistant_synonyms).concepts
-        assert any(shared.stem(wanted) in concept for concept in concepts), phrase
-        platform = shared.asked([phrase], assistant.SYNONYMS).concepts
-        assert not any(shared.stem(wanted) in concept for concept in platform), phrase
-        assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
+    task, project, comment = shared.stem("task"), shared.stem("project"), shared.stem("comment")
+    assert_its_words_name(
+        "task",
+        [
+            ("borra la tarea de colgar el cartel", task),
+            ("¿qué proyectos tenemos?", project),
+            ("comenta que el técnico viene el lunes", comment),
+        ],
+    )
 
 
 def test_the_guests_of_a_table_are_no_comment():

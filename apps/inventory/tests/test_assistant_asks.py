@@ -7,12 +7,11 @@ the asks and the guard that no ask copies a probe of layer 2.
 """
 
 import pytest
-from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, registry
 
-from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
@@ -54,15 +53,14 @@ def test_the_hub_reads_units_as_units_and_a_delivery_note_as_goods_received():
     own words (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive
     control)."""
     unit, receive = shared.stem("unit"), shared.stem("receive")
-    for phrase, wanted in (
-        ("¿qué unidades tengo configuradas?", unit),
-        ("registra el albarán del proveedor", receive),
-        ("entran 20 cafés más", receive),
-    ):
-        concepts = shared.asked([phrase], apps.get_app_config("inventory").assistant_synonyms).concepts
-        assert any(wanted in concept for concept in concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "inventory",
+        [
+            ("¿qué unidades tengo configuradas?", unit),
+            ("registra el albarán del proveedor", receive),
+            ("entran 20 cafés más", receive),
+        ],
+    )
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
