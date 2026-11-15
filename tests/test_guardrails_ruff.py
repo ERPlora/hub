@@ -11,8 +11,8 @@ entry per file with the rules it breaks. An entry that no longer silences anythi
 branch left origin/main, the entries gain no file-and-rule pair and no frozen rule is broken more often, counted per
 rule wherever its code moved: the list only shrinks. An entry may follow its code into the package of the same name
 (``base/schemas.py`` into ``base/schemas/__init__.py`` or ``base/schemas/money.py``) or into flat siblings named after
-it (``test_services.py`` into ``test_services_payments.py``). The ``noqa`` markers that name one of these rules only
-shrink too, per rule, wherever they moved.
+it (``test_services.py`` into ``test_services_payments.py``). The ``noqa`` markers that name one of these rules, and
+those that name none and so silence them all, only shrink too, per rule, wherever they moved.
 
 In tests a fixture comes back as an argument under the name it was imported with, so redefining a name (F811) is not
 checked there, like the argument limits.
@@ -32,7 +32,17 @@ from pathlib import Path
 
 import pytest
 from allow_list_base import REPO, comparison_point, file_at_base, git, grep_at_base
-from test_guardrails_lint import PRODUCTION, PYTHON, RANGE_MARKER, TEST, grep_now, grown, rules_found
+from test_guardrails_lint import (
+    FILE_WIDE,
+    PRODUCTION,
+    PYTHON,
+    RANGE_MARKER,
+    TEST,
+    after_noqa,
+    grep_now,
+    grown,
+    rules_found,
+)
 
 CONFIG = "pyproject.toml"
 FAMILIES = ("B", "DJ", "E4", "E7", "E9", "F")
@@ -42,9 +52,12 @@ FAMILY_RULE = re.compile(f"({'|'.join(FAMILIES)})[0-9]+")
 TEST_GLOBS = ("**/tests/**", "**/test_*.py", "**/conftest.py")
 TEST_EXEMPTIONS = ["F811", "PLR0913", "PLR0917"]
 GLOB = re.compile(r"[*?\[\]{}!]")
-# A noqa that names codes, anywhere on its line; ruff reads noqa in any case.
-NOQA_CODES = r"#[[:space:]]*[Nn][Oo][Qq][Aa][[:space:]]*:[^#]*"
-NOQA = "# noqa"
+# A noqa anywhere on its line, file-wide or not, with codes or without; ruff reads noqa in any case.
+NOQA_MARKERS = rf"#[[:space:]]*({FILE_WIDE})?[Nn][Oo][Qq][Aa][^#]*"
+# Written in two pieces so that this file adds no marker of its own to the count.
+NOQA = "#" + " noqa"
+FILE_NOQA = NOQA.replace("# ", "# ruff: ")
+EVERY_RULE = "every rule"
 NO_RULES_AT_BASE = (
     "ruff did not check these rules where the branch left origin/main: this is the commit that brings them and freezes "
     "what breaks them today"
@@ -194,9 +207,11 @@ def gained(now: dict[str, list[str]], before: dict[str, list[str]]) -> list[str]
 
 
 def family_codes(markers: list[str]) -> Counter[str]:
-    """The rules of the families each noqa or range marker names."""
+    """The rules of the families each noqa or range marker names. A noqa that names no rule silences them all, on its
+    line or in its whole file."""
     codes = [code for marker in markers for code in re.findall(r"[A-Z]+[0-9]+", marker)]
-    return Counter(code for code in codes if FAMILY_RULE.fullmatch(code))
+    bare = [marker for marker in markers if "noqa" in marker.lower() and not after_noqa(marker).startswith(":")]
+    return Counter(code for code in codes if FAMILY_RULE.fullmatch(code)) + Counter({EVERY_RULE: len(bare)})
 
 
 @pytest.mark.parametrize(
@@ -269,10 +284,10 @@ def test_the_frozen_files_never_break_their_rules_more_often():
 
 
 def test_the_noqa_markers_of_these_rules_never_grow():
-    now = family_codes(grep_now(NOQA_CODES, *PYTHON) + grep_now(RANGE_MARKER, *PYTHON))
-    before = family_codes(grep_at_base(NOQA_CODES, *PYTHON) + grep_at_base(RANGE_MARKER, *PYTHON))
+    now = family_codes(grep_now(NOQA_MARKERS, *PYTHON) + grep_now(RANGE_MARKER, *PYTHON))
+    before = family_codes(grep_at_base(NOQA_MARKERS, *PYTHON) + grep_at_base(RANGE_MARKER, *PYTHON))
     found = grown(now, before)
-    assert found == [], "A new noqa for one of these rules: fix the code instead.\n" + "\n".join(found)
+    assert found == [], "A new noqa for these rules, or one that names none: fix the code instead.\n" + "\n".join(found)
 
 
 def test_a_rule_is_one_whole_rule_of_the_families():
@@ -338,8 +353,26 @@ def test_the_noqa_markers_count_only_the_rules_of_the_families():
         f"def a():  {NOQA}: C901",
         f"x = 1  {NOQA}: BLE001",
         "# ruff: disable[B905]",
+        f"{FILE_NOQA}: B905",
     ]
-    assert family_codes(markers) == Counter({"F401": 1, "E402": 1, "F403": 1, "B905": 1})
+    assert family_codes(markers) == Counter({"F401": 1, "E402": 1, "F403": 1, "B905": 2})
+
+
+def test_a_noqa_that_names_no_rule_counts_as_silencing_every_rule():
+    bare = [f"import os  {NOQA}", f"x = 1  {NOQA} - on purpose", FILE_NOQA]
+    markers = [*bare, f"y = 2  {NOQA}: F401", "# ruff: disable[B905]"]
+    assert family_codes(markers) == Counter({EVERY_RULE: 3, "F401": 1, "B905": 1})
+
+
+@pytest.mark.parametrize(
+    "line",
+    [f"import os  {NOQA}", f"import os  {NOQA} - on purpose", f"import os  {NOQA}: F401", f"{FILE_NOQA}: B905"],
+    ids=["bare", "bare with a reason", "one rule", "file-wide rule"],
+)
+def test_every_noqa_that_can_silence_these_rules_is_found(line):
+    command = ["grep", "-o", "-E", NOQA_MARKERS]
+    found = subprocess.run(command, input=f"{line}\n", capture_output=True, text=True, check=False)
+    assert found.stdout.splitlines() == [line[line.index("#") :]]
 
 
 def test_a_frozen_rule_counts_only_in_the_files_frozen_for_it():
