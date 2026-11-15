@@ -14,7 +14,7 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.conftest import IN_HUBS_COMMITTED, ISSUER, run
+from apps.invoice.tests.conftest import HUB_DB_COMMITTED, ISSUER, run
 from apps.sale.models import Sale
 from apps.verifactu.models import Record
 from base import catalog, relay, worker
@@ -22,7 +22,7 @@ from base.catalog import RegisterResult
 from base.models import EventDelivery
 
 #: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
-pytestmark = IN_HUBS_COMMITTED
+pytestmark = HUB_DB_COMMITTED
 
 REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 

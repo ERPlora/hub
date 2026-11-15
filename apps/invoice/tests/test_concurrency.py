@@ -14,19 +14,13 @@ from live.errors import OperationError
 from apps.customer.models import Customer
 from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
-from apps.invoice.tests.conftest import (
-    IN_HUBS_COMMITTED,
-    ISSUER,
-    at_once,
-    card_deleted_on_screen,
-    deliver,
-    run,
-)
+from apps.invoice.tests.conftest import HUB_DB_COMMITTED, ISSUER, deliver, run
 from apps.sale.models import Sale
 from base.tenancy.tests import hubs
+from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile
 
 #: Several sessions of business A at once, each committing: its plan has room for them all.
-pytestmark = [IN_HUBS_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
@@ -152,9 +146,6 @@ def test_the_same_refund_delivered_twice_at_once_is_one_rectification(product, c
 # deletion waits for it and answers «Cannot delete», since the document protects the card; a document that comes
 # second waits for the deletion and is told the card is gone, spending no number.
 
-HOW = ["page", "list"]
-
-
 def by_hand(card):
     data = {
         "lines": [{"description": "Course", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
@@ -192,10 +183,10 @@ def fact_numbers() -> int:
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("document", sorted(CARD_DOCUMENTS))
-def test_the_hub_admin_cannot_delete_a_card_a_document_names_meanwhile(document, how, today):
+def test_the_hub_admin_cannot_delete_a_card_a_document_names_meanwhile(document, how, today, hub_staff):
     card = a_card()
     issue = CARD_DOCUMENTS[document](card)
-    with card_deleted_on_screen(card, how, writes("invoice_invoice")) as answers:
+    with meanwhile(writes("invoice_invoice"), admin_delete(hub_staff, how, card), first=True) as answers:
         issue()
     [answer] = answers
     assert card_protected(answer)
@@ -204,10 +195,10 @@ def test_the_hub_admin_cannot_delete_a_card_a_document_names_meanwhile(document,
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("document", sorted(CARD_DOCUMENTS))
-def test_a_document_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(document, how):
+def test_a_document_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(document, how, hub_staff):
     card = a_card()
     issue = CARD_DOCUMENTS[document](card)
-    with card_deleted_on_screen(card, how, reads("customer_customer")) as answers:
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, how, card), first=True) as answers:
         with pytest.raises(OperationError) as refused:
             issue()
     [answer] = answers
@@ -218,7 +209,7 @@ def test_a_document_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(do
     assert fact_numbers() == 0
 
 
-def test_a_statement_run_while_the_card_is_deleted_reaches_the_next_wrapper_with_its_own_context():
+def test_a_statement_run_while_the_card_is_deleted_reaches_the_next_wrapper_with_its_own_context(hub_staff):
     card = a_card()
     seen = []
 
@@ -226,7 +217,7 @@ def test_a_statement_run_while_the_card_is_deleted_reaches_the_next_wrapper_with
         seen.append(context)
         return execute(sql, params, many, context)
 
-    with card_deleted_on_screen(card, "page", reads("customer_customer")):
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, "page", card), first=True):
         with connections[hubs.HUB_A_ALIAS].execute_wrapper(next_wrapper):
             Customer.objects.filter(pk=card.pk).exists()
     assert seen

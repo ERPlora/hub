@@ -20,10 +20,10 @@ from live.models import OutboxEvent
 
 from apps.invoice import services
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
-from apps.invoice.tests.conftest import A, IN_HUBS, ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import A, HUB_DB, ISSUER, ctx_for, run
 from apps.sale.tests.test_integration_tax import where_rules_are_made
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 RECIPIENT = {

@@ -18,7 +18,7 @@ from apps.invoice.admin import (
     IssuerAdmin,
 )
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
-from apps.invoice.tests.conftest import A, IN_HUBS, run
+from apps.invoice.tests.conftest import A, HUB_DB, run
 
 PLATFORM_HOST = "hubs.localhost"
 
@@ -86,7 +86,7 @@ def test_the_four_models_are_registered():
     assert admin.site._registry[Invoice].inlines == [InvoiceLineInline]
 
 
-@IN_HUBS
+@HUB_DB
 def test_series_and_issuer_have_full_crud(superuser):
     request = request_by(superuser)
     for model in (InvoiceSeries, Issuer):
@@ -98,7 +98,7 @@ def test_series_and_issuer_have_full_crud(superuser):
         assert {"id", "updated_at"} <= set(model_admin.get_readonly_fields(request))
 
 
-@IN_HUBS
+@HUB_DB
 def test_an_issued_invoice_is_read_with_its_fiscal_fields_read_only_and_never_deleted(
     superuser,
 ):
@@ -122,7 +122,7 @@ def test_an_issued_invoice_is_read_with_its_fiscal_fields_read_only_and_never_de
     }
 
 
-@IN_HUBS
+@HUB_DB
 def test_the_pages_render(client, superuser, issuer):
     invoice = run(
         "invoice.invoice.create",
@@ -157,7 +157,7 @@ def test_the_pages_render(client, superuser, issuer):
         assert content in response.content, path
 
 
-@IN_HUBS
+@HUB_DB
 def test_the_staff_can_change_the_notes_of_an_invoice_and_nothing_fiscal(
     client, superuser, issuer
 ):
@@ -195,7 +195,7 @@ def test_the_staff_can_change_the_notes_of_an_invoice_and_nothing_fiscal(
     assert (stored.notes, stored.total_amount) == ("Checked by support", 165)
 
 
-@IN_HUBS
+@HUB_DB
 def test_a_series_keeps_its_identity_and_freezes_its_numbering_once_it_numbers(
     superuser, issuer
 ):
@@ -231,7 +231,7 @@ def test_a_series_keeps_its_identity_and_freezes_its_numbering_once_it_numbers(
     assert identity | numbering <= set(series_admin.get_readonly_fields(request, shop))
 
 
-@IN_HUBS
+@HUB_DB
 def test_the_issuer_form_checks_the_tax_id(client, superuser):
     staff_in_business_a(client, superuser)
     form = {

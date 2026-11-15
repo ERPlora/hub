@@ -18,7 +18,7 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
-from apps.invoice.tests.conftest import IN_HUBS, in_hubs
+from apps.invoice.tests.conftest import HUB_DB, in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_offered_with_room
@@ -209,7 +209,7 @@ def test_invoice_offers_its_twenty_five_tools():
     assert tools == TOOLS
 
 
-@IN_HUBS  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_rectifies_numbers_or_names_who_issues(catalog_of):
     for role, lacked in (
         (Membership.Role.OWNER, set()),
@@ -228,13 +228,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert {probe["tool"] for probe in PROBES} >= {name for name, _ in REPORTED}  # the probes below include them
 
 
-@IN_HUBS  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED, ids=[name for name, _ in REPORTED])
 def test_the_reported_invoice_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@IN_HUBS  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), THE_ISSUES)
 def test_the_request_of_the_issue_offers_its_write_near_the_top(catalog_of, name, phrase):
     """The owner asks to mark an invoice paid or to rectify it, and the write is among the first eight a turn
@@ -242,7 +242,7 @@ def test_the_request_of_the_issue_offers_its_write_near_the_top(catalog_of, name
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=NEAR_THE_TOP)
 
 
-@IN_HUBS  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_invoicing_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's twenty-five phrases of layer 2, the ones the model answered right too: a tool of Invoicing that a
@@ -279,7 +279,7 @@ def without_the_paid_group():
     return kept
 
 
-@IN_HUBS  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_invoice_said_paid_brings_marking_it_paid_by_the_hubs_words(catalog_of):
     """«marca como cobrada la FACT-2026-000001»: with the Hub's words of a paid invoice, marking it paid is among the
     first eight; without them, behind the reads and writes of the sale a «cobrada» names, it is not."""
@@ -326,7 +326,7 @@ test_the_english_asks_that_say_nothing_new_keep_saying_nothing_new = said_in_spa
 SALES_OF_AN_INVOICE = [("en", "sale.sale.print", "invoice"), ("es", "sale.settings.update", "factura")]
 
 
-@IN_HUBS  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "name", "word"), SALES_OF_AN_INVOICE, ids=[n for _, n, _ in SALES_OF_AN_INVOICE])
 def test_invoicings_asks_take_no_place_from_the_asks_of_sales_that_speak_of_an_invoice(
     catalog_of, language, name, word

@@ -23,16 +23,8 @@ from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
 from base.services import ensure_hub_user
-from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-
-#: The businesses of the root conftest's ``hub_a`` and ``hub_b``, each with its own database.
-A = Scope("host", "tenant-a")
-B = Scope("host", "tenant-b")
-#: The host of the business ``A``'s pages and API.
-HOST = f"{A.key}.localhost"
-#: The mark of a sale test that uses the database: both businesses' databases next to control's.
-HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
 
 def ctx_for(
@@ -60,22 +52,6 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
-
-
-@pytest.fixture(autouse=True)
-def in_business_a(request, no_test_fallback, hub_databases):
-    """The business ``A`` (``hub_a``), entered for the whole test, if the test uses the database.
-
-    ``hub_databases`` is asked for here, not only through ``hub_a``: built inside a test, its aliases would be forgotten
-    with the test's own (``hub_aliases_forgotten``) and the next tests would find them gone."""
-    marked = request.node.get_closest_marker("django_db") is not None
-    if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
-        yield None
-        return
-    hub = request.getfixturevalue("hub_a")
-    assert hub.slug == A.key, f"hub_a is {hub.slug!r}, not the scope A of these tests"
-    with use_hub(hub):
-        yield hub
 
 
 #: Bogotá at 23:30 of 2 November 2026, already the 3rd in Madrid, the deployment's clock (hub#771).
@@ -168,24 +144,6 @@ def customer(db):
         )
 
     return make
-
-
-@pytest.fixture
-def factory_data(transactional_db, in_business_a, hub_b):
-    """A transactional test starts from flushed businesses: tax's factory catalogue and the factory
-    payment methods are planted again in both businesses' databases, as their migrations do (idempotent)."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    for hub in (in_business_a, hub_b):
-        with use_hub(hub) as active, connections[active.alias].schema_editor() as editor:
-            for module in (
-                "apps.tax.migrations.0002_factory_catalogue",
-                "apps.tax.migrations.0005_retail_alcohol",
-                "apps.sale.migrations.0002_factory_payment_methods",
-            ):
-                import_module(module).plant(registry, editor)
 
 
 @pytest.fixture

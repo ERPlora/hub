@@ -15,11 +15,12 @@ from live.context import system_context
 from live.errors import OperationError
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import A, IN_HUBS, IN_HUBS_COMMITTED, at_once, run
+from apps.invoice.tests.conftest import A, HUB_DB, HUB_DB_COMMITTED, run
 from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, line
 from apps.verifactu.models import Config, Record
+from base.tenancy.tests.concurrency import at_once
 
-pytestmark = IN_HUBS
+pytestmark = HUB_DB
 
 #: ERPlora's own hub is a business with its own database, as every other: here, business A.
 PLATFORM = A
@@ -350,7 +351,7 @@ def committed_platform_hub(factory_data, plan_with_room, settings):
     run("invoice.issuer.update", PLATFORM_ISSUER, system())
 
 
-@IN_HUBS_COMMITTED
+@HUB_DB_COMMITTED
 def test_the_same_invoice_delivered_twice_at_once_is_one_invoice_and_one_record(
     committed_platform_hub,
 ):
