@@ -12,12 +12,12 @@ from live.live_registry import live_registry
 from live.operations import registry
 
 from apps.sale import events
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from base.models import Hub
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ISSUER = {
     "legal_name": "Salón Aurora S.L.",

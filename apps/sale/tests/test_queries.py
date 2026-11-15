@@ -13,10 +13,10 @@ from live.errors import NotFound, PermissionDenied
 
 from apps.sale.models import PaymentMethod, Sale
 from apps.sale.schemas import BreakdownOut, PreviewLineOut, PreviewOut
-from apps.sale.tests.conftest import ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base.tests.typed_operations import ts_fields
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

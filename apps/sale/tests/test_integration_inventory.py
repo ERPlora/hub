@@ -15,9 +15,9 @@ from live.models import OutboxEvent
 from apps.inventory import events as inventory_events
 from apps.inventory.models import Product, StockMovement
 from apps.sale.models import Order, OrderLine, Sale
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def deliver(name: str):

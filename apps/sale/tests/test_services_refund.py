@@ -14,9 +14,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.sale.models import PaymentMethod, Refund, Sale
-from apps.sale.tests.conftest import ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:

@@ -16,9 +16,9 @@ from live.models import OutboxEvent
 
 from apps.inventory import events as inventory_events
 from apps.sale.models import OrderLine, SaleLine
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: Taxes' factory catalogue: restaurant food (10 %) and the general rate (21 %).
 FOOD = "restaurant.food"

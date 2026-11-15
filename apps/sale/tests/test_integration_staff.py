@@ -17,9 +17,9 @@ from live.errors import AppInactive
 from live.models import OutboxEvent
 from live.operations import registry
 
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 CARD = [{"method": "card"}]
 CURRENT = "staff.member.current"
