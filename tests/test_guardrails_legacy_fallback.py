@@ -1,12 +1,14 @@
 """The tests that may lean on the suite's fallback only get fewer.
 
 ``.legacy-fallback-allow`` names them (``base/tenancy/tests/legacy_allow.py``): it never gains a line compared with the
-list where the branch left origin/main, and a line whose test is gone leaves it. A listed test that runs every case
+list where the branch left origin/main (a line may move with its test to another file), and a line whose test is gone
+leaves it. A listed test that runs every case
 without leaning on the fallback is caught by the run itself, which fails naming its line.
 """
 
 import functools
 import re
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -15,11 +17,19 @@ from allow_list_base import REPO, file_at_base
 from base.tenancy.tests.legacy_allow import ALLOW_FILE, parse_allow
 
 
+def name_of(entry: str) -> str:
+    return entry.rsplit("::", 1)[1]
+
+
 def gained(entries: set[str], base_entries: set[str]) -> list[str]:
-    """Lines the list has and the base list did not."""
+    """Lines the list has and the base list did not, unless their test only moved to another file (a file split by
+    size takes its tests' lines along): a test's name is never listed more times than in the base list."""
+    now = Counter(name_of(entry) for entry in entries)
+    before = Counter(name_of(entry) for entry in base_entries)
     return [
         f"{entry}: new in {ALLOW_FILE}; the list only shrinks, so make the test run as production does"
         for entry in sorted(entries - base_entries)
+        if now[name_of(entry)] > before[name_of(entry)]
     ]
 
 
@@ -70,6 +80,21 @@ def test_the_list_may_lose_lines_but_never_gain_one():
     assert gained({"base/tests/test_a.py::test_one"}, before) == []
     assert gained({*before, "base/tests/test_b.py::test_new"}, before) == [
         f"base/tests/test_b.py::test_new: new in {ALLOW_FILE}; "
+        "the list only shrinks, so make the test run as production does"
+    ]
+
+
+def test_a_line_that_moves_with_its_test_to_another_file_is_no_gain():
+    before = {"apps/x/tests/test_services.py::test_one", "apps/x/tests/test_services.py::TestTwo::test_two"}
+    split = {"apps/x/tests/test_services_one.py::test_one", "apps/x/tests/test_services_two.py::test_two"}
+
+    assert gained(split, before) == []
+    assert gained({*split, "apps/x/tests/test_services_two.py::test_three"}, before) == [
+        f"apps/x/tests/test_services_two.py::test_three: new in {ALLOW_FILE}; "
+        "the list only shrinks, so make the test run as production does"
+    ]
+    assert gained({*before, "apps/y/tests/test_services.py::test_one"}, before) == [
+        f"apps/y/tests/test_services.py::test_one: new in {ALLOW_FILE}; "
         "the list only shrinks, so make the test run as production does"
     ]
 
