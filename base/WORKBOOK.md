@@ -3545,7 +3545,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
   `retryable` = su app está en `relay.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto (test de
   dos hubs en `base/tests/test_queries_system.py`).
-- Comandos (`base/services.py`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
+- Comandos (`base/services/`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
   `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
   409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
   /api/system/failed-events/retry_all`: `SKIP LOCKED`, todas las reenviables del host) y `base.failed_event.discard`
@@ -3654,7 +3654,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
   mientras su sesión vive (BASE-F13, `tests/e2e/helpers-login-hub-session.spec.ts`). `/auth/logout` en una caja con
   pinpad vuelve a `/login`.
-- Operaciones (`base/queries.py`, `base/services.py`; rutas en `base/api.py` y `frontend/generated/operations.json`):
+- Operaciones (`base/queries.py`, `base/services/`; rutas en `base/api.py` y `frontend/generated/operations.json`):
   `base.access.door` (sin sesión: la cookie decide; nunca da caras a quien el PIN no dejaría entrar, ni correos:
   `queries.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
@@ -3663,7 +3663,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `avatars/` del almacén del hub, servida solo a una sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
   `base.pin.set`, `base.device.mode_changed|renamed|removed|pruned`, `base.access.settings_changed` y
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
-- El pase a erplora.com (BASE-F11; ACCOUNTS-F29 del SaaS): `base.saas_pass.create` (`base/services.py`, `ai=INTERNAL`:
+- El pase a erplora.com (BASE-F11; ACCOUNTS-F29 del SaaS): `base.saas_pass.create` (`base/services/`, `ai=INTERNAL`:
   en un chat se quedaría en su historial; `database=False`) firma al pulsar, nunca en el HTML de `hub-home`, donde
   caducaría en un minuto y lo leería cualquier script: `signing.dumps({user, hub, next, nonce}, key=INTERNAL_SHARED_SECRET,
   salt="erplora.hub-pass.v1")`, y devuelve `SAAS_URL/hub-pass/?pass=…`. Solo en una sesión abierta con la cuenta
@@ -4084,7 +4084,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (`frontend/main.ts`) es una acción (`run` de `ShellUserMenuItem`, `packages/ui`) que abre `ReportProblemDialog.vue`
   (en `BackgroundChrome.vue`, con `lib/report-problem.ts`), el `ReportProblemModal` de `@erplora/ui/components`
   sobre `FormModal`. Sale con `account_url` (la sesión abierta con la cuenta; `base/spa.py` no incrusta
-  `report_url`). `base.support.report` (`base/services.py`, `database=False`: espera a erplora.com sin transacción
+  `report_url`). `base.support.report` (`base/services/`, `database=False`: espera a erplora.com sin transacción
   abierta) solo acepta una sesión abierta con la cuenta (`CREDENTIAL_SESSION_KEY` de `base/access.py`, que escribe
   `_log_in` como `SessionOwner.credential`; una sesión sin ella no es de la cuenta, y el shell, `base/spa.py`, la
   copia de `SessionOwner` al cargar, así que una sesión anterior al cambio sigue igual: la de la cuenta puede, la de

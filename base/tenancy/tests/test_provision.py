@@ -1117,7 +1117,7 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
 
 # ── Guardrail: no new hub is ever born sharing control's database ───────────────────────────────────────────────────
 
-#: The ``Hub.objects.create`` calls of ``base/services.py`` that may leave ``db_name`` empty, each with its reason.
+#: The ``Hub.objects.create`` calls of ``base/services/__init__.py`` that may leave ``db_name`` empty, each with its reason.
 #: None: the old shared database is gone, every hub is born with its own (the local ones included).
 SHARED_HUB_CREATES: dict[str, str] = {}
 
@@ -1172,7 +1172,7 @@ def test_the_scanner_sees_a_hub_made_with_and_without_its_database():
 
 
 def test_every_hub_the_services_make_names_its_own_database_but_the_listed_ones():
-    found = hub_creates((HUB_DIR / "base" / "services.py").read_text())
+    found = hub_creates((HUB_DIR / "base" / "services" / "__init__.py").read_text())
 
     assert {"hub_register", "demo_create", "hub_seed_local"} <= {function for function, _named in found}
     offenders = sorted({function for function, named in found if not named} - set(SHARED_HUB_CREATES))

@@ -198,7 +198,7 @@ def test_migrations_are_left_out(path):
 def test_ruff_never_formats_the_code():
     """The code keeps its own layout: ruff is here only for the limits, and an editor that formats with it on save
     must find nothing to format."""
-    result = ruff("format", "--check", "--diff", "base/services.py")
+    result = ruff("format", "--check", "--diff", "base/services/__init__.py")
     assert (result.returncode, result.stdout) == (0, ""), result.stdout[:2000] + result.stderr
 
 

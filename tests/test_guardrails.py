@@ -627,7 +627,7 @@ def test_database_check_sees_pools_persistent_connections_and_server_cursors_on_
 def test_the_scan_reads_the_real_source_and_finds_the_orm_behind_the_doors():
     files = source_files(HUB_DIR)
 
-    assert PurePosixPath("base/services.py") in files
+    assert PurePosixPath("base/services/__init__.py") in files
     assert PurePosixPath("apps/demo/queries.py") in files
     assert not [path for path in files if "tests" in path.parts]
     # Real code, real ORM: a scanner that went blind would let every check below pass.
