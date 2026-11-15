@@ -453,6 +453,20 @@ class TestTheCopyGoesThroughTheBucket:
         assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
         assert marker(hub.db_name) == [AS_THEN, SINCE]
 
+    def test_a_worker_that_stops_while_it_fills_the_copy_leaves_it_to_the_next_one(self, asides, monkeypatch):
+        hub, aside = a_hub_with_its_copy(asides)
+
+        run(asides, cancelled=s3.stopping_as(monkeypatch, move, "_restore_command"))
+
+        # Not a failure: nothing noted and its lease let go; the next worker makes the copy anew over what was left.
+        left = fresh(aside)
+        assert (left.status, left.last_error, left.lease_owner) == ("copying", "", "")
+
+        assert run(asides) == 1
+
+        assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
     def test_without_a_bucket_nothing_is_made_and_the_row_says_why(self, asides, monkeypatch):
         hub, aside = a_hub_with_its_copy(asides)
         monkeypatch.setenv("HUB_DUMPS_BUCKET", "")
