@@ -43,7 +43,7 @@ async function expectSuspendedPage(page: Page): Promise<void> {
   await expect(page.getByRole('link', { name: 'Go to ERPlora' })).toHaveAttribute('href', `${SAAS}/launch`);
 }
 
-test('BILLING-F16: a business suspended for an unpaid invoice answers 402 until it is paid, page and API', async ({
+test('BILLING-F16: a business suspended for an unpaid invoice answers 402 until it is paid, page and API @smoke', async ({
   browser,
 }) => {
   const before = photoStatus();

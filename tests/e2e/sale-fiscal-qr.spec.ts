@@ -44,7 +44,7 @@ async function documentReady(page: Page): Promise<void> {
   await page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt-qr] img').waitFor({ state: 'visible' });
 }
 
-test('SALE-F29: the ticket of a charged sale carries VeriFactu’s QR, «VERI*FACTU» and how to check it', async ({ page, context }) => {
+test('SALE-F29: the ticket of a charged sale carries VeriFactu’s QR, «VERI*FACTU» and how to check it @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/sales');
   const sale = await chargeByApi(context, { lines: [{ product: product.sku }], payments: [{ method: 'card' }] });

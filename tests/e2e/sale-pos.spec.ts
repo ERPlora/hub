@@ -84,7 +84,7 @@ async function addBySearch(page: Page, product: Product): Promise<void> {
 const lineOf = (page: Page, name: string) =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).filter({ has: page.locator('[data-testid=pos-qty-plus], [data-testid$=-void]') });
 
-test('SALE-F01: the owner sells two shirts in cash, gets the change and the ticket with its 21 % VAT', async ({ page, context }) => {
+test('SALE-F01: the owner sells two shirts in cash, gets the change and the ticket with its 21 % VAT @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);
@@ -123,7 +123,7 @@ test('SALE-F01: the owner sells two shirts in cash, gets the change and the tick
   expect(sale.payments.map((p) => [p.method_type, p.tendered, p.change])).toEqual([['cash', 5000, 2580]]);
 });
 
-test('SALE-F05 and F13: a check with a customer found in the till and a quick note is charged by card', async ({ page, context }) => {
+test('SALE-F05 and F13: a check with a customer found in the till and a quick note is charged by card @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await login(page, A, '/sale/pos');
   const note = await api<{ id: string }>(context, A, 'POST', '/sale/quick_notes', { text: `e2e no ice ${RUN}`, sort_order: 1 });

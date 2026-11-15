@@ -77,7 +77,7 @@ async function coffeeOnACheck(page: Page): Promise<string> {
   return (await page.evaluate((key) => localStorage.getItem(key), CURRENT_CHECK_KEY))!;
 }
 
-test('SALE-F19: the till seats its check at a table and takes the table off again', async ({ page, context }) => {
+test('SALE-F19: the till seats its check at a table and takes the table off again @smoke', async ({ page, context }) => {
   const orderId = await coffeeOnACheck(page);
   const till = shown(page);
   const trigger = till.locator('[data-testid=pos-table-trigger]');

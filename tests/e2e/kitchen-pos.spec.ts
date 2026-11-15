@@ -93,7 +93,7 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tickets» and rushes one', async ({ page, context }) => {
+test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tickets» and rushes one @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);

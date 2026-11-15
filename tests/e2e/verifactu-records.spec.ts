@@ -179,7 +179,7 @@ async function openRecord(page: Page, record: RecordOut): Promise<void> {
   await expect(shown(page).locator('[data-testid=verifactu-record-title]')).toHaveText(`Record ${record.invoice_number}`);
 }
 
-test('VERIFACTU-F13, F16–F18: an issued ticket is sealed, listed pending with its QR, and says why it waits', async ({ page, context }) => {
+test('VERIFACTU-F13, F16–F18: an issued ticket is sealed, listed pending with its QR, and says why it waits @smoke', async ({ page, context }) => {
   await login(page, A, '/verifactu/records');
   const issued = await ticket(context);
   const record = await recordOf(context, issued.id);
@@ -208,7 +208,7 @@ test('VERIFACTU-F13, F16–F18: an issued ticket is sealed, listed pending with 
   });
 });
 
-test('VERIFACTU-F14: voiding a charged sale registers its R5 as an alta, never as an anulación', async ({ page, context }) => {
+test('VERIFACTU-F14: voiding a charged sale registers its R5 as an alta, never as an anulación @smoke', async ({ page, context }) => {
   await login(page, A, '/verifactu/records');
   const sale = await chargeByApi(context, { lines: [{ product: product.sku }], payments: [{ method: 'card' }] });
   const ticketId = psql(`select id from invoice_invoice where source_sale_id = '${sale.id}' and source_type = 'sale'`);
