@@ -16,10 +16,9 @@ from live.operations import get, registry
 
 from apps.invoice import queries, schemas
 from apps.invoice.models import Invoice, InvoiceSeries, InvoiceType
-from apps.invoice.tests.conftest import ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import IN_HUBS, ISSUER, ctx_for, run
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
 from base.tests.test_services_assistant import answered, waiting
@@ -130,6 +129,7 @@ def rectifications():
     return Invoice.objects.filter(invoice_type__startswith="R")
 
 
+@IN_HUBS
 def test_rectifying_an_invoice_offers_the_preview_and_the_rectification(issuer):
     names = [tool["name"] for tool in turn()["tools"]]
     assert {"invoice__invoice__rectification_preview", "invoice__invoice__rectify"} <= set(names)
@@ -144,6 +144,7 @@ def test_the_rectification_tells_the_assistant_to_read_its_preview_first_and_to_
     assert (seen.kind, assistant.is_tool(seen), seen.permission) == ("query", True, rectify.permission)
 
 
+@IN_HUBS
 def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_be_born(issuer, today):
     original = an_invoice()
     plan = turn(call("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON}))
@@ -164,6 +165,7 @@ def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_b
     assert not InvoiceSeries.objects.filter(code="RECT").exists()
 
 
+@IN_HUBS
 def test_what_cannot_be_rectified_the_preview_says_why_in_the_persons_language_and_no_card_comes(issuer):
     original = an_invoice()
     rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
@@ -179,6 +181,7 @@ def test_what_cannot_be_rectified_the_preview_says_why_in_the_persons_language_a
     assert rectifications().count() == 1
 
 
+@IN_HUBS
 def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_the_reason(issuer):
     original = an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
@@ -198,6 +201,7 @@ def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_th
     assert not rectifications().exists()
 
 
+@IN_HUBS
 def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today):
     original = an_invoice()
     seen = run("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON})
@@ -216,6 +220,7 @@ def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today
     assert Invoice.objects.get(pk=original.id).status == "cancelled"
 
 
+@IN_HUBS
 @pytest.mark.parametrize(
     "decision",
     [
@@ -234,6 +239,7 @@ def test_without_the_word_nothing_is_issued_and_the_original_stays_issued(issuer
     assert not InvoiceSeries.objects.filter(code="RECT").exists()
 
 
+@IN_HUBS
 def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(issuer, today):
     original = an_invoice()
     yesterday = str(today - dt.timedelta(days=1))
@@ -277,6 +283,7 @@ def card_labels(screens: dict) -> list[str]:
     ]
 
 
+@IN_HUBS
 def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in_negative_as_money(issuer, today):
     original = an_invoice()
     preview = preview_of(original.number, "es")
@@ -292,6 +299,7 @@ def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in
     assert assistant.preview_of(get("invoice.invoice.rectify"))["fields"] == PREVIEWED
 
 
+@IN_HUBS
 def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issuer, today):
     original = an_invoice()
     plan = turn(call("invoice.invoice.rectify", {"number": original.number, "reason": REASON}))
@@ -309,6 +317,7 @@ def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issue
     assert not rectifications().exists()
 
 
+@IN_HUBS
 def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     original = an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
@@ -325,6 +334,7 @@ def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     )
 
 
+@IN_HUBS
 def test_another_rectification_issued_after_the_card_takes_its_number_and_the_yes_shows_the_next_first(issuer, today):
     """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»): another rectification issued
     before the yes takes it, and the yes issues nothing — the card comes again with the next number — until it is
@@ -345,6 +355,7 @@ def test_another_rectification_issued_after_the_card_takes_its_number_and_the_ye
     assert rectifications().get(rectifies_id=original.id).number == shown
 
 
+@IN_HUBS
 def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_says_why(issuer):
     """Without reading the preview first, a rectifying invoice asked to be rectified: the card's preview cannot be read,
     so no card (nothing is confirmed blind) and the model hears why, in the person's language."""
@@ -401,6 +412,7 @@ def previewed_kind(number: str, language: str, **more) -> dict:
     return next(field for field in preview if field["name"] == "invoice_type")
 
 
+@IN_HUBS
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_what_the_card_says_it_will_do_names_the_kind_too(issuer, language):
     original = an_invoice()
@@ -408,6 +420,7 @@ def test_what_the_card_says_it_will_do_names_the_kind_too(issuer, language):
     assert (kind["kind"], kind["value"]) == ("text", name_of("R4", language))
 
 
+@IN_HUBS
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_ticket_is_previewed_by_the_name_of_its_own_kind(issuer, language):
     """A ticket is always R5, whatever was asked: the preview's closed list takes the kind no rectification asks for."""
@@ -417,6 +430,7 @@ def test_a_ticket_is_previewed_by_the_name_of_its_own_kind(issuer, language):
     assert kind["value"] == name_of("R5", language)
 
 
+@IN_HUBS
 def test_the_model_and_the_write_keep_the_code_the_card_names(issuer):
     """Only the card is in words: the read still tells the model the code, and the record is issued with it."""
     original = an_invoice()
@@ -546,9 +560,9 @@ def test_every_record_a_write_of_invoice_names_by_its_id_is_listed_here():
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@IN_HUBS
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(language, hub_a, no_fallback):
+def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(language, hub_a):
     """«Marca como pagada esa factura», «emite la factura de esa venta», «rectifica esa devolución»: the card says which
     invoice, sale, refund, series or customer as the Facturas screens show them, in the person's language, never by its
     id."""
@@ -559,7 +573,7 @@ def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(languag
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@IN_HUBS
 @pytest.mark.parametrize(
     ("language", "titles"),
     [
@@ -567,7 +581,7 @@ def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(languag
         ("en", {"customer_id": "Customer", "series_id": "Series", "invoice_id": "Invoice"}),
     ],
 )
-def test_each_record_is_titled_as_the_invoice_titles_it(language, titles, hub_a, no_fallback):
+def test_each_record_is_titled_as_the_invoice_titles_it(language, titles, hub_a):
     """«Factura: FACT-2026-000001», «Venta: 20261031-0001», «Devolución de venta: …»: each record by the name its screens
     give it, never by its field («Invoice Id», «Refund Id»)."""
     screens = SCREENS if language == "es" else SCREENS_EN
@@ -580,8 +594,8 @@ def test_each_record_is_titled_as_the_invoice_titles_it(language, titles, hub_a,
     } == {write: {datum: titles[datum] for datum in data} for write, data in NAMED.items()}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_invoice(hub_a, no_fallback):
+@IN_HUBS
+def test_nobody_behind_the_request_reads_no_record_of_invoice(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         shown = cards(a_business(Scope("host", hub_a.slug)), None)
@@ -589,8 +603,8 @@ def test_nobody_behind_the_request_reads_no_record_of_invoice(hub_a, no_fallback
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@IN_HUBS
+def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a):
     """Whoever may issue, rectify and keep the series but see neither invoices, nor sales, nor customers (a key that only
     writes, say) gets every record left out, never its id."""
     writes_only = frozenset({"invoice.add_invoice", "invoice.rectify_invoice", "invoice.manage_series"})
@@ -601,8 +615,8 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@IN_HUBS
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {"ids": {datum: uuid.uuid7() for datum in ("customer_id", "series_id", "sale_id", "refund_id", "invoice_id")}}
     with use_hub(hub_a):
         shown = cards(gone, in_hub(hub_a))
@@ -610,8 +624,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallba
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@IN_HUBS
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's invoice, sale, refund, series or customer is nobody in hub A."""
     with use_hub(hub_b):
         theirs = a_business(Scope("host", hub_b.slug))
@@ -624,8 +638,8 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fa
     assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens(theirs)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_product_of_a_manual_line_is_left_out_never_by_its_id(hub_a, no_fallback):
+@IN_HUBS
+def test_the_product_of_a_manual_line_is_left_out_never_by_its_id(hub_a):
     """Inventory is no requirement of Invoicing: its product on a manual line is left out of the card, whose line says
     what is invoiced by its description."""
     line = {"description": "Champú", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}
@@ -682,7 +696,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
 # ── A series asked for with a code of another shape (INVOICE-F12) ───────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@IN_HUBS
 def test_a_series_with_a_code_of_another_shape_gets_no_card_and_the_model_hears_what_a_code_takes():
     """The code is checked before the card, as the screen checks it: no card for data the operation refuses, and the
     model hears, in the person's language, what a code takes (letters, digits, hyphens and underscores), never

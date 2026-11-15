@@ -9,19 +9,20 @@ deliveries, the environment by deployment, the QR only from a record.
 """
 
 import copy
-import threading
 
 import pytest
-from django.db import connection
-from live.context import Scope, system_context
+from live.context import system_context
 from live.errors import OperationError
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import run
+from apps.invoice.tests.conftest import A, IN_HUBS, IN_HUBS_COMMITTED, at_once, run
 from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, line
 from apps.verifactu.models import Config, Record
 
-PLATFORM = Scope("host", "erplora")
+pytestmark = IN_HUBS
+
+#: ERPlora's own hub is a business with its own database, as every other: here, business A.
+PLATFORM = A
 #: ERPlora's identity with a test tax ID (never the real seal's NIF in a test).
 PLATFORM_ISSUER = {
     "legal_name": "ERPLORA CLOUD SL",
@@ -343,37 +344,13 @@ def test_it_is_ready_in_prod_with_real_filing_open_and_in_pre_whatever_the_serve
 
 
 @pytest.fixture
-def committed_platform_hub(transactional_db, settings):
+def committed_platform_hub(factory_data, plan_with_room, settings):
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
     settings.ERPLORA_ENVIRONMENT = "pre"
     run("invoice.issuer.update", PLATFORM_ISSUER, system())
 
 
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
-
-
-@pytest.mark.django_db(transaction=True)
+@IN_HUBS_COMMITTED
 def test_the_same_invoice_delivered_twice_at_once_is_one_invoice_and_one_record(
     committed_platform_hub,
 ):
