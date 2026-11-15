@@ -7,7 +7,6 @@ payload.
 
 import re
 
-import pytest
 from live.context import Scope
 from live.operations import NAME_RE
 

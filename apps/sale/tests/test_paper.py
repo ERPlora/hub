@@ -9,7 +9,7 @@ from django.utils import translation
 
 from apps.printing import documents
 from apps.sale import paper
-from apps.sale.tests.conftest import HUB_DB, run
+from apps.sale.tests.conftest import HUB_DB, A, run
 from base.models import Hub
 
 pytestmark = HUB_DB
@@ -140,7 +140,9 @@ def test_the_bill_of_a_check_lists_what_is_owed_without_number_or_payment(bar):
 
 def test_a_discount_in_a_currency_written_in_letters_keeps_the_code_off_the_figure(bar):
     # flow: money-text — the paper writes the amount as the screen does: «PLN 0.75» (no-break space), never «PLN0.75».
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    for key in ("restaurant.drink", "restaurant.food"):  # a business charges by its own country's rules
+        run("tax.rule.create", {"country_code": "PL", "tax_category_key": key, "rate_pct": "8"})
     sale = charged(payments=[{"method": "card"}], discount_percent="10")
     assert sale.currency == "PLN"
     with translation.override("en"):

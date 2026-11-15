@@ -16,6 +16,7 @@ from apps.sale.queries import money_text
 from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run
 from base import operations as base_operations
 from base.models import Hub
+from base.tenancy.context import use_hub
 
 pytestmark = HUB_DB
 
@@ -29,9 +30,17 @@ ISSUER = {
 }
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     Hub.objects.filter(slug=slug).update(country=country)
+
+
+def taxed_in(country: str, scope: Scope = A) -> None:
+    """Taxes' rules of ``country`` for what these tests sell, in ``scope``'s business: a business charges by its own
+    country's rules, and the factory catalogue only has Spain's."""
+    for key in ("restaurant.drink", "service.generic"):
+        data = {"country_code": country, "tax_category_key": key, "rate_pct": "10"}
+        run("tax.rule.create", data, system_context(scope))
 
 
 @pytest.fixture
@@ -39,9 +48,21 @@ def coffee(product):
     product("Coffee", "COF", 150, "restaurant.drink")
 
 
+def a_till(ctx: OperationContext | None = None):
+    return run("printing.printer.create", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}, ctx)
+
+
 @pytest.fixture
 def till(db):
-    return run("printing.printer.create", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"})
+    return a_till()
+
+
+@pytest.fixture
+def platform(settings, hub_b):
+    """ERPlora's own hub (``PLATFORM_HUB_SLUG``), here the business ``B``'s: a registry row with a database of its own,
+    as any business, and no business on erplora.com, so no country of its own."""
+    settings.PLATFORM_HUB_SLUG = hub_b.slug
+    return hub_b
 
 
 def charge(key: str = "sale-currency-1", ctx: OperationContext | None = None, sku: str = "COF", **more):
@@ -52,8 +73,8 @@ def charge(key: str = "sale-currency-1", ctx: OperationContext | None = None, sk
     )
 
 
-def coffee_in(scope: Scope, sku: str) -> None:
-    """A coffee of 150 in ``scope``'s catalog (the scopes here share one database, so each takes its own SKU)."""
+def coffee_in(scope: Scope, sku: str = "COF") -> None:
+    """A coffee of 150 in ``scope``'s catalog, inside its business."""
     data = {"name": "Coffee", "sku": sku, "price": 150, "tax_category_key": "restaurant.drink"}
     run("inventory.product.create", data, system_context(scope))
 
@@ -67,6 +88,7 @@ def jobs() -> list[PrintJob]:
 
 def test_a_business_in_poland_charges_in_zlotys(coffee):
     business_in("PL")
+    taxed_in("PL")
     sale = charge()
     assert sale.currency == "PLN" and Sale.objects.get(pk=sale.id).currency == "PLN"
     detail = run("sale.sale.get", {"sale_id": str(sale.id)})
@@ -79,17 +101,19 @@ def test_a_business_in_spain_still_charges_in_euros(coffee):
     assert (sale.currency, sale.currency_decimals) == ("EUR", 2)
 
 
-def test_each_hub_charges_in_its_own_business_s_currency(product):
-    business_in("PL", "a")
-    business_in("ES", "b")
-    product("Coffee", "COF", 150, "restaurant.drink")
-    coffee_in(B, "COF-B")
+def test_each_hub_charges_in_its_own_business_s_currency(coffee, hub_b):
+    business_in("PL")
+    taxed_in("PL")
+    business_in("ES", hub_b.slug)
+    with use_hub(hub_b):
+        coffee_in(B)
+        assert charge("sale-currency-b", ctx_for(scope=B)).currency == "EUR"
     assert charge("sale-currency-a").currency == "PLN"
-    assert charge("sale-currency-b", ctx_for(scope=B), sku="COF-B").currency == "EUR"
 
 
 def test_an_api_key_with_only_its_operation_s_permission_charges_in_the_business_s_currency(coffee):
     business_in("PL")
+    taxed_in("PL")
     # A key that charges holds what an employee charging holds, not the Home's permission that reads the business.
     charging = ctx_for("hub_employee").permissions - {"base.view_home"}
     key = OperationContext(scope=A, actor="key", permissions=charging)
@@ -100,6 +124,7 @@ def test_an_api_key_with_only_its_operation_s_permission_charges_in_the_business
 def test_a_sale_says_the_decimals_of_its_currency_as_the_server_counts_them(coffee, country, currency, decimals):
     # Intl gives the forint no decimals; the server (CLDR) two: a screen paints with these, never the browser's.
     business_in(country)
+    taxed_in(country)
     sale = charge()
     assert (sale.currency, sale.currency_decimals) == (currency, decimals)
     (row,) = run("sale.sale.list", {}).rows
@@ -108,6 +133,7 @@ def test_a_sale_says_the_decimals_of_its_currency_as_the_server_counts_them(coff
 
 def test_a_charged_sale_keeps_its_currency_when_the_business_s_changes(coffee):
     business_in("PL")
+    taxed_in("PL")
     zlotys = charge("sale-currency-pl")
     business_in("ES")
     euros = charge("sale-currency-es")
@@ -118,14 +144,14 @@ def test_a_charged_sale_keeps_its_currency_when_the_business_s_changes(coffee):
 
 
 @pytest.mark.parametrize("country", ["PL", "JP"])
-def test_erploras_own_hub_charges_in_the_currency_of_its_issuer_s_country(settings, country):
-    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its sales keep the
-    # currency of its issuer's country, as its invoices do (hub#273), and the charge never fails for it.
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def test_erploras_own_hub_charges_in_the_currency_of_its_issuer_s_country(settings, platform, country):
+    # ERPlora's own hub has no business on erplora.com: its sales keep the currency of its issuer's country, as its
+    # invoices do (hub#273), and the charge never fails for it.
     settings.PLATFORM_ISSUER_COUNTRY = country
-    platform = Scope("host", "erplora")
-    coffee_in(platform, "COF-ERPLORA")
-    sale = charge(ctx=ctx_for(scope=platform), sku="COF-ERPLORA")
+    with use_hub(platform):
+        taxed_in(country, B)
+        coffee_in(B)
+        sale = charge(ctx=ctx_for(scope=B))
     assert sale.currency == {"PL": "PLN", "JP": "JPY"}[country]
 
 
@@ -143,6 +169,7 @@ def test_money_in_a_sentence_takes_the_decimals_and_the_sign_of_its_currency():
 
 def test_a_refused_refund_says_the_amounts_in_the_sale_s_currency(coffee):
     business_in("PL")
+    taxed_in("PL")
     sale = charge()
     card = str(sale.payments[0].id)
     with translation.override("en"), pytest.raises(Conflict) as refusal:
@@ -153,6 +180,7 @@ def test_a_refused_refund_says_the_amounts_in_the_sale_s_currency(coffee):
 
 def test_a_service_s_range_is_said_in_the_business_s_currency(db):
     business_in("JP")
+    taxed_in("JP")
     colour = run(
         "service.service.create",
         {"name": "Colour", "pricing_type": "from", "price": 6000, "min_price": 5000, "max_price": 9000, "tax_category_key": "service.generic"},
@@ -167,10 +195,15 @@ def test_a_service_s_range_is_said_in_the_business_s_currency(db):
 
 def test_the_preview_says_its_legal_limits_are_in_euros_whatever_the_business_charges_in(coffee):
     # hub#926: the law writes them in euros; the preview says so beside them, as a payment says its currency beside its
-    # amount, so whoever reads them (Automations, the assistant) never takes them for yen.
-    business_in("JP")
+    # amount, so whoever reads them (Automations, the assistant) never takes them for yen. They are Spain's law: a
+    # business of Japan, which charges in yen, has none, and still says the currency they would be in.
+    business_in("ES")
     preview = run("sale.checkout.preview", {"lines": [{"product": "COF"}]})
     assert (preview.cash_limit, preview.ticket_limit, preview.limits_currency) == (100000, 300000, "EUR")
+    business_in("JP")
+    taxed_in("JP")
+    preview = run("sale.checkout.preview", {"lines": [{"product": "COF"}]})
+    assert (preview.cash_limit, preview.ticket_limit, preview.limits_currency) == (None, None, "EUR")
 
 
 def test_the_cash_limit_of_spain_is_still_said_in_euros(product):
@@ -185,6 +218,7 @@ def test_the_cash_limit_of_spain_is_still_said_in_euros(product):
 def test_the_bill_on_paper_takes_the_decimals_of_the_business_s_currency(coffee, till):
     # The yen has no cents: two coffees of 150 are ¥300 on the paper, not 3.00.
     business_in("JP")
+    taxed_in("JP")
     order = run("sale.order.open", {"lines": [{"product": "COF", "quantity": "2"}], "label": "Table 4"})
     run("sale.order.print_bill", {"order_id": str(order.id)})
     (job,) = jobs()
@@ -194,6 +228,7 @@ def test_the_bill_on_paper_takes_the_decimals_of_the_business_s_currency(coffee,
 def test_the_receipt_prints_in_the_currency_of_its_sale_even_after_the_business_s_changes(coffee, till):
     run("invoice.issuer.update", ISSUER)
     business_in("JP")
+    taxed_in("JP")
     sale = charge()
     business_in("ES")
     run("sale.sale.print", {"sale_id": str(sale.id), "duplicate": True})
@@ -205,6 +240,7 @@ def test_the_receipt_prints_in_the_currency_of_its_sale_even_after_the_business_
 def test_what_a_sale_can_give_back_is_said_in_its_own_currency(coffee):
     # The refund screen paints what each tender has left with the sale's money, whatever the business's is now.
     business_in("JP")
+    taxed_in("JP")
     sale = charge()
     business_in("ES")
     options = run("sale.refund.options", {"sale_id": str(sale.id)})
@@ -220,9 +256,8 @@ def test_what_a_sale_can_give_back_is_said_in_its_own_currency(coffee):
 
 def coffee_for(scope: Scope) -> str:
     """A coffee of 150 in ``scope``'s catalog, and its SKU."""
-    sku = f"COF-{scope.key.upper()}"
-    coffee_in(scope, sku)
-    return sku
+    coffee_in(scope)
+    return "COF"
 
 
 def colour_for(scope: Scope) -> str:
@@ -270,14 +305,15 @@ FROM_BASE = {
 
 @pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
 @pytest.mark.parametrize("caller", sorted(FROM_BASE))
-def test_each_place_takes_the_currency_base_answers(caller, platform_hub, till, settings, monkeypatch):
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def test_each_place_takes_the_currency_base_answers(caller, platform_hub, settings, monkeypatch, in_business_a, platform):
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     business_in("ES")
-    scope = Scope("host", "erplora") if platform_hub else A
+    hub, scope = (platform, B) if platform_hub else (in_business_a, A)
     prepare, through, base_says, gives = FROM_BASE[caller]
-    ready = prepare(scope)
     asked = []
-    monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or base_says)
-    assert through(ctx_for(scope=scope), ready) == gives
+    with use_hub(hub):
+        a_till(ctx_for(scope=scope))
+        ready = prepare(scope)
+        monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or base_says)
+        assert through(ctx_for(scope=scope), ready) == gives
     assert asked and set(asked) == {scope}

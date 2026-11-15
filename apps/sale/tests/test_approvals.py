@@ -24,7 +24,7 @@ from live.operations import get as operation
 
 from apps.invoice.models import Invoice
 from apps.sale.models import Order, OrderLine, Sale, SaleLine
-from apps.sale.tests.conftest import HUB_DB, run
+from apps.sale.tests.conftest import HOST, HUB_DB, run
 from apps.sale.tests.test_integration_invoice import ISSUER
 from apps.sale.tests.test_integration_service import charged_with_voucher
 from apps.service.models import Redemption
@@ -32,8 +32,6 @@ from base.models import Credential
 from base.tests.test_people import with_pin
 
 pytestmark = HUB_DB
-
-HOST = "a.localhost"
 
 #: The commands of the till a manager may approve, and what the dialog says is approved.
 APPROVABLE = {

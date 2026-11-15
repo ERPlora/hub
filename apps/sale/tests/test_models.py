@@ -5,8 +5,9 @@ from decimal import Decimal
 from uuid import uuid7
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connections
 from django.utils import translation
+from live.operations import atomic
 
 from apps.sale.models import (
     Department,
@@ -22,12 +23,13 @@ from apps.sale.models import (
 )
 from apps.sale.tests.conftest import HUB_DB
 from apps.tax.models import TaxCategory
+from base.tenancy.context import current_alias
 
 pytestmark = HUB_DB
 
 
 def refused(make):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 
@@ -179,13 +181,16 @@ def test_a_line_may_be_a_service_and_may_be_paid_with_a_voucher_session():
 def test_a_refund_may_give_back_no_money_but_never_a_negative_amount():
     sale = a_sale()
     Refund.objects.create(sale=sale, total=0, reason="only the session")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Refund.objects.create(sale=sale, total=-1, reason="x")
 
 
-def _indexes(table: str) -> dict:
-    from django.db import connection
+def _business_database():
+    return connections[current_alias()]
 
+
+def _indexes(table: str) -> dict:
+    connection = _business_database()
     with connection.cursor() as cursor:
         found = connection.introspection.get_constraints(cursor, table)
     return {name: info for name, info in found.items() if info["index"]}
@@ -194,8 +199,7 @@ def _indexes(table: str) -> dict:
 def test_the_cash_register_reads_voids_and_refunds_by_time_through_an_index():
     # Cash register (CASH_REGISTER-F11, F17) reads the voids and the refunds of a shift by their time:
     # a partial index on the voided sales only, and one on when each refund was made.
-    from django.db import connection
-
+    connection = _business_database()
     sale_indexes = _indexes(Sale._meta.db_table)
     assert sale_indexes["sale_sale_voided_idx"]["columns"] == ["voided_at"]
     with connection.cursor() as cursor:

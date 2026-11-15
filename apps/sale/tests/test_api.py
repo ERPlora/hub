@@ -1,6 +1,6 @@
 """The sale app's routes: each bound to its operation, and the main flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to the business ``A``'s host (``HOST``) with Django's sync test client, which sees the test's
 transaction.
 """
 
@@ -13,7 +13,7 @@ from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
 from apps.sale.api import router
-from apps.sale.tests.conftest import HUB_DB, A, run
+from apps.sale.tests.conftest import HOST, HUB_DB, A, run
 from base.tests.routes import bound_routes, spa_route_map
 from config.api import api
 
@@ -87,11 +87,11 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
+def get(client, path, host=HOST, **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data, host="a.localhost", **headers):
+def post(client, path, data, host=HOST, **headers):
     return client.post(
         f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host, **headers
     )
@@ -99,13 +99,13 @@ def post(client, path, data, host="a.localhost", **headers):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", role="hub_employee"))
     return client
 
 

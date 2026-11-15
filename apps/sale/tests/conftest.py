@@ -28,6 +28,8 @@ from base.tenancy.tests import hubs
 #: The businesses of the root conftest's ``hub_a`` and ``hub_b``, each with its own database.
 A = Scope("host", "tenant-a")
 B = Scope("host", "tenant-b")
+#: The host of the business ``A``'s pages and API.
+HOST = f"{A.key}.localhost"
 #: The mark of a sale test that uses the database: both businesses' databases next to control's.
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
