@@ -1,4 +1,4 @@
-// Rows of Settings › Data for its tests, shaped as base/schemas.py answers them.
+// Rows of Settings › Data for its tests, shaped as base/schemas/ answers them.
 import type { BlueprintSummary, ImportRow, Template } from '../operations';
 
 export function template(key: string, fields: Partial<Template> = {}): Template {

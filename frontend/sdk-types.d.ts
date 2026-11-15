@@ -1,5 +1,5 @@
 // Types of the hub's operations for the SDK (`useLive`, `useCommand`, `client.api.call`).
-// Written by hand from base/schemas.py, keyed by operation name.
+// Written by hand from base/schemas/, keyed by operation name.
 // Keep it in step with `./generated/operations.json`. One input per operation (ninja's parity):
 // no path parameters, so the item `id` travels in the input — query string (GET) or body (POST).
 import type { SessionMe } from '@erplora/ui/shell';

@@ -1,5 +1,5 @@
-// Types of base's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from base/schemas.py. Written by
-// hand, as the apps'. Keep it in step with schemas.py and
+// Types of base's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from base/schemas/. Written by
+// hand, as the apps'. Keep it in step with base/schemas/ and
 // `frontend/generated/operations.json`. The Home's take no input: each one answers for the person and the hub of the request.
 
 type NoInput = Record<string, never>;
