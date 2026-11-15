@@ -81,7 +81,7 @@ function expireNow(slug: string): string {
   }).trim();
 }
 
-test('a demo from the SaaS door: empty hub as «Demo», something made, ended now → 410 → the door says it ended', async ({
+test('a demo from the SaaS door: empty hub as «Demo», something made, ended now → 410 → the door says it ended @smoke', async ({
   page,
   context,
 }) => {

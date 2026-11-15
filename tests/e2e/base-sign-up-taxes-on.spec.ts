@@ -64,7 +64,7 @@ test.afterAll(async () => {
   await portugal?.context.close();
 });
 
-test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Taxes on and VeriFactu off', async ({
+test('BASE-F63 BASE-F14 BASE-F01 TAX-F16 — a business of Spain is born with Taxes on and VeriFactu off @smoke', async ({
   browser,
 }) => {
   test.setTimeout(300_000);

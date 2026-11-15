@@ -147,7 +147,7 @@ async function chooseServiceStaffAndDay(page: Page, what: Offer, day: string): P
   await input.press('Tab');
 }
 
-test('Agenda: book with a free time, an overlap refused, the grid and the week, drag, cancel, charge, series and the card', async ({ browser }) => {
+test('Agenda: book with a free time, an overlap refused, the grid and the week, drag, cancel, charge, series and the card @smoke', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/appointment/agenda');
   let who!: Cast;
   try {

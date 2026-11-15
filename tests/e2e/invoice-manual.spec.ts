@@ -105,7 +105,7 @@ test('INVOICE-F21: without the issuer Invoices says so once; «Set up» opens it
   }
 });
 
-test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and rectified', async ({ page, context }) => {
+test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and rectified @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/invoice/invoices');
   await ensureIssuer(context);

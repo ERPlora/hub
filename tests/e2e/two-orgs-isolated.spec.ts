@@ -24,7 +24,7 @@ async function writeAndWatch(writer: Page, other: Page, name: string) {
   return { before: before.length, after: after.length, samples, sameRows: JSON.stringify(before) === JSON.stringify(after), leaked: leaked !== undefined };
 }
 
-test('a write in b does not reach a within 2 s, and the other way round', async ({ browser }) => {
+test('a write in b does not reach a within 2 s, and the other way round @smoke', async ({ browser }) => {
   const a = await hostPage(browser, A);
   const b = await hostPage(browser, B);
   await listReady(a.page);

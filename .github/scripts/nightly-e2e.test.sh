@@ -81,6 +81,7 @@ EOF
 # pnpm: `install`; `e2e <args>` logs its arguments, the commit it runs on, its environment and the fake servers
 # alive, leaves FAKE_RESULTS as its JSON report and exits with FAKE_E2E_EXIT. FAKE_MAIN_MOVES=<remote> moves main
 # and fetches it meanwhile; with FAKE_E2E_NEVER_ENDS it then sleeps like specs that hang (its pid in $FAKE_PIDS).
+# FAKE_GONE_LISTENER=<file>: when the specs end, lsof reports once the pid in <file>.pid, a server already gone.
 cat > "$root/bin/pnpm" <<'EOF'
 #!/usr/bin/env bash
 where="$(basename "$PWD")"
@@ -102,6 +103,7 @@ case "${1:-}" in
       git -C "$FAKE_MAIN_MOVES" -c user.name=nightly -c user.email=nightly@example.com commit -q --allow-empty -m later
       git -C "$HUB_REPO" fetch --quiet origin
     fi
+    [ -z "${FAKE_GONE_LISTENER:-}" ] || cp "$FAKE_GONE_LISTENER.pid" "$FAKE_GONE_LISTENER"
     if [ -n "${FAKE_E2E_NEVER_ENDS:-}" ]; then
       echo "$$" >> "$FAKE_PIDS"
       exec sleep 120
@@ -144,6 +146,11 @@ EOF
 cat > "$root/bin/lsof" <<'EOF'
 #!/usr/bin/env bash
 echo "lsof $*" >> "$FAKE_CALLS"
+if [ -n "${FAKE_GONE_LISTENER:-}" ] && [ -f "$FAKE_GONE_LISTENER" ]; then
+  cat "$FAKE_GONE_LISTENER"
+  rm -f "$FAKE_GONE_LISTENER"
+  exit 0
+fi
 exit 1
 EOF
 cat > "$root/bin/launchctl" <<'EOF'
@@ -309,6 +316,12 @@ expect "NIGHTLY_HUB_PORT moves the whole stack" 1 \
   "$(calls 'E2E_HUB_PORT=28770 VITE_DEV_PORT=28775 SAAS_URL=http://localhost:28771 DB_NAME=hub_e2e_28770 E2E_SAAS_DB=saas_e2e_28771')"
 expect "and the SaaS's Vite with it" 1 "$(calls_re '^runserver saas 127\.0\.0\.1:28771 DB_NAME=saas_e2e_28771 VITE_DEV_PORT=28776 ')"
 expect "--spec runs only that spec" 1 "$(calls_re '^e2e hub args=--global-timeout=[0-9]+ tests/e2e/sale-sales\.spec\.ts HEAD=')"
+# A commit only the clone has, as a branch not pushed yet: the smoke runs the commit checked out, not main.
+unpushed="$(g -C "$hub_clone" commit-tree -p "$clone_head" -m unpushed "$(git -C "$hub_clone" rev-parse "$clone_head^{tree}")")"
+night NIGHTLY_GREP=@smoke NIGHTLY_HUB_REF="$unpushed" FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
+expect "NIGHTLY_GREP runs only the tests it matches" 1 "$(calls_re '^e2e hub args=--global-timeout=[0-9]+ --grep @smoke HEAD=')"
+expect "NIGHTLY_HUB_REF runs the Hub on that commit, even one not pushed" 1 "$(calls "HEAD=$unpushed ")"
+expect "and the shared checkout's HEAD does not move" "$clone_head" "$(git -C "$hub_clone" rev-parse HEAD)"
 night QA_REAL_PROVIDER=1 E2E_HEADED=1
 expect "the specs that spend real tokens stay off" 1 "$(calls_re 'QA_REAL_PROVIDER= E2E_OUTPUT_DIR=')"
 
@@ -355,6 +368,16 @@ night FAKE_MAIN_MOVES="$root/remote/hub"
 expect "main moved and was fetched during the night" 0 \
   "$([ "$(git -C "$hub_clone" rev-parse origin/main)" = "$newest_main" ] && echo 1 || echo 0)"
 expect "the issue still names the commit the specs ran on" 1 "$(grep -cF "(commit \`${newest_main:0:7}\`)" "$BODIES_LOG" || true)"
+
+# --- a server that closes while the clean-up looks for it ------------------------------------------------
+sleep 0 &
+echo "$!" > "$root/gone.pid"
+wait "$!"
+night FAKE_GONE_LISTENER="$root/gone" FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
+expect "a green night stays green when a server it stops is already gone" 0 "$status"
+expect "its databases are still dropped after the specs" 1 \
+  "$([ "$(last_line_of 'drop saas')" -gt "$(line_of 'e2e hub')" ] && echo 1 || echo 0)"
+expect "and its worktrees removed" "1 1" "$(worktrees "$hub_clone") $(worktrees "$root/erplora/saas")"
 
 # --- a night that is told to stop ------------------------------------------------------------------------
 settings=(FAKE_E2E_NEVER_ENDS=1)

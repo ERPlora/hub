@@ -8,17 +8,18 @@
 #   nightly-e2e.sh uninstall-launchd
 #
 # A night builds the stack of tests/e2e/README.md («Varias ejecuciones a la vez») by itself: detached worktrees of
-# origin/main of the Hub and the SaaS in NIGHTLY_DIR (the shared checkouts only get a fetch), their e2e databases,
+# the Hub and the SaaS in NIGHTLY_DIR (the shared checkouts only get a fetch), their e2e databases,
 # the SaaS seeded with the ids of `a` and `b` and the fake assistant provider, both runservers and `pnpm e2e`.
 # Whatever happens, it then stops what listens on the stack's ports, drops both databases and removes the worktrees.
 # A step before the specs that fails is a red night too, and the issue names it. Each night's log and Playwright's
 # output (results.json, traces, failure screenshots) stay in NIGHTLY_DIR/runs/<night>/, the newest NIGHTLY_KEEP_RUNS.
 #
 # Environment (default): NIGHTLY_DIR (~/.erplora/hub-nightly-e2e) · HUB_REPO (the clone this script is in) ·
-# ERPLORA_ROOT (the folder above it: compose.yaml, blueprints/) · SAAS_REPO ($ERPLORA_ROOT/saas) ·
-# NIGHTLY_HUB_PORT (9770, below the ports the fleet's workers take; the SaaS on +1, the fake assistant provider on +2, the two Vites on +5 and +6, Meta's
-# proxy on +9) · NIGHTLY_MAX_MINUTES (360, Playwright's global timeout) · NIGHTLY_START_SECONDS (300, for the
-# servers to answer) · NIGHTLY_KEEP_RUNS (7) · GH_REPO (ERPlora/hub).
+# ERPLORA_ROOT (the folder above it: compose.yaml, blueprints/) · SAAS_REPO ($ERPLORA_ROOT/saas) · NIGHTLY_HUB_REF
+# (origin/main; the Hub's commit, any of HUB_REPO, pushed or not) · NIGHTLY_GREP (none; Playwright's --grep) ·
+# NIGHTLY_HUB_PORT (9770, under the fleet workers' ports; SaaS +1, fake assistant provider +2, Vites +5 and +6, Meta's
+# proxy +9) · NIGHTLY_MAX_MINUTES (360, Playwright's global timeout) · NIGHTLY_START_SECONDS (300, for the servers to
+# answer) · NIGHTLY_KEEP_RUNS (7) · GH_REPO (ERPlora/hub).
 # Exit: 0 green · 1 red · 2 usage · 3 another night is running · 4 install-launchd without the script in HUB_REPO.
 set -euo pipefail
 
@@ -199,20 +200,19 @@ remove_worktree() { # <repo> <dir>: the night's own, so --force (it has submodul
   git -C "$1" worktree prune
 }
 
-# The .env lives only in the repo's main checkout, the one that holds .git, also when the night starts from a
-# linked worktree.
+# The .env lives only in the repo's main checkout, the one that holds .git, also from a linked worktree.
 main_checkout() { (cd "$1" && cd "$(git rev-parse --git-common-dir)/.." && pwd); }
 
-make_worktree() { # <repo> <dir>
+make_worktree() { # <repo> <dir> [<commit>, origin/main]
   local env_file
   env_file="$(main_checkout "$1")/.env" &&
     remove_worktree "$1" "$2" &&
-    git -C "$1" worktree add --quiet --detach "$2" origin/main &&
+    git -C "$1" worktree add --quiet --detach "$2" "${3:-origin/main}" &&
     git -C "$2" submodule update --init --quiet &&
     { [ ! -f "$env_file" ] || cp "$env_file" "$2/.env"; }
 }
 
-make_worktrees() { make_worktree "$HUB_REPO" "$hub_wt" && make_worktree "$SAAS_REPO" "$saas_wt"; }
+make_worktrees() { make_worktree "$HUB_REPO" "$hub_wt" "${NIGHTLY_HUB_REF:-origin/main}" && make_worktree "$SAAS_REPO" "$saas_wt"; }
 
 dependencies() { (cd "$1" && uv sync && pnpm install --frozen-lockfile); }
 
@@ -280,7 +280,7 @@ signal_all() { # <signal>
   local pid pgid
   for pid in ${started[@]+"${started[@]}"}; do kill "-$1" -- "-$pid" 2> /dev/null || true; done
   for pid in $(listeners); do
-    pgid="$(ps -o pgid= -p "$pid" 2> /dev/null | tr -d ' ')"
+    pgid="$(ps -o pgid= -p "$pid" 2> /dev/null | tr -d ' ')" || continue # gone since lsof saw it
     if [ -n "$pgid" ] && [ "$pgid" != "$own_pgid" ]; then
       kill "-$1" -- "-$pgid" 2> /dev/null || true
     else
@@ -314,8 +314,8 @@ stop_stack() {
 # specs in the foreground would wait hours for them; `wait` returns at once and the clean-up stops their group.
 run_specs() {
   set -m
-  (cd "$hub_wt" && exec env "${hub_env[@]}" CI=1 E2E_OUTPUT_DIR="$run/test-results" \
-    pnpm e2e --global-timeout=$((MAX_MINUTES * 60000)) ${specs[@]+"${specs[@]}"}) < /dev/null &
+  (cd "$hub_wt" && exec env "${hub_env[@]}" CI=1 E2E_OUTPUT_DIR="$run/test-results" pnpm e2e \
+    --global-timeout=$((MAX_MINUTES * 60000)) ${NIGHTLY_GREP:+--grep "$NIGHTLY_GREP"} ${specs[@]+"${specs[@]}"}) < /dev/null &
   started+=("$!")
   set +m
   wait "$!"
@@ -352,7 +352,7 @@ say "night in $run, Hub on $HUB_PORT, SaaS on $SAAS_PORT, databases $HUB_DB and 
 result=failure
 failed_step=""
 if step "traer origin/main" && fetch_main &&
-  step "los worktrees de origin/main" && make_worktrees &&
+  step "los worktrees" && make_worktrees &&
   step "las dependencias del Hub" && dependencies "$hub_wt" &&
   step "las dependencias del SaaS" && dependencies "$saas_wt" &&
   step "borrar lo que dejó una noche anterior" && clear_earlier_night &&

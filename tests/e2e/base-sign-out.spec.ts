@@ -52,7 +52,7 @@ async function signOutOfTheBusiness(): Promise<number> {
   return (await landed).status();
 }
 
-test('BASE-F61: «Sign out» on a personal device lands on erplora.com’s question, never a 404; «Stay signed in» keeps its session', async ({ browser }) => {
+test('BASE-F61: «Sign out» on a personal device lands on erplora.com’s question, never a 404; «Stay signed in» keeps its session @smoke', async ({ browser }) => {
   await login(page, origin, '/', credentials);
   expect(await signOutOfTheBusiness()).toBe(200);
   await expect(page).toHaveURL(SIGN_OUT_PAGE);

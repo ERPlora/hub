@@ -108,7 +108,7 @@ async function addCoffee(page: Page): Promise<void> {
   await expect(shown(page).locator('[data-testid=pos-total]')).toContainText(/1[.,]50/);
 }
 
-test('PRINTING-F07, F13, F08: the charge queues its receipt (the drawer only with cash) and «Print» a copy', async ({ page, context }) => {
+test('PRINTING-F07, F13, F08: the charge queues its receipt (the drawer only with cash) and «Print» a copy @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);

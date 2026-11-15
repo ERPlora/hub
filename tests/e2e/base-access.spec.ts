@@ -139,7 +139,7 @@ test.afterAll(async () => {
   await employee?.context.close();
 });
 
-test('the owner enters with the account, names themselves and chooses their PIN', async () => {
+test('the owner enters with the account, names themselves and chooses their PIN @smoke', async () => {
   const page = owner.page;
   await login(page, origin, '/profile', owner.credentials);
   // A business is born with every app off: Sales, for the sale «Switch user» takes over on the till.

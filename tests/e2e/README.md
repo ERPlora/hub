@@ -239,11 +239,14 @@ comenta, y la primera noche en verde la cierra. No es un check: una noche roja n
 en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los planes, solo `aws` usa Actions; el SaaS hace lo
 mismo con su pasada.
 
-- **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub y del SaaS en
+- **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub (o del commit que diga
+  `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en
   `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
   `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
   `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
-  (`NIGHTLY_MAX_MINUTES`, 360). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera.
+  (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con ese patrón (`--grep` de
+  Playwright). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera. El humo de navegador
+  (`.github/scripts/smoke-e2e.sh`, README del Hub) es esta misma pila con `@smoke`, el commit en el que estás y su tope.
 - **Pase lo que pase**, al acabar para lo que escucha en los puertos de la pila (también un `runserver` que una spec
   reinició), borra las dos BD y quita los worktrees; al empezar, borra lo que dejó una noche cortada. Un paso previo a las
   specs que falla (las dependencias, una BD, la siembra, los servidores que no contestan) también es una noche roja, y la

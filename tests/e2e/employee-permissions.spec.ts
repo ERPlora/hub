@@ -22,7 +22,7 @@ async function addLine(context: BrowserContext, id: string, text: string): Promi
   expect(res.status, `add_line ${text}`).toBe(200);
 }
 
-test('DEMO-F06: an employee sees Demo but cannot manage it, by the screens or by the API', async ({ browser }) => {
+test('DEMO-F06: an employee sees Demo but cannot manage it, by the screens or by the API @smoke', async ({ browser }) => {
   const owner = await hostPage(browser, A);
   const item = await createItem(owner.context, A, uniqueName('F06'));
   await addLine(owner.context, item.id, OWNER_LINE);

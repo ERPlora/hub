@@ -23,6 +23,33 @@ sube al repo.
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
 del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
 
+## El humo de navegador (`@smoke`)
+
+```bash
+bash .github/scripts/smoke-e2e.sh    # los tests @smoke del commit en el que estás; rojo si uno falla o si pasan del tope
+```
+
+Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
+suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
+citas, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada
+nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
+
+- **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
+  `pnpm e2e --list --grep @smoke` los lista.
+- **Qué código**: el último commit del checkout desde el que se lanza, subido o no; lo que no está en un commit no entra.
+  El SaaS va en su `origin/main`.
+- **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
+  cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
+- **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
+  pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
+  `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
+  registros de los dos `runserver` y `test-results/`).
+- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con
+  argumentos, porque no lleva ninguno; 3 si ya corre otro humo en esa carpeta.
+- **Entrar en el humo**: un test se marca solo después de pasar 3 veces seguidas con este comando. Uno que falla sin
+  nada roto frenaría todos los cambios: se queda fuera y, si es un fallo de verdad, va a su issue.
+- Hoy no frena ninguna fusión: se corre a mano.
+
 ## Registro de hubs y `/internal`
 
 El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `docs/plans/2026-10-17-demo-hubs-fase-1.md`,
