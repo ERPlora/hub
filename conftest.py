@@ -277,16 +277,19 @@ def hub_databases(django_db_setup, django_db_blocker):
         hubs.drop(built)
 
 
-def _hub_with_its_database(request, hub_id, slug, db_name):
-    """The row in control of a hub whose database the session made, with every app on in it (``every_app_on``); the
-    test names it in its ``django_db`` (``databases=hubs.HUB_DATABASES``), whose transaction rolls both back. A
-    ``transaction=True`` test commits in the hub's database: its rows are deleted after it."""
+def _hub_with_its_database(request, hub_databases, hub_id, slug, db_name):
+    """The row in control of a hub whose database the session made, as its sign-up leaves it (the apps its database
+    has, ``Hub.schema_apps``), with every app on in it (``every_app_on``); the test names it in its ``django_db``
+    (``databases=hubs.HUB_DATABASES``), whose transaction rolls both back. A ``transaction=True`` test commits in the
+    hub's database: its rows are deleted after it."""
     from base.tenancy import identity
     from base.tenancy.context import use_hub
     from base.tenancy.tests import hubs
     from control.models import Hub
 
-    hub = Hub.objects.create(id=hub_id, slug=slug, status=Hub.Status.READY, db_name=db_name)
+    hub = Hub.objects.create(
+        id=hub_id, slug=slug, status=Hub.Status.READY, db_name=db_name, schema_apps=hub_databases.schema_apps[db_name]
+    )
     verified = set(identity._verified)
     with use_hub(hub):
         _every_app_on(slug)
@@ -303,7 +306,7 @@ def hub_a(request, hub_databases):
     """The hub ``tenant-a``, ready, with its own database (``hub_databases.a``), as every hub is."""
     from base.tenancy.tests import hubs
 
-    yield from _hub_with_its_database(request, hubs.HUB_A_ID, "tenant-a", hub_databases.a)
+    yield from _hub_with_its_database(request, hub_databases, hubs.HUB_A_ID, "tenant-a", hub_databases.a)
 
 
 @pytest.fixture
@@ -311,7 +314,7 @@ def hub_b(request, hub_databases):
     """The hub ``tenant-b``, ready, with its own database (``hub_databases.b``)."""
     from base.tenancy.tests import hubs
 
-    yield from _hub_with_its_database(request, hubs.HUB_B_ID, "tenant-b", hub_databases.b)
+    yield from _hub_with_its_database(request, hub_databases, hubs.HUB_B_ID, "tenant-b", hub_databases.b)
 
 
 def pytest_collection_modifyitems(items):
