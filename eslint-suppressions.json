@@ -1,4 +1,14 @@
 {
+  "apps/appointment/frontend/components/AppointmentFormModal.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "apps/appointment/frontend/components/DayGrid.vue": {
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
   "apps/appointment/frontend/components/SeriesFormModal.vue": {
     "complexity": {
       "count": 1
@@ -42,6 +52,11 @@
       "count": 2
     }
   },
+  "apps/attendance/frontend/pages/ClockPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
   "apps/cart_checkout/frontend/__tests__/list-page-checks.ts": {
     "max-params": {
       "count": 1
@@ -64,6 +79,11 @@
   },
   "apps/cash_register/frontend/lib/summary.ts": {
     "max-params": {
+      "count": 1
+    }
+  },
+  "apps/combo/frontend/components/CourseCard.vue": {
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
@@ -92,6 +112,11 @@
   },
   "apps/customer/frontend/lib/useListState.ts": {
     "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/flow/frontend/components/StepNode.vue": {
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
@@ -152,6 +177,16 @@
       "count": 1
     }
   },
+  "apps/inventory/frontend/pages/ProductsPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "apps/invoice/frontend/components/InvoicePaper.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "apps/invoice/frontend/composables/useLiveWindows.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -170,6 +205,11 @@
       "count": 1
     },
     "max-params": {
+      "count": 1
+    }
+  },
+  "apps/kitchen/frontend/components/KdsTicket.vue": {
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
@@ -198,6 +238,11 @@
       "count": 1
     }
   },
+  "apps/online_booking/frontend/pages/PreviewPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "apps/payment/frontend/composables/useServerTable.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -205,6 +250,11 @@
   },
   "apps/pricing/frontend/__tests__/table-checks.ts": {
     "max-params": {
+      "count": 1
+    }
+  },
+  "apps/pricing/frontend/components/RuleFormModal.vue": {
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
@@ -253,8 +303,28 @@
       "count": 1
     }
   },
+  "apps/sale/frontend/components/checkout/CheckoutPanel.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "apps/sale/frontend/components/document/__tests__/fixtures.ts": {
     "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/components/pos/CartLine.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/components/pos/PosItemTile.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "apps/sale/frontend/components/pos/PosSheet.vue": {
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
@@ -311,6 +381,11 @@
       "count": 1
     }
   },
+  "apps/sale/frontend/pages/PosPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
   "apps/schedule/frontend/composables/useLiveList.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -328,6 +403,9 @@
   },
   "apps/staff/frontend/components/MemberFormModal.vue": {
     "complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
@@ -369,6 +447,11 @@
       "count": 1
     }
   },
+  "apps/task/frontend/components/TaskSheet.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "apps/task/frontend/composables/useServerTable.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -394,6 +477,11 @@
       "count": 1
     }
   },
+  "apps/verifactu/frontend/components/RepresentationGrant.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "apps/verifactu/frontend/composables/useLiveWindows.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -407,14 +495,39 @@
       "count": 1
     }
   },
+  "apps/verifactu/frontend/pages/RecordDetailPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "apps/verifactu/frontend/pages/SettingsPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "apps/website/frontend/components/HoursEditor.vue": {
     "max-params": {
+      "count": 1
+    }
+  },
+  "apps/website/frontend/components/TemplatePicker.vue": {
+    "vue/max-lines-per-block": {
       "count": 1
     }
   },
   "apps/website/frontend/lib/hours.ts": {
     "max-params": {
       "count": 1
+    }
+  },
+  "apps/website/frontend/pages/WebsitePage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "apps/whatsapp_inbox/frontend/components/TemplateFormModal.vue": {
+    "vue/max-lines-per-block": {
+      "count": 2
     }
   },
   "apps/whatsapp_inbox/frontend/composables/useLiveList.ts": {
@@ -465,6 +578,21 @@
       "count": 1
     }
   },
+  "base/frontend/components/WidgetPanel.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "base/frontend/components/data/ExportPanel.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "base/frontend/components/data/ResetPanel.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "base/frontend/lib/access.ts": {
     "max-params": {
       "count": 1
@@ -503,6 +631,26 @@
   },
   "base/frontend/lib/plan-usage.ts": {
     "max-params": {
+      "count": 2
+    }
+  },
+  "base/frontend/pages/AppsPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "base/frontend/pages/FilesPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 3
+    }
+  },
+  "base/frontend/pages/LoginPage.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "base/frontend/pages/ProfilePage.vue": {
+    "vue/max-lines-per-block": {
       "count": 2
     }
   },
