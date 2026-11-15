@@ -6,20 +6,25 @@ the same invoice at once are one rectification, and the other is refused without
 (the current product's open question 12, closed here with its test).
 """
 
-import threading
-
 import pytest
-from django.db import connection
 from django.utils import timezone
 from live.errors import OperationError
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, reads, writes
+from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
-from apps.invoice.tests.conftest import ISSUER, deliver, run
+from apps.invoice.tests.conftest import (
+    IN_HUBS_COMMITTED,
+    ISSUER,
+    at_once,
+    card_deleted_on_screen,
+    deliver,
+    run,
+)
 from apps.sale.models import Sale
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of business A at once, each committing: its plan has room for them all.
+pytestmark = [IN_HUBS_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
@@ -29,47 +34,8 @@ RECIPIENT = {
 
 
 @pytest.fixture(autouse=True)
-def factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and the factory
-    payment methods are planted again, as their migrations do (idempotent); then the issuer."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    with connection.schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
+def issuer_set_up(factory_data):
     run("invoice.issuer.update", ISSUER)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def manual():

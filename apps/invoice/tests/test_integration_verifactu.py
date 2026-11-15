@@ -20,11 +20,11 @@ from live.models import OutboxEvent
 
 from apps.invoice import services
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import A, ctx_for, run
+from apps.invoice.tests.conftest import A, IN_HUBS, ctx_for, run
 from apps.verifactu import events as verifactu_events
 from apps.verifactu.models import Record
 
-pytestmark = pytest.mark.django_db
+pytestmark = IN_HUBS
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",

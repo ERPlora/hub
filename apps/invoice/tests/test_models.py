@@ -8,12 +8,14 @@ has at most one default series. The issuer is a single row.
 
 import datetime as dt
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import translation
+from live.operations import atomic
 
 from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries, Issuer
+from apps.invoice.tests.conftest import IN_HUBS
 
-pytestmark = pytest.mark.django_db
+pytestmark = IN_HUBS
 
 TODAY = dt.date(2026, 10, 14)
 
@@ -57,7 +59,7 @@ def a_sale(number="20261014-0001"):
 
 
 def refused(make):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 

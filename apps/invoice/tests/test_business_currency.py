@@ -6,14 +6,15 @@ currency it was issued in."""
 
 import pytest
 from django.utils import translation
-from live.context import Scope, system_context
+from live.context import system_context
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.conftest import A, B, ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import A, B, IN_HUBS, ISSUER, ctx_for, run
 from base import operations as base_operations
 from base.models import Hub
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = IN_HUBS
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
@@ -23,7 +24,7 @@ RECIPIENT = {
 LINES = [{"description": "Haircut course", "quantity": "2", "unit_price": 5000, "tax_rate": "21"}]
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     Hub.objects.filter(slug=slug).update(country=country)
 
@@ -61,12 +62,13 @@ def test_the_document_writes_the_amounts_with_the_decimals_of_the_currency(issue
     assert "¥12,100" in document(invoice)
 
 
-def test_each_hub_invoices_in_its_own_business_s_currency(issuer):
-    business_in("PL", "a")
-    business_in("ES", "b")
-    run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
+def test_each_hub_invoices_in_its_own_business_s_currency(issuer, hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
     assert manual().currency == "PLN"
-    assert manual(ctx_for(scope=B)).currency == "EUR"
+    with use_hub(hub_b):
+        run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
+        assert manual(ctx_for(scope=B)).currency == "EUR"
 
 
 def test_an_issued_invoice_keeps_its_currency_when_the_business_s_changes(issuer):
@@ -88,13 +90,13 @@ def test_an_invoice_says_the_decimals_of_its_currency_as_the_server_counts_them(
 
 @pytest.mark.parametrize(("country", "currency"), [("ES", "EUR"), ("PL", "PLN")])
 def test_erploras_own_hub_invoices_in_the_currency_of_its_issuer_s_country(settings, country, currency):
-    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its invoices keep the
-    # currency of the country its issuer is set up in, Spain's, rather than failing.
-    settings.PLATFORM_HUB_SLUG = "erplora"
+    # ERPlora's own hub has no business on erplora.com: its invoices keep the currency of the country its issuer is set
+    # up in, whatever its row in the registry says (create_platform_hub).
+    settings.PLATFORM_HUB_SLUG = A.key
     settings.PLATFORM_ISSUER_COUNTRY = country
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    run("invoice.issuer.update", ISSUER, platform)
-    assert manual(system_context(platform.scope)).currency == currency
+    business_in("JP")
+    run("invoice.issuer.update", ISSUER, ctx_for())
+    assert manual(system_context(A)).currency == currency
 
 
 @pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
@@ -102,14 +104,13 @@ def test_a_manual_invoice_asks_base_for_the_business_s_currency(settings, monkey
     # Invoicing asks the one question every app that charges asks (``base.operations.business_currency``, BASE-F50), on
     # ERPlora's own hub too, never a copy of its own that drifts in silence from it (here, an answer other than the one
     # of the business's or the issuer's country).
-    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_HUB_SLUG = A.key if platform_hub else "erplora"
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     business_in("ES")
-    scope = Scope("host", "erplora") if platform_hub else A
-    ctx = ctx_for(scope=scope)
+    ctx = ctx_for()
     run("invoice.issuer.update", ISSUER, ctx)
     asked = []
     monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or "KWD")
-    invoice = manual(system_context(scope) if platform_hub else ctx)
+    invoice = manual(system_context(A) if platform_hub else ctx)
     assert (invoice.currency, invoice.currency_decimals) == ("KWD", 3)
-    assert asked == [scope]
+    assert asked == [A]
