@@ -17,10 +17,11 @@ hub again in theirs).
 
 Without any of them, a hub's model or operation fails with :class:`HubContextMissing`: it never falls back to
 ``default``. A model of a module whose tables the hub's database does not have yet is :class:`AppNotCreated`
-(``base.tenancy.router``). ``_test_fallback`` is the one exception, set only by the suite's ``conftest.py``: the tests
-written before the tenancy keep every business of theirs (``db_name=""``) in control's test database
-(``base/tenancy/tests/legacy.py``), so under it they run without a context and such a business is entered there
-(:func:`serves_hubs_without_database`). Never outside the tests.
+(``base.tenancy.router``). ``_test_fallback`` is the one exception, set only by the suite, and only for the tests
+``.legacy-fallback-allow`` names (``base/tenancy/tests/legacy_allow.py``): the tests written before the tenancy keep
+every business of theirs (``db_name=""``) in control's test database (``base/tenancy/tests/legacy.py``), so under it
+they run without a context and such a business is entered there (:func:`serves_hubs_without_database`). Never outside
+the tests.
 """
 
 from collections.abc import Iterator
@@ -71,10 +72,11 @@ class DatabaseContext:
 CONTROL_DATABASE = DatabaseContext(kind=CONTROL, alias=DEFAULT_DB_ALIAS)
 
 _current: ContextVar[DatabaseContext | None] = ContextVar("tenancy_database_context", default=None)
-#: Set only by the tests' conftest.py: what a test written before the tenancy runs on without a context.
+#: Set only by the suite, for the tests that still need it: what a test written before the tenancy runs on without a
+#: context.
 _test_fallback: DatabaseContext | None = None
-#: How many times the code leaned on the fallback where production refuses or behaves otherwise: the suite's
-#: conftest.py reads it to tell the tests that still need the fallback from the ones that only have it on.
+#: How many times the code leaned on the fallback where production refuses or behaves otherwise: the suite reads it to
+#: tell the tests that still need the fallback from the ones that only have it on.
 _test_fallback_entries = 0
 
 

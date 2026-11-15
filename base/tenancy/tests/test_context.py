@@ -307,7 +307,12 @@ LEANING_ON_THE_FALLBACK = [
     open_the_admin_without_a_business,
     serve_a_business_without_its_database,
 ]
-RUNNING_AS_PRODUCTION_DOES = [peek_without_a_context, ask_inside_a_hub, ask_inside_control, ask_inside_the_legacy_tables]
+RUNNING_AS_PRODUCTION_DOES = [
+    peek_without_a_context,
+    ask_inside_a_hub,
+    ask_inside_control,
+    ask_inside_the_legacy_tables,
+]
 
 
 def times_the_fallback_was_leaned_on(probe) -> int:

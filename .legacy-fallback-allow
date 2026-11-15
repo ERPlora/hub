@@ -8050,6 +8050,7 @@ base/tests/test_ws_print.py::test_the_session_of_whoever_sets_up_the_printers_pa
 base/tests/test_ws_print.py::test_the_wake_never_carries_the_document
 base/tests/test_ws_print.py::test_the_wake_of_a_business_suspended_while_the_socket_is_open_closes_it
 base/tests/test_ws_print.py::test_without_a_declared_presence_the_socket_tells_nobody
+config/tests/reuse_db_cases.py::test_finds_the_factory_data
 config/tests/test_api.py::test_anonymous_write_is_401_envelope
 config/tests/test_api.py::test_openapi_is_served_with_operation_names_as_ids
 config/tests/test_api.py::test_route_without_auth_is_open

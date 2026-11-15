@@ -69,7 +69,8 @@ def test_the_list_may_lose_lines_but_never_gain_one():
 
     assert gained({"base/tests/test_a.py::test_one"}, before) == []
     assert gained({*before, "base/tests/test_b.py::test_new"}, before) == [
-        f"base/tests/test_b.py::test_new: new in {ALLOW_FILE}; the list only shrinks, so make the test run as production does"
+        f"base/tests/test_b.py::test_new: new in {ALLOW_FILE}; "
+        "the list only shrinks, so make the test run as production does"
     ]
 
 

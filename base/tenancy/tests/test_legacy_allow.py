@@ -50,12 +50,14 @@ LEANING = ["test_suite.py::test_leaning", "test_suite.py::test_one_case_leaning"
 def run_suite(tmp_path: Path, allowed: list[str], *args: str) -> subprocess.CompletedProcess[str]:
     """``pytest`` over ``SUITE`` in ``tmp_path`` with the plugin alone, ``allowed`` as the list."""
     (tmp_path / "test_suite.py").write_text(SUITE)
-    (tmp_path / legacy_allow.ALLOW_FILE).write_text("# the tests that may still lean on the fallback\n" + "\n".join(allowed) + "\n")
+    (tmp_path / legacy_allow.ALLOW_FILE).write_text("# may still lean on the fallback\n" + "\n".join(allowed) + "\n")
     (tmp_path / "pytest.ini").write_text("[pytest]\n")
     command = [sys.executable, "-m", "pytest", "-p", "base.tenancy.tests.legacy_allow", "-p", "no:django"]
     command += ["-p", "no:cacheprovider", "-q", *args]
     environment = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO), "HOME": str(tmp_path)}
-    return subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=120, check=False)
+    return subprocess.run(
+        command, cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=120, check=False
+    )
 
 
 def outcome(run: subprocess.CompletedProcess[str]) -> str:
@@ -95,7 +97,8 @@ def test_a_listed_test_that_runs_every_case_without_leaning_has_to_leave_the_lis
 
 
 def test_the_cases_of_a_listed_test_spread_over_several_processes_are_judged_together(tmp_path):
-    run = run_suite(tmp_path, [*LEANING, "test_suite.py::test_not_leaning"], "test_suite.py", "-k", "not failing", "-n", "2")
+    allowed = [*LEANING, "test_suite.py::test_not_leaning"]
+    run = run_suite(tmp_path, allowed, "test_suite.py", "-k", "not failing", "-n", "2")
 
     assert run.returncode == 1, outcome(run)
     assert stale_lines(run) == ["test_suite.py::test_not_leaning"]
@@ -116,7 +119,8 @@ def test_a_listed_test_is_not_judged_on_some_of_its_cases(tmp_path, selection):
 
 
 def test_a_listed_test_that_fails_is_not_judged(tmp_path):
-    run = run_suite(tmp_path, [*LEANING, "test_suite.py::test_not_leaning_and_failing"], "test_suite.py", "-k", "failing")
+    allowed = [*LEANING, "test_suite.py::test_not_leaning_and_failing"]
+    run = run_suite(tmp_path, allowed, "test_suite.py", "-k", "failing")
 
     assert run.returncode == 1
     assert "broken on its own" in outcome(run)

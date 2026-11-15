@@ -16,7 +16,9 @@ from dataclasses import dataclass
 import pytest
 
 ALLOW_FILE = ".legacy-fallback-allow"
-STALE_TITLE = f"These tests ran every case without leaning on the suite's fallback; remove their lines from {ALLOW_FILE}:"
+STALE_TITLE = (
+    f"These tests ran every case without leaning on the suite's fallback; remove their lines from {ALLOW_FILE}:"
+)
 ENTRY = re.compile(r"[\w./-]+\.py(::\w+)+")
 _LEANINGS_BEFORE = pytest.StashKey[int]()
 
