@@ -16,7 +16,6 @@ import json
 import re
 import subprocess
 import sys
-import tomllib
 from collections import Counter
 
 import pytest
@@ -151,7 +150,8 @@ def grown(now: Counter[str], before: Counter[str]) -> list[str]:
 def test_every_python_function_stays_within_the_limits():
     result = ruff("check", "--output-format", "concise", ".")
     assert result.returncode == 0, (
-        "Python functions over their limits, or a noqa that silences nothing any more (remove it):\n"
+        "Python functions over their limits, a mistake of the rules tests/test_guardrails_ruff.py describes, or a noqa "
+        "that silences nothing any more (remove it):\n"
         + result.stdout
         + result.stderr
     )
@@ -163,7 +163,8 @@ def test_complexity_over_ten_fails_and_ten_passes():
 
 
 def test_statements_branches_and_returns_have_their_limits():
-    statements = "def long():\n" + "".join(f"    x{index} = {index}\n" for index in range(51)) + "    return x0\n"
+    appends = "".join(f"    values.append({index})\n" for index in range(51))
+    statements = f"def long(values):\n{appends}    return values\n"
     returns = "def many(value):\n" + "".join(f"    if value == {i}:\n        return {i}\n" for i in range(6)) + "    return -1\n"
     assert rules_found(statements, PRODUCTION) == ["PLR0915"]
     assert rules_found(returns, PRODUCTION) == ["PLR0911"]
@@ -184,10 +185,6 @@ def test_the_other_limits_still_apply_to_tests():
 def test_a_noqa_that_silences_nothing_fails():
     assert rules_found(branchy("simple_enough", 9, noqa="  # noqa: C901"), PRODUCTION) == ["RUF100"]
     assert rules_found(branchy("too_complex", 10, noqa="  # noqa: C901"), PRODUCTION) == []
-
-
-def test_only_these_limits_are_checked():
-    assert rules_found("import os\nx=1;y = 2\n", PRODUCTION) == []
 
 
 @pytest.mark.parametrize("path", ["apps/sale/migrations/0001_initial.py", "base/migrations/0002_probe.py"])
@@ -311,30 +308,3 @@ def test_the_eslint_suppressions_never_grow():
     config = (REPO / ESLINT_CONFIG).read_text(encoding="utf-8")
     found = grown(comparable(now, config, file_at_base(ESLINT_CONFIG) or ""), suppression_counts(before))
     assert not found, f"New suppressions in {SUPPRESSIONS}: fix the function instead.\n" + "\n".join(found)
-
-
-RUFF_CONFIGURATION = {
-    "target-version": "py314",
-    "extend-exclude": ["migrations", "packages"],
-    "force-exclude": True,
-    "format": {"exclude": ["*"]},
-    "lint": {
-        "select": ["C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "RUF100"],
-        "external": ["A002", "B018", "BLE001", "E402", "E731", "F401", "F403", "F405", "F811", "N801", "N802", "N803"],
-        "mccabe": {"max-complexity": 10},
-        "pylint": {"max-args": 5, "max-positional-args": 5, "max-branches": 12, "max-returns": 6, "max-statements": 50},
-        "per-file-ignores": {
-            "**/tests/**": ["PLR0913", "PLR0917"],
-            "**/test_*.py": ["PLR0913", "PLR0917"],
-            "**/conftest.py": ["PLR0913", "PLR0917"],
-        },
-    },
-}
-
-
-def test_the_ruff_configuration_is_exactly_the_limits():
-    """Excluding a folder, ignoring a rule or loosening a value would switch a limit off for good: any change to the
-    configuration shows here first, and no other file configures ruff."""
-    assert tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["ruff"] == RUFF_CONFIGURATION
-    configs = git(REPO, "ls-files", "--cached", "--others", "--exclude-standard", "--", "*ruff.toml", "*pyproject.toml")
-    assert configs.stdout.split() == ["pyproject.toml"]
