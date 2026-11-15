@@ -7,25 +7,32 @@ over) and DJ (a nullable text field, a form that takes every field of its model)
 this one pins its configuration down.
 
 What broke one of these rules when it came in is frozen in pyproject.toml's ``[tool.ruff.lint.per-file-ignores]``, one
-entry per file with the rules it breaks. An entry that no longer silences anything fails here, and compared with where
-the branch left origin/main the entries gain no file-and-rule pair: the list only shrinks. An entry may follow its code
-into the package of the same name (``base/schemas.py`` into ``base/schemas/__init__.py`` or ``base/schemas/money.py``)
-or into flat siblings named after it (``test_services.py`` into ``test_services_payments.py``). The ``noqa`` markers
-that name one of these rules only shrink too, per rule, wherever they moved.
+entry per file with the rules it breaks. An entry that no longer silences anything fails here. Compared with where the
+branch left origin/main, the entries gain no file-and-rule pair and no frozen rule is broken more often, counted per
+rule wherever its code moved: the list only shrinks. An entry may follow its code into the package of the same name
+(``base/schemas.py`` into ``base/schemas/__init__.py`` or ``base/schemas/money.py``) or into flat siblings named after
+it (``test_services.py`` into ``test_services_payments.py``). The ``noqa`` markers that name one of these rules only
+shrink too, per rule, wherever they moved.
 
 In tests a fixture comes back as an argument under the name it was imported with, so redefining a name (F811) is not
 checked there, like the argument limits.
 """
 
+import io
 import json
 import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
 import tomllib
 from collections import Counter
 from pathlib import Path
 
 import pytest
-from allow_list_base import REPO, file_at_base, git, grep_at_base
-from test_guardrails_lint import PRODUCTION, PYTHON, RANGE_MARKER, TEST, grep_now, grown, rules_found, ruff
+from allow_list_base import REPO, comparison_point, file_at_base, git, grep_at_base
+from test_guardrails_lint import PRODUCTION, PYTHON, RANGE_MARKER, TEST, grep_now, grown, rules_found
 
 CONFIG = "pyproject.toml"
 FAMILIES = ("B", "DJ", "E4", "E7", "E9", "F")
@@ -118,20 +125,51 @@ def inline_table(table: dict[str, list[str]]) -> str:
     return "{" + ", ".join(f"{json.dumps(key)} = {json.dumps(value)}" for key, value in table.items()) + "}"
 
 
-def found_without_the_entries(entries: dict[str, list[str]]) -> set[tuple[str, str]]:
-    """Each file-and-rule pair ruff finds in the frozen files once their entries are lifted."""
+def found_without_the_entries(entries: dict[str, list[str]], root: Path = REPO) -> Counter[tuple[str, str]]:
+    """How often ruff finds each file-and-rule pair in the frozen files under ``root`` once their entries are lifted,
+    with the branch's configuration."""
     if not entries:
-        return set()
+        return Counter()
     kept = without_frozen(current_config())["lint"]["per-file-ignores"]
     lifted = f"lint.per-file-ignores = {inline_table(kept)}"
-    result = ruff("check", "--output-format", "json", "--config", lifted, *entries)
+    command = [sys.executable, "-m", "ruff", "check", "--no-cache", "--output-format", "json", "--config", lifted]
+    result = subprocess.run([*command, *entries], cwd=root, capture_output=True, text=True, check=False)
     assert result.returncode in (0, 1), result.stderr
     findings = json.loads(result.stdout)
-    return {(Path(found["filename"]).relative_to(REPO).as_posix(), found["code"]) for found in findings}
+    return Counter((Path(found["filename"]).relative_to(root).as_posix(), found["code"]) for found in findings)
 
 
-def unneeded(entries: dict[str, list[str]], found: set[tuple[str, str]]) -> list[str]:
-    return [f"{path}: {rule}" for path, rule in sorted(pairs(entries) - found)]
+def found_at_base(entries: dict[str, list[str]]) -> Counter[tuple[str, str]]:
+    """The same for the frozen files as they were at the comparison point, copied out of git with this configuration."""
+    if not entries:
+        return Counter()
+    archive = git_bytes("archive", "--format=tar", comparison_point(), "--", *entries)
+    with tempfile.TemporaryDirectory() as folder:
+        root = Path(folder).resolve()
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            tar.extractall(root, filter="data")
+        shutil.copyfile(REPO / CONFIG, root / CONFIG)
+        return found_without_the_entries(entries, root)
+
+
+def git_bytes(*args: str) -> bytes:
+    result = subprocess.run(["git", *args], cwd=REPO, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr.decode()
+    return result.stdout
+
+
+def unneeded(entries: dict[str, list[str]], found: Counter[tuple[str, str]]) -> list[str]:
+    return [f"{path}: {rule}" for path, rule in sorted(pairs(entries) - found.keys())]
+
+
+def frozen_counts(entries: dict[str, list[str]], found: Counter[tuple[str, str]]) -> Counter[str]:
+    """How often each frozen rule is broken in the files frozen for it."""
+    frozen_pairs = pairs(entries)
+    counts: Counter[str] = Counter()
+    for (path, rule), times in found.items():
+        if (path, rule) in frozen_pairs:
+            counts[rule] += times
+    return counts
 
 
 def module_of(path: str) -> str:
@@ -220,6 +258,16 @@ def test_the_frozen_entries_never_gain_one():
     assert found == [], "The frozen rules only shrink: fix the code instead of freezing it.\n" + "\n".join(found)
 
 
+def test_the_frozen_files_never_break_their_rules_more_often():
+    before = ruff_config(file_at_base(CONFIG) or "")
+    if not set(FAMILIES) <= set(before.get("lint", {}).get("select", [])):
+        pytest.skip(NO_RULES_AT_BASE)
+    now_entries, base_entries = frozen(current_config()), frozen(before)
+    now = frozen_counts(now_entries, found_without_the_entries(now_entries))
+    found = grown(now, frozen_counts(base_entries, found_at_base(base_entries)))
+    assert found == [], "A frozen file breaks its rule once more: fix the code instead.\n" + "\n".join(found)
+
+
 def test_the_noqa_markers_of_these_rules_never_grow():
     now = family_codes(grep_now(NOQA_CODES, *PYTHON) + grep_now(RANGE_MARKER, *PYTHON))
     before = family_codes(grep_at_base(NOQA_CODES, *PYTHON) + grep_at_base(RANGE_MARKER, *PYTHON))
@@ -252,7 +300,7 @@ def test_a_frozen_entry_names_one_python_file_and_whole_rules():
 
 def test_an_entry_ruff_no_longer_needs_is_reported():
     entries = {"base/assistant.py": ["F401"], "base/files.py": ["B905", "B911"]}
-    found = {("base/assistant.py", "F401"), ("base/files.py", "B911"), ("base/auth.py", "F401")}
+    found = Counter({("base/assistant.py", "F401"): 12, ("base/files.py", "B911"): 1, ("base/auth.py", "F401"): 2})
     assert unneeded(entries, found) == ["base/files.py: B905"]
 
 
@@ -292,3 +340,9 @@ def test_the_noqa_markers_count_only_the_rules_of_the_families():
         "# ruff: disable[B905]",
     ]
     assert family_codes(markers) == Counter({"F401": 1, "E402": 1, "F403": 1, "B905": 1})
+
+
+def test_a_frozen_rule_counts_only_in_the_files_frozen_for_it():
+    entries = {"base/auth.py": ["F401"], "base/files.py": ["B905"]}
+    found = Counter({("base/auth.py", "F401"): 2, ("base/files.py", "B905"): 1, ("base/files.py", "F401"): 4})
+    assert frozen_counts(entries, found) == Counter({"F401": 2, "B905": 1})
