@@ -10,6 +10,7 @@ does not exist. Other apps are always the real ones (task, customer, sale…), n
 """
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -26,6 +27,11 @@ from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
 MADRID = dt.timezone(dt.timedelta(hours=2))
+#: The frozen «now» of a test that sets the clock: noon of 15 October 2026 in Madrid.
+NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=ZoneInfo("Europe/Madrid"))
+#: The assistant's door at erplora.com, and the quota it answers with.
+CHAT = "/internal/assistant/chat"
+QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 
 
 def ctx_for(

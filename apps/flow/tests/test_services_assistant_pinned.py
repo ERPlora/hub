@@ -14,30 +14,21 @@ Agentforce's input bindings.
 
 import datetime as dt
 import json
-from zoneinfo import ZoneInfo
 
 import pydantic
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.context import system_context
 from live.errors import InvalidPayload
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
-from base import relay
-from base.tenancy.context import current_alias
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import A, HUB_DB, ctx_for, make_flow, run
+from .conftest import A, CHAT, HUB_DB, NOON, QUOTA, ctx_for, make_flow, run
 
 pytestmark = HUB_DB
 
-MADRID = ZoneInfo("Europe/Madrid")
-NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-CHAT = "/internal/assistant/chat"
-QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 CANCEL = "reservation.reservation.cancel"
 UPDATE = "reservation.reservation.update"
 #: Whoever may answer and cancel a reservation themselves (the yes to a cancellation, hub#418).
@@ -52,23 +43,6 @@ THEIRS = {CANCEL: {"on_behalf_of": "input.customer"}, UPDATE: {"on_behalf_of": "
 @pytest.fixture(autouse=True)
 def no_pauses(monkeypatch):
     monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
-
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 @pytest.fixture

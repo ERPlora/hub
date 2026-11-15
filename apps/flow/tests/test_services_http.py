@@ -16,15 +16,12 @@ from zoneinfo import ZoneInfo
 import pydantic
 import pytest
 from cryptography.fernet import Fernet
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.context import system_context
 from live.errors import InvalidPayload
 
 from apps.flow import events, services, vault
 from apps.flow.models import Flow, FlowRun, Question, Secret
 from apps.task.models import Task
-from base import relay
 from base.models import EventDelivery
 from base.tenancy.context import current_alias
 
@@ -67,24 +64,6 @@ def _manual(origin: str, steps, grants=None):
         grants=list(grants if grants is not None else [_grant(origin), "task.task.create"]),
     )
 
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay): what it hands over runs,
-    and a call it schedules goes out after its COMMIT. Inside a test's transaction it keeps the connection."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        """Runs the operation ``name`` as a web request does, its COMMIT included: what it answers."""
-        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 def test_run_now_answers_at_once_and_the_worker_makes_the_call(trusted, clock, worker):

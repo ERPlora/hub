@@ -32,8 +32,8 @@ from base.tenancy.tests import hubs
 
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import A, HUB_DB, ctx_for, make_run, run
-from .test_services_assistant_step import CHAT, said, wants
+from .conftest import A, CHAT, HUB_DB, ctx_for, make_run, run
+from .test_services_assistant_step import said, wants
 
 EVA = {"name": "Eva Ruiz", "phone": "+34600111222", "email": "eva@example.com"}
 READ_HER_CARD = {"id": "s1", "kind": "query", "operation": "customer.customer.detail", "params": {"id": "input.id"}}

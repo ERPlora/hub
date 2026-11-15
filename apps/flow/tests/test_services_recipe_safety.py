@@ -25,11 +25,10 @@ from apps.flow import queries
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
 
-from .conftest import A, HUB_DB, ctx_for, run
+from .conftest import A, CHAT, HUB_DB, ctx_for, run
 from .test_recipes import declaration, declared  # noqa: F401 - the fixture
 from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     CANCEL,
-    CHAT,
     MAY_CANCEL,
     UPDATE,
     gateway,
@@ -39,7 +38,6 @@ from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     status_of,
     told,
     wants,
-    worker,
 )
 
 pytestmark = HUB_DB

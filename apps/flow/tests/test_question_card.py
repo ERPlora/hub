@@ -8,32 +8,24 @@ may read it — never by its id. The details keep only what the assistant said.
 import datetime as dt
 import json
 import re
-from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.operations import Operation, registry
 from ninja import Field, Schema
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, Question
 from apps.flow.queries import TURN
-from base import relay
 from base.models import Hub, Membership
 from base.schemas import names
-from base.tenancy.context import current_alias, use_hub
+from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import HUB_DB, A, ctx_for, make_flow, run
+from .conftest import A, CHAT, HUB_DB, NOON, QUOTA, ctx_for, make_flow, run
 
 pytestmark = HUB_DB
 
-MADRID = ZoneInfo("Europe/Madrid")
-NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-CHAT = "/internal/assistant/chat"
-QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 SERVICE = "0192f0b2-2222-7000-8000-000000000002"
 MEMBER = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -97,23 +89,6 @@ def no_pauses(monkeypatch):
 def plan(monkeypatch):
     monkeypatch.setitem(registry, PLAN.name, PLAN)
     return PLAN
-
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 @pytest.fixture
@@ -239,7 +214,6 @@ def test_a_question_an_automation_step_asks_has_no_data_of_a_change(clock):
     )
     row = row_of(question, OWNER)
     assert (row["details"], row["fields"]) == ("Ana, 15 €", [])
-
 
 
 # --- The action it waits on -----------------------------------------------------------------------------------------
