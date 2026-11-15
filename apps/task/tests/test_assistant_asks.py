@@ -89,16 +89,19 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentario_as_a_comment():
-    """``base.assistant.SYNONYMS``: «la tarea», «el proyecto» and «comenta» name what Tasks' operations are of
-    (``task.task``, ``task.project``, ``task.comment``), so the owner's words reach those tools by their entity and not
-    only by the words of their asks; without the Hub's groups, none of them does (positive control)."""
+    """``TaskConfig.assistant_synonyms`` (gathered by ``base.assistant.synonyms``, hub#1145): «la tarea», «el proyecto»
+    and «comenta» name what Tasks' operations are of (``task.task``, ``task.project``, ``task.comment``), so the owner's
+    words reach those tools by their entity and not only by the words of their asks; the platform's own words
+    (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive control)."""
     for phrase, wanted in (
         ("borra la tarea de colgar el cartel", "task"),
         ("¿qué proyectos tenemos?", "project"),
         ("comenta que el técnico viene el lunes", "comment"),
     ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
+        concepts = shared.asked([phrase], assistant.RANKING["synonyms"]).concepts
         assert any(shared.stem(wanted) in concept for concept in concepts), phrase
+        platform = shared.asked([phrase], assistant.SYNONYMS).concepts
+        assert not any(shared.stem(wanted) in concept for concept in platform), phrase
         assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
@@ -109,7 +112,9 @@ def test_the_guests_of_a_table_are_no_comment():
     comment = shared.stem("comment")
     assert not any(
         comment in concept
-        for concept in shared.asked(["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.SYNONYMS).concepts
+        for concept in shared.asked(
+            ["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.RANKING["synonyms"]
+        ).concepts
     )
 
 

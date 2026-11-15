@@ -105,36 +105,69 @@ NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
 #: How a person names each app in a turn: its id, its name and its menu (``live.assistant.app_words``). The QA of the
 #: assistant ranks with it too (``base/tests/test_assistant_asks.py``).
 APP_WORDS = shared.app_words
-#: What a word means in the Hub and nowhere else (``live.assistant`` keeps what it means in any business): a «cuenta», a
-#: check or a tab is a table's open check, ``sale.order``, never the person's account (what it is in erplora.com's
-#: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
-#: prints), never the kitchen's, which is named by its app («la cocina»); a «placa» is a person's badge; the «unidades»
-#: are Inventory's units of measure (``inventory.unit``), and a «albarán», the «mercancía» or what «entran» (never
-#: «entrada»: its stem is that of «entre») is the goods ``inventory.stock.receive`` records; a «tarea» and a «proyecto»
-#: are Tasks' task and project (``task.task``, ``task.project``), and what one «comenta» its comment (``task.comment``),
-#: named by its phrases and never by the word: «comentario» shares its stem with «comensales», a table's guests.
+#: What a word of the platform means in the Hub and nowhere else (``live.assistant`` keeps what it means in any
+#: business): a «placa» is a person's badge (``base.person.badge_*``) and an «empleado» or «empleada» a ``base.person``.
+#: What an app's own words mean the app says itself, in its ``LiveAppConfig`` (``SYNONYMS_ATTRIBUTE``), never here.
 SYNONYMS = (
-    ("cuenta", "check", "tab", "order"),
-    ("ticket", "tique", "recibo", "receipt", "sale"),
     ("placa", "badge"),
     ("empleado", "empleada", "employee", "person"),
-    ("unidad", "unidades", "unit", "units"),
-    (
-        "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
-        "delivery note",
-    ),
-    ("tarea", "tareas", "task", "tasks"),
-    ("proyecto", "proyectos", "project", "projects"),
-    (
-        "comment", "comments", "comenta en", "comenta que", "un comentario", "el comentario", "los comentarios",
-        "sus comentarios", "que comentarios", "de comentarios",
-    ),
 )
+#: The attribute of an app's ``LiveAppConfig`` that says what its own words mean, in groups as ``SYNONYMS``'s: a word of
+#: a group asks for all of them, and a phrase with spaces names its group without lending its stems to other words
+#: (``assistant_synonyms = (("tarea", "tareas", "task", "tasks"),)``). ``synonyms`` gathers them; ``base.E017`` checks them.
+SYNONYMS_ATTRIBUTE = "assistant_synonyms"
+
+
+def _synonym_problems(config: LiveAppConfig) -> list[str]:
+    """What is wrong with the words ``config`` declares (none declared: nothing)."""
+    declared = getattr(config, SYNONYMS_ATTRIBUTE, ())
+    said = f"{config.label}.{SYNONYMS_ATTRIBUTE}"
+    if not isinstance(declared, list | tuple) or not all(isinstance(group, list | tuple) for group in declared):
+        return [f"{said} is not a list of groups of words."]
+    return [
+        f"{said} has {list(group)!r}, not a group of two words or more."
+        for group in declared
+        if len(group) < 2 or not all(isinstance(word, str) and word.strip() for word in group)
+    ]
+
+
+def synonyms() -> tuple[tuple[str, ...], ...]:
+    """The Hub's words, the ones a turn ranks with (``RANKING``): the platform's (``SYNONYMS``) and, in the order of the
+    apps, the ones each installed app says (``SYNONYMS_ATTRIBUTE``), on in the business or not; never the ones
+    ``base.E017`` refuses. A word two groups say names both (``live.assistant`` joins every group of a stem), whichever
+    app says it first: the order changes nothing."""
+    return (
+        *SYNONYMS,
+        *(
+            tuple(group)
+            for config in all_live_app_configs()
+            if not _synonym_problems(config)
+            for group in getattr(config, SYNONYMS_ATTRIBUTE, ())
+        ),
+    )
+
+
+@checks.register("base")
+def check_synonyms(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E017``: an app says what its words mean (``SYNONYMS_ATTRIBUTE``) as groups of two words or more, each a
+    text: one word alone means nothing more, and a group written bare would be read as its letters."""
+    return [
+        checks.Error(
+            problem,
+            hint=f'Declare {SYNONYMS_ATTRIBUTE} = (("<word>", "<word>", …), …) on the app\'s LiveAppConfig.',
+            obj=config,
+            id="base.E017",
+        )
+        for config in all_live_app_configs()
+        for problem in _synonym_problems(config)
+    ]
+
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
 #: How a turn ranks the tools it offers (``relevant``), and the assistant's QA with it, word for word
-#: (``base/tests/test_assistant_asks.py``): one place, so the QA never ranks otherwise than the turn.
-RANKING = MappingProxyType({"always": ALWAYS, "app_words": APP_WORDS, "synonyms": SYNONYMS, "howto": HOWTO})
+#: (``base/tests/test_assistant_asks.py``): one place, so the QA never ranks otherwise than the turn. The apps' words
+#: are read once, here: this module imports ``base.models``, so the apps are loaded whenever it is imported.
+RANKING = MappingProxyType({"always": ALWAYS, "app_words": APP_WORDS, "synonyms": synonyms(), "howto": HOWTO})
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"

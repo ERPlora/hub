@@ -35,6 +35,16 @@ class InventoryConfig(LiveAppConfig):
     # The products' own photos (round 2026-10-30, base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["inventory/products/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What Inventory's words mean to the assistant (base.assistant.synonyms): the «unidades» are its units of measure
+    # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
+    # is the goods inventory.stock.receive records.
+    assistant_synonyms = (
+        ("unidad", "unidades", "unit", "units"),
+        (
+            "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
+            "delivery note",
+        ),
+    )
     permissions = [
         "inventory.view_product",
         "inventory.view_category",
