@@ -23,7 +23,8 @@ from base import registry, signing
 from base.models import Hub
 from base.queries import hub_get, hubs_by_slugs
 from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubsBySlugIn, HubStateIn
-from base.services import hub_cancel, hub_register, hub_restore, hub_state_apply, report_ready
+from base.services.hub_registry import hub_cancel, hub_register, hub_restore, hub_state_apply
+from base.services.provisioning import report_ready
 from base.tenancy import names
 from base.tenancy.connections import control_name
 from base.tests.conftest import SECRET

@@ -53,6 +53,7 @@ from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
 from base import access, auth, queries, services
+from base.services import demos, sessions
 from base.models import SessionOwner
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
@@ -127,8 +128,8 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     if not result.ok:
         return (result.refused and _refused_attempt(request)) or auth.login_redirect(slug, next_path, error=result.error)
     try:
-        services.open_session_from_saas(request, result.user, slug)
-    except services.InactiveUser:
+        sessions.open_session_from_saas(request, result.user, slug)
+    except sessions.InactiveUser:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
     landing = _choose_a_pin_first(request, next_path, slug)
@@ -139,15 +140,15 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
 
 def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:
     """A demo's code, redeemed here (never by the SaaS): the owner's session and ``next``, else the SaaS's door."""
-    redeemed = services.redeem_demo_code(hub.slug, request.POST.get("code"))
+    redeemed = demos.redeem_demo_code(hub.slug, request.POST.get("code"))
     if redeemed is None:
         logger.warning(
             "Demo login on %r refused: the code is missing, spent, out of its minute or another demo's.", hub.slug
         )
         return _refused_attempt(request) or auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
     try:
-        services.open_demo_session(request, hub)
-    except services.InactiveUser:
+        demos.open_demo_session(request, hub)
+    except sessions.InactiveUser:
         logger.warning("Demo login on %r refused: its owner was deactivated.", hub.slug)
         return auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
     return auth.forget_state(_with_language(HttpResponseRedirect(next_path), redeemed.language))
@@ -191,8 +192,8 @@ def _admin_callback(request: HttpRequest) -> HttpResponse:
     if not result.ok:
         return (result.refused and _refused_attempt(request)) or HttpResponseRedirect(auth.admin_hubs_url(result.error))
     try:
-        services.open_admin_session_from_saas(request, result.user)
-    except services.InactiveUser:
+        sessions.open_admin_session_from_saas(request, result.user)
+    except sessions.InactiveUser:
         logger.warning("Hub admin entry refused: the hub's user %r is deactivated.", result.user.user_id)
         return HttpResponseRedirect(auth.admin_hubs_url(USER_INACTIVE))
     logger.info("Hub admin session opened for SaaS user %r (%s) on hub %r.", result.user.user_id, result.user.role, slug)

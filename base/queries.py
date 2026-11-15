@@ -2059,8 +2059,8 @@ def is_a_person(actor: Any) -> bool:
 
 
 def hub_user_of(ctx: OperationContext) -> HubUser | None:
-    """The caller's ``HubUser`` in the active hub's database, read only (``base.services.acting_hub_user`` makes it);
-    ``None`` for the platform, an API key, nobody, or a person who has none there yet."""
+    """The caller's ``HubUser`` in the active hub's database, read only (``base.services.sessions.acting_hub_user``
+    makes it); ``None`` for the platform, an API key, nobody, or a person who has none there yet."""
     if not is_a_person(ctx.actor):
         return None
     return HubUser.objects.filter(username=ctx.actor.get_username()).first()

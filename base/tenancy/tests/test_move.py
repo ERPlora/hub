@@ -32,7 +32,7 @@ from django.db import connections as django_connections
 from django.utils import timezone
 from psycopg import sql
 
-from base import services
+from base.services import provisioning
 from base.tenancy import bootstrap, dumps, identity, move, names
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
@@ -220,7 +220,7 @@ class TestAMoveAskedForTheNight:
         with use_control():
             assert hub.id not in move.control_services.moves_scheduled_due(now)
             # Even listed (a pass that read it before it was put off), its locked row says it is not due.
-            assert services.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
+            assert provisioning.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
             assert move.control_services.start_scheduled_move(hub.id, now, owner="a:1") is False
 
         assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
@@ -247,7 +247,7 @@ class TestAMoveAskedForTheNight:
         start = move.control_services.start_scheduled_move
 
         with use_control():
-            assert services.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
+            assert provisioning.claim_hub(hub.id, now, move.LEASE, owner="a:1") is not None
             with pytest.raises(move.control_services.MoveTaken):
                 start(hub.id, now, owner="b:2")
             assert (fresh(hub).moving_to_id, fresh(hub).move_scheduled_to_id) == (None, target.pk)
@@ -426,7 +426,7 @@ class TestAFailurePutsEverythingBack:
         hub = moves.hub(to=target)
 
         def stolen(*args, **kwargs):
-            raise services.ProvisioningStopped("another worker holds it now")
+            raise provisioning.ProvisioningStopped("another worker holds it now")
 
         monkeypatch.setattr(move, "_restore_from_bucket", stolen)
 

@@ -1327,7 +1327,7 @@ estricto en el test hasta ERPlora/live#76; sin «la cuenta y», la misma frase l
   workers a la vez (un despliegue) nunca la corren dos veces, y los minutos perdidos con el worker parado se
   juntan en una sola pasada. Si la pasada falla, se registra en el log, se deshace lo suyo y vuelve al minuto
   siguiente. La pasada de un negocio ve solo sus registros y los presenta con su slug. También se sirve a un negocio
-  que se fue y conserva su BD (`base.services.hubs_to_serve`), porque lo que le queda por enviar tiene que llegar a
+  que se fue y conserva su BD (`base.services.provisioning.hubs_to_serve`), porque lo que le queda por enviar tiene que llegar a
   la AEAT. La pasada del hub de ERPlora (`PLATFORM_HUB_SLUG`) solo ve los registros de ERPlora y los presenta como
   `erplora` (`queries.presenter`, hub#1130).
 - La consulta a la AEAT (VERIFACTU-F27 y F28) sigue todas sus páginas.

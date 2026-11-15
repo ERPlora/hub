@@ -5,7 +5,7 @@ transaction (``live.outbox.record_event``); the relay hands each one to the reac
 it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other apps):
 
 - **taken**: an event nobody took yet gets one delivery per app that is on and listens to it, and its
-  ``delivered_at``, in one transaction (``base.services.relay_take_events``); an app turned on later never
+  ``delivered_at``, in one transaction (``base.services.relay_runs.relay_take_events``); an app turned on later never
   receives what came before. An app is on unless it is a paid one its business has no right to or one the
   business turned off (``active_apps``: ``base.entitlement`` and ``base.activation``; ``base.session.me`` says the
   same);
@@ -43,7 +43,8 @@ from live.live_registry import ALL_EVENTS
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
-from base import activation, entitlement, services
+from base import activation, entitlement
+from base.services import relay_runs
 from base.recovery import brought_back
 from base.tenancy.context import HUB_SCOPE_KIND
 
@@ -169,13 +170,13 @@ def backoff(attempts: int) -> dt.timedelta:
 def run(now: dt.datetime, *, of_hubs: bool = True) -> RelayPass:
     """Take the new events, then run the deliveries due at ``now``, one transaction each. ``of_hubs=False`` (control's
     outbox): only the events of no hub, never a business's."""
-    taken = services.relay_take_events(
+    taken = relay_runs.relay_take_events(
         now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH, of_hubs=of_hubs
     )
     close_old_connections()
     delivered = failed = 0
     for _ in range(DELIVER_PER_TICK):
-        outcome = services.relay_deliver_next(
+        outcome = relay_runs.relay_deliver_next(
             now,
             deliver=deliver,
             listeners=listeners,

@@ -14,7 +14,7 @@ from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 
 from apps.online_booking.models import Booking
 from apps.online_booking.queries import hash_token, visitor_key
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 

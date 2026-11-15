@@ -55,7 +55,7 @@ from apps.task.schemas import (
     TaskPatchIn,
     TaskRefIn,
 )
-from base.services import acting_hub_user
+from base.services.sessions import acting_hub_user
 
 TASK_ALREADY_CLOSED = _("That task is already closed, so it was left as it was.")
 MEMBER_INACTIVE = _("That person is not active in the team.")

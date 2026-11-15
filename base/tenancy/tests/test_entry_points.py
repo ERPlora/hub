@@ -221,7 +221,7 @@ def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
 def test_the_registrys_operations_run_on_control_and_their_events_land_there(client, settings):
     from base.registry import REGISTRY_SCOPE
     from base.schemas import HubSeedLocalIn
-    from base.services import hub_seed_local
+    from base.services.hub_registry import hub_seed_local
     from live.context import system_context
 
     answer = hub_seed_local(system_context(REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c"]))

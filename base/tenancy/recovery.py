@@ -53,7 +53,8 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from live.meta import all_live_app_configs
 from live.operations import get as get_operation
 
-from base import activation, registry, services
+from base import activation, registry
+from base.services import provisioning
 from base.recovery import HOOK, LeftOut, Recoverable, RecoveredOut, actor_of, giving_back
 from base.tenancy import migrator, move, ops
 from base.tenancy.context import use_hub
@@ -93,13 +94,13 @@ def run_due(now: dt.datetime | None = None, *, cancelled: Callable[[], bool] | N
         if cancelled is not None and cancelled():
             return 0
         # By the clock, never ``now``: a move before it in the same tick may have taken longer than the lease.
-        row = control_services.claim_recovery(recovery_id, timezone.now(), LEASE, services.LEASE_OWNER)
+        row = control_services.claim_recovery(recovery_id, timezone.now(), LEASE, provisioning.LEASE_OWNER)
         if row is None:
             continue
         try:
             worked = recover(row, now=now)
         finally:
-            control_services.release_recovery(recovery_id, services.LEASE_OWNER)
+            control_services.release_recovery(recovery_id, provisioning.LEASE_OWNER)
         if worked:
             return 1
     return 0
@@ -108,9 +109,9 @@ def run_due(now: dt.datetime | None = None, *, cancelled: Callable[[], bool] | N
 def recover(row: CopyRecovery, *, now: dt.datetime) -> bool:
     """Do the recovery ``row`` (its lease held; see the module); whether it was worked on (``False``: its business is
     being moved or restored, left for later). A failure is noted on it, never raised."""
-    copy, owner = row.copy, services.LEASE_OWNER
+    copy, owner = row.copy, provisioning.LEASE_OWNER
     # As it is now: a move or a restore may have started since the recovery was asked.
-    hub = services.registry_row(copy.hub_id)
+    hub = provisioning.registry_row(copy.hub_id)
     if registry.is_copying(hub):
         logger.info("base.tenancy.recovery.waits copy=%s: the business %s is being moved or restored.", copy, hub.slug)
         return False

@@ -30,7 +30,7 @@ from django.test import Client
 from django.utils.dateparse import parse_datetime
 
 from apps.verifactu.models import Config
-from base import services
+from base.services import hub_registry, provisioning
 from base.tenancy import names
 from control.models import HubDue
 from base.models import DemoCode, Hub
@@ -489,7 +489,7 @@ def connection_name() -> str:
 
 
 def test_the_saas_hears_ready_signed_once_the_worker_made_it(client, db, saas_hears):
-    services.report_ready(NEW_ID)
+    provisioning.report_ready(NEW_ID)
 
     [call] = saas_hears.calls
     ready_path = f"/internal/hubs/{NEW_ID}/ready"
@@ -533,8 +533,8 @@ def test_registering_a_business_whose_preparation_failed_tries_again_now(client,
 def test_a_photo_of_a_business_being_prepared_waits_on_its_row_for_its_seeding(client, db, monkeypatch):
     signed(client, "put", HUB_PATH, REGISTRY)
     entered = []
-    monkeypatch.setattr(services, "_sync_verifactu", lambda hub, data: entered.append("verifactu"))
-    monkeypatch.setattr(services, "_sync_whatsapp", lambda hub, data: entered.append("whatsapp"))
+    monkeypatch.setattr(hub_registry, "_sync_verifactu", lambda hub, data: entered.append("verifactu"))
+    monkeypatch.setattr(hub_registry, "_sync_whatsapp", lambda hub, data: entered.append("whatsapp"))
     photo = {"id": NEW_ID, "version": 3, "status": "active", "verifactu": {}, "whatsapp": {"status": "connected"}}
 
     answer = signed(client, "put", f"{HUB_PATH}/state", photo, with_v2=True)
@@ -549,7 +549,7 @@ def test_a_photo_of_a_business_being_prepared_waits_on_its_row_for_its_seeding(c
 def test_the_people_of_a_photo_of_a_business_being_prepared_wait_for_its_seeding(client, db, monkeypatch):
     signed(client, "put", HUB_PATH, REGISTRY)
     entered = []
-    monkeypatch.setattr(services, "_sync_hub_users", lambda hub, members, left: entered.append("people"))
+    monkeypatch.setattr(hub_registry, "_sync_hub_users", lambda hub, members, left: entered.append("people"))
     owner = "01a18f92-0000-7000-8000-000000000001"
     members = [{"user_id": owner, "role": "hub_owner", "email": "ana@example.com", "name": "Ana"}]
     photo = {"id": NEW_ID, "version": 3, "members": members}
@@ -591,7 +591,7 @@ def test_a_photo_of_a_business_cancelled_before_its_database_was_made_is_kept_wi
 def test_a_saas_that_is_away_never_breaks_the_ready_notice(client, db, saas_at, caplog):
     saas_at(raises=OSError("connection refused"))
 
-    services.report_ready(NEW_ID)
+    provisioning.report_ready(NEW_ID)
 
     assert "base.hub.ready_unreported" in caplog.text
 

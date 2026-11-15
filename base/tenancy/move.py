@@ -138,13 +138,13 @@ def run_due(
     launch_due(now)
     worked = 0
     for hub_id in control_services.hubs_moving():
-        if services.claim_hub(hub_id, now, LEASE) is None:
+        if services.provisioning.claim_hub(hub_id, now, LEASE) is None:
             continue
         try:
             move_hub(hub_id, now=now, roles=roles, cancelled=cancelled)
             worked = 1
         finally:
-            services.release_hub(hub_id, timezone.now())
+            services.provisioning.release_hub(hub_id, timezone.now())
         break
     drop_old_copies(now)
     drop_leftovers(now)
@@ -157,16 +157,16 @@ def launch_due(now: dt.datetime) -> int:
     refused says why; a failure of one is logged and it is tried again on the next pass. How many started."""
     started = 0
     for hub_id in control_services.moves_scheduled_due(now):
-        if services.claim_hub(hub_id, now, LEASE) is None:
+        if services.provisioning.claim_hub(hub_id, now, LEASE) is None:
             continue
         try:
-            if control_services.start_scheduled_move(hub_id, now, owner=services.LEASE_OWNER):
+            if control_services.start_scheduled_move(hub_id, now, owner=services.provisioning.LEASE_OWNER):
                 started += 1
                 logger.info("move: the move of %s asked for its night started.", hub_id)
         except Exception:
             logger.exception("move: the move of %s asked for its night could not start; the next pass retries.", hub_id)
         finally:
-            services.release_hub(hub_id, timezone.now())
+            services.provisioning.release_hub(hub_id, timezone.now())
     return started
 
 
@@ -198,7 +198,7 @@ def move_hub(
     def ours(*, forward: bool = True) -> None:
         heartbeat()
         try:
-            control_services.still_ours(hub.id, target.pk, services.LEASE_OWNER, forward=forward)
+            control_services.still_ours(hub.id, target.pk, services.provisioning.LEASE_OWNER, forward=forward)
         except control_services.MoveTaken as taken:
             raise MoveStopped(str(taken)) from taken
 
@@ -220,7 +220,7 @@ def move_hub(
             _verify_identity(hub.db_name, target, hub.id)
             _ensure_schema(hub, target, heartbeat)
             _switch(hub.id, target, origin, copy_name, now)
-        except (services.ProvisioningStopped, MoveStopped, dumps.DumpStopped) as stopped:
+        except (services.provisioning.ProvisioningStopped, MoveStopped, dumps.DumpStopped) as stopped:
             logger.info("base.tenancy.move.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
             return
         except Exception as error:
@@ -240,7 +240,7 @@ def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str)
     """Undo the move of ``hub`` and note why; one that cannot be undone now stays moving, to be undone next time."""
     try:
         _undo(hub, copy_name, origin, target, roles, ours, now)
-    except (services.ProvisioningStopped, MoveStopped) as stopped:
+    except (services.provisioning.ProvisioningStopped, MoveStopped) as stopped:
         logger.info("base.tenancy.move.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
         return
     except Exception as undo_error:
@@ -278,7 +278,7 @@ def drop_leftovers(now: dt.datetime) -> int:
         if not _leftover_droppable(left.hub, left):
             control_services.forget_leftover(left.cluster_id, left.db_name)
             continue
-        if services.claim_hub(left.hub_id, timezone.now(), LEASE) is None:
+        if services.provisioning.claim_hub(left.hub_id, timezone.now(), LEASE) is None:
             continue
         try:
             hub = control_services.moving_row(left.hub_id)
@@ -292,7 +292,7 @@ def drop_leftovers(now: dt.datetime) -> int:
         except Exception:
             logger.exception("base.tenancy.move.leftover_kept database=%s: it could not be dropped; tried again.", left.db_name)
         finally:
-            services.release_hub(left.hub_id, timezone.now())
+            services.provisioning.release_hub(left.hub_id, timezone.now())
     return dropped
 
 
@@ -437,7 +437,7 @@ def _make_destination(hub, target, roles: bootstrap.Names, ours=None) -> None:
     of a move cut short, dropped first, unless control says it is a hub's database on that cluster (``MoveStopped``)."""
     try:
         template = provision.template_for(hub)
-    except services.ProvisioningFailed as missing:
+    except services.provisioning.ProvisioningFailed as missing:
         raise MoveFailed("move_template_missing", missing) from missing
     if control_services.attributed(target.pk, hub.db_name, besides=hub.id):
         raise MoveStopped(f"control says {hub.db_name} on {target.name} is a hub's database: it is never dropped.")
@@ -454,7 +454,7 @@ def _clone_emptied(hub, cluster, roles: bootstrap.Names, template: str | None = 
     if template is None:
         try:
             template = provision.template_for(hub)
-        except services.ProvisioningFailed as missing:
+        except services.provisioning.ProvisioningFailed as missing:
             raise MoveFailed("move_template_missing", missing) from missing
     name = aside or hub.db_name
     try:
@@ -704,7 +704,7 @@ def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
     still this worker's (``MoveStopped`` otherwise: nothing written)."""
     try:
         control_services.move_finished(
-            hub_id, target.pk, getattr(origin, "pk", None), copy_name, now, owner=services.LEASE_OWNER
+            hub_id, target.pk, getattr(origin, "pk", None), copy_name, now, owner=services.provisioning.LEASE_OWNER
         )
     except control_services.MoveTaken as taken:
         raise MoveStopped(str(taken)) from taken

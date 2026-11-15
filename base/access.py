@@ -78,10 +78,11 @@ PERSONAL_SESSION = dt.timedelta(days=30)
 ALWAYS_SESSION_CAP = dt.timedelta(hours=1)
 
 
-#: How the session was opened (``SessionOwner.Credential``), as ``SessionOwner`` notes it: ``base.services._log_in``
-#: writes it, so an operation that touches no database (``base.support.report``) knows it was opened with the account.
-#: A session opened before that has none, and none is no account (a PIN shift's too): the shell (``base.spa``) copies
-#: it from ``SessionOwner`` when it loads, so the user menu and the operation say the same.
+#: How the session was opened (``SessionOwner.Credential``), as ``SessionOwner`` notes it:
+#: ``base.services.sessions._log_in`` writes it, so an operation that touches no database (``base.support.report``)
+#: knows it was opened with the account. A session opened before that has none, and none is no account (a PIN shift's
+#: too): the shell (``base.spa``) copies it from ``SessionOwner`` when it loads, so the user menu and the operation say
+#: the same.
 CREDENTIAL_SESSION_KEY = "credential"
 
 

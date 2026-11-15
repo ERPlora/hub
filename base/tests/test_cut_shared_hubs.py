@@ -118,10 +118,10 @@ def phase_one(django_db_blocker, hub_databases):
 
 def held(hub: Hub, owner: str | None = None) -> None:
     """``hub``'s lease taken now, as a cut takes it (``services.claim_hub``): this process's, or ``owner``'s."""
-    from base import services
+    from base.services import provisioning
 
     kwargs = {} if owner is None else {"owner": owner}
-    assert services.claim_hub(hub.id, timezone.now(), cut.LEASE, **kwargs) is not None
+    assert provisioning.claim_hub(hub.id, timezone.now(), cut.LEASE, **kwargs) is not None
 
 
 def run(*args: str) -> str:
@@ -593,7 +593,7 @@ def test_a_cut_whose_lease_is_taken_meanwhile_stops_and_never_drops_what_the_oth
 
 
 def test_a_cut_renews_its_lease_around_every_long_step(phase_one, monkeypatch):
-    from base import services
+    from base.services import photo as photo_services, provisioning
     from base.tenancy import ops
 
     aurora = phase_one.business("aurora")
@@ -607,9 +607,9 @@ def test_a_cut_renews_its_lease_around_every_long_step(phase_one, monkeypatch):
 
         return step
 
-    monkeypatch.setattr(services, "renew_hub_lease", spy("renew", services.renew_hub_lease))
+    monkeypatch.setattr(provisioning, "renew_hub_lease", spy("renew", provisioning.renew_hub_lease))
     monkeypatch.setattr(ops, "clone_database", spy("clone", ops.clone_database))
-    monkeypatch.setattr(services, "apply_kept_photo", spy("seed", services.apply_kept_photo))
+    monkeypatch.setattr(photo_services, "apply_kept_photo", spy("seed", photo_services.apply_kept_photo))
     monkeypatch.setattr(cut, "_copy_group", spy("group", cut._copy_group))
     monkeypatch.setattr(cut.migrator, "ensure_schema", spy("schema", cut.migrator.ensure_schema))
 
@@ -630,14 +630,15 @@ def test_two_copy_alls_at_once_into_two_businesses_leave_one(phase_one, monkeypa
     from live.errors import Conflict
     from live.operations import get
 
-    from base import registry, services
+    from base import registry
+    from base.services import hub_registry
 
     first, second = phase_one.business("first"), phase_one.business("second")
     with use_control():
         held(first)
         held(second)
     both = threading.Barrier(2, timeout=2)
-    went_to = services.copy_all_went_to
+    went_to = hub_registry.copy_all_went_to
 
     def read_then_wait():
         found = went_to()
@@ -647,7 +648,7 @@ def test_two_copy_alls_at_once_into_two_businesses_leave_one(phase_one, monkeypa
             pass
         return found
 
-    monkeypatch.setattr(services, "copy_all_went_to", read_then_wait)
+    monkeypatch.setattr(hub_registry, "copy_all_went_to", read_then_wait)
     outcomes: dict[str, object] = {}
 
     def last_step(hub):

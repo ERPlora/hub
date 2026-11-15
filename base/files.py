@@ -732,8 +732,8 @@ class HubFilesNotDeleted(Exception):
 
 def delete_hub_files(store: Storage, hub: uuid.UUID) -> None:
     """Delete everything under ``hub``'s prefix, its Files and what its apps keep beside them, and no key of any other
-    hub: only its database's end calls this (``base.services.purge_demo_data``, ``base.tenancy.offboarding``), the hub
-    never comes back. Safe to run again: nothing left is no failure.
+    hub: only its database's end calls this (``base.services.demos.purge_demo_data``, ``base.tenancy.offboarding``), the
+    hub never comes back. Safe to run again: nothing left is no failure.
 
     In a versioned bucket a key leaves a delete marker, and its old version goes with the bucket's lifecycle rule."""
     prefix = hub_prefix(hub)

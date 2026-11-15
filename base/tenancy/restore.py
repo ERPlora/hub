@@ -68,6 +68,7 @@ from django.utils import timezone
 from live.meta import all_live_app_configs
 
 from base import services
+from base.services import provisioning
 from base.tenancy import bootstrap, dumps, move, names, ops
 from base.tenancy import connections as tenancy_connections
 from control import services as control_services
@@ -102,12 +103,12 @@ def run_due(
     now = now or timezone.now()
     for hub_id in control_services.hubs_restoring():
         # By the clock, never ``now``: a move before it in the same tick may have taken longer than the lease.
-        if services.claim_hub(hub_id, timezone.now(), LEASE) is None:
+        if provisioning.claim_hub(hub_id, timezone.now(), LEASE) is None:
             continue
         try:
             restore_hub(hub_id, now=now, roles=roles, cancelled=cancelled, source=source)
         finally:
-            services.release_hub(hub_id, timezone.now())
+            provisioning.release_hub(hub_id, timezone.now())
         return 1
     return 0
 
@@ -138,7 +139,7 @@ def restore_hub(
     def ours(*, forward: bool = True) -> None:
         heartbeat()
         try:
-            control_services.still_restoring(hub.id, origin.pk, services.LEASE_OWNER, forward=forward)
+            control_services.still_restoring(hub.id, origin.pk, provisioning.LEASE_OWNER, forward=forward)
         except control_services.MoveTaken as taken:
             raise move.MoveStopped(str(taken)) from taken
 
@@ -158,7 +159,7 @@ def restore_hub(
             move._verify_identity(hub.db_name, hub.cluster, hub.id)
             move._ensure_schema(hub, hub.cluster, heartbeat)
             _finish(hub, origin, kept_name, roles, ours, now)
-        except (services.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
+        except (provisioning.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
             logger.info("base.tenancy.restore.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
             return
         except Exception as error:
@@ -186,7 +187,7 @@ def _back(hub, kept_name: str, roles, ours, *, reason: str) -> None:
     """Undo the restore of ``hub`` and note why; one that cannot be undone now stays restoring, undone next time."""
     try:
         _put_back(hub, kept_name, roles, ours)
-    except (services.ProvisioningStopped, move.MoveStopped) as stopped:
+    except (provisioning.ProvisioningStopped, move.MoveStopped) as stopped:
         logger.info("base.tenancy.restore.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
         return
     except Exception as undo_error:
@@ -212,13 +213,13 @@ def run_aside_due(
     :func:`run_due` (``source`` by default :func:`source_name`)."""
     now = now or timezone.now()
     for copy_id in control_services.copies_to_make():
-        row = control_services.claim_copy(copy_id, timezone.now(), LEASE, services.LEASE_OWNER)
+        row = control_services.claim_copy(copy_id, timezone.now(), LEASE, provisioning.LEASE_OWNER)
         if row is None:
             continue
         try:
             make_aside(row, now=now, roles=roles, cancelled=cancelled, source=source or source_name)
         finally:
-            control_services.release_copy(copy_id, services.LEASE_OWNER)
+            control_services.release_copy(copy_id, provisioning.LEASE_OWNER)
         drop_old_aside_copies(now)
         return 1
     drop_old_aside_copies(now)
@@ -239,9 +240,9 @@ def make_aside(
     roles = ops.environment_roles(tenancy_connections.control_name()) if roles is None else roles
 
     def ours() -> None:
-        control_services.renew_copy(row.pk, LEASE, services.LEASE_OWNER)
+        control_services.renew_copy(row.pk, LEASE, provisioning.LEASE_OWNER)
         try:
-            control_services.still_making(row.pk, services.LEASE_OWNER)
+            control_services.still_making(row.pk, provisioning.LEASE_OWNER)
         except control_services.MoveTaken as taken:
             raise move.MoveStopped(str(taken)) from taken
 
@@ -258,7 +259,7 @@ def make_aside(
         with ops.connect_ops(cluster=cluster) as conn:
             move._close(conn, name, roles)
         _made(row, now)
-    except (services.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
+    except (provisioning.ProvisioningStopped, move.MoveStopped, dumps.DumpStopped) as stopped:
         logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", name, stopped)
         return
     except Exception as error:
@@ -278,7 +279,7 @@ def aside_dump_kind(row) -> str:
 
 def _made(row, now: dt.datetime) -> None:
     try:
-        control_services.copy_made(row.pk, now, services.LEASE_OWNER)
+        control_services.copy_made(row.pk, now, provisioning.LEASE_OWNER)
     except control_services.MoveTaken as taken:
         raise move.MoveStopped(str(taken)) from taken
 
@@ -297,7 +298,7 @@ def _aside_failed(row, ours, reason: str) -> None:
     except Exception:
         logger.exception("base.tenancy.restore.aside_kept copy=%s: it could not be dropped now.", row.db_name)
     try:
-        control_services.copy_failed(row.pk, reason, services.LEASE_OWNER)
+        control_services.copy_failed(row.pk, reason, provisioning.LEASE_OWNER)
     except control_services.MoveTaken as taken:
         logger.info("base.tenancy.restore.aside_stopped copy=%s: %s; left to whoever holds it now.", row.db_name, taken)
 
@@ -377,7 +378,7 @@ def _finish(hub, origin, kept_name: str, roles: bootstrap.Names, ours, now: dt.d
         move._open(conn, hub.db_name, roles)
     try:
         control_services.restore_finished(
-            hub.id, origin.pk, hub.cluster_id, kept_name, now, owner=services.LEASE_OWNER
+            hub.id, origin.pk, hub.cluster_id, kept_name, now, owner=provisioning.LEASE_OWNER
         )
     except control_services.MoveTaken as taken:
         raise move.MoveStopped(str(taken)) from taken

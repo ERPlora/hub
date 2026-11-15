@@ -30,6 +30,7 @@ from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from base import files, registry, services
+from base.services import demos
 from base.models import DemoCode, Hub, Membership
 from base.storage import hub_prefix
 from base.tenancy import names, ops, provision
@@ -37,8 +38,7 @@ from base.tenancy.connections import control_name
 from control.models import HubDue
 from base.queries import demo_get
 from base.schemas import DemoCodeIn, DemoCreateIn, DemoSlugIn
-from base.services import (
-    InactiveUser,
+from base.services.demos import (
     demo_code_create,
     demo_create,
     demo_expire,
@@ -49,6 +49,7 @@ from base.services import (
     reap_demos,
     redeem_demo_code,
 )
+from base.services.sessions import InactiveUser
 
 pytestmark = pytest.mark.django_db
 
@@ -199,13 +200,13 @@ class TestCreate:
     def test_two_calls_of_one_browser_at_once_end_in_one_demo(self, monkeypatch):
         # The second call did not see the first one's demo yet; the unique constraint catches it.
         first = create()
-        real, looks = services._live_demo_of, []
+        real, looks = demos._live_demo_of, []
 
         def late(session_key, now):
             looks.append(session_key)
             return None if len(looks) == 1 else real(session_key, now)
 
-        monkeypatch.setattr(services, "_live_demo_of", late)
+        monkeypatch.setattr(demos, "_live_demo_of", late)
         again = create()
         assert (again.created, again.slug) == (False, first.slug)
         assert Hub.objects.filter(is_demo=True).count() == 1
@@ -530,7 +531,7 @@ class TestReaper:
 
     def test_hands_each_purged_demo_to_purge_demo_data(self, monkeypatch):
         purged = []
-        monkeypatch.setattr(services, "purge_demo_data", lambda hub: purged.append(hub.slug))
+        monkeypatch.setattr(demos, "purge_demo_data", lambda hub: purged.append(hub.slug))
         demo = create()
         lapse(demo.slug)
         reap_demos()
@@ -545,7 +546,7 @@ class TestReaper:
             if hub.slug == first.slug:
                 raise RuntimeError("the database went away")
 
-        monkeypatch.setattr(services, "purge_demo_data", purge)
+        monkeypatch.setattr(demos, "purge_demo_data", purge)
         with caplog.at_level(logging.ERROR, logger="base.services.demos"):
             assert reap_demos() == 1
         # Its purge was undone; it stays on its way out (410) and due again, its lease given back.
@@ -564,7 +565,7 @@ class TestReaper:
             tried.append(hub.slug)
             raise RuntimeError("permission denied to terminate process")
 
-        monkeypatch.setattr(services, "purge_demo_data", refused)
+        monkeypatch.setattr(demos, "purge_demo_data", refused)
         demo = create()
         lapse(demo.slug)
         before = timezone.now()
@@ -587,7 +588,7 @@ class TestReaper:
 
     def test_a_demo_whose_preparation_had_failed_is_dropped_at_once_when_it_ends(self, monkeypatch):
         dropped = []
-        monkeypatch.setattr(services, "purge_demo_data", lambda hub: dropped.append(hub.slug))
+        monkeypatch.setattr(demos, "purge_demo_data", lambda hub: dropped.append(hub.slug))
         demo = create()
         Hub.objects.filter(slug=demo.slug).update(
             status="failed", attempts=3, next_attempt_at=timezone.now() + 15 * MINUTE

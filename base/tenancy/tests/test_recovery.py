@@ -34,7 +34,7 @@ from psycopg import sql
 from pydantic import ConfigDict
 
 from base import recovery as base_recovery
-from base import services
+from base.services import provisioning
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import names, recovery
 from base.tenancy.context import use_control, use_hub
@@ -1200,4 +1200,4 @@ def test_the_lease_is_the_moves():
     from base.tenancy import move
 
     assert recovery.LEASE == move.LEASE
-    assert services.LEASE_OWNER
+    assert provisioning.LEASE_OWNER

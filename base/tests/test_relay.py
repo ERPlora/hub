@@ -38,7 +38,8 @@ from apps.invoice.models import Invoice
 from apps.kitchen.models import Ticket
 from apps.printing.models import PrintJob
 from apps.verifactu.models import Record
-from base import catalog, relay, services, worker
+from base import catalog, relay, worker
+from base.services import relay_runs
 from base.catalog import RegisterResult
 from base.models import EventDelivery
 from base.tenancy.tests import hubs
@@ -495,7 +496,7 @@ def test_an_event_a_reaction_records_and_then_undoes_is_not_handed_over(worker_l
 def test_past_the_deepest_level_an_event_is_not_delivered_and_says_why(worker_loop, till, monkeypatch, caplog):
     monkeypatch.setattr(relay, "MAX_EVENT_DEPTH", 0)
 
-    with caplog.at_level(logging.ERROR, logger="base.services.relay"):
+    with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
         charge("relay-0011")
         worker_loop()
 
@@ -516,7 +517,7 @@ def test_a_reaction_that_fails_is_retried_with_a_growing_wait_then_given_up_and_
     charge("relay-0012")
     now = worker_loop.now
 
-    with caplog.at_level(logging.ERROR, logger="base.services.relay"):
+    with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
         worker_loop()
 
     # The good sale went through; the broken one waits 2 s for its second attempt.
@@ -558,7 +559,7 @@ def one_delivery(db):
     """A ``sale.sale.completed`` taken for Invoicing, due now: ``(event, now)``."""
     now = timezone.now()
     event = OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed", payload={})
-    services.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
+    relay_runs.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
     return event, now
 
 
@@ -568,7 +569,7 @@ def deliver_once(error: Exception, at: dt.datetime) -> EventDelivery:
     def deliver(app_label, event):
         raise error
 
-    delivery, delivered = services.relay_deliver_next(
+    delivery, delivered = relay_runs.relay_deliver_next(
         at,
         deliver=deliver,
         listeners=lambda _: [],
@@ -582,7 +583,7 @@ def deliver_once(error: Exception, at: dt.datetime) -> EventDelivery:
 
 
 def relay_logs(caplog) -> list[logging.LogRecord]:
-    return [record for record in caplog.records if record.name == "base.services.relay"]
+    return [record for record in caplog.records if record.name == "base.services.relay_runs"]
 
 
 @pytest.mark.parametrize(
@@ -597,7 +598,7 @@ def test_a_reaction_the_business_refuses_is_a_warning_with_its_code_and_no_trace
 ):
     event, now = one_delivery
 
-    with caplog.at_level(logging.DEBUG, logger="base.services.relay"):
+    with caplog.at_level(logging.DEBUG, logger="base.services.relay_runs"):
         delivery = deliver_once(refusal, now)
 
     [logged] = relay_logs(caplog)
@@ -619,7 +620,7 @@ def test_a_reaction_the_business_refuses_is_a_warning_with_its_code_and_no_trace
 def test_a_reaction_that_fails_unexpectedly_is_an_error_with_its_traceback(one_delivery, caplog):
     event, now = one_delivery
 
-    with caplog.at_level(logging.DEBUG, logger="base.services.relay"):
+    with caplog.at_level(logging.DEBUG, logger="base.services.relay_runs"):
         delivery = deliver_once(RuntimeError("the printer driver crashed"), now)
 
     [logged] = relay_logs(caplog)
@@ -640,7 +641,7 @@ def test_a_refusal_given_up_at_the_last_attempt_is_an_error_with_its_code(one_de
     EventDelivery.objects.filter(event=event).update(attempts=relay.MAX_ATTEMPTS - 1)
     refusal = Conflict("Set up the issuer first.", code="invoice.issuer_missing")
 
-    with caplog.at_level(logging.DEBUG, logger="base.services.relay"):
+    with caplog.at_level(logging.DEBUG, logger="base.services.relay_runs"):
         delivery = deliver_once(refusal, now)
 
     [logged] = relay_logs(caplog)
