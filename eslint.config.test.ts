@@ -20,9 +20,9 @@ const nodeRequire = createRequire(import.meta.url);
 type Lint = readonly [code: string, filePath: string];
 /** What ESLint said of each text of a `lintInThread`, in order, and whether it ignores each of its paths. */
 interface Found {
-  lints: { ruleId: string | null; message: string }[][];
+  lints: { ruleId: string | null; message: string; line: number }[][];
   ignored: boolean[];
-  /** Each object of eslint.config.js: its keys, its files and ignores, and what it sets of the four function limits. */
+  /** Each object of eslint.config.js: its keys, its files and ignores, and what it sets of the size limits. */
   blocks: { keys: string[]; files: string[] | null; ignores: string[] | null; rules: Record<string, unknown> }[];
 }
 
@@ -36,7 +36,7 @@ const eslint = new ESLint({ cwd: workerData.cwd });
   const lints = [];
   for (const [code, filePath] of workerData.lints) {
     const [result] = await eslint.lintText(code, { filePath });
-    lints.push(result.messages.map(({ ruleId, message }) => ({ ruleId, message })));
+    lints.push(result.messages.map(({ ruleId, message, line }) => ({ ruleId, message, line })));
   }
   const ignored = [];
   for (const path of workerData.paths) ignored.push(await eslint.isPathIgnored(path));
@@ -60,11 +60,12 @@ const eslint = new ESLint({ cwd: workerData.cwd });
  * (hub#1315). A lint left waiting on nothing that could end it fails at once, saying so.
  */
 function lintInThread(lints: readonly Lint[], paths: readonly string[], eslint = nodeRequire.resolve('eslint')): Promise<Found> {
-  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths, limits: FUNCTION_LIMITS });
+  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths, limits: [...FUNCTION_LIMITS, BLOCKS] });
 }
 
 const RESTRICTED = 'no-restricted-globals';
 const FUNCTION_LIMITS = ['complexity', 'max-depth', 'max-params', 'max-lines-per-function'];
+const BLOCKS = 'vue/max-lines-per-block';
 const NETWORK = ['fetch', 'EventSource', 'WebSocket', 'XMLHttpRequest'];
 const APP_PAGE = 'apps/demo/frontend/pages/ItemListPage.ts';
 const ENTRY = 'frontend/main.ts';
@@ -87,6 +88,20 @@ const taking = (count: number) =>
 const long = (lines: number) =>
   `export function f(): number {\n  let v = 0;\n\n  // a comment\n${'  v += 1;\n'.repeat(lines - 4)}  return v;\n}\n`;
 
+/** `count` lines of `text`, every other one blank: a blank line counts like any other. */
+const lines = (count: number, text: (n: number) => string) =>
+  Array.from({ length: count }, (_, n) => (n % 2 ? '' : text(n))).join('\n');
+/** A Vue page whose blocks hold the given number of lines between their opening and closing tags. */
+const vuePage = (template: number, script: number, style: number) =>
+  [
+    `<template>\n${lines(template, (n) => `  <p>${n}</p>`)}\n</template>`,
+    `<script setup lang="ts">\n${lines(script, (n) => `const line${n} = ${n};`)}\n</script>`,
+    `<style scoped>\n${lines(style, (n) => `.line${n} { order: ${n}; }`)}\n</style>`,
+    '',
+  ].join('\n');
+const AT_CAPS = vuePage(250, 300, 150);
+const PAST_CAPS = vuePage(251, 301, 151);
+
 /** Every lint these tests read. */
 const LINTS: readonly Lint[] = [
   ...NETWORK.flatMap((name): Lint[] => [
@@ -95,6 +110,8 @@ const LINTS: readonly Lint[] = [
   ]),
   [SCRIPT_SETUP, VUE_PAGE],
   ...['ion-icon', 'HubIcon', 'ok-icon'].map((tag): Lint => [slottedIn(tag), PROBE]),
+  [AT_CAPS, PROBE],
+  [PAST_CAPS, PROBE],
   ...[branchy(14), branchy(15), nested(4), nested(5), taking(3), taking(4), long(50), long(51)].flatMap((code): Lint[] => [
     [code, APP_PAGE],
     [code, APP_TEST],
@@ -119,11 +136,22 @@ describe('eslint config', () => {
     found = await lintInThread(LINTS, IGNORED);
   }, NO_CLOCK);
 
-  /** The messages of `rule` in what ESLint said of `code` linted as `filePath`, one of `LINTS`. */
-  function said(code: string, filePath: string, rule: string): string[] {
+  /** What ESLint said under `rule` of `code` linted as `filePath`, one of `LINTS`. */
+  function reports(code: string, filePath: string, rule: string): Found['lints'][number] {
     const index = LINTS.findIndex(([text, file]) => text === code && file === filePath);
     if (index < 0) throw new Error(`no lint of that text as ${filePath} in LINTS`);
-    return found.lints[index].filter((message) => message.ruleId === rule).map((message) => message.message);
+    return found.lints[index].filter((message) => message.ruleId === rule);
+  }
+
+  /** The messages of `rule` in what ESLint said of `code` linted as `filePath`. */
+  function said(code: string, filePath: string, rule: string): string[] {
+    return reports(code, filePath, rule).map((message) => message.message);
+  }
+
+  /** The blocks of a Vue page ESLint finds too long, by the tag of the line it points to. */
+  function longBlocks(code: string): string[] {
+    const source = code.split('\n');
+    return reports(code, PROBE, BLOCKS).map(({ line }) => source[line - 1].replace(/^<(\w+).*$/, '$1'));
   }
 
   it.each(NETWORK)('forbids %s in an app page and in the entry', (name) => {
@@ -170,13 +198,18 @@ describe('eslint config', () => {
     }
   });
 
+  it('caps each block of a Vue page, blank lines included: template 250, script 300 and style 150', () => {
+    expect(longBlocks(AT_CAPS)).toEqual([]);
+    expect(longBlocks(PAST_CAPS)).toEqual(['template', 'script', 'style']);
+  });
+
   it('keeps the suppressions of what already broke a limit, and fails on one no longer needed', () => {
     const { scripts } = JSON.parse(readFileSync(join(HUB_DIR, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
     expect(existsSync(join(HUB_DIR, 'eslint-suppressions.json'))).toBe(true);
     expect(scripts.lint).toBe('eslint .');
   });
 
-  it('sets the four limits for every file once, loosens two of them only in tests and ignores nothing else', () => {
+  it('sets the function limits for every file and the block caps for every Vue page once, loosens two only in tests and ignores nothing else', () => {
     const globalIgnores = found.blocks.filter(({ keys }) => keys.length === 1 && keys[0] === 'ignores');
     expect(globalIgnores.map(({ ignores }) => ignores)).toEqual([
       ['frontend/dist/**', 'staticfiles/**', 'node_modules/**', 'coverage/**', '.venv/**', 'packages/**'],
@@ -192,6 +225,12 @@ describe('eslint config', () => {
           'max-params': ['error', 3],
           'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
         },
+      },
+      {
+        keys: ['files', 'rules'],
+        files: ['**/*.vue'],
+        ignores: null,
+        rules: { [BLOCKS]: ['error', { template: 250, script: 300, style: 150 }] },
       },
       {
         keys: ['files', 'rules'],
