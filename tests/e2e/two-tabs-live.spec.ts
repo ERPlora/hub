@@ -7,7 +7,7 @@ import { recordResponses, responseEnd } from './resource-timing';
 
 const ROUNDS = 3;
 
-test('create in tab 1 → tab 2 paints the row in < 1 s, no reload, focus kept @smoke', async ({ context }) => {
+test('create in tab 1 → tab 2 paints the row in < 1 s, no reload, focus kept', async ({ context }) => {
   const tab1 = await context.newPage();
   await recordResponses(tab1);
   await login(tab1, A);
