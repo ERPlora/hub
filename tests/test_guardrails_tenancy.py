@@ -463,7 +463,7 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
     _any_more`` keeps off any shared database: there is none."""
     defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
 
-    assert set(defined.values()) <= {"base/services.py", "base/queries.py"}, defined
+    assert set(defined.values()) <= {"base/services/__init__.py", "base/queries.py"}, defined
 
 
 def _as_admin_of(slug: str):
