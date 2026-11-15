@@ -366,7 +366,7 @@ def test_a_cut_that_broke_leaves_the_business_on_control_and_the_next_run_does_i
 
 @pytest.mark.parametrize(
     ("mode", "breaks"),
-    [("--copy-all", (cut, "copy_rows")), ("--recreate", (cut.services, "apply_kept_photo"))],
+    [("--copy-all", (cut, "copy_rows")), ("--recreate", (cut.photo, "apply_kept_photo"))],
     ids=["copying", "seeding"],
 )
 def test_a_cut_that_broke_after_its_schema_leaves_the_business_s_schema_as_it_was(phase_one, monkeypatch, mode, breaks):

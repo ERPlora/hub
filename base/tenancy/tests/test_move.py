@@ -1040,7 +1040,7 @@ class TestTwoWorkers:
         assert fresh(hub).cluster_id == target.pk
         monkeypatch.setattr(move.control_services, "moving_row", lambda hub_id: stale)
         with use_control():
-            move.services.claim_hub(hub.id, AT, move.LEASE)
+            move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
 
         with use_control():
             move.move_hub(hub.id)
@@ -1350,10 +1350,10 @@ class TestTheMinorPoints:
         target = moves.cluster()
         hub = moves.hub(to=target)
         with use_control():
-            move.services.claim_hub(hub.id, AT, move.LEASE)
+            move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
             with CaptureQueriesContext(connection) as queries:
                 move.control_services.move_finished(
-                    hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.LEASE_OWNER
+                    hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.provisioning.LEASE_OWNER
                 )
 
         leases = [q["sql"] for q in queries.captured_queries if '"control_hubdue"' in q["sql"]]
@@ -1366,7 +1366,7 @@ class TestTheMinorPoints:
         with use_control():
             LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
         claimed: list[dt.datetime] = []
-        real = move.services.claim_hub
+        real = move.services.provisioning.claim_hub
 
         def claim(hub_id, now, lease, **kwargs):
             claimed.append(now)
@@ -1374,7 +1374,7 @@ class TestTheMinorPoints:
             Hub.objects.filter(pk=hub_id).update(cluster=target)
             return real(hub_id, now, lease, **kwargs)
 
-        monkeypatch.setattr(move.services, "claim_hub", claim)
+        monkeypatch.setattr(move.services.provisioning, "claim_hub", claim)
 
         run()
 
