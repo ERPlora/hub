@@ -28,9 +28,9 @@ from django.apps import apps
 
 from apps.flow import queries
 
-from .conftest import A
+from .conftest import A, HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 LOCALE = Path(apps.get_app_config("flow").path) / "frontend" / "locale"
 

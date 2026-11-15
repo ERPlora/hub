@@ -16,12 +16,16 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.flow.tests.conftest import HUB_DB
+from apps.invoice.tests.conftest import (
+    catalog_of,  # noqa: F401 (a fixture: the tests below take it by name)
+    in_hubs,
+)
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, comparable, offered_to, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The questions an automation asks a person (FLOW-F29): every role may be asked one, so every role holds these.
 THE_QUESTIONS = {"flow.question.list", "flow.question.get", "flow.question.answer"}
@@ -186,7 +190,7 @@ def test_automations_offers_its_thirty_tools():
     assert tools == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_only_who_runs_the_business_is_offered_the_automations(catalog_of):
     """An automation acts in the business's name with nobody watching (``FlowConfig.role_permissions``): the owner and
     the admin hold every tool; a manager and an employee only the questions an automation asks them."""
@@ -204,7 +208,7 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     assert {probe["tool"] for probe in PROBES} == TOOLS  # positive control: one probe per tool, all read
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -212,7 +216,7 @@ def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(cat
     assert FINDS.get(name, name) in offered_to(tools, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "probe",
     [
@@ -261,7 +265,7 @@ def test_a_word_that_only_shares_their_stem_names_no_automation_step_question_or
     assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.synonyms()).concepts)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("member", "name", "phrase"), GROUPS)
 def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name, phrase):
     """What a group of Automations' words is for, measured on what a turn offers and not on how a word reads: without
@@ -284,7 +288,7 @@ NAMED = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), NAMED)
 def test_what_waits_for_live_is_offered_when_the_request_names_the_automation(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -302,7 +306,7 @@ def test_the_asks_of_every_tool_are_caught_by_a_request():
     assert len(OWN_WORDS) == len(own)
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Automations that needs one, neither
@@ -339,5 +343,5 @@ OWN_WORDS_EN = [
     ("flow.secret.delete", "the old API one is no good, delete it"),
     ("flow.secret.list", "which saved names can the automations use now?"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("flow", OWN_WORDS_EN)

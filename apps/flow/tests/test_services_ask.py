@@ -19,9 +19,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 
-from .conftest import A, TASK_STEP, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

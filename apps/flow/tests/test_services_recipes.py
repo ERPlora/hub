@@ -18,9 +18,9 @@ from live.models import OutboxEvent
 from apps.flow import recipes
 from apps.flow.models import Flow, FlowRun
 
-from .conftest import A, ctx_for, make_run, run
+from .conftest import A, HUB_DB, ctx_for, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 REF = "appointment/customer_cancelled"
 TASK = "task.task.create"
