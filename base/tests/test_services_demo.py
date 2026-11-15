@@ -546,7 +546,7 @@ class TestReaper:
                 raise RuntimeError("the database went away")
 
         monkeypatch.setattr(services, "purge_demo_data", purge)
-        with caplog.at_level(logging.ERROR, logger="base.services"):
+        with caplog.at_level(logging.ERROR, logger="base.services.demos"):
             assert reap_demos() == 1
         # Its purge was undone; it stays on its way out (410) and due again, its lease given back.
         first_hub = Hub.objects.get(slug=first.slug)

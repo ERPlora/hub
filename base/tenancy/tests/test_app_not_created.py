@@ -307,7 +307,7 @@ def test_a_reaction_that_touches_it_fails_as_a_refusal_of_the_business_and_is_tr
     _, without_it = two_businesses
     now = timezone.now()
 
-    with use_hub(without_it), caplog.at_level(logging.WARNING, logger="base.services"):
+    with use_hub(without_it), caplog.at_level(logging.WARNING, logger="base.services.relay"):
         event = OutboxEvent.objects.create(
             scope_kind="host", scope_key=without_it.slug, name="sale.sale.paid", actor="ana"
         )
@@ -335,7 +335,7 @@ def test_a_task_that_touches_it_is_logged_with_the_refusal_and_moves_to_its_next
     now = timezone.now()
     later = now + dt.timedelta(hours=1)
 
-    with use_hub(without_it), caplog.at_level(logging.ERROR, logger="base.services"):
+    with use_hub(without_it), caplog.at_level(logging.ERROR, logger="base.services.relay"):
         schedule = TaskSchedule.objects.create(
             app_label="demo", name="touches", operation="demo.touches", cron="0 * * * *", next_run=now
         )

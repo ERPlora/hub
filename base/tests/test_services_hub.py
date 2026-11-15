@@ -180,19 +180,19 @@ class TestRegister:
 class TestReportReady:
     def test_a_saas_that_is_away_is_logged_and_never_raises(self, fake_saas, caplog):
         fake_saas(raises=OSError("connection refused"))
-        with caplog.at_level(logging.WARNING, logger="base.services"):
+        with caplog.at_level(logging.WARNING, logger="base.services.provisioning"):
             report_ready(HUB_ID)
         assert f"hub={HUB_ID}" in caplog.text and "connection refused" in caplog.text
 
     def test_a_refusal_of_the_saas_is_logged(self, fake_saas, caplog):
         fake_saas(status=409, body={"error": {"code": "hubs.not_preparing", "message": "Already active."}})
-        with caplog.at_level(logging.WARNING, logger="base.services"):
+        with caplog.at_level(logging.WARNING, logger="base.services.provisioning"):
             report_ready(HUB_ID)
         assert "409" in caplog.text
 
     def test_a_heard_ready_is_logged_as_info(self, fake_saas, caplog):
         fake_saas(body={"id": str(HUB_ID), "status": "active"})
-        with caplog.at_level(logging.INFO, logger="base.services"):
+        with caplog.at_level(logging.INFO, logger="base.services.provisioning"):
             report_ready(HUB_ID)
         assert "base.hub.ready_reported" in caplog.text
 
