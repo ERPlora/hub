@@ -160,6 +160,14 @@ def test_a_listed_test_whose_cases_the_shards_spread_is_judged_once_their_views_
     assert stale_lines(joined) == ["test_spread.py::test_spread"]
 
 
+def test_a_run_that_is_not_asked_for_its_view_writes_nothing(tmp_path):
+    run = run_suite(tmp_path, LEANING, "test_suite.py", "-k", "not failing")
+
+    assert run.returncode == 0, outcome(run)
+    written = sorted(path.name for path in tmp_path.iterdir() if path.name != "__pycache__")
+    assert written == sorted([legacy_allow.ALLOW_FILE, "pytest.ini", "test_suite.py"])
+
+
 @pytest.mark.parametrize(
     "selection",
     [
