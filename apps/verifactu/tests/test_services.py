@@ -8,6 +8,7 @@ stood in for (``gateway_answers``).
 
 import datetime as dt
 import hashlib
+import re
 
 import httpx
 import pytest
@@ -29,12 +30,11 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
-import re
-
 from apps.verifactu.tests.conftest import (
-    A,
     FIXTURES,
+    HUB_DB,
     RECIPIENT,
+    A,
     aeat_holds,
     answering,
     b64,
@@ -46,7 +46,7 @@ from apps.verifactu.tests.conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ISSUER_NIF = "B12345674"
 
@@ -203,7 +203,7 @@ def test_the_xml_is_built_when_sealed_and_passes_the_schema(issuer):
     assert record.fingerprint and record.qr_url
     assert record.xml.startswith("<sum1:RegistroAlta>")
     assert "<sum1:PrimerRegistro>S</sum1:PrimerRegistro>" in record.xml
-    assert "<sum1:NumeroInstalacion>a</sum1:NumeroInstalacion>" in record.xml
+    assert f"<sum1:NumeroInstalacion>{A.key}</sum1:NumeroInstalacion>" in record.xml
     assert "<sum1:IndicadorMultiplesOT>S</sum1:IndicadorMultiplesOT>" in record.xml
     assert f"<sum1:Huella>{record.fingerprint}</sum1:Huella>" in record.xml
     xsd.validate_record(
@@ -608,7 +608,7 @@ def test_a_submission_carries_the_chain_in_order_and_takes_the_aeats_acceptance(
         payload["nif"],
         payload["environment"],
         payload["route"],
-    ) == ("a", ISSUER_NIF, "testing", "erplora")
+    ) == (A.key, ISSUER_NIF, "testing", "erplora")
     sent = payload["envelope"]
     xsd.validate(sent)
     assert sent.index(first.invoice_number) < sent.index(second.invoice_number)

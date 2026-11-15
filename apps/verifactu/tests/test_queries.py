@@ -25,6 +25,7 @@ from apps.verifactu.models import (
     SendControl,
 )
 from apps.verifactu.tests.conftest import (
+    HUB_DB,
     A,
     RECIPIENT,
     b64,
@@ -34,7 +35,7 @@ from apps.verifactu.tests.conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture(autouse=True)
@@ -561,7 +562,7 @@ def test_the_configuration_starts_in_testing_through_erplora(issuer, settings):
     ) == (
         "B27593136",
         "EC",
-        "a",
+        A.key,
         "S",
     )
     assert config.synced_at is None

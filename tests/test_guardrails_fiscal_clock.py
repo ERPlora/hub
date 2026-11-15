@@ -5,7 +5,8 @@ The issue date of an invoice, the day of a sale and Taxes' «today» are on the 
 or not at all, under supervision (hub#772): the rate a «today» proposes or charges has to be the one in force on the date
 the record says. A «today» moved alone changes the TipoImpositivo and the Huella of a record without anybody asking for
 it, on the day a rate changes: the form proposes 10 % and the invoice goes out dated the day of the 21 %. Only hub#772
-rewrites these tables, on purpose. The records are sealed, never sent: nothing here leaves the machine.
+rewrites these tables, on purpose. The records are sealed, never sent: nothing here leaves the machine. The business is
+``hub_a``, in its own database.
 """
 
 import datetime as dt
@@ -19,11 +20,11 @@ from django.utils import timezone
 from apps.invoice.models import Invoice
 from apps.tax.models import TaxCategory, TaxRule
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import run
-from base.models import Hub
+from apps.verifactu.tests.conftest import HUB_DB, run
 from base.tenancy.context import use_hub
+from control.models import Hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
 
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -141,7 +142,20 @@ def nothing_leaves(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def rate_turns_at_midnight(db):
+def business(hub_a):
+    """The business ``A`` (``hub_a``), entered for the whole test."""
+    with use_hub(hub_a):
+        yield hub_a
+
+
+def in_zone(business, zone: str):
+    """The business, its zone now ``zone``: the clock its day is read on."""
+    Hub.objects.filter(pk=business.pk).update(timezone=zone)
+    return use_hub(Hub.objects.get(pk=business.pk))
+
+
+@pytest.fixture(autouse=True)
+def rate_turns_at_midnight(business):
     """The issuer, and a general rate that changes at the turn of the night: 10 % until the 2nd, 21 % from the 3rd."""
     run("invoice.issuer.update", ISSUER)
     category = TaxCategory.objects.get(key="product.generic")
@@ -151,11 +165,11 @@ def rate_turns_at_midnight(db):
 
 
 @pytest.mark.parametrize(("moment", "expected"), SALES)
-def test_a_sale_at_night_reaches_the_record_as_frozen(monkeypatch, moment, expected):
+def test_a_sale_at_night_reaches_the_record_as_frozen(business, monkeypatch, moment, expected):
     zone, instant = moment
     run("inventory.product.create", {"name": "Shampoo", "sku": "SHA", "price": 1000, "tax_category_key": "product.generic"})
     monkeypatch.setattr(timezone, "now", lambda: instant)
-    with use_hub(Hub(slug="a", timezone=zone)):
+    with in_zone(business, zone):
         sale = run(
             "sale.sale.complete",
             {
@@ -168,10 +182,10 @@ def test_a_sale_at_night_reaches_the_record_as_frozen(monkeypatch, moment, expec
 
 
 @pytest.mark.parametrize(("moment", "expected"), INVOICES)
-def test_an_invoice_at_the_rate_the_form_proposes_reaches_the_record_as_frozen(monkeypatch, moment, expected):
+def test_an_invoice_at_the_rate_the_form_proposes_reaches_the_record_as_frozen(business, monkeypatch, moment, expected):
     zone, instant = moment
     monkeypatch.setattr(timezone, "now", lambda: instant)
-    with use_hub(Hub(slug="a", timezone=zone)):
+    with in_zone(business, zone):
         proposed = run("invoice.invoice.line_defaults").tax_rate
         created = run(
             "invoice.invoice.create",

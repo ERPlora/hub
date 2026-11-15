@@ -10,16 +10,16 @@ Cases from the current module's ``desglose.hub``, ``recipient_snapshot`` and ``r
 """
 
 import pytest
-from django.db import transaction
 from live.errors import Conflict
+from live.operations import atomic
 
 from apps.invoice.models import Invoice
 from apps.tax.models import TaxRule
 from apps.verifactu import xsd
 from apps.verifactu.models import Chain, Record
-from apps.verifactu.tests.conftest import RECIPIENT, ctx_for, deliver, manual, run
+from apps.verifactu.tests.conftest import HUB_DB, RECIPIENT, ctx_for, deliver, manual, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 CUT = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
 
@@ -66,7 +66,7 @@ def valid(record: Record) -> None:
 
 
 def test_the_document_and_its_record_commit_together(issuer):
-    with transaction.atomic():
+    with atomic():
         invoice = run(
             "invoice.invoice.create",
             {"series_code": "TICKET", "lines": CUT},
@@ -82,7 +82,7 @@ def test_the_document_and_its_record_commit_together(issuer):
 
 
 def test_when_the_emission_rolls_back_no_record_nor_number_is_left(issuer):
-    with pytest.raises(RuntimeError), transaction.atomic():
+    with pytest.raises(RuntimeError), atomic():
         run(
             "invoice.invoice.create",
             {"series_code": "TICKET", "lines": CUT},

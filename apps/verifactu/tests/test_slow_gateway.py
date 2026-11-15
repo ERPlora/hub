@@ -27,14 +27,16 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
-from django.db import Error, connection, transaction
+from django.db import Error, connections
 from django.utils import timezone
+from live.operations import atomic
 
 from apps.verifactu import gateway
 from apps.verifactu.models import AeatRecord, Record
-from apps.verifactu.tests.conftest import FIXTURES, aeat_answer, manual, records_of, run
+from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, A, FIXTURES, aeat_answer, manual, records_of, run
 from base import scheduler
 from base.models import TaskSchedule
+from base.tenancy.context import current_alias
 
 #: The cluster's cut and a gateway slower than it: production's 30 s and 31 s, scaled down, and no further. The cut also
 #: counts the work an operation does between two statements before it calls (building and validating the XML, seconds
@@ -45,7 +47,9 @@ SUBMIT_ANSWER = "rotation_a_2026-09-22.xml"
 QUERY_ANSWER = "consulta_preproduccion_2026-08-01.xml"
 QUEUE = "verifactu.process_queue"
 
-committed = pytest.mark.usefixtures("committed_factory_data")
+def committed(test):
+    """A test on committed data, the business ``A``'s factory data and issuer planted again."""
+    return HUB_DB_COMMITTED(pytest.mark.usefixtures("committed_factory_data")(test))
 
 
 def peers_of_this_process() -> list[str]:
@@ -133,7 +137,9 @@ def slow_gateway(settings):
 
 @contextmanager
 def cluster_cut():
-    """This session cut as the cluster cuts them, for the block only: a session it cut is gone, with its setting."""
+    """The business's session cut as the cluster cuts them, for the block only: a session it cut is gone, with its
+    setting."""
+    connection = connections[current_alias()]
     with connection.cursor() as cursor:
         cursor.execute(f"SET idle_in_transaction_session_timeout = '{CUT}'")
     try:
@@ -188,7 +194,7 @@ def test_an_aeat_that_never_answers_leaves_the_sending_recorded_as_sent(slow_gat
 
 @committed
 def test_the_workers_pass_slower_than_the_cut_keeps_the_answer_and_moves_its_clock(slow_gateway, settings, monkeypatch):
-    settings.WORKER_SCOPE_SLUG = "a"
+    settings.WORKER_SCOPE_SLUG = A.key
     # The session of ``cluster_cut`` lives through the pass: released, it would reach the pool with its setting.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
     started = timezone.now()
@@ -226,8 +232,8 @@ def test_a_probe_of_the_gateway_slower_than_the_cut_keeps_its_answer(slow_gatewa
 @committed
 def test_the_cut_is_real_for_a_transaction_that_waits_on_nothing_declared():
     # What makes the tests above mean something: the same wait, without the allowance, loses its session.
-    with cluster_cut(), pytest.raises(Error), transaction.atomic():
-        with connection.cursor() as cursor:
+    with cluster_cut(), pytest.raises(Error), atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("SELECT 1")
             time.sleep(DELAY_SECONDS)
             cursor.execute("SELECT 1")

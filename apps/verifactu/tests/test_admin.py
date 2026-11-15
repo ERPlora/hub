@@ -9,16 +9,19 @@ form's error). The SaaS's photo, the environment and the certificate are never t
 """
 
 import pytest
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.utils import flatten_fieldsets
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
+from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.html import escape
+from live.context import system_context
 
+from apps.verifactu import gateway
 from apps.verifactu.admin import (
     CHAINS_RESCHEDULED,
     CORRECTED,
@@ -39,13 +42,24 @@ from apps.verifactu.models import (
     OwnCertificate,
     Record,
     SendControl,
+    wait_reason_text,
 )
-from apps.verifactu import gateway
-from apps.verifactu.models import wait_reason_text
-from apps.verifactu.tests.conftest import ISSUER, aeat_holds, aeat_answer, answering, manual, records_of, run
+from apps.verifactu.tests.conftest import (
+    HUB_DB,
+    ISSUER,
+    A,
+    B,
+    aeat_answer,
+    aeat_holds,
+    answering,
+    ctx_for,
+    manual,
+    records_of,
+    run,
+)
 from base.admin import ADMIN_HUB_SESSION_KEY
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 PLATFORM = "hubs.localhost:8000"
 RECORDS = "/admin/verifactu/record/"
@@ -59,7 +73,7 @@ def staff(db):
 
 @pytest.fixture
 def request_of(staff):
-    def make(hub: str | None = "a"):
+    def make(hub: str | None = A.key):
         request = RequestFactory().post(RECORDS)
         request.user = staff
         request.session = SessionStore()
@@ -69,6 +83,16 @@ def request_of(staff):
         return request
 
     return make
+
+
+def signed_in(client, staff, hub: str = A.key):
+    """The staff's admin session with ``hub`` chosen, as ``/admin/hub/<slug>/`` leaves it: its pages open that
+    business's own database."""
+    client.force_login(staff)
+    session = client.session
+    session[ADMIN_HUB_SESSION_KEY] = hub
+    session.save()
+    return client
 
 
 def model_admin(admin_class, model):
@@ -145,7 +169,7 @@ def test_the_records_list_shows_what_the_records_screen_showed(client, staff, is
     assert {"status", "record_type", "invoice_type", "environment"} <= set(instance.list_filter)
     assert {"invoice_number", "issuer_nif", "csv", "fingerprint"} <= set(instance.search_fields)
     sealed = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     response = client.get(RECORDS, HTTP_HOST=PLATFORM)
     assert response.status_code == 200
     html = response.content.decode()
@@ -158,7 +182,7 @@ def test_the_records_list_groups_the_thousands_of_a_total(client, staff, issuer)
     lines = [{"description": "Course", "quantity": "1", "unit_price": 102030, "tax_rate": "21"}]
     invoice = manual(lines, series_code="TICKET")
     run("verifactu.record.create", {"invoice_id": str(invoice.id)})
-    client.force_login(staff)
+    signed_in(client, staff)
     for language, total in (("en", "1,234.56 €"), ("es", "1.234,56 €")):
         response = client.get(RECORDS, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE=language)
         assert response.status_code == 200
@@ -170,13 +194,13 @@ def test_the_records_list_groups_the_thousands_of_a_total(client, staff, issuer)
 )
 def test_every_list_opens(client, staff, issuer, model):
     record()
-    client.force_login(staff)
+    signed_in(client, staff)
     assert client.get(f"/admin/verifactu/{model}/", HTTP_HOST=PLATFORM).status_code == 200
 
 
 def test_a_record_opens_read_only_and_is_never_saved(client, staff, issuer):
     sealed = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     page = f"{RECORDS}{sealed.pk}/change/"
     response = client.get(page, HTTP_HOST=PLATFORM)
     assert response.status_code == 200
@@ -194,7 +218,7 @@ def test_a_record_page_in_spanish_says_the_aeats_words(client, staff, issuer):
     the same English (invoice's «fecha de emisión» and «tipo de rectificación», sale's «desglose de impuestos» and
     «impuesto», attendance's «corrección»)."""
     sealed = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     response = client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 200
     html = response.content.decode()
@@ -314,7 +338,7 @@ def test_the_staff_resends_from_the_records_list_of_the_chosen_hub(
     gateway_answers.set(answering())
     sealed = record()
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         RECORDS,
         {"action": "resend_to_aeat", "_selected_action": [str(sealed.pk)], "index": "0"},
@@ -328,7 +352,7 @@ def test_the_staff_resends_from_the_records_list_of_the_chosen_hub(
 
 
 def test_without_staff_the_records_are_forbidden(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
     assert client.get(RECORDS, HTTP_HOST=PLATFORM).status_code == 403
 
 
@@ -616,7 +640,7 @@ def test_the_staff_asks_the_aeat_from_the_records_list(client, staff, issuer, ga
     [sealed] = left_without_answer(gateway_answers)
     gateway_answers.set(aeat_holds(sealed))
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         RECORDS,
         {"action": "ask_the_aeat", "_selected_action": [str(sealed.pk)], "index": "0"},
@@ -682,7 +706,7 @@ def test_the_send_controls_only_action_is_reschedule(request_of):
 def test_the_records_are_filtered_by_why_they_wait(client, staff, issuer, gateway_answers):
     waiting = failed_once(gateway_answers)
     fresh = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     html = client.get(f"{RECORDS}?wait_reason=unreachable", HTTP_HOST=PLATFORM).content.decode()
     assert waiting.invoice_number in html
     assert fresh.invoice_number not in html
@@ -695,7 +719,7 @@ def test_a_record_page_says_why_it_waits_and_links_its_invoice(
     client, staff, issuer, gateway_answers
 ):
     sealed = failed_once(gateway_answers)
-    client.force_login(staff)
+    signed_in(client, staff)
     html = client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
     assert wait_reason_text("unreachable", "connection refused") in html
     assert f"/admin/invoice/invoice/{sealed.invoice_id}/change/" in html
@@ -723,7 +747,7 @@ def test_a_record_the_gateway_refused_is_filtered_and_its_page_gives_the_gateway
 ):
     refused = refused_once(gateway_answers)
     fresh = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     listing = client.get(RECORDS, HTTP_HOST=PLATFORM).content.decode()
     assert escape(wait_reason_text("refused", "…", "…")) in listing
     html = client.get(f"{RECORDS}?wait_reason=refused", HTTP_HOST=PLATFORM).content.decode()
@@ -786,7 +810,7 @@ def config_page(config) -> str:
 def test_the_route_is_chosen_through_its_operation(client, staff, config):
     Config.objects.filter(pk=config.pk).update(route="own")
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         config_page(config),
         {"route": "erplora", "hub_status": "suspended", "_save": "Save"},
@@ -801,7 +825,7 @@ def test_the_route_is_chosen_through_its_operation(client, staff, config):
 
 def test_a_route_the_operation_refuses_is_the_forms_error(client, staff, config):
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         config_page(config), {"route": "own", "_save": "Save"}, HTTP_HOST=PLATFORM
     )
@@ -813,76 +837,93 @@ def test_a_route_the_operation_refuses_is_the_forms_error(client, staff, config)
 
 
 def test_without_a_chosen_hub_the_route_is_not_changed(client, staff, config):
+    # A business's configuration is only in its own database: without one chosen, the page goes back to the admin's
+    # index, warning to choose it first.
     Config.objects.filter(pk=config.pk).update(route="own")
     client.force_login(staff)
     response = client.post(
         config_page(config), {"route": "erplora", "_save": "Save"}, HTTP_HOST=PLATFORM
     )
-    assert response.status_code == 200
-    assert "Choose a hub first" in response.content.decode()
+    assert (response.status_code, response.url) == (302, reverse("admin:index"))
+    assert [message.level for message in get_messages(response.wsgi_request)] == [messages.WARNING]
     config.refresh_from_db()
     assert config.route == "own"
 
 
-def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(client, staff, settings):
-    # The page of a record says why it waits for the hub chosen in the admin session. ERPlora's own hub
-    # needs no authorisation for ERPlora's records; a business with ERPlora's tax ID typed in, the approved one.
-    from live.context import Scope, system_context
+def test_the_form_itself_refuses_a_route_without_a_chosen_hub(request_of, config):
+    # The page never hands the form a request without a hub chosen; the form refuses one on its own all the same.
+    Config.objects.filter(pk=config.pk).update(route="own")
+    config.refresh_from_db()
+    form_class = model_admin(ConfigAdmin, Config).get_form(request_of(hub=None), config, change=True)
+    form = form_class({"route": "erplora"}, instance=config)
+    assert not form.is_valid()
+    assert "Choose a hub first" in str(form.errors)
+    assert Config.objects.get(pk=config.pk).route == "own"
+    assert not Event.objects.filter(message_key="route_erplora").exists()
 
-    from apps.verifactu.tests.conftest import ISSUER, ctx_for
 
-    settings.PLATFORM_HUB_SLUG = "erplora"
+TICKET = {
+    "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+    "series_code": "TICKET",
+}
+
+
+def sealed_by_erploras_own_hub(settings) -> Record:
+    """ERPlora's invoice on its own hub (the business ``B``), issued by the system (``/internal/platform/invoices``) and
+    sealed in production."""
+    settings.PLATFORM_HUB_SLUG = B.key
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, ctx_for(scope=B))
+    run("verifactu.config.follow_deployment", {}, system_context(B))
+    sealed = Record.objects.get(invoice_id=run("invoice.invoice.create", TICKET, system_context(B)).id)
+    assert sealed.environment == "production"
+    return sealed
+
+
+def sealed_by_a_business_with_erploras_tax_id(settings) -> Record:
+    """An invoice of the business ``A``, which typed ERPlora's tax ID, sealed in production while its authorisation was
+    approved; revoked since."""
+    run("invoice.issuer.update", ISSUER)
+    run("verifactu.config.sync", {"version": 1, "representation": {"status": "approved"}}, system_context(A))
+    run("verifactu.config.go_live")
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID})
+    sealed = Record.objects.get(invoice_id=run("invoice.invoice.create", TICKET).id)
+    run("verifactu.config.sync", {"version": 2, "representation": {"status": "revoked"}}, system_context(A))
+    assert sealed.environment == "production"
+    return sealed
+
+
+@pytest.fixture
+def production_server(settings):
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform)
-    run("verifactu.config.follow_deployment", {}, system_context(platform.scope))
-    invoice = run(
-        "invoice.invoice.create",
-        {
-            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
-            "series_code": "TICKET",
-        },
-        system_context(platform.scope),  # ERPlora's invoices are issued by the system (/internal/platform/invoices)
-    )
-    sealed = Record.objects.get(invoice_id=invoice.id)
-    assert sealed.environment == "production"
+    return settings
+
+
+def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(
+    client, staff, production_server, in_business_b
+):
+    # The page of a record says why it waits for the hub chosen in the admin session, whose database holds it.
+    # ERPlora's own hub needs no authorisation for ERPlora's records; a business with ERPlora's tax ID typed in, the
+    # approved one.
+    with in_business_b():
+        erploras = sealed_by_erploras_own_hub(production_server)
+    typed = sealed_by_a_business_with_erploras_tax_id(production_server)
     needs_it = escape(wait_reason_text("representation_not_approved"))
-    client.force_login(staff)
-    session = client.session
 
-    session[ADMIN_HUB_SESSION_KEY] = "erplora"
-    session.save()
-    assert needs_it not in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
-
-    session[ADMIN_HUB_SESSION_KEY] = "a"
-    session.save()
-    assert needs_it in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+    on_erploras = signed_in(client, staff, B.key).get(f"{RECORDS}{erploras.pk}/change/", HTTP_HOST=PLATFORM)
+    assert on_erploras.status_code == 200
+    assert needs_it not in on_erploras.content.decode()
+    on_the_business = signed_in(client, staff, A.key).get(f"{RECORDS}{typed.pk}/change/", HTTP_HOST=PLATFORM)
+    assert on_the_business.status_code == 200
+    assert needs_it in on_the_business.content.decode()
 
 
-def test_without_a_hub_drawn_erploras_tax_id_is_no_exemption_and_the_reason_is_said(settings):
+def test_without_a_hub_drawn_erploras_tax_id_is_no_exemption_and_the_reason_is_said(production_server, in_business_b):
     # «Why it waits» drawn outside a hub's page (no hub chosen: no scope) never takes ERPlora's tax ID as
     # ERPlora's own hub; it says the authorisation is missing instead of failing.
     from django.contrib.admin.sites import site
-    from live.context import Scope, system_context
 
-    from apps.verifactu.tests.conftest import ISSUER, ctx_for
-
-    settings.PLATFORM_HUB_SLUG = "erplora"
-    settings.ERPLORA_ENVIRONMENT = "prod"
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
-    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform)
-    run("verifactu.config.follow_deployment", {}, system_context(platform.scope))
-    invoice = run(
-        "invoice.invoice.create",
-        {
-            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
-            "series_code": "TICKET",
-        },
-        system_context(platform.scope),
-    )
-    sealed = Record.objects.get(invoice_id=invoice.id)
-    assert str(wait_reason_text("representation_not_approved")) in site._registry[Record].why_waiting(sealed)
+    with in_business_b():
+        sealed = sealed_by_erploras_own_hub(production_server)
+        assert str(wait_reason_text("representation_not_approved")) in site._registry[Record].why_waiting(sealed)

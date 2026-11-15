@@ -20,7 +20,9 @@ from live.models import OutboxEvent
 
 from apps.verifactu import representation
 from apps.verifactu.models import Config, Event
-from apps.verifactu.tests.conftest import A, ISSUER, ctx_for, run
+from apps.verifactu.tests.conftest import HUB_DB, A, ISSUER, ctx_for, run
+
+pytestmark = HUB_DB
 
 URL = "http://saas.internal:8001"
 HUB_ID = uuid.UUID("01920000-0000-7000-8000-000000000abc")
