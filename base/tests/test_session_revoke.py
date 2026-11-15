@@ -7,6 +7,8 @@ HUBS-F28 of the SaaS. Every login notes whose and where its session is (``base.S
 host the login noted), so the door ends exactly those sessions through that index, never decoding the sessions of the
 table. An open ``/api/live`` stream of an ended session gets no more results: its next re-run ends it with ``bye``,
 and the door wakes the hub's open apps after the COMMIT so that re-run comes now.
+
+The businesses are ``hub_a`` (Acme) and ``hub_b`` (Beta), each on a database of its own, as every business is.
 """
 
 import json
@@ -31,29 +33,33 @@ from base.middleware import PLATFORM_SESSION_HOST
 from base.models import Hub, Membership, SessionOwner
 from base.operations import HubContextBuilder
 from base.services import open_admin_session_from_saas, open_session_from_saas
+from base.tenancy.context import use_control, use_hub
+from base.tenancy.tests import hubs
 from base.tests.test_internal import code, signed
 
+pytestmark = pytest.mark.usefixtures("no_test_fallback")
+
+HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 REVOKE = "/internal/sessions/revoke"
 ANA = "0199c4b0-0000-7000-8000-00000000a0a0"
 OLGA = "0199c4b0-0000-7000-8000-00000000b0b0"
-ACME_ID = "0199c4b0-0000-7000-8000-0000000000a1"
-BETA_ID = "0199c4b0-0000-7000-8000-0000000000a2"
+ACME_ID = str(hubs.HUB_A_ID)
 UNKNOWN_ID = "0199c4b0-0000-7000-8000-0000000000ff"
 
 
 @pytest.fixture
-def acme(db):
-    return Hub.objects.create(id=ACME_ID, slug="acme", status="ready")
+def acme(hub_a):
+    return hub_a
 
 
 @pytest.fixture
-def beta(db):
-    return Hub.objects.create(id=BETA_ID, slug="beta", status="ready")
+def beta(hub_b):
+    return hub_b
 
 
 def login(saas_id: str, hub: Hub | None = None, role: str = "hub_employee") -> str:
-    """A session opened as ``/auth/callback`` opens it: on ``hub``'s host for a member, or on the platform host for
-    the staff (``hub=None``); its key."""
+    """A session opened as ``/auth/callback`` opens it: on ``hub``'s host for a member, inside the hub, or on the
+    platform host for the staff (``hub=None``), on control; its key."""
     host = f"{hub.slug}.localhost:8000" if hub else "hubs.localhost:8000"
     request = RequestFactory().post("/auth/callback", HTTP_HOST=host)
     SessionMiddleware(lambda r: None).process_request(request)
@@ -62,10 +68,12 @@ def login(saas_id: str, hub: Hub | None = None, role: str = "hub_employee") -> s
     redeemed = RedeemedUser(user_id=saas_id, email=f"{saas_id[-4:]}@example.com", name="Ana", locale="es", role=role)
     if hub is None:
         request.platform_host = True
-        open_admin_session_from_saas(request, RedeemedUser(**{**redeemed.__dict__, "role": PLATFORM_ADMIN}))
+        with use_control():
+            open_admin_session_from_saas(request, RedeemedUser(**{**redeemed.__dict__, "role": PLATFORM_ADMIN}))
     else:
         request.hub = hub
-        open_session_from_saas(request, redeemed, hub.slug)
+        with use_hub(hub):
+            open_session_from_saas(request, redeemed, hub.slug)
     request.session.save()
     return request.session.session_key
 
@@ -74,37 +82,39 @@ def alive(key: str) -> bool:
     return Session.objects.filter(session_key=key).exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 class TestTheIndex:
     def test_every_login_notes_whose_and_where_its_session_is(self, acme):
         member = login(ANA, acme)
         staff = login(ANA)
 
         assert set(SessionOwner.objects.values_list("session_id", "saas_user_id", "host")) == {
-            (member, ANA, "acme"),
+            (member, ANA, acme.slug),
             (staff, ANA, PLATFORM_SESSION_HOST),
         }
 
     def test_a_login_over_another_person_s_session_notes_the_new_one(self, acme):
         """``login`` flushes a session of another user and leaves it without a key: the note saves it first."""
-        request = RequestFactory().post("/auth/callback", HTTP_HOST="acme.localhost:8000")
+        request = RequestFactory().post("/auth/callback", HTTP_HOST=f"{acme.slug}.localhost:8000")
         SessionMiddleware(lambda r: None).process_request(request)
         request.user, request.hub = AnonymousUser(), acme
         for saas_id in (ANA, OLGA):
             redeemed = RedeemedUser(user_id=saas_id, email="x@example.com", name="X", locale="es", role="hub_employee")
-            open_session_from_saas(request, redeemed, acme.slug)
+            with use_hub(acme):
+                open_session_from_saas(request, redeemed, acme.slug)
 
         assert list(SessionOwner.objects.values_list("session_id", "saas_user_id")) == [
             (request.session.session_key, OLGA)
         ]
 
     def test_the_same_person_entering_again_keeps_one_note(self, acme):
-        request = RequestFactory().post("/auth/callback", HTTP_HOST="acme.localhost:8000")
+        request = RequestFactory().post("/auth/callback", HTTP_HOST=f"{acme.slug}.localhost:8000")
         SessionMiddleware(lambda r: None).process_request(request)
         request.user, request.hub = AnonymousUser(), acme
         redeemed = RedeemedUser(user_id=ANA, email="x@example.com", name="X", locale="es", role="hub_employee")
-        open_session_from_saas(request, redeemed, acme.slug)
-        open_session_from_saas(request, redeemed, acme.slug)
+        with use_hub(acme):
+            open_session_from_saas(request, redeemed, acme.slug)
+            open_session_from_saas(request, redeemed, acme.slug)
 
         assert list(SessionOwner.objects.values_list("session_id", "saas_user_id")) == [
             (request.session.session_key, ANA)
@@ -118,7 +128,7 @@ class TestTheIndex:
         assert not SessionOwner.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 class TestTheDoor:
     def test_with_a_business_it_ends_that_account_s_sessions_there_and_nowhere_else(self, client, acme, beta):
         on_acme, again_on_acme, on_beta, staff = login(ANA, acme), login(ANA, acme), login(ANA, beta), login(ANA)
@@ -245,13 +255,11 @@ def fresh_executor():
     executor.reset()
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 @pytest.mark.usefixtures("fresh_executor")
 class TestTheOpenApps:
-    async def test_the_stream_of_an_ended_session_ends_without_a_result(self, client, every_app_on):
-        hub = await in_db(Hub.objects.create, id=ACME_ID, slug="acme", status="ready")
-        await in_db(every_app_on, "acme")  # the stream reads the demo app's items
-        stream = await in_db(open_stream, ANA, hub)
+    async def test_the_stream_of_an_ended_session_ends_without_a_result(self, client, hub_a):
+        stream = await in_db(open_stream, ANA, hub_a)
         await executor.run_all(stream)
         assert b"event: result" in stream.queue.get_nowait()
 
@@ -263,10 +271,8 @@ class TestTheOpenApps:
         assert stream.queue.get_nowait() == BYE_FRAME
         assert stream.queue.empty()
 
-    async def test_the_stream_of_another_account_goes_on(self, client, every_app_on):
-        hub = await in_db(Hub.objects.create, id=ACME_ID, slug="acme", status="ready")
-        await in_db(every_app_on, "acme")
-        stream = await in_db(open_stream, OLGA, hub)
+    async def test_the_stream_of_another_account_goes_on(self, client, hub_a):
+        stream = await in_db(open_stream, OLGA, hub_a)
         await executor.run_all(stream)
         stream.queue.get_nowait()
 
@@ -276,15 +282,14 @@ class TestTheOpenApps:
         assert not stream.closed
         assert stream.queue.empty()  # the same result: nothing new to send
 
-    def test_the_door_wakes_the_hub_s_open_apps_after_the_commit(self, client):
-        Hub.objects.create(id=ACME_ID, slug="acme", status="ready")
-        login(ANA, Hub.objects.get(pk=ACME_ID))
+    def test_the_door_wakes_the_hub_s_open_apps_after_the_commit(self, client, hub_a):
+        login(ANA, hub_a)
         params = connections["default"].settings_dict
         dsn = make_conninfo(
             dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
         )
         with psycopg.connect(dsn, autocommit=True) as listener:
-            listener.execute(f"LISTEN {channel_for(Scope('host', 'acme'))}")
+            listener.execute(f"LISTEN {channel_for(Scope('host', hub_a.slug))}")
 
             signed(client, "post", REVOKE, {"user_id": ANA, "hub_id": ACME_ID})
 
