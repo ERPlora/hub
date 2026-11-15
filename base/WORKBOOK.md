@@ -2935,10 +2935,11 @@ Implicados: HUB_APP-F26 (ERPlora/app), HUB_APP-F07 (ERPlora/app), KITCHEN-F16, A
 ### BASE-F114 Devolver un negocio a un momento pasado desde el admin de Hubs
 Estado: hecho (la acción y la restauración, en su sitio o en una copia aparte, y recuperar desde la copia aparte los
 clientes que se perdieron, los eliminados tal como eran, los productos, los servicios con sus categorías, las citas,
-las citas periódicas, los precios de tarifa, los grupos de suplementos que el negocio borró, con sus opciones, los
-grupos de suplementos de las categorías y de los productos, los menús que el negocio retiró y los platos que quitó de un
+las citas periódicas, los precios de tarifa, los grupos de suplementos que el negocio borró, con sus opciones, las
+opciones que quitó de un grupo de suplementos que conserva, los grupos de suplementos de las categorías y de los
+productos, los menús que el negocio retiró y los platos que quitó de un
 menú y las elecciones de menú de los productos; crear y borrar el clúster temporal es el procedimiento «Devolver un
-negocio a un momento» de ERPlora/aws; una opción quitada de un grupo de suplementos que el negocio conserva, hub#1505)
+negocio a un momento» de ERPlora/aws)
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide
 Pantalla: el admin de Hubs (`hubs.erplora.com/admin`) › Hubs, acciones «Restaurar desde una copia…» y «Restaurar en una
 copia aparte…»; Copias aparte, acción «Recuperar en el negocio…»; y Recuperaciones
@@ -2980,12 +2981,13 @@ Pasos:
      Debajo, «Qué recuperar», con lo que se puede traer marcado (hoy, **Clientes**, **Categorías de productos,
      Productos, Enlaces de productos a categorías**, **Categorías de servicios, Servicios, Enlaces de servicios a
      categorías, Enlaces de subcategorías a categorías**, **Citas, Citas periódicas**, **Precios de tarifa**,
-     **Menús, Platos de menú, Elecciones de menú de productos** y **Grupos de suplementos, Grupos de suplementos de
-     categorías, Grupos de suplementos de productos**). Pulsa **Recuperar**.
+     **Menús, Platos de menú, Elecciones de menú de productos** y **Grupos de suplementos, Opciones de suplementos,
+     Grupos de suplementos de categorías, Grupos de suplementos de productos**). Pulsa **Recuperar**.
   10. Sale «1 copia aparte devolverá Clientes, Categorías de productos, Productos, Enlaces de productos a categorías,
       Categorías de servicios, Servicios, Enlaces de servicios a categorías, Enlaces de subcategorías a categorías,
       Citas, Citas periódicas, Precios de tarifa, Menús, Platos de menú, Elecciones de menú de productos, Grupos de
-      suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos a su negocio en unos minutos:
+      suplementos, Opciones de suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos a su
+      negocio en unos minutos:
       Recuperaciones dice cómo
       fue.». En
       Recuperaciones la ve «Pedida» con la copia, qué se pidió y cuándo.
@@ -3104,19 +3106,25 @@ Pasos:
       que vuelve, el mismo o como uno nuevo, pregunta otra vez en el TPV sus salsas, su punto o sus extras
       (MODIFIER-F10). No se repite uno cuyo grupo el negocio ya volvió a enganchar a ese producto: se queda el suyo. Uno
       que la hoja del grupo no acepta hoy (su producto sigue eliminado, o el negocio ya hizo otro a mano con su SKU, o
-      borró el grupo y ya hizo otro a mano con su nombre) no vuelve y su motivo lo dice. Justo antes van, contados aparte, los grupos de suplementos de las
-      categorías: «Grupos de suplementos de categorías: se crearon 2». Cada grupo que en la copia colgaba de una
-      categoría viva allí y que el negocio ya no tiene enganchado a ella se vuelve a enganchar del mismo modo: a la
-      misma categoría si el negocio la conserva, o a la que la recuperación trajo por ella con su nombre, así que sus
-      productos vuelven a preguntarlo en el TPV. Una categoría que sigue eliminada o que el negocio volvió a crear a mano
-      se queda sin él, y su motivo lo dice. Y antes de los enganches, contados aparte, los propios grupos: «Grupos de
-      suplementos: se creó 1». Cada grupo que la copia tiene y el negocio ya no (lo borró, con sus opciones y sus
-      enganches) se vuelve a crear como lo crea la pantalla de Suplementos, con sus opciones como las añade la hoja del
-      grupo, y sus enganches de la copia se le hacen a ese, así que vuelve a salir en el TPV con sus opciones y sus
-      suplementos (MODIFIER-F10). Uno que el negocio volvió a crear a mano con su nombre se queda como está, sin otro
-      igual, y uno que conserva, con las opciones que tenga. Una opción que la hoja del grupo no acepta hoy (su categoría
-      fiscal propia ya no está activa en Impuestos) no vuelve: el grupo vuelve sin ella y su nota lo dice («Grupos de
-      suplementos: se creó 1, 1 con notas»).
+      borró el grupo y ya hizo otro a mano con su nombre) no vuelve y su motivo lo dice. Justo antes van, contados
+      aparte, los grupos de suplementos de las categorías: «Grupos de suplementos de categorías: se crearon 2». Cada
+      grupo que en la copia colgaba de una categoría viva allí y que el negocio ya no tiene enganchado a ella se vuelve
+      a enganchar del mismo modo: a la misma categoría si el negocio la conserva, o a la que la recuperación trajo por
+      ella con su nombre, así que sus productos vuelven a preguntarlo en el TPV. Una categoría que sigue eliminada o que
+      el negocio volvió a crear a mano se queda sin él, y su motivo lo dice. Antes, contadas aparte, las opciones que el
+      negocio quitó de un grupo que conserva: «Opciones de suplementos: se creó 1». Cada una vuelve a su grupo, el mismo
+      aunque lo renombrara, como la añade la hoja del grupo, con su suplemento, su categoría fiscal propia y su orden;
+      no se repite una que el negocio ya volvió a crear con su nombre en ese grupo. Si estaba elegida por defecto y el
+      grupo ya trae tantas como admite (otra, en uno de «elige una»), vuelve sin elegir, las del negocio siguen elegidas
+      y su nota lo dice («Opciones de suplementos: se creó 1, 1 con notas») (MODIFIER-F10). Y antes de todo eso,
+      contados aparte, los propios grupos: «Grupos de suplementos: se creó 1». Cada grupo que la copia tiene y el
+      negocio ya no (lo borró, con sus opciones y sus enganches) se vuelve a crear como lo crea la pantalla de
+      Suplementos, con sus opciones como las añade la hoja del grupo, y sus enganches de la copia se le hacen a ese, así
+      que vuelve a salir en el TPV con sus opciones y sus suplementos (MODIFIER-F10). Uno que el negocio volvió a crear
+      a mano con su nombre se queda como está, sin otro igual, y uno que conserva, con las opciones que tenga más las
+      que le quitó. Una opción que la hoja del grupo no acepta hoy (su categoría fiscal propia ya no está activa en
+      Impuestos) no vuelve: el grupo vuelve sin ella y su nota lo dice («Grupos de suplementos: se creó 1, 1 con
+      notas»).
       Las elecciones de menú de los productos van también después de los productos: «Elecciones de menú de productos:
       se crearon 2». Cada elección que en la copia ofrecía un producto vivo allí y que el negocio ya no tiene se vuelve a
       añadir a su plato, como la añade el constructor del menú, con su suplemento y, si estaba agotada, agotada, así que
@@ -3157,10 +3165,11 @@ aún guardaba, activa otra vez con su aviso de serie recuperada (`appointment.re
 nueva por cada una que ya no tenía, con su aviso de serie creada (`appointment.recurring.created`) y el de cada cita que
 reserva, un precio de tarifa por cada uno que le faltaba, con su aviso de precio puesto (`pricing.price_item.added`),
 un grupo de suplementos nuevo por cada uno que le faltaba, con su aviso de grupo creado (`modifier.group.created`) y el
-de cada una de sus opciones (`modifier.option.created`), un grupo de suplementos enganchado a una categoría o a un producto por cada uno que le faltaba, con su aviso de enganche
-hecho (`modifier.link.attached`), un menú por cada uno que le faltaba, con su aviso de menú nuevo (`combo.combo.created`),
-un plato por cada uno que le faltaba, con su aviso de plato nuevo (`combo.group.created`), y una elección de menú por
-cada una que le faltaba, con su aviso de elección nueva (`combo.option.created`), y nada más. Cada uno
+de cada una de sus opciones (`modifier.option.created`), una opción por cada una que le faltaba a un grupo de
+suplementos que conserva, con su aviso de opción creada (`modifier.option.created`), un grupo de suplementos enganchado
+a una categoría o a un producto por cada uno que le faltaba, con su aviso de enganche hecho (`modifier.link.attached`),
+un menú por cada uno que le faltaba, con su aviso de menú nuevo (`combo.combo.created`), un plato por cada uno que le
+faltaba, con su aviso de plato nuevo (`combo.group.created`), y una elección de menú por cada una que le faltaba, con su aviso de elección nueva (`combo.option.created`), y nada más. Cada uno
 de esos avisos dice que lo hizo la recuperación (su autor es `copy_recovery:<id>`, el de la fila de Recuperaciones), así
 que ninguna automatización del negocio arranca con ellos (FLOW-F21), sea de algo creado o de algo recuperado; lo que
 solo pone al día lo del negocio con ellos sigue igual (la Bandeja de WhatsApp enlaza a la ficha su conversación;
@@ -3777,7 +3786,10 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
   catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
   `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
-  preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
+  preguntas; `base.setup.status` y `base.business.get` siempre; `ranking` lo ordena con las palabras propias del
+  Hub: las de la plataforma, `SYNONYMS` («placa», «empleado»), y las que cada app declara en `assistant_synonyms` de
+  su `LiveAppConfig`, con su forma comprobada por `base.E018`; cuentan en todo turno, salvo las de una app fuera de
+  la tienda, `listed = False` como Demo, que solo cuentan donde se ofrecen sus herramientas), la tarjeta (`card`: `ai={"risk": "high"}` pide
   `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `assistant` del catálogo de `live`, o el número de `ids`; sin `ids`, `blocked`; cada
   dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
   cual en inglés; si no, el `verbose_name` del campo del mismo nombre en los modelos de su app, primero el de la

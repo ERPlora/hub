@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -125,7 +126,7 @@ PROBES = json.loads(
         encoding="utf-8"
     )
 )["probes"]
-#: The Hub's groups of words of Automations (``base.assistant.SYNONYMS``), each by a word of its own, and a request that
+#: Automations' own groups of words (its ``assistant_synonyms``), each by a word of its own, and a request that
 #: is neither an ask nor a probe whose tool only the group brings among the first ten: what it is for. A recipe's is
 #: also the read that finds the recipe the person names (``FINDS``), as pausing one asks.
 GROUPS = [
@@ -228,12 +229,12 @@ def test_every_probe_of_automations_offers_its_tool_without_being_one_of_its_ask
 
 
 def test_the_hub_names_an_automation_its_runs_steps_questions_drafts_and_recipes():
-    """``base.assistant.SYNONYMS``: «la automatización» is a ``flow.flow``, «la ejecución» a run (``flow.run``), «los
-    pasos» its steps, «la pregunta» the one it waits on, «el borrador» the assistant's draft and «la receta» a ready-made
-    one, so a request in the words of the Automations screens names what their tools are of; live alone names none
-    (positive control)."""
+    """Automations' own words (its ``assistant_synonyms``): «la automatización» is a ``flow.flow``, «la ejecución» a run
+    (``flow.run``), «los pasos» its steps, «la pregunta» the one it waits on, «el borrador» the assistant's draft and
+    «la receta» a ready-made one, so a request in the words of the Automations screens names what their tools are of;
+    live alone names none (positive control)."""
     phrase = "abre la automatización y dime la ejecución, los pasos, la pregunta, el borrador y la receta"
-    named = shared.asked([phrase], assistant.SYNONYMS).concepts
+    named = shared.asked([phrase], apps.get_app_config("flow").assistant_synonyms).concepts
     bare = shared.asked([phrase]).concepts
     for word in ("flow", "run", "step", "question", "draft", "recipe"):
         assert any(shared.stem(word) in concept for concept in named), word
@@ -257,19 +258,19 @@ def test_a_word_that_only_shares_their_stem_names_no_automation_step_question_or
     """«automática» shares its stem with «automatización», «pasó» is «paso» without its accent and «pregunta» is a verb
     too: the Hub names those by their phrases, so a request about something else does not climb to Automations. «borra»
     and «bórralo» stem apart from «borrador» (``borr``, ``borra``): deleting names no draft."""
-    assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts)
+    assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.synonyms()).concepts)
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("member", "name", "phrase"), GROUPS)
 def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name, phrase):
-    """What a group of ``SYNONYMS`` is for, measured on what a turn offers and not on how a word reads: without it, the
-    request's tool falls past the first ten."""
+    """What a group of Automations' words is for, measured on what a turn offers and not on how a word reads: without
+    it, the request's tool falls past the first ten."""
     tools = catalog_of(Membership.Role.OWNER, "es")
     assert nobodys_words(tools, phrase)
-    group = [group for group in assistant.SYNONYMS if member in group]
-    assert len(group) == 1, member  # positive control: the group is the Hub's, and only one
-    without = tuple(other for other in assistant.SYNONYMS if other is not group[0])
+    group = [group for group in apps.get_app_config("flow").assistant_synonyms if member in group]
+    assert len(group) == 1, member  # positive control: the group is Automations', and only one
+    without = tuple(other for other in assistant.synonyms() if other != group[0])
     assert name in offered_to(tools, phrase)[:TOP]
     assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
 

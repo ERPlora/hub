@@ -70,3 +70,33 @@ def test_a_search_at_the_comparison_point_reads_that_commit_only(scratch_repo):
     commit(scratch_repo, None)
     assert grep_at_base("noqa: [A-Z0-9, ]+", "*.py", repo=scratch_repo) == ["noqa: C901"]
     assert grep_at_base("noqa: PLR0911", "*.py", repo=scratch_repo) == []
+
+
+def test_a_shallow_clone_fails_instead_of_comparing_the_list_with_itself(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    run_git(source, "init", "-q", "-b", "main")
+    commit(source, "1200 base/x.py hub#1\n")
+    commit(source, "1300 base/x.py hub#1\n")
+    run_git(tmp_path, "clone", "-q", "--depth", "1", f"file://{source}", "shallow")
+    with pytest.raises(pytest.fail.Exception, match="shallow"):
+        file_at_base(ALLOW_FILE, tmp_path / "shallow")
+
+
+def test_a_shallow_clone_of_a_branch_says_it_is_shallow(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    run_git(source, "init", "-q", "-b", "main")
+    commit(source, "1200 base/x.py hub#1\n")
+    commit(source, "1300 base/x.py hub#1\n")
+    run_git(source, "checkout", "-q", "-b", "work", "HEAD~1")
+    commit(source, "1100 base/x.py hub#1\n")
+    run_git(tmp_path, "clone", "-q", "--depth", "1", "--no-single-branch", f"file://{source}", "shallow")
+    with pytest.raises(pytest.fail.Exception, match="This clone is shallow"):
+        file_at_base(ALLOW_FILE, tmp_path / "shallow")
+
+
+def test_the_first_commit_of_a_full_history_is_compared_with_itself(scratch_repo):
+    root = commit(scratch_repo, "1200 base/x.py hub#1\n")
+    run_git(scratch_repo, "update-ref", "refs/remotes/origin/main", root)
+    assert comparison_point(scratch_repo) == root

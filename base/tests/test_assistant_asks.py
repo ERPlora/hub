@@ -2,8 +2,8 @@
 model and no network, in every pull request.
 
 Every tool of an app listed in ``LIVE_ASSISTANT_ASKS_REQUIRED`` says what a person types to ask for it (its ``asks``,
-``live.E020``), and each of those phrases, ranked exactly as a chat turn ranks (``base.assistant.RANKING``: the same
-``ALWAYS`` first, the same ``APP_WORDS``, the Hub's own ``SYNONYMS`` and ``HOWTO``), brings its tool among the first ten
+``live.E020``), and each of those phrases, ranked exactly as a chat turn ranks (``base.assistant.ranking``: the same
+``ALWAYS`` first, the same ``APP_WORDS``, the Hub's own words and ``HOWTO``), brings its tool among the first ten
 offered, against the real catalogue of each role of the Hub (``base.assistant.catalog`` of a member of business ``a``,
 which has every module on: the largest catalogue a role can have). What a role may not run is not in its catalogue at
 all. An app joins the list in the same pull request that completes its asks, and stays in it while any of its tools
@@ -25,6 +25,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.assistant_qa import Miss, misses, report, uncovered
@@ -91,7 +92,7 @@ def missed(tools: dict[str, Operation], language: str) -> list[Miss]:
     """``misses`` of ``tools`` as a turn ranks them, once per catalogue: the roles that hold the same tools share it."""
     key = (language, tuple(tools))
     if key not in _found:
-        _found[key] = misses(tools, language=language, top=TOP, **assistant.RANKING)
+        _found[key] = misses(tools, language=language, top=TOP, **assistant.ranking(tools))
     return _found[key]
 
 
@@ -188,9 +189,22 @@ def catalog_of(make_user):
 
 
 def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
-    """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.RANKING`` ranks them, or
-    with what ``ranking`` puts in its place (``synonyms=``…)."""
-    return [op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.RANKING, **ranking})]
+    """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.ranking`` ranks them,
+    or with what ``ranking`` puts in its place (``synonyms=``…)."""
+    return [
+        op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.ranking(tools), **ranking})
+    ]
+
+
+def assert_its_words_name(label: str, cases: Iterable[tuple[str, str]]) -> None:
+    """That in each ``(phrase, stem)`` of ``cases`` the words app ``label`` declares (its ``assistant_synonyms``) name
+    ``stem``, and that neither the platform's own words (``base.assistant.SYNONYMS``) nor live alone do: the app's words
+    are what names it."""
+    own = apps.get_app_config(label).assistant_synonyms
+    for phrase, wanted in cases:
+        assert any(wanted in concept for concept in shared.asked([phrase], own).concepts), phrase
+        for without in (assistant.SYNONYMS, ()):
+            assert not any(wanted in concept for concept in shared.asked([phrase], without).concepts), phrase
 
 
 def place_in(offered: list[str], name: str) -> int | None:
@@ -322,8 +336,8 @@ def assert_its_asks_lift(tools: dict[str, Operation], name: str, phrase: str, la
 
 def said_only_in_english(op: Operation) -> list[str]:
     """The words of ``op``'s English asks that nothing else of it says: no Spanish ask, nor its description or name,
-    names what they name (``base.assistant.SYNONYMS`` included). Where there are none, no English phrase depends on
-    its English asks, so no ranking can see them change; filler written over them is such a word."""
+    names what they name (the Hub's words, ``base.assistant.synonyms``, included). Where there are none, no English
+    phrase depends on its English asks, so no ranking can see them change; filler written over them is such a word."""
     asks = shared.asks_of(op)
     name = op.name.replace(".", " ").replace("_", " ")
     elsewhere = shared.stems(" ".join([*asks.get("es", ()), shared.description(op), name]))
@@ -332,7 +346,7 @@ def said_only_in_english(op: Operation) -> list[str]:
         dict.fromkeys(
             word
             for word in words
-            if (concepts := shared.asked([word], assistant.SYNONYMS).concepts)
+            if (concepts := shared.asked([word], assistant.synonyms()).concepts)
             and all(concept.isdisjoint(elsewhere) for concept in concepts)
         )
     )
@@ -428,7 +442,8 @@ def probes_test(probes: list[dict], label: str) -> Callable:
 
 def by_group_test(cases: list) -> Callable:
     """The test that each ``(name, phrase, word)`` of ``cases``, a request in Spanish, brings its tool among the first
-    ``TOP`` by the group of ``base.assistant.SYNONYMS`` that says ``word``, and not without that group."""
+    ``TOP`` by the group of the Hub's words (``base.assistant.ranking``) that says ``word``, and not without that
+    group."""
 
     @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize(("name", "phrase", "word"), cases)
@@ -436,8 +451,9 @@ def by_group_test(cases: list) -> Callable:
         tools = catalog_of(OWNER, "es")
         assert comparable(phrase) not in probe_phrases()
         assert_offered_with_room(tools, name, phrase, room=TOP)
-        without = tuple(group for group in assistant.SYNONYMS if word not in group)
-        assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: exactly its group is left out
+        counted = assistant.ranking(tools)["synonyms"]
+        without = tuple(group for group in counted if word not in group)
+        assert len(without) == len(counted) - 1  # positive control: exactly its group is left out
         assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
     return by_its_group
@@ -683,7 +699,7 @@ def test_the_reported_platform_request_offers_its_existing_operation(context_of,
 
 
 #: A phrase of some tools, each with the tool it asks for: reads and writes, both languages, and words only the Hub's
-#: ``SYNONYMS`` read as it does («cuenta» is a table's check, «ticket» a sale).
+#: own words read as it does («cuenta» is a table's check, «ticket» a sale).
 SAMPLE = [
     ("es", "customer.customer.create", "apúntame a Ana con su teléfono 600 111 222"),
     ("en", "customer.consent.withdraw", "unsubscribe Marta from WhatsApp messages"),
@@ -704,7 +720,7 @@ SAMPLE = [
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "name", "phrase"), SAMPLE)
 def test_the_layer_ranks_each_phrase_where_a_turn_of_the_hub_offers_its_tool(context_of, language, name, phrase):
-    """``misses`` is given the turn's own ranking (``base.assistant.RANKING``): the place it gives a tool is the one
+    """``misses`` is given the turn's own ranking (``base.assistant.ranking``): the place it gives a tool is the one
     the turn (``base.assistant.relevant``) offers it at, so a turn that ranks otherwise fails here."""
     tools = assistant.catalog(context_of(Membership.Role.OWNER, language))
     assert phrase in shared.asks_of(tools[name])[language]  # positive control: the phrase is one of its asks
@@ -713,7 +729,7 @@ def test_the_layer_ranks_each_phrase_where_a_turn_of_the_hub_offers_its_tool(con
     tool = shared.tool_name(name)
     # Every ask whose tool is not first in the turn is a miss with ``top=1``: its place, as the layer computes it.
     places = {
-        miss.ask: miss.position for miss in misses(tools, language=language, top=1, **assistant.RANKING)
+        miss.ask: miss.position for miss in misses(tools, language=language, top=1, **assistant.ranking(tools))
         if miss.tool_name == tool
     }
     # With what is always at hand in front, none of these is first: the layer reports each one's place.
@@ -765,7 +781,7 @@ def test_how_many_asks_of_each_listed_app_reach_their_tool_without_their_own_wor
     reached: dict[str, list[str]] = {label: [] for label in LISTED}
     for language in LANGUAGES:
         tools = assistant.catalog(context_of(Membership.Role.OWNER, language))
-        reaches = report(tools, language, TOP, **assistant.RANKING)
+        reaches = report(tools, language, TOP, **assistant.ranking(tools))
         for label, said in reached.items():
             mine = [reach for reach in reaches if of_app(reach.tool_name, label)]
             asks = sum(len(shared.asks_of(op).get(language, ())) for op in tools.values() if op.app_label == label)

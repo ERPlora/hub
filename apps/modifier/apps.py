@@ -30,6 +30,13 @@ class ModifierConfig(LiveAppConfig):
     # A link points at a product or a category of Inventory; an option at a tax category of Taxes.
     requires = ["inventory", "tax"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.synonyms). The «predeterminada» option is the one a
+    # group brings chosen, its default (is_default), as the descriptions say it in English. Never «por defecto»: it is
+    # also the default of a shift, a working day or a threshold (Staff's and Inventory's settings), whose asks would
+    # then rank the options of a group.
+    assistant_synonyms = (
+        ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
+    )
     permissions = ["modifier.view", "modifier.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier is an
     # employee: it reads the groups of a product and has its picks valued.
@@ -47,10 +54,11 @@ class ModifierConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each group
-        the business no longer has, made again with its options by ``modifier.group.recover``; then each group hung from
-        a category, then each hung from a product, that the business no longer hangs there, hung again by
-        ``modifier.link.attach``, the group sheet's own, each counted apart. It goes after Inventory, so a deleted
-        category or product is back before its groups."""
+        the business no longer has, made again with its options by ``modifier.group.recover``; then each option a group
+        it keeps no longer has, added again by ``modifier.option.recover``; then each group hung from a category, then
+        each hung from a product, that the business no longer hangs there, hung again by ``modifier.link.attach``, the
+        group sheet's own, each counted apart. It goes after Inventory, so a deleted category or product is back before
+        its groups."""
         from apps.modifier import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -61,6 +69,13 @@ class ModifierConfig(LiveAppConfig):
                 read=queries.groups_in_copy,
                 missing=queries.groups_not_in_business,
                 create="modifier.group.recover",
+            ),
+            Recoverable(
+                label=_("Modifier options"),
+                reads_since="0001_initial",
+                read=queries.options_in_copy,
+                missing=queries.options_not_in_business,
+                create="modifier.option.recover",
             ),
             Recoverable(
                 label=_("Modifier groups of categories"),

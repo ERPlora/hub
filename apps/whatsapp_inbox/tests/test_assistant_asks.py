@@ -14,6 +14,7 @@ from live.operations import AI, registry
 
 from base import assistant
 from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
 from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
@@ -40,9 +41,10 @@ REPORTED = [
         "cambia Recordatorio QA para que diga «Tu cita queda para {{1}}» y vuelve a enviarla a revisión",
     ),
 ]
-#: What the inbox's groups of ``base.assistant.SYNONYMS`` are for, in a turn: a request nobody wrote as an ask nor as
-#: a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without the group, the other
-#: writes of the Hub tie with ``template.create`` and win by name (the 11th), and ``message.list`` is the 15th.
+#: What the inbox's own groups of words (its ``assistant_synonyms``) are for, in a turn: a request nobody wrote as an
+#: ask nor as a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without the group,
+#: the other writes of the Hub tie with ``template.create`` and win by name (the 11th), and ``message.list`` is the
+#: 15th.
 BY_GROUP = [
     ("whatsapp_inbox.template.create", "haz otra plantilla para avisar de las rebajas", "plantilla"),
     ("whatsapp_inbox.message.list", "¿cuántos mensajes tiene la conversación de Rocío?", "mensaje"),
@@ -114,18 +116,19 @@ def test_the_inbox_offers_at_least_30_tools():
 
 
 def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message():
-    """``base.assistant.SYNONYMS``: a «plantilla» and a «mensaje» are what an English «template» and «message» are, the
-    inbox's (``whatsapp_inbox.template``, ``whatsapp_inbox.message``, the only ones a tool of the Hub acts on); without
-    the Hub's groups, Spanish names neither (positive control)."""
+    """The inbox's own words (its ``assistant_synonyms``): a «plantilla» and a «mensaje» are what an English «template»
+    and «message» are, the inbox's (``whatsapp_inbox.template``, ``whatsapp_inbox.message``, the only ones a tool of the
+    Hub acts on); without the Hub's groups, Spanish names neither (positive control)."""
     template, message = shared.stem("template"), shared.stem("message")
-    for phrase, wanted in (
-        ("borra la plantilla de bienvenida", template),
-        ("¿qué plantillas tengo aprobadas?", template),
-        ("reenvía el mensaje de Nuria", message),
-        ("¿han leído nuestros mensajes?", message),
-    ):
-        assert any(wanted in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
-        assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
+    assert_its_words_name(
+        "whatsapp_inbox",
+        [
+            ("borra la plantilla de bienvenida", template),
+            ("¿qué plantillas tengo aprobadas?", template),
+            ("reenvía el mensaje de Nuria", message),
+            ("¿han leído nuestros mensajes?", message),
+        ],
+    )
 
 
 test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups = by_group_test(BY_GROUP)

@@ -969,7 +969,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   como las diría quien la usa (Cocina está en `LIVE_ASSISTANT_ASKS_REQUIRED`, `live.E020`), sin «cocina», «ticket»,
   «mesa» ni «cuenta» salvo donde la herramienta es eso (las rondas de una cuenta: `send`, `receive`, `by_order`):
   esas palabras ya nombran la app o su comanda, y repetidas en 29 herramientas las ponían por delante de Ventas en
-  cada frase que las dice. Para el Hub (`base.assistant.SYNONYMS`), «la comanda» (por sus frases: «la comanda», «qué
+  cada frase que las dice. Para el Hub (`assistant_synonyms`, en `apps.py`), «la comanda» (por sus frases: «la comanda», «qué
   comandas», «las comandas de…»; la palabra sola sigue siendo la cuenta de Ventas para live) es la comanda de cocina
   (`ticket`), una «estación» y «el puesto» la estación, «urgente» o «prisa» la urgencia (`set_rush`), el «enrutado»
   y la «regla» que manda un plato a una estación el enrutado (live lee «regla» como cualquier regla, la de Impuestos

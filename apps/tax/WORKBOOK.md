@@ -709,8 +709,8 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   nombre Productos, en esas frases de la QA reactivar y desactivar la regla salen antes que encender o apagar
   una app (`base.app.enable`/`disable`), y lo vigila
   `test_the_reported_request_offers_its_tool_before_the_switch_of_an_app`.
-  Sin sinónimos propios en
-  `base.assistant.SYNONYMS`: «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
+  Sin sinónimos propios
+  (`assistant_synonyms`): «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
   con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna

@@ -2,7 +2,7 @@
 offered, that the real-model QA's requests (hub#1090), in the owner's and the employee's own words, are offered their
 existing operation, and that a payment to a supplier is never taken for a charge of the till, nor the other way round.
 And what the Hub's words of Payments are for (a «cuenta bancaria» or «del banco» is a Payments' method,
-``base.assistant.SYNONYMS``), and that each tool's asks, not only its name, bring what a person says in words of their
+its ``assistant_synonyms``), and that each tool's asks, not only its name, bring what a person says in words of their
 own.
 
 Every ask of every tool of payment bringing its tool among the first ten, role by role, in both languages, is
@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -166,7 +167,7 @@ def test_the_reported_request_to_bring_a_method_back_goes_ahead_of_turning_an_ap
     assert place_in(offered, "payment.method.activate") < place_in(offered, "base.app.enable"), offered[:10]
 
 
-#: Where the business pays from in the Hub's words (``base.assistant.SYNONYMS``): a «cuenta bancaria» or «cuenta del
+#: Where the business pays from in Payments' own words (its ``assistant_synonyms``): a «cuenta bancaria» or «cuenta del
 #: banco», never the table's check a «cuenta» alone is, and a «bank account», are a Payments' method, as «method» is.
 BANK_ACCOUNT = (
     "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco", "bank account", "bank accounts",
@@ -183,17 +184,19 @@ PAYMENT_WORDS = [
 
 @pytest.mark.parametrize("words", BANK_ACCOUNT)
 def test_the_hub_reads_a_bank_account_as_where_the_business_pays_from(words):
+    own_words = apps.get_app_config("payment").assistant_synonyms
     phrase = f"la {words} del BBVA"
     method = shared.asked(["the payment method"]).concepts
     assert any("metho" in concept for concept in method)  # positive control: «method» names Payments' method
-    assert any("metho" in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+    assert any("metho" in concept for concept in shared.asked([phrase], own_words).concepts), phrase
     assert not any("metho" in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
 def without_the_bank_account():
-    """The Hub's ``SYNONYMS`` without the group of where the business pays from."""
-    kept = tuple(group for group in assistant.SYNONYMS if not set(BANK_ACCOUNT) & set(group))
-    assert len(kept) == len(assistant.SYNONYMS) - 1  # positive control: the group is there, and only one
+    """The Hub's words (``base.assistant.synonyms``) without the group of where the business pays from."""
+    every = assistant.synonyms()
+    kept = tuple(group for group in every if not set(BANK_ACCOUNT) & set(group))
+    assert len(kept) == len(every) - 1  # positive control: the group is there, and only one
     return kept
 
 

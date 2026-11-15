@@ -340,53 +340,67 @@ Implicados: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 Estado: hecho
 Actor: el personal de ERPlora que administra la plataforma, cuando un negocio lo pide (BASE-F114)
 Pantalla: ninguna de Suplementos: en el admin de Hubs, Copias aparte › «Recuperar en el negocio…», con **Grupos de
-suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos** marcado (lo está, como todo lo
-que se puede traer)
+suplementos, Opciones de suplementos, Grupos de suplementos de categorías, Grupos de suplementos de productos** marcado
+(lo está, como todo lo que se puede traer)
 Pasos:
-1. El personal recupera desde una copia aparte con **Grupos de suplementos, Grupos de suplementos de categorías, Grupos
-   de suplementos de productos** marcado. Suplementos va siempre después de Inventario, se pida en el orden que se pida:
-   una categoría o un producto eliminados que vuelven ya están vivos cuando se les enganchan sus grupos.
+1. El personal recupera desde una copia aparte con **Grupos de suplementos, Opciones de suplementos, Grupos de
+   suplementos de categorías, Grupos de suplementos de productos** marcado. Suplementos va siempre después de
+   Inventario, se pida en el orden que se pida: una categoría o un producto eliminados que vuelven ya están vivos cuando
+   se les enganchan sus grupos.
 2. Primero, cada grupo de la copia que el negocio ya no tiene (lo borró, y borrarlo se lleva sus opciones y sus
    enganches, F03) se vuelve a crear como lo crea la pantalla de Suplementos (F02), con su nombre, su nombre en la
    comanda, su mínimo y su máximo, si una opción se puede repetir y su orden, y con sus opciones como las añade la hoja
    del grupo (F04), cada una con su nombre, su nombre en la comanda, su suplemento, su categoría fiscal propia, si sale
    elegida por defecto y su orden. Vuelve como un grupo nuevo, con otro identificador, y en los pasos siguientes sus
    enganches de la copia se le hacen a ese: el que la recuperación trajo con su nombre.
-3. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
+3. Después, cada opción que en la copia tenía un grupo que el negocio conserva (el mismo, aunque lo renombrara, o el
+   que trajo una recuperación anterior con su nombre) y que ese grupo ya no tiene, porque el negocio se la quitó (F04),
+   se vuelve a añadir como la añade la hoja del grupo (F04), con su nombre, su nombre en la comanda, su suplemento, su
+   categoría fiscal propia y su orden. Si en la copia salía elegida por defecto, vuelve elegida solo si el grupo tiene
+   hueco: nunca se la quita a las que el negocio eligió. En un grupo de «elige una» que ya trae otra por defecto, o en
+   uno que ya trae tantas como su máximo, vuelve sin elegir y su nota lo dice.
+4. Cada grupo que en la copia colgaba de un producto vivo en ella y que el negocio ya no tiene enganchado a ese producto
    se vuelve a enganchar, como lo engancha la hoja del grupo (MODIFIER-F05): el producto vuelve a preguntar en el TPV
    sus salsas, su punto o sus extras. Un producto que el negocio ya no tenía en absoluto vuelve como uno nuevo, con
    otro identificador (INVENTORY-F01): sus grupos se enganchan a ese, el que la recuperación hizo con su SKU.
-4. Antes, igual, cada grupo que en la copia colgaba de una categoría viva en ella y que el negocio ya no tiene
+5. Antes, igual, cada grupo que en la copia colgaba de una categoría viva en ella y que el negocio ya no tiene
    enganchado a esa categoría: todos los productos de la categoría vuelven a preguntarlo. Una categoría eliminada
    vuelve siempre como una nueva, con otro identificador (INVENTORY-F07): sus grupos se enganchan a esa, la que la
    recuperación trajo con su nombre.
-5. Recuperaciones cuenta aparte cada cosa: «Grupos de suplementos: se creó 1», «Grupos de suplementos de categorías:
-   se crearon 2» y «Grupos de suplementos de productos: se crearon 2».
+6. Recuperaciones cuenta aparte cada cosa: «Grupos de suplementos: se creó 1», «Opciones de suplementos: se creó 1»,
+   «Grupos de suplementos de categorías: se crearon 2» y «Grupos de suplementos de productos: se crearon 2».
 Entra: la copia aparte y lo que el negocio tiene hoy.
-Sale: un grupo por cada uno que faltaba, con su aviso de grupo creado (`modifier.group.created`) y el de cada una de
-sus opciones (`modifier.option.created`), y un enganche por cada uno que faltaba, con su aviso de enganche hecho
-(`modifier.link.attached`), todos hechos por la recuperación, así que no arranca ninguna automatización (FLOW-F21);
-nada más. Las pantallas abiertas de Suplementos,
-el TPV y el reparto de Cocina ven al momento el producto que vuelve, como vieron que se eliminaba; las de Suplementos y
-el TPV, también cada grupo que vuelve a colgar de una categoría o de un producto.
+Sale: un grupo por cada uno que faltaba, con su aviso de grupo creado (`modifier.group.created`) y el de cada una de sus
+opciones (`modifier.option.created`), una opción por cada una que le faltaba a un grupo que el negocio conserva, con su
+aviso de opción creada (`modifier.option.created`), y un enganche por cada uno que faltaba, con su aviso de enganche
+hecho (`modifier.link.attached`), todos hechos por la recuperación, así que no arranca ninguna automatización
+(FLOW-F21); nada más. Las pantallas abiertas de Suplementos, el TPV y el reparto de Cocina ven al momento el producto
+que vuelve, como vieron que se eliminaba; las de Suplementos y el TPV, también cada grupo que vuelve a colgar de una
+categoría o de un producto.
 Si falla: un enganche que el negocio aún tiene se queda como está, y no se repite uno cuyo grupo el negocio ya volvió a
-enganchar a ese producto o a esa categoría: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo que el negocio soltó
-a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene (BASE-F114). Lo que la
-hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del enganche en la copia: un
-producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos, o el negocio ya hizo otro a mano
-con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró y ya volvió a crear a mano
-con su nombre («not_found: …»). Ese grupo hecho a mano se queda como el negocio lo dejó, con sus opciones y sus
-enganches: no se crea otro con su nombre ni se le añade ni engancha nada. Un grupo que el negocio conserva, aunque lo
-renombrara, también se queda con las opciones que tenga; una opción que le quitó no vuelve todavía (hub#1505). Una
-opción que la hoja del grupo no acepta hoy (su categoría fiscal propia ya no está activa en Impuestos) no vuelve: el
-grupo vuelve sin ella, su cuenta lo dice («Grupos de suplementos: se creó 1, 1 con notas») y su ficha dice en «notas»
-qué opción y por qué, por el identificador del grupo en la copia. Pedirlo otra vez no crea ningún grupo dos veces: el
-que trajo la recuperación ya es del negocio. El producto que hizo una recuperación se reconoce por su SKU la
-hiciera esta u otra anterior: pedida otra vez desde una copia anterior, le vuelve a enganchar los grupos que el negocio
-le soltó después, como a todo lo que ya no tiene. Con las categorías es igual: una que sigue eliminada (no se recuperó
-Productos) o que el negocio ya volvió a crear a mano con su nombre, que se queda con los grupos que él le enganchó, no
-recibe ninguno y Recuperaciones dice por qué («not_found: …»); la que trajo una recuperación se reconoce por su nombre,
-la trajera esta u otra anterior.
+enganchar a ese producto o a esa categoría: se queda el suyo, y pedirlo otra vez no engancha nada dos veces. Un grupo
+que el negocio soltó a mano de un producto después de la copia también vuelve, como todo lo que el negocio ya no tiene
+(BASE-F114). Lo que la hoja del grupo no acepta hoy no vuelve y Recuperaciones dice por qué, por el identificador del
+enganche en la copia: un producto que sigue eliminado o que el negocio ya no tiene (no se recuperó Productos, o el
+negocio ya hizo otro a mano con su SKU, que se queda con los grupos que él le enganchó) o un grupo que el negocio borró
+y ya volvió a crear a mano con su nombre («not_found: …»). Ese grupo hecho a mano se queda como el negocio lo dejó, con
+sus opciones y sus enganches: no se crea otro con su nombre ni se le añade ni engancha nada. Un grupo que el negocio
+conserva, aunque lo renombrara, se queda con las opciones que tenga, cambiadas o no, y solo recupera las que le quitó;
+no se repite una que el negocio ya volvió a crear con su nombre en ese grupo, sin importar mayúsculas: se queda la suya.
+Una opción elegida por defecto que no cabe vuelve sin elegir, las del negocio siguen elegidas, y su cuenta lo dice
+(«Opciones de suplementos: se creó 1, 1 con notas»), con la nota «volvió sin venir elegida por defecto: su grupo ya
+viene con «Ketchup»» por el identificador de la opción en la copia. Una opción que la hoja del grupo no acepta hoy (su
+categoría fiscal propia ya no está activa en Impuestos, o el grupo ya tiene 100 opciones) no vuelve y su motivo lo dice,
+y tampoco vuelve ninguna a un grupo que el negocio borró y volvió a crear a mano («not_found: …»). Las opciones de un
+grupo que vuelve entero en esa misma recuperación vuelven con él y no se cuentan dos veces: de esas, una que la hoja del
+grupo no acepta hoy (su categoría fiscal propia ya no está activa en Impuestos) no vuelve: el grupo vuelve sin ella, su
+cuenta lo dice («Grupos de suplementos: se creó 1, 1 con notas») y su ficha dice en «notas» qué opción y por qué, por el
+identificador del grupo en la copia. Pedirlo otra vez no crea ningún grupo dos veces: el que trajo la recuperación ya es
+del negocio. El producto que hizo una recuperación se reconoce por su SKU la hiciera esta u otra anterior: pedida otra
+vez desde una copia anterior, le vuelve a enganchar los grupos que el negocio le soltó después, como a todo lo que ya no
+tiene. Con las categorías es igual: una que sigue eliminada (no se recuperó Productos) o que el negocio ya volvió a
+crear a mano con su nombre, que se queda con los grupos que él le enganchó, no recibe ninguno y Recuperaciones dice por
+qué («not_found: …»); la que trajo una recuperación se reconoce por su nombre, la trajera esta u otra anterior.
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Servicios: lo que entra y lo que sale
