@@ -50,7 +50,7 @@ def account(client, make_user, fake_saas, spa_manifest):
     """Ana, who runs the shift, enters with her erplora.com account the real way: the SaaS's jump and its code."""
     fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
     person = a_person(make_user, Membership.Role.MANAGER)
-    assert enter(client).status_code == 302
+    assert enter(client, host=HOST).status_code == 302
     return person
 
 
@@ -158,7 +158,7 @@ class TestOnlyWithTheAccount:
     def test_a_pin_session_on_a_till_gets_no_pass(self, client, make_user, spa_manifest, saas):
         bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
         a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
 
         self.refused(ask(client))
         self.refused(ask(client, "business"))
@@ -167,7 +167,7 @@ class TestOnlyWithTheAccount:
         bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
         a_device(client)
         with_badge(bea, "04a1b2c3")
-        assert badge(client, "04a1b2c3").status_code == 200
+        assert badge(client, "04a1b2c3", host=HOST).status_code == 200
 
         self.refused(ask(client))
 
@@ -204,7 +204,7 @@ class TestTheBusinessNeedsItsPermission:
         # The role is the one erplora.com says at the jump, which overwrites the one kept here.
         fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en", "role": str(role)})
         a_person(make_user, role)
-        assert enter(client).status_code == 302
+        assert enter(client, host=HOST).status_code == 302
 
     def test_an_employee_with_the_account_goes_to_the_plan_but_not_to_the_business(
         self, client, make_user, fake_saas, spa_manifest
@@ -231,7 +231,7 @@ class TestItsBusiness:
         person = a_person(make_user, Membership.Role.MANAGER)
         Membership.objects.create(user=person, host="b", role=Membership.Role.MANAGER)
         on_a, on_b = Client(), Client()
-        assert enter(on_a).status_code == 302
+        assert enter(on_a, host=HOST).status_code == 302
         assert enter(on_b, host="b.localhost:8000").status_code == 302
 
         assert read_as_the_saas(the_pass(ask(on_a)))["hub"] == "a"
@@ -243,7 +243,7 @@ class TestItsWords:
         """What the operation answers a person of this role whom erplora.com says speaks this language."""
         fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": language, "role": str(role)})
         browser = Client()
-        assert enter(browser).status_code == 302
+        assert enter(browser, host=HOST).status_code == 302
         return ask(browser, next_).json()["error"]
 
     def test_no_permission_for_the_business_speaks_the_person_s_language(self, make_user, fake_saas, spa_manifest):
@@ -272,7 +272,7 @@ class TestItsWords:
     def test_a_pin_s_refusal_speaks_the_browser_s_language(self, client, make_user, spa_manifest, saas):
         bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
         a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
 
         english, spanish = (
             client.post(
