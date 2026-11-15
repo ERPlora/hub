@@ -5,9 +5,11 @@ ruff checks every function against the limits: cyclomatic complexity 10 (C901), 
 not apply, because pytest hands fixtures over as arguments. The functions that were already over a limit when it came in
 carry a ``# noqa: <rule>`` on their definition line, and RUF100 fails a ``noqa`` that no longer silences anything.
 
-Those exceptions, and ESLint's suppressions of the TypeScript and Vue limits (eslint-suppressions.json), only shrink:
-each rule keeps at most the exceptions it had where the branch left origin/main, wherever they moved since, and no
-comment switches a limit off without being counted.
+Those exceptions, and ESLint's suppressions of the TypeScript and Vue limits (eslint-suppressions.json), the block caps
+of a Vue page included, only shrink: each rule keeps at most the exceptions it had where the branch left origin/main,
+wherever they moved since, and no comment switches a limit off without being counted. A limit the branch's
+eslint.config.js turns on and main's does not name yet has nothing to compare with: the change that turns it on freezes
+what breaks it today.
 """
 
 import json
@@ -24,8 +26,9 @@ PRODUCTION = "base/probe.py"
 TEST = "base/tests/test_probe.py"
 
 LIMIT_RULES = frozenset({"C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917"})
-ESLINT_LIMITS = ("complexity", "max-depth", "max-params", "max-lines-per-function")
+ESLINT_LIMITS = ("complexity", "max-depth", "max-params", "max-lines-per-function", "vue/max-lines-per-block")
 SUPPRESSIONS = "eslint-suppressions.json"
+ESLINT_CONFIG = "eslint.config.js"
 PYTHON = ("*.py", ":(exclude)*/migrations/*")
 SCRIPTS = ("*.ts", "*.tsx", "*.vue", "*.js", "*.mjs", "*.cjs")
 # A noqa on the line that opens a function, where ruff reports its limits, or alone on its line. A file-wide one, with
@@ -129,6 +132,12 @@ def suppression_counts(text: str) -> Counter[str]:
     for rules in json.loads(text).values():
         counts.update({rule: entry["count"] for rule, entry in rules.items() if rule in ESLINT_LIMITS})
     return counts
+
+
+def comparable(counts: Counter[str], config: str, base_config: str) -> Counter[str]:
+    """The exceptions of the limits there is something to compare with: those the base configuration already names,
+    and those the current one does not name at all."""
+    return Counter({rule: count for rule, count in counts.items() if rule not in config or rule in base_config})
 
 
 def grown(now: Counter[str], before: Counter[str]) -> list[str]:
@@ -252,6 +261,34 @@ def test_a_rule_may_lose_exceptions_and_move_them_but_never_gain_one():
     ]
 
 
+def test_an_eslint_comment_that_switches_the_block_caps_of_a_vue_page_off_is_found():
+    comments = ["<!-- eslint-disable vue/max-lines-per-block -->", "eslint-disable vue/max-lines-per-block ", "<!-- eslint-disable-next-line vue/no-v-html -->"]
+    assert eslint_bypasses(comments) == comments[:2]
+
+
+def test_the_block_caps_of_a_vue_page_are_counted_like_the_function_limits():
+    suppressions = {"a.vue": {"vue/max-lines-per-block": {"count": 2}, "complexity": {"count": 1}}}
+    assert suppression_counts(json.dumps(suppressions)) == Counter({"vue/max-lines-per-block": 2, "complexity": 1})
+
+
+LIMITS_CONFIG = "export default [{ rules: { complexity: ['error', 15] } }];"
+BLOCKS_CONFIG = "export default [{ rules: { complexity: ['error', 15], 'vue/max-lines-per-block': ['error'] } }];"
+
+
+def test_a_limit_the_branch_turns_on_freezes_what_breaks_it_today():
+    counts = Counter({"complexity": 3, "vue/max-lines-per-block": 30})
+    assert comparable(counts, BLOCKS_CONFIG, LIMITS_CONFIG) == Counter({"complexity": 3})
+
+
+def test_once_main_turns_a_limit_on_its_suppressions_only_shrink():
+    counts = Counter({"complexity": 3, "vue/max-lines-per-block": 30})
+    assert comparable(counts, BLOCKS_CONFIG, BLOCKS_CONFIG) == counts
+
+
+def test_a_limit_the_config_does_not_name_is_compared_like_the_rest():
+    assert comparable(Counter({"max-depth": 1}), LIMITS_CONFIG, LIMITS_CONFIG) == Counter({"max-depth": 1})
+
+
 def test_no_function_limit_is_switched_off_without_being_counted():
     found = noqa_bypasses(grep_now(NOQA_MARKER, *PYTHON)) + range_bypasses(grep_now(RANGE_MARKER, *PYTHON))
     found += eslint_bypasses(grep_now(ESLINT_COMMENT, *SCRIPTS))
@@ -271,7 +308,8 @@ def test_the_eslint_suppressions_never_grow():
     if before is None:
         pytest.skip(f"there is no {SUPPRESSIONS} where the branch left origin/main: this is the commit that brings it")
     now = suppression_counts((REPO / SUPPRESSIONS).read_text(encoding="utf-8"))
-    found = grown(now, suppression_counts(before))
+    config = (REPO / ESLINT_CONFIG).read_text(encoding="utf-8")
+    found = grown(comparable(now, config, file_at_base(ESLINT_CONFIG) or ""), suppression_counts(before))
     assert not found, f"New suppressions in {SUPPRESSIONS}: fix the function instead.\n" + "\n".join(found)
 
 
