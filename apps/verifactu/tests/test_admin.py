@@ -850,6 +850,18 @@ def test_without_a_chosen_hub_the_route_is_not_changed(client, staff, config):
     assert config.route == "own"
 
 
+def test_the_form_itself_refuses_a_route_without_a_chosen_hub(request_of, config):
+    # The page never hands the form a request without a hub chosen; the form refuses one on its own all the same.
+    Config.objects.filter(pk=config.pk).update(route="own")
+    config.refresh_from_db()
+    form_class = model_admin(ConfigAdmin, Config).get_form(request_of(hub=None), config, change=True)
+    form = form_class({"route": "erplora"}, instance=config)
+    assert not form.is_valid()
+    assert "Choose a hub first" in str(form.errors)
+    assert Config.objects.get(pk=config.pk).route == "own"
+    assert not Event.objects.filter(message_key="route_erplora").exists()
+
+
 TICKET = {
     "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
     "series_code": "TICKET",
