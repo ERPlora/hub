@@ -81,6 +81,7 @@ EOF
 # pnpm: `install`; `e2e <args>` logs its arguments, the commit it runs on, its environment and the fake servers
 # alive, leaves FAKE_RESULTS as its JSON report and exits with FAKE_E2E_EXIT. FAKE_MAIN_MOVES=<remote> moves main
 # and fetches it meanwhile; with FAKE_E2E_NEVER_ENDS it then sleeps like specs that hang (its pid in $FAKE_PIDS).
+# FAKE_GONE_LISTENER=<file>: when the specs end, lsof reports once the pid in <file>.pid, a server already gone.
 cat > "$root/bin/pnpm" <<'EOF'
 #!/usr/bin/env bash
 where="$(basename "$PWD")"
@@ -102,6 +103,7 @@ case "${1:-}" in
       git -C "$FAKE_MAIN_MOVES" -c user.name=nightly -c user.email=nightly@example.com commit -q --allow-empty -m later
       git -C "$HUB_REPO" fetch --quiet origin
     fi
+    [ -z "${FAKE_GONE_LISTENER:-}" ] || cp "$FAKE_GONE_LISTENER.pid" "$FAKE_GONE_LISTENER"
     if [ -n "${FAKE_E2E_NEVER_ENDS:-}" ]; then
       echo "$$" >> "$FAKE_PIDS"
       exec sleep 120
@@ -144,6 +146,11 @@ EOF
 cat > "$root/bin/lsof" <<'EOF'
 #!/usr/bin/env bash
 echo "lsof $*" >> "$FAKE_CALLS"
+if [ -n "${FAKE_GONE_LISTENER:-}" ] && [ -f "$FAKE_GONE_LISTENER" ]; then
+  cat "$FAKE_GONE_LISTENER"
+  rm -f "$FAKE_GONE_LISTENER"
+  exit 0
+fi
 exit 1
 EOF
 cat > "$root/bin/launchctl" <<'EOF'
@@ -361,6 +368,16 @@ night FAKE_MAIN_MOVES="$root/remote/hub"
 expect "main moved and was fetched during the night" 0 \
   "$([ "$(git -C "$hub_clone" rev-parse origin/main)" = "$newest_main" ] && echo 1 || echo 0)"
 expect "the issue still names the commit the specs ran on" 1 "$(grep -cF "(commit \`${newest_main:0:7}\`)" "$BODIES_LOG" || true)"
+
+# --- a server that closes while the clean-up looks for it ------------------------------------------------
+sleep 0 &
+echo "$!" > "$root/gone.pid"
+wait "$!"
+night FAKE_GONE_LISTENER="$root/gone" FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
+expect "a green night stays green when a server it stops is already gone" 0 "$status"
+expect "its databases are still dropped after the specs" 1 \
+  "$([ "$(last_line_of 'drop saas')" -gt "$(line_of 'e2e hub')" ] && echo 1 || echo 0)"
+expect "and its worktrees removed" "1 1" "$(worktrees "$hub_clone") $(worktrees "$root/erplora/saas")"
 
 # --- a night that is told to stop ------------------------------------------------------------------------
 settings=(FAKE_E2E_NEVER_ENDS=1)

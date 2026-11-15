@@ -280,7 +280,7 @@ signal_all() { # <signal>
   local pid pgid
   for pid in ${started[@]+"${started[@]}"}; do kill "-$1" -- "-$pid" 2> /dev/null || true; done
   for pid in $(listeners); do
-    pgid="$(ps -o pgid= -p "$pid" 2> /dev/null | tr -d ' ')"
+    pgid="$(ps -o pgid= -p "$pid" 2> /dev/null | tr -d ' ')" || continue # gone since lsof saw it
     if [ -n "$pgid" ] && [ "$pgid" != "$own_pgid" ]; then
       kill "-$1" -- "-$pgid" 2> /dev/null || true
     else
