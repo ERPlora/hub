@@ -9,9 +9,8 @@ invoice does, so the breakdown of both is the same to the cent.
 from decimal import Decimal
 
 import pytest
-from django.db import transaction
 from live.errors import Conflict
-from live.operations import registry
+from live.operations import atomic, registry
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.sale.models import Sale
@@ -208,7 +207,7 @@ def test_a_sale_charged_as_an_invoice_is_a_full_invoice_in_the_same_commit(issue
         "B12345674",
     )
     # One commit: if the charge does not commit, neither the sale nor its number exist.
-    with pytest.raises(RuntimeError), transaction.atomic():
+    with pytest.raises(RuntimeError), atomic():
         charge("chain-0003", {"product": "CAN"}, document_type="invoice", **RECIPIENT)
         raise RuntimeError("the charge never commits")
     assert Sale.objects.count() == Invoice.objects.count() == 1

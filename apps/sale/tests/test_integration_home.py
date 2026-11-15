@@ -16,6 +16,7 @@ from live.outbox import channel_for
 
 from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run
 from base.schemas import WidgetListIn
+from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
 PANELS = ["sale.today", "sale.tickets_today", "sale.last_7_days", "sale.recent_activity"]
@@ -137,23 +138,24 @@ def received(session, timeout=WAIT):
 # factory catalogue (seeded by its migrations): `factory_data` plants it again.
 @pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
 @pytest.mark.usefixtures("factory_data")
-def test_a_charge_in_hub_b_re_runs_the_panels_of_b_and_tells_a_nothing(listen):
+def test_a_charge_in_hub_b_re_runs_the_panels_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     in_b = ctx_for(scope=B)
-    order = run(
-        "sale.order.open",
-        {"label": "Table 4", "open_lines": [{"unit_price": 250, "tax_category_key": "product.generic"}]},
-        in_b,
-    )
-    run(
-        "sale.sale.complete",
-        {"idempotency_key": "home-b-0001", "order_id": str(order.id), "payments": [{"method": "cash"}]},
-        in_b,
-    )
+    with use_hub(hub_b):
+        order = run(
+            "sale.order.open",
+            {"label": "Table 4", "open_lines": [{"unit_price": 250, "tax_category_key": "product.generic"}]},
+            in_b,
+        )
+        run(
+            "sale.sale.complete",
+            {"idempotency_key": "home-b-0001", "order_id": str(order.id), "payments": [{"method": "cash"}]},
+            in_b,
+        )
+        panels = sale_panels(ctx_for("hub_manager", scope=B))
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     events = {event for _, payload in notes for event in payload["events"]}
-    panels = sale_panels(ctx_for("hub_manager", scope=B))
     assert list(panels) == PANELS
     assert {panel["operation"] for panel in panels.values()} <= live_registry.affected(events)
     assert received(on_a, timeout=QUIET) == []

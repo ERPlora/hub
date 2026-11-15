@@ -9,6 +9,7 @@ The products and the customers are created through their own apps' operations, n
 integration with ``tax``, ``inventory`` and ``customer`` is tested as it runs (no mocks).
 """
 
+import datetime as dt
 from decimal import Decimal
 
 import pytest
@@ -75,6 +76,19 @@ def in_business_a(request, no_test_fallback, hub_databases):
     assert hub.slug == A.key, f"hub_a is {hub.slug!r}, not the scope A of these tests"
     with use_hub(hub):
         yield hub
+
+
+#: Bogotá at 23:30 of 2 November 2026, already the 3rd in Madrid, the deployment's clock (hub#771).
+ELSEWHERE = "America/Bogota"
+NIGHT_THERE = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
+
+
+@pytest.fixture
+def night_elsewhere(monkeypatch, in_business_a):
+    """The business ``A`` in another zone than the deployment's, at night: it is 2 November 2026 there and the 3rd on
+    the deployment's clock (hub#771). The root conftest's opens a business without a database of its own."""
+    monkeypatch.setattr(timezone, "now", lambda: NIGHT_THERE)
+    monkeypatch.setattr(in_business_a, "timezone", ELSEWHERE)
 
 
 @pytest.fixture(autouse=True)
@@ -157,26 +171,27 @@ def customer(db):
 
 
 @pytest.fixture
-def factory_data(transactional_db, in_business_a):
-    """A transactional test starts from a flushed business: tax's factory catalogue and the factory
-    payment methods are planted again in its database, as their migrations do (idempotent)."""
+def factory_data(transactional_db, in_business_a, hub_b):
+    """A transactional test starts from flushed businesses: tax's factory catalogue and the factory
+    payment methods are planted again in both businesses' databases, as their migrations do (idempotent)."""
     from importlib import import_module
 
     from django.apps import apps as registry
 
-    with connections[hubs.HUB_A_ALIAS].schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
+    for hub in (in_business_a, hub_b):
+        with use_hub(hub) as active, connections[active.alias].schema_editor() as editor:
+            for module in (
+                "apps.tax.migrations.0002_factory_catalogue",
+                "apps.tax.migrations.0005_retail_alcohol",
+                "apps.sale.migrations.0002_factory_payment_methods",
+            ):
+                import_module(module).plant(registry, editor)
 
 
 @pytest.fixture
-def db_dsn(hub_databases):
-    """DSN of the business ``A``'s database, for raw psycopg sessions (reading only what is committed)."""
-    params = connections[hubs.HUB_A_ALIAS].settings_dict
+def db_dsn(django_db_setup):
+    """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
+    params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],
         user=params["USER"],

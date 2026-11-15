@@ -7,15 +7,13 @@ payload.
 
 import re
 
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.sale import events
 from apps.sale.models import Sale
-from apps.sale.tests.conftest import HUB_DB, run
+from apps.sale.tests.conftest import HUB_DB, A, run
 
 PAST_FACT = re.compile(r"^sale\.[a-z_]+\.[a-z_]+(ed|_from_appointment)$")
-A = Scope("host", "a")
 
 
 def declared():

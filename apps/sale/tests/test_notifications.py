@@ -10,6 +10,7 @@ from live.errors import Conflict
 from live.outbox import channel_for
 
 from apps.sale.tests.conftest import A, B, ctx_for, run
+from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
 WAIT = 1.0
@@ -50,14 +51,15 @@ def open_price(ctx):
 # factory catalogue (seeded by its migrations): `factory_data` plants it again.
 @pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES)
 @pytest.mark.usefixtures("factory_data")
-def test_a_check_opened_and_charged_in_hub_b_notifies_the_channel_of_b_only(listen):
+def test_a_check_opened_and_charged_in_hub_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    order = open_price(ctx_for(scope=B))
-    run(
-        "sale.sale.complete",
-        {"idempotency_key": "notify-b-0001", "order_id": str(order.id), "payments": [{"method": "cash"}]},
-        ctx_for(scope=B),
-    )
+    with use_hub(hub_b):
+        order = open_price(ctx_for(scope=B))
+        run(
+            "sale.sale.complete",
+            {"idempotency_key": "notify-b-0001", "order_id": str(order.id), "payments": [{"method": "cash"}]},
+            ctx_for(scope=B),
+        )
     # Everything B's channel heard in the window, not the first two notices: under load a write may come split.
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
