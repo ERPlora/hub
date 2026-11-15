@@ -48,6 +48,12 @@ export default [
     },
   },
   {
+    // A Vue page is measured by blocks: the function limits see neither its template nor its style. Every physical
+    // line counts, blank ones too, and the blocks over their cap today are frozen in eslint-suppressions.json.
+    files: ['**/*.vue'],
+    rules: { 'vue/max-lines-per-block': ['error', { template: 250, script: 300, style: 150 }] },
+  },
+  {
     // In tests each describe is a function, and a test's helpers take what they need.
     // The extensions are spelled out: a pattern such as `**/*.test.*` would make ESLint lint the shell scripts too.
     files: ['**/tests/**', '**/e2e/**', '**/*.{test,spec}.{ts,tsx,js,mjs,cjs,vue}'],
