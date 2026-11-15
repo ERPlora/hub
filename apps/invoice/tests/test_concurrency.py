@@ -7,6 +7,7 @@ the same invoice at once are one rectification, and the other is refused without
 """
 
 import pytest
+from django.db import connections
 from django.utils import timezone
 from live.errors import OperationError
 
@@ -22,6 +23,7 @@ from apps.invoice.tests.conftest import (
     run,
 )
 from apps.sale.models import Sale
+from base.tenancy.tests import hubs
 
 #: Several sessions of business A at once, each committing: its plan has room for them all.
 pytestmark = [IN_HUBS_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
@@ -214,3 +216,18 @@ def test_a_document_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(do
     assert not Customer.objects.filter(pk=card.pk).exists()
     assert not Invoice.objects.filter(invoice_type__in=["F1", "F3"]).exists()
     assert fact_numbers() == 0
+
+
+def test_a_statement_run_while_the_card_is_deleted_reaches_the_next_wrapper_with_its_own_context():
+    card = a_card()
+    seen = []
+
+    def next_wrapper(execute, sql, params, many, context):
+        seen.append(context)
+        return execute(sql, params, many, context)
+
+    with card_deleted_on_screen(card, "page", reads("customer_customer")):
+        with connections[hubs.HUB_A_ALIAS].execute_wrapper(next_wrapper):
+            Customer.objects.filter(pk=card.pk).exists()
+    assert seen
+    assert all(context["connection"].alias == hubs.HUB_A_ALIAS for context in seen)

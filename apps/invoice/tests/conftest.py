@@ -349,7 +349,7 @@ def card_deleted_on_screen(card, how: str, before: Callable[[str], bool]):
             deadline = time.monotonic() + DELETION_WAIT
             while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
                 time.sleep(0.02)
-        return execute(sql, params, many, context)
+        return execute(sql, params, many, call_context)
 
     try:
         with connections[hubs.HUB_A_ALIAS].execute_wrapper(wrapper):
