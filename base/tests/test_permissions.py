@@ -2,6 +2,8 @@
 platform scope's alone: ERPlora's staff is no customer, tests/test_guardrails_permissions.py).
 
 Owner and admin get every permission of every app; manager and employee, what each app declares.
+
+The businesses are ``hub_a`` and ``hub_b``, each on a database of its own; the memberships live in control.
 """
 
 from types import SimpleNamespace
@@ -15,11 +17,14 @@ from base import permissions as permissions_module
 
 from base.models import Membership
 from base.permissions import permissions_for, reload_user
+from base.tests.test_auth_views import ON_HUB_A
+from base.tests.test_auth_views import A as SLUG_A
+from base.tests.test_auth_views import B as SLUG_B
 
-pytestmark = pytest.mark.django_db
+pytestmark = ON_HUB_A
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+A = Scope("host", SLUG_A)
+B = Scope("host", SLUG_B)
 
 
 def of_apps(permissions, *labels: str) -> set[str]:
@@ -43,12 +48,12 @@ def test_a_superuser_without_a_membership_has_nothing_on_a_host(superuser):
 
 
 def test_inactive_user_has_nothing(make_user):
-    user = make_user(host="a", role="hub_admin", is_active=False)
+    user = make_user(host=SLUG_A, role="hub_admin", is_active=False)
     assert permissions_for(user, A) == frozenset()
 
 
 def test_role_permissions_on_its_host_only(make_user):
-    user = make_user(host="a", role="hub_employee")
+    user = make_user(host=SLUG_A, role="hub_employee")
     # demo is the reference app; the other modules' grants are pinned by their own tests.
     assert of_apps(permissions_for(user, A), "demo") == {"demo.view"}
     assert permissions_for(user, B) == frozenset()
@@ -75,12 +80,12 @@ def only_demo_and_shop(monkeypatch):
 
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager"])
 def test_owner_admin_and_manager_get_all_of_demo(make_user, role):
-    assert of_apps(permissions_for(make_user(host="a", role=role), A), "demo") == {"demo.view", "demo.manage"}
+    assert of_apps(permissions_for(make_user(host=SLUG_A, role=role), A), "demo") == {"demo.view", "demo.manage"}
 
 
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin"])
 def test_owner_and_admin_get_every_permission_of_every_app_even_unlisted(make_user, with_shop, role):
-    granted = permissions_for(make_user(host="a", role=role), A)
+    granted = permissions_for(make_user(host=SLUG_A, role=role), A)
     everything = {"demo.view", "demo.manage", "shop.view", "shop.sell", "shop.refund"}
     assert of_apps(granted, "demo", "shop") == everything
     # Every permission each installed app declares, and nothing else.
@@ -89,15 +94,15 @@ def test_owner_and_admin_get_every_permission_of_every_app_even_unlisted(make_us
 
 
 def test_manager_and_employee_get_what_each_app_declares(make_user, only_demo_and_shop):
-    manager = make_user("marta", host="a", role="hub_manager")
-    employee = make_user("eva", host="a", role="hub_employee")
+    manager = make_user("marta", host=SLUG_A, role="hub_manager")
+    employee = make_user("eva", host=SLUG_A, role="hub_employee")
     assert permissions_for(manager, A) == {"demo.view", "demo.manage", "shop.view", "shop.sell"}
     assert permissions_for(employee, A) == {"demo.view", "shop.view"}
 
 
 @pytest.mark.parametrize("role", ["owner", "admin", "employee"])
 def test_a_role_without_the_hub_prefix_gets_nothing(make_user, role):
-    assert permissions_for(make_user(host="a", role=role), A) == frozenset()
+    assert permissions_for(make_user(host=SLUG_A, role=role), A) == frozenset()
 
 
 def test_reload_user_reads_the_database_again(make_user):
@@ -118,6 +123,6 @@ def test_reload_user_of_nobody_is_none():
 
 
 def test_membership_role_change_is_seen(make_user):
-    user = make_user(host="a", role="hub_employee")
-    Membership.objects.filter(user=user, host="a").update(role="hub_admin")
+    user = make_user(host=SLUG_A, role="hub_employee")
+    Membership.objects.filter(user=user, host=SLUG_A).update(role="hub_admin")
     assert "demo.manage" in permissions_for(user, A)

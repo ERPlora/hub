@@ -4,6 +4,8 @@ Sessions live in control's database, so the session of hub B is a row hub A's ho
 the host it was opened on (a hub's slug, or the platform host's mark), and on any other host that session is no
 session: anonymous, 401 on the API, the SaaS's login on a page. Nothing changes for a browser: its cookie is its host's
 only. A session with no host noted stays valid where it is used until it expires.
+
+The hubs are ``hub_a`` and ``hub_b``, each on a database of its own, as every business is.
 """
 
 import pytest
@@ -13,9 +15,12 @@ from django.test import RequestFactory
 
 from base.middleware import PLATFORM_SESSION_HOST, SESSION_HOST_KEY
 from base.models import Membership
-from control.models import Hub
+from base.tests.test_auth_views import A, B, ON_HUB_A
 
-pytestmark = pytest.mark.django_db
+pytestmark = ON_HUB_A
+
+HOST_A = f"{A}.localhost"
+HOST_B = f"{B}.localhost"
 
 
 def member_of(*slugs: str):
@@ -42,31 +47,31 @@ def items(client, host: str) -> int:
     return client.get("/api/demo/items", HTTP_HOST=host).status_code
 
 
-def test_the_login_notes_the_host_it_was_opened_on(client):
-    key = session_opened_on(client, member_of("a"), hub=Hub.objects.get(slug="a"))
+def test_the_login_notes_the_host_it_was_opened_on(client, hub_a):
+    key = session_opened_on(client, member_of(A), hub=hub_a)
 
-    assert SessionStore(session_key=key)[SESSION_HOST_KEY] == "a"
-
-
-def test_a_session_works_on_its_own_host(client):
-    session_opened_on(client, member_of("a", "b"), hub=Hub.objects.get(slug="a"))
-
-    assert items(client, "a.localhost") == 200
+    assert SessionStore(session_key=key)[SESSION_HOST_KEY] == A
 
 
-def test_a_hubs_session_is_no_session_on_another_hubs_host_even_for_one_of_its_members(client):
-    session_opened_on(client, member_of("a", "b"), hub=Hub.objects.get(slug="b"))
+def test_a_session_works_on_its_own_host(client, hub_a, hub_b):
+    session_opened_on(client, member_of(A, B), hub=hub_a)
 
-    assert items(client, "a.localhost") == 401
-    assert client.get("/api/me", HTTP_HOST="a.localhost").json()["user"] is None
-    assert items(client, "b.localhost") == 200
+    assert items(client, HOST_A) == 200
 
 
-def test_a_hubs_session_never_opens_the_admin(client):
-    user = member_of("a")
+def test_a_hubs_session_is_no_session_on_another_hubs_host_even_for_one_of_its_members(client, hub_a, hub_b):
+    session_opened_on(client, member_of(A, B), hub=hub_b)
+
+    assert items(client, HOST_A) == 401
+    assert client.get("/api/me", HTTP_HOST=HOST_A).json()["user"] is None
+    assert items(client, HOST_B) == 200
+
+
+def test_a_hubs_session_never_opens_the_admin(client, hub_a):
+    user = member_of(A)
     user.is_staff = user.is_superuser = True
     user.save()
-    session_opened_on(client, user, hub=Hub.objects.get(slug="a"))
+    session_opened_on(client, user, hub=hub_a)
 
     page = client.get("/admin/", HTTP_HOST="hubs.localhost")
 
@@ -74,14 +79,14 @@ def test_a_hubs_session_never_opens_the_admin(client):
 
 
 def test_the_platform_hosts_session_is_no_session_on_a_hub(client):
-    user = member_of("a")
+    user = member_of(A)
     session_opened_on(client, user, platform_host=True)
 
     assert SessionStore(session_key=client.cookies["sessionid"].value)[SESSION_HOST_KEY] == PLATFORM_SESSION_HOST
-    assert items(client, "a.localhost") == 401
+    assert items(client, HOST_A) == 401
 
 
 def test_a_session_from_before_the_rule_stays_valid_where_it_is_used(client):
-    client.force_login(member_of("a"))
+    client.force_login(member_of(A))
 
-    assert items(client, "a.localhost") == 200
+    assert items(client, HOST_A) == 200
