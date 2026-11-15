@@ -19,10 +19,9 @@ from django.utils import timezone
 from base import access
 from base.models import AccessSettings, SessionOwner, TrustedDevice
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_auth_views import HOST, a_code, callback, demo, host_of  # noqa: F401 (demo: a fixture)
+from base.tests.test_auth_views import HOST, ON_HUB_A, a_code, callback, demo, host_of  # noqa: F401 (demo: a fixture)
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 ANDROID = "Mozilla/5.0 (Linux; Android 14; SM-T220) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
 

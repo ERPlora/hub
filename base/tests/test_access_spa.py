@@ -20,10 +20,9 @@ from django.utils import timezone
 from base import access
 from base.models import AccessSettings, Credential, Membership, Profile, TrustedDevice
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_auth_views import A, HOST
+from base.tests.test_auth_views import A, HOST, ON_HUB_A
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 
 def hub_home(client) -> dict:

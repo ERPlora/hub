@@ -17,11 +17,11 @@ from base import permissions as permissions_module
 
 from base.models import Membership
 from base.permissions import permissions_for, reload_user
-from base.tenancy.tests import hubs
+from base.tests.test_auth_views import ON_HUB_A
 from base.tests.test_auth_views import A as SLUG_A
 from base.tests.test_auth_views import B as SLUG_B
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
+pytestmark = ON_HUB_A
 
 A = Scope("host", SLUG_A)
 B = Scope("host", SLUG_B)

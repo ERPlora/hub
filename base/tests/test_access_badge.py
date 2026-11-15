@@ -15,17 +15,10 @@ from django.utils import timezone
 from base import access, services
 from base.models import AccessSettings, Credential, Membership, SessionOwner, TrustedDevice
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_auth_views import A, B, HOST
+from base.tests.test_access_pin import a_device
+from base.tests.test_auth_views import A, B, HOST, ON_HUB_A
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
-
-
-def a_device(client, mode=access.SHARED) -> TrustedDevice:
-    token = access.new_device_token()
-    device = TrustedDevice.objects.create(token_digest=access.token_digest(token), mode=mode, last_entry_at=timezone.now())
-    client.cookies[access.DEVICE_COOKIE] = token
-    return device
+pytestmark = ON_HUB_A
 
 
 def with_badge(user, card: str) -> Credential:

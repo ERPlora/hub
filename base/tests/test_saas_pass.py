@@ -29,6 +29,13 @@ from base.tests.test_auth_views import DEEP_LINK, PLATFORM, ROOT, callback
 pytestmark = pytest.mark.django_db
 
 HOST = "a.localhost:8000"
+
+
+def bea_enters_with_her_pin(client, make_user):
+    """Bea enters this browser, a shared till of the business, with her PIN."""
+    bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
+    a_device(client)
+    enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
 URL = "/api/saas-pass"
 #: What erplora.com's ``accounts/hub_pass.py`` reads: its salt, its minute and the shape of a nonce.
 SALT = "erplora.hub-pass.v1"
@@ -156,9 +163,7 @@ class TestOnlyWithTheAccount:
         assert "url" not in response.json()
 
     def test_a_pin_session_on_a_till_gets_no_pass(self, client, make_user, spa_manifest, saas):
-        bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
-        a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
+        bea_enters_with_her_pin(client, make_user)
 
         self.refused(ask(client))
         self.refused(ask(client, "business"))
@@ -270,9 +275,7 @@ class TestItsWords:
         assert english["message"] != spanish["message"]
 
     def test_a_pin_s_refusal_speaks_the_browser_s_language(self, client, make_user, spa_manifest, saas):
-        bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
-        a_device(client)
-        enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
+        bea_enters_with_her_pin(client, make_user)
 
         english, spanish = (
             client.post(

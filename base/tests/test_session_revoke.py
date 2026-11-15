@@ -13,20 +13,17 @@ The businesses are ``hub_a`` (Acme) and ``hub_b`` (Beta), each on a database of 
 
 import json
 
-import psycopg
 import pytest
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.backends.base import SessionBase
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.contrib.sessions.models import Session
-from django.db import close_old_connections, connections
+from django.db import close_old_connections
 from django.test import RequestFactory
 from live.context import Scope
 from live.executor import BYE_FRAME, Stream, Subscription, executor
 from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
 from base.auth import PLATFORM_ADMIN, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST
@@ -36,6 +33,7 @@ from base.services import open_admin_session_from_saas, open_session_from_saas
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_internal import code, signed
+from base.tests.test_queries_home import listen  # noqa: F401 (a fixture)
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
@@ -282,16 +280,11 @@ class TestTheOpenApps:
         assert not stream.closed
         assert stream.queue.empty()  # the same result: nothing new to send
 
-    def test_the_door_wakes_the_hub_s_open_apps_after_the_commit(self, client, hub_a):
+    def test_the_door_wakes_the_hub_s_open_apps_after_the_commit(self, client, hub_a, listen):
         login(ANA, hub_a)
-        params = connections["default"].settings_dict
-        dsn = make_conninfo(
-            dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-        )
-        with psycopg.connect(dsn, autocommit=True) as listener:
-            listener.execute(f"LISTEN {channel_for(Scope('host', hub_a.slug))}")
+        listener = listen(Scope("host", hub_a.slug))
 
-            signed(client, "post", REVOKE, {"user_id": ANA, "hub_id": ACME_ID})
+        signed(client, "post", REVOKE, {"user_id": ANA, "hub_id": ACME_ID})
 
-            heard = {name for note in listener.notifies(timeout=1.0) for name in json.loads(note.payload)["events"]}
+        heard = {name for note in listener.notifies(timeout=1.0) for name in json.loads(note.payload)["events"]}
         assert "*" in heard
