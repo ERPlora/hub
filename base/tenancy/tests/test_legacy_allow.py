@@ -180,3 +180,10 @@ def test_this_suite_turns_the_fallback_on_only_for_the_tests_its_list_names(requ
     assert plugin.allowed, f"no test named in {REPO / legacy_allow.ALLOW_FILE}"
     assert legacy_allow.entry_of(request.node.nodeid) not in plugin.allowed
     assert context._test_fallback is None
+
+
+def test_a_test_the_list_does_not_name_keeps_the_worker_s_own_pass(request):
+    from base import worker
+
+    assert legacy_allow.entry_of(request.node.nodeid) not in request.config.pluginmanager.get_plugin("legacy_allow").allowed
+    assert worker._relay is not legacy_allow.worker_pass
