@@ -309,6 +309,12 @@ expect "NIGHTLY_HUB_PORT moves the whole stack" 1 \
   "$(calls 'E2E_HUB_PORT=28770 VITE_DEV_PORT=28775 SAAS_URL=http://localhost:28771 DB_NAME=hub_e2e_28770 E2E_SAAS_DB=saas_e2e_28771')"
 expect "and the SaaS's Vite with it" 1 "$(calls_re '^runserver saas 127\.0\.0\.1:28771 DB_NAME=saas_e2e_28771 VITE_DEV_PORT=28776 ')"
 expect "--spec runs only that spec" 1 "$(calls_re '^e2e hub args=--global-timeout=[0-9]+ tests/e2e/sale-sales\.spec\.ts HEAD=')"
+# A commit only the clone has, as a branch not pushed yet: the smoke runs the commit checked out, not main.
+unpushed="$(g -C "$hub_clone" commit-tree -p "$clone_head" -m unpushed "$(git -C "$hub_clone" rev-parse "$clone_head^{tree}")")"
+night NIGHTLY_GREP=@smoke NIGHTLY_HUB_REF="$unpushed" FAKE_E2E_EXIT=0 FAKE_RESULTS="$green_report"
+expect "NIGHTLY_GREP runs only the tests it matches" 1 "$(calls_re '^e2e hub args=--global-timeout=[0-9]+ --grep @smoke HEAD=')"
+expect "NIGHTLY_HUB_REF runs the Hub on that commit, even one not pushed" 1 "$(calls "HEAD=$unpushed ")"
+expect "and the shared checkout's HEAD does not move" "$clone_head" "$(git -C "$hub_clone" rev-parse HEAD)"
 night QA_REAL_PROVIDER=1 E2E_HEADED=1
 expect "the specs that spend real tokens stay off" 1 "$(calls_re 'QA_REAL_PROVIDER= E2E_OUTPUT_DIR=')"
 
