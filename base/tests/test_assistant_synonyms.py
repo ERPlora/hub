@@ -1,7 +1,7 @@
-"""What a word means in the Hub (hub#1145): the platform says its own words (``base.assistant.SYNONYMS``) and each app
-says its own in its ``LiveAppConfig`` (``base.assistant.SYNONYMS_ATTRIBUTE``); ``base.assistant.synonyms`` gathers
-them, and a turn ranks with all of them (``base.assistant.RANKING``). A malformed declaration is said at start
-(``base.E017``) and never read."""
+"""What a word means in the Hub: the platform says its own words (``base.assistant.SYNONYMS``) and each app says its own
+in its ``LiveAppConfig`` (``base.assistant.SYNONYMS_ATTRIBUTE``); ``base.assistant.synonyms`` gathers them, and a turn
+ranks with the ones that count for the tools it may offer (``base.assistant.ranking``). A malformed declaration is said
+at start (``base.E018``) and never read."""
 
 import unicodedata
 
@@ -13,6 +13,14 @@ from live.meta import all_live_app_configs
 from live.operations import registry
 
 from base import assistant
+from base.models import Membership
+from base.tests.test_assistant_asks import members, offered_place
+
+#: The words of an item («elemento»), a word only Demo says (``demo.item``), in requests of other apps' tools.
+ELEMENT_REQUESTS = [
+    ("inventory.product.delete", "borra el elemento «Tarta de queso» del inventario"),
+    ("inventory.product.create", "añade un elemento nuevo a la carta: tarta de queso a 5 euros"),
+]
 
 
 def stems_of(*words: str) -> frozenset[str]:
@@ -21,6 +29,15 @@ def stems_of(*words: str) -> frozenset[str]:
 
 def concepts(phrase: str, groups) -> frozenset[frozenset[str]]:
     return shared.asked([phrase], groups).concepts
+
+
+def said_by(config) -> tuple[tuple[str, ...], ...]:
+    return tuple(tuple(group) for group in getattr(config, assistant.SYNONYMS_ATTRIBUTE, ()))
+
+
+def tools_of(*labels: str) -> dict:
+    """The assistant's tools of the apps ``labels``, as a catalogue holds them (by name)."""
+    return {name: op for name, op in sorted(registry.items()) if op.app_label in labels and assistant.is_tool(op)}
 
 
 @pytest.fixture
@@ -33,6 +50,11 @@ def printing():
     return apps.get_app_config("printing")
 
 
+@pytest.fixture
+def demo():
+    return apps.get_app_config("demo")
+
+
 def test_a_group_an_app_declares_names_its_concept(table, monkeypatch):
     phrase = "enséñame la zarpa del gato"
     assert stems_of("zarpa", "claw") not in concepts(phrase, assistant.synonyms())  # positive control: nobody says it
@@ -42,15 +64,12 @@ def test_a_group_an_app_declares_names_its_concept(table, monkeypatch):
     assert stems_of("zarpa", "claw") in concepts(phrase, gathered)
 
 
-def test_a_turn_ranks_with_the_platforms_words_and_every_installed_apps():
+def test_the_hubs_words_are_the_platforms_and_then_every_installed_apps():
     gathered = assistant.synonyms()
-    assert assistant.RANKING["synonyms"] == gathered
     assert gathered[: len(assistant.SYNONYMS)] == assistant.SYNONYMS
-    declared = [
-        tuple(group) for config in all_live_app_configs() for group in getattr(config, assistant.SYNONYMS_ATTRIBUTE, ())
-    ]
-    assert declared  # positive control: some app says its own words
-    assert gathered[len(assistant.SYNONYMS) :] == tuple(declared)
+    apps_words = tuple(group for config in all_live_app_configs() for group in said_by(config))
+    assert apps_words  # positive control: some app says its own words
+    assert gathered[len(assistant.SYNONYMS) :] == apps_words
 
 
 def test_two_apps_that_declare_the_same_word_join_their_groups_whichever_comes_first(table, printing, monkeypatch):
@@ -74,9 +93,8 @@ def plain(word: str) -> str:
 
 def base_words() -> frozenset[str]:
     """The words base's own operations are named with (``base.person.badge_remove``: person, badge, remove)."""
-    return frozenset(
-        word for name in registry if name.startswith("base.") for part in name.split(".")[1:] for word in part.split("_")
-    )
+    own = [name.split(".")[1:] for name in registry if name.startswith("base.")]
+    return frozenset(word for parts in own for part in parts for word in part.split("_"))
 
 
 def test_the_platforms_groups_name_only_what_base_does():
@@ -87,8 +105,56 @@ def test_the_platforms_groups_name_only_what_base_does():
     assert [group for group in assistant.SYNONYMS if words.isdisjoint(plain(word) for word in group)] == []
 
 
+def test_an_app_out_of_the_store_says_its_words_only_where_its_tools_are_offered(demo):
+    """Demo never reaches a customer (``listed = False``): where its tools are not offered, its «elemento» would only
+    bring other apps' items, a cart's or a price list's, in front of what the person asks for."""
+    assert not demo.listed and said_by(demo)  # positive controls: out of the store, and it says words of its own
+    item = shared.stem("item")
+    phrase = ELEMENT_REQUESTS[0][1]
+    others = tools_of("inventory", "cart_checkout", "pricing")
+    assert not any(item in concept for concept in concepts(phrase, assistant.ranking(others)["synonyms"]))
+    with_demo = {**others, **tools_of("demo")}
+    assert any(item in concept for concept in concepts(phrase, assistant.ranking(with_demo)["synonyms"]))
+
+
+def test_the_words_of_an_app_in_the_store_count_in_every_turn(demo):
+    """A listed app's words also name what other apps share: Appointments' «bloqueo» is a reservation's blocked date
+    too, so a turn without any of its tools still reads them."""
+    reservations = tools_of("reservation")
+    assert reservations and not any(op.app_label == "appointment" for op in reservations.values())
+    counted = assistant.ranking(reservations)["synonyms"]
+    assert set(counted) == set(assistant.synonyms()) - set(said_by(demo))
+    assert any(stems_of("blocked") <= concept for concept in concepts("¿qué bloqueos hay en Navidad?", counted))
+
+
+def test_a_turn_ranks_with_the_words_that_count_for_its_tools():
+    tools = tools_of("inventory", "cart_checkout", "pricing")
+    name, phrase = ELEMENT_REQUESTS[0]
+    turn = [op.name for op in assistant.relevant(tools, [phrase], "es")]
+    assert turn == [op.name for op in shared.relevant(tools, [phrase], "es", **assistant.ranking(tools))]
+    every = {**assistant.ranking(tools), "synonyms": assistant.synonyms()}
+    assert turn != [op.name for op in shared.relevant(tools, [phrase], "es", **every)]  # positive control
+
+
+@pytest.fixture
+def owner_tools(make_user):
+    """The owner's catalogue in business ``a`` (every app on), in Spanish, without Demo's tools: a customer's."""
+    tools = assistant.catalog(members(make_user, "words")(Membership.Role.OWNER, "es"))
+    assert any(op.app_label == "demo" for op in tools.values())  # positive control: there were some to leave out
+    return {name: op for name, op in tools.items() if op.app_label != "demo"}
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), ELEMENT_REQUESTS)
+def test_an_element_in_a_customers_words_brings_their_tool_and_not_demos_items(owner_tools, name, phrase):
+    """With Demo's words, these came 30th and 18th: «elemento» brought a cart's items and a price list's first."""
+    every = assistant.synonyms()
+    assert offered_place(owner_tools, name, phrase) <= 10
+    assert offered_place(owner_tools, name, phrase, synonyms=every) > 10
+
+
 def synonym_errors() -> list:
-    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E017"]
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E018"]
 
 
 def test_the_words_every_app_declares_are_sound():

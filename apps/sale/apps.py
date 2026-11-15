@@ -33,10 +33,10 @@ class SaleConfig(LiveAppConfig):
     # Inventory is optional: its products are read through its own operations.
     requires = ["tax", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What Sales' words mean to the assistant (base.assistant.synonyms): a «cuenta», a check or a tab is a table's open
-    # check, sale.order, never the person's account (what it is in erplora.com's panel); a ticket or a receipt is a
-    # sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it prints), never the kitchen's,
-    # which is named by its app («la cocina»).
+    # What these words mean to the Hub's assistant (base.assistant.synonyms). A «cuenta», a check or a tab is a table's
+    # open check (sale.order), never the person's account (what it is in erplora.com's panel); a ticket or a receipt is
+    # a sale's, as the till's screens say («Tiques hoy», «Tique medio», the «Tique» it prints), never the kitchen's,
+    # which is its «comanda».
     assistant_synonyms = (
         ("cuenta", "check", "tab", "order"),
         ("ticket", "tique", "recibo", "receipt", "sale"),

@@ -775,7 +775,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   y `es` (`combo` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase
   traiga su herramienta entre las diez primeras, por rol). Sin ellos, «ordena las opciones de…» ofrecía antes cambiar el
   menú, la elección o una impresora que reordenar, y el modelo borraba las elecciones y las creaba de nuevo.
-  `base.assistant.SYNONYMS` lee «opción» y «elección» como la elección de un plato (`combo.option`, también
+  Sus palabras propias (`assistant_synonyms`, en `apps.py`) leen «opción» y «elección» como la elección de un plato (`combo.option`, también
   `modifier.option`). `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
   (`tests/e2e/qa/probes/*-es-combo-*.json` y las de preparar la venta), nunca con los propios `asks`, y con una frase
   propia por herramienta que solo la trae con sus asks; el empleado no recibe ninguna escritura. Trampas medidas:

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -72,7 +73,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentario_as_a_comment():
-    """``TaskConfig.assistant_synonyms`` (gathered by ``base.assistant.synonyms``, hub#1145): «la tarea», «el proyecto»
+    """``TaskConfig.assistant_synonyms`` (gathered by ``base.assistant.synonyms``): «la tarea», «el proyecto»
     and «comenta» name what Tasks' operations are of (``task.task``, ``task.project``, ``task.comment``), so the owner's
     words reach those tools by their entity and not only by the words of their asks; the platform's own words
     (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive control)."""
@@ -81,7 +82,7 @@ def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentari
         ("¿qué proyectos tenemos?", "project"),
         ("comenta que el técnico viene el lunes", "comment"),
     ):
-        concepts = shared.asked([phrase], assistant.RANKING["synonyms"]).concepts
+        concepts = shared.asked([phrase], apps.get_app_config("task").assistant_synonyms).concepts
         assert any(shared.stem(wanted) in concept for concept in concepts), phrase
         platform = shared.asked([phrase], assistant.SYNONYMS).concepts
         assert not any(shared.stem(wanted) in concept for concept in platform), phrase
@@ -96,7 +97,7 @@ def test_the_guests_of_a_table_are_no_comment():
     assert not any(
         comment in concept
         for concept in shared.asked(
-            ["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.RANKING["synonyms"]
+            ["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.synonyms()
         ).concepts
     )
 

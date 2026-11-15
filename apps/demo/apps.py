@@ -26,6 +26,11 @@ class DemoConfig(LiveAppConfig):
     # The technical reference, not sold (its WORKBOOK): registered, but kept out of the public store.
     listed = False
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.synonyms). An «elemento», as the screens name one, is
+    # an item (demo.item).
+    assistant_synonyms = (
+        ("elemento", "elementos", "item", "items"),
+    )
     permissions = ["demo.view", "demo.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {

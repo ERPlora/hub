@@ -114,109 +114,10 @@ APP_WORDS = shared.app_words
 SYNONYMS = (
     ("placa", "badge"),
     ("empleado", "empleada", "employee", "person"),
-    ("arqueo", "recuento", "conteo", "count"),
-    ("divisa", "moneda", "currency"),
-    # service
-    ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
-    ("asignacion", "asignaciones", "assignment", "assignments"),
-    # staff
-    ("desactiva", "desactivar", "deactivate"),
-    ("pido", "solicito", "solicitud", "request"),
-    # cart_checkout: a «cesta» or a «carrito» is a shopping cart (``cart_checkout.cart``), and «unidades» or «cantidad»,
-    # as «tres unidades», the quantity a line takes (never «cantidad» as Inventory's unit of measure). Never «línea»: it
-    # is the till's check line (``sale.order.*_line``) and a cart's line would take its place.
-    ("unidades", "cantidad", "quantity"),
-    ("cesta", "carrito", "cart", "basket"),
-    # payment: where the business pays its suppliers from is a payment method (``payment.method``), and so is its «cuenta
-    # bancaria» or «cuenta del banco», named by its phrases: a «cuenta» alone is a table's check.
-    (
-        "method", "methods", "cuenta bancaria", "cuentas bancarias", "cuenta del banco", "cuentas del banco",
-        "bank account", "bank accounts",
-    ),
-    # invoice: an invoice «pagada» or «pagado» is a paid one (``invoice.invoice.mark_paid``), as «paid» is in
-    # English, and so is one marked «como cobrada», named by its phrases: «cobrar» and «cobro» alone are a sale's
-    # charge.
-    (
-        "pagada", "pagadas", "pagado", "pagados", "paid", "como cobrada", "como cobradas", "como cobrado",
-        "como cobrados",
-    ),
-    # flow: an automation (``flow.flow``), its steps and the question it waits on (``flow.question``) are named by their
-    # phrases and never by the word: «automatización» shares its stem with «automático» («la respuesta automática»),
-    # «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso» nor «de paso») and «pregunta» with its verb («se les
-    # pregunta»). A run is its «ejecución» (``flow.run``), the assistant's draft its «borrador» (``flow.draft``; «borra»,
-    # «bórralo» and «borrada» stem apart from it) and a ready-made one an app brings its «receta» or «prefabricada»
-    # (``flow.recipe``).
-    (
-        "flujo", "flow", "an automation", "a new automation", "the automation", "this automation", "that automation",
-        "each automation", "any automation", "the automations", "my automations", "your automations",
-        "which automations", "what automations",
-        *(f"{one} automatizacion" for one in ("la", "una", "esta", "esa", "cada", "alguna", "ninguna", "otra")),
-        *(f"{one} automatizacion" for one in ("nueva", "mi", "tu", "su", "de")),
-        *(f"{many} automatizaciones" for many in ("las", "unas", "estas", "esas", "todas", "otras", "que", "cuantas")),
-        *(f"{many} automatizaciones" for many in ("mis", "tus", "sus", "nuestras", "de")),
-    ),
-    ("ejecucion", "ejecuciones", "run", "runs"),
-    (
-        "step", "steps", "paso a paso",
-        *(f"{one} paso" for one in ("el", "un", "ese", "este", "cada", "primer", "ultimo", "otro", "algun", "ningun")),
-        *(f"{one} paso" for one in ("mi", "tu", "su")),
-        *(f"{many} pasos" for many in ("los", "unos", "esos", "estos", "todos", "otros", "nuevos", "que", "cuantos")),
-        *(f"{many} pasos" for many in ("mis", "tus", "sus", "de")),
-    ),
-    (
-        "question", "questions",
-        *(f"{one} pregunta" for one in ("la", "una", "esa", "esta", "cada", "primera", "ultima", "otra", "alguna")),
-        *(f"{one} pregunta" for one in ("ninguna", "mi", "tu", "su")),
-        *(f"{many} preguntas" for many in ("las", "unas", "esas", "estas", "todas", "otras", "nuevas", "que")),
-        *(f"{many} preguntas" for many in ("cuantas", "mis", "tus", "sus", "de")),
-    ),
-    ("borrador", "borradores", "draft", "drafts"),
-    ("receta", "recetas", "prefabricada", "prefabricadas", "recipe", "recipes"),
-    # demo
-    ("elemento", "elementos", "item", "items"),
-    # kitchen
-    (
-        "ticket", "la comanda", "una comanda", "unas comandas", "esta comanda", "esa comanda", "su comanda",
-        "sus comandas", "que comanda", "que comandas", "cuantas comandas", "otra comanda", "alguna comanda",
-        "cada comanda", "comanda manual", "comandas manuales", "las comandas de",
-    ),
-    ("estacion", "estaciones", "station", "stations", "el puesto", "al puesto", "del puesto", "un puesto",
-     "los puestos", "que puesto", "que puestos", "cada puesto", "por puesto"),
-    ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
-    ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
-    # the «regla» that sends a product or a family to a station is its routing (``kitchen.routing``): live reads
-    # «regla» as any rule («rule», as Taxes' and Pricing's), and the QA says it of the routing.
-    ("regla", "routing"),
-    ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
-     "como hechas"),
-    ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
-    # whatsapp_inbox
-    ("plantilla", "plantillas", "template", "templates"),
-    ("mensaje", "mensajes", "message", "messages"),
-    # combo: an «opción» or an «elección» of a course is a choice (``combo.option``), as of a modifier group
-    # (``modifier.option``). live still reads «ordena» and «orden» as «ordenador»'s stem, so they also name a device.
-    ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
-    # modifier: the «predeterminada» option is the one a group brings chosen, its default (``is_default``), as the
-    # descriptions say it in English. Never «por defecto»: it is also the default of a shift, a working day or a
-    # threshold (Staff's and Inventory's settings), whose asks would then rank the options of a group.
-    ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
-    # appointment: a «bloqueo» of the agenda is its blocked period (``appointment.blocked_time``), as «block» says in
-    # English; a «cita fija», a «serie semanal» or a «cita que se repite» is a repeating appointment
-    # (``appointment.recurring``), named by its phrases and never by «serie» alone, which is also an invoice's series;
-    # whether someone «puede atender» or there is a «hueco libre» asks for the availability of the agenda
-    # (``appointment.availability``), named by its phrases: «puede» and «libre» alone ask for nothing.
-    ("bloqueo", "blocked"),
-    (
-        "recurring", "cita fija", "citas fijas", "cita periodica", "citas periodicas", "cita semanal", "citas semanales",
-        "cita mensual", "citas mensuales", "serie semanal", "series semanales", "serie mensual", "serie quincenal",
-        "serie de citas", "series de citas", "que se repite", "que se repiten", "que se repita", "que se repitan",
-        "repeating appointment", "repeating appointments", "weekly appointment", "monthly appointment",
-    ),
-    ("availability", "puede atender", "pueda atender", "puede coger", "pueda coger", "hueco libre", "huecos libres"),
 )
 #: The attribute of an app's ``LiveAppConfig`` that says what its own words mean, in groups as ``SYNONYMS``'s: a word of
 #: a group asks for all of them, and a phrase with spaces names its group without lending its stems to other words
-#: (``assistant_synonyms = (("tarea", "tareas", "task", "tasks"),)``). ``synonyms`` gathers them; ``base.E017`` checks them.
+#: (``assistant_synonyms = (("tarea", "tareas", "task", "tasks"),)``). ``base.E018`` checks them.
 SYNONYMS_ATTRIBUTE = "assistant_synonyms"
 
 
@@ -233,17 +134,26 @@ def _synonym_problems(config: LiveAppConfig) -> list[str]:
     ]
 
 
-def synonyms() -> tuple[tuple[str, ...], ...]:
-    """The Hub's words, the ones a turn ranks with (``RANKING``): the platform's (``SYNONYMS``) and, in the order of the
-    apps, the ones each installed app says (``SYNONYMS_ATTRIBUTE``), on in the business or not; never the ones
-    ``base.E017`` refuses. A word two groups say names both (``live.assistant`` joins every group of a stem), whichever
-    app says it first: the order changes nothing."""
+def _counts(config: LiveAppConfig, offered: Collection[str] | None) -> bool:
+    """Whether ``config``'s words count in a turn that may offer the tools of the apps ``offered`` (``None``: any). A
+    listed app's count in every turn, because a word one app teaches also names what others share (a «bloqueo» is a
+    reservation's blocked date too). An app out of the store (``listed = False``, never shown to a customer) counts
+    only where its tools are: elsewhere its words would only bring other apps' tools first. What ``base.E018`` refuses
+    never counts."""
+    return (offered is None or config.listed or config.label in offered) and not _synonym_problems(config)
+
+
+def synonyms(offered: Collection[str] | None = None) -> tuple[tuple[str, ...], ...]:
+    """The Hub's words: the platform's (``SYNONYMS``) and then, in the order of the apps, the groups each app says
+    (``SYNONYMS_ATTRIBUTE``) that count in a turn offering the tools of the apps ``offered`` (``_counts``; ``None``:
+    every app's). A word two groups say names both (``live.assistant`` joins every group of a stem), whichever app says
+    it first: the order changes nothing."""
     return (
         *SYNONYMS,
         *(
             tuple(group)
             for config in all_live_app_configs()
-            if not _synonym_problems(config)
+            if _counts(config, offered)
             for group in getattr(config, SYNONYMS_ATTRIBUTE, ())
         ),
     )
@@ -251,25 +161,30 @@ def synonyms() -> tuple[tuple[str, ...], ...]:
 
 @checks.register("base")
 def check_synonyms(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
-    """``base.E017``: an app says what its words mean (``SYNONYMS_ATTRIBUTE``) as groups of two words or more, each a
+    """``base.E018``: an app says what its words mean (``SYNONYMS_ATTRIBUTE``) as groups of two words or more, each a
     text: one word alone means nothing more, and a group written bare would be read as its letters."""
     return [
         checks.Error(
             problem,
             hint=f'Declare {SYNONYMS_ATTRIBUTE} = (("<word>", "<word>", …), …) on the app\'s LiveAppConfig.',
             obj=config,
-            id="base.E017",
+            id="base.E018",
         )
         for config in all_live_app_configs()
         for problem in _synonym_problems(config)
     ]
 
+
 #: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
 HOWTO = (DOCS_SEARCH,)
-#: How a turn ranks the tools it offers (``relevant``), and the assistant's QA with it, word for word
-#: (``base/tests/test_assistant_asks.py``): one place, so the QA never ranks otherwise than the turn. The apps' words
-#: are read once, here: this module imports ``base.models``, so the apps are loaded whenever it is imported.
-RANKING = MappingProxyType({"always": ALWAYS, "app_words": APP_WORDS, "synonyms": synonyms(), "howto": HOWTO})
+
+
+def ranking(tools: dict[str, Operation]) -> MappingProxyType:
+    """How a turn ranks ``tools`` (``relevant``), and the assistant's QA with it, word for word
+    (``base/tests/test_assistant_asks.py``): one place, so the QA never ranks otherwise than the turn. The Hub's words
+    are the ones that count where the apps of ``tools`` are (``synonyms``)."""
+    offered = {op.app_label for op in tools.values()}
+    return MappingProxyType({"always": ALWAYS, "app_words": APP_WORDS, "synonyms": synonyms(offered), "howto": HOWTO})
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"
@@ -315,9 +230,9 @@ def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = No
 
 
 def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -> list[Operation]:
-    """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``), as ``RANKING``
+    """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``), as ``ranking``
     says."""
-    return shared.relevant(tools, texts, language, **RANKING)
+    return shared.relevant(tools, texts, language, **ranking(tools))
 
 
 # ── The card of a write in the Hub's words ───────────────────────────────────────────────────────────────────────

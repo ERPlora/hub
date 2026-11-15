@@ -30,6 +30,13 @@ class ModifierConfig(LiveAppConfig):
     # A link points at a product or a category of Inventory; an option at a tax category of Taxes.
     requires = ["inventory", "tax"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.synonyms). The «predeterminada» option is the one a
+    # group brings chosen, its default (is_default), as the descriptions say it in English. Never «por defecto»: it is
+    # also the default of a shift, a working day or a threshold (Staff's and Inventory's settings), whose asks would
+    # then rank the options of a group.
+    assistant_synonyms = (
+        ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
+    )
     permissions = ["modifier.view", "modifier.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier is an
     # employee: it reads the groups of a product and has its picks valued.

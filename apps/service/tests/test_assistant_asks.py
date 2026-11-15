@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, Operation, registry
@@ -310,16 +311,16 @@ def test_a_record_taken_by_its_id_says_which_read_finds_it(name, read):
 
 
 def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_assignment():
-    """``base.assistant.SYNONYMS``: «el bono» names Services' voucher, the one of the catalogue and the one sold
-    (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's assignment
-    to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
+    """Services' own words (its ``assistant_synonyms``): «el bono» names Services' voucher, the one of the catalogue and
+    the one sold (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's
+    assignment to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
     for phrase, wanted in (
         ("anula el bono de Marta", "grant"),
         ("¿qué bonos ofrecemos?", "package"),
         ("asigna los peinados a Lucas", "assignment"),
         ("cambia la asignación de Lucas", "assignment"),
     ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
+        concepts = shared.asked([phrase], apps.get_app_config("service").assistant_synonyms).concepts
         assert any(shared.stem(wanted) in concept for concept in concepts), phrase
         assert not any(shared.stem(wanted) in concept for concept in shared.asked([phrase]).concepts), phrase
 
@@ -359,9 +360,10 @@ NAMES_AN_ASSIGNMENT = re.compile(r"\basign", re.IGNORECASE)
 
 
 def without_services_groups() -> tuple[tuple[str, ...], ...]:
-    """``base.assistant.SYNONYMS`` without the groups Services adds: «bono» and «asignación»."""
-    kept = tuple(group for group in assistant.SYNONYMS if not {"bono", "asignacion"} & set(group))
-    assert len(assistant.SYNONYMS) - len(kept) == 2  # positive control: both of Services' groups are there
+    """The Hub's words (``base.assistant.synonyms``) without the groups Services says: «bono» and «asignación»."""
+    every = assistant.synonyms()
+    kept = tuple(group for group in every if not {"bono", "asignacion"} & set(group))
+    assert len(every) - len(kept) == 2  # positive control: both of Services' groups are there
     return kept
 
 

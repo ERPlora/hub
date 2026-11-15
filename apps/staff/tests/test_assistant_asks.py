@@ -9,6 +9,7 @@ the asks and the guard that no ask copies a probe of layer 2.
 import json
 
 import pytest
+from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, registry
 
@@ -60,16 +61,16 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_desactivar_as_a_deactivation_and_pido_as_a_request():
-    """``base.assistant.SYNONYMS``: «desactiva» names what ``staff.member.deactivate`` does and «pido» or «una solicitud»
-    what ``staff.time_off.request`` records, so the owner's words reach those tools, whose actions no verb of the
-    assistant reads; without the Hub's groups, none of them does (positive control)."""
+    """Staff's own words (its ``assistant_synonyms``): «desactiva» names what ``staff.member.deactivate`` does and
+    «pido» or «una solicitud» what ``staff.time_off.request`` records, so the owner's words reach those tools, whose
+    actions no verb of the assistant reads; without the Hub's groups, none of them does (positive control)."""
     deactivate, request = shared.stem("deactivate"), shared.stem("request")
     for phrase, wanted in (
         ("desactiva a Pablo", deactivate),
         ("pido el viernes libre", request),
         ("mira mi solicitud de vacaciones", request),
     ):
-        concepts = shared.asked([phrase], assistant.SYNONYMS).concepts
+        concepts = shared.asked([phrase], apps.get_app_config("staff").assistant_synonyms).concepts
         assert any(wanted in concept for concept in concepts), phrase
         assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
 
@@ -77,7 +78,7 @@ def test_the_hub_reads_desactivar_as_a_deactivation_and_pido_as_a_request():
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.EMPLOYEE])
 def test_what_one_asks_for_oneself_brings_the_request_among_the_first_ten(catalog_of, role):
-    """What the «pido» group of ``base.assistant.SYNONYMS`` is for, in a turn: a request for oneself nobody wrote as
+    """What Staff's «pido» group is for, in a turn: a request for oneself nobody wrote as
     an ask nor as a probe brings ``staff.time_off.request`` among the first ten (``TOP``), before the weeks of the rota
     and the approvals; without the group, «pido vacaciones…» leaves it the 36th of the owner's 40 and the 16th of an
     employee's."""

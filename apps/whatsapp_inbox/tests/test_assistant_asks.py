@@ -9,6 +9,7 @@ Every ask of every tool of whatsapp_inbox bringing its tool among the first ten,
 import json
 
 import pytest
+from django.apps import apps
 from live import assistant as shared
 from live.operations import AI, registry
 
@@ -40,9 +41,10 @@ REPORTED = [
         "cambia Recordatorio QA para que diga «Tu cita queda para {{1}}» y vuelve a enviarla a revisión",
     ),
 ]
-#: What the inbox's groups of ``base.assistant.SYNONYMS`` are for, in a turn: a request nobody wrote as an ask nor as
-#: a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without the group, the other
-#: writes of the Hub tie with ``template.create`` and win by name (the 11th), and ``message.list`` is the 15th.
+#: What the inbox's own groups of words (its ``assistant_synonyms``) are for, in a turn: a request nobody wrote as an
+#: ask nor as a probe, the tool it brings among the first ten (``TOP``) and the word of its group. Without the group,
+#: the other writes of the Hub tie with ``template.create`` and win by name (the 11th), and ``message.list`` is the
+#: 15th.
 BY_GROUP = [
     ("whatsapp_inbox.template.create", "haz otra plantilla para avisar de las rebajas", "plantilla"),
     ("whatsapp_inbox.message.list", "¿cuántos mensajes tiene la conversación de Rocío?", "mensaje"),
@@ -114,9 +116,10 @@ def test_the_inbox_offers_at_least_30_tools():
 
 
 def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message():
-    """``base.assistant.SYNONYMS``: a «plantilla» and a «mensaje» are what an English «template» and «message» are, the
-    inbox's (``whatsapp_inbox.template``, ``whatsapp_inbox.message``, the only ones a tool of the Hub acts on); without
-    the Hub's groups, Spanish names neither (positive control)."""
+    """The inbox's own words (its ``assistant_synonyms``): a «plantilla» and a «mensaje» are what an English «template»
+    and «message» are, the inbox's (``whatsapp_inbox.template``, ``whatsapp_inbox.message``, the only ones a tool of the
+    Hub acts on); without the Hub's groups, Spanish names neither (positive control)."""
+    own_words = apps.get_app_config("whatsapp_inbox").assistant_synonyms
     template, message = shared.stem("template"), shared.stem("message")
     for phrase, wanted in (
         ("borra la plantilla de bienvenida", template),
@@ -124,7 +127,7 @@ def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message(
         ("reenvía el mensaje de Nuria", message),
         ("¿han leído nuestros mensajes?", message),
     ):
-        assert any(wanted in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+        assert any(wanted in concept for concept in shared.asked([phrase], own_words).concepts), phrase
         assert not any(wanted in concept for concept in shared.asked([phrase]).concepts), phrase
 
 

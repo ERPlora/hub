@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -80,7 +81,7 @@ OWN_WORDS = [
     ("combo.option.delete", "ya no damos gazpacho de entrante"),
     ("combo.option.reorder", "que el helado salga el primero de los postres"),
 ]
-#: The Hub's group of the choices of a course (``base.assistant.SYNONYMS``): «opción» and «elección» name what
+#: Menus' group of the choices of a course (its ``assistant_synonyms``): «opción» and «elección» name what
 #: ``combo.option`` (and ``modifier.option``) is of, as «option» and «choice» do.
 CHOICES = ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices")
 #: The places an ask of another app keeps free below the first ten: the asks of the next app to say its own take them.
@@ -182,12 +183,12 @@ def test_every_tool_of_menus_has_a_phrase_of_its_own():
 
 
 def test_the_hub_reads_an_opcion_and_an_eleccion_as_a_choice_of_a_course():
-    """``base.assistant.SYNONYMS``: «las opciones» and «las elecciones» name what ``combo.option`` is of, as «options»
-    and «choices» do; without the Hub's group, neither does (positive control)."""
-    assert CHOICES in assistant.SYNONYMS
+    """Menus' own words (its ``assistant_synonyms``): «las opciones» and «las elecciones» name what ``combo.option`` is
+    of, as «options» and «choices» do; without the Hub's group, neither does (positive control)."""
+    assert CHOICES in apps.get_app_config("combo").assistant_synonyms
     option = shared.stem("option")
     for phrase in ("ordena las opciones del segundo plato", "¿qué elecciones tiene el postre?"):
-        assert any(option in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+        assert any(option in concept for concept in shared.asked([phrase], (CHOICES,)).concepts), phrase
         assert not any(option in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
@@ -199,7 +200,7 @@ def test_the_choices_named_as_elecciones_bring_their_reorder_only_with_the_hubs_
     phrase = "ordena las elecciones del segundo plato: pollo, merluza y tortilla"
     assert comparable(phrase) not in probe_phrases()
     assert "combo.option.reorder" in offered_to(tools, phrase)[:TOP]
-    without = tuple(group for group in assistant.SYNONYMS if group != CHOICES)
+    without = tuple(group for group in assistant.synonyms() if group != CHOICES)
     assert "combo.option.reorder" not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 

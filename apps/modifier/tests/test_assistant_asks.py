@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -194,7 +195,8 @@ test_each_tool_has_its_own_english_words = english_coverage_test("modifier", OWN
 def test_the_hub_reads_predeterminada_as_the_default():
     """A «predeterminada» option is the one a group brings chosen (``is_default``): the Hub reads the word as the
     default the English descriptions and the option's data say."""
-    said = shared.asked(["quítala como opción predeterminada"], assistant.SYNONYMS).concepts
+    own_words = apps.get_app_config("modifier").assistant_synonyms
+    said = shared.asked(["quítala como opción predeterminada"], own_words).concepts
     assert any({shared.stem("predeterminada"), shared.stem("default")} <= concept for concept in said)
 
 
@@ -204,8 +206,9 @@ def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hu
     assert comparable(BY_DEFAULT) not in probe_phrases()
     assert_offered_with_room(tools, "modifier.option.update", BY_DEFAULT, room=TOP)
 
-    without = tuple(group for group in assistant.SYNONYMS if "predeterminada" not in group)
-    assert len(without) == len(assistant.SYNONYMS) - 1  # positive control: one group is left out, the default's
+    every = assistant.synonyms()
+    without = tuple(group for group in every if "predeterminada" not in group)
+    assert len(without) == len(every) - 1  # positive control: one group is left out, the default's
     unread = offered_place(tools, "modifier.option.update", BY_DEFAULT, synonyms=without)
     assert unread is None or unread > TOP, unread
 

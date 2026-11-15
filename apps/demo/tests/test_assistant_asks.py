@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
@@ -95,12 +96,13 @@ def test_the_probes_of_demo_are_read():
 
 
 def test_the_hub_reads_an_elemento_as_an_item():
-    """``base.assistant.SYNONYMS``: «el elemento», as Demo's screens name one, is the item its operations are of
-    (``demo.item``), so the person's words reach those tools by their entity and not only by the words of their asks;
-    without the Hub's group, it does not (positive control)."""
+    """Demo's own words (its ``assistant_synonyms``): «el elemento», as Demo's screens name one, is the item its
+    operations are of (``demo.item``), so the person's words reach those tools by their entity and not only by the words
+    of their asks; without the Hub's group, it does not (positive control)."""
+    own_words = apps.get_app_config("demo").assistant_synonyms
     item = shared.stem("item")
     for phrase in ("borra el elemento Ensayo 7", "¿qué elementos están hechos?"):
-        assert any(item in concept for concept in shared.asked([phrase], assistant.SYNONYMS).concepts), phrase
+        assert any(item in concept for concept in shared.asked([phrase], own_words).concepts), phrase
         assert not any(item in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
