@@ -22,6 +22,8 @@ type Lint = readonly [code: string, filePath: string];
 interface Found {
   lints: { ruleId: string | null; message: string }[][];
   ignored: boolean[];
+  /** Each object of eslint.config.js: its keys, its files and ignores, and what it sets of the four function limits. */
+  blocks: { keys: string[]; files: string[] | null; ignores: string[] | null; rules: Record<string, unknown> }[];
 }
 
 /** The thread's side: the ESLint at `workerData.eslint` lints each text as its file and tells whether it ignores each
@@ -38,7 +40,15 @@ const eslint = new ESLint({ cwd: workerData.cwd });
   }
   const ignored = [];
   for (const path of workerData.paths) ignored.push(await eslint.isPathIgnored(path));
-  parentPort.postMessage({ lints, ignored });
+  const configFile = require('node:url').pathToFileURL(require('node:path').join(workerData.cwd, 'eslint.config.js'));
+  const { default: config } = await import(configFile.href);
+  const blocks = config.map((block) => ({
+    keys: Object.keys(block),
+    files: block.files ?? null,
+    ignores: block.ignores ?? null,
+    rules: Object.fromEntries(Object.entries(block.rules ?? {}).filter(([rule]) => workerData.limits.includes(rule))),
+  }));
+  parentPort.postMessage({ lints, ignored, blocks });
 })();
 `;
 
@@ -50,10 +60,11 @@ const eslint = new ESLint({ cwd: workerData.cwd });
  * (hub#1315). A lint left waiting on nothing that could end it fails at once, saying so.
  */
 function lintInThread(lints: readonly Lint[], paths: readonly string[], eslint = nodeRequire.resolve('eslint')): Promise<Found> {
-  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths });
+  return inThread<Found>(LINTER, { eslint, cwd: HUB_DIR, lints, paths, limits: FUNCTION_LIMITS });
 }
 
 const RESTRICTED = 'no-restricted-globals';
+const FUNCTION_LIMITS = ['complexity', 'max-depth', 'max-params', 'max-lines-per-function'];
 const NETWORK = ['fetch', 'EventSource', 'WebSocket', 'XMLHttpRequest'];
 const APP_PAGE = 'apps/demo/frontend/pages/ItemListPage.ts';
 const ENTRY = 'frontend/main.ts';
@@ -162,8 +173,33 @@ describe('eslint config', () => {
   it('keeps the suppressions of what already broke a limit, and fails on one no longer needed', () => {
     const { scripts } = JSON.parse(readFileSync(join(HUB_DIR, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
     expect(existsSync(join(HUB_DIR, 'eslint-suppressions.json'))).toBe(true);
-    expect(scripts.lint).toMatch(/^eslint /);
-    expect(scripts.lint).not.toMatch(/--(pass-on-unpruned-suppressions|suppress-all|suppress-rule|suppressions-location)/);
+    expect(scripts.lint).toBe('eslint .');
+  });
+
+  it('sets the four limits for every file once, loosens two of them only in tests and ignores nothing else', () => {
+    const globalIgnores = found.blocks.filter(({ keys }) => keys.length === 1 && keys[0] === 'ignores');
+    expect(globalIgnores.map(({ ignores }) => ignores)).toEqual([
+      ['frontend/dist/**', 'staticfiles/**', 'node_modules/**', 'coverage/**', '.venv/**', 'packages/**'],
+    ]);
+    expect(found.blocks.filter(({ rules }) => Object.keys(rules).length > 0)).toEqual([
+      {
+        keys: ['rules'],
+        files: null,
+        ignores: null,
+        rules: {
+          complexity: ['error', 15],
+          'max-depth': ['error', 4],
+          'max-params': ['error', 3],
+          'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
+        },
+      },
+      {
+        keys: ['files', 'rules'],
+        files: ['**/tests/**', '**/e2e/**', '**/*.{test,spec}.{ts,tsx,js,mjs,cjs,vue}'],
+        ignores: null,
+        rules: { 'max-params': 'off', 'max-lines-per-function': 'off' },
+      },
+    ]);
   });
 
   it('lints in a thread of its own: this worker never loads ESLint', () => {
