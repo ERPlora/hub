@@ -6,7 +6,8 @@ scanning they share (``source_files``, ``_offenders``), are ``tests/test_guardra
     imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside ``live.broker``; the old shared
     database (``use_shared_database``) is gone and nobody brings it back; the tests' fallback never set outside the
     tests; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
-    (``live.operations.on_commit``).
+    (``live.operations.on_commit``); no migration of ``base/`` or ``apps/`` asks the router whether a model migrates
+    (a ``RunPython``'s hints choose its database).
 (g) Operations that need the hub's own database: in a hub that still shares control's (``db_name=""``) each
     refuses with its domain error before it reads or writes anything of the business in ``default``, and an API key
     is refused for that reason (never let through by a session). Production no longer serves such a business at
@@ -19,7 +20,7 @@ import re
 from pathlib import Path
 
 import pytest
-from test_guardrails import HUB_DIR, _offenders, _receiver_name, source_files
+from test_guardrails import HUB_DIR, _offenders, _receiver_name, is_migration, source_files
 
 # ── (e) The tenancy ────────────────────────────────────────────────────────────────────────────
 
@@ -168,6 +169,21 @@ def fallback_touches(source: str) -> list[tuple[int, str]]:
     return sorted(found)
 
 
+def router_question_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every ``router.allow_migrate…(`` call. A ``RunPython`` already runs only where the router
+    lets its hints through: asking it again inside is a branch that, on a business's database, always goes one way."""
+    return sorted(
+        {
+            (node.lineno, f"router.{node.func.attr}(")
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr.startswith("allow_migrate")
+            and _receiver_name(node.func.value) == "router"
+        }
+    )
+
+
 # ── (e) The tenancy: positive controls ─────────────────────────────────────────────────────────
 
 TENANCY_OFFENDER = """\
@@ -186,6 +202,7 @@ context._test_fallback = SHARED
 setattr(context, "_test_fallback", SHARED)
 transaction.on_commit(partial(notify, scope), robust=True)
 from django.db.transaction import on_commit
+elsewhere = not router.allow_migrate_model(schema_editor.connection.alias, Hub)
 """
 TENANCY_LOOKALIKES = """\
 \"\"\"LISTEN on control, never CREATE DATABASE by hand.\"\"\"
@@ -195,6 +212,8 @@ settings = dict(connections.settings)
 fallback = context._test_fallback
 operations.on_commit(partial(notify, scope))
 transaction.atomic(using=alias)
+migrations.RunPython(add_prefix, remove_prefix, hints={"model_name": "membership"})
+TenantRouter().allow_migrate(alias, "base")
 """
 
 
@@ -221,6 +240,7 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         (14, "transaction.on_commit("),
         (15, "from django.db.transaction import on_commit"),
     ]
+    assert router_question_touches(TENANCY_OFFENDER) == [(16, "router.allow_migrate_model(")]
     for check in (
         database_ddl_touches,
         settings_mutation_touches,
@@ -229,6 +249,7 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         shared_database_touches,
         fallback_touches,
         bare_on_commit_touches,
+        router_question_touches,
     ):
         assert check(TENANCY_LOOKALIKES) == [], check.__name__
 
@@ -285,6 +306,17 @@ def test_the_tests_fallback_is_never_set_outside_the_tests():
     offenders = _everywhere(fallback_touches)
 
     assert offenders == [], f"Only the suite's conftest.py sets base.tenancy.context._test_fallback: {offenders}"
+
+
+def test_no_migration_of_a_business_s_app_asks_the_router():
+    files = [path for path in source_files(HUB_DIR) if is_migration(path) and path.parts[0] in ("base", "apps")]
+
+    offenders = _offenders(lambda path: router_question_touches((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], (
+        "A migration of a business's app runs where its hints send it, so the router always answers the same there: "
+        f"drop the branch, or split the step in two RunPython with their own hints: {offenders}"
+    )
 
 
 def test_no_hub_model_carries_its_hub_but_the_listed_ones():

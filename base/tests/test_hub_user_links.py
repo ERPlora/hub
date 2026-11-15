@@ -7,15 +7,14 @@ expand migrations that moved those links only change the schema: a business's ow
 fill them from and no key to them to drop.
 """
 
-import importlib
-
 import pytest
 from django.apps import apps
-from django.db import connections, migrations
+from django.db import connections
 
 from base import catalog
 from base.tenancy import inventory, migrator, names
 from base.tenancy.tests import hubs
+from base.tests.migration_steps import python_steps
 from base.tests.test_auth_views import ON_HUB_A
 
 #: The apps whose links to control's users moved to ``base.HubUser``, and those that waited for them.
@@ -95,19 +94,6 @@ def test_the_tests_template_and_its_hubs_have_the_people_apps_tables(hub_databas
         assert tables <= hubs.table_names(database), database
 
 
-def _python_steps(app: str, name: str) -> list[str]:
-    """The Python ``migrate`` runs for ``app``'s migration ``name``, a database step split from the state included."""
-    pending = list(importlib.import_module(f"apps.{app}.migrations.{name}").Migration.operations)
-    steps = []
-    while pending:
-        operation = pending.pop()
-        if isinstance(operation, migrations.SeparateDatabaseAndState):
-            pending.extend(operation.database_operations)
-        elif isinstance(operation, migrations.RunPython):
-            steps.append(operation.code.__name__)
-    return steps
-
-
 def _columns(database, table: str) -> dict[str, bool]:
     """Each column of ``table`` in ``database`` and whether it takes NULL."""
     with database.cursor() as cursor:
@@ -129,7 +115,7 @@ class TestTheExpand:
     pytestmark = ON_HUB_A
 
     def test_it_runs_no_python(self, app, name, links):
-        assert _python_steps(app, name) == []
+        assert python_steps(f"apps.{app}.migrations.{name}") == []
 
     def test_the_old_columns_stay_unkeyed_and_the_new_ones_point_to_the_business_s_people(self, app, name, links):
         database = connections[hubs.HUB_A_ALIAS]
