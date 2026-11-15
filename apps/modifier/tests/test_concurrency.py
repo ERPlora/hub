@@ -14,18 +14,21 @@ one already under way when the write reads it is not found, as one deleted befor
 
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
 from django.db import connection, transaction
 from live.errors import NotFound, OperationError
+from live.models import OutboxEvent
 
 from apps.inventory.models import Category, Product
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.tax.models import TaxCategory
+from base.recovery import actor_of
 
-from .conftest import make_product, run
+from .conftest import ctx_with, make_product, run
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -393,3 +396,54 @@ def test_a_tax_category_being_deleted_when_an_option_names_it_is_refused(world, 
     assert (outcome.status, outcome.code, list(outcome.fields)) == (422, "invalid_field", ["tax_category_key"])
     assert not ModifierOption.objects.filter(name="Truffle").exists()
     assert ModifierOption.objects.get(pk=world.mayo.id).tax_category_id is None
+
+
+@contextmanager
+def right_after_reading(table: str, call):
+    """Runs ``call`` in another session right after this one first reads ``table``, and gives it a moment: it commits
+    then, or waits for this session when it holds what ``call`` needs. Its result or error, once this one is done."""
+    outcome: list = []
+
+    def other():
+        try:
+            outcome.append(call())
+        except Exception as error:  # reported to the test, which fails on it
+            outcome.append(error)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=other)
+
+    def wrapper(execute, sql, params, many, context):
+        result = execute(sql, params, many, context)
+        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and f'FROM "{table}"' in sql:
+            thread.start()
+            thread.join(IN_FLIGHT)
+        return result
+
+    try:
+        with connection.execute_wrapper(wrapper):
+            yield outcome
+    finally:
+        if thread.ident is not None:
+            thread.join(30)
+
+
+def test_a_default_the_business_chooses_while_an_option_comes_back_is_never_taken_from_it():
+    sauces = run("modifier.group.create", {"name": "Sauces", "max_choices": 1})
+    ketchup = run("modifier.option.create", {"group": "Sauces", "name": "Ketchup"})
+    recovery = actor_of(uuid.uuid7())
+    choose = lambda: run("modifier.option.update", {"id": str(ketchup.id), "is_default": True})  # noqa: E731
+
+    # The recovery has just read that the group has room for its option chosen by default.
+    with right_after_reading(ModifierOption._meta.db_table, choose) as chosen:
+        run(
+            "modifier.option.recover",
+            {"group_id": str(sauces.id), "name": "Alioli", "is_default": True},
+            ctx=ctx_with("*", actor=recovery),
+        )
+
+    # The business's choice waited for the group the recovery held, and stands: the recovery changed nothing of its own.
+    assert codes(chosen) == ["ok"]
+    assert list(ModifierOption.objects.filter(is_default=True).values_list("name", flat=True)) == ["Ketchup"]
+    assert list(OutboxEvent.objects.filter(actor=recovery).values_list("name", flat=True)) == ["modifier.option.created"]

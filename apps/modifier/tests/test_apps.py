@@ -79,7 +79,7 @@ def test_the_workbook_has_the_user_part_and_the_maintainers_part():
 
 
 #: What only the recovery from a separate copy runs (a group made again with its options): no tool (``INTERNAL``).
-NO_TOOL = {"modifier.group.recover"}
+NO_TOOL = {"modifier.group.recover", "modifier.option.recover"}
 
 
 def test_every_operation_is_described_for_the_assistant():
@@ -108,6 +108,7 @@ def test_every_operation_is_described_for_the_assistant():
             "modifier.link.drop_product",
             "modifier.link.drop_category",
             "modifier.group.recover",
+            "modifier.option.recover",
         ]
     )
     for name, op in ops.items():

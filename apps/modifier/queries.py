@@ -49,7 +49,7 @@ from apps.modifier.schemas import (
 )
 from apps.tax.models import TaxCategory
 from base.ordering import list_order, list_order_for
-from base.recovery import brought_back
+from base.recovery import at_work, brought_back
 
 GROUP_NOT_FOUND = _("This group does not exist.")
 GROUP_AMBIGUOUS = _("«%(said)s» names several groups: %(names)s. Say which one.")
@@ -751,6 +751,52 @@ def groups_not_in_business(groups: list[dict]) -> list[dict]:
             ]
         }
         for one in lacking
+    ]
+
+
+def options_in_copy(conn) -> list[dict]:
+    """Each option of a separate copy of the business, by id, with its group there (``group_id``), what
+    ``OPTION_COPY_FIELDS`` names, the id of its own tax category (``tax_category_id``) and the copy's groups by name
+    (``copy_groups``, to pair a group the business deleted with the one brought back); nothing where the app's table is
+    not there. ``conn`` is the copy's direct, read-only connection."""
+    option = ModifierOption._meta
+    if conn.execute("SELECT to_regclass(%s)", [option.db_table]).fetchone()[0] is None:
+        return []
+    rows = conn.execute(_by_id(option, ("id", "group", *OPTION_COPY_FIELDS, "tax_category"))).fetchall()
+    if not rows:
+        return []
+    groups = group_names_in_copy(conn)
+    keys = ("id", "group_id", *OPTION_COPY_FIELDS, "tax_category_id")
+    return [dict(zip(keys, row, strict=True)) | {"copy_groups": groups} for row in rows]
+
+
+def options_not_in_business(options: list[dict]) -> list[dict]:
+    """The options of a separate copy (``options_in_copy``) that a group the business keeps no longer has, in their
+    order, each as ``modifier.option.recover`` takes it with its ``id`` there and the key of its own tax category. Its
+    group is the business's that stands for the copy's (``groups_standing_for``): the same while held, else the one a
+    recovery brought back with its name; the copy's own where none does, which the create then refuses as not found.
+    Not lacking: one the business still holds, renamed or not (an option never changes its group); one whose name its
+    group has again, the case aside, made again by hand or brought back already; nor one of a group the recovery at work
+    brought back, whose recover gave back its options and said what it came back without."""
+    if not options:
+        return []
+    groups = groups_standing_for(options[0]["copy_groups"])
+    held = set(ModifierOption.objects.filter(pk__in=[one["id"] for one in options]).values_list("pk", flat=True))
+    wanted = [(one, groups.get(one["group_id"], one["group_id"])) for one in options if one["id"] not in held]
+    places = {group for _one, group in wanted}
+    # Outside a recovery, at_work() is None and no group was made by it.
+    with_it = set(ModifierGroup.objects.filter(pk__in=places, created_by=at_work()).values_list("pk", flat=True))
+    named = ModifierOption.objects.filter(group_id__in=places).values_list("group_id", "name")
+    taken = {(group, name.lower()) for group, name in named}
+    lacking = [
+        (one, group) for one, group in wanted if group not in with_it and (group, one["name"].lower()) not in taken
+    ]
+    taxed = {one["tax_category_id"] for one, _group in lacking}
+    keys = dict(TaxCategory.objects.filter(pk__in=taxed).values_list("pk", "key"))
+    return [
+        {field: one[field] for field in ("id", *OPTION_COPY_FIELDS)}
+        | {"group_id": group, "tax_category_key": keys.get(one["tax_category_id"], "")}
+        for one, group in lacking
     ]
 
 
