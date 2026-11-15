@@ -46,6 +46,30 @@ def test_not_leaning_and_failing():
 
 LEANING = ["test_suite.py::test_leaning", "test_suite.py::test_one_case_leaning"]
 
+SPREAD = """\
+import pytest
+
+from base.tenancy import context
+
+
+@pytest.mark.parametrize("case", [1, 2])
+def test_spread(case):
+    pass
+
+
+@pytest.mark.parametrize("case", [1, 2])
+def test_spread_failing(case):
+    assert case == 1
+
+
+@pytest.mark.parametrize("case", [1, 2])
+def test_spread_leaning(case):
+    if case == 2:
+        context.current()
+"""
+
+SPREAD_LISTED = ["test_spread.py::test_spread", "test_spread.py::test_spread_failing", "test_spread.py::test_spread_leaning"]
+
 
 def run_suite(tmp_path: Path, allowed: list[str], *args: str) -> subprocess.CompletedProcess[str]:
     """``pytest`` over ``SUITE`` in ``tmp_path`` with the plugin alone, ``allowed`` as the list."""
@@ -62,6 +86,24 @@ def run_suite(tmp_path: Path, allowed: list[str], *args: str) -> subprocess.Comp
 
 def outcome(run: subprocess.CompletedProcess[str]) -> str:
     return run.stdout + run.stderr
+
+
+def run_shard(tmp_path: Path, group: int) -> tuple[subprocess.CompletedProcess[str], Path]:
+    """Group ``group`` of two of ``SPREAD``, dealt out as the CI deals the suite, and the view of the listed tests it
+    writes for joining."""
+    (tmp_path / "test_spread.py").write_text(SPREAD)
+    view = tmp_path / f"shard-{group}" / "legacy-fallback.json"
+    split = ["--splits", "2", "--group", str(group), "--splitting-algorithm", "least_duration"]
+    run = run_suite(tmp_path, SPREAD_LISTED, "test_spread.py", "-rA", *split, "--legacy-fallback-report", str(view))
+    return run, view
+
+
+def join(tmp_path: Path, *views: Path) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, "-m", "base.tenancy.tests.legacy_allow", *map(str, views)]
+    environment = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO), "HOME": str(tmp_path)}
+    return subprocess.run(
+        command, cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=60, check=False
+    )
 
 
 def stale_lines(run: subprocess.CompletedProcess[str]) -> list[str]:
@@ -102,6 +144,20 @@ def test_the_cases_of_a_listed_test_spread_over_several_processes_are_judged_tog
 
     assert run.returncode == 1, outcome(run)
     assert stale_lines(run) == ["test_suite.py::test_not_leaning"]
+
+
+def test_a_listed_test_whose_cases_the_shards_spread_is_judged_once_their_views_are_joined(tmp_path):
+    first, first_view = run_shard(tmp_path, 1)
+    second, second_view = run_shard(tmp_path, 2)
+
+    for shard in (first, second):
+        ran = outcome(shard)
+        assert all(ran.count(f"{entry}[") == 1 for entry in SPREAD_LISTED), ran
+        assert stale_lines(shard) == [], ran
+    assert stale_lines(join(tmp_path, first_view)) == []
+    joined = join(tmp_path, first_view, second_view)
+    assert joined.returncode == 1, outcome(joined)
+    assert stale_lines(joined) == ["test_spread.py::test_spread"]
 
 
 @pytest.mark.parametrize(

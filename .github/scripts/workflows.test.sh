@@ -91,18 +91,19 @@ check("only build and deploy get an OIDC token",
 
 # --- test.yml: three independent jobs behind the required check "test / test" ------------------
 tjobs = test.get("jobs", {})
-check("test.yml has the jobs python, frontend, scripts and test",
-      {"python", "frontend", "scripts", "test"} <= set(tjobs))
+check("test.yml has the jobs python, frontend, scripts, legacy-fallback and test",
+      {"python", "frontend", "scripts", "legacy-fallback", "test"} <= set(tjobs))
 check("python, frontend and scripts wait for nothing",
       all(not needs(tjobs.get(name, {})) for name in ("python", "frontend", "scripts")))
-check("test (the required check) needs the three jobs",
-      set(needs(tjobs.get("test", {}))) == {"python", "frontend", "scripts"})
+check("test (the required check) needs python, frontend, scripts and legacy-fallback",
+      set(needs(tjobs.get("test", {}))) == {"python", "frontend", "scripts", "legacy-fallback"})
 check("test reports even when a job fails or is cancelled", str(tjobs.get("test", {}).get("if", "")) == "always()")
 # A red shard of python's matrix (or a red job) only turns "test / test" red if test reads every job's result and
 # nothing turns a failure into a pass on the way: no continue-on-error, on a job or on a step (hub#1185).
 test_results = "\n".join(str((step.get("env") or {}).get("RESULTS", "")) for step in steps(tjobs.get("test", {})))
-check("test reads the result of python (every shard), frontend and scripts",
-      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results for name in ("python", "frontend", "scripts")))
+check("test reads the result of python (every shard), frontend, scripts and legacy-fallback",
+      all(f"{name}=${{{{ needs.{name}.result }}}}" in test_results
+          for name in ("python", "frontend", "scripts", "legacy-fallback")))
 check("no job or step of test.yml continues on error, so no red shard is hidden",
       not any("continue-on-error" in job or any("continue-on-error" in step for step in steps(job))
               for job in tjobs.values()))
@@ -173,6 +174,25 @@ check("the shard warns before the job's timeout, with room to add a shard",
       warn_minutes.isdigit() and 0 < int(warn_minutes) <= python_job.get("timeout-minutes", 0) * 2 // 3)
 check("each shard runs pytest in parallel (pytest-xdist)", " -n " in " ".join(shard_run[5:]) + " ")
 check("pytest runs only through pytest-shard.sh", "pytest " not in python_runs.replace(str(shard_step.get("run")), ""))
+# A listed test of .legacy-fallback-allow whose cases the shards spread over several jobs is judged by none of them
+# (base/tenancy/tests/legacy_allow.py only judges a test a run ran every case of): each shard writes what it saw of the
+# listed tests and uploads it, even when one of its tests fails, and legacy-fallback joins the views of every shard.
+report = next((after for word, after in zip(shard_run, shard_run[1:]) if word == "--legacy-fallback-report"), "")
+report = report.strip('"').replace("$RUNNER_TEMP", "${{ runner.temp }}")
+upload = next((step for step in python_steps if str(step.get("uses", "")).startswith("actions/upload-artifact@")), None)
+upload_with = (upload or {}).get("with") or {}
+check("each shard writes its view of the listed tests and uploads it, even when one of its tests fails",
+      report.endswith(".json") and upload is not None and upload_with.get("path") == report
+      and python_steps.index(upload) > python_steps.index(shard_step) and "!cancelled()" in str(upload.get("if")))
+check("each shard's view is an artifact of its own, which a rerun of the shard replaces",
+      "${{ strategy.job-index }}" in str(upload_with.get("name")) and upload_with.get("overwrite") is True)
+fallback = tjobs.get("legacy-fallback", {})
+download = next((step for step in steps(fallback) if str(step.get("uses", "")).startswith("actions/download-artifact@")), {})
+views = str(upload_with.get("name", "")).split("${{")[0]
+check("legacy-fallback waits for every shard and joins their views, also when a shard is red",
+      needs(fallback) == ["python"] and "!cancelled()" in str(fallback.get("if")) and views != ""
+      and (download.get("with") or {}).get("pattern") == f"{views}*"
+      and before(fallback, "actions/download-artifact", "python -m base.tenancy.tests.legacy_allow"))
 lock = (folder.resolve().parent.parent / "uv.lock").read_text()
 check("pytest-split, which pytest-shard.sh runs, is locked in uv.lock", '\nname = "pytest-split"\n' in lock)
 # tests/test_guardrails_size.py compares the size allow list with the one where the branch left origin/main, and fails
