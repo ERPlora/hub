@@ -5,6 +5,9 @@ at the till, the way in is the PIN pad: the people of this hub with a PIN (name 
 their PIN, checked by the Hub. Wrong PINs are counted against the person (5 in 5 minutes) and against the address (20 in
 15 minutes, whoever they tried); a right one opens the person's session for a shift and, over a session of someone else
 («Switch user»), ends that one only once the new one exists.
+
+The hub is ``hub_a``, on a database of its own as every business is: its devices, PINs and settings are written and
+read there, inside its context. A person of another business (``B``) is a member there only.
 """
 
 import datetime as dt
@@ -20,11 +23,11 @@ from live.models import OutboxEvent
 
 from base import access
 from base.models import AccessSettings, Credential, Membership, SessionOwner, TrustedDevice
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
+from base.tests.test_auth_views import A, B, HOST
 
-pytestmark = pytest.mark.django_db
-
-HOST = "a.localhost:8000"
-B_HOST = "b.localhost:8000"
+pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback", "hub_a")]
 
 
 def a_device(client, mode=access.SHARED) -> TrustedDevice:
@@ -55,51 +58,62 @@ def code(response) -> str:
 
 @pytest.fixture
 def ana(make_user):
-    return make_user("saas:1", host="a", role=Membership.Role.EMPLOYEE, first_name="Ana", last_name="López", email="ana@example.com")
+    return make_user("saas:1", host=A, role=Membership.Role.EMPLOYEE, first_name="Ana", last_name="López", email="ana@example.com")
 
 
 @pytest.fixture
 def bea(make_user):
-    return make_user("saas:2", host="a", role=Membership.Role.MANAGER, first_name="Bea", email="bea@example.com")
+    return make_user("saas:2", host=A, role=Membership.Role.MANAGER, first_name="Bea", email="bea@example.com")
 
 
 class TestTheDoor:
-    def test_a_shared_device_of_the_hub_lists_its_people_with_a_pin_by_name_and_initials(self, client, ana, bea, make_user):
-        a_device(client)
-        with_pin(ana, "4826")
-        with_pin(bea, "9071")
-        make_user("saas:3", host="a", first_name="Carla")  # no PIN: not on the grid
+    def test_a_shared_device_of_the_hub_lists_its_people_with_a_pin_by_name_and_initials(
+        self, client, ana, bea, make_user, hub_a
+    ):
+        with use_hub(hub_a):
+            a_device(client)
+            with_pin(ana, "4826")
+            with_pin(bea, "9071")
+        make_user("saas:3", host=A, first_name="Carla")  # no PIN: not on the grid
         answer = door(client)
         assert (answer["pin"], answer["pin_length"], answer["wait"]) == (True, 4, 0)
         assert [(p["name"], p["initials"]) for p in answer["people"]] == [("Ana López", "AL"), ("Bea", "B")]
-        assert {p["id"] for p in answer["people"]} == {str(c.pk) for c in Credential.objects.all()}
+        with use_hub(hub_a):
+            assert {p["id"] for p in answer["people"]} == {str(c.pk) for c in Credential.objects.all()}
         assert "example.com" not in json.dumps(answer) and "saas:" not in json.dumps(answer)
 
-    def test_an_account_without_a_name_is_on_the_grid_without_its_email(self, client, make_user):
+    def test_an_account_without_a_name_is_on_the_grid_without_its_email(self, client, make_user, hub_a):
         # The SaaS names a person without a name by their email (`full_name or email`); the grid is seen by anyone at
         # the till, so it shows the part before the «@», never the address.
-        a_device(client)
-        with_pin(make_user("saas:5", host="a", first_name="carla.ruiz@example.com", email="carla.ruiz@example.com"), "4826")
+        carla = make_user("saas:5", host=A, first_name="carla.ruiz@example.com", email="carla.ruiz@example.com")
+        with use_hub(hub_a):
+            a_device(client)
+            with_pin(carla, "4826")
         faces = door(client)["people"]
         assert [(p["name"], p["initials"]) for p in faces] == [("carla.ruiz", "C")]
         assert "example.com" not in json.dumps(faces)
 
-    def test_only_the_active_people_of_this_hub(self, client, ana, make_user):
-        a_device(client)
-        with_pin(ana, "4826")
-        with_pin(make_user("saas:7", host="b", first_name="Bruno"), "1357")
-        with_pin(make_user("saas:8", host="a", first_name="Gone", is_active=False), "2468")
+    def test_only_the_active_people_of_this_hub(self, client, ana, make_user, hub_a):
+        bruno = make_user("saas:7", host=B, first_name="Bruno")
+        gone = make_user("saas:8", host=A, first_name="Gone", is_active=False)
+        with use_hub(hub_a):
+            a_device(client)
+            with_pin(ana, "4826")
+            # A person of another business only, with a PIN left in this one's database.
+            with_pin(bruno, "1357")
+            with_pin(gone, "2468")
         assert [p["name"] for p in door(client)["people"]] == ["Ana López"]
 
     @pytest.mark.parametrize("how", ["no_cookie", "unknown_device", "personal", "never"])
-    def test_anywhere_else_there_is_no_pin_pad_and_nobody_is_named(self, client, ana, how):
-        with_pin(ana, "4826")
-        if how == "unknown_device":
-            client.cookies[access.DEVICE_COOKIE] = access.new_device_token()
-        elif how != "no_cookie":
-            a_device(client, mode=access.PERSONAL if how == "personal" else access.SHARED)
-        if how == "never":
-            AccessSettings.objects.create(pin_policy=access.NEVER)
+    def test_anywhere_else_there_is_no_pin_pad_and_nobody_is_named(self, client, ana, hub_a, how):
+        with use_hub(hub_a):
+            with_pin(ana, "4826")
+            if how == "unknown_device":
+                client.cookies[access.DEVICE_COOKIE] = access.new_device_token()
+            elif how != "no_cookie":
+                a_device(client, mode=access.PERSONAL if how == "personal" else access.SHARED)
+            if how == "never":
+                AccessSettings.objects.create(pin_policy=access.NEVER)
         answer = door(client)
         assert (answer["pin"], answer["people"]) == (False, [])
 
@@ -110,15 +124,17 @@ class TestTheDoor:
         answer = door(client)
         assert answer["plan_url"] == "https://erplora.example/dashboard/store/plans"
 
-    def test_a_business_of_six_digit_pins_says_so(self, client, ana):
-        a_device(client)
-        with_pin(ana, "482613")
-        AccessSettings.objects.create(pin_length=6)
+    def test_a_business_of_six_digit_pins_says_so(self, client, ana, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            with_pin(ana, "482613")
+            AccessSettings.objects.create(pin_length=6)
         assert door(client)["pin_length"] == 6
 
-    def test_an_address_that_tried_too_many_pins_hears_how_long_to_wait_and_nobody_is_named(self, client, ana):
-        a_device(client)
-        with_pin(ana, "4826")
+    def test_an_address_that_tried_too_many_pins_hears_how_long_to_wait_and_nobody_is_named(self, client, ana, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            with_pin(ana, "4826")
         for _ in range(20):
             pin(client, uuid4(), "0000")  # 20 names: each one's own count stays under its 5
         answer = door(client)
@@ -126,59 +142,69 @@ class TestTheDoor:
 
 
 class TestEnteringWithThePin:
-    def test_the_right_pin_opens_the_person_s_session_on_this_device_for_a_shift(self, client, ana):
-        device = a_device(client)
-        cred = with_pin(ana, "4826")
+    def test_the_right_pin_opens_the_person_s_session_on_this_device_for_a_shift(self, client, ana, hub_a):
+        with use_hub(hub_a):
+            device = a_device(client)
+            cred = with_pin(ana, "4826")
         response = pin(client, cred.pk, "4826")
         assert (response.status_code, response.json()) == (200, {"next": "/sale/pos"})
         me = client.get("/api/me", HTTP_HOST=HOST).json()
         assert me["user"]["label"] == "Ana López"
         owner = SessionOwner.objects.get()
-        assert (owner.saas_user_id, owner.host, owner.device_id, owner.credential) == ("1", "a", device.pk, "pin")
+        assert (owner.saas_user_id, owner.host, owner.device_id, owner.credential) == ("1", A, device.pk, "pin")
         lasts = client.session.get_expiry_date() - timezone.now()
         assert dt.timedelta(hours=11, minutes=59) < lasts <= dt.timedelta(hours=12)
-        device.refresh_from_db()
+        with use_hub(hub_a):
+            device.refresh_from_db()
         assert (device.last_username, device.last_user_label) == ("saas:1", "Ana López")
 
     @pytest.mark.parametrize(("own", "business", "cookie"), [("en", "es", "en"), ("", "es", "es")])
-    def test_the_entry_leaves_the_person_s_language_so_a_reload_speaks_it_at_once(self, client, ana, own, business, cookie):
+    def test_the_entry_leaves_the_person_s_language_so_a_reload_speaks_it_at_once(
+        self, client, ana, hub_a, own, business, cookie
+    ):
         # The page Django serves after the entry, and every reload, is in the person's language from the
         # first paint (their «My profile» choice, else the business's): never a moment in the business's.
         from django.conf import settings
 
         from base.models import Hub, Profile
 
-        Hub.objects.filter(slug="a").update(language=business)
-        Profile.objects.create(username=ana.username, first_name="Ana", language=own)
-        a_device(client)
-        response = pin(client, with_pin(ana, "4826").pk, "4826")
+        Hub.objects.filter(pk=hub_a.pk).update(language=business)
+        with use_hub(hub_a):
+            Profile.objects.create(username=ana.username, first_name="Ana", language=own)
+            a_device(client)
+            cred = with_pin(ana, "4826")
+        response = pin(client, cred.pk, "4826")
         assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == cookie
 
     @pytest.mark.usefixtures("spa_manifest")
-    def test_who_has_not_chosen_a_language_sees_the_business_s_not_the_browser_s(self, client, ana):
+    def test_who_has_not_chosen_a_language_sees_the_business_s_not_the_browser_s(self, client, ana, hub_a):
         # BASE-F51: «The business's language — the one of whoever has not chosen theirs». The browser asks
         # for English; the business is in Spanish and the person chose nothing in «My profile»: the page is Spanish.
         from base.models import Hub, Profile
 
-        Hub.objects.filter(slug="a").update(language="es")
-        Profile.objects.create(username=ana.username, first_name="Ana", language="")
-        a_device(client)
-        assert pin(client, with_pin(ana, "4826").pk, "4826").status_code == 200
+        Hub.objects.filter(pk=hub_a.pk).update(language="es")
+        with use_hub(hub_a):
+            Profile.objects.create(username=ana.username, first_name="Ana", language="")
+            a_device(client)
+            cred = with_pin(ana, "4826")
+        assert pin(client, cred.pk, "4826").status_code == 200
         page = client.get("/sale/pos", HTTP_HOST=HOST, HTTP_ACCEPT="text/html", HTTP_ACCEPT_LANGUAGE="en")
         assert page.status_code == 200
         assert '<html lang="es"' in page.content.decode()
 
-    def test_a_wrong_pin_says_so_and_opens_nothing(self, client, ana):
-        a_device(client)
-        cred = with_pin(ana, "4826")
+    def test_a_wrong_pin_says_so_and_opens_nothing(self, client, ana, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            cred = with_pin(ana, "4826")
         response = pin(client, cred.pk, "4827")
         assert (response.status_code, code(response)) == (401, "base.pin_incorrect")
         assert client.get("/api/me", HTTP_HOST=HOST).json()["user"] is None
 
-    def test_the_pin_pad_s_refusals_speak_the_till_s_language(self, client, ana):
+    def test_the_pin_pad_s_refusals_speak_the_till_s_language(self, client, ana, hub_a):
         # The pad paints the Hub's sentence as it comes: a Spanish till reads it in Spanish (base/locale, en + es).
-        a_device(client)
-        cred = with_pin(ana, "4826")
+        with use_hub(hub_a):
+            a_device(client)
+            cred = with_pin(ana, "4826")
         response = pin(client, cred.pk, "4827", HTTP_ACCEPT_LANGUAGE="es")
         assert response.json()["error"]["message"] == "PIN incorrecto."
         client.cookies.pop(access.DEVICE_COOKIE)
@@ -186,22 +212,27 @@ class TestEnteringWithThePin:
         assert refused.json()["error"]["message"].startswith("En este dispositivo todavía no funciona el PIN.")
 
     @pytest.mark.parametrize("who", ["another_hubs", "deactivated", "unknown", "not_an_id", "no_pin"])
-    def test_whoever_is_not_a_person_of_this_hub_with_that_pin_hears_the_same(self, client, make_user, who):
-        a_device(client)
-        if who == "another_hubs":
-            person = with_pin(make_user("saas:7", host="b"), "4826").pk
-        elif who == "deactivated":
-            person = with_pin(make_user("saas:8", host="a", is_active=False), "4826").pk
-        elif who == "no_pin":
-            person = Credential.objects.create(username=make_user("saas:9", host="a").username).pk
-        else:
-            person = uuid4() if who == "unknown" else "x"
+    def test_whoever_is_not_a_person_of_this_hub_with_that_pin_hears_the_same(self, client, make_user, hub_a, who):
+        people = {"another_hubs": ("saas:7", B, True), "deactivated": ("saas:8", A, False), "no_pin": ("saas:9", A, True)}
+        if who in people:
+            username, host, active = people[who]
+            user = make_user(username, host=host, is_active=active)
+        with use_hub(hub_a):
+            a_device(client)
+            if who == "no_pin":
+                person = Credential.objects.create(username=user.username).pk
+            elif who in ("another_hubs", "deactivated"):
+                # Another business's person has a PIN row in this one's database only if it was left behind.
+                person = with_pin(user, "4826").pk
+            else:
+                person = uuid4() if who == "unknown" else "x"
         response = pin(client, person, "4826")
         assert (response.status_code, code(response)) == (401, "base.pin_incorrect")
 
-    def test_five_wrong_pins_for_one_person_make_it_wait_and_a_right_one_before_starts_again(self, client, ana, bea):
-        a_device(client)
-        cred = with_pin(ana, "4826")
+    def test_five_wrong_pins_for_one_person_make_it_wait_and_a_right_one_before_starts_again(self, client, ana, bea, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            cred = with_pin(ana, "4826")
         for _ in range(4):
             pin(client, cred.pk, "1111")
         assert pin(client, cred.pk, "4826").status_code == 200
@@ -211,71 +242,86 @@ class TestEnteringWithThePin:
         refused = pin(client, cred.pk, "4826")
         assert (refused.status_code, code(refused)) == (429, "base.too_many_attempts")
         assert 0 < int(refused["Retry-After"]) <= 300
-        other = with_pin(bea, "9071")
+        with use_hub(hub_a):
+            other = with_pin(bea, "9071")
         assert pin(client, other.pk, "9071").status_code == 200
 
-    def test_twenty_wrong_pins_from_one_address_close_the_pin_to_it_for_everyone_else_s_name(self, client, ana, bea):
-        a_device(client)
-        with_pin(ana, "4826")
-        second = with_pin(bea, "9071")
+    def test_twenty_wrong_pins_from_one_address_close_the_pin_to_it_for_everyone_else_s_name(self, client, ana, bea, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            with_pin(ana, "4826")
+            second = with_pin(bea, "9071")
         for _ in range(20):
             assert pin(client, uuid4(), "0000").status_code == 401
         refused = pin(client, second.pk, "9071")
         assert (refused.status_code, code(refused)) == (429, "base.too_many_attempts")
         elsewhere = Client(REMOTE_ADDR="10.0.0.9")
-        a_device(elsewhere)
+        with use_hub(hub_a):
+            a_device(elsewhere)
         assert pin(elsewhere, second.pk, "9071").status_code == 200
 
-    def test_a_browser_that_is_no_device_of_the_hub_cannot_use_the_pin(self, client, ana):
-        cred = with_pin(ana, "4826")
+    def test_a_browser_that_is_no_device_of_the_hub_cannot_use_the_pin(self, client, ana, hub_a):
+        with use_hub(hub_a):
+            cred = with_pin(ana, "4826")
         response = pin(client, cred.pk, "4826")
         assert (response.status_code, code(response)) == (403, "base.device_not_trusted")
         client.cookies[access.DEVICE_COOKIE] = access.new_device_token()
         assert code(pin(client, cred.pk, "4826")) == "base.device_not_trusted"
 
     @pytest.mark.parametrize("how", ["personal", "never"])
-    def test_where_the_pin_is_not_offered_it_does_not_open(self, client, ana, how):
-        a_device(client, mode=access.PERSONAL if how == "personal" else access.SHARED)
-        if how == "never":
-            AccessSettings.objects.create(pin_policy=access.NEVER)
-        response = pin(client, with_pin(ana, "4826").pk, "4826")
+    def test_where_the_pin_is_not_offered_it_does_not_open(self, client, ana, hub_a, how):
+        with use_hub(hub_a):
+            a_device(client, mode=access.PERSONAL if how == "personal" else access.SHARED)
+            if how == "never":
+                AccessSettings.objects.create(pin_policy=access.NEVER)
+            cred = with_pin(ana, "4826")
+        response = pin(client, cred.pk, "4826")
         assert (response.status_code, code(response)) == (403, "base.pin_not_offered")
 
-    def test_a_pin_needs_this_hub_s_csrf_token(self, ana):
+    def test_a_pin_needs_this_hub_s_csrf_token(self, ana, hub_a):
         strict = Client(enforce_csrf_checks=True)
-        a_device(strict)
-        assert pin(strict, with_pin(ana, "4826").pk, "4826").status_code == 403
+        with use_hub(hub_a):
+            a_device(strict)
+            cred = with_pin(ana, "4826")
+        assert pin(strict, cred.pk, "4826").status_code == 403
         assert not SessionOwner.objects.exists()
 
-    def test_next_is_a_path_of_this_hub_or_home(self, client, ana):
-        a_device(client)
-        response = pin(client, with_pin(ana, "4826").pk, "4826", next_path="https://evil.example/")
+    def test_next_is_a_path_of_this_hub_or_home(self, client, ana, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            cred = with_pin(ana, "4826")
+        response = pin(client, cred.pk, "4826", next_path="https://evil.example/")
         assert response.json() == {"next": "/"}
 
     @pytest.mark.parametrize("next_path", [5, ["/sale/pos"], {"to": "/sale/pos"}, None], ids=["number", "list", "object", "null"])
-    def test_a_next_that_is_no_text_goes_home_instead_of_breaking_the_entry(self, client, ana, next_path):
+    def test_a_next_that_is_no_text_goes_home_instead_of_breaking_the_entry(self, client, ana, hub_a, next_path):
         # The body is JSON from anyone with the device cookie: a «next» that is not a string is no path of this hub.
-        a_device(client)
-        response = pin(client, with_pin(ana, "4826").pk, "4826", next_path=next_path)
+        with use_hub(hub_a):
+            a_device(client)
+            cred = with_pin(ana, "4826")
+        response = pin(client, cred.pk, "4826", next_path=next_path)
         assert response.status_code == 200
         assert response.json() == {"next": "/"}
 
 
 class TestSwitchingUser:
-    def test_a_right_pin_over_someone_s_session_ends_that_one_and_opens_the_new_one(self, client, ana, bea):
-        a_device(client)
-        pin(client, with_pin(ana, "4826").pk, "4826")
+    def test_a_right_pin_over_someone_s_session_ends_that_one_and_opens_the_new_one(self, client, ana, bea, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            first, second = with_pin(ana, "4826"), with_pin(bea, "9071")
+        pin(client, first.pk, "4826")
         before = client.session.session_key
-        assert pin(client, with_pin(bea, "9071").pk, "9071").status_code == 200
+        assert pin(client, second.pk, "9071").status_code == 200
         assert not Session.objects.filter(session_key=before).exists()
         assert client.get("/api/me", HTTP_HOST=HOST).json()["user"]["label"] == "Bea"
         assert list(SessionOwner.objects.values_list("saas_user_id", flat=True)) == ["2"]
 
-    def test_a_wrong_pin_leaves_whoever_was_in_inside(self, client, ana, bea):
-        a_device(client)
-        pin(client, with_pin(ana, "4826").pk, "4826")
-        with_pin(bea, "9071")
-        assert pin(client, Credential.objects.get(username="saas:2").pk, "1111").status_code == 401
+    def test_a_wrong_pin_leaves_whoever_was_in_inside(self, client, ana, bea, hub_a):
+        with use_hub(hub_a):
+            a_device(client)
+            first, second = with_pin(ana, "4826"), with_pin(bea, "9071")
+        pin(client, first.pk, "4826")
+        assert pin(client, second.pk, "1111").status_code == 401
         assert client.get("/api/me", HTTP_HOST=HOST).json()["user"]["label"] == "Ana López"
 
 
@@ -292,38 +338,46 @@ def ana_in(client, ana):
 
 
 class TestChoosingMyPin:
-    def test_a_first_pin_is_kept_as_an_argon2id_hash_and_says_so_to_the_live_queries(self, client, ana_in):
+    def test_a_first_pin_is_kept_as_an_argon2id_hash_and_says_so_to_the_live_queries(self, client, ana_in, hub_a):
         response = set_pin(client, "4826")
         assert (response.status_code, response.json()) == (200, {"set": True})
-        cred = Credential.objects.get(username="saas:1")
-        # Checked, not looked for in the text: a hash is random, and now and then its letters spell the PIN (hub#796).
-        assert identify_hasher(cred.pin_hash).algorithm == "argon2" and pin_matches("saas:1", "4826")
-        assert cred.pin_hash.startswith("argon2$argon2id$")
-        assert OutboxEvent.objects.filter(name="base.pin.set").count() == 1
+        with use_hub(hub_a):
+            cred = Credential.objects.get(username="saas:1")
+            # Checked, not looked for in the text: a hash is random, and now and then its letters spell the PIN (hub#796).
+            assert identify_hasher(cred.pin_hash).algorithm == "argon2" and pin_matches("saas:1", "4826")
+            assert cred.pin_hash.startswith("argon2$argon2id$")
+            assert OutboxEvent.objects.filter(name="base.pin.set").count() == 1
 
     @pytest.mark.parametrize(("digits", "expected"), [("482", "base.pin_length"), ("48261", "base.pin_length"), ("48a6", "base.pin_digits"), ("1234", "base.pin_guessable"), ("7777", "base.pin_guessable")])
-    def test_a_pin_the_business_would_not_take_is_refused_with_its_reason(self, client, ana_in, digits, expected):
+    def test_a_pin_the_business_would_not_take_is_refused_with_its_reason(self, client, ana_in, hub_a, digits, expected):
         response = set_pin(client, digits)
         assert (response.status_code, code(response)) == (422, expected)
-        assert not Credential.objects.exists()
+        with use_hub(hub_a):
+            assert not Credential.objects.exists()
 
-    def test_six_digits_when_the_business_says_six(self, client, ana_in):
-        AccessSettings.objects.create(pin_length=6)
+    def test_six_digits_when_the_business_says_six(self, client, ana_in, hub_a):
+        with use_hub(hub_a):
+            AccessSettings.objects.create(pin_length=6)
         assert code(set_pin(client, "4826")) == "base.pin_length"
         assert set_pin(client, "482613").status_code == 200
 
-    def test_changing_it_asks_for_the_current_one(self, client, ana_in):
+    def test_changing_it_asks_for_the_current_one(self, client, ana_in, hub_a):
         set_pin(client, "4826")
         wrong = set_pin(client, "9071", current="1111")
         assert (wrong.status_code, code(wrong)) == (403, "base.pin_current_wrong")
         assert set_pin(client, "9071", current="4826").status_code == 200
-        assert pin_matches("saas:1", "9071")
+        with use_hub(hub_a):
+            assert pin_matches("saas:1", "9071")
 
-    def test_a_pin_another_active_person_of_this_hub_has_is_refused(self, client, ana_in, bea, make_user):
-        with_pin(bea, "9071")
+    def test_a_pin_another_active_person_of_this_hub_has_is_refused(self, client, ana_in, bea, make_user, hub_a):
+        with use_hub(hub_a):
+            with_pin(bea, "9071")
         taken = set_pin(client, "9071")
         assert (taken.status_code, code(taken)) == (409, "base.pin_taken")
-        with_pin(make_user("saas:7", host="b"), "1357")
+        bruno = make_user("saas:7", host=B)
+        with use_hub(hub_a):
+            # A person of another business only, with a PIN left in this one's database.
+            with_pin(bruno, "1357")
         assert set_pin(client, "1357").status_code == 200
 
     def test_thirty_tries_in_an_hour_make_it_wait_whether_they_were_taken_or_not(self, client, ana_in):
