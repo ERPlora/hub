@@ -4,9 +4,11 @@ BASE-F114).
 ``control.hub.restore_aside`` asks (a ``RestoredCopy`` row, ``<control>_copy_<its hex>``); the worker makes it
 (``base.tenancy.restore.run_aside_due``, in the moves' thread), one a pass, under the row's own lease, never the hub's:
 
-1. the hub's copy is dumped from the temporary cluster (a point-in-time restore of its cluster, closed to new hubs);
+1. the hub's copy is dumped from the temporary cluster (a point-in-time restore of its cluster, closed to new hubs)
+   to the dumps bucket as it is made, under the hub's own key, never to a file of the worker;
 2. on the hub's cluster a new database of the row's name is cloned from its vertical's template, granted to nobody,
-   emptied, filled with the dump's ``pg_restore`` and its identity checked (it says it is this hub);
+   emptied, filled with ``pg_restore`` reading the copy from the bucket and its identity checked (it says it is this
+   hub);
 3. control notes it made, and lets the temporary cluster go.
 
 The business is never closed nor changed: it is not restored, so its fiscal records are never compared and a
@@ -16,29 +18,37 @@ app's roles, and its name is one of a copy left behind, which no process registe
 it made and notes why on the row. The copies go after ``move.MOVED_COPY_DAYS``, with their rows, in the moves' pass.
 
 Real databases on the session's server, as ``test_restore.py``: the temporary cluster's row points at it, so the hub's
-copy there has a name of its own (``run_aside_due(source=…)``).
+copy there has a name of its own (``run_aside_due(source=…)``). The bucket is a real S3 server (moto's, ``s3.py``).
 """
 
 import copy as copying
 import datetime as dt
 import ipaddress
+import re
 import socket
 import uuid
 
 import pytest
 from django.utils import timezone
+from psycopg import sql
 
 from base import registry, services
 from base.tenancy import connections as tenancy_connections
-from base.tenancy import identity, move, names, restore
+from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy.context import use_control
-from base.tenancy.tests import hubs
-from base.tenancy.tests.test_restore import AFTER, AS_THEN, SINCE, THEN, Restores, a_record
+from base.tenancy.tests import hubs, s3
+from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
+from base.tenancy.tests.test_restore import AFTER, AS_THEN, SINCE, THEN, Restores, a_record, write
+from control import services as control_services
 from control.models import Cluster, Hub, MovedCopy, RestoredCopy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 AT = dt.datetime(2026, 11, 12, 9, 0, tzinfo=dt.UTC)
+#: What a copy of the business at another moment holds besides ``AS_THEN``.
+OTHER_MOMENT = "as it was at another moment"
+#: The lease owner of another worker of the same deploy.
+OTHER_WORKER = "other:1"
 
 databases, marker, says_it_is = hubs.control_databases, hubs.marker, hubs.says_it_is
 
@@ -91,7 +101,7 @@ class Asides(Restores):
 
 
 @pytest.fixture
-def asides(django_db_blocker, hub_databases):
+def asides(django_db_blocker, hub_databases, dumps_bucket):
     with django_db_blocker.unblock():
         made = Asides(hub_databases.template)
         yield made
@@ -125,14 +135,14 @@ class TestACopyAside:
         hub, aside = a_hub_with_its_copy(asides)
         hubs.grant_connect(app_role, hub.db_name)
         meanwhile: list[tuple[bool, bool]] = []
-        real = move._restore
+        real = move._restore_from_bucket
 
-        def restoring(path, name, cluster, heartbeat, cancelled=None):
+        def restoring(key, name, cluster, heartbeat, cancelled=None):
             # While the copy is filled, the business is open: its host answers and the app reaches its database.
             meanwhile.append((registry.is_copying(Hub.objects.get(pk=hub.pk)), hubs.reaches(app_role, hub.db_name)))
-            return real(path, name, cluster, heartbeat, cancelled)
+            return real(key, name, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_restore", restoring)
+        monkeypatch.setattr(move, "_restore_from_bucket", restoring)
 
         assert run(asides, roles=hubs.app_roles(app_role)) == 1
 
@@ -194,15 +204,15 @@ class TestACopyAside:
         # The business goes on meanwhile: its apps' setup and data work, under the hub's lease, never wait for its copy.
         hub, aside = a_hub_with_its_copy(asides)
         held: list[tuple[bool, str]] = []
-        real = move._restore
+        real = move._restore_from_bucket
 
-        def restoring(path, name, cluster, heartbeat, cancelled=None):
+        def restoring(key, name, cluster, heartbeat, cancelled=None):
             held.append((services.claim_hub(hub.id, timezone.now(), restore.LEASE, owner="other:1") is not None,
                          fresh(aside).lease_owner))
             services.release_hub(hub.id, timezone.now(), owner="other:1")
-            return real(path, name, cluster, heartbeat, cancelled)
+            return real(key, name, cluster, heartbeat, cancelled)
 
-        monkeypatch.setattr(move, "_restore", restoring)
+        monkeypatch.setattr(move, "_restore_from_bucket", restoring)
 
         run(asides)
 
@@ -315,7 +325,7 @@ def record_states(name: str) -> dict[uuid.UUID, str]:
 class TestAFailureDropsWhatItMade:
     @pytest.mark.parametrize(
         "step, code",
-        [("_dump", "restore_aside_dump_failed"), ("_restore", "restore_aside_restore_failed")],
+        [("_dump_to_bucket", "restore_aside_dump_failed"), ("_restore_from_bucket", "restore_aside_restore_failed")],
     )
     def test_the_row_says_why_and_nothing_of_the_copy_is_left(self, asides, monkeypatch, step, code):
         hub, aside = a_hub_with_its_copy(asides)
@@ -348,7 +358,7 @@ class TestAFailureDropsWhatItMade:
         assert fresh(aside).last_error.startswith("restore_aside_identity_mismatch: it says it is")
         assert aside_absent(aside)
 
-    def test_a_copy_missing_on_the_temporary_cluster_fails_it_with_why(self, asides):
+    def test_a_copy_missing_on_the_temporary_cluster_fails_it_with_why(self, asides, moto_s3, dumps_bucket):
         hub, aside = a_hub_with_its_copy(asides)
         hubs.drop_database(asides.copies[hub.id])
 
@@ -357,6 +367,8 @@ class TestAFailureDropsWhatItMade:
         assert fresh(aside).status == "failed"
         assert fresh(aside).last_error.startswith("restore_aside_dump_failed:")
         assert marker(hub.db_name) == [AS_THEN, SINCE]
+        # The upload of a dump that failed is aborted: nothing of it is kept.
+        assert s3.nothing_kept(moto_s3, dumps_bucket)
 
     def test_one_left_without_its_temporary_cluster_fails_with_why(self, asides):
         aside = asides.aside(asides.hub(source=None), None)
@@ -367,16 +379,129 @@ class TestAFailureDropsWhatItMade:
         assert aside_absent(aside)
 
 
+
+class TestTheCopyGoesThroughTheBucket:
+    """The hub's copy is dumped to the dumps bucket as it is made and ``pg_restore`` reads it from there, as a move's:
+    the worker's disk never holds it, so no size stops a copy aside."""
+
+    def test_the_copy_is_under_the_hubs_own_key_and_never_in_a_file_of_the_worker(
+        self, asides, moto_s3, dumps_bucket, monkeypatch
+    ):
+        hub, aside = a_hub_with_its_copy(asides)
+        started = s3.copy_programs(monkeypatch)
+
+        assert run(asides) == 1
+
+        assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
+        # Under the business's own prefix, named after its row.
+        [key] = s3.objects(moto_s3, dumps_bucket)
+        assert re.fullmatch(rf"{hub.id.hex}/\d{{8}}T\d{{6}}Z-aside-{aside.pk.hex}\.dump", key)
+        assert s3.how_it_was_copied(started) == s3.THROUGH_THE_BUCKET
+
+    def test_two_copies_of_one_business_made_at_once_each_keep_their_own_moment(self, asides, monkeypatch):
+        # Each holds its own row's lease, never the hub's: two workers (a deploy's old and new) may make two copies of
+        # one business in the same second, and neither may read the other's from the bucket.
+        hub, first = a_hub_with_its_copy(asides)
+        second = asides.aside(hub, asides.cluster("restore-2"))
+        control = tenancy_connections.control_name()
+        other_moment = names.hub_db_name(control, uuid.uuid7())
+        with hubs._maintenance() as conn:
+            conn.execute(
+                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                    names.identifier(other_moment, control=control),
+                    names.identifier(asides.copies[hub.id], control=control),
+                )
+            )
+        write(other_moment, OTHER_MOMENT)
+        key_for = dumps.key_for
+        monkeypatch.setattr(dumps, "key_for", lambda copied, kind, at: key_for(copied, kind, AT))
+        real = move._clone_emptied
+        meanwhile: list[RestoredCopy] = []
+
+        def the_other_made_meanwhile(*args, **kwargs):
+            # The first one dumped; before it reads its copy back, another worker makes the second one whole.
+            if not meanwhile:
+                meanwhile.append(control_services.claim_copy(second.pk, timezone.now(), restore.LEASE, OTHER_WORKER))
+                with monkeypatch.context() as patched:
+                    patched.setattr(services, "LEASE_OWNER", OTHER_WORKER)
+                    restore.make_aside(meanwhile[0], now=AT, source=lambda copied: other_moment)
+                control_services.release_copy(second.pk, OTHER_WORKER)
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(move, "_clone_emptied", the_other_made_meanwhile)
+
+        assert run(asides) == 1
+
+        assert (fresh(first).status, fresh(second).status) == ("made", "made")
+        assert marker(first.db_name) == [AS_THEN]
+        assert marker(second.db_name) == sorted([AS_THEN, OTHER_MOMENT])
+
+    def test_a_worker_that_stops_while_it_dumps_leaves_the_copy_to_the_next_one(
+        self, asides, moto_s3, dumps_bucket, monkeypatch
+    ):
+        hub, aside = a_hub_with_its_copy(asides)
+
+        run(asides, cancelled=s3.stopping_as(monkeypatch, dumps, "_pg_dump_command"))
+
+        # Not a failure: nothing noted, its lease let go, and half a copy is never kept.
+        left = fresh(aside)
+        assert (left.status, left.last_error, left.lease_owner) == ("copying", "", "")
+        assert s3.nothing_kept(moto_s3, dumps_bucket) and aside_absent(aside)
+
+        assert run(asides) == 1
+
+        assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_a_worker_that_stops_while_it_fills_the_copy_leaves_it_to_the_next_one(self, asides, monkeypatch):
+        hub, aside = a_hub_with_its_copy(asides)
+
+        run(asides, cancelled=s3.stopping_as(monkeypatch, move, "_restore_command"))
+
+        # Not a failure: nothing noted and its lease let go; the next worker makes the copy anew over what was left.
+        left = fresh(aside)
+        assert (left.status, left.last_error, left.lease_owner) == ("copying", "", "")
+
+        assert run(asides) == 1
+
+        assert fresh(aside).status == "made" and marker(aside.db_name) == [AS_THEN]
+        assert marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_without_a_bucket_nothing_is_made_and_the_row_says_why(self, asides, monkeypatch):
+        hub, aside = a_hub_with_its_copy(asides)
+        monkeypatch.setenv("HUB_DUMPS_BUCKET", "")
+
+        assert run(asides) == 1
+
+        failed = fresh(aside)
+        assert failed.status == "failed" and failed.last_error.startswith("restore_aside_dump_failed:")
+        assert "HUB_DUMPS_BUCKET" in failed.last_error
+        assert aside_absent(aside) and marker(hub.db_name) == [AS_THEN, SINCE]
+
+    def test_a_copy_that_cannot_be_read_back_fails_with_why_and_leaves_nothing(
+        self, asides, moto_s3, dumps_bucket, monkeypatch
+    ):
+        aside = a_hub_with_its_copy(asides)[1]
+        s3.lose_each_copy(monkeypatch, moto_s3, dumps_bucket)
+
+        assert run(asides) == 1
+
+        failed = fresh(aside)
+        assert failed.status == "failed" and failed.last_error.startswith("restore_aside_restore_failed:")
+        assert "could not be read from the bucket" in failed.last_error
+        assert aside_absent(aside)
+
+
 class TestTwoWorkers:
     def test_a_lease_lost_meanwhile_leaves_the_copy_to_its_new_holder(self, asides, monkeypatch):
         aside = a_hub_with_its_copy(asides)[1]
-        real = move._restore
+        real = move._restore_from_bucket
 
-        def taken(path, name, cluster, heartbeat, cancelled=None):
-            real(path, name, cluster, heartbeat, cancelled)
+        def taken(key, name, cluster, heartbeat, cancelled=None):
+            real(key, name, cluster, heartbeat, cancelled)
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
 
-        monkeypatch.setattr(move, "_restore", taken)
+        monkeypatch.setattr(move, "_restore_from_bucket", taken)
 
         run(asides)
 
@@ -387,15 +512,15 @@ class TestTwoWorkers:
 
     def test_a_lease_lost_while_it_dumps_never_touches_what_its_new_holder_made(self, asides, monkeypatch):
         hub, aside = a_hub_with_its_copy(asides)
-        real = move._dump
+        real = move._dump_to_bucket
 
-        def taken(name, cluster, path, heartbeat, cancelled=None):
-            real(name, cluster, path, heartbeat, cancelled)
+        def taken(*args, **kwargs):
+            real(*args, **kwargs)
             # Another worker took it meanwhile and already made its own database of the copy's name.
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
             something_of_its_name(aside, hub)
 
-        monkeypatch.setattr(move, "_dump", taken)
+        monkeypatch.setattr(move, "_dump_to_bucket", taken)
 
         run(asides)
 
@@ -406,11 +531,11 @@ class TestTwoWorkers:
     def test_a_failure_after_the_lease_was_lost_drops_nothing_and_notes_nothing(self, asides, monkeypatch):
         aside = a_hub_with_its_copy(asides)[1]
 
-        def taken_then_broken(path, name, cluster, heartbeat, cancelled=None):
+        def taken_then_broken(key, name, cluster, heartbeat, cancelled=None):
             RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
             raise move.MoveFailed("move_restore_failed", "it broke on purpose")
 
-        monkeypatch.setattr(move, "_restore", taken_then_broken)
+        monkeypatch.setattr(move, "_restore_from_bucket", taken_then_broken)
 
         run(asides)
 
@@ -433,7 +558,7 @@ class TestTwoWorkers:
             if failing:
                 RestoredCopy.objects.filter(pk=aside.pk).update(lease_owner="other:1")
 
-        monkeypatch.setattr(move, "_restore", broken)
+        monkeypatch.setattr(move, "_restore_from_bucket", broken)
         monkeypatch.setattr(move, "_drop_copy", dropped_then_taken)
 
         run(asides)

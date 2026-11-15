@@ -71,11 +71,6 @@ def as_actor(actor) -> OperationContext:
     return OperationContext(scope=REGISTRY_SCOPE, actor=actor, permissions=frozenset(), language="en")
 
 
-@pytest.fixture
-def admin_ctx():
-    return as_actor(person("root", is_staff=True, is_superuser=True))
-
-
 def cluster_in(**changes) -> ClusterIn:
     fields = {
         "name": "cluster-2",
@@ -796,7 +791,8 @@ class AskedFromATemporaryCluster:
     """What a restore in place (``control.hub.restore``) and a separate copy (``control.hub.restore_aside``) both
     refuse, nothing asked (``control.services._restorable``): a hub that is not ready or has no database of its own, a
     demo, one moving or being restored, a copy from a cluster open to new hubs, with hubs on it or the hub's own, a
-    moment still to come, a copy missing or too large; support, and unknown hubs or clusters."""
+    moment still to come, a copy missing; support, and unknown hubs or clusters (a copy of any size is asked:
+    ``test_services_restore_any_size.py``)."""
 
     MOMENT = dt.datetime(2026, 11, 9, 14, 30, tzinfo=dt.UTC)
 
@@ -868,16 +864,16 @@ class AskedFromATemporaryCluster:
         assert refused.value.code == "control.restore_point_ahead"
         assert set(refused.value.fields) == {"at"}
 
-    def test_a_copy_missing_or_too_large_is_refused(self, admin_ctx, small, monkeypatch):
+    def test_a_copy_missing_is_refused(self, admin_ctx, monkeypatch):
         from control import queries
 
         hub = self.a_hub()
-        for sizes, code in (({}, "control.restore_copy_missing"), (None, "control.hub_too_large")):
-            found = sizes if sizes is not None else {hub.db_name: services.RESTORE_MAX_BYTES + 1}
-            monkeypatch.setattr(queries, "measure", lambda cluster, names, found=found: found)
-            with pytest.raises(Conflict) as refused:
-                self.ask(admin_ctx, hub, self.temporary(name=f"t-{code}", host=f"{code}.example"))
-            assert refused.value.code == code
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {})
+
+        with pytest.raises(Conflict) as refused:
+            self.ask(admin_ctx, hub, self.temporary())
+
+        assert refused.value.code == "control.restore_copy_missing"
         assert self.nothing_asked(hub)
 
     def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):

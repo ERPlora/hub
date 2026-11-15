@@ -4142,8 +4142,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   cancelar en cualquier momento. La copia queda en `<hex>/<AAAAMMDDTHHMMSSZ>-move.dump` los 90 días del bucket, sin
   fila `HubDump` (no es una copia del negocio para descargar; el worker no puede borrar del bucket). Sin bucket no se
   cierra nada: el traslado acaba con `move_dump_failed` en `Hub.last_error` y el negocio sigue donde estaba. La
-  restauración a un momento y la copia aparte (BASE-F114) siguen copiando por un fichero del worker, con su tope
-  (`control.services.RESTORE_MAX_BYTES`, hub#1524). Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
+  restauración a un momento y la copia aparte (BASE-F114) copian con las mismas piezas (hub#1524, nota siguiente).
+  Tests: `base/tenancy/tests/test_dumps.py` (los `stream`),
   `base/tenancy/tests/test_move.py::TestTheCopyGoesThroughTheBucket` y `::TestFeedingAProgram` (dos BD reales y el S3
   de moto), `control/tests/test_services.py::TestMove` y
   `control/tests/test_admin.py::test_its_confirmation_page_promises_no_refusal_by_size`.
@@ -4161,13 +4161,28 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada uno se cierra
   al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
   `base/tenancy/tests/test_move_closure.py` y `control/tests/test_admin_closure.py`.
+- **Un negocio de cualquier tamaño se restaura o se copia aparte** (hub#1524): la copia del clúster temporal pasa por el
+  bucket de volcados como la de un traslado, nunca por el disco del worker: `pg_dump` la sube según la hace
+  (`move._dump_to_bucket`) y `pg_restore` la lee desde allí por su entrada (`move._restore_from_bucket`), así que
+  `control.hub.restore` y `control.hub.restore_aside` no miran el tamaño: solo comprueban que la copia está en el
+  clúster temporal. La
+  restauración en su sitio vuelca a `<hex>/<AAAAMMDDTHHMMSSZ>-restore.dump` antes de cerrar el negocio, así que sin
+  bucket no se cierra nada y acaba con `restore_dump_failed` en `Hub.last_error`; la copia aparte vuelca a
+  `<hex del hub>/<AAAAMMDDTHHMMSSZ>-aside-<hex de la fila>.dump` (lleva el arriendo de su fila y no el del hub, así que
+  dos copias del mismo negocio pueden volcarse en el mismo segundo y ninguna lee la de otra) y sin bucket la fila falla
+  con `restore_aside_dump_failed`. Cada mitad tiene `move.COPY_TIMEOUT_SECONDS`; en la restauración en su sitio el
+  negocio está en mantenimiento desde que se pide (`registry.is_copying`) y su base se cierra a la app antes de la
+  segunda. Una subida que falla o se para se aborta y no deja nada; la copia queda los 90 días del bucket, sin fila
+  `HubDump`. Tests: `base/tenancy/tests/test_restore.py::TestTheCopyGoesThroughTheBucket`,
+  `base/tenancy/tests/test_restore_aside.py::TestTheCopyGoesThroughTheBucket` (dos BD reales y el S3 de moto) y
+  `control/tests/test_services.py::TestRestore` y `::TestRestoreAside` (`test_a_copy_of_any_size_is_asked`).
 - **«Restaurar en una copia aparte…»** (BASE-F114, hub#1213, capa 1) es `control.admin.HubAdmin.restore_aside`: el mismo
   formulario y la misma página (`HubAdmin.from_a_copy`), con `control.hub.restore_aside`, que comprueba lo mismo que
   `control.hub.restore` (`control.services._restorable`) y escribe una fila `control.RestoredCopy` con su nombre
   `<control>_copy_<hex de la fila>` (`base.tenancy.names.copy_db_name`). El worker la hace en el hilo de los traslados
-  (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: clona sin
-  conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore`, comprueba la identidad, la cierra otra vez y
-  suelta el clúster temporal. El envío a Hacienda está apagado por construcción: ninguna fila de `base_hub` la nombra
+  (`base.tenancy.restore.run_aside_due`), una por pasada y con el arriendo de la propia fila, nunca el del hub: vuelca la
+  copia al bucket, clona sin conceder nada (`ops.clone_database(aside=True)`), vacía, `pg_restore` desde el bucket,
+  comprueba la identidad, la cierra otra vez y suelta el clúster temporal. El envío a Hacienda está apagado por construcción: ninguna fila de `base_hub` la nombra
   (el worker sirve solo las del registro), ningún rol de la app conecta y su nombre es de copia que queda atrás
   (`names.is_left_behind`), así que `connections.register_hub_alias` se niega a darle alias. Se borra con su fila a los
   `move.MOVED_COPY_DAYS` (`restore.drop_old_aside_copies`); mientras se hace cuenta en `control.freeze.get`. Su esquema

@@ -22,8 +22,8 @@ on control (the registry's scope) and records its event in control's outbox in t
   (:func:`start_scheduled_move`, under the hub's lease), and «Cancel the move» takes it away until then.
 - ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment
   (``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
-  closed to new hubs, with no hub on it), small enough for a copy (:data:`RESTORE_MAX_BYTES`). Its host answers 503
-  «maintenance» until the worker is done. The worker refuses it, nothing changed, while the hub's database has a
+  closed to new hubs, with no hub on it). Its size stops nothing: the copy goes through the dumps bucket, never the
+  worker's disk. Its host answers 503 «maintenance» until the worker is done. The worker refuses it, nothing changed, while the hub's database has a
   production VeriFactu record the copy lacks or has otherwise (it reads both with the migrator, which the web does not
   have; it only reads).
 - ``control.hub.restore_aside`` asks the worker for a separate copy of a ready hub's database as it was at a moment
@@ -94,9 +94,6 @@ from control.schemas import (
 CLUSTER_FIELDS = tuple(ClusterIn.model_fields)
 #: Which server it is: never changed under the hubs on it.
 WRITER_FIELDS = ("host", "port")
-#: The largest database a restore copies: it goes through a file of the worker (``base.tenancy.restore``), its hub
-#: closed meanwhile. A move has no such limit: its copy goes through the dumps bucket.
-RESTORE_MAX_BYTES = 512 * 1024 * 1024
 #: When a move asked for the night may start, on the business's own clock: Square's nightly updates run at 03:00, after
 #: the bars close and before the bakeries open. It bounds the start, as AWS's maintenance window does, not the end.
 NIGHT_STARTS = dt.time(3)
@@ -411,17 +408,11 @@ def _restoring() -> Conflict:
 
 
 def _copy_to_restore(hub: Hub, source: Cluster) -> None:
-    """Refuse unless the copy of ``hub``'s database is on ``source`` under its name, small enough for a copy
-    (:data:`RESTORE_MAX_BYTES`)."""
-    size = queries.measure(source, [hub.db_name]).get(hub.db_name)
-    if size is None:
+    """Refuse unless the copy of ``hub``'s database is on ``source`` under its name, of any size."""
+    if hub.db_name not in queries.measure(source, [hub.db_name]):
         raise _move_refused(
             gettext("The hub's database is not on that cluster: there is no copy to restore it from."),
             "control.restore_copy_missing",
-        )
-    if size > RESTORE_MAX_BYTES:
-        raise _move_refused(
-            gettext("This hub's database is too large to restore with a copy."), "control.hub_too_large"
         )
 
 
