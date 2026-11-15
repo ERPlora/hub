@@ -18,11 +18,12 @@ from apps.flow import queries
 from apps.flow.models import Draft, Flow, FlowRun
 from apps.task.models import Task
 
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import A, B, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
+from .conftest import A, B, HUB_DB, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def outbox(name: str, payload: dict, scope=A, **fields) -> OutboxEvent:
@@ -161,7 +162,7 @@ def test_the_catalog_names_the_apps_that_are_off_so_the_editor_can_say_why_a_ste
     django_capture_on_commit_callbacks,
 ):
     assert "task" not in [app.app for app in run("flow.catalog.read").off_apps]
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("base.app.disable", {"app": "task"})
     off = run("flow.catalog.read").off_apps
     assert {"app": "task", "app_name": "Tasks"} in [app.model_dump() for app in off]

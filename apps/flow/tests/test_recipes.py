@@ -13,9 +13,9 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.flow import queries, recipes
 
-from .conftest import A, make_flow
+from .conftest import A, HUB_DB, make_flow
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TASK = "task.task.create"
 DAY = "reservation.availability.day"
@@ -69,9 +69,13 @@ def declared(monkeypatch):
 
 
 def without(monkeypatch, *labels: str) -> None:
-    """This business without the apps ``labels``."""
-    active = {label: config for label, config in queries.active_apps(A).items() if label not in labels}
-    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
+    """The business at work without the apps ``labels``."""
+    real = queries.active_apps
+    monkeypatch.setattr(
+        queries,
+        "active_apps",
+        lambda scope: {label: config for label, config in real(scope).items() if label not in labels},
+    )
 
 
 # ── What the apps bring ──────────────────────────────────────────────────────────────────────────────

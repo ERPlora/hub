@@ -3795,7 +3795,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   cual en inglés; si no, el `verbose_name` del campo del mismo nombre en los modelos de su app, primero el de la
   entidad de la operación; si no, el `title` por los catálogos. Un dato sin campo de modelo lleva
   `title=gettext_noop(…)` y su `es` en el `.po` de su app, como los de Archivos, Plantillas y Personas en
-  `base/schemas.py`; lo comprueba `test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_name`;
+  `base/schemas/`; lo comprueba `test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_name`;
   la app de la tarjeta y del recibo, `app_name`: la de una app por su `verbose_name`, una acción de `base` por la
   pantalla de su entidad, `BASE_SCREENS`, nunca «Base»; el recibo usa el `app_name` que manda el turno en
   `executed`; lo comprueba `test_every_action_of_base_names_its_screen`; la acción de la tarjeta y del recibo, el

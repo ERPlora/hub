@@ -17,10 +17,11 @@ from live.models import OutboxEvent
 
 from apps.flow.models import Draft, Flow, FlowRun
 from apps.task.models import Task
+from base.tenancy.context import current_alias
 
-from .conftest import TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
+from .conftest import HUB_DB, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -104,7 +105,7 @@ def test_what_the_business_does_not_have_is_refused_by_field():
 
 def test_an_event_or_a_step_of_an_app_that_is_off_says_so_and_how_to_bring_it_back(django_capture_on_commit_callbacks):
     """Off is not «does not exist» (hub#1054): the refusal names the app and says where it is turned on."""
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("base.app.disable", {"app": "task"})
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", {"trigger": {"kind": "event", "event": "task.task.created"}, "steps": [TASK_STEP]})

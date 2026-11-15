@@ -14,10 +14,11 @@ from django.utils import translation
 
 from apps.flow import events, queries
 from apps.flow.models import Flow, FlowRun, Question
+from base.tenancy.context import current_alias
 
-from .conftest import A, TASK_STEP, make_flow, make_run, run, ctx_for
+from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOT_ALLOWED = {
     "en": "It tried to do something you have not allowed it to do («task.task.create»), so it stopped. "
@@ -122,7 +123,7 @@ def test_a_call_that_answered_an_error_is_said_in_the_reader_s_language(django_c
     origin = "https://api.example.com"
     step = {"id": "s1", "kind": "http", "method": "POST", "url": f"{origin}/orders", "timeout": 5}
     flow = make_flow(language="es", trigger_kind=Flow.Trigger.MANUAL, steps=[step], grants=[f"http:{origin}"])
-    with django_capture_on_commit_callbacks(execute=False):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=False):
         ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
     system = ctx_for(permissions={"flow.system"})
     run("flow.run.record_call", {"id": str(ran.id), "kind": "status", "status": 503, "body": {}}, system)

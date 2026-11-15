@@ -10,8 +10,9 @@ from live.live_registry import live_registry
 from live.outbox import channel_for
 
 from apps.flow import events
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_flow, run
+from .conftest import A, B, HUB_DB_COMMITTED, ctx_for, make_flow, run
 
 
 def flow_queries():
@@ -90,21 +91,25 @@ def heard_until(session, expected: list[str], timeout=1.0) -> list[str]:
     return sorted(names)
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_run_started_by_an_event_in_b_is_heard_in_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_run_started_by_an_event_in_b_is_heard_in_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     make_flow()
-    events.react(B, "customer.customer.created", {"id": "c"}, event_id=uuid.uuid7())
+    with use_hub(hub_b):
+        make_flow()
+        events.react(B, "customer.customer.created", {"id": "c"}, event_id=uuid.uuid7())
     expected = ["flow.run.finished", "flow.run.started", "task.task.created"]
     assert heard_until(on_b, expected) == expected
     assert heard(on_a, timeout=0.3) == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_run_by_hand_in_b_is_heard_in_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_run_by_hand_in_b_is_heard_in_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     flow = make_flow(trigger_kind="manual")
-    run("flow.flow.run", {"id": str(flow.id)}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        theirs = make_flow(trigger_kind="manual")
+        run("flow.flow.run", {"id": str(theirs.id)}, ctx_for(scope=B))
     expected = ["flow.run.finished", "flow.run.started", "task.task.created"]
     assert heard_until(on_b, expected) == expected
     assert heard(on_a, timeout=0.3) == []
@@ -113,18 +118,19 @@ def test_a_run_by_hand_in_b_is_heard_in_b_only(listen):
     assert "flow.run.finished" in heard_until(on_a, ["flow.run.finished"])
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_question_asked_and_answered_in_b_is_heard_in_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_question_asked_and_answered_in_b_is_heard_in_b_only(listen, hub_b):
     # FLOW-F28/F29: «Waiting for your answer» of A never hears what an automation asked in B.
     from apps.flow.models import Question
 
     on_a, on_b = listen(A), listen(B)
-    flow = make_flow(trigger_kind="manual", steps=[{"id": "s1", "kind": "ask", "title": "Go?"}])
-    ran = run("flow.flow.run", {"id": str(flow.id)}, ctx_for(scope=B))
-    asked = ["flow.question.asked", "flow.run.parked", "flow.run.started"]
-    assert heard_until(on_b, asked) == asked
-    question = Question.objects.get(run_id=ran.id)
-    run("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        flow = make_flow(trigger_kind="manual", steps=[{"id": "s1", "kind": "ask", "title": "Go?"}])
+        ran = run("flow.flow.run", {"id": str(flow.id)}, ctx_for(scope=B))
+        asked = ["flow.question.asked", "flow.run.parked", "flow.run.started"]
+        assert heard_until(on_b, asked) == asked
+        question = Question.objects.get(run_id=ran.id)
+        run("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for(scope=B))
     answered = ["flow.question.answered", "flow.run.finished", "flow.run.resumed"]
     assert heard_until(on_b, answered) == answered
     assert heard(on_a, timeout=0.3) == []

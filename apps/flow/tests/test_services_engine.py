@@ -9,7 +9,6 @@ import datetime as dt
 import uuid
 from zoneinfo import ZoneInfo
 
-import pytest
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -18,10 +17,11 @@ from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 from base.recovery import actor_of
+from base.tenancy.context import current_alias
 
-from .conftest import A, TASK_STEP, due_daily_flow, make_flow, make_run, run
+from .conftest import A, HUB_DB, TASK_STEP, due_daily_flow, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -331,7 +331,7 @@ def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_cal
     )
     assert Task.objects.count() == 0
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("base.app.enable", {"app": "task"})
     resumed = run("flow.run.retry", {"id": str(stopped.id)})
     assert (resumed.status, resumed.error_code, resumed.error_message) == (
@@ -348,7 +348,7 @@ def test_a_scheduled_run_on_the_worker_s_pass_stops_at_an_action_whose_app_is_of
     from live.context import system_context
 
     flow = due_daily_flow(monkeypatch)
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("base.app.disable", {"app": "task"})
 
     assert run("flow.schedule.fire_due", {}, system_context(A)).count == 1
@@ -578,8 +578,8 @@ def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
     assert Task.objects.get().title == "Call Ana López"
 
 
-# The worker's minute (FLOW-F22, FLOW-F23), through the scheduler it calls every tick, with the tasks flow declares and
-# no scope: `WORKER_SCOPE_SLUG`'s, here `a`'s. In production each business runs on its own (`test_worker_parked_runs.py`).
+# The worker's minute (FLOW-F22, FLOW-F23), through the scheduler it calls every tick, with the tasks flow declares, on
+# business A's own scope as the worker's pass over the businesses runs them (`test_worker_parked_runs.py`).
 
 
 def _flow_tasks():
@@ -588,12 +588,11 @@ def _flow_tasks():
     return [task for task in scheduler.tasks() if task.app_label == "flow"]
 
 
-def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, settings, monkeypatch):
+def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, monkeypatch):
     from base import scheduler
 
     # The worker releases its connection after each task; the test's transaction must stay open.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
-    settings.WORKER_SCOPE_SLUG = "a"
     clock(NOON - dt.timedelta(minutes=1))
     scheduler.sync(NOON - dt.timedelta(minutes=1), declared=_flow_tasks())
     daily = make_flow(
@@ -611,13 +610,13 @@ def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, setting
     assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
 
     clock(NOON)
-    assert sorted(scheduler.run_due(NOON)) == ["flow.expire_questions", "flow.fire_due", "flow.resume_due"]
+    assert sorted(scheduler.run_due(NOON, scope=A)) == ["flow.expire_questions", "flow.fire_due", "flow.resume_due"]
     fired = FlowRun.objects.get(flow=daily)
     assert (fired.trigger_kind, fired.status) == ("schedule", FlowRun.Status.SUCCEEDED)
     assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
 
     clock(NOON + dt.timedelta(minutes=1))
-    assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1))) == [
+    assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1), scope=A)) == [
         "flow.expire_questions",
         "flow.fire_due",
         "flow.resume_due",

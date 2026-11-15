@@ -2,14 +2,15 @@
 mantiene»). UUIDv7 keys, no hub id; one run per automation and trigger key."""
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from live.models import UUIDModel
+from live.operations import atomic
 
 from apps.flow.models import Draft, Flow, FlowRun
 
-from .conftest import make_draft, make_flow, make_run
+from .conftest import HUB_DB, make_draft, make_flow, make_run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_every_model_has_a_uuid7_key_and_no_hub_id():
@@ -51,14 +52,14 @@ def test_the_trigger_and_run_choices():
 
 
 def test_an_event_flow_needs_its_event():
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Flow.objects.create(
             name="No event", trigger_kind=Flow.Trigger.EVENT, trigger_event=""
         )
 
 
 def test_an_unknown_trigger_kind_is_refused_by_the_database():
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Flow.objects.create(name="Odd", trigger_kind="sometimes")
 
 
@@ -70,7 +71,7 @@ def test_an_automation_of_its_own_comes_from_no_recipe():
 def test_one_automation_per_recipe_while_it_is_not_deleted():
     # FLOW-F33: turning a recipe on twice is one automation; a deleted one lets it be built again.
     first = make_flow(recipe="appointment/customer_cancelled", recipe_digest="a" * 64)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_flow("Again", recipe="appointment/customer_cancelled", recipe_digest="a" * 64)
     make_flow("Another recipe", recipe="online_booking/booked_online")
     make_flow("Mine"), make_flow("Mine too")  # automations of the owner's own come from no recipe
@@ -82,7 +83,7 @@ def test_one_automation_per_recipe_while_it_is_not_deleted():
 def test_one_run_per_flow_and_trigger_key():
     flow = make_flow()
     make_run(flow, trigger_key="event-1")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_run(flow, trigger_key="event-1")
     # Another automation may run on the same event.
     make_run(make_flow("Other"), trigger_key="event-1")
@@ -99,7 +100,7 @@ def test_a_run_remembers_the_version_and_steps_it_started_with():
 
 
 def test_an_unknown_run_status_is_refused_by_the_database():
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_run(make_flow(), status="lost")
 
 

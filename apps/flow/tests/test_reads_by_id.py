@@ -15,9 +15,8 @@ from apps.flow.models import Draft, Flow, FlowRun, Question
 from base.models import Membership
 from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
-from .conftest import ctx_for, make_draft, make_flow, make_run, run
+from .conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run, run
 
 #: Thursday 15 October 2026 at 21:00 in Madrid, the test business's clock (an instant: 19:00 UTC).
 STARTED = dt.datetime(2026, 10, 15, 19, 0, tzinfo=dt.UTC)
@@ -37,7 +36,7 @@ def make_question(flow: Flow | None = None, *, role: str = "", status: str = Que
 # ── flow.draft.get ───────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_draft_is_read_by_its_id_with_its_name_whatever_was_decided_of_it():
     """As the drafts' tray names it; a draft already used or discarded is still read, with its status."""
     waiting = make_draft()
@@ -47,7 +46,7 @@ def test_a_draft_is_read_by_its_id_with_its_name_whatever_was_decided_of_it():
     assert (run("flow.draft.get", {"id": str(dismissed.id)}).status) == "dismissed"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_draft_is_not_found_as_discarding_it_says():
     with pytest.raises(NotFound) as caught:
         run("flow.draft.get", {"id": "0192f0b2-0000-7000-8000-000000000000"})
@@ -57,7 +56,7 @@ def test_a_missing_draft_is_not_found_as_discarding_it_says():
 # ── flow.run.get ─────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_run_is_named_by_its_automation_and_when_it_started_as_the_history_says_it(language):
     """The History lists an automation's runs by when each started; out of it, the automation says whose."""
@@ -66,7 +65,7 @@ def test_a_run_is_named_by_its_automation_and_when_it_started_as_the_history_say
     assert (read.id, read.status, read.label) == (ran.id, "failed", f"Welcome · {WHEN[language]}")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_run_is_not_found_as_resuming_it_says():
     with pytest.raises(NotFound) as caught:
         run("flow.run.get", {"id": "0192f0b2-0000-7000-8000-000000000000"})
@@ -76,14 +75,14 @@ def test_a_missing_run_is_not_found_as_resuming_it_says():
 # ── flow.question.get ────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_question_waiting_for_an_answer_is_read_by_its_id_as_the_inbox_shows_it():
     asked = make_question(role="employee")
     read = run("flow.question.get", {"id": str(asked.id)}, ctx_for(permissions={"flow.answer"}))
     assert (read.id, read.title, read.flow_name, read.run_id) == (asked.id, "Refund 15 € to Ana?", "Refunds", asked.run_id)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_question_is_read_only_by_whom_it_was_asked_of_or_whoever_runs_the_business():
     """As «Waiting for your answer» shows it: an employee reads an employee's question, never a manager's; who manages
     reads them all."""
@@ -95,7 +94,7 @@ def test_a_question_is_read_only_by_whom_it_was_asked_of_or_whoever_runs_the_bus
     assert run("flow.question.get", {"id": str(of_a_manager.id)}, ctx_for("hub_owner")).id == of_a_manager.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("status", [Question.Status.APPROVED, Question.Status.EXPIRED, Question.Status.CANCELLED])
 def test_a_question_no_longer_waiting_is_closed_and_a_missing_one_not_found(status):
     closed = make_question(status=status)
@@ -107,7 +106,7 @@ def test_a_question_no_longer_waiting_is_closed_and_a_missing_one_not_found(stat
     assert caught.value.code == "flow.question_not_found"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_question_whose_run_no_longer_waits_is_closed():
     """A run paused or cancelled while it waited leaves its question pending but nobody can answer it any more."""
     asked = make_question()
@@ -127,7 +126,7 @@ READS = [
 ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("name", "made", "permission"), READS)
 def test_each_is_read_with_the_permission_of_its_list_and_only_with_it(name, made, permission):
     record = made()
@@ -169,7 +168,7 @@ def read(client, hub, path: str, record_id) -> tuple[int, dict]:
     return answer.status_code, answer.json()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("path", "made", "named"), ROUTES)
 def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client, hub_a, as_in_production, path, made, named):
     signed_in(client, hub_a)
@@ -180,7 +179,7 @@ def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client,
     assert body["id"] == str(record.id) and body[named]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("path", "made", "named"), ROUTES)
 def test_another_businesss_record_is_not_there(client, hub_a, hub_b, as_in_production, path, made, named):
     with use_hub(hub_b):

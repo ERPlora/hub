@@ -11,43 +11,25 @@ from contextlib import contextmanager
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from live.context import system_context
 from live.errors import NotFound
 from live.models import OutboxEvent
+from live.operations import atomic
 from psycopg.errors import LockNotAvailable
 
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once
 
-from .conftest import A, TASK_STEP, due_daily_flow, make_flow, run
+from .conftest import A, HUB_DB_COMMITTED, TASK_STEP, due_daily_flow, make_flow, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 MADRID = ZoneInfo("Europe/Madrid")
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported to the test, which fails on it
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def test_the_same_event_delivered_twice_at_once_runs_once():
@@ -105,8 +87,8 @@ def delete(flow, how: str) -> None:
     """Deletes ``flow`` in this session, giving up at once on a row another session has locked. The lock
     timeout is the transaction's (SET LOCAL): a session-level one would go back to the pool with the
     connection and reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("SET LOCAL lock_timeout = '300ms'")
         if how == "operation":
             run("flow.flow.delete", {"id": str(flow.id)})
@@ -128,7 +110,7 @@ def deleted_after_the_first_read_of(flow, how: str):
             deletions.extend(at_once(lambda: delete(flow, how)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -277,8 +259,8 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
 
     def sweep():
         clock.now = start + dt.timedelta(hours=1, minutes=1)
-        with transaction.atomic():
-            with connection.cursor() as cursor:
+        with atomic():
+            with connections[current_alias()].cursor() as cursor:
                 cursor.execute("SET LOCAL lock_timeout = '300ms'")
             return run("flow.question.expire_due", {}, system_context(A))
 
@@ -294,7 +276,7 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
                     sweeps.extend(at_once(sweep))
             return result
 
-        with connection.execute_wrapper(wrapper):
+        with connections[current_alias()].execute_wrapper(wrapper):
             return run("flow.question.answer", {"id": str(question.id), "approve": True})
 
     before = OutboxEvent.objects.count()
