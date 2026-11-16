@@ -10,6 +10,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+.complexipy_cache/
 
 # Node and the SPA build
 node_modules/
