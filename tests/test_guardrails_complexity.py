@@ -61,7 +61,8 @@ def complexipy(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def scores(cache: Path, cwd: Path = REPO) -> dict[Key, int]:
     """Each function's score with the configuration under ``cwd``, keyed by file and name as complexipy keys its
-    snapshot: of the functions of one file that share a name, the first keeps it and the next become ``name#2``…"""
+    snapshot: of the functions of one file that share a name, the first keeps it and each next one takes it followed by a
+    hash sign and its position."""
     output = ("--output-format", "json", "--output", "-", "--cache-dir", str(cache))
     result = complexipy("--snapshot-ignore", "--quiet", *output, cwd=cwd)
     # It exits with 1 both when a function is over the limit and when it cannot run; only a run prints the report.
