@@ -14,7 +14,8 @@ needs its entry recorded again (``uv run complexipy --snapshot-create``); the en
 score, into the package of the same name or a flat sibling named after it (``base/services/__init__.py`` into
 ``base/services/sessions.py``). Each old entry carries one function, so a frozen function copied twice fails.
 
-No comment switches the limit off: the configuration makes complexipy disregard its ignore markers.
+Nothing switches the limit off: the configuration makes complexipy disregard its ignore comments, and every Python file
+that defines a function has to be one it reads, which leaves out hidden folders and what a .gitignore or .ignore names.
 """
 
 import json
@@ -37,6 +38,9 @@ COMPLEXIPY_CONFIGURATION = {
     "max-complexity-allowed": LIMIT,
     "no-ignore": True,
 }
+# What the configuration reads, as git pathspecs, and a line that opens a function.
+READ = ("*.py", ":(exclude,glob)**/migrations/**", ":(exclude)packages")
+DEFINITION = r"^[[:space:]]*(async[[:space:]]+)?def[[:space:]]"
 NO_SNAPSHOT_AT_BASE = (
     f"{SNAPSHOT} did not exist where the branch left origin/main: this is the commit that freezes what breaks the limit"
 )
@@ -62,8 +66,8 @@ def complexipy(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def scores(cache: Path, cwd: Path = REPO) -> dict[Key, int]:
     """Each function's score with the configuration under ``cwd``, keyed by file and name as complexipy keys its
-    snapshot: of the functions of one file that share a name, the first keeps it and each next one takes it followed by a
-    hash sign and its position."""
+    snapshot: of the functions of one file that share a name, the first keeps it and each next one takes it followed
+    by a hash sign and its position."""
     output = ("--output-format", "json", "--output", "-", "--cache-dir", str(cache))
     result = complexipy("--snapshot-ignore", "--quiet", *output, cwd=cwd)
     # It exits with 1 both when a function is over the limit and when it cannot run; only a run prints the report.
@@ -138,12 +142,38 @@ def gained(now: dict[Key, int], before: dict[Key, int]) -> list[str]:
     return found
 
 
-def test_no_function_scores_more_than_the_limit_or_its_frozen_entry(tmp_path):
+def files_with_functions() -> set[str]:
+    """The Python files of the repo, new ones included, with a line that opens a function, but those not read. With
+    ``--untracked`` git leaves out the tracked files a .gitignore names, so those are searched for on their own."""
+    files: set[str] = set()
+    for untracked in ([], ["--untracked"]):
+        found = git(REPO, "grep", *untracked, "-l", "-E", DEFINITION, "--", *READ)
+        assert found.returncode in (0, 1), found.stderr
+        files |= set(found.stdout.split())
+    return files
+
+
+@pytest.fixture(scope="module")
+def repo_scores(tmp_path_factory) -> dict[Key, int]:
+    return scores(tmp_path_factory.mktemp("complexipy"))
+
+
+def test_no_function_scores_more_than_the_limit_or_its_frozen_entry(repo_scores):
     frozen = entries((REPO / SNAPSHOT).read_text(encoding="utf-8"))
-    found = against_snapshot(over_limit(scores(tmp_path)), frozen)
+    found = against_snapshot(over_limit(repo_scores), frozen)
     assert found == [], (
         f"Functions over the cognitive complexity limit of {LIMIT}, or {SNAPSHOT} out of step with them. Split a new "
         "or a grown function into smaller ones instead of freezing it:\n" + "\n".join(found)
+    )
+
+
+def test_complexipy_reads_every_python_file_that_defines_a_function(repo_scores):
+    """complexipy leaves out what git ignores, hidden folders and the files an .ignore file names: none of them may
+    keep a function out of the count."""
+    unread = sorted(files_with_functions() - {path for path, _ in repo_scores})
+    assert unread == [], (
+        "Python files complexipy does not read: move them out of a hidden folder, or out of the .gitignore or .ignore "
+        "that hides them:\n" + "\n".join(unread)
     )
 
 
