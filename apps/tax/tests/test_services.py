@@ -754,33 +754,13 @@ def _in_thread(target):
 def test_two_overlapping_rules_saved_at_once_keep_one(plan_with_room):
     TaxCategory.objects.create(key="product.race", name="Race")
     rule = {"country_code": "FR", "tax_category_key": "product.race"}
-    first_saved, release = threading.Event(), threading.Event()
 
-    def first():
-        with atomic():  # stays open, holding what it wrote, until released
-            created = create_rule(**rule, rate_pct="20")
-            first_saved.set()
-            release.wait(5)
-        return created
-
-    holder, held = _in_thread(first)
-    assert first_saved.wait(5)
-    second, outcome = _in_thread(
-        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01")
+    waited, outcome = _race(
+        lambda: create_rule(**rule, rate_pct="20"),
+        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01"),
     )
-    second.join(QUIET)
-    assert (
-        second.is_alive()
-    )  # it waits for the first one, it does not run its check blind
-    release.set()
-    holder.join(5)
-    second.join(5)
 
-    assert isinstance(held[0], RuleOut)
-    assert (
-        isinstance(outcome[0], Conflict)
-        and outcome[0].code == "tax.rule_overlaps"
-    )
+    _overlap_refused(waited, outcome)
     assert list(
         TaxRule.objects.filter(category__key="product.race").values_list(
             "rate_pct", flat=True
@@ -792,22 +772,12 @@ def test_two_overlapping_rules_saved_at_once_keep_one(plan_with_room):
 def test_two_rules_that_do_not_overlap_saved_at_once_are_both_kept(plan_with_room):
     TaxCategory.objects.create(key="product.race", name="Race")
     rule = {"country_code": "FR", "tax_category_key": "product.race"}
-    first_saved, release = threading.Event(), threading.Event()
 
-    def first():
-        with atomic():
-            create_rule(**rule, rate_pct="20", valid_to="2026-12-31")
-            first_saved.set()
-            release.wait(5)
-
-    holder, _held = _in_thread(first)
-    assert first_saved.wait(5)
-    second, outcome = _in_thread(
-        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01")
+    _waited, outcome = _race(
+        lambda: create_rule(**rule, rate_pct="20", valid_to="2026-12-31"),
+        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01"),
     )
-    release.set()
-    holder.join(5)
-    second.join(5)
+
     assert isinstance(outcome[0], RuleOut)
     assert TaxRule.objects.filter(category__key="product.race").count() == 2
 
