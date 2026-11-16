@@ -15,7 +15,7 @@ import uuid
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import translation
 from live.models import OutboxEvent
 from live.operations import get as get_operation
@@ -35,17 +35,17 @@ from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.services import OPTION_LEFT, TAX_CATEGORY_UNKNOWN
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 
-from .conftest import GENERIC, ctx_for, ctx_with, make_category, make_product
+from .conftest import GENERIC, HUB_DB, ctx_for, ctx_with, make_category, make_product
 from .conftest import run as run_here
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    (business := connections[current_alias()]).ensure_connection()
+    return business.connection
 
 
 def a_group(name: str):
@@ -62,7 +62,7 @@ def hang(group, *, product=None, category=None) -> ModifierLink:
     return ModifierLink.objects.get(pk=run_here("modifier.link.attach", {"group_id": str(group.id), **target}).id)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_group_hung_from_a_live_product_with_what_its_attach_takes():
     burger, fries = make_product("Burger", "BUR"), make_product("Fries", "FRI")
     sauces, extras = a_group("Sauces"), a_group("Extras")
@@ -91,9 +91,9 @@ def test_the_copy_gives_each_group_hung_from_a_live_product_with_what_its_attach
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE modifier_modifierlink CASCADE")
 
@@ -114,7 +114,7 @@ def a_link_of_a_product_gone(group, sku: str, product_id=None) -> dict:
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_product():
     burger, fries = make_product("Burger", "BUR"), make_product("Fries", "FRI")
     sauces, extras, sizes = a_group("Sauces"), a_group("Extras"), a_group("Sizes")
@@ -137,7 +137,7 @@ def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_product():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_product_gone_gets_its_groups_on_the_one_a_recovery_made_again_with_its_sku():
     sauces, extras = a_group("Sauces"), a_group("Extras")
     burger = made_by_a_recovery("Burger", "BUR")
@@ -164,7 +164,7 @@ def test_with_nothing_read_nothing_is_lacking():
     assert queries.category_links_not_in_business([]) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_group_hung_from_a_live_category_with_what_its_attach_takes():
     mains, drinks, bare = make_category("Mains"), make_category("Drinks"), make_category("Bare")
     sauces, extras = a_group("Sauces"), a_group("Extras")
@@ -195,19 +195,19 @@ def test_the_copy_gives_each_group_hung_from_a_live_category_with_what_its_attac
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_no_group_of_a_category():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE modifier_modifierlink CASCADE")
 
     assert queries.category_links_in_copy(direct()) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("read", [queries.links_in_copy, queries.category_links_in_copy, queries.options_in_copy])
 def test_a_copy_with_none_of_the_apps_tables_reads_no_group_for_its_links(read):
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction. A copy taken before the app was switched on has none of its tables: the
         # groups by name are not read where there is no link to pair.
         cursor.execute("DROP TABLE modifier_modifierlink, modifier_modifieroption, modifier_modifiergroup CASCADE")
@@ -224,7 +224,7 @@ def a_category_link_of_the_copy(group, category_id, copy: dict) -> dict:
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_category():
     mains, drinks = make_category("Mains"), make_category("Drinks")
     sauces, extras, sizes = a_group("Sauces"), a_group("Extras"), a_group("Sizes")
@@ -248,7 +248,7 @@ def test_lacking_is_a_group_the_business_no_longer_hangs_from_that_category():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_gone_gets_its_groups_on_the_one_a_recovery_brought_back_with_its_name():
     sauces, extras = a_group("Sauces"), a_group("Extras")
     lost = make_category("Mains")
@@ -273,7 +273,7 @@ def test_a_category_gone_gets_its_groups_on_the_one_a_recovery_brought_back_with
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_the_copy_also_holds_is_never_the_stand_in_of_another_with_its_name():
     sauces = a_group("Sauces")
     lost = make_category("Specials")
@@ -288,7 +288,7 @@ def test_a_category_the_copy_also_holds_is_never_the_stand_in_of_another_with_it
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_group_with_its_options_as_its_recover_takes_them():
     sauces = run_here("modifier.group.create", {
         "name": "Sauces", "kitchen_name": "SAU", "min_choices": 1, "max_choices": 2, "allow_repeat": True,
@@ -323,9 +323,9 @@ def test_the_copy_gives_each_group_with_its_options_as_its_recover_takes_them():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_groups_table_gives_no_group():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE modifier_modifiergroup CASCADE")
 
@@ -348,7 +348,7 @@ def an_option_of_the_copy(name: str, **fields) -> dict:
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_a_group_the_business_no_longer_holds_nor_made_again_with_its_name():
     generic = TaxCategory.objects.get(key=GENERIC).pk
     # Still held, renamed since: the business's, never a second one.
@@ -384,7 +384,7 @@ def a_group_brought_back(name: str) -> ModifierGroup:
     return ModifierGroup.objects.create(name=name, created_by=actor_of(uuid.uuid7()))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_group_gone_stands_for_the_one_a_recovery_brought_back_with_its_name():
     kept = a_group("Sizes")
     back = a_group_brought_back("SAUCES")
@@ -405,7 +405,7 @@ def test_a_group_gone_stands_for_the_one_a_recovery_brought_back_with_its_name()
     assert standing == {lost: back.id}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_group_the_copy_also_holds_is_never_the_stand_in_of_another_with_its_name():
     # Brought back by an earlier recovery before the copy was made, then renamed as the lost one was called.
     earlier = a_group_brought_back("Dips")
@@ -415,7 +415,7 @@ def test_a_group_the_copy_also_holds_is_never_the_stand_in_of_another_with_its_n
     assert queries.groups_standing_for({lost: "Sauces", earlier.id: "Dips"}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_group_gone_hangs_again_as_the_one_a_recovery_brought_back_with_its_name():
     burger, fries = make_product("Burger", "BUR"), make_product("Fries", "FRI")
     mains = make_category("Mains")
@@ -453,7 +453,7 @@ def recovered(record: dict, actor: str = "system"):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_group_comes_back_with_its_options_by_the_group_sheets_own_creates():
     actor = actor_of(uuid.uuid7())
     [record] = queries.groups_not_in_business([
@@ -485,7 +485,7 @@ def test_a_group_comes_back_with_its_options_by_the_group_sheets_own_creates():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_option_its_create_refuses_today_is_left_out_and_said_and_the_group_comes_back():
     generic = TaxCategory.objects.get(key=GENERIC)
     [record] = queries.groups_not_in_business([
@@ -508,7 +508,7 @@ def test_an_option_its_create_refuses_today_is_left_out_and_said_and_the_group_c
     assert spanish != OPTION_LEFT % {"option": "Wine sauce", "why": TAX_CATEGORY_UNKNOWN}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_option_named_as_one_already_back_in_its_group_is_left_out_with_why():
     [record] = queries.groups_not_in_business([
         a_group_of_the_copy("Sauces", options=[an_option_of_the_copy("Alioli"), an_option_of_the_copy("ALIOLI")])
@@ -520,7 +520,7 @@ def test_an_option_named_as_one_already_back_in_its_group_is_left_out_with_why()
     assert [one.code for one in made.left_out] == ["modifier.option_name_taken"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_making_a_group_again_with_its_options_is_only_the_systems():
     op = get_operation("modifier.group.recover")
 

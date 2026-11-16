@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import translation
 from live.models import OutboxEvent
 from live.operations import get as get_operation
@@ -22,11 +22,11 @@ from apps.modifier.models import ModifierGroup, ModifierOption
 from apps.modifier.services import DEFAULT_KEPT
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of, giving_back
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import fields_held_since, fresh, run, run_in
 
 from . import test_recovery as whole
-from .conftest import GENERIC, ctx_for, ctx_with
+from .conftest import GENERIC, HUB_DB, ctx_for, ctx_with
 from .conftest import run as run_here
 from .test_recovery import recoveries  # noqa: F401 - the fixture of the two databases
 
@@ -53,7 +53,7 @@ def as_recovered(option: dict, group_id, **fields) -> dict:
     return {key: option[key] for key in taken} | {"group_id": group_id, "tax_category_key": "", **fields}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_option_with_its_group_and_what_its_create_takes():
     sauces, extras = whole.a_group("Sauces"), whole.a_group("Extras")
     ketchup = an_option(sauces, "Ketchup", is_default=True)
@@ -75,16 +75,16 @@ def test_the_copy_gives_each_option_with_its_group_and_what_its_create_takes():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_whose_options_table_is_there_without_any_option_reads_no_group():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction: with no option to pair, the groups by name are never read.
         cursor.execute("DROP TABLE modifier_modifiergroup CASCADE")
 
     assert queries.options_in_copy(whole.direct()) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_an_option_a_group_the_business_keeps_no_longer_has():
     generic = TaxCategory.objects.get(key=GENERIC).pk
     sauces = whole.a_group("Sauces")
@@ -106,7 +106,7 @@ def test_lacking_is_an_option_a_group_the_business_keeps_no_longer_has():
     assert lacking == [as_recovered(taken, sauces.id, tax_category_key=GENERIC)]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_option_another_group_has_by_its_name_is_lacking_all_the_same():
     sauces, extras = whole.a_group("Sauces"), whole.a_group("Extras")
     # A name is taken in its own group only.
@@ -118,7 +118,7 @@ def test_an_option_another_group_has_by_its_name_is_lacking_all_the_same():
     assert lacking == [as_recovered(taken, sauces.id), as_recovered(other, extras.id)]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_option_of_a_group_gone_goes_to_the_one_a_recovery_brought_back_with_its_name():
     back = whole.a_group_brought_back("SAUCES")
     an_option(back, "Ketchup")
@@ -136,7 +136,7 @@ def test_an_option_of_a_group_gone_goes_to_the_one_a_recovery_brought_back_with_
     assert lacking == [as_recovered(taken, back.id), as_recovered(by_hand, gone)]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_options_of_a_group_this_same_recovery_brought_back_came_back_with_it():
     now, earlier = actor_of(uuid.uuid7()), actor_of(uuid.uuid7())
     with_it = ModifierGroup.objects.create(name="Sauces", created_by=now)
@@ -154,7 +154,7 @@ def test_the_options_of_a_group_this_same_recovery_brought_back_came_back_with_i
     assert queries.options_not_in_business([left_out]) == [as_recovered(left_out, with_it.id)]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_with_nothing_read_no_option_is_lacking():
     assert queries.options_not_in_business([]) == []
 
@@ -167,7 +167,7 @@ def recovered(record: dict, actor: str = "system"):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_option_comes_back_by_the_option_sheets_own_create():
     actor = actor_of(uuid.uuid7())
     sauces = whole.a_group("Sauces")
@@ -197,7 +197,7 @@ def alioli_back_to(most: int, chosen: list[str], **fields) -> tuple:
     return sauces, record
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("most", "chosen"), [(1, []), (0, ["Ketchup"]), (2, ["Ketchup"])])
 def test_one_chosen_by_default_comes_back_chosen_where_its_group_has_room(most, chosen):
     _sauces, record = alioli_back_to(most, chosen, is_default=True)
@@ -207,7 +207,7 @@ def test_one_chosen_by_default_comes_back_chosen_where_its_group_has_room(most, 
     assert (made.is_default, made.left_out) == (True, [])
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("most", "chosen"), [(1, ["Ketchup"]), (2, ["BBQ", "Ketchup"])])
 def test_one_chosen_by_default_never_takes_it_from_the_ones_the_business_chose(most, chosen):
     actor = actor_of(uuid.uuid7())
@@ -227,7 +227,7 @@ def test_one_chosen_by_default_never_takes_it_from_the_ones_the_business_chose(m
     assert spanish != DEFAULT_KEPT % {"chosen": ", ".join(chosen)}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_not_chosen_by_default_comes_back_as_it_was_whatever_its_group_holds():
     _sauces, record = alioli_back_to(1, ["Ketchup"])
 
@@ -236,7 +236,7 @@ def test_one_not_chosen_by_default_comes_back_as_it_was_whatever_its_group_holds
     assert (made.is_default, made.left_out) == (False, [])
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_bringing_an_option_back_is_only_the_systems():
     op = get_operation("modifier.option.recover")
 

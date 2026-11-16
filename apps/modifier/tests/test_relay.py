@@ -11,10 +11,14 @@ import pytest
 from live.models import OutboxEvent
 
 from apps.modifier.models import ModifierLink
-from base import catalog, relay
+from base import relay
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import FOOD, REGISTERED, A, B, ctx_for, heard, make_category, make_product, one_tick, run
+from .conftest import FOOD, HUB_DB_COMMITTED, A, B, ctx_for, heard, make_category, make_product, run
+
+#: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
+pytestmark = HUB_DB_COMMITTED
 
 
 def as_admin_of(scope, name: str, data: dict):
@@ -46,7 +50,7 @@ def links_of(group, scope=A) -> list[tuple[str | None, str | None]]:
 
 
 @pytest.fixture
-def menu(db):
+def menu(factory_data):
     """A burger with «Sauces» and «Extras», and the category «Mains» with «Sauces» too."""
     burger = make_product()
     mains = make_category()
@@ -134,27 +138,32 @@ def linked(scope, sku: str, group: str):
     return product, made
 
 
-def test_a_product_deleted_in_hub_b_lets_go_of_b_links_only_and_is_heard_in_b_only(listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+def test_a_product_deleted_in_hub_b_lets_go_of_b_links_only_and_is_heard_in_b_only(
+    listen, worker_loop, factory_data, factory_data_b, hub_b
+):
     on_a, on_b = listen(A), listen(B)
     a_burger, a_sauces = linked(A, "BUR-A", "Sauces A")
-    b_burger, b_sauces = linked(B, "BUR-B", "Sauces B")
+    with use_hub(hub_b):
+        b_burger, b_sauces = linked(B, "BUR-B", "Sauces B")
     heard(on_a), heard(on_b)  # the creations' own notices
 
-    as_admin_of(B, "inventory.product.delete", {"id": str(b_burger.id)})
+    with use_hub(hub_b):
+        as_admin_of(B, "inventory.product.delete", {"id": str(b_burger.id)})
     heard(on_b)  # the deletion's own notice
-    one_tick()
+    worker_loop()
 
-    assert links_of(b_sauces, B) == []
+    with use_hub(hub_b):
+        assert links_of(b_sauces, B) == []
+        (reaction,) = detached()
     assert "modifier.link.detached" in heard(on_b)
     assert heard(on_a) == set()
     assert links_of(a_sauces, A) == [(str(a_burger.id), None)]
-    (reaction,) = detached()
+    assert detached() == []
     assert (reaction.scope_kind, reaction.scope_key, reaction.payload["group_id"]) == (B.kind, B.key, str(b_sauces.id))
     # The positive control: a product deleted in hub A lets go of A's link, heard in A only.
     as_admin_of(A, "inventory.product.delete", {"id": str(a_burger.id)})
     heard(on_a)
-    one_tick()
+    worker_loop()
     assert links_of(a_sauces, A) == []
     assert "modifier.link.detached" in heard(on_a)
     assert heard(on_b) == set()
