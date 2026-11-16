@@ -16,7 +16,7 @@ from decimal import Decimal
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 
@@ -32,16 +32,19 @@ from apps.inventory.models import (
 from apps.inventory.schemas import CategoryRecoverIn, ProductCategoryIn, ProductIn
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
+
+from .conftest import HUB_DB
 
 TAX = "test.general"
 BARCODE = "8412345678905"
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    connection = connections[current_alias()]
     connection.ensure_connection()
     return connection.connection
 
@@ -55,7 +58,7 @@ def product(name: str, sku: str, **fields) -> Product:
     return Product.objects.create(name=name, sku=sku, price=fields.pop("price", 100), **fields)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
     drinks = Category.objects.create(name="Drinks")
     gone = Category.objects.create(name="Old menu", is_deleted=True)
@@ -108,9 +111,9 @@ def test_the_copy_gives_each_live_product_with_what_its_create_takes(general):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE inventory_product CASCADE")
 
@@ -144,7 +147,7 @@ def a_product_of_the_copy(found: Product | None = None, **fields) -> dict:
     return given | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_lacks_only_what_it_no_longer_holds_nor_made_again_with_its_sku_or_barcode():
     live = product("Tea", "TEA-1")
     # Deleted, it is still held: it comes back the same (products_deleted_in_business), never created again.
@@ -162,7 +165,7 @@ def test_the_business_lacks_only_what_it_no_longer_holds_nor_made_again_with_its
     assert [one["id"] for one in lacking] == [absent["id"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_holds_deleted_what_comes_back_the_same_unless_its_codes_were_taken_since():
     live = product("Tea", "TEA-1")
     deleted = product("Coffee", "COF-1", ean13=BARCODE, is_deleted=True, is_active=False)
@@ -182,7 +185,7 @@ def test_the_business_holds_deleted_what_comes_back_the_same_unless_its_codes_we
     assert [one["id"] for one in held] == [deleted.pk, without_barcode.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_business_still_has(general):
     drinks = Category.objects.create(name="Drinks")
     lost = Category.objects.create(name="Desserts", is_deleted=True)
@@ -205,7 +208,7 @@ def test_a_lacking_product_is_what_the_create_takes_in_the_categories_the_busine
     assert payload.image == "catalog:drinks/coffee"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_product_without_a_tax_category_names_none_and_its_create_says_so():
     [lacking] = queries.products_not_in_business([a_product_of_the_copy(name="Cake", sku="CAK-1", price=300)])
 
@@ -219,7 +222,7 @@ def made_by_a_recovery(name: str, sku: str, **fields) -> Product:
     return product(name, sku, created_by=actor_of(uuid.uuid7()), **fields)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_product_no_longer_held_live_stands_for_the_one_a_recovery_made_again_with_its_sku():
     tea = made_by_a_recovery("Tea", "TEA-1")
     gone = uuid.uuid7()
@@ -230,7 +233,7 @@ def test_a_product_no_longer_held_live_stands_for_the_one_a_recovery_made_again_
     assert queries.products_standing_for({gone: "TEA-1", old.pk: "CAK-1"}) == {gone: tea.pk, old.pk: cake.pk}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_product_still_live_is_itself_by_its_id_before_any_sku():
     tea = product("Tea", "TEA-2")
     made_by_a_recovery("Old tea", "TEA-1")
@@ -239,7 +242,7 @@ def test_a_product_still_live_is_itself_by_its_id_before_any_sku():
     assert queries.products_standing_for({tea.pk: "TEA-1"}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_made_again_by_hand_or_deleted_since_stands_for_none():
     # Made again by hand with the SKU: the business's own, set up as the business chose.
     product("Tea", "TEA-1", created_by="ana")
@@ -271,7 +274,7 @@ def a_category_of_the_copy(found: Category | None = None, **fields) -> dict:
     return given | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_live_category_with_what_its_create_takes_and_the_live_products_in_it(general):
     drinks = category(
         "Drinks", slug="bar", description="Hot and cold", icon="ion:wine-outline", color="#aa3300", order=2,
@@ -298,16 +301,16 @@ def test_the_copy_gives_each_live_category_with_what_its_create_takes_and_the_li
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_category_table_gives_no_category():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE inventory_category CASCADE")
 
     assert queries.categories_in_copy(direct()) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_category_comes_as_its_recover_takes_it_with_the_deleted_products_it_had(general):
     drinks = category("Drinks")
     desserts = category("Desserts", is_deleted=True)
@@ -355,7 +358,7 @@ def test_a_lacking_category_comes_as_its_recover_takes_it_with_the_deleted_produ
         CategoryRecoverIn.model_validate({key: value for key, value in record.items() if key != "id"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_the_business_made_again_by_hand_is_never_made_twice():
     gone = category("Desserts", is_deleted=True)
     # The same name, the case and the spaces aside.
@@ -364,7 +367,7 @@ def test_a_category_the_business_made_again_by_hand_is_never_made_twice():
     assert queries.categories_not_in_business([a_category_of_the_copy(gone)]) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_the_business_renamed_since_is_the_same_one_whoever_took_its_old_name():
     drinks = category("Drinks")
     copy = [a_category_of_the_copy(drinks)]
@@ -380,7 +383,7 @@ def test_a_category_the_business_renamed_since_is_the_same_one_whoever_took_its_
     assert lacking["category_ids"] == [drinks.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_one_made_again_stands_for_one_category_of_the_copy_the_oldest_first():
     kept = category("Specials")
     lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
@@ -401,7 +404,7 @@ def test_each_one_made_again_stands_for_one_category_of_the_copy_the_oldest_firs
     assert lacking["category_ids"] == [second_again.pk, kept.pk, first_again.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lacking_product_goes_into_its_category_brought_back_just_before_with_its_name():
     desserts = category("Desserts", is_deleted=True)
     # What the categories' part of the same recovery created just before: a new one, the same name.
@@ -415,7 +418,7 @@ def test_a_lacking_product_goes_into_its_category_brought_back_just_before_with_
     assert lacking["category_ids"] == [back.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_link_of_a_live_product_to_a_live_category():
     drinks, desserts = category("Drinks"), category("Desserts")
     gone = category("Old menu", is_deleted=True)
@@ -441,9 +444,9 @@ def test_the_copy_gives_each_link_of_a_live_product_to_a_live_category():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_link_table_gives_no_link():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE inventory_productcategory CASCADE")
 
@@ -466,7 +469,7 @@ def brought_back(name: str, **fields) -> Category:
     return category(name, created_by=actor_of(uuid.uuid7()), **fields)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_brought_back_gets_back_the_live_products_the_copy_had_in_it():
     drinks, desserts = category("Drinks"), category("Desserts", is_deleted=True)
     back = brought_back("Desserts")
@@ -489,7 +492,7 @@ def test_a_category_brought_back_gets_back_the_live_products_the_copy_had_in_it(
         ProductCategoryIn.model_validate({key: value for key, value in record.items() if key != "id"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_only_a_product_the_business_keeps_live_and_out_of_it_goes_back_in():
     desserts = category("Desserts", is_deleted=True)
     back = brought_back("Desserts")
@@ -504,7 +507,7 @@ def test_only_a_product_the_business_keeps_live_and_out_of_it_goes_back_in():
     assert queries.product_links_not_in_business(links) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_the_business_kept_or_made_again_by_hand_stays_as_the_business_has_it():
     # Kept, and its product taken out of it since by the business.
     drinks = category("Drinks")
@@ -525,7 +528,7 @@ def test_a_category_the_business_kept_or_made_again_by_hand_stays_as_the_busines
     assert queries.product_links_not_in_business(links) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_an_earlier_recovery_brought_back_and_the_business_kept_is_its_own():
     # Brought back by an earlier recovery before this copy was made, then kept: the business took its product out of it
     # since, and that stays.
@@ -536,7 +539,7 @@ def test_a_category_an_earlier_recovery_brought_back_and_the_business_kept_is_it
     assert queries.product_links_not_in_business(links) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copys_category_is_the_business_own_by_its_id_before_any_name():
     drinks = category("Drinks")
     coffee = product("Coffee", "COF-1")
@@ -549,7 +552,7 @@ def test_the_copys_category_is_the_business_own_by_its_id_before_any_name():
     assert queries.product_links_not_in_business(links) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_category_brought_back_gets_the_products_of_the_one_it_stands_for_the_oldest_first():
     lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
     first_back, second_back = brought_back("Specials"), brought_back("specials")
@@ -566,7 +569,7 @@ def test_each_category_brought_back_gets_the_products_of_the_one_it_stands_for_t
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_its_live_categories_by_id_with_their_names():
     drinks, desserts = category("Drinks"), category("Desserts")
     category("Old menu", is_deleted=True)
@@ -574,7 +577,7 @@ def test_the_copy_gives_its_live_categories_by_id_with_their_names():
     assert queries.category_names_in_copy(direct()) == {drinks.pk: "Drinks", desserts.pk: "Desserts"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_no_longer_held_live_stands_for_the_one_a_recovery_brought_back_with_its_name():
     # Held, but deleted; and gone altogether: each stands for the one a recovery made again with its name.
     desserts = category("Desserts", is_deleted=True)
@@ -586,7 +589,7 @@ def test_a_category_no_longer_held_live_stands_for_the_one_a_recovery_brought_ba
     assert standing == {desserts.pk: desserts_back.pk, gone: specials_back.pk}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_still_live_is_itself_and_one_made_again_by_hand_or_deleted_since_stands_for_none():
     # Still live, renamed since, and its old name taken by one a recovery brought back: it is itself, by its id.
     drinks = category("Beverages")
@@ -600,7 +603,7 @@ def test_a_category_still_live_is_itself_and_one_made_again_by_hand_or_deleted_s
     assert queries.categories_standing_for(copy) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_of_the_copy_brought_back_earlier_is_its_own_and_stands_for_no_other():
     # Brought back by an earlier recovery before the copy was made, and kept: it is the copy's own, never the stand-in
     # of another of the copy's with its name. The whole copy is given, so the pairing is the categories' part's.
@@ -612,7 +615,7 @@ def test_a_category_of_the_copy_brought_back_earlier_is_its_own_and_stands_for_n
     assert queries.categories_standing_for({lost.pk: "Specials"}) == {lost.pk: earlier.pk}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_category_brought_back_stands_for_one_of_the_copy_the_oldest_first():
     lost, also_lost = category("Specials", is_deleted=True), category("Specials", is_deleted=True)
     first_back, second_back = brought_back("Specials"), brought_back("specials")
@@ -622,7 +625,7 @@ def test_each_category_brought_back_stands_for_one_of_the_copy_the_oldest_first(
     assert standing == {lost.pk: first_back.pk, also_lost.pk: second_back.pk}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_with_nothing_read_nothing_is_lacking():
     # The platform asks what is lacking also when the copy gave nothing.
     assert queries.categories_not_in_business([]) == []

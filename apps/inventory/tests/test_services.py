@@ -11,12 +11,11 @@ from decimal import Decimal
 
 import psycopg
 import pytest
-from django.db import connection, transaction
 from django.utils import translation
 from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 from live.outbox import channel_for
 
 from apps.inventory import events
@@ -57,11 +56,13 @@ from apps.inventory.schemas import (
     WriteOffIn,
 )
 from apps.tax.models import TaxCategory
+from base.tenancy.context import use_hub
+from base.tenancy.tests.concurrency import in_a_thread
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
-from .conftest import A, B, ctx_for, ctx_with
+from .conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, ctx_with
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TAX = "test.general"
 LATTE = "catalog:hospitality/cafe_con_leche"
@@ -2158,17 +2159,14 @@ def received(session, timeout=1.0, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_write_in_scope_b_notifies_b_only(listen):
-    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+@HUB_DB_COMMITTED
+def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-
-    get("inventory.product.create")(
-        ctx_for("hub_admin", B),
-        ProductIn(
-            name="Coffee", sku="CAF", price=1, tax_category_key=TAX, initial_stock="1"
-        ),
-    )
+    with use_hub(hub_b):
+        TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+        get("inventory.product.create")(
+            ctx_for("hub_admin", B), ProductIn(name="Coffee", sku="CAF", price=1, tax_category_key=TAX, initial_stock="1")
+        )
 
     assert received(on_b, stop_after=1) == [
         {"events": [events.PRODUCT_CREATED, events.STOCK_CHANGED]}
@@ -2176,15 +2174,15 @@ def test_a_write_in_scope_b_notifies_b_only(listen):
     assert received(on_a, timeout=0.3) == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_marking_a_product_sold_out_in_scope_b_notifies_b_only(listen):
-    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
-    croquettes = get("inventory.product.create")(
-        ctx_for("hub_admin", B), ProductIn(name="Croquettes", sku="CRO", price=1, tax_category_key=TAX)
-    )
-    on_a, on_b = listen(A), listen(B)
-
-    get("inventory.product.set_sold_out")(ctx_for("hub_admin", B), ProductSoldOutIn(id=croquettes.id, sold_out=True))
+@HUB_DB_COMMITTED
+def test_marking_a_product_sold_out_in_scope_b_notifies_b_only(listen, hub_b):
+    with use_hub(hub_b):
+        TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+        croquettes = get("inventory.product.create")(
+            ctx_for("hub_admin", B), ProductIn(name="Croquettes", sku="CRO", price=1, tax_category_key=TAX)
+        )
+        on_a, on_b = listen(A), listen(B)
+        get("inventory.product.set_sold_out")(ctx_for("hub_admin", B), ProductSoldOutIn(id=croquettes.id, sold_out=True))
 
     # The till's catalog of B re-runs on this event (live.py); the one of A hears nothing.
     assert received(on_b, stop_after=1) == [{"events": [events.PRODUCT_UPDATED]}]
@@ -2373,6 +2371,7 @@ QUIET_JOIN = 0.3
 
 
 def _in_thread(target):
+    """Runs ``target`` in its own thread and session of the business at work; its outcome under result or error."""
     outcome = {}
 
     def body():
@@ -2380,10 +2379,8 @@ def _in_thread(target):
             outcome["result"] = target()
         except Exception as error:  # the outcome is asserted by the test
             outcome["error"] = error
-        finally:
-            connection.close()
 
-    thread = threading.Thread(target=body)
+    thread = in_a_thread(body, [None])
     thread.start()
     return thread, outcome
 
@@ -2393,7 +2390,7 @@ def _first_holds(write):
     done, release = threading.Event(), threading.Event()
 
     def first():
-        with transaction.atomic():
+        with atomic():
             result = write()
             done.set()
             release.wait(5)
@@ -2429,8 +2426,8 @@ def test_inventory_f16_a_sale_keeps_the_number_it_arrived_with_even_one_too_long
     assert stock_of(coffee.id) == Decimal("3")
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_sales_of_the_last_unit_at_once_lower_it_once():
+@HUB_DB_COMMITTED
+def test_two_sales_of_the_last_unit_at_once_lower_it_once(plan_with_room):
     last = create("Last", initial_stock="1")
     holder, held, release = _first_holds(lambda: sell(uuid.uuid7(), line(last.id, "1")))
 
@@ -2442,7 +2439,7 @@ def test_two_sales_of_the_last_unit_at_once_lower_it_once():
     assert len(movements(last.id, "sale")) == 1
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize(
     ("start", "crosses_on"),
     [
@@ -2450,7 +2447,7 @@ def test_two_sales_of_the_last_unit_at_once_lower_it_once():
         ("12", "the second"),  # neither alone would cross from the balance it started with: never lost
     ],
 )
-def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, crosses_on):
+def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, crosses_on, plan_with_room):
     article = create("Article", initial_stock=start, low_stock_threshold="10")
     holder, held, release = _first_holds(lambda: sell(uuid.uuid7(), line(article.id, "1")))
 
@@ -2466,8 +2463,8 @@ def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, cr
     assert said == [("below", "11.000", "10.000")], crosses_on
 
 
-@pytest.mark.django_db(transaction=True)
-def test_the_same_sale_delivered_twice_at_once_lowers_once():
+@HUB_DB_COMMITTED
+def test_the_same_sale_delivered_twice_at_once_lowers_once(plan_with_room):
     coffee, sale = create("Coffee", initial_stock="10"), uuid.uuid7()
     holder, held, release = _first_holds(lambda: sell(sale, line(coffee.id, "3")))
 
@@ -2479,8 +2476,8 @@ def test_the_same_sale_delivered_twice_at_once_lowers_once():
     assert len(movements(coffee.id, "sale")) == 1
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_sale_and_its_void_at_once_leave_the_stock_as_it_was():
+@HUB_DB_COMMITTED
+def test_a_sale_and_its_void_at_once_leave_the_stock_as_it_was(plan_with_room):
     coffee, sale = create("Coffee", initial_stock="10"), uuid.uuid7()
     holder, held, release = _first_holds(lambda: sell(sale, line(coffee.id, "3")))
 
@@ -2492,8 +2489,8 @@ def test_a_sale_and_its_void_at_once_leave_the_stock_as_it_was():
     assert [movement_type for movement_type, _, _ in movements(coffee.id)] == ["initial", "sale", "void"]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_write_offs_of_the_whole_balance_at_once_take_it_once():
+@HUB_DB_COMMITTED
+def test_two_write_offs_of_the_whole_balance_at_once_take_it_once(plan_with_room):
     wine = create("Wine", initial_stock="2")
     holder, held, release = _first_holds(lambda: write_off(wine.id, "2"))
 
