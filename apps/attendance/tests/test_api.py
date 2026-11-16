@@ -12,7 +12,7 @@ from apps.attendance.api import router
 from apps.attendance.models import Correction, Record
 from apps.flow.tests.test_api import get, post
 from apps.staff.models import Member
-from base.tests.routes import bound_routes
+from base.tests.routes import bound_routes, published_routes
 from config.api import api
 
 from .conftest import HOST, HUB_DB, B
@@ -67,14 +67,7 @@ def test_the_api_keeps_parity():
 
 @HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_publishes_the_operations_with_their_ids(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
-    served = {
-        (method.upper(), path.removeprefix("/api"), op["operationId"])
-        for path, methods in paths.items()
-        for method, op in methods.items()
-        if op["operationId"].startswith("attendance.")
-    }
-    assert served == ROUTES
+    assert published_routes(client, "attendance.", HOST) == ROUTES
 
 
 # Authentication and permissions
