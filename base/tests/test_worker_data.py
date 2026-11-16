@@ -19,7 +19,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
-from live.errors import Conflict, PermissionDenied
+from live.errors import PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -29,7 +29,7 @@ from base.models import Membership
 from base.permissions import permissions_for
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import dumps, provision
-from base.tenancy.context import use_control, use_hub
+from base.tenancy.context import HubWithoutDatabase, use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
 from control.models import Hub, HubDue, HubDump
@@ -272,35 +272,25 @@ def test_the_worker_empties_only_through_its_own_operation(hub_a):
     assert refused.value.code == "base.internal_only"
 
 
-def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_databases, monkeypatch):
-    """The platform's alone, refused before anything else (OPEN_OPERATIONS «platform»). The local ``a`` has no
-    database of its own: only the suite's fallback enters such a business."""
-    from base.tenancy import context
-    from base.tenancy.tests.legacy import LEGACY
-
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
+def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_a):
+    """The platform's alone, refused before anything else (OPEN_OPERATIONS «platform»)."""
     owner = get_user_model().objects.create_user(username="saas:owner-of-a")
-    Membership.objects.create(user=owner, host="a", role=Membership.Role.OWNER)
-    ctx = OperationContext(scope=Scope("host", "a"), actor=owner, permissions=frozenset({"*"}))
+    Membership.objects.create(user=owner, host=hub_a.slug, role=Membership.Role.OWNER)
+    ctx = OperationContext(scope=Scope("host", hub_a.slug), actor=owner, permissions=frozenset({"*"}))
 
-    with use_hub(Hub.objects.get(slug="a")), pytest.raises(PermissionDenied) as refused:
+    with use_hub(ready(hub_a)), pytest.raises(PermissionDenied) as refused:
         call(ctx, "base.hub.reset_apply", apps=["table"])
 
     assert refused.value.code == "base.internal_only"
 
 
-def test_the_emptying_is_never_run_on_a_shared_database(dumps_bucket, monkeypatch):
-    # Production never enters a business without its own database: only the suite's fallback does.
-    from base.tenancy import context
-    from base.tenancy.tests.legacy import LEGACY
+def test_the_emptying_never_reaches_a_business_without_its_own_database(dumps_bucket):
+    """Production never enters one: its address answers 503 maintenance, and the worker's data pass serves only the
+    businesses with their own database."""
+    shared = Hub.objects.create(slug="shared", status=Hub.Status.READY)
 
-    monkeypatch.setattr(context, "_test_fallback", LEGACY)
-    shared = Hub.objects.get(slug="a")
-
-    with use_hub(shared), pytest.raises(Conflict) as refused:
-        call(system_context(Scope("host", "a")), "base.hub.reset_apply", apps=["table"])
-
-    assert refused.value.code == "base.reset_shared_database"
+    with pytest.raises(HubWithoutDatabase), use_hub(shared):
+        call(system_context(Scope("host", shared.slug)), "base.hub.reset_apply", apps=["table"])
 
 
 # ── A business that leaves ───────────────────────────────────────────────────────────────────────────────────────
