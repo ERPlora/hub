@@ -15,16 +15,21 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
+from apps.flow.tests.test_relay import worker_loop
 from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.staff.models import Member
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
-from base.tenancy.tests.concurrency import hub_staff
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
 #: The scopes, marks and fixtures of the businesses' own databases (the platform staff with business A chosen in the
-#: Hub admin) and the assistant's catalogue of a person of business A, that these tests take from here.
-__all__ = ["HOST", "HUB_DB", "HUB_DB_COMMITTED", "A", "B", "catalog_of", "hub_staff", "in_business_a", "in_hubs"]
+#: Hub admin, business A on a plan with room for several sessions, one tick of the worker's real loop over every
+#: business) and the assistant's catalogue of a person of business A, that these tests take from here.
+__all__ = [
+    "HOST", "HUB_DB", "HUB_DB_COMMITTED", "A", "B", "catalog_of", "hub_staff", "in_business_a", "in_hubs",
+    "plan_with_room", "worker_loop",
+]
 
 
 def ctx_for(

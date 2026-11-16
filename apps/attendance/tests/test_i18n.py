@@ -5,7 +5,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.translation import gettext_lazy

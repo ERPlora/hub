@@ -1,66 +1,22 @@
 """Two taps at the same instant (threads, real transactions): the second waits for the first one's lock on
 the person, then decides on what it left. «Two clock-ins at once leave one open day» is the old module's
-rule (its partial unique index); here the lock answers first and the index is the last guard."""
+rule (its partial unique index); here the lock answers first and the index is the last guard.
 
-import threading
+Business A runs on a plan with room for both sessions (``plan_with_room``): on Free's, the second would wait for its
+turn to open a transaction, never for the lock."""
 
 import pytest
-from django.db import connection, transaction
 from django.utils import timezone
 from live.errors import Conflict
 
 from apps.attendance.models import Break, Correction, Record
 from apps.staff.models import Member
-from apps.staff.tests.conftest import deleted_on_screen
+from apps.staff.tests.test_services import _race
+from base.tenancy.tests.concurrency import HOW, admin_delete, meanwhile
 
-from .conftest import ctx_for, make_member, run, utc
+from .conftest import HUB_DB_COMMITTED, ctx_for, make_member, run, utc
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-QUIET = 0.3
-
-
-def _in_thread(target):
-    outcome = {}
-
-    def body():
-        try:
-            outcome["result"] = target()
-        except Exception as error:  # the outcome is asserted by the test
-            outcome["error"] = error
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=body)
-    thread.start()
-    return thread, outcome
-
-
-def _race(first, second):
-    """Run ``first`` in a transaction kept open until ``second`` (another thread) is blocked on it.
-
-    Returns the outcome of ``second``, which must have waited (a lock), never decided blind.
-    """
-    done, release = threading.Event(), threading.Event()
-
-    def held():
-        with transaction.atomic():
-            result = first()
-            done.set()
-            release.wait(5)
-        return result
-
-    holder, held_outcome = _in_thread(held)
-    assert done.wait(5)
-    waiter, outcome = _in_thread(second)
-    waiter.join(QUIET)
-    waited = waiter.is_alive()
-    release.set()
-    holder.join(5)
-    waiter.join(5)
-    assert "result" in held_outcome, held_outcome
-    assert waited, "the second call did not wait for the first one's lock"
-    return outcome
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def test_two_clock_ins_at_once_leave_one_open_day(person):
@@ -132,11 +88,14 @@ def test_a_clock_in_while_her_old_day_is_reopened_keeps_one_open_day(
 # check, so it waits for the clock-in and answers «Cannot delete», as for a person protected before.
 
 
-@pytest.mark.parametrize("how", ["page", "list"])
-def test_a_clock_in_while_the_hub_admin_deletes_the_person_leaves_them_protected(how):
+def writes_the_day(sql: str) -> bool:
+    return sql.lstrip().startswith('INSERT INTO "attendance_record"')
+
+
+@pytest.mark.parametrize("how", HOW)
+def test_a_clock_in_while_the_hub_admin_deletes_the_person_leaves_them_protected(hub_staff, how):
     ana = make_member()
-    writes_the_day = lambda sql: sql.lstrip().startswith('INSERT INTO "attendance_record"')  # noqa: E731
-    with deleted_on_screen(ana, how, writes_the_day) as answers:
+    with meanwhile(writes_the_day, admin_delete(hub_staff, how, ana), first=True) as answers:
         record = run("attendance.record.clock_in", {"member_id": str(ana.id)})
     [answer] = answers
     assert not isinstance(answer, Exception), answer
