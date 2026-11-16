@@ -53,8 +53,8 @@ nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la 
 
 ## Registro de hubs y `/internal`
 
-El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `docs/plans/2026-10-17-demo-hubs-fase-1.md`,
-ERPlora/docs): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
+El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `knowledge/raw/plans/2026-10-17-demo-hubs-fase-1.md`,
+ERPlora/knowledge): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
 **410** si el hub terminó (cancelado, purgado o una demo pasada su `expires_at`; página con la vuelta a ERPlora) y
 **503** con `Retry-After` si aún se prepara. La API, y toda llamada que no pide una página, recibe el sobre
 (`base.hub_gone`, `base.hub_preparing`). En local, `seed_local_hubs` (solo con `DEBUG`, idempotente) deja `a` y `b`;
@@ -127,7 +127,7 @@ corte y qué se repite, en el README de `packages/live`):
 
 ## Tenencia: una BD por hub (fase 1, tajadas S1–S5)
 
-Plan `docs/plans/2026-10-22-fase-2-tenencia.md` (ERPlora/docs); reglas en PLAN-DB y en `ARCHITECTURE.md` §3 «Tenencia
+Plan `knowledge/raw/plans/2026-10-22-fase-2-tenencia.md` (ERPlora/knowledge); reglas en PLAN-DB y en `ARCHITECTURE.md` §3 «Tenencia
 del Hub» de erplora-next.
 
 - **Dos clases de BD.** La de control (`default`) guarda el registro (`control/`: `Hub`, `DemoCode`, `Cluster`,
@@ -146,7 +146,7 @@ del Hub» de erplora-next.
   todas las filas de las tablas de hub que quedan en control), `--recreate <slug>` (de su plantilla y la foto del SaaS,
   nada copiado) o `--skip <slug>` (un cancelado, sin BD: si vuelve, `base.hub.restore` le hace una de cero);
   `--dry-run` dice el plan, y antes del primer corte copia control al bucket de volcados (`<control>/<hora>-cut.dump`;
-  sin bucket, solo con `--no-dump`). Runbook: `docs/runbooks/cut-shared-hubs.md` (ERPlora/docs). `migrate` ya no crea
+  sin bucket, solo con `--no-dump`). Runbook: `knowledge/wiki/runbooks/cut-shared-hubs.md` (ERPlora/knowledge). `migrate` ya no crea
   tablas de hub en control (`TenantRouter.allow_migrate`); las que quedan allí de la fase 1 no se tocan.
 - **Alta** (`base/tenancy/provision.py`, S2a). `PUT /internal/hubs/{id}` y `POST /internal/demos` dejan el hub
   `requested` y debido en `control.HubDue`; el worker (o `provision(hub)`) toma su arriendo (`SELECT … FOR UPDATE SKIP
@@ -456,7 +456,7 @@ token que nadie emitió, 30 por dirección en 5 min (`base/api_keys.py`).
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
 que prod, con su propio clúster de ECS (`erplora-pre`; prod corre en `erplora-prod`), sus propios
 servicios (`hub-pre`, `worker-pre`), BD `pre_*` y repositorio de ECR (`erplora/hub-pre`). Se apaga
-sola cada tarde (plan `docs/plans/2026-10-14-entorno-pre.md`, ERPlora/docs).
+sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/knowledge).
 
 1. Cada push a una rama de trabajo corre `test / test` (`ci.yml`).
 2. Si `pre` avanzó, se integra `origin/pre` en la rama y se vuelve a empujar.

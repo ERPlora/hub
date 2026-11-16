@@ -636,6 +636,6 @@ def _name_the_businesses_without_a_database() -> None:
     for slug in waiting:
         logger.error(
             "base.worker.hub_without_database hub=%s: it has no database of its own and is not served; run "
-            "manage.py cut_shared_hubs (docs/runbooks/cut-shared-hubs.md).",
+            "manage.py cut_shared_hubs (knowledge/wiki/runbooks/cut-shared-hubs.md).",
             slug,
         )
