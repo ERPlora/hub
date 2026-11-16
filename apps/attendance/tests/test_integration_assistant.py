@@ -21,7 +21,7 @@ from base import assistant
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID
 
-from .conftest import ctx_for, make_member, utc
+from .conftest import HUB_DB, ctx_for, make_member, utc
 
 FRONTEND = Path(apps.get_app_config("attendance").path) / "frontend/locale"
 SETTINGS = json.loads((FRONTEND / "es.json").read_text())["attendance"]["settings"]
@@ -91,7 +91,7 @@ def no_id(card: dict) -> bool:
     return not AN_ID.search(json.dumps(card, ensure_ascii=False))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", CLOCKING)
 def test_an_employee_who_clocks_themselves_reads_their_own_name_on_the_card(name, person):
     """The most common card: an employee, with only «Clock in», clocks in or out or pauses by their own id."""
@@ -103,7 +103,7 @@ def test_an_employee_who_clocks_themselves_reads_their_own_name_on_the_card(name
     assert labels(assistant.cards.card(get(name), {"member_id": str(ana.id)}, "en", ctx)) == ["Person"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("permissions", [CLOCKS_OTHERS, None], ids=["clock_others", "hub_manager"])
 @pytest.mark.parametrize("name", CLOCKING)
 def test_who_clocks_someone_else_reads_their_name_on_the_card(name, permissions, make_user):
@@ -114,7 +114,7 @@ def test_who_clocks_someone_else_reads_their_name_on_the_card(name, permissions,
     assert no_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", CLOCKING)
 def test_someone_else_is_left_out_of_the_card_of_who_only_clocks_themselves(name, person):
     """The write refuses it («You can only clock yourself in and out.»); the card names nobody by an id meanwhile."""
@@ -145,7 +145,7 @@ def open_day(member: Member, clock_in: str = "2026-10-06T07:00", clock_out: str 
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("permissions", [CORRECTS, None], ids=["correct", "hub_manager"])
 @pytest.mark.parametrize(
     ("language", "named", "label"),
@@ -167,7 +167,7 @@ def test_a_correction_names_the_working_day_by_its_person_and_its_day(language, 
     assert no_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("permissions", [CORRECTS, None], ids=["correct", "hub_manager"])
 def test_closing_the_day_of_who_was_terminated_names_them(permissions, make_user):
     """ATTENDANCE-F13 (the reaction to a termination, also the assistant's): the card says whose day it closes."""
