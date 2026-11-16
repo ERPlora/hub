@@ -20,6 +20,7 @@ from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 
 from .conftest import (
     FOOD,
+    HUB_DB,
     make_combo,
     make_group,
     make_option,
@@ -54,6 +55,7 @@ def test_every_model_is_registered_with_its_inlines():
     assert ChoiceGroupAdmin.inlines == [ChoiceOptionInline]
 
 
+@HUB_DB
 def test_full_crud_for_the_platform_staff(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -64,9 +66,8 @@ def test_full_crud_for_the_platform_staff(superuser):
         assert model_admin.has_delete_permission(request), model
 
 
-@pytest.mark.django_db
-def test_a_menu_is_added_and_changed_from_the_admin(client, superuser):
-    client.force_login(superuser)
+@HUB_DB
+def test_a_menu_is_added_and_changed_from_the_admin(hub_staff):
     inline = {
         "groups-TOTAL_FORMS": "0",
         "groups-INITIAL_FORMS": "0",
@@ -83,10 +84,10 @@ def test_a_menu_is_added_and_changed_from_the_admin(client, superuser):
         "is_active": "on",
         **inline,
     }
-    added = client.post("/admin/combo/combo/add/", form, HTTP_HOST="hubs.localhost")
+    added = hub_staff.post("/admin/combo/combo/add/", form, HTTP_HOST="hubs.localhost")
     assert added.status_code == 302, added.content[:800]
     combo = Combo.objects.get()
-    changed = client.post(
+    changed = hub_staff.post(
         f"/admin/combo/combo/{combo.pk}/change/",
         {**form, "price": "1400"},
         HTTP_HOST="hubs.localhost",
@@ -96,12 +97,11 @@ def test_a_menu_is_added_and_changed_from_the_admin(client, superuser):
     assert combo.price == 1400
 
 
-@pytest.mark.django_db
-def test_the_pages_render_on_the_platform_host(client, superuser):
+@HUB_DB
+def test_the_pages_render_on_the_platform_host(hub_staff):
     combo = make_combo("Menu of the day")
     group = make_group(combo, "Starters")
     option = make_option(group, make_product("Lentils"))
-    client.force_login(superuser)
     for url, text in (
         ("/admin/combo/combo/", b"Menu of the day"),
         (f"/admin/combo/combo/{combo.pk}/change/", b"Starters"),
@@ -109,6 +109,6 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         (f"/admin/combo/choicegroup/{group.pk}/change/", b"Lentils"),
         (f"/admin/combo/choiceoption/{option.pk}/change/", b"price_delta"),
     ):
-        response = client.get(url, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url
