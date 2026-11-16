@@ -6,31 +6,27 @@ outbox, in the step's transaction; one tick of the worker's real loop (``base.wo
 hands it to Automations (``apps.flow``), and the automation that waits for it runs once — a second tick, or the
 same notice handed over again, changes nothing. A refused completion records nothing, so it starts nothing. A
 payment completed in hub B starts its run in B, and its notices are heard in B only.
+
+The worker's real loop serves each business in its own database and releases its connections once it has served it:
+what these tests write is committed.
 """
 
-import json
-import threading
-
-import psycopg
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.errors import Conflict
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.flow.models import FlowRun
+from apps.flow.tests.test_relay import heard
 from apps.task.models import Task
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import A, B
+from .conftest import HUB_DB_COMMITTED, A, B
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 RECEIPT = {
     "name": "File the receipt",
     "trigger": {"kind": "event", "event": "payment.payment.completed"},
@@ -57,11 +53,11 @@ def run(name: str, data: dict, scope: Scope = A):
     return op(owner(scope), op.input.model_validate(data))
 
 
-def automation() -> str:
+def automation(scope: Scope = A) -> str:
     """«When a payment is completed, file its receipt», as the owner makes it: created, granted and on."""
-    created = run("flow.flow.create", RECEIPT)
-    run("flow.flow.grant", {"id": str(created.id), "operations": ["task.task.create"]})
-    run("flow.flow.set_enabled", {"id": str(created.id), "enabled": True})
+    created = run("flow.flow.create", RECEIPT, scope)
+    run("flow.flow.grant", {"id": str(created.id), "operations": ["task.task.create"]}, scope)
+    run("flow.flow.set_enabled", {"id": str(created.id), "enabled": True}, scope)
     return str(created.id)
 
 
@@ -83,27 +79,11 @@ def sent_payment(scope: Scope = A, method: str = "BBVA account"):
     return payment
 
 
-def tick() -> None:
-    """One tick of the worker's real loop (relay included)."""
-    stop = threading.Event()
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
-
-
-@pytest.fixture
-def worker_loop(monkeypatch):
-    """The worker without the SaaS (``register_apps``) and, inside a test's transaction, without releasing the
-    connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return tick
-
-
 def receipts() -> list[str]:
     return sorted(Task.objects.values_list("title", flat=True))
 
 
-@pytest.mark.django_db
+@HUB_DB_COMMITTED
 def test_a_completed_payment_starts_the_automation_through_the_workers_relay_once(worker_loop):
     flow_id = automation()
     payment = sent_payment()
@@ -137,7 +117,7 @@ def test_a_completed_payment_starts_the_automation_through_the_workers_relay_onc
     assert (FlowRun.objects.count(), receipts()) == (1, [f"File the receipt of {payment.reference}"])
 
 
-@pytest.mark.django_db
+@HUB_DB_COMMITTED
 def test_the_same_notice_handed_over_again_starts_no_second_run(worker_loop):
     automation()
     payment = sent_payment()
@@ -155,7 +135,7 @@ def test_the_same_notice_handed_over_again_starts_no_second_run(worker_loop):
     assert (FlowRun.objects.count(), Task.objects.count()) == (1, 1)
 
 
-@pytest.mark.django_db
+@HUB_DB_COMMITTED
 def test_a_refused_completion_records_no_notice_and_starts_nothing(worker_loop):
     automation()
     run("payment.method.create", {"name": "BBVA account"})
@@ -172,49 +152,34 @@ def test_a_refused_completion_records_no_notice_and_starts_nothing(worker_loop):
     assert (FlowRun.objects.count(), Task.objects.count()) == (0, 0)
 
 
-# ── Two hubs, on committed data ──────────────────────────────────────────────────────────────
+# ── Two hubs ─────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 0.5) -> set[str]:
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
-
-
-@pytest.mark.django_db(transaction=True)
-def test_a_payment_completed_in_hub_b_starts_its_run_in_b_and_is_heard_in_b_only(listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+@HUB_DB_COMMITTED
+def test_a_payment_completed_in_hub_b_starts_its_run_in_b_and_is_heard_in_b_only(listen, worker_loop, hub_b):
     automation()
     on_a, on_b = listen(A), listen(B)
-    payment = sent_payment(B, method="Caja B")
-    tick()
+    with use_hub(hub_b):
+        automation(B)
+        payment = sent_payment(B, method="Caja B")
+    worker_loop()
     heard(on_a), heard(on_b)  # the ladder's own notices
 
-    run("payment.payment.mark_completed", {"id": str(payment.id)}, B)
+    with use_hub(hub_b):
+        run("payment.payment.mark_completed", {"id": str(payment.id)}, B)
     assert heard(on_b) == {"payment.payment.completed"}
-    tick()
+    worker_loop()
 
     assert {"flow.run.started", "flow.run.finished", "task.task.created"} <= heard(on_b)
     assert heard(on_a, timeout=0.3) == set()
-    started = OutboxEvent.objects.get(name="flow.run.started")
+    with use_hub(hub_b):
+        started = OutboxEvent.objects.get(name="flow.run.started")
     assert (started.scope_kind, started.scope_key) == (B.kind, B.key)
+    assert not FlowRun.objects.exists()
     # The positive control: a payment completed in A is heard in A and starts its run there.
     in_a = sent_payment(A, method="Caja A")
-    tick()
+    worker_loop()
     heard(on_a)
     run("payment.payment.mark_completed", {"id": str(in_a.id)}, A)
-    tick()
+    worker_loop()
     assert "flow.run.started" in heard(on_a)

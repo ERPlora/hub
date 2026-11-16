@@ -1,12 +1,11 @@
 """The reference of the day on the clock of the business, not the deployment's (hub#771). Apart from ``test_services``,
 which fixes ``timezone.localdate`` itself for every test."""
 
-import pytest
 from live.operations import get
 
-from .conftest import ctx_for, make_method
+from .conftest import HUB_DB, ctx_for, make_method
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def recorded(bank):
