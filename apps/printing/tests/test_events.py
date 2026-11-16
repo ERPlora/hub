@@ -1,10 +1,10 @@
 """Events of the printing app: their names follow ``printing.<entity>.<fact>`` and it reacts to nobody's
 (the apps that print call printing.job.create by name, in their own transaction)."""
 
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.printing import events
+from apps.printing.tests.conftest import A
 
 
 def test_every_event_is_named_by_the_convention():
@@ -28,4 +28,4 @@ def test_every_event_is_named_by_the_convention():
 
 def test_it_reacts_to_nothing():
     assert events.REACTIONS == {}
-    assert events.react(Scope("host", "a"), "sale.sale.completed", {"id": "x"}) is None
+    assert events.react(A, "sale.sale.completed", {"id": "x"}) is None
