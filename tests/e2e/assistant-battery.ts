@@ -4,7 +4,7 @@
 // with it, only with QA_REAL_PROVIDER=1 (never in CI: it spends real tokens). An answer's wording is never judged
 // here: what a person must read is listed per item for the human review.
 
-/** One server-sent event of a turn (`base/assistant.py`, `turn_frames`). */
+/** One server-sent event of a turn (`base/assistant/gateway.py`, `turn_frames`). */
 export interface Frame {
   type: string;
   [key: string]: unknown;
@@ -88,7 +88,7 @@ export interface Meta {
   chunks: Record<string, number>;
 }
 
-/** The tools every turn is offered whatever is asked (`base/assistant.py`, `ALWAYS`): none of them is the business's. */
+/** The tools every turn is offered whatever is asked (`base/assistant/relevance.py`, `ALWAYS`): none of them is the business's. */
 export const ALWAYS = ['base.setup.status', 'base.business.get', 'base.docs.search'];
 const DOCS_SEARCH = 'base.docs.search';
 

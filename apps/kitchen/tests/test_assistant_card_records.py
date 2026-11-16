@@ -148,7 +148,7 @@ def make_kitchen(
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -408,7 +408,7 @@ def test_a_record_removed_meanwhile_is_left_out():
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     kitchen = make_kitchen()
-    card = assistant.card(get("kitchen.station.update"), {"station_id": str(kitchen.station.id), "name": "Horno"}, "en")
+    card = assistant.cards.card(get("kitchen.station.update"), {"station_id": str(kitchen.station.id), "name": "Horno"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Horno"}
 
 

@@ -6,7 +6,7 @@ such a field must hand it to the card as money, or the AI could send 65 for «65
 
 And by its name (base's half is hub#258): in Spanish, every datum a write of Services sends reaches the card by the name
 the Services screens give it, never by the title pydantic makes up from the field («Absorbed Id», «Tax Category Key»,
-«Items»). The card is base's (``base.assistant.card``); the names are service's: the titles of its schemas and the
+«Items»). The card is base's (``base.assistant.cards.card``); the names are service's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import dataclasses
@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import formats, timezone, translation
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, Conflict, PermissionDenied
 from live.meta import all_live_app_configs, permissions_for_role
@@ -31,25 +32,26 @@ from apps.service.schemas import MAX_CENTS
 from base import assistant
 from base.business import business_zone
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
 from base.tests.test_assistant_card_values import AN_ID, list_field, unnamed
 
-from .conftest import ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption, make_service
+from .conftest import (
+    HUB_DB, ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption, make_service,
+)
 
 APP = Path(apps.get_app_config("service").path)
 SCREENS = json.loads((APP / "frontend/locale/es.json").read_text())["service"]
 SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["service"]
 
 #: The writes of Services the assistant calls, by name.
-TOOLS = sorted(name for name, op in registry.items() if op.app_label == "service" and op.kind == "command" and assistant.is_tool(op))
+TOOLS = sorted(name for name, op in registry.items() if op.app_label == "service" and op.kind == "command" and assistant.tools.is_tool(op))
 
 
 def money_fields(name: str) -> list[str]:
     """The fields of the input of ``name`` that are an amount (``Cents``: at most ``MAX_CENTS``)."""
-    schema = assistant._schema(get(name))
+    schema = shared.input_schema(get(name))
     defs = schema.get("$defs", {})
-    return [field for field, prop in schema.get("properties", {}).items() if assistant._resolved(prop, defs).get("maximum") == MAX_CENTS]
+    return [field for field, prop in schema.get("properties", {}).items() if shared.resolved(prop, defs).get("maximum") == MAX_CENTS]
 
 
 def test_the_writes_with_an_amount_are_found():
@@ -62,7 +64,7 @@ def test_the_writes_with_an_amount_are_found():
 @pytest.mark.parametrize("name", TOOLS)
 def test_every_amount_of_a_write_reaches_the_card_as_money(name, language):
     fields = money_fields(name)
-    card = assistant.card(get(name), {field: 1500 for field in fields}, language)
+    card = assistant.cards.card(get(name), {field: 1500 for field in fields}, language)
     assert {field["name"]: field["kind"] for field in card["fields"]} == dict.fromkeys(fields, "money")
 
 
@@ -74,12 +76,12 @@ def named_by_service(op, name: str, title: str | None) -> bool:
     """Whether service itself names the datum ``name`` of ``op``: by its schema's own title, by the ``verbose_name`` of
     one of its models, or by its own catalog. A title pydantic made up that another app's catalog happens to translate
     («Reference» → «Referencia», from Printing's) is not a name of Services: it changes if that app's text changes."""
-    made_up = assistant._generated_title(name)
+    made_up = shared.generated_title(name)
     with (APP / "locale/es/LC_MESSAGES/django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     return (
         bool(title and title != made_up)
-        or assistant._verbose_name("service", op.name.split(".")[1], name) is not None
+        or shared.verbose_name("service", op.name.split(".")[1], name) is not None
         or own.gettext(made_up) != made_up
     )
 
@@ -93,8 +95,8 @@ def test_no_datum_of_a_write_of_service_reaches_a_spanish_card_by_its_technical_
     technical: dict[str, list[str]] = {}
     for name in TOOLS:
         op = get(name)
-        props = assistant._schema(op).get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        props = shared.input_schema(op).get("properties", {})
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_service(op, datum, props[datum].get("title")):
                 technical.setdefault(name, []).append(datum)
@@ -104,33 +106,33 @@ def test_no_datum_of_a_write_of_service_reaches_a_spanish_card_by_its_technical_
 def test_the_card_names_the_duplicate_customer_whose_vouchers_move():
     """Customers merges a duplicate card into the one that stays: the duplicate as its merge screen calls it."""
     reassign = get("service.grant.reassign")
-    assert labels(assistant.card(reassign, {"absorbed_id": "x"}, "es")) == ["Ficha duplicada"]
-    assert labels(assistant.card(reassign, {"absorbed_id": "x"}, "en")) == ["Duplicate customer"]
+    assert labels(assistant.cards.card(reassign, {"absorbed_id": "x"}, "es")) == ["Ficha duplicada"]
+    assert labels(assistant.cards.card(reassign, {"absorbed_id": "x"}, "en")) == ["Duplicate customer"]
 
 
 def test_the_card_names_the_tax_category_of_a_service_as_its_form():
     for name in ("service.service.create", "service.service.update"):
         arguments = {"tax_category_key": "general"}
-        assert labels(assistant.card(get(name), arguments, "es")) == [SCREENS["services"]["form"]["tax"]]
-        assert labels(assistant.card(get(name), arguments, "en")) == [SCREENS_EN["services"]["form"]["tax"]]
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [SCREENS["services"]["form"]["tax"]]
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [SCREENS_EN["services"]["form"]["tax"]]
     settings = get("service.settings.update")
     arguments = {"default_tax_category_key": "general"}
-    assert labels(assistant.card(settings, arguments, "es")) == [SCREENS["settings"]["defaultTax"]]
-    assert labels(assistant.card(settings, arguments, "en")) == [SCREENS_EN["settings"]["defaultTax"]]
+    assert labels(assistant.cards.card(settings, arguments, "es")) == [SCREENS["settings"]["defaultTax"]]
+    assert labels(assistant.cards.card(settings, arguments, "en")) == [SCREENS_EN["settings"]["defaultTax"]]
 
 
 def test_the_card_names_the_services_a_package_includes_as_its_form():
     create = get("service.package.create")
     arguments = {"items": [{"service": "Corte"}]}
-    assert labels(assistant.card(create, arguments, "es")) == [SCREENS["packages"]["form"]["lines"]]
-    assert labels(assistant.card(create, arguments, "en")) == [SCREENS_EN["packages"]["form"]["lines"]]
+    assert labels(assistant.cards.card(create, arguments, "es")) == [SCREENS["packages"]["form"]["lines"]]
+    assert labels(assistant.cards.card(create, arguments, "en")) == [SCREENS_EN["packages"]["form"]["lines"]]
 
 
 def test_the_card_titles_the_refund_or_void_that_gives_sessions_back_by_services_own_words():
     """Sales gives back the sessions spent in a sale it refunds or voids: the card titles that document by what it is,
     with service's own words, not with the «Referencia» another app's catalog lends to pydantic's «Reference» (the
     card that names a real refund under it: test_a_write_of_services_names_the_sale_the_lines_the_appointment_…)."""
-    reference = assistant._schema(get("service.session.return"))["properties"]["reference"]
+    reference = shared.input_schema(get("service.session.return"))["properties"]["reference"]
     assert named_by_service(get("service.session.return"), "reference", reference.get("title"))
     with translation.override("es"):
         assert translation.gettext(reference["title"]) == "Devolución o anulación"
@@ -236,7 +238,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def values(card: dict) -> dict:
@@ -385,7 +387,7 @@ def said_at_the_till(till: dict, language: str = "es") -> dict:
 def till_cards(till: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``TILL`` naming every record of Sales or Appointments it names by its id."""
     return {
-        write: assistant.card(get(write), {datum: str(till[kind]) for datum, kind in data.items()}, language, ctx)
+        write: assistant.cards.card(get(write), {datum: str(till[kind]) for datum, kind in data.items()}, language, ctx)
         for write, data in TILL.items()
     }
 
@@ -398,7 +400,7 @@ def named_at_the_till(till: dict, language: str = "es") -> dict:
 def cards(salon: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        write: assistant.card(get(write), {datum: str(salon[kind]) for datum, kind in data.items()}, language, ctx)
+        write: assistant.cards.card(get(write), {datum: str(salon[kind]) for datum, kind in data.items()}, language, ctx)
         for write, data in NAMED.items()
     }
 
@@ -442,10 +444,10 @@ def assert_left_out(shown: dict) -> None:
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_refund_as_their_screens_do(
-    language, hub_a, no_fallback
+    language, hub_a
 ):
     """«Véndele el bono de la venta de esta mañana», «gasta la sesión en la cita de Lucía»: the card says which sale (by
     its number), which line (by what it charges), which appointment (as Appointments' cards say it) and which refund
@@ -461,13 +463,13 @@ def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_re
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
-def test_the_sessions_a_void_gives_back_name_the_sale_voided(language, said, hub_a, no_fallback):
+def test_the_sessions_a_void_gives_back_name_the_sale_voided(language, said, hub_a):
     """SERVICE-F27: Sales gives back the sessions of a sale it voids with the sale itself as the document."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
-        card = assistant.card(
+        card = assistant.cards.card(
             get("service.session.return"), {"reference": str(till["voided"])}, language, person(hub_a, language=language)
         )
     assert values(card) == {"reference": said.format(till["voided_number"])}
@@ -490,9 +492,9 @@ def turn_off_sales_and_appointments(request, monkeypatch):
     return turn_off
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 def test_without_sales_and_appointments_the_card_leaves_them_out_never_by_their_id(
-    hub_a, no_fallback, turn_off_sales_and_appointments
+    hub_a, turn_off_sales_and_appointments
 ):
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
@@ -503,8 +505,8 @@ def test_without_sales_and_appointments_the_card_leaves_them_out_never_by_their_
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(hub_a):
     """The reads of Sales and Appointments run as whoever asks: without their rights, Services names nothing of theirs."""
     hidden = frozenset({"sale.view_sale", "appointment.view_appointment", "appointment.view_own_appointment"})
     ctx = person(hub_a, without=hidden)
@@ -515,8 +517,8 @@ def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(h
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_someone_else(hub_a, no_fallback):
+@HUB_DB
+def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_someone_else(hub_a):
     """An employee sees her own appointments only (Appointments' rule): another's is left out, never by its id."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
@@ -527,23 +529,23 @@ def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_some
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_nothing_of_sales_nor_appointments(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_nothing_of_sales_nor_appointments(hub_a):
     with use_hub(hub_a):
         shown = till_cards(a_till(hub_a, a_salon()), None)
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_sale_or_an_appointment_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_sale_or_an_appointment_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in TILL_TITLES["es"]}
     with use_hub(hub_a):
         shown = till_cards(gone, person(hub_a))
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_sale_or_an_appointment_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_sale_or_an_appointment_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     with use_hub(hub_b):
         theirs = a_till(hub_b, a_salon())
         named_in_b = till_cards(theirs, person(hub_b))
@@ -564,9 +566,9 @@ def test_the_read_that_names_them_is_no_tool_and_takes_one_record():
             read.input.model_validate(data)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
-def test_the_read_that_names_them_answers_in_the_readers_language(language, said, hub_a, no_fallback):
+def test_the_read_that_names_them_answers_in_the_readers_language(language, said, hub_a):
     """Whatever language is active where it is asked from (a request in the other one, a nested call)."""
     other = {"es": "en", "en": "es"}[language]
     read = get("service.record.get")
@@ -577,8 +579,8 @@ def test_the_read_that_names_them_answers_in_the_readers_language(language, said
     assert named.name == said.format(till["voided_number"])
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_fallback):
+@HUB_DB
+def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a):
     read = get("service.record.get")
     # By name: with a lower one of Services («see services») the read would open to whoever never sees a voucher.
     assert read.permission == "service.view_package_balance"
@@ -586,7 +588,7 @@ def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_
         read(person(hub_a, without=frozenset({read.permission})), read.input.model_validate({"sale_id": str(uuid.uuid7())}))
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(
     ("datum", "code"),
     [
@@ -597,7 +599,7 @@ def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_
         ("appointment_id", "service.appointments_unavailable"),
     ],
 )
-def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, no_fallback, monkeypatch):
+def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, monkeypatch):
     for name in BEHIND:
         monkeypatch.delitem(registry, name)
     read = get("service.record.get")
@@ -606,9 +608,9 @@ def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, n
     assert caught.value.code == code
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a, no_fallback):
+def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a):
     """«Anula ese bono», «quítale ese servicio a Ana»: the card says which service, category, package, professional,
     customer, voucher or session by its name, in the person's language, never by its id."""
     with use_hub(hub_a):
@@ -617,9 +619,9 @@ def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallback):
+def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
     """«Servicio: Corte», «Bono vendido: Bono 5 cortes · …», never «Id: Corte»: the mark alone would name it under its
     field."""
     with use_hub(hub_a):
@@ -629,17 +631,17 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallb
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_the_records_inside_a_list_are_named_too(language, hub_a, no_fallback):
+def test_the_records_inside_a_list_are_named_too(language, hub_a):
     """The services of a new package and the category of each service of a bulk create, at any depth."""
     with use_hub(hub_a):
         salon = a_salon()
         ctx = person(hub_a, language=language)
-        package = assistant.card(
+        package = assistant.cards.card(
             get("service.package.create"), {"items": [{"service_id": str(salon["service"]), "sessions": 5}]}, language, ctx
         )
-        bulk = assistant.card(
+        bulk = assistant.cards.card(
             get("service.service.bulk_create"),
             {"services": [{"name": "Tinte", "category_id": str(salon["category"])}]},
             language,
@@ -650,17 +652,17 @@ def test_the_records_inside_a_list_are_named_too(language, hub_a, no_fallback):
     assert no_id(package) and no_id(bulk)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 @pytest.mark.parametrize("write", OVER_SESSIONS)
-def test_a_write_over_several_sessions_names_each_and_says_how_many(write, language, hub_a, no_fallback):
+def test_a_write_over_several_sessions_names_each_and_says_how_many(write, language, hub_a):
     """The dangerous writes over the sessions of a sale: whoever types the number sees which they are."""
     with use_hub(hub_a):
         salon = a_salon()
         second_service = make_service("Peinado")
         grant = Grant.objects.get(pk=salon["grant"])
         second = make_redemption(grant, second_service)
-        card = assistant.card(
+        card = assistant.cards.card(
             get(write), {"ids": [str(salon["session"]), str(second.id)]}, language, person(hub_a, language=language)
         )
     field = list_field(card, "ids")
@@ -670,8 +672,8 @@ def test_a_write_over_several_sessions_names_each_and_says_how_many(write, langu
     assert no_id(card)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_services(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_record_of_services(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         shown = cards(a_salon(), None)
@@ -679,8 +681,8 @@ def test_nobody_behind_the_request_reads_no_record_of_services(hub_a, no_fallbac
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a):
     """Whoever may run the writes but see nothing (a key that only writes, say) gets every record left out, never its
     id."""
     writes_only = OperationContext(
@@ -704,8 +706,8 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in TITLES["es"]}
     with use_hub(hub_a):
         shown = cards(gone, person(hub_a))
@@ -713,8 +715,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallba
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's voucher or session is nobody in hub A."""
     with use_hub(hub_b):
         theirs = a_salon()
@@ -727,26 +729,26 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fa
     assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_two_equal_vouchers_of_a_customer_are_told_apart_by_the_day_they_were_sold(hub_a, no_fallback):
+@HUB_DB
+def test_two_equal_vouchers_of_a_customer_are_told_apart_by_the_day_they_were_sold(hub_a):
     with use_hub(hub_a):
         salon = a_salon()
         package, customer = Package.objects.get(pk=salon["package"]), Customer.objects.get(pk=salon["customer"])
         later = sold(package, customer, on=dt.datetime(2026, 10, 20, 12, tzinfo=dt.UTC))
         admin = person(hub_a)
         void = get("service.grant.void")
-        said_of = [values(assistant.card(void, {"id": str(grant)}, "es", admin))["id"] for grant in (salon["grant"], later.id)]
+        said_of = [values(assistant.cards.card(void, {"id": str(grant)}, "es", admin))["id"] for grant in (salon["grant"], later.id)]
     assert said_of == ["Bono 5 cortes · Lucía Pérez · 3 oct 2026", "Bono 5 cortes · Lucía Pérez · 20 oct 2026"]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_customers_reads_the_voucher_without_its_owner(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_customers_reads_the_voucher_without_its_owner(hub_a):
     """The voucher's name is Services'; the customer's, Customers': the card says no more than the person may read."""
     with use_hub(hub_a):
         salon = a_salon()
         ctx = person(hub_a, without=frozenset({"customer.view"}))
-        grant = values(assistant.card(get("service.grant.void"), {"id": str(salon["grant"])}, "es", ctx))["id"]
-        session = values(assistant.card(get("service.session.release"), {"id": str(salon["session"])}, "es", ctx))["id"]
+        grant = values(assistant.cards.card(get("service.grant.void"), {"id": str(salon["grant"])}, "es", ctx))["id"]
+        session = values(assistant.cards.card(get("service.session.release"), {"id": str(salon["session"])}, "es", ctx))["id"]
     assert grant == "Bono 5 cortes · 3 oct 2026"
     assert session == "Bono 5 cortes · Corte"
 
@@ -770,8 +772,8 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             defs = schema.get("$defs", {})
             for datum, kind in data.items():
                 checked += 1
-                prop = assistant._resolved(schema["properties"][datum], defs)
-                marked = assistant.refers_of(assistant._resolved(prop["items"], defs) if "items" in prop else prop)
+                prop = shared.resolved(schema["properties"][datum], defs)
+                marked = shared.refers_of(shared.resolved(prop["items"], defs) if "items" in prop else prop)
                 reads = [marked["read"]] if marked else []
                 # What Sales or Appointments name, by the read of theirs that Services' own read asks.
                 reads += [BEHIND_OF[kind]] if kind in BEHIND_OF else []

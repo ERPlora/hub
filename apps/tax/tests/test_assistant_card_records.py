@@ -87,7 +87,7 @@ def make_rule(
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -188,7 +188,7 @@ def test_a_change_keeps_saying_the_rule_beside_what_it_changes():
 def test_a_write_says_the_country_by_its_name_never_its_code(write, datum, language, expected):
     """«Deactivate the beer rule in Germany» by voice: «País: Alemania», as the Rules screen's picker says it, never «DE».
     No person is needed: the name is the app's, not a record's."""
-    card = assistant.card(get(write), {datum: "DE", "tax_category_key": "cerveza"}, language)
+    card = assistant.cards.card(get(write), {datum: "DE", "tax_category_key": "cerveza"}, language)
     assert {field["name"]: field["value"] for field in card["fields"]}[datum] == expected
 
 
@@ -200,7 +200,7 @@ def test_a_batch_of_rules_says_the_country_of_each_one_by_its_name(language, exp
         {"country_code": "DE", "tax_category_key": "cerveza", "rate_pct": "19"},
         {"country_code": "FR", "tax_category_key": "vino", "rate_pct": "20"},
     ]
-    (field,) = assistant.card(get("tax.rule.bulk_create"), {"rules": rules}, language)["fields"]
+    (field,) = assistant.cards.card(get("tax.rule.bulk_create"), {"rules": rules}, language)["fields"]
     assert [line["country_code"] for line in field["value"]] == expected
 
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
@@ -229,7 +229,7 @@ def test_what_does_not_exist_is_left_out(write, datum):
 def test_nobody_behind_the_request_reads_no_rule():
     """An automation's card (no person at hand) names no rule: nothing is read for anybody."""
     rule = make_rule(make_category())
-    card = assistant.card(get("tax.rule.end"), {"id": str(rule.id), "valid_to": "2026-12-31"}, "en")
+    card = assistant.cards.card(get("tax.rule.end"), {"id": str(rule.id), "valid_to": "2026-12-31"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"valid_to": "Dec 31, 2026"}
 
 

@@ -1,7 +1,7 @@
 """The assistant's confirmation card names each datum of a write of Cart & checkout by a name of the app's own (base's
 half is hub#258): in Spanish, never by the title pydantic makes up from the field («Item Id», «Order Id»), nor by a word
 another app's catalog happens to lend («Customer» → «Cliente», from Tables'). The card is base's
-(``base.assistant.card``); the names are cart_checkout's: the titles of its schemas and the ``verbose_name`` of its
+(``base.assistant.cards.card``); the names are cart_checkout's: the titles of its schemas and the ``verbose_name`` of its
 models, with their Spanish in its catalog.
 
 The record a write names by its id (base's half is hub#416): the cart by its session code, as the Carts list and «Delete
@@ -17,6 +17,7 @@ import pytest
 from django.apps import apps
 from django.utils.text import capfirst
 from django.utils.translation import override
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get, registry
@@ -39,7 +40,7 @@ SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["cart_che
 TOOLS = sorted(
     name
     for name, op in registry.items()
-    if op.app_label == "cart_checkout" and op.kind == "command" and assistant.is_tool(op)
+    if op.app_label == "cart_checkout" and op.kind == "command" and assistant.tools.is_tool(op)
 )
 
 
@@ -51,12 +52,12 @@ def named_by_cart_checkout(op, name: str, title: str | None) -> bool:
     """Whether cart_checkout itself names the datum ``name`` of ``op``: by its schema's own title, by the
     ``verbose_name`` of one of its models, or by its own catalog. A title pydantic made up that another app's catalog
     happens to translate is not a name of Cart & checkout: it changes if that app's text changes."""
-    made_up = assistant._generated_title(name)
+    made_up = shared.generated_title(name)
     with (APP / "locale/es/LC_MESSAGES/django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     return (
         bool(title and title != made_up)
-        or assistant._verbose_name("cart_checkout", op.name.split(".")[1], name) is not None
+        or shared.verbose_name("cart_checkout", op.name.split(".")[1], name) is not None
         or own.gettext(made_up) != made_up
     )
 
@@ -70,8 +71,8 @@ def test_no_datum_of_a_write_of_cart_checkout_reaches_a_spanish_card_by_its_tech
     technical: dict[str, list[str]] = {}
     for name in TOOLS:
         op = get(name)
-        props = assistant._schema(op).get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        props = shared.input_schema(op).get("properties", {})
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_cart_checkout(op, datum, props[datum].get("title")):
                 technical.setdefault(name, []).append(datum)
@@ -81,8 +82,8 @@ def test_no_datum_of_a_write_of_cart_checkout_reaches_a_spanish_card_by_its_tech
 def test_the_card_names_the_customer_a_cart_is_found_by():
     """A cart said by its customer (their email or part of their name), as the app calls them: «Cliente»."""
     for name in ("cart_checkout.cart.clear", "cart_checkout.item.add", "cart_checkout.checkout.initiate"):
-        assert labels(assistant.card(get(name), {"customer": "Ana"}, "es")) == ["Cliente"]
-        assert labels(assistant.card(get(name), {"customer": "Ana"}, "en")) == ["Customer"]
+        assert labels(assistant.cards.card(get(name), {"customer": "Ana"}, "es")) == ["Cliente"]
+        assert labels(assistant.cards.card(get(name), {"customer": "Ana"}, "en")) == ["Customer"]
 
 
 # ── The record a write names by its id, by its name ───────────────────────────────────────────────────────────────────
@@ -146,7 +147,7 @@ def no_fallback(monkeypatch):
 
 def cards(ctx: OperationContext, names: tuple[str, ...], datum: str, record: str, language: str = "es") -> dict:
     return {
-        name: assistant.card(get(name), {datum: record, **BESIDES.get(name, {})}, language, ctx) for name in names
+        name: assistant.cards.card(get(name), {datum: record, **BESIDES.get(name, {})}, language, ctx) for name in names
     }
 
 
@@ -202,8 +203,8 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             op = get(name)
             if not mine.has(op.permission):
                 continue
-            for prop in assistant._schema(op).get("properties", {}).values():
-                marked = assistant.refers_of(assistant._resolved(prop, assistant._schema(op).get("$defs", {})))
+            for prop in shared.input_schema(op).get("properties", {}).values():
+                marked = shared.refers_of(shared.resolved(prop, shared.input_schema(op).get("$defs", {})))
                 if marked is not None:
                     checked += 1
                     if not mine.has(registry[marked["read"]].permission):
@@ -219,7 +220,7 @@ def test_nobody_behind_the_request_reads_no_cart_line_or_order(hub_a, no_fallbac
         made = shop(in_hub(hub_a))
         for names, datum in ((ON_A_CART, "cart_id"), (ON_A_LINE, "item_id"), (ON_AN_ORDER, "order_id")):
             for name in names:
-                card = assistant.card(get(name), {datum: made[datum], **BESIDES.get(name, {})}, "es")
+                card = assistant.cards.card(get(name), {datum: made[datum], **BESIDES.get(name, {})}, "es")
                 assert datum not in values(card) and no_id(card), name
 
 
@@ -245,7 +246,7 @@ def test_a_deleted_cart_is_left_out_never_by_its_id(hub_a, no_fallback):
         ctx = in_hub(hub_a)
         made = shop(ctx)
         run(ctx, "cart_checkout.cart.delete", {"cart_id": made["cart_id"]})
-        card = assistant.card(get("cart_checkout.cart.clear"), {"cart_id": made["cart_id"]}, "es", ctx)
+        card = assistant.cards.card(get("cart_checkout.cart.clear"), {"cart_id": made["cart_id"]}, "es", ctx)
     assert values(card) == {} and no_id(card)
 
 
@@ -256,7 +257,7 @@ def test_a_cart_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fall
         of_b = shop(in_hub(hub_b), session="sess_bea")
     with use_hub(hub_a):
         in_a = {
-            datum: assistant.card(get(name), {datum: of_b[datum], **BESIDES.get(name, {})}, "es", in_hub(hub_a))
+            datum: assistant.cards.card(get(name), {datum: of_b[datum], **BESIDES.get(name, {})}, "es", in_hub(hub_a))
             for name, datum in (
                 ("cart_checkout.cart.clear", "cart_id"),
                 ("cart_checkout.item.remove", "item_id"),
@@ -266,7 +267,7 @@ def test_a_cart_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fall
     assert {datum: values(card) for datum, card in in_a.items()} == {"cart_id": {}, "item_id": {}, "order_id": {}}
     # Positive control: in hub B the same cards name them.
     with use_hub(hub_b):
-        in_b = assistant.card(get("cart_checkout.cart.clear"), {"cart_id": of_b["cart_id"]}, "es", in_hub(hub_b))
+        in_b = assistant.cards.card(get("cart_checkout.cart.clear"), {"cart_id": of_b["cart_id"]}, "es", in_hub(hub_b))
     assert values(in_b) == {"cart_id": "sess_bea"}
 
 
@@ -280,8 +281,8 @@ def test_the_card_names_the_line_of_a_cart_as_its_model(hub_a, no_fallback):
     with use_hub(hub_a):
         item = shop(in_hub(hub_a))["item_id"]
         for name in ("cart_checkout.item.update", "cart_checkout.item.remove"):
-            assert labels(assistant.card(get(name), {"item_id": item}, "es", in_hub(hub_a))) == [line]
-            assert labels(assistant.card(get(name), {"item_id": item}, "en", in_hub(hub_a))) == ["Cart line"]
+            assert labels(assistant.cards.card(get(name), {"item_id": item}, "es", in_hub(hub_a))) == [line]
+            assert labels(assistant.cards.card(get(name), {"item_id": item}, "en", in_hub(hub_a))) == ["Cart line"]
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -290,10 +291,10 @@ def test_the_card_names_the_order_as_the_orders_screen(hub_a, no_fallback):
         order = shop(in_hub(hub_a))["order_id"]
         for name in ON_AN_ORDER:
             arguments = {"order_id": order, **BESIDES.get(name, {})}
-            assert labels(assistant.card(get(name), arguments, "es", in_hub(hub_a)))[0] == SCREENS["orders"]["columns"][
+            assert labels(assistant.cards.card(get(name), arguments, "es", in_hub(hub_a)))[0] == SCREENS["orders"]["columns"][
                 "order"
             ]
-            assert labels(assistant.card(get(name), arguments, "en", in_hub(hub_a)))[0] == SCREENS_EN["orders"][
+            assert labels(assistant.cards.card(get(name), arguments, "en", in_hub(hub_a)))[0] == SCREENS_EN["orders"][
                 "columns"
             ]["order"]
 
@@ -303,7 +304,7 @@ def test_the_card_says_the_payment_method_as_cart_checkout_does(language, label)
     """«Inicia el pedido y paga con tarjeta»: the payment method by cart_checkout's own word, not another app's («medio
     de pago», the till's)."""
     arguments = {"customer": "Ana", "payment_method": "card"}
-    card = assistant.card(get("cart_checkout.checkout.initiate"), arguments, language)
+    card = assistant.cards.card(get("cart_checkout.checkout.initiate"), arguments, language)
     assert labels(card)[1] == label
 
 
@@ -324,6 +325,6 @@ def test_a_line_added_to_a_cart_in_another_currency_is_priced_in_it(currency, mo
         ctx = in_hub(hub_a)
         cart = run(ctx, "cart_checkout.cart.create", {"session_token": "sess_ana", "customer_name": "Ana García", "currency": currency})
         which = {"cart_id": str(cart.id), "session_token": "sess_ana", "customer": "Ana García"}[datum]
-        card = assistant.card(get("cart_checkout.item.add"), {datum: which, **BESIDES["cart_checkout.item.add"]}, "es", ctx)
+        card = assistant.cards.card(get("cart_checkout.item.add"), {datum: which, **BESIDES["cart_checkout.item.add"]}, "es", ctx)
     [price] = [field for field in card["fields"] if field["name"] == "unit_price"]
     assert {key: price[key] for key in ("kind", "value", "money") if key in price} == {"kind": "money", "value": 900, "money": money}

@@ -32,6 +32,7 @@ from django.db.models import Q, TextField
 from django.db.models.functions import Cast, Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
+from live import assistant as shared
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import Operation, atomic, get, operation
@@ -118,8 +119,7 @@ from apps.flow.schemas import (
     SecretSetIn,
     UpdateIn,
 )
-from base import assistant as hub_assistant
-from base import outbound
+from base import assistant as hub_assistant, outbound
 from base.business import business_zone
 from base.recovery import brought_back
 
@@ -1312,7 +1312,7 @@ UNATTENDED = (
     "tools and answer with what you found or did, in a few words."
 )
 #: What the assistant hears of a call of its answer that was not made: one change waits for a person at a time.
-NOT_MADE = hub_assistant.error_content("not_made", "Not made: ask for one change at a time.")
+NOT_MADE = shared.error_content("not_made", "Not made: ask for one change at a time.")
 #: What the assistant hears of a call whose fixed datum is empty in this run: the tool is not used (nothing half done).
 PINNED_EMPTY_CODE = "flow.pinned_empty"
 PINNED_EMPTY_TOLD = "Not made: %(fields)s, fixed by this step, is empty in this run, so this tool cannot be used now."
@@ -1342,14 +1342,14 @@ def _offered(ctx: OperationContext, flow: Flow, step: dict) -> dict[str, Operati
     tools: dict[str, Operation] = {}
     for name in step.get("tools") or []:
         op = catalog.get(name)
-        if name in flow.grants and op is not None and hub_assistant.is_tool(op):
+        if name in flow.grants and op is not None and hub_assistant.tools.is_tool(op):
             tools[name] = op
     return tools
 
 
 def _spec(op: Operation, step: dict) -> dict:
     """``op`` as the step offers it to the assistant: without the data the step fixes, which it never sees."""
-    spec = hub_assistant.tool_spec(op)
+    spec = shared.tool_spec(op)
     fixed = (step.get("pinned") or {}).get(op.name)
     if not fixed:
         return spec
@@ -1386,7 +1386,7 @@ def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
     except OperationError:
         business = {}
     currency = business.get("currency") or "EUR"
-    text = hub_assistant.instructions(
+    text = hub_assistant.prompt.instructions(
         language=flow.language,
         currency=currency,
         decimals=business.get("currency_decimals", 2),
@@ -1517,7 +1517,7 @@ def _propose(  # noqa: PLR0913, PLR0917
         run=run,
         flow=flow,
         step_id=f"{step['id']}:{Question.objects.filter(run=run).count() + 1}",
-        title=(str(ASSISTANT_WANTS) % {"app": hub_assistant.app_name(op)})[:300],
+        title=(str(ASSISTANT_WANTS) % {"app": hub_assistant.cards.app_name(op)})[:300],
         details=said[:2000],
         role="",
         on_no="stop",
@@ -1564,13 +1564,13 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
     ]}]
     with translation.override(flow.language):
         for index, call in enumerate(data.calls):
-            op = hub_assistant.operation_of(call.name, tools)
+            op = shared.operation_of(call.name, tools)
             fixed, empty = _pinned(run, step, op) if op is not None else ({}, [])
             if op is None:
-                content = hub_assistant.error_content("not_available", "That tool was not offered in this step.")
+                content = shared.error_content("not_available", "That tool was not offered in this step.")
             elif empty:
                 told = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
-                content = hub_assistant.error_content(PINNED_EMPTY_CODE, told)
+                content = shared.error_content(PINNED_EMPTY_CODE, told)
                 _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
             elif op.kind == "command" and step.get("mode", "ask") == "ask":
                 later = [behind.call_id for behind in data.calls[index + 1 :]]
@@ -1579,7 +1579,7 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
                 _propose(ctx, run, flow, step, op, call, arguments, later, asked_turn, data.text, now)
                 return {"go_on": False}
             else:
-                outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
+                outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
                 _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
                 content = outcome.content
             messages.append({"role": "tool", "tool_call_id": call.call_id, "content": content})
@@ -1665,11 +1665,11 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     fixed, empty = _pinned(run, step, op)
     if empty:
         told_empty = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
-        content = hub_assistant.error_content(PINNED_EMPTY_CODE, told_empty)
+        content = shared.error_content(PINNED_EMPTY_CODE, told_empty)
         _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
     else:
         arguments = _with_pinned(str(proposal.get("arguments") or "{}"), fixed)
-        outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, arguments)
+        outcome = shared.run_tool(_step_context(ctx, run, flow, op), op, arguments)
         _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
         content = outcome.content
     told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": content}]

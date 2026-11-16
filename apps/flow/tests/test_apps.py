@@ -212,7 +212,7 @@ def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
-        if assistant.is_tool(op):  # what a person says to ask for it (hub#1106); the engine's are no tool
+        if assistant.tools.is_tool(op):  # what a person says to ask for it (hub#1106); the engine's are no tool
             expected |= {"asks"}
         assert set(op.ai) == expected, name
         if op.kind == "command":

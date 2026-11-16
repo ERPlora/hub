@@ -1407,7 +1407,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   vacío (`queries.fixed_value`: `None` o texto en blanco, la misma regla en «Probar») → `flow.pinned_empty` al
   modelo y `assistant_pinned_empty` en el log, sin proponer ni ejecutar. «Probar» devuelve `pinned` por paso
   (`PinnedOut`: `filled`, `empty` o `unknown` si lee un paso que no corre en la prueba), cada `filled` con `said`,
-  el dato de `base.assistant.card` (la tarjeta de FLOW-F29) leído con el `ctx` de quien prueba: `null` si la tarjeta
+  el dato de `base.assistant.cards.card` (la tarjeta de FLOW-F29) leído con el `ctx` de quien prueba: `null` si la tarjeta
   lo deja fuera (`_LEFT_OUT`), y entonces `TestPanel.vue` no lo pinta; los demás, con `fieldText` de base. Un importe
   lleva la moneda del negocio en su `money` (la pone el servidor), para que abrir la pestaña no abra una lectura viva
   más (reabriría el flujo de la página). Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
@@ -1449,7 +1449,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Los datos del cambio que espera un sí**:
   `_propose` guarda en `Question.details` solo lo que dijo el asistente; `flow.question.list` añade `fields` con
   `queries.question_row`, que lee con `queries.proposal_of` la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
-  la vez, la misma que hace `_make_proposal` tras el sí) y la pasa por `base.assistant.card` con el `ctx` de quien
+  la vez, la misma que hace `_make_proposal` tras el sí) y la pasa por `base.assistant.cards.card` con el `ctx` de quien
   lee: fechas en su idioma y a la hora del negocio, listas cerradas por su etiqueta y registros por la lectura de
   su marca `refers`, ejecutada como esa persona (si no puede leerlo, el dato no sale). La pantalla los pinta con
   `fieldLines` del chat compartido (`@erplora/ui/components`), como la tarjeta del chat, sin los vacíos y con la

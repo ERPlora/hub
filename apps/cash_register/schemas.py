@@ -37,7 +37,7 @@ COUNT_SOMETHING = _("Count the drawer: give its notes and coins or its total.")
 #: How «Open session» and the drawers of the settings name a drawer (the assistant's card names the datum by it).
 DRAWER = gettext_noop("Drawer")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a session by its number, as the sessions' list and every window of a shift («Cash count ·
 # S-…»); a drawer by its name, as «Open session» and the drawers of the settings. Every till role reads both.
 A_SESSION = names("cash_register.session.get", by="session_id", name=("number",))

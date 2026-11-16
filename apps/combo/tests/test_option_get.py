@@ -47,4 +47,4 @@ def test_it_needs_the_right_to_see_menus(lentils):
 
 
 def test_it_is_no_tool_of_the_assistant():
-    assert assistant.is_tool(get("combo.option.get")) is False
+    assert assistant.tools.is_tool(get("combo.option.get")) is False

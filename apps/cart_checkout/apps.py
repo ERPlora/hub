@@ -30,7 +30,7 @@ class CartCheckoutConfig(LiveAppConfig):
     # Nothing: products and prices are free text and the customer an email and a name (WORKBOOK «Decisión»).
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). A «cesta» or a «carrito» is a shopping
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «cesta» or a «carrito» is a shopping
     # cart (cart_checkout.cart), and «unidades» or «cantidad», as «tres unidades», the quantity a line takes (never
     # «cantidad» as Inventory's unit of measure). Never «línea»: it is the till's check line (sale.order.*_line) and a
     # cart's line would take its place.

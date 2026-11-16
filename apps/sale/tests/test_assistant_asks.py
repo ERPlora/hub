@@ -9,6 +9,7 @@ the catalogue of a business with every app on and ranked as a turn ranks, is ``b
 import re
 
 import pytest
+from live import assistant as shared
 from live.assistant import asks_of
 from live.operations import registry
 
@@ -25,7 +26,7 @@ MIN_PHRASES = 200
 def test_every_phrase_of_sale_is_one_of_at_least_200():
     """Each tool of sale says at least two phrases in each language (``live.E020``); they are at least ``MIN_PHRASES``
     in all, so what the layer ranks is the whole set and never a silent few."""
-    sale = [op for op in registry.values() if op.app_label == "sale" and assistant.is_tool(op)]
+    sale = [op for op in registry.values() if op.app_label == "sale" and assistant.tools.is_tool(op)]
     assert sum(len(asks_of(op).get(language, ())) for op in sale for language in LANGUAGES) >= MIN_PHRASES
 
 
@@ -33,8 +34,8 @@ def test_every_phrase_of_sale_is_one_of_at_least_200():
 def test_what_the_employee_may_not_do_is_not_in_their_catalogue():
     """The till's settings are the manager's (``sale.manage_settings``), and no manager approves them on the spot:
     the employee's turn never offers them, whatever they ask; the figures of the business are not theirs either."""
-    employee = assistant.catalog(ctx_for("hub_employee", language="es"))
-    manager = assistant.catalog(ctx_for("hub_manager", language="es"))
+    employee = assistant.tools.catalog(ctx_for("hub_employee", language="es"))
+    manager = assistant.tools.catalog(ctx_for("hub_manager", language="es"))
     for name in ("sale.settings.update", "sale.payment_method.create", "sale.sale.today"):
         assert name in manager  # positive control: the manager holds it
         assert name not in employee
@@ -112,7 +113,7 @@ def test_the_reported_requests_of_layer_2_are_its_probes_word_for_word():
 @HUB_DB
 @pytest.mark.parametrize(("language", "name", "phrase"), QA_PROBES)
 def test_the_reported_sales_request_offers_its_existing_operation(language, name, phrase):
-    tools = assistant.catalog(ctx_for("hub_owner", language=language))
+    tools = assistant.tools.catalog(ctx_for("hub_owner", language=language))
     assert name in tools
     assert name in offered_to(tools, phrase, language)[:10]
 
@@ -122,7 +123,7 @@ def test_how_customers_may_pay_at_the_till_brings_the_payment_methods_before_the
     """«¿De qué maneras pueden abonarme los clientes en caja?» asks for the payment methods of the till: they come among
     the first eight, ahead of every tool of Customers and of Cash register its words name."""
     language, name, phrase = PAYING_AT_THE_TILL
-    offered = offered_to(assistant.catalog(ctx_for("hub_owner", language=language)), phrase, language)
+    offered = offered_to(assistant.tools.catalog(ctx_for("hub_owner", language=language)), phrase, language)
 
     assert name in offered[:8], offered[:10]
     named = [tool for tool in offered if tool.split(".")[0] in ("customer", "cash_register")]
@@ -144,7 +145,7 @@ def test_the_asks_of_the_payment_methods_of_the_till_take_no_place_from_the_paym
     for probe in probes_of_layer_2():
         if not probe["tool"].startswith("payment.method."):
             continue
-        tools = assistant.catalog(ctx_for(ROLE_OF[probe["role"]], language=probe["language"]))
+        tools = assistant.tools.catalog(ctx_for(ROLE_OF[probe["role"]], language=probe["language"]))
         if probe["tool"] not in tools:
             continue
         said = probe["tool"], probe["phrase"], probe["language"]
@@ -201,7 +202,7 @@ OWN_WORDS = [
 @HUB_DB
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
 def test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks(language, name, phrase):
-    assert_its_asks_bring(assistant.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
+    assert_its_asks_bring(assistant.tools.catalog(ctx_for("hub_owner", language=language)), name, phrase, language)
 
 
 def test_no_qa_probe_is_an_ask():
@@ -211,7 +212,7 @@ def test_no_qa_probe_is_an_ask():
     for language, name, phrase in QA_PROBES:
         assert phrase not in asks_of(registry[name]).get(language, ()), phrase
     for op in registry.values():
-        if op.app_label == "sale" and assistant.is_tool(op):
+        if op.app_label == "sale" and assistant.tools.is_tool(op):
             for phrases in asks_of(op).values():
                 for phrase in phrases:
                     assert not re.search(r"\bQA\b", phrase), (op.name, phrase)
@@ -244,6 +245,6 @@ RESOLUTION_READS = {
 
 @pytest.mark.parametrize(("name", "reads"), RESOLUTION_READS.items())
 def test_the_operation_names_the_reads_that_resolve_human_references(name, reads):
-    description = assistant.description(registry[name])
+    description = shared.description(registry[name])
     for read in reads:
         assert read in description

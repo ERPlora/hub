@@ -39,7 +39,7 @@ TICKET_TYPE = gettext_noop("Ticket type")
 DISHES = gettext_noop("Dishes")
 STATION_COLOUR = gettext_noop("Station colour")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a ticket by its number, as the «Cancel ticket …?» dialog and its sheet say it; a dish and a
 # station by their names, as the board and the stations' «Delete …?» dialog say them; a product and a category of
 # Inventory by their names, as Inventory says them; a check of Sales by its title (else its amount) and a line of it by

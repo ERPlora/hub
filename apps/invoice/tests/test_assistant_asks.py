@@ -204,7 +204,7 @@ OWN_WORDS = [
 
 def test_invoice_offers_its_twenty_five_tools():
     """Invoicing's assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == TOOLS
 
@@ -266,14 +266,14 @@ def test_the_hub_reads_a_paid_invoice_as_paid(words):
 def test_a_charge_of_the_till_is_never_read_as_a_paid_invoice(phrase):
     """«cobrar» and «cobro» alone are a sale's charge (live's group of a sale): only «como cobrada» marks one paid."""
     sale = shared.stem("sale")
-    concepts = shared.asked([phrase], assistant.synonyms()).concepts
+    concepts = shared.asked([phrase], assistant.relevance.synonyms()).concepts
     assert any(sale in concept for concept in concepts)  # positive control: it names a sale
     assert not any(shared.stem("paid") in concept for concept in concepts)
 
 
 def without_the_paid_group():
-    """The Hub's words (``base.assistant.synonyms``) without the group of a paid invoice."""
-    every = assistant.synonyms()
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the group of a paid invoice."""
+    every = assistant.relevance.synonyms()
     kept = tuple(group for group in every if not set(PAID) & set(group))
     assert len(kept) == len(every) - 1  # positive control: the group is there, and only one
     return kept
