@@ -6,14 +6,13 @@ the delivered event to ``events.react``; here the test hands it over the same wa
 may deliver twice.
 """
 
-import pytest
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import A, card, receive, run, system
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, A, card, receive, run, system
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def delivered(name: str):

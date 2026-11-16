@@ -11,39 +11,18 @@ import uuid
 import httpx
 import pytest
 import respx
-from django.db import connection
+from django.db import connections
 from live.errors import Conflict, OperationError
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, delete_card, reads
+from apps.customer.tests.conftest import reads
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, card, connect, ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, card, connect, ctx_for, receive, run, system, template
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, in_a_thread, meanwhile
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def test_the_same_message_twice_at_once_is_one_message_and_one_unread():
@@ -112,34 +91,23 @@ def test_no_lock_is_held_while_erplora_answers():
         return httpx.Response(200, json={"wa_message_id": "wamid.SLOW"})
 
     respx.post(SEND).mock(side_effect=slow)
-    outcome: dict = {}
-
-    def sender():
-        try:
-            outcome["sent"] = run(
-                "whatsapp_inbox.message.send",
-                {"id": conversation, "text": "Hola", "client_message_id": str(uuid.uuid7())},
-            )
-        except Exception as error:  # reported by the test
-            outcome["error"] = error
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=sender)
+    outcome: list = [None]
+    payload = {"id": conversation, "text": "Hola", "client_message_id": str(uuid.uuid7())}
+    thread = in_a_thread(lambda: run("whatsapp_inbox.message.send", payload), outcome)
     thread.start()
     try:
         assert in_http.wait(10), "the send never reached erplora.com"
-        with connection.cursor() as cursor:
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("SET lock_timeout = '2s'")
         read = run("whatsapp_inbox.conversation.mark_read", {"id": conversation})
         assert read.unread_count == 0
     finally:
         release.set()
         thread.join(30)
-        with connection.cursor() as cursor:
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("SET lock_timeout = 0")
-    assert "error" not in outcome, outcome
-    assert Message.objects.get(pk=outcome["sent"].id).status == "sent"
+    assert not isinstance(outcome[0], Exception), outcome
+    assert Message.objects.get(pk=outcome[0].id).status == "sent"
 
 
 @respx.mock
@@ -164,8 +132,6 @@ def test_the_same_key_twice_at_once_is_one_message_sent_once():
 # (an IntegrityError, a 500; a message lost, a reaction retried for ever). The card is locked before the
 # conversation, as the deletion takes them: the deletion waits and then leaves the conversation without the card;
 # a join that comes second waits for the deletion and finds no card to join.
-
-HOW = ["page", "list"]
 
 
 def links(nth: int = 1):
@@ -245,11 +211,11 @@ JOINS = {
 @respx.mock
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("join", sorted(JOINS))
-def test_the_hub_admin_deleting_a_card_a_conversation_is_joined_to_meanwhile_leaves_it_without(join, how):
+def test_the_hub_admin_deleting_a_card_a_conversation_is_joined_to_meanwhile_leaves_it_without(join, how, hub_staff):
     ana = card_of()
     make, nth = JOINS[join]
     joining = make(ana)
-    with card_deleted_on_screen(ana, how, links(nth)) as answers:
+    with meanwhile(links(nth), admin_delete(hub_staff, how, ana), first=True) as answers:
         joining()
     [answer] = answers
     assert not isinstance(answer, Exception), answer
@@ -269,11 +235,11 @@ JOINS_FIRST_DELETED = {
 @respx.mock
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("join", sorted(JOINS_FIRST_DELETED))
-def test_a_join_to_a_card_the_hub_admin_deletes_first_joins_nothing(join, how):
+def test_a_join_to_a_card_the_hub_admin_deletes_first_joins_nothing(join, how, hub_staff):
     ana = card_of()
     joining = JOINS[join][0](ana)
     refusal = JOINS_FIRST_DELETED[join]
-    with card_deleted_on_screen(ana, how, reads("customer_customer")) as answers:
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, how, ana), first=True) as answers:
         try:
             joining()
         except OperationError as error:
@@ -287,11 +253,11 @@ def test_a_join_to_a_card_the_hub_admin_deletes_first_joins_nothing(join, how):
 
 
 @pytest.mark.parametrize("how", HOW)
-def test_a_merge_into_a_card_the_hub_admin_deleted_moves_no_conversation(how):
+def test_a_merge_into_a_card_the_hub_admin_deleted_moves_no_conversation(how, hub_staff):
     ana = card_of()
     move = _moved(ana)
     old = Conversation.objects.get().customer_id
-    assert delete_card(ana, how).status_code == 302
+    assert admin_delete(hub_staff, how, ana)().status_code == 302
     assert move().count == 0
     assert Conversation.objects.get().customer_id == old
 
@@ -323,12 +289,12 @@ REJOINS = {"by hand": (_rejoined_by_hand, "customer.customer_unavailable"), "mes
 
 
 @pytest.mark.parametrize("join", sorted(REJOINS))
-def test_a_join_and_the_hub_admin_deleting_both_its_cards_never_wait_in_a_circle(join):
+def test_a_join_and_the_hub_admin_deleting_both_its_cards_never_wait_in_a_circle(join, hub_staff):
     ana, old = card_of(), card_of("Ana L.", "699000111")
     make, refusal = REJOINS[join]
     joining = make(old, ana)
     card_locked = lambda sql: 'FROM "customer_customer"' in sql and "FOR UPDATE" in sql  # noqa: E731
-    with card_deleted_on_screen(ana, "list", card_locked, also=[old]) as answers:
+    with meanwhile(card_locked, admin_delete(hub_staff, "list", ana, old), first=True) as answers:
         try:
             joining()
         except OperationError as error:

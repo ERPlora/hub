@@ -215,14 +215,6 @@ def make_run(flow, **fields):
     return FlowRun.objects.create(flow=flow, **fields)
 
 
-def whatsapp_connected(templates: list | None = None):
-    """erplora.com says business A's WhatsApp number is connected (and, when given, which templates Meta has)."""
-    from apps.whatsapp_inbox.tests.conftest import system
-
-    body = {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150, "templates": templates}
-    return system("whatsapp_inbox.channel.sync", body, A)
-
-
 def make_draft(name: str = "Call who did not come", **fields):
     from apps.flow.models import Draft
 

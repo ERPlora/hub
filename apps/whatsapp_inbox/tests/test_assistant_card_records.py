@@ -15,10 +15,9 @@ from live.operations import get
 from pydantic import ValidationError
 
 from apps.whatsapp_inbox.models import Conversation, Message, Note, Template
-from apps.whatsapp_inbox.tests.conftest import NOW, A, card, connect, ctx_for, receive, run, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, A, card, connect, ctx_for, receive, run, template
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -81,7 +80,7 @@ def no_id(said) -> bool:
 # ── A conversation ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Conversation"), ("es", "Conversación")])
 @pytest.mark.parametrize(("write", "extra"), ON_A_CONVERSATION)
 def test_a_write_on_a_conversation_says_whose_it_is_as_the_inbox_calls_it(write, extra, language, title):
@@ -91,7 +90,7 @@ def test_a_write_on_a_conversation_says_whose_it_is_as_the_inbox_calls_it(write,
     assert (field["value"], field["label"]) == ("Ana", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_conversation_joined_to_a_card_goes_by_the_cards_name():
     """As the inbox lists it: the card's name before the WhatsApp profile's."""
     conversation = a_conversation()
@@ -101,7 +100,7 @@ def test_a_conversation_joined_to_a_card_goes_by_the_cards_name():
     assert said["id"] == "Ana López"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Customer"), ("es", "Cliente")])
 def test_joining_a_card_says_the_customer_by_its_name(language, title):
     conversation, ana = a_conversation(), card("Ana López")
@@ -115,7 +114,7 @@ def test_joining_a_card_says_the_customer_by_its_name(language, title):
 # ── A message and a note, by their text ───────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Message"), ("es", "Mensaje")])
 def test_retrying_a_message_says_it_by_its_text(language, title):
     message = Message.objects.get(pk=receive("wamid.1", text="Hola, ¿tenéis hora mañana?").id)
@@ -123,7 +122,7 @@ def test_retrying_a_message_says_it_by_its_text(language, title):
     assert (field["value"], field["label"]) == ("Hola, ¿tenéis hora mañana?", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_message_without_text_goes_by_its_caption_else_by_its_file_name():
     """As the inbox's list says one: its caption, else its file name."""
     media = {"url": "https://erplora.com/m/1", "mime_type": "application/pdf", "filename": "carta.pdf"}
@@ -134,7 +133,7 @@ def test_a_message_without_text_goes_by_its_caption_else_by_its_file_name():
     assert shown(retry, {"id": str(bare.id)})["id"] == "carta.pdf"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Note"), ("es", "Nota")])
 def test_deleting_a_note_says_it_by_its_text(language, title):
     note = a_note("Prefers mornings")
@@ -145,7 +144,7 @@ def test_deleting_a_note_says_it_by_its_text(language, title):
 # ── A template, by its name and its language ──────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Template"), ("es", "Plantilla")])
 @pytest.mark.parametrize("write", ON_A_TEMPLATE)
 def test_a_write_on_a_template_says_its_name_and_its_language_as_its_sheet_does(write, language, title):
@@ -155,7 +154,7 @@ def test_a_write_on_a_template_says_its_name_and_its_language_as_its_sheet_does(
     assert (field["value"], field["label"]) == ("recordatorio (es)", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_template_deleted_here_that_meta_still_has_is_named_to_retry_its_deletion():
     """Settings still lists it, «Deleting…», and «Retry» hands its deletion to Meta again."""
     kept = a_template()
@@ -178,7 +177,7 @@ def test_the_buttons_of_a_template_go_by_how_many_never_by_their_codes(write):
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("needed", "write", "datum"),
     [
@@ -205,7 +204,7 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(needed, w
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("write", "datum"),
     [
@@ -223,7 +222,7 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_erased_conversation_and_what_it_held_are_left_out():
     """Erasing keeps the conversation's row without the customer's data: no screen shows it any more."""
     conversation = a_conversation()
@@ -236,7 +235,7 @@ def test_an_erased_conversation_and_what_it_held_are_left_out():
     assert shown("whatsapp_inbox.note.delete", {"id": str(note.id)}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     conversation = a_conversation()
@@ -249,7 +248,7 @@ def test_nobody_behind_the_request_reads_no_record():
     assert said == {"text": "Hi"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
@@ -275,7 +274,7 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
 READS = ["whatsapp_inbox.note.get", "whatsapp_inbox.template.get"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_reads_answer_what_names_what_they_read():
     note, kept = a_note("Prefers mornings"), a_template("recordatorio", "en")
     assert read("whatsapp_inbox.note.get", {"id": str(note.id)}).text == "Prefers mornings"
@@ -283,7 +282,7 @@ def test_the_reads_answer_what_names_what_they_read():
     assert (named.name, named.language, named.label) == ("recordatorio", "en", "recordatorio (en)")
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("name", "needed"),
     [("whatsapp_inbox.note.get", "whatsapp_inbox.view"), ("whatsapp_inbox.template.get", "whatsapp_inbox.reply")],
@@ -293,14 +292,14 @@ def test_the_reads_need_the_right_to_see_what_they_read(name, needed):
         read(name, {"id": A_MISSING_ID}, without(needed))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", READS)
 def test_the_reads_say_not_found_for_what_is_not_there(name):
     with pytest.raises(NotFound):
         read(name, {"id": A_MISSING_ID})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_template_gone_for_good_is_not_found():
     gone = a_template("aviso")
     Template.objects.filter(pk=gone.pk).update(deleted_at=NOW)
