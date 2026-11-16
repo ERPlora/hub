@@ -1,12 +1,13 @@
 """What a write of the reservation app tells the live streams, after the COMMIT and only on its own hub's
 channel (the guardrail «writing in hub B does not notify A», CLAUDE.md): booking in B notifies B's channel
-with the reservation's events, never A's; a refused booking notifies nobody."""
+with the reservation's events, never A's, and records them in B's outbox as B's; a refused booking notifies nobody."""
 
 import json
 
 import psycopg
 import pytest
 from live.errors import Conflict
+from live.models import OutboxEvent
 from live.outbox import channel_for
 
 from base.tenancy.context import use_hub
@@ -64,6 +65,9 @@ def test_booking_in_hub_b_notifies_the_channel_of_b_only(listen, hub_b):
     assert {channel for channel, _ in notes} == {channel_for(B)}
     assert {"customer.customer.created", "reservation.reservation.created"} <= events_of(notes)
     assert received(on_a, timeout=QUIET) == []
+    with use_hub(hub_b):
+        assert set(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == {(B.kind, B.key)}
+    assert not OutboxEvent.objects.exists()  # nothing in business A's outbox
 
 
 @HUB_DB_COMMITTED
