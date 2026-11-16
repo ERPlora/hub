@@ -67,12 +67,14 @@ def at_once_behind(hold, *calls):
 
 def codes(results) -> list[str]:
     """``ok`` per success, the domain code per refusal, the class name per unexpected failure (an
-    ``IntegrityError`` from a repeated reference is not «ok»)."""
+    ``IntegrityError`` from a repeated reference is not «ok») and ``unfinished`` per call that never ended."""
     return sorted(
         result.code
         if isinstance(result, OperationError)
         else type(result).__name__
         if isinstance(result, Exception)
+        else "unfinished"
+        if result is None
         else "ok"
         for result in results
     )
