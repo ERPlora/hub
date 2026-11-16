@@ -9,7 +9,18 @@ import pytest
 from live.errors import Conflict
 from live.outbox import channel_for
 
-from .conftest import A, B, ctx_for, make_session, make_table, make_zone, run
+from base.tenancy.context import use_hub
+
+from .conftest import (
+    HUB_DB_COMMITTED,
+    A,
+    B,
+    ctx_for,
+    make_session,
+    make_table,
+    make_zone,
+    run,
+)
 
 WAIT = 1.0
 QUIET = 0.3
@@ -34,18 +45,19 @@ def received(session, timeout=WAIT, stop_after=None):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_seating_in_hub_b_notifies_the_channel_of_b_only(listen):
-    table = make_table("4", zone=make_zone())
+@HUB_DB_COMMITTED
+def test_seating_in_hub_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("table.session.open", {"table_id": str(table.id)}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        table = make_table("4", zone=make_zone())
+        run("table.session.open", {"table_id": str(table.id)}, ctx_for(scope=B))
     notes = received(on_b, stop_after=2)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     assert {event for _, payload in notes for event in payload["events"]} == {"sale.order.opened", "table.session.opened"}
     assert received(on_a, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_refused_write_notifies_nobody(listen):
     table = make_table("4", zone=make_zone())
     make_session(table)

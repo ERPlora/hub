@@ -22,6 +22,7 @@ from apps.sale.models import Order
 from apps.table.models import Hold, SessionMove, Table, TableSession
 
 from .conftest import (
+    HUB_DB,
     add_line,
     charge,
     ctx_for,
@@ -34,7 +35,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 MANAGER = "hub_manager"
