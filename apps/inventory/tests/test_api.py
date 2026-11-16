@@ -5,19 +5,19 @@ transaction. No path parameters: a product or a category travels in the input (q
 body on POST), by its id or by its SKU or name.
 """
 
-import json
 import uuid
 
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.inventory.api import router
 from apps.inventory.tests.test_product_image import IMAGE_ROUTES
 from apps.tax.models import TaxCategory
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import A, B, HOST, HUB_DB
+from .conftest import A, B, HUB_DB
 
 ROUTES = {
     ("GET", "/inventory/products", "inventory.product.list"),
@@ -50,14 +50,6 @@ ROUTES = {
     ("POST", "/inventory/config", "inventory.config.update"),
 } | IMAGE_ROUTES
 TAX = "test.general"
-
-
-def get(client, path, host=HOST, **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host=HOST):
-    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host)
 
 
 @pytest.fixture

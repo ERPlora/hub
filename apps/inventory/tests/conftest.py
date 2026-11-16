@@ -12,16 +12,17 @@ from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from psycopg.conninfo import make_conninfo
 
+from apps.flow.tests.test_relay import worker_loop
 from apps.invoice.tests.conftest import catalog_of
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, factory_data_b, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-#: The marks, scopes and fixtures of the businesses' own databases, and the assistant's catalogue of a person of
-#: business A, that these tests take from here.
+#: The marks, scopes and fixtures of the businesses' own databases, the assistant's catalogue of a person of business
+#: A and the worker's real pass over every business, that these tests take from here.
 __all__ = [
     "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "factory_data", "factory_data_b", "hub_staff",
-    "in_business_a", "plan_with_room",
+    "in_business_a", "plan_with_room", "worker_loop",
 ]
 
 

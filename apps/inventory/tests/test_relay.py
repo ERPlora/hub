@@ -7,13 +7,11 @@ transaction, so it exists exactly when its movement does; a crossing in hub B is
 """
 
 import json
-import threading
 from decimal import Decimal
 
 import psycopg
 import pytest
 from django.db import connections
-from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
@@ -23,8 +21,6 @@ from psycopg.conninfo import make_conninfo
 
 from apps.inventory import events
 from apps.inventory.models import Product, SaleStock, StockMovement
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
 from base.tenancy.context import use_hub
 
@@ -33,7 +29,6 @@ from .conftest import A, B, HUB_DB_COMMITTED
 #: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
 pytestmark = HUB_DB_COMMITTED
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 GENERIC = "product.generic"
 FOOD = "restaurant.food"
 
@@ -91,21 +86,10 @@ def crossings() -> list[tuple[str, str, str, str, str]]:
 
 
 @pytest.fixture
-def tick(monkeypatch, factory_data):
-    """One tick of the worker's real loop over every business in its own database, without the SaaS
-    (``register_apps``), as a fresh process (no business served yet, A first) whose pass serves every business
-    however slow the machine."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
-    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
-
-    def once() -> None:
-        stop = threading.Event()
-        now = timezone.now()
-        assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
-
-    return once
+def tick(worker_loop, factory_data):
+    """One tick of the worker's real loop over every business in its own database, as Automations' tests run it, with
+    the factory data a sale needs planted again in business A."""
+    return worker_loop
 
 
 @pytest.fixture
