@@ -48,8 +48,9 @@ test('create in tab 1 → tab 2 paints the row with the same notice, < 1 s, no r
   }[] = [];
   for (let i = 0; i < ROUNDS; i += 1) {
     const name = uniqueName(`Live ${i + 1}`);
-    const before = (await api<Figures>(context, A, 'GET', '/demo/items/stats')).data;
-    const after = { ...before, open: before.open + 1 };
+    const { open, done, lines } = (await api<Figures>(context, A, 'GET', '/demo/items/stats')).data;
+    const before = { open, done, lines };
+    const after = { ...before, open: open + 1 };
     for (const tab of tabs) {
       await expect.poll(() => shownFigures(tab)).toEqual(before);
       await watchFigures(tab, after);
