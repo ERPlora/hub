@@ -15,12 +15,15 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
+from apps.invoice.tests.conftest import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: The requests of hub#1097's QA (``tests/e2e/qa/probes/owner-es-appointment-2026-11-08.json``), as the owner said them,
 #: and nothing of the tools' ``asks``: before Appointments said its asks, the blocks of the agenda and generating the
@@ -137,13 +140,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_appointment_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=REPORTED_TOP)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_appointments_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's thirty-five phrases of layer 2, the ones the model answered right too: a tool of Appointments that a
@@ -153,7 +156,7 @@ def test_every_probe_of_appointments_offers_its_tool_without_being_one_of_its_as
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "twin"), TWINS)
 def test_the_reported_request_offers_appointments_tool_before_online_bookings_twin(catalog_of, name, twin):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -163,10 +166,10 @@ def test_the_reported_request_offers_appointments_tool_before_online_bookings_tw
     assert place is not None and (twins is None or place < twins), (place, twins)
 
 
-test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups = by_group_test(BY_GROUP)
+test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_appointments_groups = in_hubs(by_group_test(BY_GROUP))
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Appointments that needs one, neither
@@ -208,7 +211,7 @@ OWN_WORDS_EN = [
     ("appointment.settings.get", "how much notice do we need for a booking?"),
     ("appointment.settings.update", "they should book at least two hours ahead, require that"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("appointment", OWN_WORDS_EN)
 
 

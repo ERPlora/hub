@@ -16,6 +16,7 @@ from live.models import OutboxEvent
 from apps.appointment.models import Appointment, History, Recurring
 
 from .conftest import (
+    HUB_DB,
     MADRID,
     MONDAY,
     at,
@@ -27,7 +28,7 @@ from .conftest import (
     wall,
 )
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 
 def create(salon, **extra) -> object:

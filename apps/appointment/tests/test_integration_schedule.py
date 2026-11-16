@@ -7,9 +7,9 @@ import datetime as dt
 import pytest
 from live.errors import Conflict
 
-from .conftest import MONDAY, make_customer, make_member, make_service, make_tax, run, wall
+from .conftest import HUB_DB, MONDAY, make_customer, make_member, make_service, make_tax, run, wall
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture

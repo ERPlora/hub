@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import timezone
 
 from apps.appointment import queries
@@ -26,7 +26,7 @@ from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_c
 from apps.service import queries as service_queries
 from apps.service.models import Service
 from apps.tax.models import TaxCategory
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import (
     ANA,
     APPOINTMENTS,
@@ -40,13 +40,15 @@ from base.tenancy.tests.test_recovery import (
     run_in,
 )
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    (business := connections[current_alias()]).ensure_connection()
+    return business.connection
 
 
 def card(customer) -> dict:
@@ -129,7 +131,7 @@ def test_a_customer_whose_card_the_copy_no_longer_has_live_is_named_as_the_appoi
 
 
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE appointment_appointment CASCADE")
 
@@ -438,7 +440,7 @@ def test_a_series_whose_customer_the_copy_no_longer_has_live_is_named_as_the_ser
 
 
 def test_a_copy_without_the_series_table_gives_none():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE appointment_recurring CASCADE")
 
@@ -573,7 +575,6 @@ def services_of(salon: Salon) -> list[list]:
     return [services for (*_rest, services, _notes) in salon.live()]
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestTheServiceMadeAgain:
     def lost_with_its_cut(self, recoveries, every_app_on) -> tuple[Salon, object, str]:
         """A salon whose cut (taxed, as Services makes one) and its appointment, booked before a separate copy, are gone
@@ -663,7 +664,6 @@ def weekly_series_of(salon: Salon, card: uuid.UUID):
     ).recurring
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestTheSeriesComesBack:
     def test_a_deleted_series_comes_back_the_same_and_books_nothing_twice(self, recoveries, every_app_on):
         """hub#1327: the series the business deleted (APPOINTMENT-F15 keeps it and its appointments) comes back by

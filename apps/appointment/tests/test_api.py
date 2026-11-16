@@ -1,19 +1,18 @@
 """The appointment app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction. The platform's reactions have no route.
 """
-
-import json
 
 import pytest
 from live.ninja import ensure_api_parity
 
 from apps.appointment.api import router
+from apps.flow.tests.test_api import get, post
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import MONDAY, at, make_appointment, wall
+from .conftest import HOST, HUB_DB, MONDAY, A, at, make_appointment, wall
 
 ROUTES = {
     ("GET", "/appointment/appointments", "appointment.appointment.list"),
@@ -82,25 +81,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("bea", host="a", role="hub_employee"))
+    client.force_login(make_user("bea", host=A.key, role="hub_employee"))
     return client
 
 
@@ -121,9 +110,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_openapi_describes_the_appointment_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -140,7 +129,7 @@ def test_the_spas_route_map_names_every_appointment_route():
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/appointment/appointments", date_from=MONDAY.isoformat()),
@@ -150,7 +139,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_without_a_record_reads_an_empty_agenda_and_deletes_nothing(
     employee_client,
 ):
@@ -176,7 +165,7 @@ def test_an_employee_without_a_record_reads_an_empty_agenda_and_deletes_nothing(
 # The flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.usefixtures("anytime")
 def test_book_list_move_and_cancel_over_http(admin_client, salon):
     booked = post(
@@ -217,7 +206,7 @@ def test_book_list_move_and_cancel_over_http(admin_client, salon):
     assert cancelled.json()["status"] == "cancelled"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.usefixtures("anytime")
 def test_a_refusal_is_a_409_and_a_bad_field_a_422_on_that_field(admin_client, salon):
     make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"))
@@ -249,7 +238,7 @@ def test_a_refusal_is_a_409_and_a_bad_field_a_422_on_that_field(admin_client, sa
     assert {"services", "start"} <= set(bad.json()["error"]["fields"])
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "path",
     [
