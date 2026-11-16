@@ -14,9 +14,9 @@ from apps.cart_checkout import events
 from apps.cart_checkout.models import Cart
 from base import scheduler
 
-from .conftest import NOW, make_cart
+from .conftest import HUB_DB, NOW, A, make_cart
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TASK = "cart_checkout.expire_overdue_carts"
 #: The worker schedules the task at 08:01 UTC; it is due at the next quarter.
@@ -27,7 +27,7 @@ DUE = NOW + dt.timedelta(minutes=15)
 @pytest.fixture
 def worker(settings, monkeypatch, clock):
     """The worker's scope and cart_checkout's task, scheduled as the worker does at 08:01 UTC."""
-    settings.WORKER_SCOPE_SLUG = "a"
+    settings.WORKER_SCOPE_SLUG = A.key
     # Inside the test's transaction a released connection could not be opened again.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
     clock.at(STARTED)

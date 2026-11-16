@@ -14,10 +14,9 @@ from live.operations import get, registry
 
 from apps.demo.models import Item
 from apps.demo.schemas import AN_ITEM_BY_NAME
-from apps.demo.tests.conftest import A, ctx_for
+from apps.demo.tests.conftest import HUB_DB, A, B, ctx_for
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID
 from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card
@@ -73,7 +72,7 @@ def named(monkeypatch):
 # ── An item by its name, titled as its screen calls one ───────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_AN_ITEM)
 def test_a_write_on_an_item_says_it_by_its_name(write, datum):
     """The case the issue names, «demo.item.delete:id»: «Item: Mesa 4», never its id nor its note."""
@@ -81,7 +80,7 @@ def test_a_write_on_an_item_says_it_by_its_name(write, datum):
     assert shown(write, {datum: str(item.id)})[datum] == "Mesa 4"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_the_case_of_the_issue_reads_item_and_its_name_in_each_language(language):
     """Deleting an item, a dangerous write: its name under the word its screen calls one («Elemento», «Item»)."""
@@ -99,7 +98,7 @@ def test_the_card_names_the_item_of_a_write_as_its_screen_calls_one(named, write
         assert label == SCREENS[language]["detail"]["title"], (write, language)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own item, never another of the list (the first, the last)."""
     items = [Item.objects.create(name="Mesa 4"), Item.objects.create(name="Barra")]
@@ -109,7 +108,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
             assert said == [item.name for item in listed], write
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_item_beside_what_it_changes():
     """The name is the item's as it is now, before the write runs: a rename says the old name under «Item» and the new
     one under its own datum; a new line says the item it goes on beside its text."""
@@ -146,7 +145,7 @@ def test_no_datum_of_a_write_of_demo_reaches_a_spanish_card_by_its_technical_nam
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_AN_ITEM)
 def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write, datum):
     """Whoever may not see the items (``demo.view``) is told no item."""
@@ -158,14 +157,14 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write, da
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_who_sees_the_items_is_told_which_one():
     """An employee sees every item (``demo.view``): the line they ask for, with a manager's approval, names its item."""
     item = Item.objects.create(name="Mesa 4")
     assert shown("demo.item.add_line", {"id": str(item.id)}, ctx=ctx_for("hub_employee")) == {"id": "Mesa 4"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_AN_ITEM)
 def test_what_does_not_exist_is_left_out(write, datum):
     said = shown(write, {datum: A_MISSING_ID})
@@ -173,7 +172,7 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_item_deleted_meanwhile_is_left_out():
     item = Item.objects.create(name="Mesa 4")
     arguments = {"id": str(item.id)}
@@ -182,7 +181,7 @@ def test_an_item_deleted_meanwhile_is_left_out():
     assert shown("demo.item.delete", arguments) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_item():
     """An automation's card (no person at hand) names no item: nothing is read for anybody."""
     item = Item.objects.create(name="Mesa 4")
@@ -190,16 +189,13 @@ def test_nobody_behind_the_request_reads_no_item():
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Mesa 5"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
-def test_an_item_of_another_business_is_left_out(hub_a, hub_b):
+@HUB_DB
+def test_an_item_of_another_business_is_left_out(hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
-    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
-    with use_hub(hub_a):
-        item = Item.objects.create(name="Mesa 4")
-        assert shown("demo.item.delete", {"id": str(item.id)}, ctx=in_a) == {"id": "Mesa 4"}  # positive control
+    item = Item.objects.create(name="Mesa 4")
+    assert shown("demo.item.delete", {"id": str(item.id)}) == {"id": "Mesa 4"}  # positive control
     with use_hub(hub_b):
-        assert shown("demo.item.delete", {"id": str(item.id)}, ctx=in_b) == {}
+        assert shown("demo.item.delete", {"id": str(item.id)}, ctx=ctx_for(scope=B)) == {}
 
 
 # ── An item said by its name (hub#1162) ───────────────────────────────────────────────────────────────────────────────
@@ -226,7 +222,7 @@ def turn_of(ctx: OperationContext, said: str, write: dict, decision: dict | None
     return op(ctx, op.input.model_validate(data)).model_dump(mode="json")
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
 def test_a_write_on_an_item_said_by_its_name_says_the_item_it_finds(write, rest):
     """The card reads the item by what was said, as the write will find it: the item's own name, even when only part
@@ -238,14 +234,14 @@ def test_a_write_on_an_item_said_by_its_name_says_the_item_it_finds(write, rest)
         assert (field["value"], field["label"]) == ("Mesa 4", SCREENS[language]["detail"]["title"]), (write, language)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_who_sees_the_items_is_told_which_one_by_its_name():
     Item.objects.create(name="Mesa 4")
     assert shown("demo.item.add_line", {"called": "Mesa 4"}, ctx=ctx_for("hub_employee")) == {"called": "Mesa 4"}
     assert shown("demo.item.add_line", {"called": "Mesa 4"}, ctx=without("demo.view")) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes_with_the_yes():
     """«elimina Ejemplo QA junto con todas sus líneas»: the model sends the name it heard, never asks for the UUID; the
     card says «Elemento: Ejemplo QA» and nothing is deleted until the person types the word."""
@@ -270,7 +266,7 @@ def test_the_item_of_the_issue_said_by_its_own_name_alone_gets_its_card_and_goes
     assert not Item.objects.filter(pk=item.pk).exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the_name_better_meanwhile():
     """hub#1208: «elimina mesa» shows «Mesa 4»; somebody creates «Mesa» before the yes. The yes, with the call as the
     turn gave it back (the panel's way), deletes nothing: the card now says «Mesa», and only its yes deletes it."""
@@ -292,7 +288,7 @@ def test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the
     assert list(Item.objects.values_list("pk", flat=True)) == [shown.pk]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
 def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest):
     """Two items called the same: no card that would act on either; the model hears ``demo.item_ambiguous`` and asks
@@ -309,7 +305,7 @@ def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest
     assert Item.objects.count() == 2
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_name_no_item_has_draws_no_card():
     Item.objects.create(name="Barra")
     plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, call("demo.item.delete", {"called": "Ejemplo QA"}))
@@ -330,7 +326,7 @@ def test_the_name_is_left_unread_beside_the_id_its_write_takes_the_item_by_inste
     assert unless_marked(demo_writes(), AN_ITEM_BY_NAME) == UNLESS
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
 def test_an_item_that_comes_by_its_id_names_no_other_one_said_beside_it(write, rest):
     item = Item.objects.create(name="Mesa 4")
@@ -346,7 +342,7 @@ def everything_of(item: Item) -> tuple:
     return row, sorted(item.lines.values_list("text", "qty"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "rest"), BY_ITS_NAME)
 def test_the_yes_to_an_item_that_comes_by_its_id_runs_on_it_whatever_name_is_said_beside_it(write, rest):
     """Control of the above: the write acts on the item of the id, never on the one the name beside it fits."""

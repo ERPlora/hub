@@ -5,16 +5,11 @@ pays; a payment method here is where the business pays a supplier from. The two 
 neither app lists the other's, the same name lives in both, a tender is not an account to pay from,
 and paying a supplier leaves the till's money untouched.
 
-The till's factory tenders come from Sales' own migration; a transactional test flushes them, and a
-reused test database keeps the flush, so every test here plants them again with that migration's own
-``plant`` (idempotent), as Sales' and Invoicing's tests do.
+The till's factory tenders come from Sales' own migration; a committed test empties business A's database, so every
+test here plants them again with that migration's own ``plant`` (idempotent), as Sales' and Invoicing's tests do.
 """
 
-from importlib import import_module
-
 import pytest
-from django.apps import apps as registry
-from django.db import connection
 from live.errors import InvalidPayload
 from live.models import OutboxEvent
 from live.operations import get
@@ -22,16 +17,17 @@ from live.operations import get
 from apps.sale.models import PaymentMethod as Tender
 from apps.sale.models import SalePayment
 
-from .conftest import ctx_for
+from base.tenancy.tests.business import plant_factory_data
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB, ctx_for
+
+pytestmark = HUB_DB
 
 
 @pytest.fixture(autouse=True)
-def factory_tenders(db):
-    """Cash and Card from the factory, as Sales' migration plants them (a flush took them)."""
-    with connection.schema_editor() as editor:
-        import_module("apps.sale.migrations.0002_factory_payment_methods").plant(registry, editor)
+def factory_tenders(db, in_business_a):
+    """Cash and Card from the factory, as Sales' migration plants them (a committed test emptied business A)."""
+    plant_factory_data()
 
 
 def run(name, data: dict | None = None):

@@ -33,9 +33,9 @@ from apps.cart_checkout.schemas import (
 from base.tests.ordering import assert_reads_backwards, listed_with
 from base.tests.typed_operations import ts_fields
 
-from .conftest import NOW, ctx_for, make_cart, make_item, make_order
+from .conftest import HUB_DB, NOW, ctx_for, make_cart, make_item, make_order
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EARLIER = NOW - dt.timedelta(hours=1)
 LATER = NOW + dt.timedelta(hours=1)

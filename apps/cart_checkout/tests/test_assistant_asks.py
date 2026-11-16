@@ -18,7 +18,8 @@ from live.operations import AI, registry
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to, place_of_no_ask
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: Cart & Checkout's reads: its carts, their lines and the orders made from them.
 READS = {
@@ -55,7 +56,7 @@ def test_cart_checkout_offers_its_nineteen_tools():
     assert tools == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_who_manages_the_carts_is_offered_every_tool_and_an_employee_only_the_reads(catalog_of):
     """``CartCheckoutConfig.role_permissions``: the owner, the admin and the manager hold every tool; an employee only
     looks (``cart_checkout.view_cart``)."""
@@ -154,7 +155,7 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     assert {name for name, _ in REPORTED} == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_cart_request_is_offered_its_tool_without_being_its_asks(catalog_of, name, phrase):
     assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
@@ -165,7 +166,7 @@ def test_the_reported_cart_request_is_offered_its_tool_without_being_its_asks(ca
 CHOSEN_INSTEAD = [("cart_checkout.item.update", "inventory.product.update")]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_cart_request_offers_its_tool_before_the_one_the_model_ran(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -182,7 +183,7 @@ def test_the_reported_cart_request_offers_its_tool_before_the_one_the_model_ran(
 NOT_EMPTYING = ("cart_checkout.cart.delete", "cart_checkout.item.remove")
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("instead", NOT_EMPTYING)
 def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting_it_or_a_line(catalog_of, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -196,7 +197,7 @@ def test_the_reported_request_to_empty_a_cart_offers_emptying_it_before_deleting
 LINE_READS = {"cart_checkout.cart.get", "cart_checkout.item.list"}
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("name", ["cart_checkout.item.update", "cart_checkout.item.remove"])
 def test_a_reported_change_of_a_line_is_offered_a_read_that_finds_the_line(catalog_of, name):
     """The person names the line by its product («el Café de QA-WEB-1»), the tool takes its id: the same turn offers a
@@ -233,7 +234,7 @@ BY_SYNONYM = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), BY_SYNONYM)
 def test_a_cart_named_by_the_shops_words_is_offered_among_the_first_ten(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=TOP)

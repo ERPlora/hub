@@ -6,18 +6,16 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone
-from live.context import Scope
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.demo.models import Item, ItemLine
 from apps.demo.schemas import ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemRefIn, ItemStatsIn, ItemStatsOut
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, B, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin"):
@@ -191,18 +189,12 @@ def test_a_name_no_item_has_is_not_found():
     assert (excinfo.value.status, excinfo.value.code) == (404, "not_found")
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
-def test_a_name_of_another_business_names_nothing_here(hub_a, hub_b):
+def test_a_name_of_another_business_names_nothing_here(hub_b):
     """Each business in its own database, as production: an item of A is not found by its name in B."""
-    in_a = ctx_for("hub_employee", Scope("host", hub_a.slug))
-    in_b = ctx_for("hub_employee", Scope("host", hub_b.slug))
-    with use_hub(hub_a):
-        item = Item.objects.create(name="Autumn trial")
-        assert get("demo.item.detail")(in_a, ItemRefIn(called="Autumn trial")).id == item.id  # positive control
-    with use_hub(hub_b):
-        with pytest.raises(NotFound):
-            get("demo.item.detail")(in_b, ItemRefIn(called="Autumn trial"))
+    item = Item.objects.create(name="Autumn trial")
+    assert named("Autumn trial").id == item.id  # positive control
+    with use_hub(hub_b), pytest.raises(NotFound):
+        get("demo.item.detail")(ctx_for("hub_employee", B), ItemRefIn(called="Autumn trial"))
 
 
 # demo.item.stats

@@ -1,7 +1,7 @@
 """The payment app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. No path parameters: a record travels in the input (query string on GET, body on POST),
+Requests go to business A's host with Django's sync test client, which sees the test's transaction in A's own
+database. No path parameters: a record travels in the input (query string on GET, body on POST),
 by its id or, as a person says it, by its name or reference.
 """
 
@@ -10,10 +10,11 @@ import json
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.payment.api import router
 from config.api import api
 
-from .conftest import make_method, make_payment
+from .conftest import HOST, HUB_DB, A, B, make_method, make_payment
 
 ROUTES = {
     ("GET", "/payment/payments", "payment.payment.list"),
@@ -32,29 +33,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -78,7 +65,7 @@ def test_the_api_keeps_parity():
 # The whole app over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_payment_from_its_method_to_completed(admin_client):
     method = post(admin_client, "/payment/methods", {"name": "BBVA account"})
     assert method.status_code == 201
@@ -110,7 +97,7 @@ def test_a_payment_from_its_method_to_completed(admin_client):
     assert [row["reference"] for row in page.json()["rows"]] == [reference]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_cancelling_over_http(admin_client):
     payment = make_payment(make_method())
     response = post(
@@ -129,7 +116,7 @@ def test_cancelling_over_http(admin_client):
     assert again.json()["error"]["code"] == "payment.not_cancellable"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_methods_over_http(admin_client):
     created = post(
         admin_client, "/payment/methods", {"name": "Cash drawer", "method_type": "cash"}
@@ -158,7 +145,7 @@ def test_the_methods_over_http(admin_client):
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/payment/payments"),
@@ -168,7 +155,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_only_looks(employee_client):
     payment = make_payment(make_method())
     assert get(employee_client, "/payment/payments").status_code == 200
@@ -196,15 +183,15 @@ def test_an_employee_only_looks(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/payment/payments", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/payment/payments", host=f"{B.key}.localhost").status_code == 403
 
 
 # Validation and refusals
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_payment_is_422_per_field(admin_client):
     method = make_method()
     response = post(
@@ -232,7 +219,7 @@ def test_an_invalid_payment_is_422_per_field(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deactivated_method_is_422_under_its_field(admin_client):
     method = make_method(is_active=False)
     response = post(
@@ -255,7 +242,7 @@ def test_a_deactivated_method_is_422_under_its_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_step_from_the_wrong_state_is_409(admin_client):
     payment = make_payment(make_method(), status="completed")
     response = post(admin_client, "/payment/payments/approve", {"id": str(payment.id)})
@@ -263,19 +250,20 @@ def test_a_step_from_the_wrong_state_is_409(admin_client):
     assert response.json()["error"]["code"] == "payment.invalid_transition"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(admin_client):
     payment = make_payment(make_method(), status="completed")
-    response = post(
-        admin_client,
-        "/payment/payments/cancel",
-        {"id": str(payment.id), "reason": "x"},
+    response = admin_client.post(
+        "/api/payment/payments/cancel",
+        json.dumps({"id": str(payment.id), "reason": "x"}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.json()["error"]["message"] == "El pago ya no admite cancelación."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     # An undeclared filter is refused by the schema (test_schemas.py); over HTTP ninja's query
     # parser drops it before the schema sees it, as for every app.
