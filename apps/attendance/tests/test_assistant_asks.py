@@ -22,7 +22,9 @@ from base.tests.test_assistant_asks import TOP
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
 from base.tests.test_assistant_asks import reported_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB, in_hubs
+
 #: What only who sees, corrects or sets up the team's time clock holds (``attendance.view_all``,
 #: ``attendance.correct``, ``attendance.manage_settings``): an employee clocks and reads their own days, never these.
 NOT_THE_EMPLOYEES = {
@@ -91,7 +93,7 @@ def test_attendance_offers_its_eighteen_tools():
     assert {"attendance.settings.update", "attendance.person.detail"} <= tools
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_runs_the_team_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -104,15 +106,17 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-test_the_reported_attendance_request_offers_its_existing_operation = reported_test(REPORTED)
+test_the_reported_attendance_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
 
 
 #: The owner's eighteen phrases of layer 2, the ones the model answered right too: a tool of Time clock that a new ask
 #: elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it.
-test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_asks = probes_test(PROBES, "attendance")
+test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_asks = in_hubs(
+    probes_test(PROBES, "attendance")
+)
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Time clock that needs one, neither
@@ -137,11 +141,11 @@ OWN_WORDS_EN = [
     ("attendance.settings.get", "how big is the radius we allow for clocking in?"),
     ("attendance.settings.update", "ask for the location when people use their own phone"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("attendance", OWN_WORDS_EN)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
 def test_who_is_clocked_in_takes_no_place_from_how_many_people_use_the_hub(catalog_of, role):
     """``base.plan.usage`` counts the people using the Hub, not who is clocked in: said as «active now», its ask was
