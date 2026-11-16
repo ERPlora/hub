@@ -7,16 +7,11 @@ transaction, so it exists exactly when its movement does; a crossing in hub B is
 """
 
 import json
-import threading
 from decimal import Decimal
-from importlib import import_module
 
 import psycopg
 import pytest
-from django.apps import apps as global_apps
 from django.db import connections
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
@@ -26,13 +21,14 @@ from psycopg.conninfo import make_conninfo
 
 from apps.inventory import events
 from apps.inventory.models import Product, SaleStock, StockMovement
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import A, B
+from .conftest import A, B, HUB_DB_COMMITTED
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+#: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
+pytestmark = HUB_DB_COMMITTED
+
 GENERIC = "product.generic"
 FOOD = "restaurant.food"
 
@@ -48,11 +44,11 @@ def run(name: str, data: dict, ctx: OperationContext | None = None):
     return op(ctx or owner(), op.input.model_validate(data))
 
 
-def make(name: str, sku: str, stock: str = "10", **fields) -> Product:
+def make(name: str, sku: str, stock: str = "10", scope: Scope = A, **fields) -> Product:
     created = run(
         "inventory.product.create",
         {"name": name, "sku": sku, "price": 500, "tax_category_key": GENERIC, "initial_stock": stock, **fields},
-        system_context(A),
+        system_context(scope),
     )
     return Product.objects.get(pk=created.id)
 
@@ -90,18 +86,10 @@ def crossings() -> list[tuple[str, str, str, str, str]]:
 
 
 @pytest.fixture
-def tick(monkeypatch):
-    """One tick of the worker's real loop, without the SaaS (``register_apps``) and, inside the test's
-    transaction, without releasing the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def once() -> None:
-        stop = threading.Event()
-        now = timezone.now()
-        assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
-
-    return once
+def tick(worker_loop, factory_data):
+    """One tick of the worker's real loop over every business in its own database, as Automations' tests run it, with
+    the factory data a sale needs planted again in business A."""
+    return worker_loop
 
 
 @pytest.fixture
@@ -127,7 +115,6 @@ def menus(quantity: str, *dishes: str) -> dict:
 # ── INVENTORY-F21: a paid sale lowers the stock ─────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
 def test_inventory_f21_a_paid_sale_lowers_each_line_once_with_the_sale_as_reference(tick):
     make("Shampoo", "SHA")
     make("Wax", "WAX", track_stock=False)
@@ -146,7 +133,6 @@ def test_inventory_f21_a_paid_sale_lowers_each_line_once_with_the_sale_as_refere
     assert StockMovement.objects.filter(movement_type="sale").count() == 2
 
 
-@pytest.mark.django_db
 def test_inventory_f21_without_selling_without_stock_an_article_that_does_not_reach_is_not_lowered(tick):
     make("Shampoo", "SHA", stock="1")
     charge("inv-relay-f21-2", ("SHA", "3"))
@@ -176,7 +162,6 @@ def ledger_rows(search: str) -> list[tuple[str, str]]:
     return [(row.movement_type, row.reference_label) for row in page.rows]
 
 
-@pytest.mark.django_db
 def test_inventory_f16_a_sale_and_its_void_read_and_are_found_by_its_ticket_number(tick):
     run("invoice.issuer.update", ISSUER)
     make("Shampoo", "SHA")
@@ -190,7 +175,6 @@ def test_inventory_f16_a_sale_and_its_void_read_and_are_found_by_its_ticket_numb
     assert ledger_rows(sale.number) == ledger_rows(sale.invoice_number)
 
 
-@pytest.mark.django_db
 def test_inventory_f16_without_a_fiscal_document_a_sale_reads_as_its_own_number(tick):
     make("Shampoo", "SHA")
     sale = charge("inv-relay-f16-2", ("SHA", "1"))
@@ -203,7 +187,6 @@ def test_inventory_f16_without_a_fiscal_document_a_sale_reads_as_its_own_number(
 # ── INVENTORY-F22: a menu lowers its dishes, never itself ───────────────────────────────────────────
 
 
-@pytest.mark.django_db
 def test_inventory_f22_three_menus_lower_three_of_each_dish_picked(tick, menu):
     sale = charge("inv-relay-f22-1", **menus("3", "LEN", "HAK"))
 
@@ -219,7 +202,6 @@ def test_inventory_f22_three_menus_lower_three_of_each_dish_picked(tick, menu):
 # ── INVENTORY-F23: a voided sale gives back what it took, once ──────────────────────────────────────
 
 
-@pytest.mark.django_db
 def test_inventory_f23_a_void_restores_exactly_what_the_sale_took_once(tick, menu):
     make("Shampoo", "SHA", stock="1")
     sale = charge("inv-relay-f23-1", ("SHA", "1"), ("SHA", "5"), **menus("2", "LEN", "HAK"))
@@ -252,7 +234,6 @@ def refund(sale, quantity: str, reason: str):
     )
 
 
-@pytest.mark.django_db
 def test_inventory_f24_a_refund_returns_its_units_once_and_never_more_than_the_sale_took(tick):
     make("Shampoo", "SHA")
     sale = charge("inv-relay-f24-1", ("SHA", "4"))
@@ -283,7 +264,6 @@ def test_inventory_f24_a_refund_returns_its_units_once_and_never_more_than_the_s
 # ── INVENTORY-F18: the threshold crossing, said by the reaction that moved the stock ────────────────
 
 
-@pytest.mark.django_db
 def test_inventory_f18_a_sale_crosses_below_once_and_the_void_says_recovered(tick):
     make("Shampoo", "SHA", stock="7", low_stock_threshold="5")
     first = charge("inv-relay-f18-1", ("SHA", "3"))
@@ -306,7 +286,6 @@ def test_inventory_f18_a_sale_crosses_below_once_and_the_void_says_recovered(tic
     assert crossings()[2:] == [("SHA", "below", "6.000", "4.000", "sale")]
 
 
-@pytest.mark.django_db
 def test_inventory_f18_the_same_article_loose_and_inside_a_menu_crosses_once_on_the_total(tick, menu):
     run("inventory.product.update", {"product": "LEN", "low_stock_threshold": "8"}, system_context(A))
     charge("inv-relay-f18-4", ("LEN", "1"), **menus("1", "LEN", "HAK"))
@@ -317,7 +296,6 @@ def test_inventory_f18_the_same_article_loose_and_inside_a_menu_crosses_once_on_
     assert crossings() == [("LEN", "below", "10.000", "8.000", "sale")]
 
 
-@pytest.mark.django_db
 def test_inventory_f18_the_crossing_and_its_movement_are_written_together_or_not_at_all(tick, monkeypatch):
     make("Shampoo", "SHA", stock="6", low_stock_threshold="5")
     charge("inv-relay-f18-5", ("SHA", "2"))
@@ -339,19 +317,6 @@ def test_inventory_f18_the_crossing_and_its_movement_are_written_together_or_not
 
 
 # ── Two hubs: a crossing in B is heard in B only ────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def committed(transactional_db):
-    """A flushed database with Taxes' factory catalogue and Sales' payment methods planted again, as their
-    migrations do."""
-    with connections["default"].schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(global_apps, editor)
 
 
 @pytest.fixture
@@ -377,17 +342,17 @@ def heard(session, timeout: float = 0.5) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-def test_inventory_f18_a_crossing_in_hub_b_is_heard_in_b_only(committed, listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    make("Shampoo", "SHA", stock="6", low_stock_threshold="5")
-    on_a, on_b = listen(A), listen(B)
-    charge("inv-relay-f18-b", ("SHA", "2"), scope=B)
+def test_inventory_f18_a_crossing_in_hub_b_is_heard_in_b_only(tick, hub_b, factory_data_b, listen):
+    with use_hub(hub_b):
+        make("Shampoo", "SHA", stock="6", low_stock_threshold="5", scope=B)
+        on_a, on_b = listen(A), listen(B)
+        charge("inv-relay-f18-b", ("SHA", "2"), scope=B)
     heard(on_b)  # the charge's own notice
-    stop = threading.Event()
 
-    assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True) == 0
+    tick()
 
-    assert crossings() == [("SHA", "below", "6.000", "4.000", "sale")]
-    assert OutboxEvent.objects.get(name=events.STOCK_THRESHOLD_CROSSED).scope_key == "b"
+    with use_hub(hub_b):
+        assert crossings() == [("SHA", "below", "6.000", "4.000", "sale")]
+        assert OutboxEvent.objects.get(name=events.STOCK_THRESHOLD_CROSSED).scope_key == B.key
     assert events.STOCK_CHANGED in heard(on_b)
     assert heard(on_a) == set()
