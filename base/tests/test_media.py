@@ -330,9 +330,13 @@ def test_an_app_turned_off_in_the_business_serves_none_of_its_folders(client, me
 
 
 def test_an_app_turned_off_in_another_business_still_serves_here(client, table, plan, monkeypatch, hub_b):
+    from base.models import AppActivation
+
     monkeypatch.setattr(table, "public_media", ["table/plans/"])
     with use_hub(hub_b):
         turn_off(B.key, "table")
+    # Every row carries its business: one of B's kept in A's database is not A's either.
+    AppActivation.objects.create(host=B.key, app="table", state="off", chosen=False)
     assert get(client, plan).status_code == 200
 
 

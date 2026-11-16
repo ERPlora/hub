@@ -384,7 +384,7 @@ def test_a_business_cancelled_before_its_database_was_finished_is_never_copied(h
 
 
 def test_a_business_without_its_own_database_that_leaves_is_never_copied(dumps_bucket):
-    shared = Hub.objects.get(slug="a")
+    shared = Hub.objects.create(slug="shared", status=Hub.Status.READY)
     Hub.objects.filter(pk=shared.pk).update(ready_at=timezone.now())
 
     cancel(shared)
