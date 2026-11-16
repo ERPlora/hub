@@ -10,10 +10,12 @@ of the catalogue of a business with every app on and ranked as a turn ranks, is 
 import pytest
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_asks_bring, english_coverage_test, place_of_no_ask
 from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: What only who runs the business does: an employee's assistant is never offered the printers' settings.
 NOT_THE_EMPLOYEES = {
@@ -33,7 +35,7 @@ def test_printing_offers_at_least_20_tools():
     assert len(tools) >= 20
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_is_never_offered_the_printers_settings(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -69,7 +71,7 @@ REPORTED = [
 ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_printing_requests_are_offered_their_tool_without_being_its_asks(catalog_of, role, name, phrase):
     assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
@@ -86,7 +88,7 @@ OWN_WORDS = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.MANAGER])
 @pytest.mark.parametrize(("language", "name", "phrase"), OWN_WORDS)
 def test_a_retired_device_in_the_persons_own_words_reaches_its_tool_by_its_asks(
@@ -149,7 +151,7 @@ OWN_WORDS_ES = [
     ("printing.settings.update", "dos de cada, por favor"),
     ("printing.settings.update", "el cajón tiene que abrirse al cobrar"),
 ]
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS_ES, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS_ES, "es"))
 
 
 #: The same in English, for each English ask with a word of its own: the tool's English asks lift it among the first
@@ -200,7 +202,7 @@ OWN_WORDS_EN = [
     ("printing.settings.update", "send what goes to the kitchen to Kitchen 3"),
     ("printing.settings.update", "two of every receipt, please"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 
 #: The tools whose English asks say nothing their Spanish asks, description or name do not: no English phrase depends
 #: on them, so what sees them change is the words they say only in English.

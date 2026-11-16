@@ -2,21 +2,18 @@
 
 import datetime as dt
 
-import pytest
 from django.utils import timezone
 
 from apps.printing.models import PrintJob
-from apps.printing.tests.conftest import printer, run
-from base.models import Hub
-from base.tenancy.context import use_hub
+from apps.printing.tests.conftest import HUB_DB, printer, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
-def test_the_a4_test_page_is_printed_at_the_businesss_hour(monkeypatch):
+def test_the_a4_test_page_is_printed_at_the_businesss_hour(monkeypatch, in_business_a):
     monkeypatch.setattr(timezone, "now", lambda: dt.datetime(2026, 11, 2, 9, 0, tzinfo=dt.UTC))
+    monkeypatch.setattr(in_business_a, "timezone", "Atlantic/Canary")
     printer("Office", kind="system", address="")
-    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
-        out = run("printing.printer.test", {"printer": "Office"})
+    out = run("printing.printer.test", {"printer": "Office"})
     html = PrintJob.objects.get(pk=out.id).html
     assert "Nov. 2, 2026, 9 a.m." in html
