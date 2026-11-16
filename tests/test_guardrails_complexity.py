@@ -183,8 +183,8 @@ def test_the_complexipy_configuration_is_exactly_the_limit_and_the_code_it_reads
     file configures complexipy."""
     config = tomllib.loads((REPO / CONFIG).read_text(encoding="utf-8")).get("tool", {}).get("complexipy")
     assert config == COMPLEXIPY_CONFIGURATION
-    others = ("complexipy.toml", ".complexipy.toml")
-    assert git(REPO, "ls-files", "--cached", "--others", "--exclude-standard", "--", *others).stdout.split() == []
+    # complexipy reads either of these before pyproject.toml, tracked or not.
+    assert [name for name in ("complexipy.toml", ".complexipy.toml") if (REPO / name).exists()] == []
 
 
 def test_the_snapshot_never_gains_an_entry_or_a_point():
