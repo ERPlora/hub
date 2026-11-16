@@ -12,9 +12,9 @@ from live.operations import get
 from apps.service import events
 from apps.service.models import Grant
 
-from .conftest import A, ctx_for, make_package, make_service, make_tax
+from .conftest import HUB_DB, A, ctx_for, make_package, make_service, make_tax
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin"):
