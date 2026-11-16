@@ -14,10 +14,11 @@ from live.operations import get
 from apps.website.queries import catalog_cache_key, live_version, published_page, read_catalog
 from apps.website.schemas import CatalogSection
 from apps.website import reviews
-from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
+from apps.website.tests.conftest import HOST, HUB_DB, PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
 from base.models import Hub
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name: str, data: dict | None = None, ctx=None):
@@ -30,8 +31,8 @@ def save(content=None, template="classic"):
 
 
 def visitor(**request):
-    """An anonymous visitor of hub ``a``, with a request (the public routes always have one)."""
-    return ctx_for(None, request=RequestFactory().get("/api/website/public/site", HTTP_HOST="a.localhost", **request))
+    """An anonymous visitor of business A, with a request (the public routes always have one)."""
+    return ctx_for(None, request=RequestFactory().get("/api/website/public/site", HTTP_HOST=HOST, **request))
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def test_the_site_of_a_hub_that_never_saved_one_is_the_empty_classic_draft(setti
     out = run("website.site.get", ctx=ctx_for("hub_manager"))
     assert (out.template, out.published_version, out.is_live, out.has_changes) == ("classic", 0, False, False)
     assert out.content.hero.title == "" and (out.theme.palette, out.theme.mode) == ("ocean", "auto")
-    assert out.public_url == f"https://a.{settings.HUB_BASE_DOMAIN}/"
+    assert out.public_url == f"https://{A.key}.{settings.HUB_BASE_DOMAIN}/"
 
 
 def test_the_site_says_what_is_published_and_whether_the_draft_moved_on():
@@ -100,12 +101,12 @@ def test_only_who_manages_the_website_previews_it():
 
 
 def test_the_qr_is_the_hubs_address_as_png_or_svg():
-    request = RequestFactory().get("/api/website/qr", HTTP_HOST="a.localhost:8000")
+    request = RequestFactory().get("/api/website/qr", HTTP_HOST=f"{HOST}:8000")
     png = run("website.qr.get", {"format": "png"}, ctx_for("hub_manager", request=request))
-    assert (png.url, png.content_type, png.filename) == ("http://a.localhost:8000/", "image/png", "website-qr-a.png")
+    assert (png.url, png.content_type, png.filename) == (f"http://{HOST}:8000/", "image/png", f"website-qr-{A.key}.png")
     assert base64.b64decode(png.content_base64).startswith(b"\x89PNG")
     svg = run("website.qr.get", {"format": "svg"}, ctx_for(request=request))
-    assert (svg.content_type, svg.filename) == ("image/svg+xml", "website-qr-a.svg")
+    assert (svg.content_type, svg.filename) == ("image/svg+xml", f"website-qr-{A.key}.svg")
     assert base64.b64decode(svg.content_base64).startswith(b"<svg")
 
 
@@ -225,7 +226,7 @@ def test_a_hidden_gallery_leaves_no_photo_in_the_public_site(hub_files):
     assert gallery.model_dump() == {"hidden": True, "title": "", "images": []}
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def business_in(country: str, slug: str = A.key) -> None:
     """``slug``'s business as erplora.com registered it in ``country``: its currency is its country's (BASE-F50)."""
     Hub.objects.filter(slug=slug).update(country=country)
 
@@ -244,7 +245,7 @@ def test_the_public_catalog_is_read_live_priced_for_the_visitor_and_cached_a_min
     out = run("website.public.catalog", ctx=with_language(visitor(), "es"))
     hair = next(group for group in out.groups if group.name == "Hair")
     assert [(item.name, item.price_label) for item in hair.items] == [("Beard", "9,00\xa0€"), ("Cut", "15,00\xa0€")]
-    assert cache.get(catalog_cache_key("a", 1, "es", "EUR")) is not None
+    assert cache.get(catalog_cache_key(A.key, 1, "es", "EUR")) is not None
     Service.objects.filter(name="Beard").update(is_active=False)
     cached = run("website.public.catalog", ctx=with_language(visitor(), "es"))
     assert "Beard" in [item.name for group in cached.groups for item in group.items]
@@ -314,7 +315,7 @@ def test_the_public_catalog_of_a_source_turned_off_after_publishing_is_empty_not
     assert (catalog.source, catalog.groups) == ("service", [])
 
 
-def test_the_page_public_home_paints_is_the_live_publication_of_its_hub():
+def test_the_page_public_home_paints_is_the_live_publication_of_its_hub(hub_b):
     assert published_page(A) is None
     save(template="minimal")
     run("website.site.publish")
@@ -322,7 +323,9 @@ def test_the_page_public_home_paints_is_the_live_publication_of_its_hub():
     assert (page["version"], page["template"]) == (1, "minimal")
     assert page["content"]["hero"]["title"] == "Fresh food every day"
     assert isinstance(page["published_at"], dt.datetime)
-    assert (published_page(B), live_version(A), live_version(B)) == (None, 1, 0)
+    assert live_version(A) == 1
+    with use_hub(hub_b):
+        assert (published_page(B), live_version(B)) == (None, 0)
     # A scope that is no hub has nothing to paint, never an error.
     assert (published_page(Scope("host", "nohub")), live_version(Scope("host", "nohub"))) == (None, 0)
     run("website.site.unpublish")
@@ -349,10 +352,10 @@ def test_the_editor_sees_whether_googles_reviews_are_there(settings, no_google):
     assert run("website.site.get").reviews.state == "unavailable"
     settings.GOOGLE_PLACES_API_KEY = "test-key"
     assert run("website.site.get").reviews.state == "waiting"
-    cache.set(reviews.reviews_key("a", PLACE_ID), reviews.FAILED, reviews.FAILURE_TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), reviews.FAILED, reviews.FAILURE_TTL)
     assert run("website.site.get").reviews.state == "failed"
     payload = google_reviews()
-    cache.set(reviews.reviews_key("a", PLACE_ID), payload, reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), payload, reviews.TTL)
     status = run("website.site.get").reviews
     assert (status.state, status.rating, status.count) == ("ready", 4.7, 128)
     assert status.fetched_at.isoformat() == payload["fetched_at"]
@@ -363,7 +366,7 @@ def test_the_preview_paints_the_reviews_kept_or_says_where_they_will_be(settings
     settings.GOOGLE_PLACES_API_KEY = "test-key"
     save(full_content(reviews={"place_ref": PLACE_ID}))
     assert "data-ep-reviews-hint" in run("website.site.preview").html
-    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), google_reviews(), reviews.TTL)
     html = run("website.site.preview").html
     assert "128 reviews on Google" in html and "data-ep-reviews-hint" not in html
 
@@ -386,7 +389,7 @@ def test_the_public_reviews_are_the_kept_ones_in_the_visitors_language(settings,
         run("website.public.reviews", ctx=visitor())
     run("website.site.publish")
     assert run("website.public.reviews", ctx=visitor()).available is False
-    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), google_reviews(), reviews.TTL)
     out = run("website.public.reviews", ctx=with_language(visitor(), "es"))
     assert (out.available, out.rating_label, out.count_label) == (True, "4,7", "128 reseñas en Google")
     assert out.stars == ["on", "on", "on", "on", "half"]
@@ -397,7 +400,7 @@ def test_the_public_reviews_are_the_kept_ones_in_the_visitors_language(settings,
 
 def test_hidden_reviews_are_not_given_to_visitors(settings, no_google):
     settings.GOOGLE_PLACES_API_KEY = "test-key"
-    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), google_reviews(), reviews.TTL)
     save(full_content(reviews={"place_ref": PLACE_ID, "hidden": True}))
     run("website.site.publish")
     assert run("website.public.reviews", ctx=visitor()).available is False

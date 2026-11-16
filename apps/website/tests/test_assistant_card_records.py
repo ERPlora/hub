@@ -19,15 +19,16 @@ from live.operations import get, registry
 
 from apps.website.models import Image, Site
 from apps.website.schemas import PALETTE_IDS
-from apps.website.tests.conftest import B, ctx_for, full_content
+from apps.website.tests.conftest import HUB_DB, B, ctx_for, full_content
 from apps.website.tests.test_choices import editor_words
 from apps.website.tests.test_queries import products_catalog, services_catalog, source_off  # noqa: F401 (fixtures)
 from apps.website.tests.test_services import png_bytes, save as save_draft, upload
 from base import assistant
 from base.tests.test_assistant import technical_names
+from base.tenancy.context import use_hub
 from base.tests.test_assistant_card_values_references import AN_ID
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAVE = "website.site.save"
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -92,9 +93,10 @@ def test_an_image_uploaded_before_its_name_was_kept_is_said_by_its_format_and_si
     assert said(a_save(full_content(topbar={"logo": logo})))["content"]["topbar"]["logo"]["id"] == "PNG 4 × 3"
 
 
-def test_an_image_of_another_business_or_not_there_is_left_out(hub_files):
+def test_an_image_of_another_business_or_not_there_is_left_out(hub_files, hub_b):
     """Read as whoever asks, in their business: an upload of B, or an id nobody uploaded, is no name for a card of A."""
-    theirs = an_image("suyo.png", 1, ctx=ctx_for(scope=B))
+    with use_hub(hub_b):
+        theirs = an_image("suyo.png", 1, ctx=ctx_for(scope=B))
     content = full_content(topbar={"logo": theirs}, hero={"cover": {"id": A_MISSING_ID, "url": ""}})
     shown = said(a_save(content))["content"]
     assert "id" not in shown["topbar"]["logo"]
