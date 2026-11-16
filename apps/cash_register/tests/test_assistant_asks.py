@@ -13,6 +13,7 @@ import pytest
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
+from apps.cash_register.tests.conftest import HUB_DB
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import (
@@ -24,7 +25,6 @@ from base.tests.test_assistant_asks import (
     place_of_no_ask,
     probe_phrases,
 )
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
 
@@ -109,13 +109,13 @@ def test_the_hub_reads_an_arqueo_as_a_count_and_the_moneda_as_the_currency():
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_cash_register_request_offers_its_existing_operation(catalog_of, role, name, phrase):
     assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("role", "name", "phrase"), [case for case in REPORTED if case[1] in FIRST])
 def test_the_reported_request_is_offered_the_read_it_needs_first(catalog_of, role, name, phrase):
     tools = catalog_of(role, "es")
@@ -129,7 +129,7 @@ def test_the_reported_request_is_offered_the_read_it_needs_first(catalog_of, rol
 MONEY_IN = [("cash_register.movement.add", "registra que entran 100 € en el turno")]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("name", "phrase"), MONEY_IN)
 def test_money_coming_in_in_the_hubs_words_brings_the_movement_among_the_first_ten(catalog_of, name, phrase):
     assert comparable(phrase) not in probe_phrases()

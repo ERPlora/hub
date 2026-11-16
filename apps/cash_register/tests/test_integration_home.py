@@ -12,16 +12,25 @@ import json
 
 import psycopg
 import pytest
-from django.db import connections
 from live.context import OperationContext
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
 from live.operations import get
 from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
-from apps.cash_register.tests.conftest import A, B, charge, ctx_for, open_session, run
+from apps.cash_register.tests.conftest import (
+    HOST,
+    HUB_DB,
+    HUB_DB_COMMITTED,
+    A,
+    B,
+    charge,
+    ctx_for,
+    open_session,
+    run,
+)
 from base.schemas import SetupStatusIn, WidgetListIn
+from base.tenancy.context import use_hub
 
 STEP = "cash_register.drawer"
 EXPECTED = "cash_register.current_session"
@@ -64,7 +73,7 @@ def close(counted: int | None, ctx=None):
     return run("cash_register.session.close", {"closing_balance": counted}, ctx)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_drawer_on_its_factory_values_has_your_cash_drawer_pending_and_it_leads_to_its_settings():
     item = steps(ctx_for())[STEP]
     assert {key: item[key] for key in ("state", "level", "required", "actionable", "route", "order", "icon")} == {
@@ -83,13 +92,13 @@ def test_a_drawer_on_its_factory_values_has_your_cash_drawer_pending_and_it_lead
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_saving_the_settings_ticks_it_even_with_the_factory_values():
     run("cash_register.settings.update", {})
     assert state() == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_saving_a_change_ticks_it_and_it_stays_done():
     run("cash_register.settings.update", {"require_blind_count": True})
     assert state() == "done"
@@ -97,13 +106,13 @@ def test_saving_a_change_ticks_it_and_it_stays_done():
     assert state() == "done"  # a decision taken stays taken: back to the factory values is still the business's
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_opening_a_session_on_the_factory_values_is_no_decision():
     open_session()
     assert state() == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_manage_the_settings_is_not_told_about_the_step():
     manager = ctx_for("hub_manager")
     assert manager.has("cash_register.view_session") and not manager.has("cash_register.manage_settings")
@@ -111,7 +120,7 @@ def test_whoever_may_not_manage_the_settings_is_not_told_about_the_step():
     assert STEP not in steps(ctx_for("hub_employee"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_manager_is_offered_both_panels_followed_live():
     offered = panels(ctx_for("hub_manager"))
     assert list(offered) == [EXPECTED, RECENT]
@@ -123,7 +132,7 @@ def test_a_manager_is_offered_both_panels_followed_live():
     assert {panel["category"] for panel in offered.values()} == {"Cash register"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_never_gets_the_expected_cash_panel_but_reads_the_discrepancies():
     """F07: the employee counts blind, so the Home never shows them what the drawer should hold; the differences of
     closed sessions are theirs to see, as in Cash register."""
@@ -132,7 +141,7 @@ def test_an_employee_never_gets_the_expected_cash_panel_but_reads_the_discrepanc
     assert list(panels(employee)) == [RECENT]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_on_a_blind_count_the_expected_panels_query_tells_the_employee_nothing():
     """Hiding a panel is not the gate: the live stream runs the panel's own query as the person, so on a blind count
     the query itself hides the open session's expected from whoever may not see it."""
@@ -143,7 +152,7 @@ def test_on_a_blind_count_the_expected_panels_query_tells_the_employee_nothing()
     assert figure(panel, ctx_for("hub_employee")) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_read_the_sessions_gets_no_panel_and_is_refused_the_figures_by_hand():
     outsider = OperationContext(scope=A, actor="tester", permissions=frozenset({"base.view_home"}), language="en")
     assert panels(outsider) == {}
@@ -154,7 +163,7 @@ def test_whoever_may_not_read_the_sessions_gets_no_panel_and_is_refused_the_figu
             answer(panel, outsider)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_expected_panel_paints_the_open_sessions_expected_cash_and_follows_it(coffee):
     panel = panels(ctx_for())[EXPECTED]
     assert figure(panel, ctx_for()) is None  # no session open: «No data», never a made-up 0
@@ -168,7 +177,7 @@ def test_the_expected_panel_paints_the_open_sessions_expected_cash_and_follows_i
     assert figure(panel, ctx_for()) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_discrepancies_panel_shows_the_last_eight_closed_the_latest_first():
     differences = [-40, 550, 0, -1200, 75, -5, 300, -999, 20]
     numbers = []
@@ -181,10 +190,10 @@ def test_the_discrepancies_panel_shows_the_last_eight_closed_the_latest_first():
     assert bars(panel, ctx_for()) == list(zip(numbers[::-1], differences[::-1], strict=True))[:8]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_spanish_request_reads_the_step_and_the_panels_in_spanish(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
-    setup = client.get("/api/home/setup", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    client.force_login(make_user("boss", role="hub_admin"))
+    setup = client.get("/api/home/setup", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert setup.status_code == 200
     (item,) = [item for item in setup.json()["items"] if item["key"] == STEP]
     assert (item["title"], item["description"]) == (
@@ -192,7 +201,7 @@ def test_a_spanish_request_reads_the_step_and_the_panels_in_spanish(client, make
         "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que "
         "queda bloqueada hasta abrirla.",
     )
-    widgets = client.get("/api/home/widgets", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    widgets = client.get("/api/home/widgets", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert widgets.status_code == 200
     ours = [widget for widget in widgets.json()["widgets"] if widget["app"] == "cash_register"]
     assert [(widget["title"], widget["category"]) for widget in ours] == [
@@ -202,15 +211,12 @@ def test_a_spanish_request_reads_the_step_and_the_panels_in_spanish(client, make
 
 
 @pytest.fixture
-def listen(django_db_setup):
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
+def listen(db_dsn):
+    """The live notices go out on control's database, after the COMMIT in the business's own."""
     sessions = []
 
     def open_listener(scope):
-        session = psycopg.connect(dsn, autocommit=True)
+        session = psycopg.connect(db_dsn, autocommit=True)
         sessions.append(session)
         session.execute(f"LISTEN {channel_for(scope)}")
         return session
@@ -228,13 +234,14 @@ def affected(session) -> set[str]:
     return live_registry.affected({event for _, payload in received(session) for event in payload["events"]})
 
 
-# Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_save_and_a_session_in_hub_b_re_run_the_step_and_the_panels_of_b_and_tell_a_nothing(listen):
+# Committed: the notice leaves after a real COMMIT.
+@HUB_DB_COMMITTED
+def test_a_save_and_a_session_in_hub_b_re_run_the_step_and_the_panels_of_b_and_tell_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("cash_register.settings.update", {}, ctx_for(scope=B))
-    assert "base.setup.status" in affected(on_b)
-    assert steps(ctx_for(scope=B))[STEP]["state"] == "done"
-    run("cash_register.session.open", {"opening_balance": 10000}, ctx_for(scope=B))
-    assert {panel["operation"] for panel in panels(ctx_for(scope=B)).values()} <= affected(on_b)
+    with use_hub(hub_b):
+        run("cash_register.settings.update", {}, ctx_for(scope=B))
+        assert "base.setup.status" in affected(on_b)
+        assert steps(ctx_for(scope=B))[STEP]["state"] == "done"
+        run("cash_register.session.open", {"opening_balance": 10000}, ctx_for(scope=B))
+        assert {panel["operation"] for panel in panels(ctx_for(scope=B)).values()} <= affected(on_b)
     assert received(on_a, timeout=QUIET) == []
