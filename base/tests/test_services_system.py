@@ -6,9 +6,7 @@ A delivery the relay gives up on is told to its hub's live queries too (the bell
 import datetime as dt
 import json
 
-import psycopg
 import pytest
-from django.db import connections
 from django.utils import timezone
 from live.assistant import description
 from live.context import OperationContext
@@ -16,16 +14,15 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
 from base import events, relay
 from base.services import relay_runs
 from base.models import EventDelivery
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tests.routes import assert_bound
+from base.tests.test_queries_home import listen
 
-__all__ = ["in_business_a"]
+__all__ = ["in_business_a", "listen"]
 
 pytestmark = HUB_DB
 
@@ -274,25 +271,6 @@ def test_the_failed_events_and_the_bell_follow_what_changes_them():
         assert {"base.failed_event.list", "base.bell.counters"} <= live_registry.affected([name])
     # The photo may turn the app a failed event was for on or off: whether it can be resent changes.
     assert "base.failed_event.list" in live_registry.affected([events.HUB_STATE_APPLIED])
-
-
-@pytest.fixture
-def listen():
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
 
 
 def heard(session, timeout=0.5):
