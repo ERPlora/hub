@@ -178,7 +178,7 @@ def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(client, s
 
 
 def test_changelist_lists_memberships(client, superuser, make_user):
-    make_user("ana", host="a", role="hub_employee")
+    make_user("ana", host=A.key, role="hub_employee")
     client.force_login(superuser)
     response = client.get("/admin/base/membership/", HTTP_HOST=PLATFORM)
     assert response.status_code == 200
@@ -187,10 +187,10 @@ def test_changelist_lists_memberships(client, superuser, make_user):
 
 def test_changelist_filters_and_search(client, superuser, make_user):
     # Usernames that appear nowhere else on the page ("ana" is inside "Manager").
-    make_user("xavier", host="a", role="hub_employee")
-    make_user("quentin", host="b", role="hub_admin")
+    make_user("xavier", host=A.key, role="hub_employee")
+    make_user("quentin", host=B.key, role="hub_admin")
     client.force_login(superuser)
-    html = client.get("/admin/base/membership/?host=b", HTTP_HOST=PLATFORM).content.decode()
+    html = client.get(f"/admin/base/membership/?host={B.key}", HTTP_HOST=PLATFORM).content.decode()
     assert "quentin" in html and "xavier" not in html
     html = client.get("/admin/base/membership/?q=xavier", HTTP_HOST=PLATFORM).content.decode()
     assert "xavier" in html and "quentin" not in html
@@ -200,7 +200,7 @@ def test_add_form_creates_a_membership(client, superuser, make_user):
     user = make_user("ana")
     client.force_login(superuser)
     response = client.post(
-        "/admin/base/membership/add/", {"user": user.pk, "host": "a", "role": "hub_manager"}, HTTP_HOST=PLATFORM
+        "/admin/base/membership/add/", {"user": user.pk, "host": A.key, "role": "hub_manager"}, HTTP_HOST=PLATFORM
     )
     assert response.status_code == 302
     assert Membership.objects.get(user=user).role == "hub_manager"
