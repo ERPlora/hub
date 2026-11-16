@@ -12,7 +12,6 @@ import datetime as dt
 import json
 from decimal import Decimal
 
-import psycopg
 import pytest
 from django.utils import translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
@@ -21,11 +20,12 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, NOW, ctx_for, make_cart, make_item, make_order
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, NOW, ctx_for, make_cart, make_item, make_order
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 WAIT = 1.0
 QUIET = 0.3
@@ -133,7 +133,7 @@ def test_an_explicit_currency_wins_and_an_empty_one_is_the_business_one(currency
 def test_a_cart_without_a_currency_takes_the_business_one_never_a_literal_euro():
     # A hub that does not work in euros got euro carts from the screen, the
     # assistant and the API. The cart follows the business's country (test_business_currency.py).
-    Hub.objects.filter(slug="a").update(country="GB")
+    business_in("GB")
     cart = run("cart_checkout.cart.create", {"session_token": "sess_1"})
     assert cart.currency == "GBP"
     assert payload("cart_checkout.cart.created")["currency"] == "GBP"
@@ -779,21 +779,6 @@ def test_from_a_new_cart_to_a_completed_order():
 # ── Notifications: after the COMMIT, on the channel of the command's scope only ───────────────
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=WAIT, stop_after=None):
     return [
         (note.channel, json.loads(note.payload))
@@ -801,19 +786,29 @@ def received(session, timeout=WAIT, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_cart_created_in_b_notifies_the_channel_of_b_only(listen):
+def scopes_of_the_events() -> list[tuple[str, str]]:
+    """The scope each event of the business at work was recorded with."""
+    return list(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
+
+
+@HUB_DB_COMMITTED
+def test_a_cart_created_in_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("cart_checkout.cart.create", {"session_token": "sess_b"}, scope=B)
+    with use_hub(hub_b):
+        run("cart_checkout.cart.create", {"session_token": "sess_b"}, scope=B)
+        assert scopes_of_the_events() == [(B.kind, B.key)]
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["cart_checkout.cart.created"]})]
     assert received(on_a, timeout=QUIET) == []
+    assert scopes_of_the_events() == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_refused_step_notifies_nobody(listen):
-    order = make_order(status="completed")
+@HUB_DB_COMMITTED
+def test_a_refused_step_notifies_nobody(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    with pytest.raises(Conflict):
-        run("cart_checkout.order.mark_paid", {"order_id": str(order.id)}, scope=B)
+    with use_hub(hub_b):
+        order = make_order(status="completed")
+        with pytest.raises(Conflict):
+            run("cart_checkout.order.mark_paid", {"order_id": str(order.id)}, scope=B)
+        assert scopes_of_the_events() == []
     assert received(on_b, timeout=QUIET) == []
     assert received(on_a, timeout=QUIET) == []

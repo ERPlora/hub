@@ -1,8 +1,8 @@
 """The cart_checkout app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. No path parameters: a record travels in the input (query string on GET, body on POST), by
-its id or, as a person says it, by its session code, its customer or its order number.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction. No path
+parameters: a record travels in the input (query string on GET, body on POST), by its id or, as a person says it, by
+its session code, its customer or its order number.
 """
 
 import json
@@ -11,9 +11,10 @@ import pytest
 from live.ninja import ensure_api_parity
 
 from apps.cart_checkout.api import router
+from apps.flow.tests.test_api import get, post
 from config.api import api
 
-from .conftest import make_cart, make_order
+from .conftest import HOST, HUB_DB, A, make_cart, make_order
 
 ROUTES = {
     ("GET", "/cart_checkout/carts", "cart_checkout.cart.list"),
@@ -38,29 +39,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -84,7 +71,7 @@ def test_the_api_keeps_parity():
 # The whole app over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_from_a_new_cart_to_a_completed_order(admin_client):
     created = post(
         admin_client,
@@ -113,7 +100,7 @@ def test_from_a_new_cart_to_a_completed_order(admin_client):
     assert [row["order_number"] for row in orders.json()["rows"]] == [number]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_session_code_in_use_answers_409_under_its_field(admin_client):
     make_cart("sess_1")
     response = post(admin_client, "/cart_checkout/carts", {"session_token": "sess_1"})
@@ -127,7 +114,7 @@ def test_a_session_code_in_use_answers_409_under_its_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_bad_quantity_answers_422_under_its_field(admin_client):
     make_cart("sess_1")
     response = post(
@@ -139,20 +126,20 @@ def test_a_bad_quantity_answers_422_under_its_field(admin_client):
     assert response.json()["error"]["fields"] == {"quantity": "The quantity must be greater than 0."}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_step_from_the_wrong_state_answers_409(admin_client):
     order = make_order(status="completed")
     response = post(admin_client, "/cart_checkout/orders/fail", {"order_id": str(order.id), "reason": "late"})
     assert (response.status_code, response.json()["error"]["code"]) == (409, "cart_checkout.invalid_transition")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_cart_answers_404(admin_client):
     response = get(admin_client, "/cart_checkout/carts/detail", session_token="nope")
     assert (response.status_code, response.json()["error"]["code"]) == (404, "cart_checkout.cart_not_found")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_looks_but_does_not_touch(employee_client):
     make_cart("sess_1")
     assert get(employee_client, "/cart_checkout/carts").json()["total"] == 1
@@ -160,21 +147,25 @@ def test_an_employee_looks_but_does_not_touch(employee_client):
     assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_session_nothing(client):
     assert get(client, "/cart_checkout/orders").status_code == 401
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_spanish_caller_hears_spanish(admin_client):
     make_cart("sess_1", status="abandoned")
-    response = post(
-        admin_client, "/cart_checkout/carts/clear", {"session_token": "sess_1"}, HTTP_ACCEPT_LANGUAGE="es"
+    response = admin_client.post(
+        "/api/cart_checkout/carts/clear",
+        json.dumps({"session_token": "sess_1"}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
+        HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.json()["error"]["message"] == "Este carrito ya no admite cambios: está Abandonado."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_line_too_large_answers_422_not_500(admin_client):
     make_cart("sess_1")
     response = post(
@@ -186,7 +177,7 @@ def test_a_line_too_large_answers_422_not_500(admin_client):
     assert set(response.json()["error"]["fields"]) == {"quantity"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_erasing_a_customer_over_http(admin_client):
     make_cart("sess_1", customer_email="ana@example.com", customer_name="Ana")
     response = post(admin_client, "/cart_checkout/customers/erase", {"email": "ana@example.com"})
