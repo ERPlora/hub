@@ -342,7 +342,7 @@ export const SAAS_CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
 const SAAS_REFUSED = '/login/error';
 
 /** The running test's (or hook's) time limit, in ms; 0 outside a test or hook, as with no limit. */
-function runningTimeout(): number {
+export function runningTimeout(): number {
   try {
     return test.info().timeout;
   } catch {
