@@ -660,14 +660,6 @@
         "complexity": 19
       },
       {
-        "name": "hub_register",
-        "complexity": 22
-      },
-      {
-        "name": "hub_seed_local",
-        "complexity": 23
-      },
-      {
         "name": "assistant_turn",
         "complexity": 27
       }
@@ -884,6 +876,20 @@
       {
         "name": "marked_prose",
         "complexity": 38
+      }
+    ]
+  },
+  {
+    "path": "base/services/hub_registry.py",
+    "file_name": "hub_registry.py",
+    "functions": [
+      {
+        "name": "hub_register",
+        "complexity": 22
+      },
+      {
+        "name": "hub_seed_local",
+        "complexity": 23
       }
     ]
   }
