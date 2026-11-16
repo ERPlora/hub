@@ -25,6 +25,7 @@ from base import assistant, entitlement
 from base.models import Membership
 from base.permissions import permissions_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests.card_values import assert_a_sent_amount_is_in_the_business_currency
 from base.tests.fake_gateway import gateway, signed
 
 __all__ = ["gateway", "in_business_a", "signed"]
@@ -865,8 +866,7 @@ def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(
         {"name": "expected_balance", "kind": "money", "value": 11210},
         {"name": "difference", "kind": "money", "value": difference, "signed": True},
     ]
-    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
-    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+    assert_a_sent_amount_is_in_the_business_currency()
 
 
 class PricedPreviewOut(Schema):
@@ -912,8 +912,7 @@ def test_an_amount_of_a_preview_carries_the_currency_its_read_answers(monkeypatc
         {"name": "total_cents", "kind": "money", "value": -12100, "money": money},
         {"name": "difference", "kind": "money", "value": 4200, "signed": True, "money": money},
     ]
-    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
-    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+    assert_a_sent_amount_is_in_the_business_currency()
 
 
 @HUB_DB

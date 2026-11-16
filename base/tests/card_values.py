@@ -6,7 +6,7 @@ from uuid import UUID
 
 from django.core import checks
 from live.context import OperationContext
-from live.operations import Operation, registry
+from live.operations import Operation, get, registry
 from ninja import Schema
 
 from base import assistant
@@ -39,3 +39,9 @@ def reference_errors() -> list:
 
 def is_attempt_key(prop: dict) -> bool:
     return prop.get("attempt_key") is True
+
+
+def assert_a_sent_amount_is_in_the_business_currency() -> None:
+    """An amount a write sends is said in the business's currency: the card's ``money``, never a preview's."""
+    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
+    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}

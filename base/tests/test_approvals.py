@@ -481,6 +481,12 @@ def declare(monkeypatch, figures: dict, config: str = "base") -> None:
     monkeypatch.setattr(apps.get_app_config(config), "approval_figures", figures, raising=False)
 
 
+def selling_in_spain(monkeypatch, figures: dict) -> None:
+    """Business A in Spain, its currency the euro, with Sales' approvals saying ``figures``."""
+    Hub.objects.update_or_create(slug=A.key, defaults={"status": "ready", "name": "A", "country": "ES"})
+    declare(monkeypatch, figures, config="sale")
+
+
 def asked_in(client, language: str, body=THIRTY) -> dict:
     response = client.post(
         f"/api{SETTINGS}", json.dumps(body), content_type="application/json", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language
@@ -613,10 +619,7 @@ class TestTheFiguresOfTheTill:
 
     @pytest.fixture(autouse=True)
     def in_spain(self, monkeypatch):
-        from base.models import Hub
-
-        Hub.objects.update_or_create(slug=A.key, defaults={"status": "ready", "name": "A", "country": "ES"})
-        declare(monkeypatch, self.SENTENCES, config="sale")
+        selling_in_spain(monkeypatch, self.SENTENCES)
 
     def said(self, name: str, language: str = "en", **data) -> str:
         from django.utils import translation
@@ -715,10 +718,7 @@ class TestTheFiguresTheReviewAdded:
 
     @pytest.fixture(autouse=True)
     def in_spain(self, monkeypatch):
-        from base.models import Hub
-
-        Hub.objects.update_or_create(slug=A.key, defaults={"status": "ready", "name": "A", "country": "ES"})
-        declare(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]}, config="sale")
+        selling_in_spain(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]})
 
     def test_the_record_says_the_amount_in_the_business_s_currency(self, client, adam, eva):
         recorded(operation=self.CHECK, figures={"discount_amount": 500})
