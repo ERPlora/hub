@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
+from apps.printing.tests.conftest import HUB_DB
 
 MODELS = [Settings, Printer, PrintJob, PrintDevice]
 DATES = (
@@ -41,6 +42,7 @@ def test_every_model_is_registered():
         assert model in admin.site._registry, model.__name__
 
 
+@HUB_DB
 def test_full_crud_for_the_staff(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -74,10 +76,9 @@ def test_the_queue_is_searched_by_document_and_filtered_by_state():
     assert {"status", "usage", "kind"} <= set(job_admin.list_filter)
 
 
-@pytest.mark.django_db
-def test_the_admin_pages_open(client, superuser):
-    client.force_login(superuser)
+@HUB_DB
+def test_the_admin_pages_open(hub_staff):
     for model in MODELS:
         url = f"/admin/printing/{model._meta.model_name}/"
-        response = client.get(url, HTTP_HOST="hubs.localhost")
-        assert response.status_code in (200, 302), (url, response.status_code)
+        response = hub_staff.get(url, HTTP_HOST="hubs.localhost")
+        assert response.status_code == 200, (url, response.status_code)
