@@ -22,12 +22,13 @@ from django.db import IntegrityError, connection, migrations, transaction
 from django.utils import timezone
 from live.context import system_context
 from live.errors import PermissionDenied
-from live.models import OutboxEvent
 
 from base.registry import REGISTRY_SCOPE
+from base.tenancy.context import use_control
 from control import queries, services
 from control.models import Freeze, Hub, HubDue
 from control.schemas import FreezeGetIn, FreezeIn
+from control.tests.conftest import events
 from control.tests.test_services import as_actor, person
 
 pytestmark = pytest.mark.django_db
@@ -41,10 +42,6 @@ def admin_ctx():
 @pytest.fixture
 def support_ctx():
     return as_actor(person("support", is_staff=True))
-
-
-def events(name: str) -> list[dict]:
-    return [event.payload for event in OutboxEvent.objects.filter(name=name).order_by("created_at")]
 
 
 def freeze(ctx, reason: str = "Aurora upgrade with Blue/Green"):
@@ -172,20 +169,26 @@ class TestSet:
             FreezeIn(frozen=True, reason="x" * 501)
 
 
+def the_workers_read() -> Freeze | None:
+    """``queries.active_freeze`` as the worker and ``migrate_hubs`` call it: on control."""
+    with use_control():
+        return queries.active_freeze()
+
+
 class TestTheWorkersRead:
     """``queries.active_freeze``: the plain read of the worker (once per tick) and of ``migrate_hubs``, no operation."""
 
     def test_none_while_never_frozen_or_lifted(self, admin_ctx):
-        assert queries.active_freeze() is None
+        assert the_workers_read() is None
         freeze(admin_ctx)
         lift(admin_ctx)
 
-        assert queries.active_freeze() is None
+        assert the_workers_read() is None
 
     def test_the_freeze_in_course_while_frozen(self, admin_ctx):
         freeze(admin_ctx)
 
-        active = queries.active_freeze()
+        active = the_workers_read()
 
         assert (active.frozen, active.reason, active.by) == (True, "Aurora upgrade with Blue/Green", "Ana Root")
 
@@ -196,7 +199,7 @@ class TestTheWorkersRead:
             cursor.execute("ALTER TABLE control_freeze RENAME TO control_freeze_away")
 
         try:
-            assert queries.active_freeze() is None
+            assert the_workers_read() is None
             # The read rolled back to its own savepoint: the transaction it ran in goes on.
             assert Hub.objects.count() >= 0
         finally:
@@ -212,7 +215,7 @@ class TestTheWorkersRead:
         monkeypatch.setattr(Freeze.objects, "filter", broken)
 
         with pytest.raises(ProgrammingError):
-            queries.active_freeze()
+            the_workers_read()
 
 
 class TestOneRow:
