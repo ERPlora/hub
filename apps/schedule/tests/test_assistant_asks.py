@@ -20,7 +20,8 @@ from base.models import Membership
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_place, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB, in_hubs
 
 #: What changes the business's opening hours (``schedule.add``, ``schedule.change``, ``schedule.delete``,
 #: ``schedule.manage_settings``): an employee reads the hours (``schedule.view``), never these.
@@ -114,7 +115,7 @@ def test_schedule_offers_its_sixteen_tools():
     assert len(tools) == 16
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_a_change_of_the_opening_hours(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -128,13 +129,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [f"owner.es.{name}" for name, _ in REPORTED]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_schedule_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), TAKEN_FOR_A_BLOCK)
 def test_a_reported_change_of_the_hours_is_offered_before_any_block_of_appointments(catalog_of, name, phrase):
     """What the model chose instead (hub#1096): each block of Appointments a turn offers comes after the tool of
@@ -148,7 +149,7 @@ def test_a_reported_change_of_the_hours_is_offered_before_any_block_of_appointme
     assert {block: at for block, at in ahead.items() if at is not None and at < place} == {}, place
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_schedules_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's sixteen phrases of layer 2, the ones the model answered right too: a tool of Schedules that a new
@@ -157,7 +158,7 @@ def test_every_probe_of_schedules_offers_its_tool_without_being_one_of_its_asks(
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Schedules that needs one, neither
@@ -180,5 +181,5 @@ OWN_WORDS_EN = [
     ("schedule.week.get", "usually, which days are we shut, Monday to Sunday?"),
     ("schedule.week.set_day", "make the usual Saturday 9 to 13"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("schedule", OWN_WORDS_EN)
