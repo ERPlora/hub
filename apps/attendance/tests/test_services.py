@@ -25,10 +25,11 @@ from apps.attendance.schemas import ClosedOut, RecordOut, ReviewOut, SettingsOut
 from apps.staff.models import Member
 from base import access
 from base.models import TrustedDevice
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_member, run, utc
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, run, utc
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 WORKPLACE = (40.4168, -3.7038)  # Puerta del Sol
 NEAR = (40.4173, -3.7038)  # 55 m north
@@ -905,11 +906,12 @@ def received(session, timeout=1.0, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_clocking_in_in_b_notifies_b_only(listen, person):
+@HUB_DB_COMMITTED
+def test_clocking_in_in_b_notifies_b_only(listen, person, hub_b):
     on_a, on_b = listen(A), listen(B)
-    _, ctx_b = person(scope=B)
-    run("attendance.record.clock_in", {}, ctx_b)
+    with use_hub(hub_b):
+        _, ctx_b = person(scope=B)
+        run("attendance.record.clock_in", {}, ctx_b)
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.CLOCKED_IN]})
     ]
@@ -922,7 +924,7 @@ def test_clocking_in_in_b_notifies_b_only(listen, person):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_refused_command_notifies_nobody(listen, person):
     on_a = listen(A)
     _, ctx = person()

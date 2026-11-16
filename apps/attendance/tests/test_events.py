@@ -3,14 +3,13 @@ reaction: a staff member's termination closes their open working day (ATTENDANCE
 
 import re
 
-import pytest
 from live.operations import NAME_RE
 
 from apps.attendance import events
 from apps.attendance.models import Correction, Record
 from apps.attendance.schemas import ClosedOut
 
-from .conftest import A, make_member, utc
+from .conftest import HUB_DB, A, make_member, utc
 
 PAST_FACT = re.compile(r"^attendance\.(record|break|settings)\.[a-z_]+ed(_in|_out)?$")
 
@@ -76,7 +75,7 @@ def test_it_reacts_only_to_a_termination():
     assert events.react(A, "staff.member.created", {"id": "x"}) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_termination_closes_the_open_day_with_a_system_correction(clock):
     ana = make_member(status="terminated")
     day = Record.objects.create(

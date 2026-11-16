@@ -1,5 +1,8 @@
 """Fixtures of the attendance tests: contexts per role and scope, users with a role on a host, staff
-members linked to them (the real staff app, never a double), a frozen clock and a raw DSN."""
+members linked to them (the real staff app, never a double), a frozen clock and a raw DSN.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it."""
 
 import datetime as dt
 
@@ -12,12 +15,16 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
+from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.staff.models import Member
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The scopes, marks and fixtures of the businesses' own databases (the platform staff with business A chosen in the
+#: Hub admin) and the assistant's catalogue of a person of business A, that these tests take from here.
+__all__ = ["HOST", "HUB_DB", "HUB_DB_COMMITTED", "A", "B", "catalog_of", "hub_staff", "in_business_a", "in_hubs"]
 
 
 def ctx_for(
@@ -56,7 +63,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.EMPLOYEE,
         first_name: str = "",
         last_name: str = "",

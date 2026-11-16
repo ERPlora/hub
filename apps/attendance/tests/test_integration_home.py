@@ -22,8 +22,9 @@ from psycopg.conninfo import make_conninfo
 from apps.attendance.models import Record
 from apps.staff.models import Member
 from base.schemas import WidgetListIn
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_member, run
+from .conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, run
 
 CLOCKED_IN_NOW = "attendance.clocked_in_now"
 WAIT = 1.0
@@ -53,7 +54,7 @@ def clock_in(member: Member, ctx=None):
     return run("attendance.record.clock_in", {"member_id": str(member.id)}, ctx)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_owner_is_offered_the_one_panel_followed_live():
     offered = panels(ctx_for("hub_owner"))
     assert list(offered) == [CLOCKED_IN_NOW]
@@ -76,14 +77,14 @@ def test_an_owner_is_offered_the_one_panel_followed_live():
     assert not {"attendance.clocked_in", "attendance.clocked_out"} & set(panel["refresh_on"])
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_sees_the_whole_team_reads_it_and_an_employee_never():
     for name in ("hub_owner", "hub_admin", "hub_manager"):
         assert list(panels(ctx_for(name))) == [CLOCKED_IN_NOW], name
     assert panels(ctx_for("hub_employee")) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_see_the_team_gets_no_panel_and_is_refused_the_figure_by_hand():
     clocker = OperationContext(
         scope=A, actor="tester", permissions=frozenset({"base.view_home", "attendance.clock"}), language="en"
@@ -94,7 +95,7 @@ def test_whoever_may_not_see_the_team_gets_no_panel_and_is_refused_the_figure_by
         answer(panel, clocker)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_it_counts_who_is_in_now_as_records_lists_them(clock):
     clock("2026-10-06T10:30")  # 12:30 in Madrid
     panel = panels(ctx_for())[CLOCKED_IN_NOW]
@@ -117,7 +118,7 @@ def test_it_counts_who_is_in_now_as_records_lists_them(clock):
     assert figure(panel, ctx_for()) == run("attendance.presence.list", {}, ctx_for()).total
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_forgotten_day_stops_counting_before_the_review_marks_it(clock):
     clock("2026-10-06T07:00")
     ana, bea = make_member("Ana"), make_member("Bea", "Ruiz")
@@ -131,10 +132,10 @@ def test_a_forgotten_day_stops_counting_before_the_review_marks_it(clock):
     assert figure(panel, ctx_for()) == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_spanish_request_reads_the_panel_in_spanish(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
-    widgets = client.get("/api/home/widgets", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    client.force_login(make_user("boss", role="hub_admin"))
+    widgets = client.get("/api/home/widgets", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert widgets.status_code == 200
     ours = [widget for widget in widgets.json()["widgets"] if widget["app"] == "attendance"]
     assert [(widget["title"], widget["category"]) for widget in ours] == [("Fichados ahora", "Control horario")]
@@ -168,16 +169,17 @@ def affected(session) -> set[str]:
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_clocking_in_and_out_in_hub_b_re_runs_the_panel_of_b_and_tells_a_nothing(listen):
+@HUB_DB_COMMITTED
+def test_clocking_in_and_out_in_hub_b_re_runs_the_panel_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     in_b = ctx_for(scope=B)
-    ana = make_member("Ana")
-    panel = panels(in_b)[CLOCKED_IN_NOW]
-    clock_in(ana, in_b)
-    assert panel["operation"] in affected(on_b)
-    assert figure(panel, in_b) == 1
-    run("attendance.record.clock_out", {"member_id": str(ana.id)}, in_b)
-    assert panel["operation"] in affected(on_b)
-    assert figure(panel, in_b) == 0
+    with use_hub(hub_b):
+        ana = make_member("Ana")
+        panel = panels(in_b)[CLOCKED_IN_NOW]
+        clock_in(ana, in_b)
+        assert panel["operation"] in affected(on_b)
+        assert figure(panel, in_b) == 1
+        run("attendance.record.clock_out", {"member_id": str(ana.id)}, in_b)
+        assert panel["operation"] in affected(on_b)
+        assert figure(panel, in_b) == 0
     assert received(on_a, timeout=QUIET) == []
