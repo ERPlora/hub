@@ -15,7 +15,7 @@ from django.apps import apps
 from live import assistant as shared
 from live.operations import get, registry
 
-from apps.online_booking.tests.conftest import ctx_for
+from apps.online_booking.tests.conftest import HUB_DB, ctx_for
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
@@ -101,6 +101,7 @@ def test_the_card_names_a_booking_by_its_number_or_its_customer_as_the_bookings_
         assert labels(assistant.cards.card(get(name), arguments, "en")) == columns_en
 
 
+@HUB_DB
 def test_the_card_names_a_booking_from_the_page_as_the_page_asks_for_it(salon):
     """The customer's booking, with the words of the booking page (its preview): its services and its professional;
     when, by its day and time. Her name, mobile, email and note the card's screen names itself, as every app's. The
