@@ -7,12 +7,10 @@ import json
 import uuid
 from decimal import Decimal
 
-import psycopg
 import pytest
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from base.tenancy.context import use_hub
@@ -534,21 +532,6 @@ def test_a_reaction_is_no_person_s(name):
 
 
 # Notifications: after the COMMIT, on the channel of the command's scope only
-
-
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
 
 
 def received(session, timeout=1.0, stop_after=None):

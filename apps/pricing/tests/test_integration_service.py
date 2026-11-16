@@ -2,32 +2,15 @@
 Services' operations (``service.service.get``) with the caller's session, and its new name arrives by
 its event, handed to ``events.react`` as the outbox relay will."""
 
-import datetime as dt
-from zoneinfo import ZoneInfo
-
 import pytest
 from live.errors import PermissionDenied
-from live.models import OutboxEvent
-from live.operations import get
 
-from apps.pricing import events
 from apps.pricing.models import DiscountRule, PriceItem
 
-from .conftest import A, HUB_DB, TODAY, ctx_for
+from .conftest import HUB_DB, ctx_for
+from .test_integration_inventory import WHEN, relay, run
 
 pytestmark = HUB_DB
-
-WHEN = dt.datetime.combine(TODAY, dt.time(12), ZoneInfo("Europe/Madrid")).isoformat()
-
-
-def run(name, data, ctx=None):
-    op = get(name)
-    return op(ctx or ctx_for("hub_admin"), op.input.model_validate(data))
-
-
-def relay(name: str) -> None:
-    event = OutboxEvent.objects.filter(name=name).latest("created_at")
-    events.react(A, event.name, event.payload)
 
 
 @pytest.fixture

@@ -12,10 +12,12 @@ apps Pricing requires); a service is Services' row, read by its operations.
 import datetime as dt
 from decimal import Decimal
 
+import psycopg
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.outbox import channel_for
 
 from apps.flow.tests.test_relay import worker_loop
 from apps.invoice.tests.conftest import catalog_of
@@ -66,6 +68,22 @@ def fixed_today(monkeypatch):
         return TODAY
     monkeypatch.setattr(queries, "business_today", lambda: TODAY)
     return TODAY
+
+
+@pytest.fixture
+def listen(db_dsn):
+    """``listen(scope)``: a raw session LISTENing on the channel of ``scope``; it hears only what is committed."""
+    sessions = []
+
+    def open_session(scope):
+        session = psycopg.connect(db_dsn, autocommit=True)
+        sessions.append(session)
+        session.execute(f"LISTEN {channel_for(scope)}")
+        return session
+
+    yield open_session
+    for session in sessions:
+        session.close()
 
 
 # Builders: other apps' rows

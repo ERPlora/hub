@@ -12,12 +12,9 @@ import datetime as dt
 import json
 from zoneinfo import ZoneInfo
 
-import psycopg
-import pytest
 from django.utils import timezone
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from base.models import EventDelivery
@@ -282,21 +279,6 @@ def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(work
 
 
 # ── Two hubs, on committed data ───────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
 
 
 def heard(session, timeout: float = 0.5) -> set[str]:
