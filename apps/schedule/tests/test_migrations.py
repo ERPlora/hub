@@ -2,28 +2,30 @@
 never over a week the business already has, and reversible while nobody confirmed it.
 
 The functions of the ``RunPython`` are called the way the migration runs them, with the app registry and
-a schema editor whose connection is the test database.
+a schema editor whose connection is business A's database, inside the test's transaction.
 """
 
 import datetime as dt
 from importlib import import_module
 
-import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import connections
 
 from apps.schedule.models import ScheduleSettings, WeekDay
-from apps.schedule.tests.conftest import make_day
+from apps.schedule.tests.conftest import HUB_DB, make_day
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NINE_TO_SIX = [(dt.time(9), dt.time(18))]
 
 
 class _SchemaEditor:
-    """What a ``RunPython`` function reads from the schema editor: the connection."""
+    """What a ``RunPython`` function reads from the schema editor: the connection of the business at work."""
 
-    connection = connection
+    @property
+    def connection(self):
+        return connections[current_alias()]
 
 
 def _seed():

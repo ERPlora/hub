@@ -19,9 +19,9 @@ from apps.schedule.schemas import (
     SpecialDayListIn,
 )
 
-from .conftest import ctx_for, make_day, make_override, make_special_day
+from .conftest import HUB_DB, ctx_for, make_day, make_override, make_special_day
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NINE_TO_SIX = [{"open_time": dt.time(9), "close_time": dt.time(18)}]
 
