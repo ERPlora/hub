@@ -32,7 +32,7 @@ from apps.whatsapp_inbox.tests.conftest import (
     system,
     template,
 )
-from base.tenancy.context import current_alias
+from base.tenancy.context import current_alias, use_hub
 
 pytestmark = HUB_DB
 
@@ -417,9 +417,7 @@ def channel_of(scope):
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
-    from base.tenancy.context import use_hub
     from live.context import Scope
 
     with use_hub(hub_a):
@@ -440,9 +438,7 @@ def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own(hub_a, hub_b):
-    from base.tenancy.context import use_hub
     from live.context import Scope
 
     with use_hub(hub_a):
@@ -468,7 +464,6 @@ def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_i
 
 
 @HUB_DB
-@pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_s_photo_keeps_its_own_number(client, settings, hub_a, hub_b):
     from base.tests.test_internal import SECRET, signed
 
@@ -483,7 +478,6 @@ def test_each_business_s_photo_keeps_its_own_number(client, settings, hub_a, hub
     assert photo(a_id, "a", 50).json() == {"applied": True, "version": 50}
     assert photo(b_id, "b", 120, status="not_connected", phone_number="", display_name="").json()["applied"] is True
 
-    from base.tenancy.context import use_hub
     from live.context import Scope
 
     with use_hub(hub_a):
