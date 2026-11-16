@@ -4,14 +4,14 @@ Idempotent, a dry run unless ``--execute``, it names what it found and refuses r
 issuer is one chain, so it never writes over another identity. The platform hub is its reserved slug
 (``PLATFORM_HUB_SLUG``, which no business can take): a row of the registry (``is_platform``) with a database of its
 own, which ``--execute`` makes when it is missing, as a sign-up does; then it gives it its issuer
-(``PLATFORM_ISSUER_*``) and pins VeriFactu to the deployment's environment, inside that database. The tests below keep
-its rows on control's test database (the suite's fallback, ``base/tenancy/tests/legacy.py``); the last ones make its
-database for real.
+(``PLATFORM_ISSUER_*``) and pins VeriFactu to the deployment's environment, inside that database. The tests below give
+it the database of a business of the session (``hub_b``); the last ones make its database for real.
 """
 
 from io import StringIO
 
 import pytest
+from django.conf import settings as deployed
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from live.context import Scope, system_context
@@ -20,6 +20,8 @@ from live.slugs import validate_hub_slug
 from apps.invoice.models import Issuer
 from apps.invoice.tests.conftest import ISSUER, run
 from apps.verifactu.models import Config, Environment
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB
 
 PLATFORM = Scope("host", "erplora")
 
@@ -38,11 +40,21 @@ def environment(settings):
 
 
 @pytest.fixture
-def deployment(db, settings):
+def deployment(hub_b, settings):
+    """ERPlora's own hub, ready on a database of its own (``hub_b``), and the deployment's settings."""
     from control.models import Hub
 
-    Hub.objects.create(slug=PLATFORM.key, status=Hub.Status.READY, is_platform=True)
-    return environment(settings)
+    Hub.objects.filter(pk=hub_b.pk).update(is_platform=True)
+    environment(settings)
+    settings.PLATFORM_HUB_SLUG = hub_b.slug
+    return settings
+
+
+def in_the_platform_hub():
+    """Inside the platform hub's own database, where the command writes."""
+    from control.models import Hub
+
+    return use_hub(Hub.objects.get(slug=deployed.PLATFORM_HUB_SLUG))
 
 
 def command(*args) -> str:
@@ -51,24 +63,28 @@ def command(*args) -> str:
     return out.getvalue()
 
 
-def test_its_slug_is_reserved_so_no_business_can_take_it(deployment):
+def test_its_slug_is_reserved_so_no_business_can_take_it():
     with pytest.raises(ValueError):
-        validate_hub_slug(deployment.PLATFORM_HUB_SLUG)
+        validate_hub_slug(PLATFORM.key)
 
 
+@HUB_DB
 def test_without_execute_nothing_is_written_and_it_says_what_it_would_do(deployment):
     out = command()
 
-    assert not Issuer.objects.exists()
-    assert not Config.objects.exists()
+    with in_the_platform_hub():
+        assert not Issuer.objects.exists()
+        assert not Config.objects.exists()
     assert "Dry run" in out
     assert "would set the issuer ERPLORA CLOUD SL (B12345674)" in out
 
 
+@HUB_DB
 def test_it_sets_the_issuer_from_the_environment(deployment):
     out = command("--execute")
 
-    issuer = Issuer.objects.get()
+    with in_the_platform_hub():
+        issuer = Issuer.objects.get()
     assert (
         issuer.legal_name,
         issuer.tax_id,
@@ -90,6 +106,7 @@ def test_it_sets_the_issuer_from_the_environment(deployment):
     assert "ready to issue ERPlora's invoices" in out
 
 
+@HUB_DB
 @pytest.mark.parametrize(
     ("where", "opened", "environment"),
     [
@@ -107,49 +124,59 @@ def test_verifactu_files_where_the_deployment_does(
 
     command("--execute")
 
-    config = Config.objects.get()
+    with in_the_platform_hub():
+        config = Config.objects.get()
     assert (config.environment, config.route) == (environment, Config.Route.ERPLORA)
     assert (config.production_since is not None) is (
         environment == Environment.PRODUCTION
     )
 
 
+@HUB_DB
 def test_running_it_twice_writes_nothing_the_second_time(deployment):
     command("--execute")
-    issuer = Issuer.objects.get()
-    config = Config.objects.get()
+    with in_the_platform_hub():
+        issuer = Issuer.objects.get()
+        config = Config.objects.get()
 
     out = command("--execute")
 
-    assert Issuer.objects.get().updated_at == issuer.updated_at
-    assert Config.objects.get().updated_at == config.updated_at
+    with in_the_platform_hub():
+        assert Issuer.objects.get().updated_at == issuer.updated_at
+        assert Config.objects.get().updated_at == config.updated_at
     assert "issuer found" in out
 
 
+@HUB_DB
 def test_another_identity_on_the_database_is_never_overwritten(deployment):
-    # Every hub shares the suite's test database: an issuer that is not ERPlora's is a business's, with its own chain.
-    run(
-        "invoice.issuer.update",
-        {**ISSUER, "tax_id": "B27593136"},
-        system_context(PLATFORM),
-    )
+    # An issuer already in its database that is not ERPlora's is a business's, with its own chain.
+    with in_the_platform_hub():
+        run(
+            "invoice.issuer.update",
+            {**ISSUER, "tax_id": "B27593136"},
+            system_context(Scope("host", deployment.PLATFORM_HUB_SLUG)),
+        )
 
     with pytest.raises(CommandError, match="B27593136"):
         command("--execute")
 
-    assert Issuer.objects.get().tax_id == "B27593136"
-    assert not Config.objects.exists()
+    with in_the_platform_hub():
+        assert Issuer.objects.get().tax_id == "B27593136"
+        assert not Config.objects.exists()
 
 
+@HUB_DB
 def test_without_an_issuer_in_the_environment_it_refuses(deployment):
     deployment.PLATFORM_ISSUER_TAX_ID = ""
 
     with pytest.raises(CommandError, match="PLATFORM_ISSUER_TAX_ID"):
         command("--execute")
 
-    assert not Issuer.objects.exists()
+    with in_the_platform_hub():
+        assert not Issuer.objects.exists()
 
 
+@HUB_DB
 def test_it_reminds_what_real_filing_still_needs(deployment):
     deployment.ERPLORA_ENVIRONMENT = "prod"
     deployment.VERIFACTU_PRODUCTION_ENABLED = False
@@ -162,6 +189,7 @@ def test_it_reminds_what_real_filing_still_needs(deployment):
     assert "FISCAL_SEAL_CURRENT" in out
 
 
+@HUB_DB
 def test_with_production_open_its_dry_run_pins_production(deployment):
     deployment.ERPLORA_ENVIRONMENT = "prod"
     deployment.VERIFACTU_PRODUCTION_ENABLED = True
@@ -258,19 +286,19 @@ def test_its_row_is_never_left_due_for_the_worker_to_take_meanwhile():
     assert not HubDue.objects.filter(pk=hub.pk).exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_when_the_worker_holds_it_the_command_waits_for_it_to_be_ready(deployment, monkeypatch):
     """A row left due by an older run may be the worker's when the command comes: it waits for it, never fails."""
     from base.management.commands import create_platform_hub
     from base.tenancy import provision
     from control.models import Hub
 
-    Hub.objects.filter(slug=PLATFORM.key).update(status=Hub.Status.MIGRATING)
+    Hub.objects.filter(slug=deployment.PLATFORM_HUB_SLUG).update(status=Hub.Status.MIGRATING)
     polls = []
 
     def the_worker_finishes(seconds):
         polls.append(seconds)
-        Hub.objects.filter(slug=PLATFORM.key).update(status=Hub.Status.READY)
+        Hub.objects.filter(slug=deployment.PLATFORM_HUB_SLUG).update(status=Hub.Status.READY)
 
     monkeypatch.setattr(provision, "provision", lambda hub, **kwargs: False)
     monkeypatch.setattr(create_platform_hub, "wait", the_worker_finishes)

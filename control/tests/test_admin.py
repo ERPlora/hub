@@ -22,12 +22,12 @@ from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.text import capfirst
-from live.models import OutboxEvent
 
 from base import admin as base_admin
 from base.tenancy import credentials
 from control import admin as control_admin
 from control.models import Cluster, Freeze, Hub, HubDue
+from control.tests.conftest import events
 
 pytestmark = pytest.mark.django_db
 PLATFORM = "hubs.localhost:8000"
@@ -117,10 +117,6 @@ def form(cluster: Cluster | None = None, **changes) -> dict:
         if not cluster.is_open:
             del fields["is_open"]
     return {key: value for key, value in (fields | changes).items() if value is not None} | {"_save": "Save"}
-
-
-def events(name: str) -> list[dict]:
-    return [event.payload for event in OutboxEvent.objects.filter(name=name)]
 
 
 def page(client, url: str, **params) -> str:

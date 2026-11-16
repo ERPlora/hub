@@ -19,7 +19,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.models import OutboxEvent
 
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import credentials
@@ -27,6 +26,7 @@ from base.tenancy.tests.hubs import HUB_DATABASES
 from control import services
 from control.models import Cluster, Hub
 from control.schemas import ClusterIdIn, ClusterIn, ClusterUpdateIn
+from control.tests.conftest import events
 
 pytestmark = pytest.mark.django_db
 
@@ -102,10 +102,6 @@ def update_in(cluster: Cluster, **changes) -> ClusterUpdateIn:
 
 def a_cluster(**fields) -> Cluster:
     return Cluster.objects.create(**({"name": "cluster-1", "host": "writer-1.example"} | fields))
-
-
-def events(name: str) -> list[dict]:
-    return [event.payload for event in OutboxEvent.objects.filter(name=name).order_by("created_at")]
 
 
 class TestCreate:
