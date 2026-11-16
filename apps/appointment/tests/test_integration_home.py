@@ -116,7 +116,7 @@ def test_without_a_permission_of_citas_there_is_no_counter(salon):
 # ── What refreshes it: every change of the number records one of its events ──────────────────────────────────────
 
 
-def book_online(salon, appointment):
+def book_online(salon, appointment=None, scope=A):
     make_settings(auto_confirm_online=False)
     run(
         "appointment.appointment.create",
@@ -127,6 +127,7 @@ def book_online(salon, appointment):
             "start": wall(MONDAY, "12:00"),
             "source": "online",
         },
+        scope=scope,
     )
 
 
@@ -222,19 +223,7 @@ def test_a_booking_in_hub_b_re_runs_the_bell_of_b_and_tells_a_nothing(listen, hu
     on_a, on_b = listen(A), listen(B)
     with use_hub(hub_b):
         without_hours()
-        salon = make_salon()
-        make_settings(auto_confirm_online=False)
-        run(
-            "appointment.appointment.create",
-            {
-                "customer_id": str(salon.lucia.id),
-                "services": [{"service_id": str(salon.cut.id)}],
-                "staff_id": str(salon.ana.id),
-                "start": wall(MONDAY, "10:00"),
-                "source": "online",
-            },
-            scope=B,
-        )
+        book_online(make_salon(), scope=B)
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     events = {event for _, payload in notes for event in payload["events"]}
