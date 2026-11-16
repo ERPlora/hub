@@ -18,6 +18,18 @@ def bound_routes(router) -> set[tuple[str, str, str]]:
     }
 
 
+def published_routes(client, prefix: str, host: str) -> set[tuple[str, str, str]]:
+    """``(METHOD, path, operation)`` of each operation named ``<prefix>…`` that ``/api/openapi.json`` publishes on
+    ``host`` (the host gate reads the business's row: the test needs the database)."""
+    paths = client.get("/api/openapi.json", HTTP_HOST=host).json()["paths"]
+    return {
+        (method.upper(), path.removeprefix("/api"), operation["operationId"])
+        for path, methods in paths.items()
+        for method, operation in methods.items()
+        if operation["operationId"].startswith(prefix)
+    }
+
+
 def assert_bound(method: str, path: str, operation: str) -> None:
     """``base/api.py`` binds ``path`` to ``operation`` alone and by ``method`` alone, and it resolves under ``/api``."""
     from base.api import router

@@ -17,8 +17,10 @@ from live.context import OperationContext, Scope
 from live.operations import get
 
 from apps.online_booking.tests.conftest import (
+    HUB_DB,
     TUESDAY,
     A,
+    B,
     at,
     ctx_for,
     make_appointment,
@@ -29,7 +31,6 @@ from apps.online_booking.tests.conftest import (
 )
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -114,7 +115,7 @@ def make_salon() -> Salon:
 # ── A booking, as the diary says it ───────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("write", ON_A_BOOKING)
 def test_a_write_on_a_booking_says_it_as_the_diary_does(write, language):
@@ -126,7 +127,7 @@ def test_a_write_on_a_booking_says_it_as_the_diary_does(write, language):
     assert (field.get("value"), field.get("label")) == (LUCIAS[language], title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own booking, never another of the list (the first, the last, the newest)."""
     salon = make_salon()
@@ -135,7 +136,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
     assert said == [{"id": LUCIAS["en"]}, {"id": PABLOS["en"]}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_cancellation_says_the_booking_beside_its_reason():
     salon = make_salon()
     said = shown("online_booking.booking.cancel", {"id": str(salon.pablos.id), "reason": "Llamó"}, "es")
@@ -145,7 +146,7 @@ def test_a_cancellation_says_the_booking_beside_its_reason():
 # ── The page's booking: its services and its professional ─────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_the_pages_booking_says_its_services_and_its_professional_by_their_names(language):
     """Each service in the order sent, the professional chosen, under the words of the booking page."""
@@ -164,7 +165,7 @@ def test_the_pages_booking_says_its_services_and_its_professional_by_their_names
     assert [field.get("value") for field in said] == [["Colour", "Haircut"], "Bea Ruiz"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_page_says_each_service_and_professional_sent_never_another():
     salon = make_salon()
     sent = {"service_ids": [str(salon.cut.id)], "staff_id": str(salon.ana.id), "start": wall(TUESDAY, "12:00")}
@@ -175,7 +176,7 @@ def test_the_page_says_each_service_and_professional_sent_never_another():
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ON_A_BOOKING)
 def test_what_the_person_may_not_read_in_the_diary_is_left_out_never_said_by_its_id(write):
     """Whoever may not read the diary is told no booking: a booking is an appointment of it."""
@@ -187,7 +188,7 @@ def test_what_the_person_may_not_read_in_the_diary_is_left_out_never_said_by_its
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_services_and_a_professional_the_person_may_not_read_are_left_out():
     salon = make_salon()
     sent = {"service_ids": [str(salon.cut.id)], "staff_id": str(salon.ana.id), "start": wall(TUESDAY, "12:00")}
@@ -197,14 +198,14 @@ def test_services_and_a_professional_the_person_may_not_read_are_left_out():
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ON_A_BOOKING)
 def test_a_booking_that_does_not_exist_is_left_out(write):
     said = shown(write, {"id": A_MISSING_ID})
     assert said == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_booking_deleted_meanwhile_is_left_out():
     salon = make_salon()
     arguments = {"id": str(salon.lucias.id)}
@@ -214,7 +215,7 @@ def test_a_booking_deleted_meanwhile_is_left_out():
     assert shown("online_booking.booking.delete", arguments) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no booking, service nor professional: nothing is read."""
     salon = make_salon()
@@ -226,14 +227,12 @@ def test_nobody_behind_the_request_reads_no_record():
     assert no_id(card) and "staff_id" not in {field["name"] for field in card["fields"]}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
-def test_a_booking_of_another_business_is_left_out(hub_a, hub_b):
+@HUB_DB
+def test_a_booking_of_another_business_is_left_out(hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
-    in_a, in_b = as_admin(scope=Scope("host", hub_a.slug)), as_admin(scope=Scope("host", hub_b.slug))
-    with use_hub(hub_a):
-        salon = make_salon()
-        arguments = {"id": str(salon.lucias.id)}
-        assert shown("online_booking.booking.confirm", arguments, ctx=in_a) == {"id": LUCIAS["en"]}  # positive control
+    in_a, in_b = as_admin(scope=A), as_admin(scope=B)
+    salon = make_salon()
+    arguments = {"id": str(salon.lucias.id)}
+    assert shown("online_booking.booking.confirm", arguments, ctx=in_a) == {"id": LUCIAS["en"]}  # positive control
     with use_hub(hub_b):
         assert shown("online_booking.booking.confirm", arguments, ctx=in_b) == {}

@@ -8,9 +8,9 @@ from apps.appointment.models import Appointment
 from apps.customer.models import Customer
 from base.models import Hub
 
-from .conftest import at, booking_data, make_appointment, public, run, TUESDAY
+from .conftest import HUB_DB, TUESDAY, A, at, booking_data, make_appointment, public, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: A Polish mobile written as a Pole types it: no prefix, in groups of three.
 POLISH = "512 345 678"
@@ -18,8 +18,8 @@ POLISH = "512 345 678"
 
 @pytest.fixture
 def in_poland(salon):
-    """The business ``a`` registered in Poland, and Ola's card saved in Customers by the digits she gave."""
-    Hub.objects.filter(slug="a").update(country="PL")
+    """Business A registered in Poland, and Ola's card saved in Customers by the digits she gave."""
+    Hub.objects.filter(slug=A.key).update(country="PL")
     salon.ola = run("customer.customer.create", {"name": "Ola Nowak", "phone": POLISH})
     return salon
 

@@ -1,21 +1,20 @@
 """The online booking app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. The public operations have session routes too (the owner's and the admin's preview); the page
-without a session calls them in-process from base. The platform's reaction has no route.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction. The public
+operations have session routes too (the owner's and the admin's preview); the page without a session calls them
+in-process from base. The platform's reaction has no route.
 """
-
-import json
 
 import pytest
 from live.ninja import ensure_api_parity
 
 from apps.appointment.models import Appointment
+from apps.flow.tests.test_api import get, post
 from apps.online_booking.api import router
-from base.tests.routes import spa_routes
+from base.tests.routes import published_routes, spa_routes
 from config.api import api
 
-from .conftest import TUESDAY, at, booking_data, make_appointment
+from .conftest import HOST, HUB_DB, TUESDAY, at, booking_data, make_appointment
 
 ROUTES = {
     ("GET", "/online_booking/bookings", "online_booking.booking.list"),
@@ -36,25 +35,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def manager_client(client, make_user):
-    client.force_login(make_user("mia", host="a", role="hub_manager"))
+    client.force_login(make_user("mia", role="hub_manager"))
     return client
 
 
@@ -75,16 +64,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_openapi_describes_the_online_booking_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
-    served = {
-        (method.upper(), path.removeprefix("/api"), op["operationId"])
-        for path, methods in paths.items()
-        for method, op in methods.items()
-        if op["operationId"].startswith("online_booking.")
-    }
-    assert served == ROUTES
+    assert published_routes(client, "online_booking.", HOST) == ROUTES
 
 
 def test_the_spas_route_map_names_every_online_booking_route():
@@ -94,7 +76,7 @@ def test_the_spas_route_map_names_every_online_booking_route():
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope_even_on_the_public_routes(client):
     for response in (
         get(client, "/online_booking/bookings"),
@@ -105,7 +87,7 @@ def test_anonymous_gets_the_401_envelope_even_on_the_public_routes(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_manager_works_the_inbox_but_neither_the_settings_nor_the_public_preview(
     manager_client, salon
 ):
@@ -137,7 +119,7 @@ def test_a_manager_works_the_inbox_but_neither_the_settings_nor_the_public_previ
 # The flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_owner_previews_the_page_books_sees_and_cancels_with_the_link(
     admin_client, salon
 ):
@@ -150,7 +132,7 @@ def test_the_owner_previews_the_page_books_sees_and_cancels_with_the_link(
     slots = admin_client.get(
         "/api/online_booking/public/slots",
         {"service_ids": [str(salon.cut.id)], "date": TUESDAY.isoformat()},
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
     assert slots.status_code == 200 and slots.json()["slots"]
     booked = post(
@@ -167,7 +149,7 @@ def test_the_owner_previews_the_page_books_sees_and_cancels_with_the_link(
     assert [row["number"] for row in inbox["rows"]] == [booked.json()["number"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_is_the_envelope_with_its_field(admin_client, salon):
     refused = post(
         admin_client, "/online_booking/public/book", booking_data(salon, phone="12")
@@ -181,7 +163,7 @@ def test_a_refusal_is_the_envelope_with_its_field(admin_client, salon):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_settings_over_http(admin_client, db):
     saved = post(
         admin_client,

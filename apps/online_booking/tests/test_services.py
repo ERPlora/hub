@@ -5,6 +5,7 @@ Every refusal leaves no trace: no appointment, no card, no link, no event.
 """
 
 import datetime as dt
+import json
 
 import pytest
 from live.errors import (
@@ -15,6 +16,7 @@ from live.errors import (
     PermissionDenied,
 )
 from live.models import OutboxEvent
+from live.outbox import channel_for
 
 from apps.appointment.models import Appointment, History
 from apps.appointment.models import Settings as Rules
@@ -22,10 +24,15 @@ from apps.customer.models import Customer
 from apps.online_booking import services
 from apps.online_booking.models import Booking, Settings
 from apps.online_booking.queries import hash_token, visitor_key
+from base.tenancy.context import use_hub
 
 from .conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
     MONDAY,
     TUESDAY,
+    A,
+    B,
     at,
     booking_data,
     ctx_for,
@@ -35,12 +42,14 @@ from .conftest import (
     make_page,
     make_rules,
     make_service,
+    no_rule_of_hours,
+    open_salon,
     public,
     public_ctx,
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:
@@ -526,52 +535,38 @@ WAIT = 1.0
 QUIET = 0.3
 
 
-@pytest.fixture
-def listen(db_dsn):
-    import psycopg
-    from live.outbox import channel_for
-
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=WAIT):
-    import json
-
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_public_booking_in_hub_b_notifies_b_only(listen, salon):
-    from live.outbox import channel_for
+def noted_for() -> set[tuple[str, str]]:
+    """The businesses the events of the outbox at hand are noted down for: the channel of a notice is the command's,
+    so only the rows tell an event written down for another business."""
+    return set(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
 
-    from .conftest import A, B
 
+@HUB_DB_COMMITTED
+def test_a_public_booking_in_hub_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("online_booking.public.book", booking_data(salon, "10:00"), ctx=public_ctx(scope=B))
+    with use_hub(hub_b):
+        no_rule_of_hours()
+        salon = open_salon()
+        run("online_booking.public.book", booking_data(salon, "10:00"), ctx=public_ctx(scope=B))
+        assert noted_for() == {(B.kind, B.key)}
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     names = {name for _, payload in notes for name in payload["events"]}
     assert {"online_booking.booking.created", "appointment.appointment.created", "customer.customer.created"} <= names
     assert received(on_a, timeout=QUIET) == []
+    assert not OutboxEvent.objects.exists()
 
 
-@pytest.mark.django_db(transaction=True)
-def test_saving_the_settings_in_hub_b_notifies_b_only(listen):
-    from live.outbox import channel_for
-
-    from .conftest import A, B
-
+@HUB_DB_COMMITTED
+def test_saving_the_settings_in_hub_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("online_booking.settings.update", {"is_enabled": True}, scope=B)
+    with use_hub(hub_b):
+        run("online_booking.settings.update", {"is_enabled": True}, scope=B)
+        assert noted_for() == {(B.kind, B.key)}
     assert received(on_b) == [(channel_for(B), {"events": ["online_booking.settings.updated"]})]
     assert received(on_a, timeout=QUIET) == []
+    assert not OutboxEvent.objects.exists()

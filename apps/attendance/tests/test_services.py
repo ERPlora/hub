@@ -10,7 +10,6 @@ import dataclasses
 import datetime as dt
 import json
 
-import psycopg
 import pytest
 from django.test import RequestFactory
 from django.utils import timezone
@@ -25,10 +24,11 @@ from apps.attendance.schemas import ClosedOut, RecordOut, ReviewOut, SettingsOut
 from apps.staff.models import Member
 from base import access
 from base.models import TrustedDevice
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_member, run, utc
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, run, utc
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 WORKPLACE = (40.4168, -3.7038)  # Puerta del Sol
 NEAR = (40.4173, -3.7038)  # 55 m north
@@ -883,21 +883,6 @@ def test_a_termination_without_an_open_day_changes_nothing(person, clock):
 # Live notifications: a write in one scope reaches that scope's channel only
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=1.0, stop_after=None):
     return [
         (note.channel, json.loads(note.payload))
@@ -905,15 +890,20 @@ def received(session, timeout=1.0, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_clocking_in_in_b_notifies_b_only(listen, person):
+@HUB_DB_COMMITTED
+def test_clocking_in_in_b_notifies_b_only(listen, person, hub_b):
     on_a, on_b = listen(A), listen(B)
-    _, ctx_b = person(scope=B)
-    run("attendance.record.clock_in", {}, ctx_b)
+    with use_hub(hub_b):
+        _, ctx_b = person(scope=B)
+        run("attendance.record.clock_in", {}, ctx_b)
+        noted_in_b = list(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.CLOCKED_IN]})
     ]
     assert received(on_a, timeout=0.3) == []
+    # The notice leaves on the operation's channel whatever the event says: the event itself is B's, in B's database.
+    assert noted_in_b == [(B.kind, B.key)]
+    assert outbox() == []
     # Positive control: the same listener of A hears a command run in A.
     _, ctx_a = person("Bea", "Ruiz", scope=A)
     run("attendance.record.clock_in", {}, ctx_a)
@@ -922,7 +912,7 @@ def test_clocking_in_in_b_notifies_b_only(listen, person):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_refused_command_notifies_nobody(listen, person):
     on_a = listen(A)
     _, ctx = person()

@@ -3,14 +3,15 @@ operation, a raw save): one open day per person, one running break per day, a co
 order, one settings row with its ranges, and no staff record deleted under its working days."""
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import ProtectedError
+from live.operations import atomic
 
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
 
-from .conftest import make_member, utc
+from .conftest import HUB_DB, make_member, utc
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def open_day(member, at="2026-10-06T08:00", **fields) -> Record:
@@ -21,7 +22,7 @@ def open_day(member, at="2026-10-06T08:00", **fields) -> Record:
 
 
 def refused(**create) -> None:
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         create.pop("model").objects.create(**create)
 
 
@@ -39,7 +40,7 @@ def test_a_new_day_is_open_from_the_shared_device_with_no_location():
 def test_one_open_day_per_person():
     ana = make_member()
     open_day(ana)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         open_day(ana, "2026-10-06T09:00")
     # Another person, or the same person with a closed day, is fine.
     open_day(make_member("Bea", "Ruiz"))
@@ -101,7 +102,7 @@ def test_the_source_is_shared_or_personal():
 def test_one_running_break_per_day_and_it_ends_after_it_starts():
     day = open_day(make_member())
     Break.objects.create(record=day, started_at=utc("2026-10-06T10:00"))
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         Break.objects.create(record=day, started_at=utc("2026-10-06T10:05"))
     refused(
         model=Break,
@@ -160,7 +161,7 @@ def test_one_settings_row_with_the_old_defaults():
         settings_row.workplace_lng,
         settings_row.auto_close_after_hours,
     ) == (False, 100, None, None, 12)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         AttendanceSettings.objects.create()
 
 
