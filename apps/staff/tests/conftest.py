@@ -1,6 +1,11 @@
 """Fixtures of the staff tests: contexts per role and scope, users with a role on a host, model
-builders for the data a test starts from, a raw DSN, and the Hub admin's «Delete» of a record from another
-session (``deleted_on_screen``, for the apps that keep something about a person)."""
+builders for the data a test starts from and a raw DSN.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+
+``deleted_on_screen`` works on control's connection, for the tests of other apps that still import it; these tests
+delete in the Hub admin with ``meanwhile`` and ``admin_delete`` of ``base.tenancy.tests.concurrency``."""
 
 import datetime as dt
 import threading
@@ -17,12 +22,21 @@ from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from psycopg.conninfo import make_conninfo
 
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import night_elsewhere
 from apps.staff.models import Member, Role, Schedule, ScheduleDay, TimeOff
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases (the platform staff with business A chosen in the Hub
+#: admin, business A at night in another zone or on a plan with room for several sessions) and the assistant's catalogue
+#: of a person of business A, that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "hub_staff", "in_business_a", "night_elsewhere",
+    "plan_with_room",
+]
 
 
 def ctx_for(
@@ -54,7 +68,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
         first_name: str = "",
     ):

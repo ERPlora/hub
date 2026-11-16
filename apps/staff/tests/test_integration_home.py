@@ -21,8 +21,9 @@ from live.operations import get
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
-from apps.staff.tests.conftest import A, B, ctx_for
+from apps.staff.tests.conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for
 from base.schemas import WidgetListIn
+from base.tenancy.context import use_hub
 
 HEADCOUNT = "staff.headcount"
 ON_LEAVE = "staff.on_leave_today"
@@ -94,7 +95,7 @@ def today() -> dt.date:
     return timezone.localdate()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_owner_is_offered_the_five_panels_followed_live():
     offered = panels(ctx_for("hub_owner"))
     assert list(offered) == ALL
@@ -109,7 +110,7 @@ def test_an_owner_is_offered_the_five_panels_followed_live():
     assert {panel["category"] for panel in offered.values()} == {"Staff"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_every_role_of_the_business_reads_the_five_as_in_staff():
     """STAFF-F20 and STAFF-F23 are for everyone: the employee sees the team and who is away, so the Home tells them
     the same figures."""
@@ -117,7 +118,7 @@ def test_every_role_of_the_business_reads_the_five_as_in_staff():
         assert list(panels(ctx_for(name))) == ALL, name
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_see_the_time_off_gets_only_the_teams_panels():
     """The list of who is away is refused by hand too; its two counts are figures of the team that Personal already
     shows to whoever sees it (STAFF-F23), without a name or a reason."""
@@ -127,7 +128,7 @@ def test_whoever_may_not_see_the_time_off_gets_only_the_teams_panels():
         answer(panels(ctx_for())[AWAY], team_only)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_see_the_team_gets_only_the_time_off_panels():
     time_off_only = ctx_for(permissions={"base.view_home", "staff.view_time_off"})
     assert list(panels(time_off_only)) == TIME_OFF
@@ -137,7 +138,7 @@ def test_whoever_may_not_see_the_team_gets_only_the_time_off_panels():
             answer(offered[key], time_off_only)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_read_nothing_of_staff_gets_no_panel_and_is_refused_the_figures_by_hand():
     outsider = OperationContext(scope=A, actor="tester", permissions=frozenset({"base.view_home"}), language="en")
     assert panels(outsider) == {}
@@ -148,7 +149,7 @@ def test_whoever_may_read_nothing_of_staff_gets_no_panel_and_is_refused_the_figu
             answer(panel, outsider)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_head_count_is_the_active_people_without_the_ones_who_left():
     panel = panels(ctx_for())[HEADCOUNT]
     assert figure(panel, ctx_for()) == 0  # an empty team: a real zero, not «No data»
@@ -162,7 +163,7 @@ def test_the_head_count_is_the_active_people_without_the_ones_who_left():
     assert ana
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_on_leave_today_counts_distinct_people_with_approved_time_off_covering_the_business_day():
     panel = panels(ctx_for())[ON_LEAVE]
     assert figure(panel, ctx_for()) == 0
@@ -177,7 +178,7 @@ def test_on_leave_today_counts_distinct_people_with_approved_time_off_covering_t
     assert figure(panel, ctx_for()) == 2
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_pending_time_off_counts_the_requests_waiting_for_an_answer():
     panel = panels(ctx_for())[PENDING]
     ana, bea = member("Ana"), member("Bea")
@@ -191,7 +192,7 @@ def test_pending_time_off_counts_the_requests_waiting_for_an_answer():
     assert figure(panel, ctx_for()) == 2
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_todays_time_off_lists_who_is_away_whole_days_first_then_by_name_with_the_type():
     panel = panels(ctx_for())[AWAY]
     assert rows(panel, ctx_for()) == []  # nobody away: «No data», never a made-up entry
@@ -214,7 +215,7 @@ def test_todays_time_off_lists_who_is_away_whole_days_first_then_by_name_with_th
         ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_staff_by_role_paints_the_active_people_of_each_role_the_biggest_first_ten_at_most():
     panel = panels(ctx_for())[BY_ROLE]
     assert rows(panel, ctx_for()) == []
@@ -232,7 +233,7 @@ def test_staff_by_role_paints_the_active_people_of_each_role_the_biggest_first_t
     assert reception
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_staff_by_role_gives_each_bar_its_roles_colour_and_none_to_a_role_without_one():
     """The old module's `map.color`: base paints each bar in the hex its row gives; a role without a colour gives ""
     and its bar keeps the panel's."""
@@ -254,10 +255,10 @@ def test_staff_by_role_gives_each_bar_its_roles_colour_and_none_to_a_role_withou
     ] == [("Colourist", 3, "#16A34A"), ("Stylist", 2, "#E11D48"), ("Reception", 1, "")]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_spanish_request_reads_the_panels_in_spanish(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
-    widgets = client.get("/api/home/widgets", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
+    widgets = client.get("/api/home/widgets", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert widgets.status_code == 200
     ours = [widget for widget in widgets.json()["widgets"] if widget["app"] == "staff"]
     assert [(widget["title"], widget["category"]) for widget in ours] == [
@@ -297,15 +298,16 @@ def affected(session) -> set[str]:
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_record_a_role_and_an_approval_in_hub_b_re_run_the_panels_of_b_and_tell_a_nothing(listen):
+@HUB_DB_COMMITTED
+def test_a_record_a_role_and_an_approval_in_hub_b_re_run_the_panels_of_b_and_tell_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     in_b = ctx_for(scope=B)
-    stylist = role("Stylist", in_b)
-    assert panels(in_b)[BY_ROLE]["operation"] in affected(on_b)
-    ana = member("Ana", ctx=in_b, role_id=stylist)
-    assert {panels(in_b)[key]["operation"] for key in (HEADCOUNT, BY_ROLE)} <= affected(on_b)
-    time_off(ana, today(), ctx=in_b)
-    assert {panels(in_b)[key]["operation"] for key in TIME_OFF} <= affected(on_b)
-    assert figure(panels(in_b)[ON_LEAVE], in_b) == 1
+    with use_hub(hub_b):
+        stylist = role("Stylist", in_b)
+        assert panels(in_b)[BY_ROLE]["operation"] in affected(on_b)
+        ana = member("Ana", ctx=in_b, role_id=stylist)
+        assert {panels(in_b)[key]["operation"] for key in (HEADCOUNT, BY_ROLE)} <= affected(on_b)
+        time_off(ana, today(), ctx=in_b)
+        assert {panels(in_b)[key]["operation"] for key in TIME_OFF} <= affected(on_b)
+        assert figure(panels(in_b)[ON_LEAVE], in_b) == 1
     assert received(on_a, timeout=QUIET) == []

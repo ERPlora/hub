@@ -17,7 +17,8 @@ from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room, comparable, place_of_no_ask
 from base.tests.test_assistant_asks import probe_phrases
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: The requests of the real-model QA (``owner.es.staff.*`` of ``owner-es-staff-2026-11-08.json``), as the owner said
 #: them: before Staff said its asks, none of these tools was among the ones a turn offers (``MAX_TOOLS``), so the model
@@ -75,7 +76,7 @@ def test_the_hub_reads_desactivar_as_a_deactivation_and_pido_as_a_request():
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.EMPLOYEE])
 def test_what_one_asks_for_oneself_brings_the_request_among_the_first_ten(catalog_of, role):
     """What Staff's «pido» group is for, in a turn: a request for oneself nobody wrote as
@@ -87,7 +88,7 @@ def test_what_one_asks_for_oneself_brings_the_request_among_the_first_ten(catalo
     assert_offered_with_room(catalog_of(role, "es"), name, phrase, room=TOP)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_staff_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
@@ -100,7 +101,7 @@ def test_layer_2_probes_every_staff_tool():
     assert probed == tools, sorted(probed ^ tools)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), staff_probes())
 def test_every_staff_probe_of_layer_2_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
     """Not only the four the QA found unreachable: each request of the QA of Staff, in the words it was said in and by
