@@ -36,6 +36,15 @@ def csp_directives(response) -> dict[str, str]:
     )
 
 
+def assert_an_employee_of_a_holds_nothing_in_b(on_a: dict, on_b: dict) -> None:
+    """The session documents of ana, an employee of business A, as A's host and B's host give them."""
+    # demo is the reference app; the other modules' grants and menus are pinned by their own tests.
+    demo_permissions = [permission for permission in on_a["permissions"] if permission.startswith("demo.")]
+    assert (on_a["user"]["label"], demo_permissions) == ("ana", ["demo.view"])
+    assert "demo" in [g["id"] for g in on_a["menu"]]
+    assert (on_b["permissions"], on_b["menu"]) == ([], [])
+
+
 def test_anonymous_shell_embeds_an_empty_session(client):
     response = client.get("/demo/items", HTTP_HOST=HOST)
     assert response.status_code == 200
@@ -51,11 +60,7 @@ def test_logged_in_shell_embeds_its_session_on_that_host(client, make_user):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     _, on_a = json_block(client.get("/demo/items", HTTP_HOST=HOST), "session-me")
     _, on_b = json_block(client.get("/demo/items", HTTP_HOST=B_HOST), "session-me")
-    # demo is the reference app; the other modules' grants and menus are pinned by their own tests.
-    demo_permissions = [permission for permission in on_a["permissions"] if permission.startswith("demo.")]
-    assert (on_a["user"]["label"], demo_permissions) == ("ana", ["demo.view"])
-    assert "demo" in [g["id"] for g in on_a["menu"]]
-    assert (on_b["permissions"], on_b["menu"]) == ([], [])
+    assert_an_employee_of_a_holds_nothing_in_b(on_a, on_b)
 
 
 def test_embedded_json_cannot_close_the_script(client, make_user):
