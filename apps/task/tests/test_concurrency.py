@@ -3,7 +3,8 @@
 Two tasks created at the same moment get consecutive numbers, never the same one; two completions of
 the same task close it once and the second one is told it was already closed. A task or a project given
 to a person the Hub admin is deleting at that moment is never a 500, and neither is a task or a project
-deleted while it is being shown, changed or named by a new subtask, a new task or a move.
+deleted while it is being shown, changed or named by a new subtask, a new task or a move. A task given
+to someone else while the tasks of the person who left the team are released keeps its new person.
 """
 
 from collections.abc import Callable
@@ -15,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.db import connections
 from django.test import RequestFactory
 from django.utils import timezone
+from live.context import system_context
 from live.errors import OperationError
 from live.models import OutboxEvent
 from live.operations import atomic, get
@@ -27,7 +29,7 @@ from base.services.sessions import ensure_hub_user
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import at_once, meanwhile
 
-from .conftest import HUB_DB_COMMITTED, ctx_for, make_member, make_project, make_task
+from .conftest import HUB_DB_COMMITTED, A, ctx_for, make_member, make_project, make_task
 
 #: Several sessions of business A at once, each committing: its plan has room for them all, so a second session meets
 #: the first at a row's lock instead of queueing for its turn.
@@ -567,3 +569,50 @@ def test_deleting_a_task_hung_under_one_of_its_own_subtasks_ends():
     Task.objects.filter(pk=top.pk).update(parent=under)
     assert run("task.task.delete", {"id": str(top.pk)}).id == top.pk
     assert not Task.objects.exists()
+
+
+# ── A person leaves the team while one of her tasks is given to someone else ─────────────────────
+#
+# The platform releases the open tasks of a person who left the team (``task.task.release_member``), holding
+# them from the read that finds them. Unheld, the release wrote over a reassignment made in between, and the
+# task was left with nobody.
+
+
+@pytest.fixture
+def leaving():
+    ana, bea = make_member(), make_member("Bea", "Ruiz")
+    return ana, bea, make_task(assigned_to=ana)
+
+
+def releasing(ana: Member):
+    op = get("task.task.release_member")
+    return lambda: op(system_context(A), op.input.model_validate({"id": str(ana.id)}))
+
+
+def giving(task: Task, bea: Member):
+    return lambda: run("task.task.assign", {"id": str(task.id), "member_id": str(bea.id)})
+
+
+def reads_tasks(sql: str) -> bool:
+    return sql.lstrip().startswith("SELECT") and 'FROM "task_task"' in sql
+
+
+def holds_tasks(sql: str) -> bool:
+    return reads_tasks(sql) and "FOR UPDATE" in sql
+
+
+def test_a_task_given_to_someone_else_while_her_tasks_are_released_keeps_its_new_person(leaving):
+    ana, bea, task = leaving
+    with meanwhile(reads_tasks, giving(task, bea)) as given:
+        releasing(ana)()
+    assert not isinstance(given[0], Exception), given
+    assert Task.objects.get(pk=task.pk).assigned_to_id == bea.id
+
+
+def test_a_task_given_to_someone_else_just_before_her_tasks_are_released_is_not_released(leaving):
+    ana, bea, task = leaving
+    with meanwhile(holds_tasks, releasing(ana)) as released:
+        giving(task, bea)()
+    assert not isinstance(released[0], Exception), released
+    assert released[0].released == 0
+    assert Task.objects.get(pk=task.pk).assigned_to_id == bea.id
