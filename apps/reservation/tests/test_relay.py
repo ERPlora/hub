@@ -129,11 +129,11 @@ def test_a_second_tick_or_the_same_notice_handed_over_again_changes_nothing(tick
     assert OutboxEvent.objects.filter(name="reservation.customer.erased").count() == notices == 1
 
 
-# ── Two hubs ─────────────────────────────────────────────────────────────────────────────────
+# ── Two hubs, on committed data ──────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def listen(db_dsn):
+def listen(transactional_db, db_dsn):
     sessions = []
 
     def open_session(scope):
