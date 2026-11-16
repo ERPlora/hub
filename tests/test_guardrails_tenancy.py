@@ -378,7 +378,7 @@ def test_the_modules_run_after_the_commit_only_through_live():
 ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
 #: The operations that run only in a hub with its own database, with what each answers in one that still shares
 #: control's (``db_name=""``): ``{operation: (payload, status, code)}``, a domain error that never names the
-#: infrastructure. ``base.api_key.detail`` answers as for a key that does not exist (404, ``base/queries.py``).
+#: infrastructure. ``base.api_key.detail`` answers as for a key that does not exist (404, ``base/queries/``).
 OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     "base.api_key.create": ({"name": "Till", "mode": "full"}, 409, "base.api_keys_unavailable"),
     "base.api_key.rotate": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
@@ -463,7 +463,7 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
     _any_more`` keeps off any shared database: there is none."""
     defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
 
-    assert set(defined.values()) <= {"base/services/__init__.py", "base/queries.py"}, defined
+    assert set(defined.values()) <= {"base/services/__init__.py", "base/queries/__init__.py"}, defined
 
 
 def _as_admin_of(slug: str):
