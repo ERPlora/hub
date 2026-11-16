@@ -13,8 +13,10 @@ from decimal import Decimal
 
 import pytest
 from django.utils import translation
+from pydantic import ValidationError
 
 from apps.invoice import fiscal, platform
+from apps.invoice.schemas.platform import PlatformInvoiceIn
 
 ISSUER = {
     "issuer_name": "ERPLORA CLOUD SL",
@@ -75,6 +77,7 @@ BODY = {
             "net_cents": 2999,
             "tax_cents": 630,
             "total_cents": 3629,
+            "discount_cents": 0,
         }
     ],
     "rectifies": None,
@@ -174,6 +177,7 @@ def test_each_line_keeps_its_text_quantity_and_net_amount():
         "description": "Plan Starter (15 oct 2026 – 14 nov 2026)",
         "quantity": Decimal(1),
         "unit_price": Decimal("2999.00"),
+        "discount_amount": 0,
         "tax_rate": Decimal("21.00"),
         "tax_category_key": "service.saas_subscription",
         "base_amount": 2999,
@@ -240,6 +244,143 @@ def test_a_proration_credit_line_carries_its_sign_in_the_quantity():
         Decimal("500.00"),
         -500,
     )
+
+
+ZERO = {"net_cents": 0, "tax_cents": 0, "total_cents": 0}
+
+
+def free_month(**changes) -> dict:
+    """A month of the plan with a 100 % discount, as Stripe bills a promotion code of free months: 0 €."""
+    return body(lines=[line(**ZERO, discount_cents=2999)], **ZERO, **changes)
+
+
+def test_a_fully_discounted_line_keeps_its_unit_price_and_its_discount():
+    [got] = fields(free_month())["lines"]
+
+    assert (got["quantity"], got["unit_price"], got["discount_amount"]) == (
+        Decimal(1),
+        Decimal("2999.00"),
+        2999,
+    )
+    assert (got["base_amount"], got["tax_amount"], got["total_amount"]) == (0, 0, 0)
+
+
+def test_a_partly_discounted_line_prices_each_unit_before_its_discount():
+    # quantity × unit price − discount is the base: 2 × 29,99 − 10,00 = 49,98.
+    discounted = line(
+        quantity=2, net_cents=4998, tax_cents=1050, total_cents=6048, discount_cents=1000
+    )
+    data = body(lines=[discounted], net_cents=4998, tax_cents=1050, total_cents=6048)
+
+    [got] = fields(data)["lines"]
+
+    assert (
+        got["quantity"],
+        got["unit_price"],
+        got["discount_amount"],
+        got["base_amount"],
+    ) == (Decimal(2), Decimal("2999.00"), 1000, 4998)
+
+
+def test_the_discount_of_a_credit_note_line_carries_the_sign_of_its_quantity():
+    refund = line(net_cents=-1500, tax_cents=-315, total_cents=-1815, discount_cents=1499)
+    amounts = {"net_cents": -1500, "tax_cents": -315, "total_cents": -1815}
+    data = body(**{**CREDIT_NOTE, **amounts, "lines": [refund]})
+
+    [got] = fields(data, original_type="F1")["lines"]
+
+    # −1 × 29,99 − (−14,99) = −15,00.
+    assert (
+        got["quantity"],
+        got["unit_price"],
+        got["discount_amount"],
+        got["base_amount"],
+    ) == (Decimal(-1), Decimal("2999.00"), -1499, -1500)
+
+
+def test_with_another_states_vat_the_discount_carries_it_as_the_whole_amount_does():
+    # OSS: the line's whole amount, with the 19 % of Germany, is its base, and its unit price with it; the SaaS's
+    # discount is without VAT, so it takes the same 19 %: 29,99 € → 35,69 €.
+    free = line(tax_treatment="oss", tax_rate="19.00", **ZERO, discount_cents=2999)
+    data = body(
+        tax_treatment="oss", tax_country="DE", tax_rate="19.00", lines=[free], **ZERO
+    )
+
+    [got] = fields(data)["lines"]
+
+    assert (got["unit_price"], got["discount_amount"], got["base_amount"]) == (
+        Decimal("3569.00"),
+        3569,
+        0,
+    )
+
+
+def test_without_any_vat_the_discount_is_the_saas_own():
+    free = line(tax_treatment="reverse_charge", tax_rate="0.00", **ZERO, discount_cents=2999)
+    data = body(
+        tax_treatment="reverse_charge", tax_country="FR", tax_rate="0.00", lines=[free], **ZERO
+    )
+
+    [got] = fields(data)["lines"]
+
+    assert (got["unit_price"], got["discount_amount"], got["base_amount"]) == (
+        Decimal("2999.00"),
+        2999,
+        0,
+    )
+
+
+def test_a_free_domestic_month_declares_s1_at_its_rate_with_a_zero_base_and_quota():
+    got = fields(free_month())
+    invoice = got["invoice"]
+
+    assert (invoice["base_amount"], invoice["tax_amount"], invoice["total_amount"]) == (
+        0,
+        0,
+        0,
+    )
+    assert [
+        (item["qualification"], item["rate"], item["base"], item["quota"])
+        for item in invoice["tax_breakdown"]
+    ] == [("subject", "21.00", 0, 0)]
+    assert (
+        fiscal.audit(
+            invoice["tax_breakdown"],
+            got["tolerance"],
+            base=0,
+            tax=0,
+            invoice_type=invoice["invoice_type"],
+        )
+        is None
+    )
+
+
+def test_a_free_month_is_a_full_invoice_f1_with_a_tax_id_and_a_simplified_f2_without():
+    anonymous = free_month()
+    anonymous["recipient"]["tax_id"] = ""
+
+    assert fields(free_month())["invoice"]["invoice_type"] == "F1"
+    assert fields(anonymous)["invoice"]["invoice_type"] == "F2"
+
+
+def test_a_line_from_a_saas_that_sends_no_discount_yet_has_none():
+    data = body()
+    del data["lines"][0]["discount_cents"]
+
+    [parsed] = PlatformInvoiceIn.model_validate(data).lines
+    [got] = fields(data)["lines"]
+
+    assert (parsed.discount_cents, got["discount_amount"]) == (0, 0)
+
+
+@pytest.mark.parametrize("discount", [-1, 10**12 + 1])
+def test_a_discount_below_zero_or_beyond_the_largest_amount_is_out_of_contract(discount):
+    with pytest.raises(ValidationError) as refused:
+        PlatformInvoiceIn.model_validate(body(lines=[line(discount_cents=discount)]))
+
+    assert [error["loc"] for error in refused.value.errors()] == [
+        ("lines", 0, "discount_cents")
+    ]
 
 
 @pytest.mark.parametrize(
