@@ -16,11 +16,12 @@ import pytest
 from base import access, registry, signing
 from base.models import Membership, SessionOwner, TrustedDevice
 from base.services import CREDENTIAL_SESSION_KEY
-from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.conftest import ANA, SECRET
 from base.tests.test_access_account import enter
 from base.tests.test_access_badge import badge, with_badge
 from base.tests.test_access_spa import a_device, enter_with_pin, with_pin
+from base.tests.test_spa import B_HOST
 
 __all__ = ["in_business_a"]
 
@@ -75,9 +76,9 @@ def forget_the_credential(client) -> None:
     session.save()
 
 
-def report(client, **body):
+def report(client, host=HOST, **body):
     payload = {"subject": "The printer stops", "description": "It prints half a ticket.", "page": "/sales/pos", **body}
-    return client.post(URL, json.dumps(payload), content_type="application/json", HTTP_HOST=HOST, HTTP_USER_AGENT=BROWSER)
+    return client.post(URL, json.dumps(payload), content_type="application/json", HTTP_HOST=host, HTTP_USER_AGENT=BROWSER)
 
 
 class TestSent:
@@ -113,6 +114,17 @@ class TestSent:
         assert headers["Content-Type"] == "application/json"
         assert headers[signing.SIGNATURE_HEADER] == signing.sign(body, timestamp, SECRET)
         assert headers[signing.SIGNATURE_V2_HEADER] == signing.sign_v2("POST", SAAS_PATH, body, timestamp, SECRET)
+
+    def test_a_report_from_another_business_names_that_one(self, client, make_user, saas, spa_manifest, fake_saas, hub_b):
+        make_user(f"saas:{ACCOUNT_ID}", host=B.key, role=Membership.Role.MANAGER, first_name="Ana")
+        fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
+        assert enter(client, host=B_HOST).status_code == 302
+        answering = fake_saas(body=SENT)
+
+        assert report(client, host=B_HOST).status_code == 200
+
+        sent = json.loads(answering.calls[0]["body"])
+        assert (sent["hub"], sent["hub_id"]) == (B.key, str(hub_b.id))
 
     def test_without_a_screen_it_says_none(self, client, account, fake_saas):
         saas = fake_saas(body=SENT)
