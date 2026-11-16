@@ -19,16 +19,18 @@ from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
+from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.sale.tests.conftest import db_dsn, make_user, night_elsewhere
 from base.permissions import FULL_ACCESS_ROLES
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-#: The marks, scopes and fixtures of the businesses' own databases, and what Sales' tests already make of business A (its
-#: users with a role, the raw DSN of control, a night in another zone), that these tests take from here.
+#: The marks, scopes and fixtures of the businesses' own databases, the assistant's catalogue of a person of business A,
+#: and what Sales' tests already make of it (its users with a role, the raw DSN of control, a night in another zone),
+#: that these tests take from here.
 __all__ = [
-    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "db_dsn", "hub_staff", "in_business_a", "make_user", "night_elsewhere",
-    "plan_with_room",
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "hub_staff", "in_business_a", "in_hubs",
+    "make_user", "night_elsewhere", "plan_with_room",
 ]
 
 
