@@ -1,7 +1,7 @@
 """The reservation app's routes: each bound to its operation, and the whole book over HTTP.
 
-Requests go to business A's host with Django's sync test client, which sees the test's transaction. No path parameters: a record travels in the input (query string on GET, body on POST), by
-its id or as a person says it.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction. No path
+parameters: a record travels in the input (query string on GET, body on POST), by its id or as a person says it.
 """
 
 import json
