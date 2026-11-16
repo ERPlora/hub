@@ -26,12 +26,13 @@ from ninja import Field, Schema
 
 from base import access, assistant
 from base.models import Hub, Membership, TrustedDevice
-from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.card_values import ADMIN, VisitIn, ctx, is_attempt_key, reference_errors, values, writes
 from base.tests.test_record_details import api_key, device as a_device, failed_event, load, signed_in
 from base.tests.test_services_assistant import call, turn
+
+__all__ = ["in_business_a"]
 
 CUSTOMER = "0192f0b2-1111-7000-8000-000000000001"
 SERVICE = "0192f0b2-2222-7000-8000-000000000002"
@@ -66,6 +67,7 @@ TABLE_BOOKING = {
 # ── A moment and a value of a closed list, as the person reads them ───────────────────────────────────────────────────
 
 
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "start", "source"),
     [("es", "2 nov 2026, 10:00", "Mostrador"), ("en", "Nov 2, 2026, 10:00 AM", "Front desk")],
@@ -85,6 +87,7 @@ def test_a_table_booking_says_its_day_its_time_and_through_what(language, expect
     assert (shown["date"], shown["time"], shown["source"]) == expected
 
 
+@HUB_DB
 def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock_one_as_it_is():
     """Outside a hub, the deployment's zone (Europe/Madrid). An instant of another zone is said at the business's hour;
     the wall-clock time the model sent (the app books it at the business's hour) as it is, summer or winter."""
@@ -97,15 +100,16 @@ def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock
     assert start("2026-11-02 10:00") == "2 nov 2026, 10:00"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_moment_is_said_in_the_zone_of_the_business_the_person_works_in():
     """In the person's hub, the business's own zone (Settings › Business), the clock every app reads."""
-    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
+    hub, _ = Hub.objects.update_or_create(slug=A.key, defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
     with use_hub(hub):
         card = assistant.cards.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
     assert values(card)["start"] == "2 nov 2026, 9:00"
 
 
+@HUB_DB
 def test_what_is_no_moment_no_value_of_its_list_or_no_id_is_shown_as_sent():
     """The write refuses it with its reason; the card makes nothing up, nor hides it."""
     arguments = {**BOOKING, "start": "mañana a las 10", "source": "carrier pigeon"}
@@ -119,6 +123,7 @@ def test_what_is_no_moment_no_value_of_its_list_or_no_id_is_shown_as_sent():
 # ── A record named by its id ──────────────────────────────────────────────────────────────────────────────────────────
 
 
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_record_named_by_its_id_never_reaches_the_card_by_it(language):
     for name, arguments in [("appointment.appointment.create", BOOKING), ("reservation.reservation.create", TABLE_BOOKING)]:
@@ -168,6 +173,7 @@ VISITS = Operation(
 )
 
 
+@HUB_DB
 def test_inside_an_object_or_a_list_a_moment_and_a_value_are_said_and_an_id_left_out():
     visit = {"staff_id": MEMBER, "start": "2026-11-02T10:00:00+01:00", "source": "phone"}
     card = assistant.cards.card(VISITS, {"first": visit, "then": [visit], "staff_ids": [MEMBER, MEMBER]}, "es")
@@ -177,18 +183,18 @@ def test_inside_an_object_or_a_list_a_moment_and_a_value_are_said_and_an_id_left
     assert [field["kind"] for field in card["fields"]] == ["object", "list", "list"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_its_schema_marks_is_named_by_the_read_of_its_app_as_the_person(make_user):
     """Base's own: «Remove the PIN» named the person by the id the model sent («Persona: saas:3»)."""
-    make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
+    make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
     card = assistant.cards.card(get("base.person.pin_remove"), {"person": "saas:3"}, "es", ctx=ctx())
     assert values(card) == {"person": "Eva Gil"}
     assert [field["label"] for field in card["fields"]] == ["Persona"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_the_person_may_not_read_or_that_is_not_there_is_left_out_never_by_its_id(make_user):
-    make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
+    make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
     op = get("base.person.pin_remove")
     assert values(assistant.cards.card(op, {"person": "saas:3"}, "es", ctx=ctx({"base.view_home"}))) == {}
     assert values(assistant.cards.card(op, {"person": "saas:0"}, "es", ctx=ctx())) == {}
@@ -202,11 +208,10 @@ def test_a_palette_is_said_by_the_name_my_profile_gives_it(language, label):
     assert values(card) == {"palette": label}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_every_record_a_write_of_base_names_by_its_id_is_named_on_its_card(client, hub_a, monkeypatch):
+@HUB_DB
+def test_every_record_a_write_of_base_names_by_its_id_is_named_on_its_card(client, hub_a):
     """«Revoke» an API key, remove or rename a device, resend or discard a failed event, undo a load or load again what
     did not go in: the card says which, by the name its screen gives it (base's own reads by id), never by the id."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     signed_in(client, hub_a)
     key, device, delivery, batch = (made(client, hub_a) for made in (api_key, a_device, failed_event, load))
     owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
@@ -224,10 +229,9 @@ def test_every_record_a_write_of_base_names_by_its_id_is_named_on_its_card(clien
     assert shown == {name: expected for name, _, expected in writes}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_device_nobody_named_is_said_by_what_it_is_as_the_devices_list_says_it(hub_a, monkeypatch):
+@HUB_DB
+def test_a_device_nobody_named_is_said_by_what_it_is_as_the_devices_list_says_it(hub_a):
     """Settings › Devices shows «Unnamed device» and, under it, what it is («Chrome · macOS»): the card, the latter."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     with use_hub(hub_a):
         device = TrustedDevice.objects.create(
             token_digest=access.token_digest("unnamed"), agent="Chrome · macOS", last_entry_at=timezone.now()
@@ -238,19 +242,18 @@ def test_a_device_nobody_named_is_said_by_what_it_is_as_the_devices_list_says_it
         }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_device_with_no_name_nor_a_browser_it_knows_is_left_out(hub_a, monkeypatch):
+@HUB_DB
+def test_a_device_with_no_name_nor_a_browser_it_knows_is_left_out(hub_a):
     """Devices shows it only as «Unnamed device», which says nothing of which: the card leaves it out, never its id."""
-    monkeypatch.setattr(context, "_test_fallback", None)
     with use_hub(hub_a):
         device = TrustedDevice.objects.create(token_digest=access.token_digest("bare"), last_entry_at=timezone.now())
         owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
         assert values(assistant.cards.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_a_turn_shows_names_the_person_and_says_the_moment(make_user):
-    make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
+    make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
     card = turn(call("base.person.pin_remove", {"person": "saas:3"}), permissions=ADMIN)["confirm"]
     assert values(card) == {"person": "Eva Gil"}
 
@@ -283,6 +286,7 @@ def ids_and_moments(prop: dict, defs: dict, depth: int = 0) -> object:
     return None
 
 
+@HUB_DB
 def test_no_write_lets_an_id_or_an_iso_moment_reach_its_card():
     """Every write the assistant may run: what its schema declares an id or a moment never reaches its card as sent."""
     checked = []
@@ -307,7 +311,7 @@ def list_field(card: dict, name: str) -> dict:
     return next(field for field in card["fields"] if field["name"] == name)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "expected"),
     [("es", ["Crear una tarea", "Crear un cliente"]), ("en", ["Create a task", "Create a customer"])],
@@ -324,7 +328,7 @@ def test_the_permissions_of_a_grant_are_named_item_by_item(language, expected):
     assert (shown["kind"], shown["value"], shown.get(NAMED)) == ("list", expected, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "expected"), [("es", ["Ventas / TPV", "Facturación"]), ("en", ["Sales & POS", "Invoicing"])])
 def test_the_apps_of_a_blueprint_are_named_item_by_item(language, expected):
     """hub#504: who confirms a template reads which apps it loads, by their name, never by their id."""
@@ -335,7 +339,7 @@ def test_the_apps_of_a_blueprint_are_named_item_by_item(language, expected):
     assert (shown["kind"], shown["value"], shown.get(NAMED)) == ("list", expected, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
     """A stale permission or app is left out, never shown by its code: the screen says the rest and counts it among the more."""
     grant = assistant.cards.card(
@@ -365,6 +369,7 @@ def text_lists() -> dict[str, list[str]]:
     return found
 
 
+@HUB_DB
 def test_no_list_of_texts_sent_as_they_are_is_named():
     """Every one of them, codes or a person's own words: as sent, so never said item by item as if the server had named
     it. A list the server says in words is (positive control: a series of visits, said as moments)."""
@@ -723,7 +728,7 @@ class WhenPreviewOut(Schema):
     since: dt.datetime = Field(title="Since")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_preview_says_a_moment_as_the_person_reads_it_too(monkeypatch):
     """«What will happen» of a dangerous card (BASE-F98) says its data by the same rule as what the write sends: a
     moment its read answers in ISO reaches the card as the person's language writes it, at the business's hour."""
