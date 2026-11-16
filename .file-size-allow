@@ -49,7 +49,7 @@
 2503 apps/inventory/tests/test_services.py ERPlora/erplora-next#74
 466 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 1359 apps/invoice/queries.py ERPlora/erplora-next#74
-1157 apps/invoice/schemas.py ERPlora/erplora-next#74
+1157 apps/invoice/schemas/__init__.py ERPlora/erplora-next#74
 1760 apps/invoice/services.py ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 515 apps/kitchen/models.py ERPlora/erplora-next#74
