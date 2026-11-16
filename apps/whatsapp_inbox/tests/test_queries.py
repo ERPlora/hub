@@ -12,6 +12,8 @@ from apps.whatsapp_inbox.models import Conversation
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from apps.whatsapp_inbox.tests.conftest import (
+    B,
+    HUB_DB,
     NOW,
     card,
     connect,
@@ -21,7 +23,7 @@ from apps.whatsapp_inbox.tests.conftest import (
     template,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def listed(params=None, ctx=None) -> list[str]:
@@ -358,7 +360,7 @@ def test_the_channel_before_erplora_speaks_and_after():
 def test_the_team_is_the_people_of_this_business(make_user):
     make_user("luis", first_name="Luis", last_name="Gil")
     make_user("marta", first_name="Marta", role="hub_manager")
-    make_user("pepe", host="b")
+    make_user("pepe", host=B.key)
     page = run("whatsapp_inbox.agent.list", {}, ctx_for("hub_employee"))
     assert [(a.name, a.role) for a in page.rows] == [
         ("Luis Gil", "hub_employee"),

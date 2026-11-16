@@ -17,12 +17,10 @@ from live.errors import Conflict
 
 from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Channel, Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run, system
-from base.models import Hub
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, ctx_for, receive, run, system
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SEND = "http://saas.test/internal/whatsapp/send"
 #: What erplora.com sends for a plan without WhatsApp messages, before any is sent this month.
@@ -104,20 +102,24 @@ def test_a_spent_month_still_says_until_next_month():
 
 
 @pytest.mark.parametrize("zone", ["America/New_York", "Atlantic/Canary", "Europe/Madrid", "Asia/Tokyo"])
-def test_a_spent_month_lasts_as_long_as_erplora_com_counts_it_on_any_clock(monkeypatch, zone):
+def test_a_spent_month_lasts_as_long_as_erplora_com_counts_it_on_any_clock(monkeypatch, zone, hub_a):
     # erplora.com counts a UTC month and refuses until it ends, whatever day it already is for the business.
     connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
     monkeypatch.setattr(clock, "now", lambda: dt.datetime(2026, 10, 31, 23, 30, tzinfo=dt.UTC))
-    with use_hub(Hub(slug="a", timezone=zone)):
+    hub_a.timezone = zone
+    hub_a.save(update_fields=["timezone"])
+    with use_hub(hub_a):
         channel = run("whatsapp_inbox.channel.get", {})
     assert (channel.monthly_usage, channel.cap_reached) == (150, True)
 
 
 @pytest.mark.parametrize("zone", ["America/New_York", "Atlantic/Canary", "Europe/Madrid", "Asia/Tokyo"])
-def test_the_next_month_starts_when_erplora_com_starts_it_on_any_clock(monkeypatch, zone):
+def test_the_next_month_starts_when_erplora_com_starts_it_on_any_clock(monkeypatch, zone, hub_a):
     connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
     monkeypatch.setattr(clock, "now", lambda: dt.datetime(2026, 11, 1, 0, 30, tzinfo=dt.UTC))
-    with use_hub(Hub(slug="a", timezone=zone)):
+    hub_a.timezone = zone
+    hub_a.save(update_fields=["timezone"])
+    with use_hub(hub_a):
         channel = run("whatsapp_inbox.channel.get", {})
     assert (channel.monthly_usage, channel.cap_reached) == (0, False)
 
@@ -131,7 +133,7 @@ def test_what_customers_write_still_arrives():
     assert (row.unread_count, row.last_message_preview) == (2, "¿Tenéis hora el viernes?")
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_has_its_own_plan(hub_a, hub_b):
     from live.context import Scope

@@ -22,9 +22,10 @@ from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Template
-from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, run, system, template
+from apps.whatsapp_inbox.tests.conftest import A, HUB_DB, NOW, connect, ctx_for, run, system, template
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 REGISTER = f"{SAAS}/internal/whatsapp/templates"
@@ -67,7 +68,7 @@ def delivered(django_capture_on_commit_callbacks):
     """Run a write and then what it left for after its COMMIT (the call to erplora.com)."""
 
     def run_and_deliver(write):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
             return write()
 
     return run_and_deliver
@@ -108,7 +109,7 @@ def events(name: str) -> list[dict]:
 def test_a_new_template_is_kept_unsent_and_registered_at_meta_only_after_the_commit(django_capture_on_commit_callbacks):
     connect()
     route = registering()
-    with django_capture_on_commit_callbacks(execute=False) as pending:
+    with django_capture_on_commit_callbacks(execute=False, using=current_alias()) as pending:
         out = create()
     row = Template.objects.get(pk=out.id)
     assert (row.status, row.submit_state) == ("DRAFT", "queued")
@@ -118,7 +119,7 @@ def test_a_new_template_is_kept_unsent_and_registered_at_meta_only_after_the_com
     request = route.calls.last.request
     assert request.headers["Idempotency-Key"] == str(row.submit_key)
     assert json.loads(request.content) == {
-        "hub": "a",
+        "hub": A.key,
         "name": "recordatorio_cita",
         "language": "es",
         "category": "UTILITY",
@@ -444,7 +445,7 @@ def test_what_only_whatsapp_manager_changes_is_read_only_here(fields, code):
 @respx.mock
 def test_a_template_on_its_way_to_meta_is_not_changed_until_it_lands(django_capture_on_commit_callbacks):
     connect()
-    with django_capture_on_commit_callbacks(execute=False):
+    with django_capture_on_commit_callbacks(execute=False, using=current_alias()):
         out = create()
     with pytest.raises(Conflict) as excinfo:
         update(Template.objects.get(pk=out.id), footer="Otro")
@@ -473,7 +474,7 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
     route = deleting()
     delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}))
     assert json.loads(route.calls.last.request.content) == {
-        "hub": "a",
+        "hub": A.key,
         "name": "recordatorio",
         "language": "es",
         "meta_id": "meta-recordatorio",

@@ -20,10 +20,10 @@ from live.operations import get
 
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.services import NO_PLAN_MESSAGES
-from apps.whatsapp_inbox.tests.conftest import NOW, A, connect, ctx_for, receive, run, system, template
-from base.tenancy.tests import hubs
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, A, connect, ctx_for, receive, run, system, template
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 SEND = f"{SAAS}/internal/whatsapp/send"
@@ -60,7 +60,7 @@ def answering():
 @pytest.fixture
 def delivered(django_capture_on_commit_callbacks):
     def run_and_deliver(write):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
             return write()
 
     return run_and_deliver
@@ -78,7 +78,7 @@ def test_within_the_24_hours_the_notice_goes_as_text_to_the_exact_number_through
     out = delivered(lambda: notify({"phone": ANA, "text": TEXT, "template": TEMPLATE}))
 
     sent = json.loads(route.calls.last.request.content)
-    assert (sent["hub"], sent["to"], sent["type"], sent["text"]) == ("a", ANA, "text", TEXT)
+    assert (sent["hub"], sent["to"], sent["type"], sent["text"]) == (A.key, ANA, "text", TEXT)
     message = Message.objects.get(pk=out.id)
     assert (message.kind, message.body, message.status, message.wa_message_id) == ("text", TEXT, "sent", "wamid.OUT")
     assert message.sent_by is None
@@ -166,7 +166,7 @@ def test_a_number_not_connected_sends_nothing():
     assert refused.value.code == "whatsapp_inbox.channel_not_connected"
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_another_business_goes_by_its_own_number(hub_a, hub_b):
     from base.tenancy.context import use_hub

@@ -26,10 +26,10 @@ from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import words_for
 from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import receive
+from apps.whatsapp_inbox.tests.conftest import connect, receive
 from base.models import Hub
 
-from .conftest import A, HUB_DB, ctx_for, make_flow, run, whatsapp_connected
+from .conftest import A, HUB_DB, ctx_for, make_flow, run
 
 pytestmark = HUB_DB
 
@@ -211,7 +211,7 @@ def chatting(settings):
     """A WhatsApp conversation with Ana that wrote ten minutes ago: a text goes as it is."""
     settings.SAAS_INTERNAL_URL = "http://saas.test"
     settings.INTERNAL_SHARED_SECRET = "s3cret"
-    whatsapp_connected()
+    connect()
     receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
 
 

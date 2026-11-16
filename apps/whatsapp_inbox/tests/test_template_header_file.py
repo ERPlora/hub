@@ -24,7 +24,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import B, connect, ctx_for, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, B, connect, ctx_for, run, system, template
 from apps.whatsapp_inbox.tests.test_services_templates import (  # noqa: F401 - shared helpers and fixtures
     delivered,
     key,
@@ -33,10 +33,9 @@ from apps.whatsapp_inbox.tests.test_services_templates import (  # noqa: F401 - 
 )
 from base import files
 from base.models import Hub
-from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
+from base.tenancy.context import current_alias, use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\x01" * 64
 OTHER_JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"\x02" * 64
@@ -105,7 +104,7 @@ def test_a_photo_for_the_header_is_kept_in_the_hubs_file_store(hub_files):
 
     row = TemplateSample.objects.get(pk=out.id)
     assert (out.header_format, out.content_type, out.size, out.name) == ("IMAGE", "image/jpeg", len(JPEG), "carta.jpg")
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     assert row.key.startswith(f"hub-{hub.id.hex}/whatsapp_inbox/samples/") and row.key.endswith(".jpg")
     with hub_files.open(row.key, "rb") as kept:
         assert kept.read() == JPEG
@@ -124,22 +123,22 @@ def test_the_people_of_the_hub_open_the_file_and_a_visitor_never_does(client):
     from base.storage import hub_prefix, media_url
 
     row = TemplateSample.objects.get(pk=upload().id)
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     url = media_url(hub.id, row.key.removeprefix(f"{hub_prefix(hub.id)}/"))
-    assert client.get(url, HTTP_HOST="a.localhost:8000").status_code == 404
+    assert client.get(url, HTTP_HOST=f"{HOST}:8000").status_code == 404
     user = get_user_model().objects.create_user(username="saas:41", password="pw")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.EMPLOYEE)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.EMPLOYEE)
     client.force_login(user)
     session = client.session
-    session[SESSION_HOST_KEY] = "a"
+    session[SESSION_HOST_KEY] = A.key
     session.save()
-    response = client.get(url, HTTP_HOST="a.localhost:8000")
+    response = client.get(url, HTTP_HOST=f"{HOST}:8000")
     assert (response.status_code, response["Content-Type"]) == (200, "image/jpeg")
     assert b"".join(response.streaming_content) == JPEG
     assert response["Cache-Control"].startswith("private")
 
 
-def sign_in(client, host: str = "a") -> None:
+def sign_in(client, host: str = A.key) -> None:
     """A session of ``host``'s hub, as its people have after the jump from erplora.com."""
     from django.contrib.auth import get_user_model
 
@@ -154,23 +153,24 @@ def sign_in(client, host: str = "a") -> None:
     session.save()
 
 
-def test_the_file_says_where_its_hubs_people_open_it_and_nobody_else_does(client):
+def test_the_file_says_where_its_hubs_people_open_it_and_nobody_else_does(client, hub_b):
     # The sheet shows the header's photo from the address the file comes with, under the inbox's members' folder of
     # /p/media/: a session of its hub opens it, a visitor gets a 404, and another business's file names its own hub,
     # which this host never serves.
     out = upload()
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     assert out.url.startswith(f"/p/media/{hub.id.hex}/whatsapp_inbox/samples/") and out.url.endswith(".jpg")
-    assert client.get(out.url, HTTP_HOST="a.localhost:8000").status_code == 404
+    assert client.get(out.url, HTTP_HOST=f"{HOST}:8000").status_code == 404
 
     sign_in(client)
-    response = client.get(out.url, HTTP_HOST="a.localhost:8000")
+    response = client.get(out.url, HTTP_HOST=f"{HOST}:8000")
     assert (response.status_code, response["Content-Type"]) == (200, "image/jpeg")
     assert b"".join(response.streaming_content) == JPEG
 
-    foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
-    assert foreign.url.startswith(f"/p/media/{Hub.objects.get(slug='b').id.hex}/whatsapp_inbox/samples/")
-    assert client.get(foreign.url, HTTP_HOST="a.localhost:8000").status_code == 404
+    with use_hub(hub_b):
+        foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
+    assert foreign.url.startswith(f"/p/media/{hub_b.id.hex}/whatsapp_inbox/samples/")
+    assert client.get(foreign.url, HTTP_HOST=f"{HOST}:8000").status_code == 404
 
 
 @respx.mock
@@ -181,7 +181,7 @@ def test_the_template_and_its_edit_on_its_way_carry_the_address_of_their_file(
     first = run("whatsapp_inbox.template.list", {}).rows[0].header_sample
     new = upload(OTHER_JPEG, name="carta-otono.jpg")
 
-    with django_capture_on_commit_callbacks(execute=False):
+    with django_capture_on_commit_callbacks(execute=False, using=current_alias()):
         run("whatsapp_inbox.template.update", {**with_file(new.id), "id": str(row.id)})
 
     [listed] = run("whatsapp_inbox.template.list", {}).rows
@@ -195,7 +195,7 @@ def test_the_template_and_its_edit_on_its_way_carry_the_address_of_their_file(
 def test_a_key_that_is_no_samples_of_a_hub_has_no_address(key):
     from apps.whatsapp_inbox import samples
 
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     assert samples.sample_url(key.replace("%s", hub.id.hex)) == ""
     assert samples.sample_url(f"hub-{hub.id.hex}/whatsapp_inbox/samples/ab.jpg") == (
         f"/p/media/{hub.id.hex}/whatsapp_inbox/samples/ab.jpg"
@@ -260,7 +260,7 @@ def test_whoever_answers_uploads_a_file_but_a_viewer_does_not():
 # ── The plan's space for files, the same as Files ───────────────────────────────────────────────
 
 
-def plan_space(limit: int, slug: str = "a") -> None:
+def plan_space(limit: int, slug: str = A.key) -> None:
     """The SaaS's photo of ``slug`` includes ``limit`` bytes for the business's files."""
     Hub.objects.filter(slug=slug).update(state={"plan": {"max_storage_bytes": limit}})
 
@@ -286,7 +286,7 @@ def test_a_file_past_the_plans_space_is_refused_with_the_reason_and_code_of_file
 
     assert said["en"] != said["es"]
     assert not TemplateSample.objects.exists()
-    assert hub_files.listdir(f"hub-{Hub.objects.get(slug='a').id.hex}")[0] == ["files"]
+    assert hub_files.listdir(f"hub-{Hub.objects.get(slug=A.key).id.hex}")[0] == ["files"]
 
 
 def test_up_to_the_plans_space_the_file_is_kept_and_files_counts_it(hub_files):
@@ -310,10 +310,11 @@ def test_the_same_file_again_takes_no_more_space(hub_files):
     assert TemplateSample.objects.get(pk=again.id).key == TemplateSample.objects.get(pk=first.id).key
 
 
-def test_without_a_space_in_its_plan_another_business_keeps_its_file(hub_files):
+def test_without_a_space_in_its_plan_another_business_keeps_its_file(hub_files, hub_b):
     plan_space(len(JPEG) - 1)
 
-    assert upload(ctx=ctx_for(scope=B)).name == "carta.jpg"
+    with use_hub(hub_b):
+        assert upload(ctx=ctx_for(scope=B)).name == "carta.jpg"
 
 
 def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_inbox_s(hub_files, monkeypatch):
@@ -327,7 +328,7 @@ def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_inbox_s
 
     upload()  # base's check (here, one that lets everything in) decides: the inbox keeps the file
 
-    assert asked == [(Hub.objects.get(slug="a").id, len(JPEG), len(JPEG) - 1)]
+    assert asked == [(Hub.objects.get(slug=A.key).id, len(JPEG), len(JPEG) - 1)]
     upload(name="menu.jpg")  # the same file again is the same object: no space asked for
     assert len(asked) == 1
     catalogue = Path(apps.get_app_config("whatsapp_inbox").path, "locale", "es", "LC_MESSAGES", "django.po").read_text()
@@ -396,7 +397,7 @@ def test_a_text_header_goes_as_it_always_went(delivered):
 
 @pytest.mark.parametrize("sample", ["none", "another_kind", "another_business"])
 @respx.mock
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_file_header_needs_its_file_of_its_kind_and_of_its_business(hub_a, hub_b, sample):
     with use_hub(hub_a):
@@ -475,7 +476,7 @@ def test_while_the_edit_is_on_its_way_the_approved_photo_stays_the_templates(dja
     row = approved_with_photo(delivered)
     new = upload(OTHER_JPEG, name="carta-otono.jpg")
 
-    with django_capture_on_commit_callbacks(execute=False):
+    with django_capture_on_commit_callbacks(execute=False, using=current_alias()):
         out = run("whatsapp_inbox.template.update", {**with_file(new.id), "id": str(row.id)})
 
     row.refresh_from_db()
@@ -618,7 +619,7 @@ def test_a_header_file_is_read_by_its_id_as_it_was_kept():
     assert (read.name, read.header_format) == ("carta.pdf", "DOCUMENT")
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_header_file_of_another_business_is_not_there(hub_a, hub_b):
     with use_hub(hub_b):

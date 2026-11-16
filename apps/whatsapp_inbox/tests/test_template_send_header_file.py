@@ -21,15 +21,14 @@ from live.context import Scope
 from live.errors import InvalidPayload
 
 from apps.whatsapp_inbox.models import Message, Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, ctx_for, receive, run, system, template
 from apps.whatsapp_inbox.tests.test_services import SEND, conv, send, stored
 from apps.whatsapp_inbox.tests.test_services import delivered  # noqa: F401 - fixture
 from apps.whatsapp_inbox.tests.test_template_header_file import JPEG, MP4, OTHER_JPEG, approved_with_photo, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("hub_files")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_files")]
 
 MANAGER_PHOTO = "promo_foto"
 
@@ -159,7 +158,7 @@ def test_without_its_file_it_does_not_leave():
     assert not Message.objects.filter(direction=Message.Direction.OUTBOUND).exists()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 @pytest.mark.parametrize("sample", ["another_kind", "another_business"])
 def test_the_file_is_of_its_kind_and_of_its_business(hub_a, hub_b, sample):

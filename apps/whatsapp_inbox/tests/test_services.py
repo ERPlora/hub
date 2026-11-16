@@ -20,6 +20,8 @@ from live.models import OutboxEvent
 from apps.customer.models import Customer
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import (
+    B,
+    HUB_DB,
     A,
     NOW,
     card,
@@ -30,9 +32,9 @@ from apps.whatsapp_inbox.tests.conftest import (
     system,
     template,
 )
-from base.tenancy.tests import hubs
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 SEND = f"{SAAS}/internal/whatsapp/send"
@@ -414,7 +416,7 @@ def channel_of(scope):
     return run("whatsapp_inbox.channel.get", {}, ctx_for(scope=scope))
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
     from base.tenancy.context import use_hub
@@ -437,7 +439,7 @@ def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
         assert (b_now.status, b_now.phone_number, b_now.monthly_limit) == ("not_connected", "", 0)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own(hub_a, hub_b):
     from base.tenancy.context import use_hub
@@ -465,7 +467,7 @@ def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_i
     assert (a_month.cap_reached, b_month.cap_reached) == (True, False)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_each_business_s_photo_keeps_its_own_number(client, settings, hub_a, hub_b):
     from base.tests.test_internal import SECRET, signed
@@ -553,7 +555,7 @@ def delivered(django_capture_on_commit_callbacks):
     """Run a write and then what it left for after its COMMIT (the delivery to erplora.com)."""
 
     def run_and_deliver(write):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
             out = write()
         return out
 
@@ -570,13 +572,13 @@ def test_a_text_is_kept_queued_and_leaves_only_after_the_commit(make_user, djang
     luis = make_user("luis", first_name="Luis", last_name="Gil")
     route = answering()
     k = key()
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         out = send({"id": str(c.id), "text": "Sí, mañana a las 10", "client_message_id": k}, ctx_for("hub_employee", actor=luis))
         # Inside the operation's transaction nothing has been asked to erplora.com.
         assert route.call_count == 0
         assert (out.status, out.wa_message_id, out.sent_by_name) == ("queued", None, "Luis Gil")
     request = route.calls.last.request
-    assert json.loads(request.content) == {"hub": "a", "to": "+34600111222", "type": "text", "text": "Sí, mañana a las 10"}
+    assert json.loads(request.content) == {"hub": A.key, "to": "+34600111222", "type": "text", "text": "Sí, mañana a las 10"}
     assert request.headers["Idempotency-Key"] == k
     message = stored(out)
     assert (message.direction, message.origin, message.status, message.wa_message_id, message.sent_by) == (
@@ -1093,7 +1095,7 @@ def test_without_the_assign_permission_nobody_takes_it_from_somebody_else(make_u
 
 def test_only_people_of_this_business_are_assigned(make_user):
     receive("wamid.1")
-    stranger = make_user("pepe", host="b")
+    stranger = make_user("pepe", host=B.key)
     with pytest.raises(InvalidPayload) as excinfo:
         run(
             "whatsapp_inbox.conversation.assign",
@@ -1254,13 +1256,13 @@ def test_erasing_asks_erplora_to_forget_the_number_after_the_commit(django_captu
     receive("wamid.2")
     c = conv()
     route = respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("whatsapp_inbox.conversation.erase", {"id": str(c.id)})
         assert route.call_count == 0
         c.refresh_from_db()
         assert (c.phone, c.erase_status, c.erase_phone) == ("", "pending", "+34600111222")
     assert json.loads(route.calls.last.request.content) == {
-        "hub": "a",
+        "hub": A.key,
         "phone": "+34600111222",
         "wa_message_ids": ["wamid.1", "wamid.2"],
     }

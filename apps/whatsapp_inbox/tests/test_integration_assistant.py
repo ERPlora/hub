@@ -13,11 +13,10 @@ import pytest
 from django.apps import apps
 from live.operations import get, registry
 
-from apps.whatsapp_inbox.tests.conftest import ctx_for
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import PDF, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base import assistant
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen, technical_names
 
 APP = Path(apps.get_app_config("whatsapp_inbox").path)
@@ -81,7 +80,7 @@ def test_no_datum_of_a_write_of_whatsapp_inbox_borrows_its_name_from_another_app
     assert borrowed == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_assignee_as_the_conversation_screen(make_user):
     """By their name or by their id, the same person: «Assigned to», as the conversation's header says it; the id
     named as the business's database knows them (``base.hub_user.get``), never as an id."""
@@ -134,7 +133,7 @@ def sending(sample_id, key: str) -> dict:
     return {"to": "+34600111222", "template": template, "client_message_id": key}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("key", KEYS)
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_the_card_of_a_template_names_its_headers_file_and_never_its_message_key(language, key):
@@ -150,7 +149,7 @@ def test_the_card_of_a_template_names_its_headers_file_and_never_its_message_key
     assert not AN_ID.search(json.dumps(card, ensure_ascii=False))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("key", KEYS)
 @pytest.mark.parametrize("name", ["whatsapp_inbox.template.create", "whatsapp_inbox.template.update"])
 def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_save_key(name, key):
@@ -164,8 +163,7 @@ def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_s
     assert "submit_key" not in shown
 
 
-@pytest.mark.django_db
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id(hub_a, hub_b):
     from base.tenancy.context import use_hub
