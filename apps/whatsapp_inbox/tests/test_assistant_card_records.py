@@ -18,7 +18,7 @@ from apps.whatsapp_inbox.models import Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, A, card, connect, ctx_for, receive, run, template
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -168,7 +168,7 @@ def test_a_template_deleted_here_that_meta_still_has_is_named_to_retry_its_delet
 def test_the_buttons_of_a_template_go_by_how_many_never_by_their_codes(write):
     """A button is a line of two data (its type and its text), so the card says how many go, as it does every such
     list, and never «QUICK_REPLY»: why the type of a button, which no field of the models names, may stay without its
-    label in base/tests/test_assistant_card_values.py (hub#571)."""
+    label in base/tests/test_assistant_card_values_references.py (hub#571)."""
     buttons = [{"type": "QUICK_REPLY", "text": "Sí"}, {"type": "PHONE_NUMBER", "text": "Llamar", "phone_number": "+34910000000"}]
     field = fields_of(write, {"body": "Hola", "buttons": buttons}, "es", ctx=None)["buttons"]
     assert (field["kind"], NAMED in field) == ("list", False)

@@ -314,7 +314,7 @@ papel en ningún negocio.
   lleva el título de su pantalla (`T_ITEM`: «Elemento», «Item»), nunca «Registro». Sin persona detrás, sin `demo.view`,
   con un id de otro negocio o de algo que ya no está, el elemento queda fuera, nunca su id
   (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. El estado, la única lista cerrada de
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. El estado, la única lista cerrada de
   sus escrituras, sale con las etiquetas de `Item.Status` en cada idioma.
 - La lista nunca pide más de 100 filas (`PAGE_MAX`, el `le=100` de `ItemListIn`): «Cargar más» crece
   hasta ese tope y, con más elementos, el `DataTable` pagina también en el móvil (`maxWindow`).

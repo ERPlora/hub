@@ -19,7 +19,7 @@ from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card
 from base.tests.test_services_assistant import asked, call
 

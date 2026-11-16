@@ -392,8 +392,8 @@ def test_an_amount_inside_a_datum_of_a_step_is_marked(operation):
 # ── The ratchet: amounts a step leaves that nobody marks, by app ─────────────────────────────────────────────────────
 
 #: How an amount says itself in this repo's schemas, as the assistant's ratchet reads it
-#: (``base/tests/test_assistant_card_values.py``): a whole number named ``…_cents``, or whose description speaks of
-#: cents or of the minor unit. The words find the amounts to mark; they never make one.
+#: (``base/tests/test_assistant_card_values_amounts.py``): a whole number named ``…_cents``, or whose description
+#: speaks of cents or of the minor unit. The words find the amounts to mark; they never make one.
 AMOUNT_WORDS = re.compile(r"\bcents?\b|\bminor units?\b|\bcéntimos?\b", re.IGNORECASE)
 
 #: The decimals of a currency say «its amounts' minor unit»: a count, never an amount.

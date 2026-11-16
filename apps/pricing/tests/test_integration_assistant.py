@@ -19,7 +19,7 @@ from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID, card_title
+from base.tests.test_assistant_card_values_references import AN_ID, card_title
 
 from .conftest import ctx_for, make_item, make_list, make_product
 

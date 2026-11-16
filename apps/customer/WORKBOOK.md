@@ -1175,7 +1175,7 @@ asistente.
   campo lleva su título («Cliente», «Grupo», «Etiqueta», «Campo personalizado»), nunca «Registro». Sin persona
   detrás, sin permiso, con un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id:
   `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca.
 - En la fusión (F13), las referencias escritas `customer` y `absorbed` de `MergeIn` llevan `A_CUSTOMER_REFERENCE`
   (`customer.customer.detail` por `customer`), la única marca de una referencia escrita sin `as_said`. Así, «junta la ficha del
   611 222 444 dentro de la del 611 222 333» sale en la tarjeta como «Cliente: Ana QA» y «Ficha duplicada: Ana QA

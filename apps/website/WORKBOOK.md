@@ -611,7 +611,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   tema, secciones que se ocultan o se muestran y nombres de las demás secciones cambiadas. `SECTION_LABELS` de
   `choices.py` da esos nombres con las palabras del editor en `en` y `es` (`tests/test_choices.py`). Sin permiso, de
   otro negocio o que ya no está: el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el
-  trinquete de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta.
+  trinquete de `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca o una lista sin etiqueta.
 - **Paletas** (`palettes.json` + `palettes.py`): las ocho paletas, cada una con su juego claro y
   oscuro (principal, página, franjas, texto, enlaces y bordes) y el color secundario; el editor lee el mismo fichero.
   `tests/test_palettes.py` comprueba WCAG AA (4,5:1) en los dos modos para texto, texto atenuado, enlaces, botones y
