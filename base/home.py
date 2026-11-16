@@ -2,7 +2,7 @@
 
 Every module declares in its ``LiveAppConfig`` its steps of «Finish setting up your business» (``setup``), its
 panels of the dashboard (``widgets``) and its counters of the bell (``bell``), each naming a query of its own
-``queries.py``. Base aggregates them in three live queries of ``base/queries.py`` (``base.setup.status``,
+``queries.py``. Base aggregates them in three live queries of ``base/queries/`` (``base.setup.status``,
 ``base.widget.list``, ``base.bell.counters``) with the old hub's rules (``crates/runtime/src/setup_status.rs``):
 
 - only the modules on in the scope bring anything, and a module kept out of the store (``listed = False``, the
