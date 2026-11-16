@@ -9,8 +9,9 @@ import re
 import pytest
 from django.utils.csp import build_policy
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
-HOST = "a.localhost:8000"
+from base.tenancy.tests.business import HOST, HUB_DB
+
+pytestmark = [HUB_DB, pytest.mark.usefixtures("spa_manifest", "hub_a")]
 PLATFORM = "hubs.localhost:8000"
 
 

@@ -13,6 +13,7 @@ from django.template.loader import get_template, render_to_string
 from django.template.loader_tags import ExtendsNode
 
 from base.models import Hub
+from base.tenancy.tests.business import HOST, HUB_DB, A
 
 STYLESHEET = "base/gate.css"
 LOGO = "base/img/logo.png"
@@ -80,7 +81,8 @@ def test_collectstatic_copies_them_where_whitenoise_serves_production_from(setti
     assert (tmp_path / LOGO).is_file()
 
 
-@pytest.mark.django_db
+@HUB_DB
+@pytest.mark.usefixtures("hub_a")
 class TestOnTheHostOfAHubThatDoesNotOpen:
     @pytest.mark.parametrize(
         ("fields", "status"),
@@ -88,8 +90,8 @@ class TestOnTheHostOfAHubThatDoesNotOpen:
         ids=["preparing", "gone", "suspended"],
     )
     def test_its_page_links_the_stylesheet_that_its_csp_lets_in(self, client, settings, fields, status):
-        Hub.objects.create(slug="acme", **{"status": "ready", **fields})
-        response = client.get("/", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML)
+        Hub.objects.filter(slug=A.key).update(**fields)
+        response = client.get("/", HTTP_HOST=HOST, HTTP_ACCEPT=HTML)
         assert response.status_code == status
         assert f'href="{settings.STATIC_URL}{STYLESHEET}"' in response.content.decode()
         directives = csp_directives(response)
@@ -100,7 +102,7 @@ class TestOnTheHostOfAHubThatDoesNotOpen:
     def test_the_stylesheet_and_the_logo_are_still_served(self, client, settings, path, content_type):
         # Static files answer before the host's gate (WhiteNoise; from the finders here, STATIC_ROOT once collected).
         settings.WHITENOISE_USE_FINDERS = True
-        Hub.objects.create(slug="acme", status="ready", state={"status": "suspended"})
-        response = client.get(f"{settings.STATIC_URL}{path}", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML)
+        Hub.objects.filter(slug=A.key).update(state={"status": "suspended"})
+        response = client.get(f"{settings.STATIC_URL}{path}", HTTP_HOST=HOST, HTTP_ACCEPT=HTML)
         assert response.status_code == 200
         assert response["Content-Type"].startswith(content_type)

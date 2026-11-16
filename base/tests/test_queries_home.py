@@ -13,12 +13,12 @@ from types import SimpleNamespace
 
 import psycopg
 import pytest
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy
 from live.assistant import description
-from live.context import OperationContext, Scope
+from live.context import OperationContext, system_context
 from live.errors import NotFound
+from live.live_registry import live_registry
 from live.meta import BellCounter, DeviceNotice, Nav, SetupCheck, SetupStep, Widget
 from live.operations import Operation, get, registry
 from live.outbox import channel_for
@@ -26,6 +26,8 @@ from live.models import OutboxEvent
 from psycopg.conninfo import make_conninfo
 from pydantic import BaseModel, ConfigDict
 
+from apps.demo.models import Item
+from apps.demo.schemas import ItemIn
 from base.models import EventDelivery, Hub, Membership
 from base.schemas import (
     BellCountersIn,
@@ -39,11 +41,11 @@ from base.schemas import (
     WidgetListIn,
     WidgetListOut,
 )
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 
-pytestmark = pytest.mark.django_db
-
-A = Scope("host", "a")
-B = Scope("host", "b")
+__all__ = ["in_business_a"]
+pytestmark = HUB_DB
 HOME = "base.view_home"
 ADMIN = "base.administer_hub"
 
@@ -116,6 +118,11 @@ def setup_status(context):
     return get("base.setup.status")(context, SetupStatusIn()).model_dump(mode="json")
 
 
+def in_b(read, context):
+    with use_hub(Hub.objects.get(slug=B.key)):
+        return read(context)
+
+
 def keys(document):
     return [item["key"] for item in document["items"]]
 
@@ -156,7 +163,7 @@ def test_the_assistant_reads_the_setup_status():
 
 def test_the_platforms_steps_for_an_administrator(modules, make_user):
     modules(module("sale"))
-    make_user("ana", host="a", role=Membership.Role.OWNER)
+    make_user("ana", host=A.key, role=Membership.Role.OWNER)
 
     document = setup_status(ctx(ADMIN))
 
@@ -202,12 +209,12 @@ def test_your_apps_is_pending_without_an_app_on_and_unavailable_when_none_can_be
 
 def test_your_team_is_done_with_two_active_people_in_this_hub(modules, make_user):
     modules(module("sale"))
-    make_user("ana", host="a", role=Membership.Role.OWNER)
-    make_user("bea", host="b")  # another hub's
-    make_user("cris", host="a", is_active=False)
+    make_user("ana", host=A.key, role=Membership.Role.OWNER)
+    make_user("bea", host=B.key)  # another hub's
+    make_user("cris", host=A.key, is_active=False)
     assert by_key(setup_status(ctx(ADMIN)))["base.team"]["state"] == "pending"
 
-    make_user("dani", host="a")
+    make_user("dani", host=A.key)
     assert by_key(setup_status(ctx(ADMIN)))["base.team"]["state"] == "done"
 
 
@@ -226,21 +233,21 @@ def fiscal(countries=("ES",), turns_on=False, **more):
     return module("fiscal", mandatory=declared, icon="ion:calculator-outline", navigation=navigation, **more)
 
 
-def test_an_app_the_platform_turns_on_by_itself_is_not_one_of_your_apps_in_its_country(modules):
+def test_an_app_the_platform_turns_on_by_itself_is_not_one_of_your_apps_in_its_country(modules, hub_b):
     """A business is born with it on (hub#997): with it alone its till has nothing to sell, so «Your apps» still asks for
     one. In a country where the platform does not turn it on, the business chose it: it counts."""
     modules(module("sale"), fiscal(("PT",), turns_on=True), on=["fiscal"])
-    Hub.objects.filter(slug="a").update(country="PT")
+    Hub.objects.filter(slug=A.key).update(country="PT")
     assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "pending"
     # B has no country: Spain, where it is no app the platform turns on.
-    assert by_key(setup_status(ctx(ADMIN, scope=B)))["base.apps"]["state"] == "done"
+    assert by_key(in_b(setup_status, ctx(ADMIN, scope=B)))["base.apps"]["state"] == "done"
 
     modules(module("sale"), fiscal(("PT",), turns_on=True), on=["fiscal", "sale"])
     assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "done"
 
 
 def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until_it_is_on(modules, make_user):
-    make_user("ana", host="a", role=Membership.Role.OWNER)
+    make_user("ana", host=A.key, role=Membership.Role.OWNER)
     modules(module("sale"), fiscal(), on=["sale"])
 
     document = setup_status(ctx(ADMIN))
@@ -263,13 +270,13 @@ def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until
     assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
 
 
-def test_a_mandatory_app_is_asked_for_only_in_its_countries_each_hub_by_its_own(modules):
+def test_a_mandatory_app_is_asked_for_only_in_its_countries_each_hub_by_its_own(modules, hub_b):
     modules(module("sale"), fiscal(), on=["sale"])
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
 
     assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
     # B has no country: it is in ERPlora's market, Spain (hub#682).
-    assert "base.mandatory.fiscal" in keys(setup_status(ctx(ADMIN, scope=B)))
+    assert "base.mandatory.fiscal" in keys(in_b(setup_status, ctx(ADMIN, scope=B)))
 
     modules(module("sale"), fiscal("all"), on=["sale"])
     assert "base.mandatory.fiscal" in keys(setup_status(ctx(ADMIN)))
@@ -277,7 +284,7 @@ def test_a_mandatory_app_is_asked_for_only_in_its_countries_each_hub_by_its_own(
 
 def test_a_mandatory_app_says_it_in_the_persons_language(modules):
     modules(module("sale"), fiscal(name=gettext_lazy("Taxes")), on=["sale"])
-    Hub.objects.filter(slug="a").update(country="FR")
+    Hub.objects.filter(slug=A.key).update(country="FR")
     modules(module("sale"), fiscal("all", name=gettext_lazy("Taxes")), on=["sale"])
 
     step = by_key(setup_status(ctx(ADMIN, language="es")))["base.mandatory.fiscal"]
@@ -521,27 +528,27 @@ def test_only_base_names_the_steps_that_are_walls_in_production(modules, declare
     assert (seen(document, "stock.catalog"), document["blocking_pending"]) == (("functional", "pending", True), 0)
 
 
-def test_a_national_step_shows_only_in_a_hub_of_its_country(modules, declare):
+def test_a_national_step_shows_only_in_a_hub_of_its_country(modules, declare, hub_b):
     declare("stock.catalog.status", {"n": 1})
     modules(module("stock", setup=[step(countries=["PT"])]))
     assert keys(setup_status(ctx())) == []  # the hub has no country: it is in ERPlora's market, Spain
 
-    Hub.objects.filter(slug="a").update(country="PT")
+    Hub.objects.filter(slug=A.key).update(country="PT")
     assert keys(setup_status(ctx())) == ["stock.catalog"]
-    assert keys(setup_status(ctx(scope=B))) == []
+    assert keys(in_b(setup_status, ctx(scope=B))) == []
 
 
-def test_a_step_for_spain_shows_in_a_hub_without_a_country_and_not_in_another_country(modules, declare):
+def test_a_step_for_spain_shows_in_a_hub_without_a_country_and_not_in_another_country(modules, declare, hub_b):
     """hub#682: a hub without a country (a demo, ERPlora's own) is in ERPlora's market, Spain, as VeriFactu counts it."""
     declare("stock.catalog.status", {"n": 1})
     modules(module("stock", setup=[step(countries=["ES"])]))
     assert keys(setup_status(ctx())) == ["stock.catalog"]
 
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
     assert keys(setup_status(ctx())) == []
-    assert keys(setup_status(ctx(scope=B))) == ["stock.catalog"]  # B has no country
+    assert keys(in_b(setup_status, ctx(scope=B))) == ["stock.catalog"]  # B has no country
 
-    Hub.objects.filter(slug="a").update(country="ES")
+    Hub.objects.filter(slug=A.key).update(country="ES")
     assert keys(setup_status(ctx())) == ["stock.catalog"]
 
 
@@ -561,7 +568,7 @@ def test_a_module_out_of_the_store_brings_no_step_to_a_customer(modules, declare
     assert keys(setup_status(ctx())) == []
 
     # A demo's hub shows the reference's example: there it is what the visitor came to see.
-    Hub.objects.filter(slug="a").update(is_demo=True)
+    Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert keys(setup_status(ctx())) == ["demo.first_item"]
 
 
@@ -586,8 +593,6 @@ def test_order_then_key_and_the_titles_in_the_persons_language(modules, declare,
 
 def test_the_demos_example_step_for_real_with_the_setting_on(settings):
     """The real demo app (no stand-in): its step is pending until the hub has an item, then done."""
-    from apps.demo.models import Item
-
     settings.SHOW_UNLISTED_MODULES = True
     owner = ctx(ADMIN, "demo.view", "demo.manage")
     assert by_key(setup_status(owner))["demo.first_item"]["state"] == "pending"
@@ -703,7 +708,7 @@ def test_a_panel_of_some_verticals_shows_only_in_a_hub_of_one_of_them(modules):
     modules(module("stock", widgets=[Widget(key="tables", title="Tables", component="Tables", verticals=["restaurant"])]))
     assert widget_list(ctx()) == []
 
-    Hub.objects.filter(slug="a").update(vertical="restaurant")
+    Hub.objects.filter(slug=A.key).update(vertical="restaurant")
     assert [w["key"] for w in widget_list(ctx())] == ["stock.tables"]
 
 
@@ -715,7 +720,7 @@ def test_panels_of_a_module_off_or_out_of_the_store(modules, settings):
     settings.SHOW_UNLISTED_MODULES = False
     assert widget_list(ctx()) == []
 
-    Hub.objects.filter(slug="a").update(is_demo=True)
+    Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert [w["key"] for w in widget_list(ctx())] == ["demo.w"]
 
 
@@ -774,7 +779,7 @@ def test_the_counters_of_a_module_out_of_the_store_only_where_the_setting_says(m
     settings.SHOW_UNLISTED_MODULES = False
     assert bell(ctx()) == []
 
-    Hub.objects.filter(slug="a").update(is_demo=True)
+    Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert [c["key"] for c in bell(ctx())] == ["demo.open"]
 
 
@@ -815,13 +820,14 @@ def dead_event(scope, status=EventDelivery.Status.DEAD):
     return EventDelivery.objects.create(event=event, app_label="invoice", status=status, next_attempt_at=timezone.now())
 
 
-def test_the_failed_events_of_this_hub_for_an_administrator(modules):
+def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
     """The bell says how many events between apps the relay gave up on, in this hub only."""
     modules(module("sale"))
     dead_event(A)
     dead_event(A)
     dead_event(A, EventDelivery.Status.PENDING)
-    dead_event(B)
+    dead_event(B)  # another scope's row in A's database: not A's to count
+    in_b(dead_event, B)
 
     assert bell(ctx(ADMIN)) == [
         {"key": "base.failed_events", "app": "base", "count": 2, "route": "/system#events", "label": "Failed events",
@@ -829,7 +835,7 @@ def test_the_failed_events_of_this_hub_for_an_administrator(modules):
     ]
     assert bell(ctx(ADMIN, language="es"))[0]["label"] == "Eventos caídos"
     assert bell(ctx()) == []  # not an administrator
-    assert [c["count"] for c in bell(ctx(ADMIN, scope=B))] == [1]
+    assert [c["count"] for c in in_b(bell, ctx(ADMIN, scope=B))] == [1]
 
 
 # --- Live: a write in hub B reaches B's channel only, and re-runs base's queries there ----------------------
@@ -859,17 +865,13 @@ def received(session, timeout=1.0, stop_after=None):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(listen):
-    from live.live_registry import live_registry
-
-    from apps.demo.schemas import ItemIn
-
+@HUB_DB_COMMITTED
+def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    get_user_model()  # the demo command runs as the person; no user is needed for the system context
-    from live.context import system_context
-
-    get("demo.item.create")(system_context(B), ItemIn(name="In B"))
+    with use_hub(hub_b):
+        get("demo.item.create")(system_context(B), ItemIn(name="In B"))
+        assert list(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == [(B.kind, B.key)]
+    assert not OutboxEvent.objects.exists()  # business A's own database
 
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["demo.item.created"]})]
     assert received(on_a, timeout=0.3) == []
@@ -1121,12 +1123,12 @@ def test_an_app_off_puts_no_card(modules):
     assert system_cards(ctx("stock.view")) == []
 
 
-def test_each_business_sees_the_cards_of_its_own_apps(modules, monkeypatch):
+def test_each_business_sees_the_cards_of_its_own_apps(modules, monkeypatch, hub_b):
     modules(module("stock", system_cards=[PRINTER]))
-    monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset({"base", "stock"} if scope.key == "a" else {"base"}))
+    monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset({"base", "stock"} if scope.key == A.key else {"base"}))
 
     assert [card["key"] for card in system_cards(ctx("stock.view", scope=A))] == ["stock.printer"]
-    assert system_cards(ctx("stock.view", scope=B)) == []
+    assert in_b(system_cards, ctx("stock.view", scope=B)) == []
 
 
 def test_a_module_out_of_the_store_puts_its_card_only_where_it_shows(modules, settings):
@@ -1138,8 +1140,6 @@ def test_a_module_out_of_the_store_puts_its_card_only_where_it_shows(modules, se
 
 
 def test_the_cards_follow_an_app_turned_on_or_off():
-    from live.live_registry import live_registry
-
     from base.events import APP_EVENTS, HUB_STATE_APPLIED
 
     assert {HUB_STATE_APPLIED, *APP_EVENTS} <= set(live_registry.subscribable["base.system.cards"])
