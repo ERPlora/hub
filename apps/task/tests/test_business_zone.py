@@ -8,22 +8,20 @@ from django.utils import timezone
 from live.operations import get
 
 from apps.task.queries import business_today
-from base.models import Hub
-from base.tenancy.context import use_hub
 
-from .conftest import ctx_for, make_task
+from .conftest import HUB_DB, ctx_for, make_task
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: 23:30 in the Canaries (UTC in November), 00:30 of the 3rd in Madrid.
 NIGHT = dt.datetime(2026, 11, 2, 23, 30, tzinfo=dt.UTC)
 
 
 @pytest.fixture
-def in_canary_at_night(monkeypatch):
+def in_canary_at_night(monkeypatch, in_business_a):
+    """Business A in the Canaries, at night."""
     monkeypatch.setattr(timezone, "now", lambda: NIGHT)
-    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
-        yield
+    monkeypatch.setattr(in_business_a, "timezone", "Atlantic/Canary")
 
 
 def run(name, data=None):
@@ -45,11 +43,11 @@ def test_a_new_task_is_numbered_on_the_businesss_day(in_canary_at_night):
     assert run("task.task.create", {"title": "Order dye"}).number.startswith("TSK-20261102-")
 
 
-def test_a_business_that_changes_zone_never_repeats_a_number(monkeypatch):
+def test_a_business_that_changes_zone_never_repeats_a_number(monkeypatch, in_business_a):
     monkeypatch.setattr(timezone, "now", lambda: NIGHT)
     numbers = []
     # The same instant is the 2nd in the Canaries and the 3rd in Madrid: going back to the 2nd carries on its count.
     for zone in ("Atlantic/Canary", "Europe/Madrid", "Atlantic/Canary"):
-        with use_hub(Hub(slug="a", timezone=zone)):
-            numbers.append(run("task.task.create", {"title": "Order dye"}).number)
+        monkeypatch.setattr(in_business_a, "timezone", zone)
+        numbers.append(run("task.task.create", {"title": "Order dye"}).number)
     assert numbers == ["TSK-20261102-0001", "TSK-20261103-0001", "TSK-20261102-0002"]
