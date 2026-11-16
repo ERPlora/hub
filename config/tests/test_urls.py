@@ -6,9 +6,12 @@ import pytest
 from django.urls import resolve
 from live.live_view import live_stream
 
-pytestmark = pytest.mark.django_db
+from base.tenancy.tests.business import A, HUB_DB
 
-HOST = "a.localhost:8000"
+# A hub's host is business A's, with its own database.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_a")]
+
+HOST = f"{A.key}.localhost:8000"
 PLATFORM = "hubs.localhost:8000"
 SHELL_MARK = '<div id="app"></div>'
 
