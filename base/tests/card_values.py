@@ -5,13 +5,13 @@ from typing import Literal
 from uuid import UUID
 
 from django.core import checks
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.operations import Operation, registry
 from ninja import Schema
 
 from base import assistant
+from base.tenancy.tests.business import A
 
-A = Scope("host", "a")
 ADMIN = frozenset({"base.view_home", "base.administer_hub"})
 
 
