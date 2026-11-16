@@ -4,10 +4,10 @@ the business leaves it unspent and the same request goes through with it after; 
 repeated; of two at once with the same pass, only one runs.
 """
 
-import pytest
-
 from base.models import Approval, Membership
-from base.tests.test_approvals import (  # noqa: F401 — the fixtures of the approvals' tests
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tenancy.tests.concurrency import plan_with_room
+from base.tests.test_approvals import (
     APPROVABLE,
     CHANGE,
     SETTINGS,
@@ -21,7 +21,10 @@ from base.tests.test_approvals import (  # noqa: F401 — the fixtures of the ap
 )
 from base.tests.test_people import with_pin
 
-pytestmark = pytest.mark.django_db
+#: The fixtures of the approvals' tests and of the businesses' own databases these tests take.
+__all__ = ["adam", "approvable", "eva", "in_business_a", "plan_with_room"]
+
+pytestmark = HUB_DB
 
 
 def failing_once(monkeypatch, *, wait: float = 0.0) -> dict:
@@ -76,8 +79,8 @@ class TestTheSpendIsTheCommands:
         assert code(again) == "requires_elevation"
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch):
+@HUB_DB_COMMITTED
+def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch, plan_with_room):
     """The pass's row is locked in the command's transaction: the second waits, finds it spent and is
     refused; the command runs once."""
     import threading
@@ -85,9 +88,9 @@ def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch):
     from django.db import connections
     from django.test import Client
 
-    make_user("saas:2", host="a", role=Membership.Role.ADMIN, first_name="Adam")
+    make_user("saas:2", host=A.key, role=Membership.Role.ADMIN, first_name="Adam")
     with_pin("saas:2", "2580")
-    eva = make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
+    eva = make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva")
     first, second = Client(), Client()
     first.force_login(eva)
     second.force_login(eva)

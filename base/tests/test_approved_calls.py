@@ -14,52 +14,29 @@ import contextlib
 from types import SimpleNamespace
 
 import pytest
-from django.apps import apps
-from django.core.cache import cache
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, PermissionDenied
 from live.operations import UnknownOperation, current_operation
 from live.operations import get as get_operation
 
 from apps.demo.models import Item
 from base.approvals import Approved, approval_of, consequence_context
-from base.models import Approval, Membership
+from base.models import Approval
 from base.operations import call
-from base.tests.test_approvals import APPROVABLE, CHANGE, SETTINGS, approve, code, post, with_pass
-from base.tests.test_people import with_pin
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests.test_approvals import APPROVABLE, CHANGE, SETTINGS, adam, approvable, approve, code, eva, post, with_pass
 
-pytestmark = pytest.mark.django_db
+#: The fixtures of the approvals' tests and of business A's own database these tests take.
+__all__ = ["adam", "approvable", "eva", "in_business_a"]
 
-A = Scope("host", "a")
+pytestmark = HUB_DB
+
 #: A command of another app (demo) that the employee may not run, and a read of that app with the very same permission.
 OTHER_COMMAND = "demo.item.create"
 OTHER_READ = "demo.item.stats"
 OTHER_PERMISSION = "demo.manage"
 #: A command of the approved command's own app (base) that the employee may not run either, with another permission.
 OWN_COMMAND = "base.file.delete"
-
-
-@pytest.fixture(autouse=True)
-def approvable(monkeypatch):
-    """``base`` names one of its commands as approvable, as an app would in its ``LiveAppConfig``."""
-    monkeypatch.setattr(apps.get_app_config("base"), "approvals", {APPROVABLE: "Change how the till asks who is there"}, raising=False)
-    cache.clear()
-    yield
-    cache.clear()
-
-
-@pytest.fixture
-def adam(make_user):
-    user = make_user("saas:2", host="a", role=Membership.Role.ADMIN, first_name="Adam")
-    with_pin("saas:2", "2580")
-    return user
-
-
-@pytest.fixture
-def eva(make_user, client):
-    user = make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
-    client.force_login(user)
-    return user
 
 
 @pytest.fixture

@@ -23,6 +23,12 @@ HOST = f"{A.key}.localhost"
 #: Control's database and both businesses' own, each in the test's transaction.
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+
+
+def on_hub_a(test):
+    """``test`` asks business A's host for pages or the API: its row in control (``hub_a``) and its own database in
+    the test's transaction, never entered by the test itself."""
+    return HUB_DB(pytest.mark.usefixtures("hub_a")(test))
 #: The migrations that plant the factory data a sale or a document needs: Taxes' catalogue and Sales' payment methods.
 FACTORY_DATA = (
     "apps.tax.migrations.0002_factory_catalogue",
