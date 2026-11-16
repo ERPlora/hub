@@ -13,7 +13,6 @@ from types import SimpleNamespace
 
 import psycopg
 import pytest
-from django.db import connections
 from django.utils import timezone
 from django.utils.translation import gettext_lazy
 from live.assistant import description
@@ -24,8 +23,11 @@ from live.meta import BellCounter, DeviceNotice, Nav, SetupCheck, SetupStep, Wid
 from live.operations import Operation, get, registry
 from live.outbox import channel_for
 from live.models import OutboxEvent
+from psycopg.conninfo import make_conninfo
 from pydantic import BaseModel, ConfigDict
 
+from apps.demo.models import Item
+from apps.demo.schemas import ItemIn
 from base.models import EventDelivery, Hub, Membership
 from base.schemas import (
     BellCountersIn,
@@ -591,8 +593,6 @@ def test_order_then_key_and_the_titles_in_the_persons_language(modules, declare,
 
 def test_the_demos_example_step_for_real_with_the_setting_on(settings):
     """The real demo app (no stand-in): its step is pending until the hub has an item, then done."""
-    from apps.demo.models import Item
-
     settings.SHOW_UNLISTED_MODULES = True
     owner = ctx(ADMIN, "demo.view", "demo.manage")
     assert by_key(setup_status(owner))["demo.first_item"]["state"] == "pending"
@@ -827,8 +827,7 @@ def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
     dead_event(A)
     dead_event(A, EventDelivery.Status.PENDING)
     dead_event(B)  # another scope's row in A's database: not A's to count
-    with use_hub(hub_b):
-        dead_event(B)
+    in_b(dead_event, B)
 
     assert bell(ctx(ADMIN)) == [
         {"key": "base.failed_events", "app": "base", "count": 2, "route": "/system#events", "label": "Failed events",
@@ -844,10 +843,15 @@ def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
 
 @pytest.fixture
 def listen(django_db_setup):
+    from django.db import connections
+
+    params = connections["default"].settings_dict
+    dsn = make_conninfo(dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"],
+                        host=params["HOST"], port=params["PORT"])
     sessions = []
 
     def open_session(scope):
-        session = psycopg.connect(**connections["default"].get_connection_params(), autocommit=True)
+        session = psycopg.connect(dsn, autocommit=True)
         sessions.append(session)
         session.execute(f"LISTEN {channel_for(scope)}")
         return session
@@ -863,8 +867,6 @@ def received(session, timeout=1.0, stop_after=None):
 
 @HUB_DB_COMMITTED
 def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(listen, hub_b):
-    from apps.demo.schemas import ItemIn
-
     on_a, on_b = listen(A), listen(B)
     with use_hub(hub_b):
         get("demo.item.create")(system_context(B), ItemIn(name="In B"))
