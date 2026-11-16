@@ -4,14 +4,13 @@ The floor is live (TABLE-F09): seating, moving, joining, splitting, charging or 
 customer put on a check re-run the plan, the zones' free tables and the checks of the room.
 """
 
-import pytest
 from live.context import system_context
 from live.live_registry import live_registry
 from live.operations import get
 
 from apps.table import events
 
-from .conftest import A, make_customer, make_table, run
+from .conftest import HUB_DB, A, make_customer, make_table, run
 
 SALE = [
     "sale.order.completed",
@@ -102,7 +101,7 @@ def test_a_hold_re_runs_the_floor_but_not_the_checks():
     assert "table.session.list" not in affected
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_card_recovered_from_the_separate_copy_is_named_again_on_its_check_and_repaints_the_room():
     """hub#1324: deleting a card takes her name off the check she sits at; the same card back (CUSTOMER-F33, run as
     the system from the separate copy) puts it back, and an open plan or room repaints at once, as with a deletion."""

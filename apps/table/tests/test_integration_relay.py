@@ -9,24 +9,29 @@ Sales), without mocks.
   when the party sat long before its time (an old «confirmed» delivered late never holds the table again);
 - a check charged in full or voided in Sales frees its table once, however many times the event is delivered
   (TABLE-F18, F20).
+
+The worker's real loop serves each business in its own database and releases its connections once it has served it:
+what these tests write is committed, with the factory data a sale needs planted again in business A.
 """
 
 import datetime as dt
-import threading
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from live.models import OutboxEvent
-from apps.reservation.tests.conftest import book, holds, open_week
+
+from apps.flow.tests.test_relay import worker_loop
+from apps.reservation.tests import conftest as reservations
+from apps.reservation.tests.conftest import holds, open_week
 from apps.table.live import FLOOR
 from apps.table.models import Hold, TableSession
-from base import catalog, worker
-from base.catalog import RegisterResult
+from base.tenancy.tests.business import factory_data
 
 from .conftest import (
+    HUB_DB_COMMITTED,
     add_line,
     charge,
+    ctx_for,
     make_customer,
     make_table,
     make_zone,
@@ -34,12 +39,14 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+#: The worker's real loop over every business and the factory data a sale needs, that these tests take from here.
+__all__ = ["factory_data", "worker_loop"]
+
+pytestmark = HUB_DB_COMMITTED
 
 MADRID = ZoneInfo("Europe/Madrid")
 #: Reservations books from its own «now» (Wednesday 2026-10-14, noon in Madrid): the booking is tomorrow at 21:00.
 NOW = dt.datetime(2026, 10, 14, 10, 0, tzinfo=dt.UTC)
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 
 
 def at(time: str, day: str = "2026-10-15") -> dt.datetime:
@@ -52,22 +59,14 @@ def clock(monkeypatch):
 
 
 @pytest.fixture
-def tick(monkeypatch):
-    """``tick()``: one turn of the worker's real loop (relay included), without the SaaS (``register_apps``) and,
-    inside a test's transaction, without releasing the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
+def tick(worker_loop, factory_data):
+    """``tick()``: one turn of the worker's real loop (relay included) at ``NOW``, without the SaaS."""
+    return lambda: worker_loop(NOW)
 
-    def turn() -> None:
-        stop = threading.Event()
 
-        def wait(seconds: float) -> bool:
-            stop.set()
-            return True
-
-        assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: NOW) == 0
-
-    return turn
+def book(**data):
+    """A booking of Reservations for tomorrow at 21:00, made in business A."""
+    return reservations.book(ctx_for(), **data)
 
 
 @pytest.fixture
