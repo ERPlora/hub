@@ -634,16 +634,6 @@
     ]
   },
   {
-    "path": "base/queries.py",
-    "file_name": "queries.py",
-    "functions": [
-      {
-        "name": "app_list",
-        "complexity": 21
-      }
-    ]
-  },
-  {
     "path": "base/services/__init__.py",
     "file_name": "__init__.py",
     "functions": [
@@ -890,6 +880,16 @@
       {
         "name": "hub_seed_local",
         "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "base/queries/__init__.py",
+    "file_name": "__init__.py",
+    "functions": [
+      {
+        "name": "app_list",
+        "complexity": 21
       }
     ]
   }
