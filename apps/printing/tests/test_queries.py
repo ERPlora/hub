@@ -12,9 +12,9 @@ from apps.printing.models import Printer, PrintJob
 from apps.printing.queries import PENDING
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from apps.printing.tests.conftest import ctx_for, enqueue, printer, run
+from apps.printing.tests.conftest import HUB_DB, ctx_for, enqueue, printer, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ITEM = {"name": "Haircut", "quantity": 1, "total": 18.0}
 

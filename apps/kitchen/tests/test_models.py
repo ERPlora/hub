@@ -4,18 +4,18 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
-import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
-from .conftest import make_station
+from .conftest import HUB_DB, make_station
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(build) -> bool:
     try:
-        with transaction.atomic():
+        with atomic():
             build()
     except IntegrityError:
         return True

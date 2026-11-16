@@ -11,16 +11,14 @@ import pytest
 from django.apps import apps
 from live import assistant as shared
 from live.assistant import NAMED as SAID_ITEM_BY_ITEM
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.operations import get, registry
 
 from apps.printing.documents import DOCUMENT_TYPES
 from apps.printing.models import PrintDevice, PrintJob
-from apps.printing.tests.conftest import A, RECEIPT, ctx_for, run
+from apps.printing.tests.conftest import A, B, HUB_DB, RECEIPT, ctx_for, run
 from base import assistant
-from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
 
@@ -52,7 +50,7 @@ def a_job() -> str:
     return str(run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}).job.id)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_a_job_of_the_queue_as_the_queue_does():
     """The job by the queue's word («trabajo») and its document's number, as retrying or cancelling one names it."""
     retry = get("printing.job.retry")
@@ -62,7 +60,7 @@ def test_the_card_names_a_job_of_the_queue_as_the_queue_does():
     assert labels(assistant.cards.card(retry, arguments, "en", ctx_for())) == [job_en, "Reference"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_what_a_device_reports_about_a_job():
     """A device confirms a job it printed, or says why it could not: the job, the device, the hand-out and the
     error."""
@@ -84,7 +82,7 @@ def test_the_card_names_what_a_device_reports_about_a_job():
     assert labels(assistant.cards.card(complete, {"attempt": 2}, "es")) == ["Intento"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_a_device_as_the_devices_screen_does():
     retire = get("printing.device.retire")
     counter = {"device_id": str(PrintDevice.objects.create(name="Mostrador", key=PrintDevice.key_of("counter")).id)}
@@ -204,7 +202,7 @@ def test_every_record_a_write_of_printing_names_by_its_id_is_listed_here():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_write_of_printing_names_each_record_as_the_printing_screens_do(language):
     """«Reintenta el ticket T-000123», «retira la tablet del mostrador», «prueba la impresora de la caja»: the card says
@@ -217,7 +215,7 @@ def test_a_write_of_printing_names_each_record_as_the_printing_screens_do(langua
     assert len(printers) == 3 and all(field.get(SAID_ITEM_BY_ITEM) is True for field in printers)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "test_page", "drawer"), [("es", "Hoja de prueba Caja", "Abrir el cajón"), ("en", "Test page Caja", "Open the drawer")])
 def test_a_job_is_named_by_its_document_as_the_queue_titles_it(language, test_page, drawer):
     """A test page by the printer it tests; a job with no number (a drawer opening at checkout) by what it is."""
@@ -238,7 +236,7 @@ def test_the_document_of_a_new_job_is_said_by_the_queues_word_for_it(language):
     assert said == {kind: screens["documents"][kind] for kind in DOCUMENT_TYPES}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record_of_printing():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     said = cards(a_business(), None)
@@ -246,7 +244,7 @@ def test_nobody_behind_the_request_reads_no_record_of_printing():
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_who_may_not_see_the_printers_reads_none_of_them_on_the_card():
     """Whoever asks without «view printers» (a key that only prints and handles the queue, say) gets every record left
     out, never its id."""
@@ -259,7 +257,7 @@ def test_who_may_not_see_the_printers_reads_none_of_them_on_the_card():
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
     gone = {"printer_id": uuid.uuid7(), "printers": [uuid.uuid7(), uuid.uuid7()], "device_id": uuid.uuid7(), "job_id": uuid.uuid7()}
     said = cards(gone, ctx_for(language="es"))
@@ -267,7 +265,7 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
     assert all(no_id(card) for card in said.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_retired_device_is_no_device_to_name():
     """Retired, it prints nothing and the devices screen no longer lists it: a card does not name it either."""
     business = a_business()
@@ -276,22 +274,14 @@ def test_a_retired_device_is_no_device_to_name():
     assert values(card) == {} and no_id(card)
 
 
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_b):
     """The read runs in the hub the person asks in: hub B's printer, device or job is nobody in hub A."""
-    in_b = ctx_for(scope=Scope("host", hub_b.slug), language="es")
+    in_b = ctx_for(scope=B, language="es")
     with use_hub(hub_b):
         theirs = a_business(in_b)
         named_in_b = cards(theirs, in_b)
-    in_a = ctx_for(scope=Scope("host", hub_a.slug), language="es")
-    with use_hub(hub_a):
-        said = cards(theirs, in_a)
+    said = cards(theirs, ctx_for(scope=A, language="es"))
     assert {write: values(card) for write, card in said.items()} == left_out()
     assert all(no_id(card) for card in said.values())
     # Positive control: in hub B the same cards name them.

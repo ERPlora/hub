@@ -1,6 +1,6 @@
 """The table app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``) with Django's sync test client, which sees the test's
 transaction. No path parameters: a record travels in the input (query string on GET, body on POST), by
 its id or as a person says it.
 """
@@ -12,11 +12,12 @@ import pytest
 from django.test import Client
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.table.api import router
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import make_hold, make_session, make_table, make_zone
+from .conftest import HOST, HUB_DB, A, B, make_hold, make_session, make_table, make_zone
 
 ROUTES = {
     ("GET", "/table/zones", "table.zone.list"),
@@ -55,29 +56,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("luis", host="a", role="hub_employee"))
+    client.force_login(make_user("luis", host=A.key, role="hub_employee"))
     return client
 
 
@@ -112,7 +99,7 @@ def test_the_api_keeps_parity():
 # ── Authentication and permissions ───────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/table/tables"),
@@ -122,7 +109,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_waiter_serves_the_room_but_does_not_draw_it(employee_client):
     table = make_table("4", zone=make_zone())
     for path in (
@@ -151,15 +138,15 @@ def test_a_waiter_serves_the_room_but_does_not_draw_it(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/table/tables", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/table/tables", host=f"{B.key}.localhost").status_code == 403
 
 
 # ── Validation and refusals ──────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_table_is_422_per_field(admin_client):
     zone = make_zone()
     response = post(
@@ -175,7 +162,7 @@ def test_an_invalid_table_is_422_per_field(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/table/tables", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -184,14 +171,15 @@ def test_a_limit_over_100_is_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_taken_table_is_a_409_with_its_own_code_in_the_readers_language(admin_client):
     table = make_table("4", zone=make_zone())
     make_session(table)
-    response = post(
-        admin_client,
-        "/table/sessions/open",
-        {"table_id": str(table.id)},
+    response = admin_client.post(
+        "/api/table/sessions/open",
+        json.dumps({"table_id": str(table.id)}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409
@@ -200,7 +188,7 @@ def test_a_taken_table_is_a_409_with_its_own_code_in_the_readers_language(admin_
     assert error["message"].startswith("Esa mesa no se puede sentar")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_seating_a_reservations_party_over_http_spends_only_its_hold(admin_client):
     table = make_table("4", zone=make_zone())
     ana, bea = str(uuid.uuid7()), str(uuid.uuid7())
@@ -215,7 +203,7 @@ def test_seating_a_reservations_party_over_http_spends_only_its_hold(admin_clien
 # ── The whole flow over HTTP ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_drawing_seating_and_closing_a_table_over_http(admin_client):
     zone = post(admin_client, "/table/zones", {"name": "Terrace"})
     assert zone.status_code == 201
@@ -245,7 +233,7 @@ def test_drawing_seating_and_closing_a_table_over_http(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_many_tables_are_made_at_once_over_http_or_none_with_the_taken_numbers(admin_client, make_user):
     # TABLE-F07 (assistant and API: the old module had no screen for it either).
     post(admin_client, "/table/zones", {"name": "Terrace"})
@@ -265,7 +253,7 @@ def test_many_tables_are_made_at_once_over_http_or_none_with_the_taken_numbers(a
     assert "T12" in again.json()["error"]["message"]
     assert len(get(admin_client, "/table/tables").json()["rows"]) == 3
     waiter = Client()
-    waiter.force_login(make_user("luis", host="a", role="hub_employee"))
+    waiter.force_login(make_user("luis", host=A.key, role="hub_employee"))
     refused = post(waiter, "/table/tables/bulk_create", {"zone": "Terrace", "count": 1})
     assert refused.status_code == 403
 
