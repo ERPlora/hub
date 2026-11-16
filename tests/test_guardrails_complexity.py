@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 from allow_list_base import REPO, file_at_base, git
+from test_guardrails_imports import write_tree
 from test_guardrails_ruff import follows
 
 CONFIG = "pyproject.toml"
@@ -216,12 +217,6 @@ def test_a_function_that_stays_keeps_its_own_entry_and_leaves_the_others_to_the_
     before = {("base/services/__init__.py", "run"): 30, ("base/services/demos.py", "run"): 20}
     now = {("base/services/demos.py", "run"): 20, ("base/services/relay_runs.py", "run"): 30}
     assert gained(now, before) == []
-
-
-def write_tree(root: Path, files: dict[str, str]) -> None:
-    for path, source in files.items():
-        (root / path).parent.mkdir(parents=True, exist_ok=True)
-        (root / path).write_text(source, encoding="utf-8")
 
 
 def configured_tree(root: Path) -> None:
