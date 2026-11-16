@@ -20,10 +20,10 @@ from apps.customer.models import Customer
 from apps.service.models import Service
 from apps.staff.models import Member
 
-from .conftest import A, MONDAY, at, make_appointment, make_series, make_settings, run
+from .conftest import A, HUB_DB, MONDAY, at, make_appointment, make_series, make_settings, run
 from .test_services import book
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 RESTORE = "appointment.appointment.restore"
 

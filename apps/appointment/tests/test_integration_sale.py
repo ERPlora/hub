@@ -19,9 +19,9 @@ from apps.appointment.models import Appointment
 from apps.sale.models import Order
 from apps.tax.models import TaxCategory
 
-from .conftest import A, MONDAY, ctx_for, make_customer, make_member, make_service, run, wall
+from .conftest import A, HUB_DB, MONDAY, ctx_for, make_customer, make_member, make_service, run, wall
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 
 @pytest.fixture

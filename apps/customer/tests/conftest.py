@@ -1,5 +1,9 @@
 """Fixtures of the customer tests: contexts per role and scope, users with a role on a host, a raw DSN, and the
-Hub admin's «Delete» of a card landing in the middle of another app's write."""
+Hub admin's «Delete» of a card landing in the middle of another app's write.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
+of B asks for ``hub_b`` and enters it."""
 
 import threading
 import time
@@ -8,19 +12,26 @@ from contextlib import contextmanager
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connection, connections
+from django.db import connection
 from django.test import Client
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
-from psycopg.conninfo import make_conninfo
 
-from base.models import Membership
+from apps.invoice.tests.conftest import catalog_of, in_hubs
+from apps.sale.tests.conftest import db_dsn, make_user, night_elsewhere
 from base.permissions import FULL_ACCESS_ROLES
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, the assistant's catalogue of a person of business A,
+#: and what Sales' tests already make of it (its users with a role, the raw DSN of control, a night in another zone),
+#: that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "hub_staff", "in_business_a", "in_hubs",
+    "make_user", "night_elsewhere", "plan_with_room",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -63,35 +74,6 @@ def run(
 ):
     """Run the operation ``name`` as ``role`` on ``scope``."""
     return get(name)(ctx_for(role, scope, actor), data)
-
-
-@pytest.fixture
-def make_user(db):
-    def make(
-        username: str = "ana",
-        *,
-        host: str | None = "a",
-        role: str = Membership.Role.ADMIN,
-    ):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        return user
-
-    return make
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (LISTEN, or reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
 
 
 # ── The Hub admin's «Delete» of a card in the middle of a write that links it ──────────────────────

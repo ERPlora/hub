@@ -13,18 +13,13 @@ import pytest
 
 from apps.customer.models import Activity, Customer, Purchase
 from apps.customer.schemas import ActivityListIn, CustomerExportIn, PurchaseListIn
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in
 
-from .conftest import run
+from .conftest import HUB_DB, B, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOW = datetime(2026, 10, 28, 10, 0, tzinfo=UTC)
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
 
 
 def spent_exported() -> str:
@@ -49,9 +44,9 @@ def test_the_export_writes_spent_with_the_decimals_of_the_business_s_currency(co
     assert spent_exported() == written
 
 
-def test_another_hub_s_currency_does_not_change_this_one_s_export():
-    business_in("ES", "a")
-    business_in("JP", "b")
+def test_another_hub_s_currency_does_not_change_this_one_s_export(hub_b):
+    business_in("ES")
+    business_in("JP", B.key)
     Customer.objects.create(name="Ana", total_spent=1250)
     assert spent_exported() == "12.50"
 

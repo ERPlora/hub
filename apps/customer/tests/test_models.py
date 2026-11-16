@@ -3,8 +3,9 @@
 from datetime import timedelta
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
 from apps.customer.models import (
     Activity,
@@ -19,7 +20,9 @@ from apps.customer.models import (
     Purchase,
 )
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 SALE = "0199a6c0-0000-7000-8000-000000000001"
 ORDER = "0199a6c0-0000-7000-8000-000000000003"
@@ -30,7 +33,7 @@ def make_customer(name="Ana García", **fields):
 
 
 def unique_violation(constraint, create):
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+    with pytest.raises(IntegrityError) as excinfo, atomic():
         create()
     return constraint in str(excinfo.value)
 
@@ -358,14 +361,13 @@ def test_an_order_has_at_most_one_customer():
 # HealthRecord (CUSTOMER-F32)
 
 
-@pytest.mark.django_db
 def test_a_card_has_at_most_one_health_record_and_it_never_names_its_data():
     ana = Customer.objects.create(name="Ana")
     record = HealthRecord.objects.create(customer=ana, allergies="PPD")
     assert (record.sensitivity_test_on, record.sensitivity_test_result) == (None, "")
     # Its text in the admin and in logs says whose it is, never what it holds.
     assert "PPD" not in str(record)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         HealthRecord.objects.create(customer=ana, allergies="Latex")
 
 

@@ -21,9 +21,9 @@ from apps.customer.models import Customer, CustomerGroup, CustomField, CustomerT
 from base.models import Credential
 from base.tests.test_people import with_pin
 
-pytestmark = pytest.mark.django_db
+from .conftest import HOST, HUB_DB
 
-HOST = "a.localhost"
+pytestmark = HUB_DB
 
 #: The commands a manager may approve, and what the dialog says is approved, in English and in Spanish.
 APPROVABLE = {
