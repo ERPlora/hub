@@ -20,8 +20,8 @@ ROLE_ORDER = (
     Membership.Role.EMPLOYEE,
 )
 
-#: The local copy of an erplora.com account is named ``saas:<id>`` (``base.services.username_for``): a person the
-#: SaaS's photo names is known by it before entering.
+#: The local copy of an erplora.com account is named ``saas:<id>`` (``base.services.sessions.username_for``): a person
+#: the SaaS's photo names is known by it before entering.
 SAAS_PREFIX = "saas:"
 
 #: Tries to give someone a badge: 30 an hour per editor, the accepted ones too («already taken» tells that a number

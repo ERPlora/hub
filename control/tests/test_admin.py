@@ -61,10 +61,10 @@ def root(client):
 
 @pytest.fixture
 def support(client):
-    from base import services
+    from base.services import sessions
 
     user = get_user_model().objects.create_user(username="support", password="pw", is_staff=True)
-    user.groups.add(services._support_group())
+    user.groups.add(sessions._support_group())
     client.force_login(user)
     return user
 

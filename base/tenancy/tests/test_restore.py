@@ -39,7 +39,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from apps.sale.apps import SaleConfig
-from base import services
+from base.services import provisioning
 from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
@@ -564,7 +564,7 @@ class TestTwoWorkers:
         hub = restores.hub(source=source)
 
         def stolen(*args, **kwargs):
-            raise services.ProvisioningStopped("another worker holds it now")
+            raise provisioning.ProvisioningStopped("another worker holds it now")
 
         monkeypatch.setattr(move, "_restore_from_bucket", stolen)
 

@@ -16,7 +16,7 @@ reached, or a secret that does not resolve, is ``control.cluster_unreachable`` (
 
 The worker's metrics (``base.metrics``) read the registry's health here too:
 :func:`registry_health` is a plain read, not an operation (no hub and no user: the worker's own measure, like
-``base.services.hubs_to_serve``), on control's database (the caller opens ``use_control``).
+``base.services.provisioning.hubs_to_serve``), on control's database (the caller opens ``use_control``).
 
 The freeze switch is read here twice: ``control.freeze.get`` says how
 it stands to the staff in the Hub admin, with how many hubs the worker is still working on; :func:`active_freeze`, a
@@ -161,7 +161,8 @@ def cluster_sizes(ctx: OperationContext, data: ClusterSizesIn) -> dict:
 
 # ── The registry's health, for the worker's metrics ──
 
-#: A demo still open: being prepared or ready (``base.services.OPEN_DEMO_STATUSES``); once its time is up it ended.
+#: A demo still open: being prepared or ready (``base.services.demos.OPEN_DEMO_STATUSES``); once its time is up it
+#: ended.
 _OPEN_DEMO_STATUSES = (*PREPARING_STATUSES, Hub.Status.READY)
 #: A demo the reaper marked as ended and has not purged yet.
 _ENDING_DEMO_STATUSES = (Hub.Status.EXPIRED, Hub.Status.DROPPING)
@@ -184,7 +185,7 @@ def registry_health(now: dt.datetime) -> RegistryHealth:
     changed (``updated_at``: each step of its preparation, each failure, and ``base.hub.restore``, which brings a
     business that left back to ``requested``, born long before); a demo whose time is up is not one of them but an
     ended demo, which waits to be dropped since its end (``expires_at``; one expired without it, since it last changed)
-    until the reaper purges it, as ``base.services.reap_demos`` takes them.
+    until the reaper purges it, as ``base.services.demos.reap_demos`` takes them.
     """
     demo_over = Q(is_demo=True, expires_at__lte=now)
     row = Hub.objects.aggregate(

@@ -8,7 +8,7 @@ on control (the registry's scope) and records its event in control's outbox in t
   ``base.tenancy.credentials.credentials_for``: the web, where the admin runs, may read only that one, so the
   migrator's is never asked from here (the worker and ``hub-migrate`` read it when they first reach the cluster).
 - «Close to new hubs» (``control.cluster.close``) takes it out of the placement of new hubs
-  (``base.services.place_hub``); the hubs on it stay there.
+  (``base.services.provisioning.place_hub``); the hubs on it stay there.
 - Its writer (``host``, ``port``) never changes under the hubs on it: another writer is another server, and the way
   there is moving them (``base.hub.move``). Its PgBouncer, limit, secret and name may change.
 - A cluster any hub's row still points at (a purged demo's included: the foreign key protects it), a hub is moving to,

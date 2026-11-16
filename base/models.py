@@ -102,7 +102,7 @@ class SessionOwner(UUIDModel):
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
 # Hub models (``base.tenancy.inventory``: base's), like any module's: kept in each hub's own database. A person is named by the ``username`` of its local copy (``saas:<id>``,
-# ``base.services.username_for``), never by a foreign key: the users are control's and a hub's database has none.
+# ``base.services.sessions.username_for``), never by a foreign key: the users are control's and a hub's database has none.
 
 #: The longest «who did it» kept beside a row (``str(actor)``), as the apps keep it.
 ACTOR_MAX_LENGTH = 150
@@ -277,8 +277,8 @@ class HubUser(UUIDModel):
     not exist, so the apps hang what a person did from this row instead. ``username`` is how the Hub knows them at its
     doors (``saas:<id>``, ``demo:<slug>``: the key of ``Credential`` and ``Profile`` too); ``account_id`` is the
     erplora.com account (none for a demo's owner); name and email are what erplora.com last said. Made or brought up to
-    date at every entry and from the SaaS's photo (``base.services.ensure_hub_user``, ``base.hub_user.sync``), never
-    deleted: whoever leaves keeps their name on what they signed and is no longer active.
+    date at every entry and from the SaaS's photo (``base.services.sessions.ensure_hub_user``, ``base.hub_user.sync``),
+    never deleted: whoever leaves keeps their name on what they signed and is no longer active.
     """
 
     account_id = models.UUIDField(_("SaaS account"), null=True, blank=True, unique=True)

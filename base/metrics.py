@@ -41,7 +41,8 @@ from django.db import close_old_connections
 from live.context import Scope
 from live.meta import all_live_app_configs
 
-from base import queries, relay, services
+from base import queries, relay
+from base.services import provisioning
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.limits import HubBusy
@@ -115,8 +116,8 @@ class HubReadings(ABC):
     """A measure read in each business with its own database the worker serves, one hub at a time in its own database
     (``use_hub``), never in one query across them.
 
-    The hubs :meth:`hubs` gives (``base.services.hubs_to_serve``: ready, or a business that left whose records must
-    still reach the tax authority; never one without its own database: there is no shared one) are read in
+    The hubs :meth:`hubs` gives (``base.services.provisioning.hubs_to_serve``: ready, or a business that left whose
+    records must still reach the tax authority; never one without its own database: there is no shared one) are read in
     turn for ``budget`` seconds a pass; each one's last reading is kept until it is read again, and forgotten when it is
     no longer read. A hub that cannot be read (busy: a warning; any other failure: an error with its trace) keeps its
     last reading (:meth:`unreadable` says what it is without one). A stop request ends the pass before the next hub.
@@ -136,7 +137,7 @@ class HubReadings(ABC):
 
     def hubs(self, now: dt.datetime) -> list:
         """The hubs to read, by id (on control)."""
-        return services.hubs_to_serve(now)
+        return provisioning.hubs_to_serve(now)
 
     @abstractmethod
     def read(self, hub, now: dt.datetime):

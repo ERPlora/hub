@@ -24,6 +24,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from base import blueprint, services, worker
+from base.services import provisioning
 from base.models import Membership
 from base.permissions import permissions_for
 from base.registry import REGISTRY_SCOPE
@@ -152,7 +153,7 @@ def test_a_slow_upload_keeps_its_lease_and_the_reset_is_done_with_one_copy(hub_a
 
     def rival() -> None:
         with use_control():
-            taken.append(services.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x"))
+            taken.append(provisioning.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x"))
 
     monkeypatch.setattr(dumps, "client", lambda: SlowUpload(real(), rival))
     monkeypatch.setattr(provision, "LEASE", dt.timedelta(seconds=1))
@@ -244,7 +245,7 @@ def test_a_reset_of_a_business_that_left_meanwhile_empties_nothing(hub_a, dumps_
 def test_the_pass_leaves_a_reset_whose_lease_another_worker_holds(hub_a, dumps_bucket):
     loaded_and_asked(ready(hub_a), ["table"])
     with use_control():
-        assert services.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x") is not None
+        assert provisioning.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x") is not None
 
     run_pass()
 
@@ -257,9 +258,9 @@ def test_a_reset_still_to_do_stays_due_when_the_provisioning_pass_gives_its_leas
     now = timezone.now()
     with use_control():
         # The provisioning's pass never takes a ready hub's ring (its data work's or its apps' to set up).
-        assert services.claim_next_due_hub(now, provision.LEASE) is None
+        assert provisioning.claim_next_due_hub(now, provision.LEASE) is None
         assert services.claim_next_data_hub(now, provision.LEASE) == hub_a.pk
-        services.release_hub(hub_a.pk, now)
+        provisioning.release_hub(hub_a.pk, now)
 
     assert HubDue.objects.filter(hub_id=hub_a.pk, due_at=now, lease_until=None).exists()
 

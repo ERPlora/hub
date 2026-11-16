@@ -16,7 +16,7 @@ from live.errors import PermissionDenied
 from base import registry
 from base.models import Hub
 from base.schemas import HubSeedLocalIn
-from base.services import hub_seed_local
+from base.services.hub_registry import hub_seed_local
 from base.tenancy import migrator
 
 pytestmark = pytest.mark.django_db

@@ -221,7 +221,7 @@ def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
 def test_the_registrys_operations_run_on_control_and_their_events_land_there(client, settings):
     from base.registry import REGISTRY_SCOPE
     from base.schemas import HubSeedLocalIn
-    from base.services import hub_seed_local
+    from base.services.hub_registry import hub_seed_local
     from live.context import system_context
 
     answer = hub_seed_local(system_context(REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c"]))
@@ -247,6 +247,7 @@ def test_a_hubs_operation_never_runs_inside_another_hub(hub_a, hub_b):
 @HUB_DB
 def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
     from base import internal
+    from base.services import photo
 
     seen = []
 
@@ -255,7 +256,7 @@ def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
-    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({internal.WHATSAPP_APP}))
+    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
     request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
     internal._whatsapp_call(request, "whatsapp_inbox.message.receive")

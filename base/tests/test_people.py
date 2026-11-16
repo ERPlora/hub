@@ -23,6 +23,7 @@ from live.operations import AI
 from live.operations import get as get_operation
 
 from base import access, services
+from base.services import sessions
 from base import people as people_rules
 from base.permissions import permissions_for
 from base.models import AccessSettings, Credential, Hub, Membership
@@ -406,7 +407,7 @@ class TestFollowedLive:
         assert on["base.api_key.list"] == sorted({events.HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *events.APP_EVENTS})
 
     def test_the_prefix_of_a_person_is_the_one_of_their_account(self):
-        assert people_rules.SAAS_PREFIX == services.SAAS_USERNAME_PREFIX
+        assert people_rules.SAAS_PREFIX == sessions.SAAS_USERNAME_PREFIX
 
 
 PEOPLE_ROUTES = {

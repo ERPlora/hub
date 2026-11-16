@@ -74,7 +74,7 @@ from apps.staff.schemas import (
     TimeOffRequestIn,
 )
 from base.models import HubUser, Membership
-from base.services import acting_hub_user
+from base.services.sessions import acting_hub_user
 
 ROLE_NAME_TAKEN = _("A role with that name already exists.")
 USER_NOT_IN_BUSINESS = _("That Hub user has no access to this business.")

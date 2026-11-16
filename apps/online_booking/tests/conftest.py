@@ -265,7 +265,7 @@ def make_user(db):
     from django.contrib.auth import get_user_model
 
     from base.models import Membership
-    from base.services import ensure_hub_user
+    from base.services.sessions import ensure_hub_user
 
     def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN):
         user = get_user_model().objects.create_user(username=username, password="pw")

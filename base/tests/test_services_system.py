@@ -19,7 +19,8 @@ from live.operations import get
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
-from base import events, relay, services
+from base import events, relay
+from base.services import relay_runs
 from base.models import EventDelivery
 from base.tests.routes import assert_bound
 
@@ -89,7 +90,7 @@ def test_resent_it_is_delivered_only_to_the_app_that_had_failed():
     run("base.failed_event.retry", id=str(delivery.id))
     got = []
 
-    services.relay_deliver_next(
+    relay_runs.relay_deliver_next(
         timezone.now(),
         deliver=lambda app, event: got.append((app, event.name)),
         listeners=lambda _: [],
@@ -207,7 +208,7 @@ def test_discarding_closes_it_for_good_with_who_when_and_why_and_keeps_the_row()
     assert recorded(events.FAILED_EVENT_DISCARDED) == [("a", {"id": str(delivery.id)})]
     # The relay never takes it again.
     assert (
-        services.relay_deliver_next(
+        relay_runs.relay_deliver_next(
             timezone.now() + dt.timedelta(days=2),
             deliver=lambda app, event: pytest.fail("a discarded event was delivered"),
             listeners=lambda _: [],
@@ -315,13 +316,13 @@ def test_a_delivery_given_up_is_told_to_its_hub_only_after_the_commit(transactio
     on_a, on_b = listen(A), listen(B)
     outbox_event = OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed")
     now = timezone.now()
-    services.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
+    relay_runs.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
 
     def fail(app, event):
         raise RuntimeError("the reaction crashed")
 
     def attempt(at, max_attempts):
-        return services.relay_deliver_next(
+        return relay_runs.relay_deliver_next(
             at,
             deliver=fail,
             listeners=lambda _: [],
@@ -344,7 +345,7 @@ def test_a_delivery_past_the_deepest_level_is_told_too(transactional_db, listen)
     on_a = listen(A)
     OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed")
 
-    services.relay_take_events(timezone.now(), listeners=lambda _: ["invoice"], limit=10, max_depth=-1)
+    relay_runs.relay_take_events(timezone.now(), listeners=lambda _: ["invoice"], limit=10, max_depth=-1)
 
     assert events.FAILED_EVENT_CREATED in heard(on_a)
 
