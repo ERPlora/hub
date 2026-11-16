@@ -116,7 +116,7 @@ OWN_WORDS = [
 
 
 def appointment_tools() -> dict[str, Operation]:
-    return {name: op for name, op in registry.items() if op.app_label == "appointment" and assistant.is_tool(op)}
+    return {name: op for name, op in registry.items() if op.app_label == "appointment" and assistant.tools.is_tool(op)}
 
 
 def test_appointments_is_listed_so_layer_1_sweeps_every_ask_of_it():

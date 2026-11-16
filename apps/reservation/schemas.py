@@ -7,7 +7,7 @@ customer by their name or phone, a slot by its weekday and start, a waitlist ent
 input refuses a field it does not declare; an edit changes only the fields it sends. A reservation's day
 and time are the business's wall clock (``2026-10-15``, ``21:00``).
 
-Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+Each id a write takes is marked with the read that names its record (``names``, base/assistant/cards.py ``REFERS``,
 checked at start by ``base.E009``): the assistant's card says which reservation, entry, slot, blocked date,
 customer or table, as the person who confirms reads it, never by the id. Reservation's own records by the
 ``label`` its reads by id answer (as the book's dialogs say them), a customer by the name of their card

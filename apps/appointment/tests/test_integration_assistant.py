@@ -10,6 +10,7 @@ base.E014 only check its shape): each write is checked here against the real nam
 import json
 
 import pytest
+from live import assistant as shared
 from live.assistant import NAMED
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
@@ -45,7 +46,7 @@ def person(hub, language: str, without: frozenset = frozenset()) -> OperationCon
 
 
 def services_of(write: str, ids: list, ctx: OperationContext) -> dict:
-    card = assistant.card(get(write), {"services": [{"service_id": str(id_)} for id_ in ids]}, ctx.language, ctx)
+    card = assistant.cards.card(get(write), {"services": [{"service_id": str(id_)} for id_ in ids]}, ctx.language, ctx)
     assert not AN_ID.search(json.dumps(card, ensure_ascii=False)), write
     return list_field(card, "services")
 
@@ -54,11 +55,11 @@ def test_every_write_of_citas_that_books_services_is_listed_here():
     """Positive control of the tests below: a new write of Citas with a booking's services comes in here."""
     found = set()
     for name, op in registry.items():
-        if op.app_label != "appointment" or op.kind != "command" or not assistant.is_tool(op):
+        if op.app_label != "appointment" or op.kind != "command" or not assistant.tools.is_tool(op):
             continue
         schema = op.input.model_json_schema()
-        services = assistant._resolved(schema.get("properties", {}).get("services", {}), schema.get("$defs", {}))
-        line = assistant._resolved(services.get("items", {}), schema.get("$defs", {}))
+        services = shared.resolved(schema.get("properties", {}).get("services", {}), schema.get("$defs", {}))
+        line = shared.resolved(services.get("items", {}), schema.get("$defs", {}))
         if "service_id" in line.get("properties", {}):
             found.add(name)
     assert found == BOOKS_SERVICES
@@ -84,14 +85,14 @@ def test_a_name_the_model_writes_as_null_beside_the_id_still_names_the_service(h
     with use_hub(hub_a):
         cut = make_service("Corte de pelo")
         booking = {"services": [{"service_id": str(cut.id), "service": None}]}
-        card = assistant.card(get("appointment.appointment.create"), booking, "es", person(hub_a, "es"))
+        card = assistant.cards.card(get("appointment.appointment.create"), booking, "es", person(hub_a, "es"))
         shown = list_field(card, "services")
     assert (shown["value"], shown.get(NAMED)) == ([{"service_id": "Corte de pelo"}], True)
 
 
 def services_said(write: str, services: list, ctx: OperationContext) -> tuple:
     """What the card of ``write`` shows of the booking's ``services`` as sent: its value and whether it is ``named``."""
-    shown = list_field(assistant.card(get(write), {"services": services}, ctx.language, ctx), "services")
+    shown = list_field(assistant.cards.card(get(write), {"services": services}, ctx.language, ctx), "services")
     return shown["value"], shown.get(NAMED, False)
 
 
@@ -221,9 +222,9 @@ def test_the_card_names_a_datum_no_model_names_by_its_title_in_the_persons_langu
     neither the one pydantic makes up nor another app's words for it."""
     op = get(write)
     title = op.input.model_fields[datum].title
-    assert title and title != assistant._generated_title(datum)
+    assert title and title != shared.generated_title(datum)
     said = {
-        language: [field["label"] for field in assistant.card(op, {datum: "x"}, language)["fields"]]
+        language: [field["label"] for field in assistant.cards.card(op, {datum: "x"}, language)["fields"]]
         for language in ("es", "en")
     }
     spanish = own_catalogue().gettext(title)

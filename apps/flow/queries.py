@@ -31,7 +31,7 @@ from django.utils import timezone, translation
 from babel.dates import format_date, format_time, get_datetime_format
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.assistant import MONEY
+from live.assistant import MONEY, description, risk
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.meta import LiveAppConfig, module_configs
@@ -195,7 +195,7 @@ def needs_a_person(op: Operation) -> bool:
     """An action the assistant confirms before running (``ai.risk == "high"``: voiding, refunding,
     erasing, sending to the tax agency…) or one done in person (``ai.in_person``: seating a party at the
     door): never for an automation, which acts with nobody in front."""
-    return hub_assistant.risk(op) == "high" or in_person(op)
+    return risk(op) == "high" or in_person(op)
 
 
 def in_person(op: Operation) -> bool:
@@ -375,10 +375,10 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
                 "kind": op.kind,
                 "app": op.app_label,
                 "app_name": str(apps[op.app_label].verbose_name),
-                "description": hub_assistant.description(op),
+                "description": description(op),
                 "fields": action_fields(op),
                 "outputs": action_outputs(op),
-                "assistant": hub_assistant.is_tool(op),
+                "assistant": hub_assistant.tools.is_tool(op),
                 "ask_first": asks_first(op),
             }
             for name, op in ask_first_catalog(ctx.scope).items()
@@ -461,7 +461,7 @@ def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps:
         op = registry.get(tool)
         if op is None or not filled:
             continue
-        said = {field["name"]: field for field in hub_assistant.card(op, filled, ctx.language, ctx)["fields"]}
+        said = {field["name"]: field for field in hub_assistant.cards.card(op, filled, ctx.language, ctx)["fields"]}
         for field in said.values():
             if field["kind"] == "money" and currency and "money" not in field:
                 field["money"] = {"currency": currency, "decimals": currency_decimals(currency)}
@@ -517,7 +517,7 @@ def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict
         if step.kind == "assistant":
             for name in step.tools:
                 problem = operation_problem(scope, name, asking=step.mode == "ask")
-                if problem is None and not hub_assistant.is_tool(grantable_operations(scope)[name]):
+                if problem is None and not hub_assistant.tools.is_tool(grantable_operations(scope)[name]):
                     problem = ("invalid_payload", str(NOT_FOR_THE_ASSISTANT) % {"name": name})
                 if problem is not None:
                     problem_code, problems[f"steps.{index}.tools"] = problem
@@ -955,7 +955,7 @@ def action_label(op: Operation, language: str) -> str:
         return curated
     _app, entity, verb = ([*op.name.split(".", 2), "", ""])[:3]
     verb_word = words["verbs"].get(verb) or verb.replace("_", " ")
-    return f"{verb_word} · {hub_assistant.app_name(op)} ({entity.replace('_', ' ')})"
+    return f"{verb_word} · {hub_assistant.cards.app_name(op)} ({entity.replace('_', ' ')})"
 
 
 @operation(
@@ -1711,9 +1711,9 @@ def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
         return row
     op, arguments = proposal
     with translation.override(ctx.language):
-        title = str(ASSISTANT_WANTS) % {"app": hub_assistant.app_name(op)}
+        title = str(ASSISTANT_WANTS) % {"app": hub_assistant.cards.app_name(op)}
         action = action_label(op, ctx.language)
-    fields = hub_assistant.card(op, arguments, ctx.language, ctx)["fields"]
+    fields = hub_assistant.cards.card(op, arguments, ctx.language, ctx)["fields"]
     return row | {"title": title[:300], "action": action, "fields": fields}
 
 

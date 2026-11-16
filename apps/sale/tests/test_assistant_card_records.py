@@ -34,7 +34,7 @@ def setup(name: str, data: dict):
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -383,7 +383,7 @@ def test_the_read_says_not_found_for_a_refund_that_is_not_there(sale):
 
 
 def test_the_read_is_no_tool_of_the_assistant():
-    assert assistant.is_tool(get("sale.record.get")) is False
+    assert assistant.tools.is_tool(get("sale.record.get")) is False
 
 
 def test_an_input_the_read_does_not_take_is_refused():

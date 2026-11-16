@@ -196,7 +196,7 @@ def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
 
 def test_services_offers_at_least_46_tools():
     """Services' tools are at least 46 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 46
 
@@ -286,7 +286,7 @@ test_each_tool_has_its_own_english_words = english_coverage_test("service", OWN_
 
 
 def test_every_tool_of_services_has_its_own_words():
-    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.tools.is_tool(op)}
     assert [name for name, _ in OWN_WORDS] == list(dict.fromkeys(name for name, _ in OWN_WORDS))  # one each
     assert {name for name, _ in OWN_WORDS} == tools
 
@@ -308,7 +308,7 @@ def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, nam
 def test_a_record_taken_by_its_id_says_which_read_finds_it(name, read):
     op = registry[name]
     assert list(op.input.model_fields)[0] in {"id", "ids"}  # positive control: it takes the record by its id
-    assert assistant.is_tool(registry[read]) and registry[read].kind == "query"
+    assert assistant.tools.is_tool(registry[read]) and registry[read].kind == "query"
     assert read in op.ai["description"], name
 
 
@@ -363,8 +363,8 @@ NAMES_AN_ASSIGNMENT = re.compile(r"\basign", re.IGNORECASE)
 
 
 def without_services_groups() -> tuple[tuple[str, ...], ...]:
-    """The Hub's words (``base.assistant.synonyms``) without the groups Services says: «bono» and «asignación»."""
-    every = assistant.synonyms()
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the groups Services says: «bono» and «asignación»."""
+    every = assistant.relevance.synonyms()
     kept = tuple(group for group in every if not {"bono", "asignacion"} & set(group))
     assert len(every) - len(kept) == 2  # positive control: both of Services' groups are there
     return kept

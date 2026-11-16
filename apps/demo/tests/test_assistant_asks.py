@@ -75,7 +75,7 @@ OFFERED_PROBES = [probe for probe in PROBES if probe["expect"] != "refused"]
 
 def test_demo_offers_at_least_8_tools():
     """Demo's tools are at least 8 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "demo" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "demo" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 8
 

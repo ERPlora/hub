@@ -55,7 +55,7 @@ def without(permissions: set[str], language: str = "en") -> OperationContext:
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or as_admin(language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or as_admin(language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -71,7 +71,7 @@ def payment_writes() -> list:
     return [
         op
         for _, op in sorted(registry.items())
-        if op.app_label == "payment" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "payment" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -218,7 +218,7 @@ def test_nobody_behind_the_request_reads_no_record():
     books = make_books()
     arguments = {"id": str(books.rent.id), "reason": "Duplicado"}
     assert shown("payment.payment.cancel", arguments)["id"] == "PAY-20261014-0001"  # positive control
-    card = assistant.card(get("payment.payment.cancel"), arguments, "en")
+    card = assistant.cards.card(get("payment.payment.cancel"), arguments, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"reason": "Duplicado"}
 
 

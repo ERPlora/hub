@@ -39,7 +39,7 @@ ON_A_TEMPLATE = ["whatsapp_inbox.template.delete", "whatsapp_inbox.template.retr
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card_ = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card_ = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card_["fields"]}
 
 
@@ -241,7 +241,7 @@ def test_nobody_behind_the_request_reads_no_record():
     conversation = a_conversation()
     said = {
         field["name"]: field["value"]
-        for field in assistant.card(get("whatsapp_inbox.note.add"), {"id": str(conversation.id), "text": "Hi"}, "en")[
+        for field in assistant.cards.card(get("whatsapp_inbox.note.add"), {"id": str(conversation.id), "text": "Hi"}, "en")[
             "fields"
         ]
     }
@@ -316,4 +316,4 @@ def test_the_reads_refuse_no_id(name):
 @pytest.mark.parametrize("name", READS)
 def test_the_reads_are_no_tool_of_the_assistant(name):
     """The model finds them in their lists; only the card reads them."""
-    assert not assistant.is_tool(get(name))
+    assert not assistant.tools.is_tool(get(name))

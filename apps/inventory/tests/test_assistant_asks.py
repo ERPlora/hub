@@ -48,10 +48,10 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_units_as_units_and_a_delivery_note_as_goods_received():
-    """``InventoryConfig.assistant_synonyms`` (gathered by ``base.assistant.synonyms``): «unidades» are the
+    """``InventoryConfig.assistant_synonyms`` (gathered by ``base.assistant.relevance.synonyms``): «unidades» are the
     units of measure of ``inventory.unit.*`` and «el albarán» or «la mercancía que entra» what
     ``inventory.stock.receive`` records, so the owner's words reach those tools without their own asks; the platform's
-    own words (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive
+    own words (``base.assistant.relevance.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive
     control)."""
     unit, receive = shared.stem("unit"), shared.stem("receive")
     assert_its_words_name(

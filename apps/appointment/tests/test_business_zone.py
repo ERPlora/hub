@@ -27,7 +27,7 @@ def in_canary(monkeypatch, in_business_a):
 def test_the_agenda_the_card_the_question_and_the_whatsapp_say_the_same_hour(salon):
     booked = make_appointment(salon.lucia, salon.ana, [salon.cut], dt.datetime.fromisoformat(SENT))
     agenda = run("appointment.appointment.get", {"id": str(booked.id)}, language="es")
-    card = assistant.card(get("appointment.appointment.create"), {"start": SENT}, "es", ctx=None)
+    card = assistant.cards.card(get("appointment.appointment.create"), {"start": SENT}, "es", ctx=None)
     words = words_for([], "es", A)("input.start", SENT)
     said = {field["name"]: field["value"] for field in card["fields"]}["start"]
     assert (agenda.start_time_label, agenda.start.isoformat()[:16]) == ("09:00", "2026-11-02T09:00")

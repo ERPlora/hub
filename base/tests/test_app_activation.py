@@ -240,8 +240,8 @@ def test_the_assistants_card_names_the_apps_screen():
     from base import assistant
 
     for name in ("base.app.enable", "base.app.disable"):
-        assert assistant.card(get(name), {"app": "task"}, "es")["app_name"] == "Apps"
-        assert assistant.card(get(name), {"app": "task"}, "en")["app_name"] == "Apps"
+        assert assistant.cards.card(get(name), {"app": "task"}, "es")["app_name"] == "Apps"
+        assert assistant.cards.card(get(name), {"app": "task"}, "en")["app_name"] == "Apps"
 
 
 def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
@@ -410,9 +410,9 @@ def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
 
     set_rows()
     for name in ("base.app.enable", "base.app.disable"):
-        card = assistant.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
+        card = assistant.cards.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
         assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservas online")]
-        card = assistant.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
+        card = assistant.cards.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
         assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservations")]
 
 
@@ -1027,8 +1027,8 @@ def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off(django_captur
     assert "task" not in relay.active_apps(A) and "staff" not in relay.active_apps(A)
     assert "base" in relay.active_apps(A)
     assert "task" in relay.active_apps(B)
-    assert "task" not in assistant.active_apps(A)
-    assert not any(op.app_label == "task" for op in assistant.catalog(ctx()).values())
+    assert "task" not in assistant.tools.active_apps(A)
+    assert not any(op.app_label == "task" for op in assistant.tools.catalog(ctx()).values())
 
 
 @pytest.mark.django_db

@@ -154,7 +154,7 @@ def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_th
     def card(name: str) -> dict[str, str]:
         op = get(name)
         arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
-        return {field["name"]: field["label"] for field in assistant.card(op, arguments, "es")["fields"]}
+        return {field["name"]: field["label"] for field in assistant.cards.card(op, arguments, "es")["fields"]}
 
     for name in ("invoice.series.create", "invoice.series.update"):
         assert card(name)["is_active"] == SCREENS["series"]["form"]["active"] == "Activa", name

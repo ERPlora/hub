@@ -73,7 +73,7 @@ OWN_WORDS = [
 
 
 def online_booking_tools() -> list[str]:
-    return sorted(name for name, op in registry.items() if op.app_label == "online_booking" and assistant.is_tool(op))
+    return sorted(name for name, op in registry.items() if op.app_label == "online_booking" and assistant.tools.is_tool(op))
 
 
 def test_online_booking_is_listed_so_layer_1_sweeps_every_ask_of_it():

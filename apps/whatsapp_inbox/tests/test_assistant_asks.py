@@ -149,7 +149,7 @@ def test_the_reported_whatsapp_request_offers_its_existing_operation(catalog_of,
 def test_layer_2_probes_every_whatsapp_tool():
     """The sweep below is whole: there is a probe of layer 2 for every tool of the inbox, read from its files."""
     probed = {tool for _, tool, _ in whatsapp_probes()}
-    tools = {name for name, op in registry.items() if op.app_label == "whatsapp_inbox" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "whatsapp_inbox" and assistant.tools.is_tool(op)}
     assert probed == tools, sorted(probed ^ tools)
 
 
@@ -164,7 +164,7 @@ def test_every_whatsapp_probe_of_layer_2_is_offered_its_tool_without_being_its_a
 
 def test_every_tool_of_the_inbox_has_its_own_words():
     """``OWN_WORDS`` is whole: one phrase for every tool of the inbox, so neutralising the asks of any of them fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "whatsapp_inbox" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "whatsapp_inbox" and assistant.tools.is_tool(op)}
     named = [name for name, _ in OWN_WORDS]
     assert sorted(named) == sorted(tools), sorted(set(named) ^ tools)
 

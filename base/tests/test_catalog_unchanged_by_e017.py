@@ -47,7 +47,7 @@ def legacy_is_tool(op: Operation, declared_permissions: frozenset[str]) -> bool:
 
 def legacy_catalog(ctx: OperationContext) -> list[str]:
     declared = frozenset(permission for config in all_live_app_configs() for permission in config.permissions)
-    on = assistant.active_apps(ctx.scope)
+    on = assistant.tools.active_apps(ctx.scope)
     return [
         name
         for name, op in sorted(registry.items())
@@ -67,7 +67,7 @@ def test_a_person_of_the_business_is_offered_the_same_tools(make_user, role):
     ctx = person(make_user("eva", host=A.key, role=role))
     expected = legacy_catalog(ctx)
     assert expected  # not an empty sweep
-    assert list(assistant.catalog(ctx)) == expected
+    assert list(assistant.tools.catalog(ctx)) == expected
 
 
 @pytest.mark.django_db
@@ -78,4 +78,4 @@ def test_a_superuser_is_offered_the_same_tools_and_none_only_the_platform_runs(s
     expected = legacy_catalog(ctx)
     assert expected and "demo.item.create" in expected  # «*» reached a write no approval offers: not an empty sweep
     assert "table.hold.expire" not in expected and "staff.member.current" not in expected
-    assert list(assistant.catalog(ctx)) == expected
+    assert list(assistant.tools.catalog(ctx)) == expected

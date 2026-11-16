@@ -97,7 +97,7 @@ def test_menus_and_combos_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_combo_offers_its_eighteen_tools():
     """Menus and combos' tools are its eighteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails.
     The upload of a photo of its own (the form's file) and the reaction to Inventory's deletion are none."""
-    tools = {name for name, op in registry.items() if op.app_label == "combo" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "combo" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) == 18
     assert WRITES < tools
@@ -178,7 +178,7 @@ test_each_tool_has_its_own_english_words = english_coverage_test("combo", OWN_WO
 def test_every_tool_of_menus_has_a_phrase_of_its_own():
     """``OWN_WORDS`` covers every tool once: a tool whose asks no phrase of a person's own reaches would let its asks
     change unseen (the sweep of ``base`` ranks only the asks themselves)."""
-    tools = sorted(name for name, op in registry.items() if op.app_label == "combo" and assistant.is_tool(op))
+    tools = sorted(name for name, op in registry.items() if op.app_label == "combo" and assistant.tools.is_tool(op))
     assert sorted(name for name, _ in OWN_WORDS) == tools
 
 
@@ -200,7 +200,7 @@ def test_the_choices_named_as_elecciones_bring_their_reorder_only_with_the_hubs_
     phrase = "ordena las elecciones del segundo plato: pollo, merluza y tortilla"
     assert comparable(phrase) not in probe_phrases()
     assert "combo.option.reorder" in offered_to(tools, phrase)[:TOP]
-    without = tuple(group for group in assistant.synonyms() if group != CHOICES)
+    without = tuple(group for group in assistant.relevance.synonyms() if group != CHOICES)
     assert "combo.option.reorder" not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 

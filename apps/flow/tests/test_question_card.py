@@ -1,5 +1,5 @@
 """FLOW-F29 step 1, FLOW-F38 step 4: in the assistant's change that waits in «Waiting for your answer» each datum comes
-with the question as the assistant's confirmation card in the chat says it (BASE-F97 step 2, ``base.assistant.card``),
+with the question as the assistant's confirmation card in the chat says it (BASE-F97 step 2, ``base.assistant.cards.card``),
 read for whoever opens the inbox: a moment in their language at the business's hour, a value of a closed list by its
 label, an amount in cents marked as money, a yes or no as one, a list as a list, and a record by its name only when they
 may read it — never by its id. The details keep only what the assistant said.

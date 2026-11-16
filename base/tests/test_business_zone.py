@@ -83,7 +83,7 @@ def test_settings_names_the_clock_every_app_reads():
 def test_a_card_says_the_businesss_hour_also_with_no_person_at_hand():
     """An automation's card has no person to read Settings › Business as: it is the same business, the same clock."""
     with in_hub(CANARY):
-        card = assistant.card(get("appointment.appointment.create"), {"start": INSTANT}, "es")
+        card = assistant.cards.card(get("appointment.appointment.create"), {"start": INSTANT}, "es")
     assert {field["name"]: field["value"] for field in card["fields"]}["start"] == "2 nov 2026, 9:00"
 
 

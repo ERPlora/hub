@@ -514,7 +514,7 @@ cliente o a un compañero).
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   borrar una tarea o un proyecto) y todo campo de entrada lleva `description`. Cada herramienta dice
   además sus `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`: Tareas está en
-  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1098), y los `SYNONYMS` del Hub (`base/assistant.py`) leen «tarea»
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1098), y los `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «tarea»
   como `task`, «proyecto» como `project` y «comenta en…» o «un comentario» como `comment` (por sus frases,
   no por la palabra: «comentario» comparte raíz con los «comensales» de Mesas). Así comentar, cambiar el
   estado, completar o cambiar un proyecto desde el chat (TASK-F05, F06, F10 y F13) llegan a su operación: las
@@ -532,7 +532,7 @@ cliente o a un compañero).
   `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Dicho por su nombre, el `task` de
   `TaskRefIn` y el `project` de `ProjectRefIn` llevan la misma marca leída por ese nombre (`A_TASK_BY_NAME`,
   `A_PROJECT_BY_NAME`: una tarea se busca sola por su número o su título y un proyecto solo por su código o su nombre),
-  y las siete escrituras cuya entrada es una de ellas declaran su `check` (`base.assistant.checked`):
+  y las siete escrituras cuya entrada es una de ellas declaran su `check` (`base.assistant.cards.checked`):
   `task.task.update`, `set_status`, `complete`, `assign` y `delete`, `task.task.detail`; `task.project.update` y
   `delete`, `task.project.detail`. Antes de dibujar la tarjeta, el turno busca el registro como lo hará la escritura,
   un nombre que encaja con varios o con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo

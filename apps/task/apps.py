@@ -28,7 +28,7 @@ class TaskConfig(LiveAppConfig):
     # The assignee and a project's owner are staff records (staff.Member).
     requires = ["staff"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). A «tarea» and a «proyecto» are the task
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «tarea» and a «proyecto» are the task
     # and the project (task.task, task.project), and what one «comenta» a comment (task.comment), named by its phrases
     # and never by the word: «comentario» shares its stem with «comensales», a table's guests.
     assistant_synonyms = (

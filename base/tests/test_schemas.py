@@ -50,7 +50,7 @@ def test_a_demo_s_session_says_when_it_ends():
 
 
 def test_a_record_in_a_currency_of_its_own_is_marked_by_the_read_that_answers_it():
-    """The mark base/assistant.py ``CURRENCY`` reads on a datum that names a cart or a price list (base.E011)."""
+    """The mark base/assistant/cards.py ``CURRENCY`` reads on a datum that names a cart or a price list (base.E011)."""
     assert in_currency_of("pricing.price_list.get", by="price_list") == {
         "currency": {"read": "pricing.price_list.get", "by": "price_list", "code": "currency"}
     }

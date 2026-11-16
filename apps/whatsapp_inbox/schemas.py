@@ -85,7 +85,7 @@ CONVERSATION_REFERENCE = (
     "of their WhatsApp profile, when the id is not known."
 )
 
-# The assistant's card names a template header's file by this read (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names a template header's file by this read (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: by the name it was chosen with, as the template's sheet shows it. Whoever sends reads it.
 A_SAMPLE = names("whatsapp_inbox.template_sample.detail")
 # The same for the record a write acts on: a conversation as the inbox calls it, a message and a note by their text (a

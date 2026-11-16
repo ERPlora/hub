@@ -47,7 +47,7 @@ OWN_TAX_CATEGORY = gettext_noop("Own tax category")
 #: The forms' name for it; the model's own, «kitchen name», is the Django admin's (hub#958).
 KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
 # two groups may have an option with one name; a link by its group and what it hangs from.
 A_GROUP = names("modifier.group.get")

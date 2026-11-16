@@ -142,7 +142,7 @@ CATEGORY = gettext_noop("Category")
 #: What the assistant's card calls the rule a write acts on by its id (its Spanish in this app's catalog), as the Rules
 #: list calls one, never «Record».
 T_RULE = gettext_noop("Rule")
-#: The assistant's card names the rule a write acts on by this read (base/assistant.py ``REFERS``), run as whoever asks,
+#: The assistant's card names the rule a write acts on by this read (base/assistant/cards.py ``REFERS``), run as whoever asks,
 #: never by its id: by its category, its country and its rate (``RuleNamedOut.label``).
 A_RULE = names("tax.rule.get", name=("label",))
 SEARCH = "Free text to search."
