@@ -33,7 +33,7 @@ from base import assistant
 from base.business import business_zone
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import named_by_the_screen
-from base.tests.test_assistant_card_values import AN_ID, list_field, unnamed
+from base.tests.test_assistant_card_values_references import AN_ID, list_field, unnamed
 
 from .conftest import (
     HUB_DB, ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption, make_service,

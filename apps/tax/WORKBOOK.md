@@ -726,7 +726,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   modelo etiqueta; `choices.py` la declara (`TaxConfig.choices`) con el nombre de cada país en el idioma de quien
   lee (CLDR por `base.business.country_name`, el mismo que enseña el selector de País de la pantalla con
   `Intl.DisplayNames`), en las escrituras de reglas y en cada línea del lote (`tests/test_choices.py`). El
-  trinquete de `base/tests/test_assistant_card_values.py` (`UNNAMED_REFERENCES`, `UNLABELLED_LISTS`) impide que
+  trinquete de `base/tests/test_assistant_card_values_references.py` (`UNNAMED_REFERENCES`, `UNLABELLED_LISTS`) impide que
   entre un dato sin marca o una lista sin etiquetas.
 - **País y región** salen de `pycountry` (ISO 3166-1 y 3166-2), no de una lista copiada.
 - **Decisión de mercado: «Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de

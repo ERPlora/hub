@@ -995,7 +995,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   desconocida cae a «En sala» y «Normal», y una ronda pedida sin prioridad queda «Normal». Sin persona detrás, sin `kitchen.view_ticket`,
   `inventory.view_product`, `inventory.view_category` o `sale.view_sale`, con un id de otro negocio o de algo
   borrado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta. Las dos
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca o una lista sin etiqueta. Las dos
   lecturas nuevas son internas (`ai=INTERNAL`, sin ruta ni consulta viva: el modelo lee las estaciones en su lista
   y los platos con su comanda) y tienen su nombre en el catálogo de Automatizaciones. En el navegador,
   `tests/e2e/kitchen-assistant-card.spec.ts` (la tarjeta en español e inglés, en tres tamaños), que borra lo suyo.

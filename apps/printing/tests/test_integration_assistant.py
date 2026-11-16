@@ -22,7 +22,7 @@ from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 FRONTEND = Path(apps.get_app_config("printing").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["printing"]

@@ -3825,7 +3825,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `test_every_attempt_key_of_a_write_is_marked_but_the_known_ones` (`UNMARKED_ATTEMPT_KEYS`, que solo baja: detecta
   por el nombre, `idempotency_key`, `job_key`, `submit_key`, `client_<x>_id` o con «idempoten»/«attempt_key», un
   texto sin la marca; hoy queda Bandeja de WhatsApp), con `test_an_attempt_key_is_marked_only_on_a_text`
-  (`base/tests/test_assistant_card_values.py`); un importe, el que su esquema marca `json_schema_extra={"money": True}`
+  (`base/tests/test_assistant_card_values_attempt_keys.py`); un importe, el que su esquema marca `json_schema_extra={"money": True}`
   (`MONEY`, siempre sobre un entero en la unidad menor de su moneda; en un tipo anotado, como `Cents` de Servicios,
   vale en cada uso), sale arriba como `kind="money"` (lo pinta la pantalla en la moneda del negocio o, en la vista
   previa, en la que dé su lectura) y, dentro de un objeto o de una lista, igual: el servidor lo manda como dinero

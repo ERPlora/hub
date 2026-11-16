@@ -858,7 +858,7 @@ la que solo se le autorizó reservar.
   por su `label`, su número con su zona (`table_label` de Mesas, hub#550).
   El id de una reserva, franja, fecha bloqueada o entrada lleva además su `title`, con su
   español en `locale/`: la tarjeta peligrosa lo nombra por lo que es, nunca «Registro». El trinquete de
-  `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca ni una escritura peligrosa de la
+  `base/tests/test_assistant_card_values_references.py` no deja entrar uno sin marca ni una escritura peligrosa de la
   plataforma o Reservas sin título.
 - **Administrador de Django con CRUD completo** (PLAN §17): ajustes, franjas, bloqueos,
   reservas y lista de espera; ids y fechas en solo lectura. Lo que guarda no pasa por las operaciones
