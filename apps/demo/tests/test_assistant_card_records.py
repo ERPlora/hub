@@ -40,7 +40,7 @@ ON_AN_ITEM = [
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -59,7 +59,7 @@ def no_id(said) -> bool:
 
 
 def demo_writes() -> list:
-    return [op for _, op in sorted(registry.items()) if op.app_label == "demo" and assistant.is_tool(op)
+    return [op for _, op in sorted(registry.items()) if op.app_label == "demo" and assistant.tools.is_tool(op)
             and op.kind == "command"]
 
 
@@ -67,7 +67,7 @@ def demo_writes() -> list:
 def named(monkeypatch):
     """Every item a write names by its id comes out named, as a person who may read it sees it: these tests are about
     what the card calls each datum, and an item nobody names is left out of it."""
-    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "Mesa 4")
+    monkeypatch.setattr(assistant.cards, "_reference", lambda value, prop, words: "Mesa 4")
 
 
 # ── An item by its name, titled as its screen calls one ───────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ def test_an_item_deleted_meanwhile_is_left_out():
 def test_nobody_behind_the_request_reads_no_item():
     """An automation's card (no person at hand) names no item: nothing is read for anybody."""
     item = Item.objects.create(name="Mesa 4")
-    card = assistant.card(get("demo.item.update"), {"id": str(item.id), "name": "Mesa 5"}, "en")
+    card = assistant.cards.card(get("demo.item.update"), {"id": str(item.id), "name": "Mesa 5"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Mesa 5"}
 
 

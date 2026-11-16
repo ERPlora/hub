@@ -48,7 +48,7 @@ def reservation_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "reservation" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "reservation" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -63,8 +63,8 @@ def test_no_datum_of_a_write_of_reservation_reaches_a_spanish_card_by_its_techni
 def test_the_card_names_the_duplicate_customer_whose_reservations_move():
     """Customers merges a duplicate card into the one that stays: the duplicate as its merge screen calls it."""
     reassign = get("reservation.customer.reassign")
-    assert labels(assistant.card(reassign, {"absorbed_id": "x"}, "es")) == ["Ficha duplicada"]
-    assert labels(assistant.card(reassign, {"absorbed_id": "x"}, "en")) == ["Duplicate customer"]
+    assert labels(assistant.cards.card(reassign, {"absorbed_id": "x"}, "es")) == ["Ficha duplicada"]
+    assert labels(assistant.cards.card(reassign, {"absorbed_id": "x"}, "en")) == ["Duplicate customer"]
 
 
 def test_the_card_names_the_reservation_it_acts_on_by_its_guest_and_its_date():
@@ -73,12 +73,12 @@ def test_the_card_names_the_reservation_it_acts_on_by_its_guest_and_its_date():
     arguments = {"guest": "Ana", "day": "2026-10-29"}
     for step in RESERVATION_STEPS:
         op = get(f"reservation.reservation.{step}")
-        assert labels(assistant.card(op, arguments, "es")) == [SCREENS["list"]["columns"]["guest"], "Fecha de la reserva"]
-        assert labels(assistant.card(op, arguments, "en")) == [
+        assert labels(assistant.cards.card(op, arguments, "es")) == [SCREENS["list"]["columns"]["guest"], "Fecha de la reserva"]
+        assert labels(assistant.cards.card(op, arguments, "en")) == [
             SCREENS_EN["list"]["columns"]["guest"],
             "Reservation date",
         ]
-    edit = assistant.card(get("reservation.reservation.update"), {**arguments, "date": "2026-10-30"}, "es")
+    edit = assistant.cards.card(get("reservation.reservation.update"), {**arguments, "date": "2026-10-30"}, "es")
     assert labels(edit) == ["Cliente", "Fecha de la reserva", "Fecha"]
 
 
@@ -88,29 +88,29 @@ def test_the_card_names_the_waitlist_entry_it_acts_on_by_its_guest_and_its_date(
     columns, columns_en = SCREENS["waitlist"]["columns"], SCREENS_EN["waitlist"]["columns"]
     for step in WAITLIST_STEPS:
         op = get(f"reservation.waitlist.{step}")
-        assert labels(assistant.card(op, arguments, "es")) == [columns["guest"], columns["date"]]
-        assert labels(assistant.card(op, arguments, "en")) == [columns_en["guest"], columns_en["date"]]
+        assert labels(assistant.cards.card(op, arguments, "es")) == [columns["guest"], columns["date"]]
+        assert labels(assistant.cards.card(op, arguments, "en")) == [columns_en["guest"], columns_en["date"]]
 
 
 def test_the_card_names_booking_a_full_slot_anyway_as_the_book_asks_it():
     """After «Esa franja ya está completa», the book asks «¿Reservar igualmente?» (a waitlist entry, «Convertir
     igualmente»): the card names the datum by that button."""
     for name in ("reservation.reservation.create", "reservation.reservation.update"):
-        assert labels(assistant.card(get(name), {"overbook": True}, "es")) == [SCREENS["overbook"]["confirm"]]
-        assert labels(assistant.card(get(name), {"overbook": True}, "en")) == [SCREENS_EN["overbook"]["confirm"]]
+        assert labels(assistant.cards.card(get(name), {"overbook": True}, "es")) == [SCREENS["overbook"]["confirm"]]
+        assert labels(assistant.cards.card(get(name), {"overbook": True}, "en")) == [SCREENS_EN["overbook"]["confirm"]]
     convert = get("reservation.waitlist.convert")
-    assert labels(assistant.card(convert, {"overbook": True}, "es")) == [SCREENS["overbook"]["convert"]]
-    assert labels(assistant.card(convert, {"overbook": True}, "en")) == [SCREENS_EN["overbook"]["convert"]]
+    assert labels(assistant.cards.card(convert, {"overbook": True}, "es")) == [SCREENS["overbook"]["convert"]]
+    assert labels(assistant.cards.card(convert, {"overbook": True}, "en")) == [SCREENS_EN["overbook"]["convert"]]
 
 
 def test_the_card_names_the_zone_of_the_table_and_leaving_a_reservation_without_one():
     """Table 5 of the terrace, by its number and its zone; an edit that frees the table leaves it «Sin mesa»."""
     create = get("reservation.reservation.create")
-    assert labels(assistant.card(create, {"table": "5", "zone": "Terraza"}, "es")) == ["Mesa", "Zona"]
-    assert labels(assistant.card(create, {"table": "5", "zone": "Terraza"}, "en")) == ["Table", "Zone"]
+    assert labels(assistant.cards.card(create, {"table": "5", "zone": "Terraza"}, "es")) == ["Mesa", "Zona"]
+    assert labels(assistant.cards.card(create, {"table": "5", "zone": "Terraza"}, "en")) == ["Table", "Zone"]
     update = get("reservation.reservation.update")
-    assert labels(assistant.card(update, {"zone": "Terraza", "no_table": True}, "es")) == ["Zona", "Sin mesa"]
-    assert labels(assistant.card(update, {"zone": "Terraza", "no_table": True}, "en")) == ["Zone", "No table"]
+    assert labels(assistant.cards.card(update, {"zone": "Terraza", "no_table": True}, "es")) == ["Zona", "Sin mesa"]
+    assert labels(assistant.cards.card(update, {"zone": "Terraza", "no_table": True}, "en")) == ["Zone", "No table"]
 
 
 def test_the_card_names_where_a_reservation_came_from_and_the_email_rule_as_reservas_screens_do():
@@ -119,10 +119,10 @@ def test_the_card_names_where_a_reservation_came_from_and_the_email_rule_as_rese
     online's «email obligatorio», apps loaded before it that say the same English (hub#548)."""
     create = get("reservation.reservation.create")
     rules = get("reservation.settings.update")
-    assert labels(assistant.card(create, {"source": "phone"}, "es")) == [SCREENS["form"]["source"]]
-    assert labels(assistant.card(rules, {"require_email": True}, "es")) == [SCREENS["settings"]["requireEmail"]]
-    assert labels(assistant.card(create, {"source": "phone"}, "en")) == [SCREENS_EN["form"]["source"]]
-    assert labels(assistant.card(rules, {"require_email": True}, "en")) == [SCREENS_EN["settings"]["requireEmail"]]
+    assert labels(assistant.cards.card(create, {"source": "phone"}, "es")) == [SCREENS["form"]["source"]]
+    assert labels(assistant.cards.card(rules, {"require_email": True}, "es")) == [SCREENS["settings"]["requireEmail"]]
+    assert labels(assistant.cards.card(create, {"source": "phone"}, "en")) == [SCREENS_EN["form"]["source"]]
+    assert labels(assistant.cards.card(rules, {"require_email": True}, "en")) == [SCREENS_EN["settings"]["requireEmail"]]
 
 
 @pytest.mark.django_db
@@ -133,7 +133,7 @@ def test_the_card_names_the_customer_a_channel_acts_for():
     ana = make_customer("Ana García")
     for name in ("reservation.reservation.cancel", "reservation.reservation.update"):
         for language, label in (("es", "En nombre del cliente"), ("en", "On behalf of the customer")):
-            card = assistant.card(get(name), {"on_behalf_of": str(ana.id)}, language, ctx=ctx_for(language=language))
+            card = assistant.cards.card(get(name), {"on_behalf_of": str(ana.id)}, language, ctx=ctx_for(language=language))
             assert said(card) == [(label, "Ana García")], (name, language)
 
 
@@ -161,7 +161,7 @@ def by_an_id(card: dict) -> bool:
 
 
 def card_for(name: str, arguments: dict, language: str, ctx=None) -> dict:
-    return assistant.card(get(name), arguments, language, ctx=ctx or ctx_for(language=language))
+    return assistant.cards.card(get(name), arguments, language, ctx=ctx or ctx_for(language=language))
 
 
 # RESERVATION-F06 «Tomar una reserva a mano», asked to the assistant: the card says for whom and at which table, the

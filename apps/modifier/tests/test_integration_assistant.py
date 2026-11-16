@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.operations import get, registry
 
@@ -33,7 +34,7 @@ def modifier_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "modifier" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "modifier" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -48,8 +49,8 @@ def test_no_datum_of_a_write_of_modifier_reaches_a_spanish_card_by_its_technical
 def test_the_card_names_the_option_said_by_its_name_as_the_group_sheet_does():
     """Changing or deleting an option the person names («Sin cebolla»): «Opción», as «Borrar opción» says it."""
     for name in ("modifier.option.update", "modifier.option.delete"):
-        assert labels(assistant.card(get(name), {"option": "Sin cebolla"}, "es")) == ["Opción"]
-        assert labels(assistant.card(get(name), {"option": "No onion"}, "en")) == ["Option"]
+        assert labels(assistant.cards.card(get(name), {"option": "Sin cebolla"}, "es")) == ["Opción"]
+        assert labels(assistant.cards.card(get(name), {"option": "No onion"}, "en")) == ["Option"]
 
 
 def test_the_card_names_the_own_tax_category_of_an_option_as_its_form_does():
@@ -57,8 +58,8 @@ def test_the_card_names_the_own_tax_category_of_an_option_as_its_form_does():
     tax, tax_en = SCREENS["options"]["form"]["tax"], SCREENS_EN["options"]["form"]["tax"]
     for name in ("modifier.option.create", "modifier.option.update"):
         arguments = {"tax_category_key": "product.generic"}
-        assert labels(assistant.card(get(name), arguments, "es")) == [tax]
-        assert labels(assistant.card(get(name), arguments, "en")) == [tax_en]
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [tax]
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [tax_en]
 
 
 def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
@@ -72,8 +73,8 @@ def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
     ):
         arguments = {"kitchen_name": "SALSA"}
         said, said_en = SCREENS[form]["form"]["kitchenName"], SCREENS_EN[form]["form"]["kitchenName"]
-        assert labels(assistant.card(get(name), arguments, "es")) == [said], name
-        assert labels(assistant.card(get(name), arguments, "en")) == [said_en], name
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [said], name
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [said_en], name
 
 
 # ── The records a write names by their id (hub#672) ──────────────────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def write_of(case: str) -> str:
@@ -148,7 +149,7 @@ def a_menu(hub) -> dict:
 def cards(menu: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        case: assistant.card(
+        case: assistant.cards.card(
             get(write_of(case)), {datum: str(menu[kind]) for datum, kind in data.items()}, language, ctx
         )
         for case, data in NAMED.items()
@@ -250,7 +251,7 @@ def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a, no_fallb
         of_drinks = run("modifier.option.create", {"group_id": str(drinks.id), "name": "Grande"}, ctx=admin)
         of_chips = run("modifier.option.create", {"group_id": str(chips.id), "name": "Grande"}, ctx=admin)
         said = [
-            values(assistant.card(get("modifier.option.delete"), {"id": str(option.id)}, "es", admin))["id"]
+            values(assistant.cards.card(get("modifier.option.delete"), {"id": str(option.id)}, "es", admin))["id"]
             for option in (of_drinks, of_chips)
         ]
     assert said == ["Grande (Bebidas)", "Grande (Patatas)"]
@@ -263,7 +264,7 @@ def test_a_link_to_a_category_is_named_by_its_group_and_that_category(hub_a, no_
         category = run("inventory.category.create", {"name": "Postres"}, ctx=admin)
         group = run("modifier.group.create", {"name": "Toppings"}, ctx=admin)
         link = run("modifier.link.attach", {"group_id": str(group.id), "category_id": str(category.id)}, ctx=admin)
-        card = assistant.card(get("modifier.link.detach"), {"id": str(link.id)}, "es", admin)
+        card = assistant.cards.card(get("modifier.link.detach"), {"id": str(link.id)}, "es", admin)
     assert values(card) == {"id": "Toppings · Postres"}
 
 
@@ -281,7 +282,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             schema = op.input.model_json_schema()
             for datum in data:
                 checked += 1
-                marked = assistant.refers_of(assistant._resolved(schema["properties"][datum], schema.get("$defs", {})))
+                marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
     # Positive control: 3 roles over the 14 records of ``NAMED``.

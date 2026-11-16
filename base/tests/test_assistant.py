@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from django.utils import translation
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import Operation, get, registry
@@ -34,21 +35,20 @@ def ctx(permissions=MANAGER, *, actor="ana", language="en", scope=A):
     return OperationContext(scope=scope, actor=actor, permissions=frozenset(permissions), language=language)
 
 
-
 # ── Tools: what the assistant may use for this person ────────────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_a_tool_is_named_without_dots_and_read_back_from_its_name():
-    assert assistant.tool_name("cash_register.session.close") == "cash_register__session__close"
-    tools = assistant.catalog(ctx({"*"}))
-    assert assistant.operation_of("demo__item__create", tools).name == "demo.item.create"
-    assert assistant.operation_of("demo__item__nothing", tools) is None
+    assert shared.tool_name("cash_register.session.close") == "cash_register__session__close"
+    tools = assistant.tools.catalog(ctx({"*"}))
+    assert shared.operation_of("demo__item__create", tools).name == "demo.item.create"
+    assert shared.operation_of("demo__item__nothing", tools) is None
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
-    names = set(assistant.catalog(ctx(EMPLOYEE)))
+    names = set(assistant.tools.catalog(ctx(EMPLOYEE)))
     assert "demo.item.list" in names
     # Without «demo.manage» the write is not even offered (the old hub's: as if it did not exist).
     assert "demo.item.create" not in names
@@ -67,18 +67,18 @@ def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
     ],
 )
 def test_what_is_not_a_tool_is_never_offered_even_to_who_may_do_everything(name, why):
-    assert name not in assistant.catalog(ctx({"*"})), why
+    assert name not in assistant.tools.catalog(ctx({"*"})), why
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_an_app_the_business_has_no_right_to_offers_no_tool(monkeypatch):
     monkeypatch.setattr(entitlement, "blocked_apps", lambda scope: frozenset({"demo"}))
-    assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("demo.")]
+    assert not [name for name in assistant.tools.catalog(ctx({"*"})) if name.startswith("demo.")]
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_assistants_own_operations_are_not_its_tools():
-    assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
+    assert not [name for name in assistant.tools.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
 
 
 #: Writes only the platform runs, of both shapes their permission takes (``<app>.system``, ``system.<app>``), each with
@@ -110,7 +110,7 @@ def test_no_operation_of_the_platform_is_a_tool_whatever_its_ai_says(owner):
     with «System only». Its permission says so, not its words."""
     platform = platform_operations(owner)
     assert PLATFORM_WRITES <= set(platform)  # not an empty sweep
-    assert [name for name in platform if assistant.is_tool(registry[name])] == []
+    assert [name for name in platform if assistant.tools.is_tool(registry[name])] == []
 
 
 def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, superuser):
@@ -118,10 +118,10 @@ def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, s
     business's host those of a person without a role, since ERPlora's staff holds nothing there without a Membership
     (``base.permissions``); and «*» itself offers every write of the business's apps, none that only the platform
     runs."""
-    staff_tools = assistant.catalog(ctx(permissions_for(superuser, A), actor=superuser))
-    assert staff_tools == assistant.catalog(ctx(frozenset(), actor=superuser))  # what a person without a role gets
+    staff_tools = assistant.tools.catalog(ctx(permissions_for(superuser, A), actor=superuser))
+    assert staff_tools == assistant.tools.catalog(ctx(frozenset(), actor=superuser))  # what a person without a role gets
     assert "demo.item.create" not in staff_tools
-    tools = assistant.catalog(ctx({"*"}, actor=superuser))
+    tools = assistant.tools.catalog(ctx({"*"}, actor=superuser))
     assert "demo.item.create" in tools
     assert sorted(set(tools) & set(platform_operations(owner))) == []
 
@@ -131,41 +131,41 @@ def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, s
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_a_turn_offers_at_most_its_share_of_the_catalogue():
-    tools = assistant.catalog(ctx({"*"}))
-    assert len(tools) > assistant.MAX_TOOLS
-    assert len(assistant.relevant(tools, ["hola"], "es")) <= assistant.MAX_TOOLS
+    tools = assistant.tools.catalog(ctx({"*"}))
+    assert len(tools) > shared.MAX_TOOLS
+    assert len(assistant.relevance.relevant(tools, ["hola"], "es")) <= shared.MAX_TOOLS
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_app_named_in_the_persons_own_language_comes_first():
-    tools = assistant.catalog(ctx({"*"}))
-    offered = assistant.relevant(tools, ["¿Cuántos clientes tengo este mes?"], "es")
+    tools = assistant.tools.catalog(ctx({"*"}))
+    offered = assistant.relevance.relevant(tools, ["¿Cuántos clientes tengo este mes?"], "es")
     # After the two reads always at hand (``ALWAYS``), the app the person named.
-    first = [op.name for op in offered if op.name not in assistant.ALWAYS][:5]
+    first = [op.name for op in offered if op.name not in assistant.relevance.ALWAYS][:5]
     assert first and all(name.startswith("customer.") for name in first), first
     assert "customer.customer.list" in first
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_what_the_person_asks_to_do_ranks_the_operation_that_does_it():
-    tools = assistant.catalog(ctx({"*"}))
-    offered = [op.name for op in assistant.relevant(tools, ["crea un servicio Corte caballero a 15 €"], "es")]
+    tools = assistant.tools.catalog(ctx({"*"}))
+    offered = [op.name for op in assistant.relevance.relevant(tools, ["crea un servicio Corte caballero a 15 €"], "es")]
     assert "service.service.create" in offered
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
     """Asked «what version of ERPlora do I have?», the assistant has a tool that answers it."""
-    tools = assistant.catalog(ctx({"base.view_home", "base.administer_hub"}))
-    offered = [op.name for op in assistant.relevant(tools, ["¿Qué versión de ERPlora tengo?"], "es")]
+    tools = assistant.tools.catalog(ctx({"base.view_home", "base.administer_hub"}))
+    offered = [op.name for op in assistant.relevance.relevant(tools, ["¿Qué versión de ERPlora tengo?"], "es")]
     assert "base.system.status" in offered
-    assert "base.system.status" not in assistant.catalog(ctx(EMPLOYEE))
+    assert "base.system.status" not in assistant.tools.catalog(ctx(EMPLOYEE))
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_checklist_read_is_always_at_hand():
-    tools = assistant.catalog(ctx({"*"}))
-    assert "base.setup.status" in [op.name for op in assistant.relevant(tools, ["zzz"], "es")]
+    tools = assistant.tools.catalog(ctx({"*"}))
+    assert "base.setup.status" in [op.name for op in assistant.relevance.relevant(tools, ["zzz"], "es")]
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -173,21 +173,21 @@ def test_the_checklist_read_is_always_at_hand():
 def test_the_documentation_search_is_always_at_hand_for_everybody(permissions):
     """Everything it is asked, it answers with our own information, inventing nothing: a how-to question («¿cómo abro
     la caja?») shares no word with the tool, so it is in every turn."""
-    assert "base.docs.search" in assistant.ALWAYS
-    tools = assistant.catalog(ctx(permissions))
+    assert "base.docs.search" in assistant.relevance.ALWAYS
+    tools = assistant.tools.catalog(ctx(permissions))
     assert "base.docs.search" in tools
-    assert "base.docs.search" in [op.name for op in assistant.relevant(tools, ["¿cómo abro la caja?"], "es")]
+    assert "base.docs.search" in [op.name for op in assistant.relevance.relevant(tools, ["¿cómo abro la caja?"], "es")]
 
 
 @pytest.mark.parametrize(("language", "name"), [("en", "Help"), ("es", "Ayuda")])
 def test_a_documentation_search_is_named_help_on_its_receipt(language, name):
     """As the panel of erplora.com names it: the help, not a screen of the business."""
     with translation.override(language):
-        assert assistant.app_name(get("base.docs.search")) == name
+        assert assistant.cards.app_name(get("base.docs.search")) == name
 
 
 def test_a_tool_is_offered_in_the_gateways_format():
-    spec = assistant.tool_spec(get("demo.item.create"))
+    spec = shared.tool_spec(get("demo.item.create"))
     assert spec["type"] == "function"
     assert spec["name"] == "demo__item__create"
     assert spec["description"].startswith("Creates a demo item")
@@ -198,7 +198,7 @@ def test_a_tool_is_offered_in_the_gateways_format():
 
 
 def test_a_normal_write_asks_a_click_and_shows_what_it_will_send():
-    card = assistant.card(get("demo.item.create"), {"name": "Mesa 4", "note": None}, "es")
+    card = assistant.cards.card(get("demo.item.create"), {"name": "Mesa 4", "note": None}, "es")
     assert (card["risk"], card["confirm_word"], card["blocked"]) == ("normal", "", False)
     assert card["app"] == "demo"
     fields = {field["name"]: field for field in card["fields"]}
@@ -227,7 +227,7 @@ def test_a_summary_is_not_called_without_a_person_and_the_card_keeps_its_details
         raise AssertionError("a summary must not run without a person")
 
     monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", forbidden)
-    fields = assistant.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es")["fields"]
+    fields = assistant.cards.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es")["fields"]
     assert [(field["name"], field["label"], field["value"]) for field in fields] == [("name", "Nombre", "Mesa 4")]
 
 
@@ -242,7 +242,7 @@ def test_a_summary_replaces_the_details_with_exactly_what_it_returns_as_the_pers
     monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", summarize)
     arguments = {"name": "Mesa 4"}
     person = ctx(language="es")
-    card = assistant.card(SUMMARY_OPERATION, arguments, "es", person)
+    card = assistant.cards.card(SUMMARY_OPERATION, arguments, "es", person)
     assert seen["context"] is person
     assert seen["arguments"] is arguments
     assert [(field["name"], field["label"], field["value"]) for field in seen["fields"]] == [("name", "Nombre", "Mesa 4")]
@@ -251,7 +251,7 @@ def test_a_summary_replaces_the_details_with_exactly_what_it_returns_as_the_pers
 
 def test_a_summary_that_is_not_callable_is_ignored(monkeypatch):
     monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", "not callable")
-    fields = assistant.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es", ctx(language="es"))["fields"]
+    fields = assistant.cards.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es", ctx(language="es"))["fields"]
     assert [(field["name"], field["label"], field["value"]) for field in fields] == [("name", "Nombre", "Mesa 4")]
 
 
@@ -261,13 +261,13 @@ def test_a_summary_runs_in_the_requested_language(monkeypatch):
 
     monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", summarize)
     with translation.override("en"):
-        fields = assistant.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es", ctx(language="en"))["fields"]
+        fields = assistant.cards.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es", ctx(language="en"))["fields"]
         assert translation.gettext("Name") == "Name"
     assert [field["value"] for field in fields] == ["Nombre"]
 
 
 def test_an_amount_in_cents_is_marked_as_money_for_the_card():
-    card = assistant.card(get("service.service.create"), {"name": "Corte", "price": 1500}, "es")
+    card = assistant.cards.card(get("service.service.create"), {"name": "Corte", "price": 1500}, "es")
     price = next(field for field in card["fields"] if field["name"] == "price")
     assert (price["kind"], price["value"]) == ("money", 1500)
 
@@ -281,16 +281,16 @@ def test_every_datum_of_the_card_is_named_in_the_persons_language():
     its schema's English title in Spanish («Session», «Counted cash»)."""
     close = get("cash_register.session.close")
     arguments = {"session": "S-1", "closing_balance": 25000}
-    assert labels(assistant.card(close, arguments, "es")) == ["Sesión", "Efectivo contado"]
-    assert labels(assistant.card(close, arguments, "en")) == ["Session", "Counted cash"]
-    pin = assistant.card(get("base.access.settings_update"), {"pin_inactivity_minutes": 10, "pin_length": 6}, "es")
+    assert labels(assistant.cards.card(close, arguments, "es")) == ["Sesión", "Efectivo contado"]
+    assert labels(assistant.cards.card(close, arguments, "en")) == ["Session", "Counted cash"]
+    pin = assistant.cards.card(get("base.access.settings_update"), {"pin_inactivity_minutes": 10, "pin_length": 6}, "es")
     assert labels(pin) == ["Volver a pedir tras (minutos)", "Dígitos del PIN"]
 
 
 def test_a_datum_is_named_by_the_model_of_its_operation_before_another_of_its_app():
     """Two models of an app may name a field of the same name differently: the operation's entity says which."""
-    assert labels(assistant.card(get("base.device.mode_set"), {"mode": "kiosk"}, "es")) == ["Modo"]
-    assert labels(assistant.card(get("base.api_key.create"), {"mode": "read"}, "es")) == ["Qué puede hacer"]
+    assert labels(assistant.cards.card(get("base.device.mode_set"), {"mode": "kiosk"}, "es")) == ["Modo"]
+    assert labels(assistant.cards.card(get("base.api_key.create"), {"mode": "read"}, "es")) == ["Qué puede hacer"]
 
 
 class TitledIn(Schema):
@@ -314,8 +314,8 @@ def test_a_title_its_app_wrote_names_the_datum_in_its_translation_or_in_english(
     """A schema's own title is the name its app chose: translated when a catalog has it, as written in English (the
     language of the code); one nobody translated never reaches a Spanish card: the model's name of the field does."""
     arguments = {"first_name": "Ana", "last_name": "Gil"}
-    assert labels(assistant.card(TITLED, arguments, "es")) == ["Propietario", "Apellidos"]
-    assert labels(assistant.card(TITLED, arguments, "en")) == ["Owner", "Family name"]
+    assert labels(assistant.cards.card(TITLED, arguments, "es")) == ["Propietario", "Apellidos"]
+    assert labels(assistant.cards.card(TITLED, arguments, "en")) == ["Owner", "Family name"]
 
 
 class Place(Schema):
@@ -352,13 +352,13 @@ def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it
     The card says which: a title its app wrote, said in the person's language, is ``titled``; one no catalog
     translates, the model's name of the field or the one pydantic makes up, never."""
     arguments = {"first_name": "Ana", "last_name": "Gil"}
-    assert titled(assistant.card(TITLED, arguments, "en")["fields"]) == {"first_name": True, "last_name": True}
+    assert titled(assistant.cards.card(TITLED, arguments, "en")["fields"]) == {"first_name": True, "last_name": True}
     # «Family name» has no Spanish: its card says the model's «Apellidos», no title of its app's.
-    assert titled(assistant.card(TITLED, arguments, "es")["fields"]) == {"first_name": True, "last_name": False}
+    assert titled(assistant.cards.card(TITLED, arguments, "es")["fields"]) == {"first_name": True, "last_name": False}
     half = {"id": "7", "name": "Ana", "category": {"city": "Vigo"}}
-    assert titled(assistant.card(HALF_TITLED, half, "es")["fields"]) == {"id": False, "name": False, "category": False}
-    assert titled(assistant.card(HALF_TITLED, half, "en")["fields"]) == {"id": True, "name": False, "category": False}
-    price = assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"]
+    assert titled(assistant.cards.card(HALF_TITLED, half, "es")["fields"]) == {"id": False, "name": False, "category": False}
+    assert titled(assistant.cards.card(HALF_TITLED, half, "en")["fields"]) == {"id": True, "name": False, "category": False}
+    price = assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"]
     assert titled(price) == {"price": False}
     assert "titled" not in price[0]
 
@@ -366,7 +366,7 @@ def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it
 @pytest.mark.django_db
 def test_a_title_the_read_of_a_preview_wrote_is_marked_so_too(settle):
     """What a dangerous write will do (BASE-F98) is said as what it sends: the read titles its owner and its person."""
-    failure, fields = assistant.preview(ctx(language="es"), settle, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx(language="es"), settle, {"id": "7"})
     assert failure is None
     assert titled(fields) == {"asked_by": True, "name": True, "total_cents": False}
 
@@ -423,7 +423,7 @@ def test_a_secret_reaches_the_card_hidden_at_any_depth_and_the_rest_as_sent():
         "api_key": "hunter8",
         "pin": "hunter9",
     }
-    card = assistant.card(SECRET_SET, arguments, "es")
+    card = assistant.cards.card(SECRET_SET, arguments, "es")
     assert "hunter" not in json.dumps(card, ensure_ascii=False)
     assert shown(card["fields"]) == [
         ("name", "text", "Banco"),
@@ -438,7 +438,7 @@ def test_a_secret_reaches_the_card_hidden_at_any_depth_and_the_rest_as_sent():
 
 
 def test_an_empty_secret_is_said_empty_nothing_to_hide():
-    card = assistant.card(SECRET_SET, {"value": "", "login": None}, "es")
+    card = assistant.cards.card(SECRET_SET, {"value": "", "login": None}, "es")
     assert shown(card["fields"]) == [("value", "empty", ""), ("login", "empty", None)]
 
 
@@ -476,7 +476,7 @@ def test_no_operation_lets_a_secret_reach_its_card_in_clear():
         arguments = with_secrets(schema, schema.get("$defs", {}))
         if arguments:
             checked.append(name)
-            assert SENTINEL not in json.dumps(assistant.card(op, arguments, "es"), ensure_ascii=False), name
+            assert SENTINEL not in json.dumps(assistant.cards.card(op, arguments, "es"), ensure_ascii=False), name
     # Not an empty sweep: today's secrets are among them (a certificate and its password, an automation's secret).
     assert {"verifactu.certificate.upload", "flow.secret.set", SECRET_SET.name} <= set(checked)
 
@@ -495,7 +495,7 @@ def technical_names(writes) -> dict[str, list[str]]:
     technical: dict[str, list[str]] = {}
     for op in writes:
         props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
                 technical.setdefault(op.name, []).append(field["name"])
     return technical
@@ -508,10 +508,10 @@ def test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_nam
     writes = [
         op
         for op in registry.values()
-        if op.app_label == "base" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "base" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
     assert technical_names(writes) == {}
-    moved = assistant.card(get("base.file.move"), {"path": "marzo.pdf", "to": "Facturas"}, "es")
+    moved = assistant.cards.card(get("base.file.move"), {"path": "marzo.pdf", "to": "Facturas"}, "es")
     assert labels(moved) == ["Archivo o carpeta", "Mover a"]
 
 
@@ -520,21 +520,21 @@ def test_an_action_of_the_platform_is_named_by_its_screen_never_base():
     person does it (Shopify's Sidekick, Business Central's Copilot: the page, never the platform's name); one of an
     app, by the app."""
     pin = get("base.access.settings_update")
-    assert assistant.card(pin, {"pin_length": 6}, "es")["app_name"] == "Ajustes"
-    assert assistant.card(pin, {"pin_length": 6}, "en")["app_name"] == "Settings"
-    assert assistant.card(get("base.file.delete"), {"path": "x"}, "es")["app_name"] == "Archivos"
-    assert assistant.card(get("base.person.pin_remove"), {"person": "x"}, "es")["app_name"] == "Empleados"
-    assert assistant.card(get("base.profile.update"), {"first_name": "x"}, "es")["app_name"] == "Mi perfil"
-    assert assistant.card(get("base.failed_event.discard"), {"id": "x"}, "es")["app_name"] == "Sistema"
-    assert assistant.card(get("demo.item.create"), {"name": "x"}, "es")["app_name"] == "Demo"
+    assert assistant.cards.card(pin, {"pin_length": 6}, "es")["app_name"] == "Ajustes"
+    assert assistant.cards.card(pin, {"pin_length": 6}, "en")["app_name"] == "Settings"
+    assert assistant.cards.card(get("base.file.delete"), {"path": "x"}, "es")["app_name"] == "Archivos"
+    assert assistant.cards.card(get("base.person.pin_remove"), {"person": "x"}, "es")["app_name"] == "Empleados"
+    assert assistant.cards.card(get("base.profile.update"), {"first_name": "x"}, "es")["app_name"] == "Mi perfil"
+    assert assistant.cards.card(get("base.failed_event.discard"), {"id": "x"}, "es")["app_name"] == "Sistema"
+    assert assistant.cards.card(get("demo.item.create"), {"name": "x"}, "es")["app_name"] == "Demo"
 
 
 def test_every_action_of_base_names_its_screen():
     """Every tool of base, and what is never done from the chat (its receipt still names it), has its screen: a new
     entity of base without one fails here."""
-    actions = {op.name for op in registry.values() if op.app_label == "base" and assistant.is_tool(op)}
-    actions |= set(assistant.NOT_FROM_CHAT)
-    assert sorted(name for name in actions if name.split(".")[1] not in assistant.BASE_SCREENS) == []
+    actions = {op.name for op in registry.values() if op.app_label == "base" and assistant.tools.is_tool(op)}
+    actions |= set(assistant.tools.NOT_FROM_CHAT)
+    assert sorted(name for name in actions if name.split(".")[1] not in assistant.cards.BASE_SCREENS) == []
 
 
 @pytest.mark.parametrize("language", ["en", "es"])
@@ -545,11 +545,11 @@ def test_each_screen_a_receipt_names_by_its_key_is_named_alike_by_the_screen(lan
     catalogue = json.loads((Path(settings.BASE_DIR) / f"base/frontend/locale/{language}.json").read_text())
     names = catalogue["base"]["assistant"]["screens"]
     with translation.override(language):
-        assert {key: names.get(key) for key in set(assistant.BASE_SCREENS.values())} == {
-            key: str(assistant.SCREEN_NAMES[key]) for key in set(assistant.BASE_SCREENS.values())
+        assert {key: names.get(key) for key in set(assistant.cards.BASE_SCREENS.values())} == {
+            key: str(assistant.cards.SCREEN_NAMES[key]) for key in set(assistant.cards.BASE_SCREENS.values())
         }
     pin = get("base.access.settings_update")
-    assert (assistant.screen(pin), assistant.screen(get("demo.item.create"))) == ("settings", "")
+    assert (assistant.cards.screen(pin), assistant.cards.screen(get("demo.item.create"))) == ("settings", "")
 
 
 def card_catalogues() -> dict[str, dict]:
@@ -587,7 +587,7 @@ def named_actions() -> dict[str, dict[str, str]]:
 def verb(op: Operation, verbs: dict[str, str], language: str = "en") -> str:
     """The verb a write's card and receipt say in a language whose verbs are ``verbs`` (``named_actions``): its whole
     operation's, else its action's; '' = none («Do this»)."""
-    action = assistant.card(op, {}, language)["action"]
+    action = assistant.cards.card(op, {}, language)["action"]
     return "" if action == "other" else str(verbs.get(op.name) or verbs.get(action, "")).strip()
 
 
@@ -597,7 +597,7 @@ def unnamed(operations: Iterable[Operation], verbs: dict[str, dict[str, str]]) -
     return sorted(
         f"{language}: {op.name}"
         for op in operations
-        if op.kind == "command" and assistant.is_tool(op)
+        if op.kind == "command" and assistant.tools.is_tool(op)
         for language, named in verbs.items()
         if not verb(op, named, language)
     )
@@ -608,7 +608,7 @@ def misnamed(verbs: dict[str, dict[str, str]]) -> list[str]:
     that names no write the assistant may call (a typo, one renamed or gone: its card falls back to its action's verb in
     silence), or with no words in a language whose catalogue another one names it in."""
     def write(name: str) -> bool:
-        return (op := registry.get(name)) is not None and op.kind == "command" and assistant.is_tool(op)
+        return (op := registry.get(name)) is not None and op.kind == "command" and assistant.tools.is_tool(op)
 
     return sorted(
         f"{language}: {name}"
@@ -689,29 +689,29 @@ def test_the_guardrail_catches_a_verb_of_its_own_that_would_never_be_said():
 
 
 def test_a_dangerous_write_asks_to_type_a_word_in_the_persons_language():
-    assert assistant.card(get("demo.item.delete"), {"id": "x"}, "es")["confirm_word"] == "CONFIRMAR"
-    assert assistant.card(get("demo.item.delete"), {"id": "x"}, "en")["confirm_word"] == "CONFIRM"
+    assert assistant.cards.card(get("demo.item.delete"), {"id": "x"}, "es")["confirm_word"] == "CONFIRMAR"
+    assert assistant.cards.card(get("demo.item.delete"), {"id": "x"}, "en")["confirm_word"] == "CONFIRM"
 
 
 def test_a_dangerous_write_over_named_records_asks_to_type_how_many():
-    card = assistant.card(get("appointment.appointment.bulk_delete"), {"ids": ["a", "b", "c"]}, "es")
+    card = assistant.cards.card(get("appointment.appointment.bulk_delete"), {"ids": ["a", "b", "c"]}, "es")
     assert (card["count"], card["confirm_word"], card["blocked"]) == (3, "3", False)
 
 
 def test_a_dangerous_write_that_names_no_record_is_not_done_from_the_chat():
-    card = assistant.card(get("appointment.appointment.bulk_delete"), {"ids": []}, "es")
+    card = assistant.cards.card(get("appointment.appointment.bulk_delete"), {"ids": []}, "es")
     assert card["blocked"] is True
 
 
 def test_the_typed_confirmation_is_compared_as_the_platforms_dialog_does():
     """As ``ConfirmDialog`` of ``@erplora/ui`` (the dialog that asks it): spaces around and case ignored, accents not."""
-    card = assistant.card(get("demo.item.delete"), {"id": "x"}, "es")
-    assert assistant.confirmed(card, "  CONFIRMAR ")
-    assert assistant.confirmed(card, "confirmar")
-    assert not assistant.confirmed(card, "CONFIRMA")
-    assert not assistant.confirmed(card, "")
-    normal = assistant.card(get("demo.item.create"), {"name": "x"}, "es")
-    assert assistant.confirmed(normal, "")
+    card = assistant.cards.card(get("demo.item.delete"), {"id": "x"}, "es")
+    assert shared.confirmed(card, "  CONFIRMAR ")
+    assert shared.confirmed(card, "confirmar")
+    assert not shared.confirmed(card, "CONFIRMA")
+    assert not shared.confirmed(card, "")
+    normal = assistant.cards.card(get("demo.item.create"), {"name": "x"}, "es")
+    assert shared.confirmed(normal, "")
 
 
 # ── What a dangerous write will do, before it is confirmed (BASE-F98) ────────────────────────────────────────────
@@ -790,18 +790,18 @@ def shown(fields: list[dict]) -> list[tuple]:
 def test_a_dangerous_write_shows_what_its_app_says_it_will_do_read_as_the_person(settle):
     """In the order its app names them, by their names in the person's language, an amount in cents as money; what
     the read hides from this person (none, as a blind count's expected cash) or leaves empty is not there."""
-    failure, fields = assistant.preview(ctx(language="es"), settle, {"id": "7", "reason": "cierre"})
+    failure, fields = assistant.cards.preview(ctx(language="es"), settle, {"id": "7", "reason": "cierre"})
     assert failure is None
     assert shown(fields) == [("asked_by", "text", "ana"), ("name", "text", "Item 7"), ("total_cents", "money", 4200)]
     assert (fields[0]["label"], fields[1]["label"]) == ("Persona", "Propietario")
-    _, english = assistant.preview(ctx(language="en", actor="eva"), settle, {"id": "7"})
+    _, english = assistant.cards.preview(ctx(language="en", actor="eva"), settle, {"id": "7"})
     assert [(field["label"], field["value"]) for field in english if field["name"] == "asked_by"] == [("Person", "eva")]
 
 
 def test_a_write_without_a_preview_reads_nothing_and_its_card_is_as_before():
     # A write with neither a preview nor a check (``demo.item.delete`` checks its item since hub#1162).
-    assert assistant.preview(ctx(), get("demo.item.create"), {"name": "x"}) == (None, None)
-    assert set(assistant.card(get("demo.item.delete"), {"id": "x"}, "es")) == {
+    assert assistant.cards.preview(ctx(), get("demo.item.create"), {"name": "x"}) == (None, None)
+    assert set(assistant.cards.card(get("demo.item.delete"), {"id": "x"}, "es")) == {
         "operation", "app", "app_name", "action", "risk", "fields", "count", "confirm_word", "blocked",
     }
 
@@ -809,20 +809,20 @@ def test_a_write_without_a_preview_reads_nothing_and_its_card_is_as_before():
 @pytest.mark.django_db
 def test_a_preview_the_person_may_not_read_is_refused_never_read_for_them(settle):
     """The read runs with the person's own session and permissions, as its screen would: never with more."""
-    failure, fields = assistant.preview(ctx({"base.view_home", "demo.manage"}), settle, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx({"base.view_home", "demo.manage"}), settle, {"id": "7"})
     assert (failure.outcome, failure.code, fields) == ("refused", "permission_denied", None)
 
 
 @pytest.mark.django_db
 def test_a_preview_that_fails_says_why_never_an_empty_one(settle):
-    failure, fields = assistant.preview(ctx(), settle, {"id": "gone"})
+    failure, fields = assistant.cards.preview(ctx(), settle, {"id": "gone"})
     assert (failure.outcome, failure.code, fields) == ("error", "demo.item_not_found", None)
     assert json.loads(failure.content)["error"]["message"] == "This item is not there any more."
 
 
 @pytest.mark.django_db
 def test_a_preview_whose_data_do_not_fit_comes_back_with_the_field(settle):
-    failure, fields = assistant.preview(ctx(), settle, {"reason": "sin id"})
+    failure, fields = assistant.cards.preview(ctx(), settle, {"reason": "sin id"})
     assert (failure.outcome, failure.code, fields) == ("error", "invalid_payload", None)
     assert "id" in json.loads(failure.content)["error"]["fields"]
 
@@ -859,13 +859,13 @@ def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(
     write = declaring({"operation": read.name, "fields": ["expected_balance", "difference"]})
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(registry, write.name, write)
-    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx(), write, {"id": "7"})
     assert failure is None
     assert [{key: value for key, value in field.items() if key != "label"} for field in fields] == [
         {"name": "expected_balance", "kind": "money", "value": 11210},
         {"name": "difference", "kind": "money", "value": difference, "signed": True},
     ]
-    price = next(field for field in assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
+    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
     assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
 
 
@@ -885,7 +885,7 @@ def priced(monkeypatch, answer: dict) -> list[dict]:
     write = declaring({"operation": read.name, "fields": ["note", "total_cents", "difference"]})
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(registry, write.name, write)
-    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx(), write, {"id": "7"})
     assert failure is None
     return [{key: value for key, value in field.items() if key != "label"} for field in fields]
 
@@ -912,7 +912,7 @@ def test_an_amount_of_a_preview_carries_the_currency_its_read_answers(monkeypatc
         {"name": "total_cents", "kind": "money", "value": -12100, "money": money},
         {"name": "difference", "kind": "money", "value": 4200, "signed": True, "money": money},
     ]
-    price = next(field for field in assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
+    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
     assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
 
 
@@ -1012,7 +1012,7 @@ def test_a_preview_marks_signed_only_an_amount(monkeypatch):
 def test_only_an_amount_declared_signed_carries_the_mark(prop, value):
     """The mark is for the card to write a sign on an amount: a datum that is no amount in cents, an amount left empty
     (a difference hidden from this person) or a declaration that is not ``True`` carry none, whatever the schema says."""
-    assert "signed" not in assistant._field("difference", "Diferencia", prop, {}, value)
+    assert "signed" not in shared.field("difference", "Diferencia", prop, {}, value)
 
 
 def test_the_previews_of_today_are_declared_right(settle):
@@ -1059,7 +1059,7 @@ def note(monkeypatch):
 
 @pytest.mark.django_db
 def test_a_write_whose_check_refuses_its_data_gets_no_card_and_says_why(note):
-    failure, fields = assistant.preview(ctx(), note, {"id": "gone", "note": "x"})
+    failure, fields = assistant.cards.preview(ctx(), note, {"id": "gone", "note": "x"})
     assert (failure.outcome, failure.code, fields) == ("error", "demo.item_not_found", None)
     assert json.loads(failure.content)["error"]["message"] == "This item is not there any more."
 
@@ -1067,7 +1067,7 @@ def test_a_write_whose_check_refuses_its_data_gets_no_card_and_says_why(note):
 @pytest.mark.django_db
 def test_a_check_that_passes_leaves_a_normal_writes_card_as_it_was(note):
     """Nothing of the check's answer reaches the card: a normal write has no preview."""
-    assert assistant.preview(ctx(), note, {"id": "7", "note": "x"}) == (None, None)
+    assert assistant.cards.preview(ctx(), note, {"id": "7", "note": "x"}) == (None, None)
 
 
 class StrictCheckIn(Schema):
@@ -1084,14 +1084,14 @@ def test_a_check_reads_only_the_data_its_own_input_takes(monkeypatch):
     monkeypatch.setitem(registry, strict.name, strict)
     write = checking(strict.name)
     monkeypatch.setitem(registry, write.name, write)
-    assert assistant.preview(ctx(), write, {"id": "7", "note": "x"}) == (None, None)
-    failure, _ = assistant.preview(ctx(), write, {"id": "gone", "note": "x"})
+    assert assistant.cards.preview(ctx(), write, {"id": "7", "note": "x"}) == (None, None)
+    failure, _ = assistant.cards.preview(ctx(), write, {"id": "gone", "note": "x"})
     assert failure.code == "demo.item_not_found"
 
 
 @pytest.mark.django_db
 def test_a_check_the_person_may_not_read_is_refused_never_read_for_them(note):
-    failure, fields = assistant.preview(ctx({"base.view_home", "demo.manage"}), note, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx({"base.view_home", "demo.manage"}), note, {"id": "7"})
     assert (failure.outcome, failure.code, fields) == ("refused", "permission_denied", None)
 
 
@@ -1109,9 +1109,9 @@ def test_a_dangerous_write_is_checked_before_its_preview_is_read(monkeypatch):
     monkeypatch.setitem(registry, previewed.name, previewed)
     write = checking(SETTLE_PREVIEW.name, risk="high", preview={"operation": previewed.name, "fields": ["name"]})
     monkeypatch.setitem(registry, write.name, write)
-    failure, _ = assistant.preview(ctx(), write, {"id": "gone"})
+    failure, _ = assistant.cards.preview(ctx(), write, {"id": "gone"})
     assert (failure.code, read) == ("demo.item_not_found", [])
-    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx(), write, {"id": "7"})
     assert (failure, shown(fields), read) == (None, [("name", "text", "Item 7")], ["7"])
 
 
@@ -1153,26 +1153,26 @@ def test_the_checks_of_today_are_declared_right(note):
 
 @pytest.mark.django_db
 def test_a_tool_runs_by_its_operation_with_the_persons_permissions():
-    outcome = assistant.run_tool(ctx(), get("demo.item.create"), '{"name": "Mesa 4"}')
+    outcome = shared.run_tool(ctx(), get("demo.item.create"), '{"name": "Mesa 4"}')
     assert outcome.outcome == "ok"
     created = json.loads(outcome.content)
-    listed = assistant.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}")
+    listed = shared.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}")
     assert created["id"] in listed.content
 
 
 @pytest.mark.django_db
 def test_a_tool_the_person_may_not_use_is_refused_and_writes_nothing():
-    outcome = assistant.run_tool(ctx(EMPLOYEE), get("demo.item.create"), '{"name": "Mesa 4"}')
+    outcome = shared.run_tool(ctx(EMPLOYEE), get("demo.item.create"), '{"name": "Mesa 4"}')
     assert (outcome.outcome, outcome.code) == ("refused", "permission_denied")
-    assert "Mesa 4" not in assistant.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}").content
+    assert "Mesa 4" not in shared.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}").content
 
 
 @pytest.mark.django_db
 def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
-    outcome = assistant.run_tool(ctx(), get("demo.item.create"), '{"name": ""}')
+    outcome = shared.run_tool(ctx(), get("demo.item.create"), '{"name": ""}')
     assert (outcome.outcome, outcome.code) == ("error", "invalid_payload")
     assert "name" in json.loads(outcome.content)["error"]["fields"]
-    broken = assistant.run_tool(ctx(), get("demo.item.create"), "{not json")
+    broken = shared.run_tool(ctx(), get("demo.item.create"), "{not json")
     assert (broken.outcome, broken.code) == ("error", "invalid_payload")
 
 
@@ -1183,7 +1183,7 @@ def test_the_instructions_answer_how_to_questions_only_from_the_documentation():
     """How ERPlora works comes from its documentation, cited; what it does not cover is said, never
     made up. Its records still come only from its tools. Cited by the ``cite`` line each excerpt brings (hub#1079: «citing
     the section» alone let the answer give the steps and name no excerpt)."""
-    text = " ".join(assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
     assert (
         "For questions about how ERPlora works (how to do something, what an option means, plans), search the "
         "documentation with `base__docs__search` and answer only from what it returns; end that answer with the `cite` "
@@ -1197,7 +1197,7 @@ def test_the_instructions_answer_how_to_questions_only_from_the_documentation():
 def test_the_instructions_keep_ids_out_of_the_answer():
     """hub#538: after creating a member, the answer listed it in a table with «ID 01a192cb-…». The model reads ids to
     call its tools, but names a record to the person by its name, as the card and the screens do, never by its id."""
-    text = " ".join(assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
     assert (
         "Name a record to the person by its name, as the screens do: never write an id (a code such as "
         "0190a3b4-…) in the answer, not in a table either."
@@ -1205,7 +1205,7 @@ def test_the_instructions_keep_ids_out_of_the_answer():
 
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():
-    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
+    text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
     # Off-topic questions (films, cinemas) would spend the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
@@ -1225,7 +1225,7 @@ def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currenc
     in it, but the model was told to say every amount in the business's, with two decimals: its text and the card
     disagreed. An amount goes in the minor unit of its currency (no cents in yen), said in the currency its result
     gives, else in the business's."""
-    text = assistant.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
+    text = assistant.prompt.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
     assert example in text
     assert "`currency`" in text and "`currency_decimals`" in text
     assert "two decimals" not in text
@@ -1235,7 +1235,7 @@ def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currenc
 
 
 def _said(language="en", **who):
-    text = assistant.instructions(language=language, currency="EUR", decimals=2, business="Bar Pepe", screens={}, **who)
+    text = assistant.prompt.instructions(language=language, currency="EUR", decimals=2, business="Bar Pepe", screens={}, **who)
     return " ".join(text.split())
 
 
@@ -1317,11 +1317,11 @@ def test_the_setup_block_carries_what_is_pending_and_who_does_it():
              "actionable": True, "route": "/apps", "description": ""},
         ],
     }
-    block = assistant.setup_block(status)
+    block = assistant.prompt.setup_block(status)
     assert "Los datos de tu negocio" in block and "/settings#business" in block
     assert "Tu numeración" in block and "administrator" in block
     assert "Tus apps" in block
-    assert "could not be read" in assistant.setup_block(None)
+    assert "could not be read" in assistant.prompt.setup_block(None)
 
 
 # ── The gateway's doors, signed ──────────────────────────────────────────────────────────────────────────────────
@@ -1329,7 +1329,7 @@ def test_the_setup_block_carries_what_is_pending_and_who_does_it():
 
 def test_the_allowance_is_asked_signed_and_for_this_business(gateway):
     gateway.reply("/internal/assistant/usage", json={"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False})
-    assert assistant.usage(A) == {"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
+    assert assistant.gateway.usage(A) == {"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
     seen = gateway.sent("/internal/assistant/usage")[0]
     assert seen.body == {"hub": "a"}
     assert signed(seen)
@@ -1337,14 +1337,14 @@ def test_the_allowance_is_asked_signed_and_for_this_business(gateway):
 
 def test_a_gateway_that_does_not_answer_is_said_never_made_up(settings):
     settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
-    with pytest.raises(assistant.GatewayError) as caught:
-        assistant.usage(A)
+    with pytest.raises(assistant.gateway.GatewayError) as caught:
+        assistant.gateway.usage(A)
     assert caught.value.code == "assistant.unreachable"
 
 
 def test_a_report_goes_to_erplora_with_the_question_and_the_answer(gateway):
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
-    answer = assistant.report(A, message_id="m1", reason="incorrect", comment="", question="¿Qué vendí?", answer="Nada")
+    answer = assistant.gateway.report(A, message_id="m1", reason="incorrect", comment="", question="¿Qué vendí?", answer="Nada")
     assert answer == {"sent": True, "duplicate": False}
     seen = gateway.sent("/internal/assistant/report")[0]
     assert seen.body == {"hub": "a", "message_id": "m1", "reason": "incorrect", "comment": "", "question": "¿Qué vendí?", "answer": "Nada"}
@@ -1353,14 +1353,14 @@ def test_a_report_goes_to_erplora_with_the_question_and_the_answer(gateway):
 
 def test_a_report_that_could_not_be_sent_says_so(gateway):
     gateway.reply("/internal/assistant/report", status=503, json={"error": {"code": "assistant.report_not_sent", "message": "x"}})
-    with pytest.raises(assistant.GatewayError) as caught:
-        assistant.report(A, message_id="m1", reason="other", comment="", question="", answer="x")
+    with pytest.raises(assistant.gateway.GatewayError) as caught:
+        assistant.gateway.report(A, message_id="m1", reason="other", comment="", question="", answer="x")
     assert caught.value.code == "assistant.report_not_sent"
 
 
 def test_a_dictation_is_transcribed_by_erplora(gateway):
     gateway.reply("/internal/speech/transcribe", json={"text": "cobra la mesa 4", "language": "es"})
-    assert assistant.transcribe(A, audio="UklGRg==", mime_type="audio/webm", language="es") == {"text": "cobra la mesa 4", "language": "es"}
+    assert assistant.gateway.transcribe(A, audio="UklGRg==", mime_type="audio/webm", language="es") == {"text": "cobra la mesa 4", "language": "es"}
     assert gateway.sent("/internal/speech/transcribe")[0].body == {"hub": "a", "audio": "UklGRg==", "mime_type": "audio/webm", "language": "es"}
 
 
@@ -1369,7 +1369,7 @@ def test_a_dictation_is_transcribed_by_erplora(gateway):
 
 def frames_of(**kwargs):
     async def collect():
-        return [frame async for frame in assistant.stream_turn(A, **kwargs)]
+        return [frame async for frame in assistant.gateway.stream_turn(A, **kwargs)]
 
     return asyncio.run(collect())
 
@@ -1507,8 +1507,8 @@ def test_the_tools_it_asks_for_after_searching_still_say_the_pages(gateway):
 def test_a_report_says_whether_its_answer_came_from_the_web(gateway):
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
-    assistant.report(A, message_id="m1", reason="incorrect", comment="", question="¿Plazo?", answer="El 20", web=True)
-    assistant.report(A, message_id="m2", reason="incorrect", comment="", question="Hola", answer="Hola", web=False)
+    assistant.gateway.report(A, message_id="m1", reason="incorrect", comment="", question="¿Plazo?", answer="El 20", web=True)
+    assistant.gateway.report(A, message_id="m2", reason="incorrect", comment="", question="Hola", answer="Hola", web=False)
     first, second = gateway.sent("/internal/assistant/report")
     assert (first.body["web"], second.body["web"]) == (True, False)
     assert signed(first) and signed(second)
@@ -1518,5 +1518,5 @@ def test_a_report_that_does_not_know_leaves_the_web_out(gateway):
     """An answer kept before the mark existed: erplora.com's safe default decides (no text while its search is on), never
     a ``false`` the Hub made up."""
     gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
-    assistant.report(A, message_id="m1", reason="other", comment="", question="", answer="x", web=None)
+    assistant.gateway.report(A, message_id="m1", reason="other", comment="", question="", answer="x", web=None)
     assert "web" not in gateway.sent("/internal/assistant/report")[0].body

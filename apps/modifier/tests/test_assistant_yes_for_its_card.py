@@ -109,7 +109,7 @@ def group_on(plan: dict) -> list[tuple[str, object]]:
 
 
 def fields_of(write: str, arguments: dict, language: str) -> dict:
-    card = assistant.card(get(write), arguments, language, as_admin(language))
+    card = assistant.cards.card(get(write), arguments, language, as_admin(language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -213,7 +213,7 @@ def test_every_write_of_modifiers_that_takes_a_group_by_its_name_is_here():
 def test_only_the_writes_that_take_a_group_by_its_name_check_their_record():
     """Ratchet: a check is a read before the card, which a write that takes no group by its name does not need (and
     whose refusal would hide its card): exactly these, each with the read of its own record."""
-    declared = {op.name: assistant.check_of(op) for op in registry.values() if op.app_label == "modifier"}
+    declared = {op.name: assistant.cards.check_of(op) for op in registry.values() if op.app_label == "modifier"}
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
@@ -350,7 +350,7 @@ def by_its_id_beside_picantes(write: str) -> dict:
 
 @pytest.mark.parametrize("write", ["modifier.group.delete", "modifier.group.update", "modifier.link.detach"])
 def test_a_record_that_comes_by_its_id_names_no_other_group_said_beside_it(write):
-    card = assistant.card(get(write), by_its_id_beside_picantes(write), "es", as_admin())
+    card = assistant.cards.card(get(write), by_its_id_beside_picantes(write), "es", as_admin())
     assert "Salsas picantes" not in [field["value"] for field in card["fields"]]
 
 
@@ -646,7 +646,7 @@ def test_words_that_fit_a_product_or_a_category_of_another_business_are_said_as_
         return {
             kind: {
                 field["name"]: field["value"]
-                for field in assistant.card(get(write), arguments, "es", ctx)["fields"]
+                for field in assistant.cards.card(get(write), arguments, "es", ctx)["fields"]
             }[kind]
             for (write, kind), (arguments, _) in SAID_IN_PART.items()
             if write == "modifier.link.attach"

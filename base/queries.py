@@ -2656,8 +2656,8 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
     """This month's messages of the assistant as erplora.com counts them: used, of how many, and when
     they come back. What cannot be read is an error, never a number made up."""
     try:
-        usage = assistant.usage(ctx.scope)
-    except assistant.GatewayError:
+        usage = assistant.gateway.usage(ctx.scope)
+    except assistant.gateway.GatewayError:
         raise OperationError(
             gettext("The assistant's plan could not be read now."), code="base.assistant_unavailable", status=503
         ) from None
@@ -2702,8 +2702,8 @@ def docs_search(ctx: OperationContext, data: DocsSearchIn) -> DocsSearchOut:
     ASSISTANT-F28): erplora.com's one index, never one of the Hub's. What it cannot answer is an error the assistant
     relays, never excerpts made up."""
     try:
-        found = DocsSearchOut.model_validate(assistant.searched_docs(ctx, query=data.query, limit=data.limit))
-    except (assistant.GatewayError, ValidationError):
+        found = DocsSearchOut.model_validate(assistant.gateway.searched_docs(ctx, query=data.query, limit=data.limit))
+    except (assistant.gateway.GatewayError, ValidationError):
         with translation.override(ctx.language):
             message = gettext("ERPlora's documentation could not be searched now.")
         raise OperationError(message, code="base.assistant_unavailable", status=503) from None

@@ -185,7 +185,7 @@ CAUGHT_ABOVE = {
 
 def test_automations_offers_its_thirty_tools():
     """Automations' assistant tools (``AI``, never ``INTERNAL`` nor the engine's «System only»): a silent drop fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "flow" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "flow" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == TOOLS
 
@@ -262,7 +262,7 @@ def test_a_word_that_only_shares_their_stem_names_no_automation_step_question_or
     """«automática» shares its stem with «automatización», «pasó» is «paso» without its accent and «pregunta» is a verb
     too: the Hub names those by their phrases, so a request about something else does not climb to Automations. «borra»
     and «bórralo» stem apart from «borrador» (``borr``, ``borra``): deleting names no draft."""
-    assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.synonyms()).concepts)
+    assert not any(shared.stem(word) in concept for concept in shared.asked([phrase], assistant.relevance.synonyms()).concepts)
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
@@ -274,7 +274,7 @@ def test_each_group_brings_its_tool_among_the_first_ten(catalog_of, member, name
     assert nobodys_words(tools, phrase)
     group = [group for group in apps.get_app_config("flow").assistant_synonyms if member in group]
     assert len(group) == 1, member  # positive control: the group is Automations', and only one
-    without = tuple(other for other in assistant.synonyms() if other != group[0])
+    without = tuple(other for other in assistant.relevance.synonyms() if other != group[0])
     assert name in offered_to(tools, phrase)[:TOP]
     assert name not in offered_to(tools, phrase, synonyms=without)[:TOP]
 

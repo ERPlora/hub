@@ -44,12 +44,12 @@ def a_save(content: dict | None = None, palette: str = "ocean", mode: str = "aut
 
 def said(arguments: dict, language: str = "en", ctx=None) -> dict:
     """Each datum of the card of the save, in words."""
-    card = assistant._card_details(get(SAVE), arguments, language, ctx or ctx_for())
+    card = assistant.cards._card_details(get(SAVE), arguments, language, ctx or ctx_for())
     return {field["name"]: field["value"] for field in card["fields"]}
 
 
 def summary(arguments: dict, language: str = "en") -> dict:
-    card = assistant.card(get(SAVE), arguments, language, ctx_for())
+    card = assistant.cards.card(get(SAVE), arguments, language, ctx_for())
     return {field["name"]: field["value"] for field in card["fields"]}
 
 
@@ -172,7 +172,7 @@ def test_each_day_of_the_opening_hours_is_said_by_the_word_the_editor_shows(lang
 
 
 def website_writes():
-    return [op for op in registry.values() if op.app_label == "website" and op.kind == "command" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "website" and op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_no_datum_of_a_write_of_the_website_reaches_a_spanish_card_by_its_technical_name():
@@ -180,7 +180,7 @@ def test_no_datum_of_a_write_of_the_website_reaches_a_spanish_card_by_its_techni
     and unpublish send none."""
     assert [op.name for op in website_writes()] == [SAVE, "website.site.publish", "website.site.unpublish"]
     assert technical_names(website_writes()) == {}
-    card = assistant._card_details(get(SAVE), a_save(), "es", ctx_for())
+    card = assistant.cards._card_details(get(SAVE), a_save(), "es", ctx_for())
     assert [field["label"] for field in card["fields"]] == ["Plantilla", "Tema", "Contenido"]
 
 
@@ -188,7 +188,7 @@ def test_each_datum_of_the_save_is_titled_by_the_website_s_own_catalog_not_anoth
     """The predicate ``technical_names()`` cannot see (hub#927's review): «template» is translated by base and the
     WhatsApp inbox too, so a title the website forgot would still reach a Spanish card. Each one is in its own."""
     own = gettext.translation("django", localedir=Path(settings.BASE_DIR) / "apps/website/locale", languages=["es"])
-    card = assistant._card_details(get(SAVE), a_save(), "es", ctx_for())
+    card = assistant.cards._card_details(get(SAVE), a_save(), "es", ctx_for())
     for field in card["fields"]:
         with translation.override("en"):
             msgid = str(Site._meta.get_field(field["name"]).verbose_name)

@@ -504,9 +504,9 @@ MAX_ASSISTANT_AUDIO_BODY = 3_000_000
 @decorate_view(accept_body_up_to(MAX_ASSISTANT_TURN_BODY))
 async def assistant_turn(request, data: AssistantTurnIn):
     # What its tools wait on erplora.com for (a search in ERPlora's documentation) goes before its transaction.
-    with assistant.prepared_docs(await assistant.prepare(request, data)):
+    with assistant.gateway.prepared_docs(await assistant.gateway.prepare(request, data)):
         plan = await run_operation(request, services.assistant_turn, data)
-    return assistant.turn_response(request, plan.model_dump(mode="json"))
+    return assistant.gateway.turn_response(request, plan.model_dump(mode="json"))
 
 
 @bind(router, "base.assistant.usage", "/assistant/usage")

@@ -81,7 +81,7 @@ ASK_FIRST = re.compile(r"\bask\b[^.]*\b(?:first|before)\b", re.IGNORECASE)
 
 
 def reservation_tools() -> dict[str, Operation]:
-    return {name: op for name, op in registry.items() if op.app_label == "reservation" and assistant.is_tool(op)}
+    return {name: op for name, op in registry.items() if op.app_label == "reservation" and assistant.tools.is_tool(op)}
 
 
 def test_no_tool_of_reservation_tells_the_model_to_ask_in_the_chat_before_its_card():

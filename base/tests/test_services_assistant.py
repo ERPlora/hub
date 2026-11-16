@@ -9,6 +9,7 @@ from datetime import datetime
 
 import pytest
 from django.db import connections
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import OperationError, Unauthorized
 from live.operations import Operation, get, registry
@@ -40,7 +41,7 @@ def run(operation_name, permissions=MANAGER, *, actor="ana", **data):
 
 
 def call(name, arguments, call_id="c1"):
-    return {"call_id": call_id, "name": assistant.tool_name(name), "arguments": json.dumps(arguments)}
+    return {"call_id": call_id, "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
 
 
 def asked(*calls):
@@ -86,7 +87,7 @@ def items():
 def test_the_turn_is_the_persons_and_not_a_tool():
     op = get("base.assistant.turn")
     assert (op.kind, op.permission) == ("command", "base.view_home")
-    assert not assistant.is_tool(op)
+    assert not assistant.tools.is_tool(op)
     with pytest.raises(Unauthorized):
         run("base.assistant.turn", actor=None, messages=[ASK])
 
@@ -459,11 +460,11 @@ def test_a_write_the_assistant_runs_for_one_business_never_lands_in_another(hub_
 
 
 def test_after_too_many_rounds_the_turn_stops_and_says_why():
-    rounds = [asked(call("demo.item.list", {}, f"r{n}")) for n in range(assistant.MAX_ROUNDS)]
+    rounds = [asked(call("demo.item.list", {}, f"r{n}")) for n in range(shared.MAX_ROUNDS)]
     messages = [ASK]
     for n, message in enumerate(rounds[:-1]):
         messages += [message, {"role": "tool", "tool_call_id": f"r{n}", "content": "{}"}]
-    last = call("demo.item.list", {}, f"r{assistant.MAX_ROUNDS - 1}")
+    last = call("demo.item.list", {}, f"r{shared.MAX_ROUNDS - 1}")
     plan = run("base.assistant.turn", messages=[*messages, asked(last)], pending=[last])
     assert plan["stop"] == "assistant.too_many_steps"
     assert plan["executed"][0]["outcome"] == "ok"
@@ -588,13 +589,13 @@ def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, oper
     transaction at a time), so the till would wait too: while the gateway answers, none is open."""
     gateway.reply(path, json=answer)
     seen = []
-    post = assistant._post
+    post = assistant.gateway._post
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     run(operation_name, EMPLOYEE, **data)
     assert seen == [False]
 
@@ -604,4 +605,4 @@ def test_a_turn_reads_the_hubs_own_words():
     check among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
     asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
     plan = run("base.assistant.turn", {"*"}, messages=[asked])
-    assert assistant.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
+    assert shared.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]

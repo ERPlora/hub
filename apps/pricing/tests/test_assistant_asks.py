@@ -115,7 +115,7 @@ def test_price_lists_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_pricing_offers_its_twenty_tools():
     """Price lists' tools are its reads and its writes (``AI``, never ``INTERNAL``; its reactions to other apps are no
     tool): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "pricing" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "pricing" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == READS | NOT_THE_EMPLOYEES
     assert {name for name, _ in OWN_WORDS} == tools  # one phrase of a person's own words for each tool

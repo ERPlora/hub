@@ -62,7 +62,7 @@ def stops_in_the_chat(description: str) -> list[str]:
 
 def tools() -> dict[str, str]:
     """Every assistant tool of the Hub, by name, with its description."""
-    return {name: shared.description(op) for name, op in sorted(registry.items()) if assistant.is_tool(op)}
+    return {name: shared.description(op) for name, op in sorted(registry.items()) if assistant.tools.is_tool(op)}
 
 
 def test_the_guard_reads_the_old_texts_and_their_wordings():

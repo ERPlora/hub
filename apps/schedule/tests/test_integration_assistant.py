@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.operations import get, registry
 
 from base import assistant
@@ -23,7 +24,7 @@ SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["schedule
 TOOLS = sorted(
     name
     for name, op in registry.items()
-    if op.app_label == "schedule" and op.kind == "command" and assistant.is_tool(op)
+    if op.app_label == "schedule" and op.kind == "command" and assistant.tools.is_tool(op)
 )
 
 #: The writes that send a day's opening intervals.
@@ -44,7 +45,7 @@ def labels(card: dict) -> list[str]:
 def named(monkeypatch):
     """Every record a write names by its id comes out named, as a person who may read it sees it: this test is about
     what the card calls each datum, and a record nobody names is left out of it (hub#675)."""
-    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "Navidad")
+    monkeypatch.setattr(assistant.cards, "_reference", lambda value, prop, words: "Navidad")
 
 
 def schedule_writes() -> list:
@@ -55,12 +56,12 @@ def named_by_schedule(op, name: str, title: str | None) -> bool:
     """Whether schedule itself names the datum ``name`` of ``op``: by its schema's own title, by the ``verbose_name``
     of one of its models, or by its own catalog. A title pydantic made up that another app's catalog happens to
     translate is not a name of Schedules: it changes if that app's text changes."""
-    made_up = assistant._generated_title(name)
+    made_up = shared.generated_title(name)
     with (APP / "locale/es/LC_MESSAGES/django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     return (
         bool(title and title != made_up)
-        or assistant._verbose_name("schedule", op.name.split(".")[1], name) is not None
+        or shared.verbose_name("schedule", op.name.split(".")[1], name) is not None
         or own.gettext(made_up) != made_up
     )
 
@@ -80,8 +81,8 @@ def test_no_datum_of_a_write_of_schedule_borrows_its_name_from_another_apps_cata
     screen = named_by_the_screen()
     borrowed: dict[str, list[str]] = {}
     for op in schedule_writes():
-        props = assistant._schema(op).get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        props = shared.input_schema(op).get("properties", {})
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_schedule(op, datum, props[datum].get("title")):
                 borrowed.setdefault(op.name, []).append(datum)
@@ -94,8 +95,8 @@ def test_the_card_names_the_intervals_as_the_hours_form():
     assert set(WITH_INTERVALS) <= set(TOOLS)
     for name in WITH_INTERVALS:
         op = get(name)
-        assert labels(assistant.card(op, {"intervals": []}, "es")) == [SCREENS["intervals"]["legend"]], name
-        assert labels(assistant.card(op, {"intervals": []}, "en")) == [SCREENS_EN["intervals"]["legend"]], name
+        assert labels(assistant.cards.card(op, {"intervals": []}, "es")) == [SCREENS["intervals"]["legend"]], name
+        assert labels(assistant.cards.card(op, {"intervals": []}, "en")) == [SCREENS_EN["intervals"]["legend"]], name
 
 
 @pytest.mark.parametrize(
@@ -113,7 +114,7 @@ def test_the_card_names_the_record_of_a_write_as_its_list_calls_one(named, write
     op = get(write)
     for screens, language in ((SCREENS, "es"), (SCREENS_EN, "en")):
         one = screens[list_]["entity"]["one"]
-        assert labels(assistant.card(op, {"id": "0192f0b2-3333-7000-8000-000000000003"}, language)) == [
+        assert labels(assistant.cards.card(op, {"id": "0192f0b2-3333-7000-8000-000000000003"}, language)) == [
             one[:1].upper() + one[1:]
         ], (write, language)
 
@@ -121,5 +122,5 @@ def test_the_card_names_the_record_of_a_write_as_its_list_calls_one(named, write
 def test_the_card_names_the_special_days_of_a_bulk_as_their_tab():
     bulk = get("schedule.special_day.bulk_create")
     arguments = {"special_days": [{"date": "2026-12-25", "name": "Navidad"}]}
-    assert labels(assistant.card(bulk, arguments, "es")) == [SCREENS["specialDays"]["heading"]]
-    assert labels(assistant.card(bulk, arguments, "en")) == [SCREENS_EN["specialDays"]["heading"]]
+    assert labels(assistant.cards.card(bulk, arguments, "es")) == [SCREENS["specialDays"]["heading"]]
+    assert labels(assistant.cards.card(bulk, arguments, "en")) == [SCREENS_EN["specialDays"]["heading"]]

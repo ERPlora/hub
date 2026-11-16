@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import timezone, translation
+from live import assistant as shared
 from live.context import OperationContext, Scope, system_context
 from live.operations import get, registry
 
@@ -33,7 +34,7 @@ def labels(card: dict) -> list[str]:
 
 
 def invoice_writes() -> list:
-    return [op for op in registry.values() if op.app_label == "invoice" and op.kind == "command" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "invoice" and op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_no_datum_of_a_write_of_invoice_reaches_a_spanish_card_by_its_technical_name():
@@ -56,29 +57,29 @@ def test_no_datum_of_a_write_of_invoice_reaches_a_spanish_card_by_its_technical_
 
 def test_the_card_names_a_reprint_as_the_paper_stamps_it():
     print_ = get("invoice.invoice.print")
-    assert labels(assistant.card(print_, {"number": "F-1", "duplicate": True}, "es")) == ["Número", SCREENS["paper"]["copy"]]
-    assert labels(assistant.card(print_, {"number": "F-1", "duplicate": True}, "en")) == ["Number", SCREENS_EN["paper"]["copy"]]
+    assert labels(assistant.cards.card(print_, {"number": "F-1", "duplicate": True}, "es")) == ["Número", SCREENS["paper"]["copy"]]
+    assert labels(assistant.cards.card(print_, {"number": "F-1", "duplicate": True}, "en")) == ["Number", SCREENS_EN["paper"]["copy"]]
 
 
 def test_the_card_names_the_kind_of_a_rectification_as_its_form_does():
     # The invoice by its number: one named by its id is said by its number, read as the person (below).
     rectify = get("invoice.invoice.rectify")
     arguments = {"number": "FACT-2026-000001", "rectification_type": "R4"}
-    assert labels(assistant.card(rectify, arguments, "es")) == ["Número", SCREENS["rectify"]["type"]]
-    assert labels(assistant.card(rectify, arguments, "en")) == ["Number", SCREENS_EN["rectify"]["type"]]
+    assert labels(assistant.cards.card(rectify, arguments, "es")) == ["Número", SCREENS["rectify"]["type"]]
+    assert labels(assistant.cards.card(rectify, arguments, "en")) == ["Number", SCREENS_EN["rectify"]["type"]]
 
 
 def test_the_card_names_the_lines_of_a_manual_invoice():
     lines = [{"description": "Corte", "quantity": "1", "unit_price": 1500, "tax_rate": "21"}]
     create = get("invoice.invoice.create")
-    assert labels(assistant.card(create, {"lines": lines}, "es")) == ["Líneas"]
-    assert labels(assistant.card(create, {"lines": lines}, "en")) == ["Lines"]
+    assert labels(assistant.cards.card(create, {"lines": lines}, "es")) == ["Líneas"]
+    assert labels(assistant.cards.card(create, {"lines": lines}, "en")) == ["Lines"]
 
 
 def test_the_card_names_a_series_next_number_as_its_form_does():
     for name in ("invoice.series.create", "invoice.series.update"):
-        assert labels(assistant.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]
-        assert labels(assistant.card(get(name), {"next_number": 120}, "en")) == [SCREENS_EN["series"]["form"]["nextNumber"]]
+        assert labels(assistant.cards.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]
+        assert labels(assistant.cards.card(get(name), {"next_number": 120}, "en")) == [SCREENS_EN["series"]["form"]["nextNumber"]]
 
 
 # ── Rectifying by asking the assistant (INVOICE-F08) ──────────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ def ask():
 
 
 def call(name, arguments, call_id="c1"):
-    return {"call_id": call_id, "name": assistant.tool_name(name), "arguments": json.dumps(arguments)}
+    return {"call_id": call_id, "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
 
 
 def asked(*calls):
@@ -137,11 +138,11 @@ def test_rectifying_an_invoice_offers_the_preview_and_the_rectification(issuer):
 
 def test_the_rectification_tells_the_assistant_to_read_its_preview_first_and_to_name_that_invoice():
     rectify = get("invoice.invoice.rectify")
-    assert "invoice.invoice.rectification_preview" in assistant.description(rectify)
-    assert assistant.risk(rectify) == "high"
+    assert "invoice.invoice.rectification_preview" in shared.description(rectify)
+    assert shared.risk(rectify) == "high"
     # The preview is a read the assistant may run by itself: never a card, never a change.
     seen = get("invoice.invoice.rectification_preview")
-    assert (seen.kind, assistant.is_tool(seen), seen.permission) == ("query", True, rectify.permission)
+    assert (seen.kind, assistant.tools.is_tool(seen), seen.permission) == ("query", True, rectify.permission)
 
 
 @HUB_DB
@@ -265,7 +266,7 @@ def name_of(code: str, language: str) -> str:
 
 
 def preview_of(number: str, language: str) -> list[dict]:
-    failure, preview = assistant.preview(
+    failure, preview = assistant.cards.preview(
         ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON}
     )
     assert failure is None
@@ -296,7 +297,7 @@ def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in
     ]
     assert [field["label"] for field in preview] == card_labels(SCREENS)
     assert [field["label"] for field in preview_of(original.number, "en")] == card_labels(SCREENS_EN)
-    assert assistant.preview_of(get("invoice.invoice.rectify"))["fields"] == PREVIEWED
+    assert shared.preview_of(get("invoice.invoice.rectify"))["fields"] == PREVIEWED
 
 
 @HUB_DB
@@ -386,26 +387,26 @@ RECTIFICATION_KINDS = ("R1", "R2", "R3", "R4")
 )
 def test_the_card_says_the_kind_it_sends_by_its_name(language, named):
     arguments = {"number": "FACT-2026-000001", "rectification_type": "R4"}
-    assert values(assistant.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"] == named
+    assert values(assistant.cards.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"] == named
 
 
 @pytest.mark.parametrize("language", ["es", "en"])
 @pytest.mark.parametrize("code", RECTIFICATION_KINDS)
 def test_every_kind_a_rectification_takes_has_its_name_on_the_card(code, language):
     arguments = {"number": "FACT-2026-000001", "rectification_type": code}
-    said_it = values(assistant.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"]
+    said_it = values(assistant.cards.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"]
     assert said_it == name_of(code, language) != code
 
 
 def test_the_kinds_the_card_names_are_those_its_write_takes():
     """Positive control of the two above: a kind the write comes to take would need its name here."""
     schema = get("invoice.invoice.rectify").input.model_json_schema()
-    prop = assistant._resolved(schema["properties"]["rectification_type"], schema.get("$defs", {}))
+    prop = shared.resolved(schema["properties"]["rectification_type"], schema.get("$defs", {}))
     assert tuple(prop["enum"]) == RECTIFICATION_KINDS
 
 
 def previewed_kind(number: str, language: str, **more) -> dict:
-    failure, preview = assistant.preview(
+    failure, preview = assistant.cards.preview(
         ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON, **more}
     )
     assert failure is None
@@ -474,7 +475,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def values(card: dict) -> dict:
@@ -537,7 +538,7 @@ def said(business: dict, language: str = "es") -> dict:
 def cards(business: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        write: assistant.card(
+        write: assistant.cards.card(
             get(write), {**{datum: str(business["ids"][datum]) for datum in data}, **BESIDES.get(write, {})}, language, ctx
         )
         for write, data in NAMED.items()
@@ -649,7 +650,7 @@ def test_the_product_of_a_manual_line_is_left_out_never_by_its_id(hub_a):
             {"name": "Champú", "sku": "CH-1", "price": 1210, "tax_category_key": "product.generic"},
             system_context(Scope("host", hub_a.slug)),
         )
-        card = assistant.card(get("invoice.invoice.create"), {"lines": [{**line, "product_id": str(shampoo.id)}]}, "es", in_hub(hub_a))
+        card = assistant.cards.card(get("invoice.invoice.create"), {"lines": [{**line, "product_id": str(shampoo.id)}]}, "es", in_hub(hub_a))
     assert [{key: value for key, value in row.items() if key != "unit_price"} for row in values(card)["lines"]] == [
         {"description": "Champú", "quantity": "1", "tax_rate": "21"}
     ]
@@ -665,7 +666,7 @@ def test_the_kind_of_a_foreign_recipient_s_document_is_said_as_the_recipient_for
     kinds = screens["recipient"]["idTypes"]
     assert set(kinds) == {"02", "03", "04", "05", "06", "07"}  # positive control: every kind the form offers
     assert {
-        code: values(assistant.card(get(write), {"customer_id_type": code}, language))["customer_id_type"]
+        code: values(assistant.cards.card(get(write), {"customer_id_type": code}, language))["customer_id_type"]
         for code in kinds
     } == kinds
 
@@ -684,7 +685,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             schema = op.input.model_json_schema()
             for datum in data:
                 checked += 1
-                marked = assistant.refers_of(assistant._resolved(schema["properties"][datum], schema.get("$defs", {})))
+                marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
     # Positive control: the employee issues, prints and marks as paid (7 records); the manager, the admin and the owner

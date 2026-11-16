@@ -25,7 +25,7 @@ def kitchen_writes() -> list:
     return [
         op
         for op in registry.values()
-        if op.app_label == "kitchen" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "kitchen" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -42,40 +42,40 @@ def test_the_card_names_the_type_and_the_dishes_of_a_round_sent_to_the_kitchen()
     dishes, dishes_en = SCREENS["form"]["dishes"], SCREENS_EN["form"]["dishes"]
     receive = get("kitchen.ticket.receive")
     arguments = {"channel": "takeaway", "items": [{"order_item_id": "x"}]}
-    assert labels(assistant.card(receive, arguments, "es")) == ["Tipo de comanda", dishes]
-    assert labels(assistant.card(receive, arguments, "en")) == ["Ticket type", dishes_en]
+    assert labels(assistant.cards.card(receive, arguments, "es")) == ["Tipo de comanda", dishes]
+    assert labels(assistant.cards.card(receive, arguments, "en")) == ["Ticket type", dishes_en]
     send = get("kitchen.ticket.send")
-    assert labels(assistant.card(send, {"channel": "delivery"}, "es")) == ["Tipo de comanda"]
-    assert labels(assistant.card(send, {"channel": "delivery"}, "en")) == ["Ticket type"]
+    assert labels(assistant.cards.card(send, {"channel": "delivery"}, "es")) == ["Tipo de comanda"]
+    assert labels(assistant.cards.card(send, {"channel": "delivery"}, "en")) == ["Ticket type"]
 
 
 def test_the_card_names_the_dishes_of_a_ticket_made_by_hand_and_the_ones_marked_ready():
     dishes, dishes_en = SCREENS["form"]["dishes"], SCREENS_EN["form"]["dishes"]
     create = get("kitchen.ticket.create")
-    assert labels(assistant.card(create, {"items": [{"name": "Tortilla"}]}, "es")) == [dishes]
-    assert labels(assistant.card(create, {"items": [{"name": "Tortilla"}]}, "en")) == [dishes_en]
+    assert labels(assistant.cards.card(create, {"items": [{"name": "Tortilla"}]}, "es")) == [dishes]
+    assert labels(assistant.cards.card(create, {"items": [{"name": "Tortilla"}]}, "en")) == [dishes_en]
     for name in ("kitchen.item.bump", "kitchen.item.recall"):
-        assert labels(assistant.card(get(name), {"item_ids": ["x"]}, "es")) == [dishes]
-        assert labels(assistant.card(get(name), {"item_ids": ["x"]}, "en")) == [dishes_en]
+        assert labels(assistant.cards.card(get(name), {"item_ids": ["x"]}, "es")) == [dishes]
+        assert labels(assistant.cards.card(get(name), {"item_ids": ["x"]}, "en")) == [dishes_en]
 
 
 def test_the_card_names_the_checks_of_a_merge_as_sales_does():
     """Two checks Sales merged: the one absorbed and the one that stays, by the names Sales' merge gives them."""
     sync = get("kitchen.ticket.sync")
     arguments = {"from_order_id": "x", "to_order_id": "y"}
-    assert labels(assistant.card(sync, arguments, "es")) == ["Cuenta de origen", "Cuenta de destino"]
-    assert labels(assistant.card(sync, arguments, "en")) == ["From check", "Into check"]
+    assert labels(assistant.cards.card(sync, arguments, "es")) == ["Cuenta de origen", "Cuenta de destino"]
+    assert labels(assistant.cards.card(sync, arguments, "en")) == ["From check", "Into check"]
 
 
 def test_the_card_names_the_colour_of_a_station_never_by_its_technical_name():
     """«Color» is written as the field is: the station's form names it, and the card says whose colour it is."""
     for name in ("kitchen.station.create", "kitchen.station.update"):
-        assert labels(assistant.card(get(name), {"color": "#F97316"}, "es")) == ["Color de la estación"]
-        assert labels(assistant.card(get(name), {"color": "#F97316"}, "en")) == ["Station colour"]
+        assert labels(assistant.cards.card(get(name), {"color": "#F97316"}, "es")) == ["Color de la estación"]
+        assert labels(assistant.cards.card(get(name), {"color": "#F97316"}, "en")) == ["Station colour"]
 
 
 def test_the_card_says_whether_a_station_is_active_as_its_screen_does():
     """«Activa», the station's word on Estaciones, not Django's «Activo» (hub#659)."""
     for name in ("kitchen.station.create", "kitchen.station.update"):
-        assert labels(assistant.card(get(name), {"is_active": False}, "es")) == ["Activa"]
-        assert labels(assistant.card(get(name), {"is_active": False}, "en")) == ["Active"]
+        assert labels(assistant.cards.card(get(name), {"is_active": False}, "es")) == ["Activa"]
+        assert labels(assistant.cards.card(get(name), {"is_active": False}, "en")) == ["Active"]

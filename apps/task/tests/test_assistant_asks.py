@@ -51,7 +51,7 @@ PROBES = json.loads(
 
 def test_task_offers_at_least_17_tools():
     """Tasks' tools are at least 17 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "task" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "task" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 17
 
@@ -96,7 +96,7 @@ def test_the_guests_of_a_table_are_no_comment():
     assert not any(
         comment in concept
         for concept in shared.asked(
-            ["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.synonyms()
+            ["¿cuántos comensales tiene la cuenta de la mesa 4?"], assistant.relevance.synonyms()
         ).concepts
     )
 

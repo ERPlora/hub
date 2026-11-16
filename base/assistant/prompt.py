@@ -1,0 +1,114 @@
+"""The system message of every turn of the Hub's assistant (``instructions``), and the setup checklist it reads
+(``setup_block``).
+"""
+
+from collections.abc import Collection
+
+from django.utils import translation
+from django.utils.translation import get_language_info
+from live.assistant import tool_name
+
+from base.models import Membership
+
+#: Who can do what a role of the business cannot (hub#585): the roles above it. The owner and an administrator hold
+#: every permission of every app (``base.permissions.FULL_ACCESS_ROLES``): what no tool of theirs does is done on its
+#: screen, never someone else's.
+ABOVE = {Membership.Role.MANAGER: "the owner or an administrator", Membership.Role.EMPLOYEE: "a manager or the owner"}
+
+
+def instructions(  # noqa: PLR0913
+    *,
+    language: str,
+    currency: str,
+    decimals: int,
+    business: str,
+    screens: dict[str, str],
+    role: str | None = None,
+    approvable: Collection[str] = (),
+) -> str:
+    """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
+    tools and money (an amount in the minor unit of its currency, ``decimals`` the business's; said in the currency
+    its result gives, else the business's), the screens it may link, and the person's ``role`` in the business with
+    the writes offered to it that a manager must approve (``approvable``, by operation name; BASE-F100)."""
+    try:
+        language_name = get_language_info(language)["name"]
+    except KeyError:
+        language_name = language
+    links = "\n".join(f"- [{name}]({path})" for path, name in screens.items())
+    example = f"{17:.{decimals}f} {currency} → {17 * 10**decimals}"
+    return f"""You are the assistant of the business «{business}» in ERPlora, its point of sale and management app.
+Answer in {language_name}, short and plain, as a colleague who knows the app. Use Markdown: bold, lists and tables.
+
+- Only help with this business and with using ERPlora. To anything else (films, general knowledge, other software),
+  say kindly that you only help with the business, in one sentence, and do not answer it.
+- Read before you answer: use the tools to look up records, numbers and ids. Never invent a record, an id, an amount
+  or a date: if no tool returned it, say you do not know or that you could not find it.
+- Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
+  answer, not in a table either.
+- For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
+  with `base__docs__search` and answer only from what it returns; end that answer with the `cite` of each excerpt you
+  used, at least one, as it comes and in a line of its own; if it returns nothing, say the documentation does not
+  cover it.
+- To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
+  «not confirmed» or with an error, nothing changed: say so, and never say it was done.
+- Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
+  description says: the one a datum marked `"currency": true` beside it names, or the one of the record (a cart, a
+  price list) a datum marked `"currency": {{"read": …}}` names, which that read gives; else the business's ({example}). To
+  the person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals)
+  when it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
+- When the person should go to a screen, link it with its path, only one of these:
+{links}{_who_asks(role, language, approvable)}
+- If something cannot be done from here (you have no tool for it), say on which screen it is done."""
+
+
+def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> str:
+    """The lines of the instructions on whom the assistant serves (hub#585, BASE-F100): their role as the screens name
+    it, in the chat's language, whose tools these are; for a role below the owner's, that what no tool does is said as
+    not available to them here (their role, or its app off or out of the plan) and theirs to ask of someone else,
+    never looked for another way nor answered with the state of something else; and the writes they may only run with
+    a manager's approval. Nothing for no role of the business (an automation's step)."""
+    lines = []
+    if role in Membership.Role.values:
+        with translation.override(language):
+            name = str(Membership.Role(role).label)
+        lines.append(
+            f"- You talk to the «{name}» of this business: your tools are the ones this role may use, no more."
+        )
+        if role in ABOVE:
+            lines.append(
+                "  When they ask for something none of your tools does, do not try other tools for it and never tell\n"
+                "  the state of something else instead: say plainly that it is not available to them here, because\n"
+                "  their role cannot do it or because its app is not on, and that "
+                f"{ABOVE[role]} can, or on which screen it is done."
+            )
+    if approvable:
+        tools = ", ".join(f"`{tool_name(name)}`" for name in approvable)
+        lines.append(
+            f"- This person needs a manager's approval to run {tools}: before you call one, say that its card will\n"
+            "  ask a manager to approve it (their PIN or badge) and that it runs only once approved."
+        )
+    return "".join(f"\n{line}" for line in lines)
+
+
+def setup_block(status: dict | None) -> str:
+    """The checklist «Finish setting up your business» as the model reads it: what is pending, what
+    blocks invoicing, what is done, and what only an administrator can do. ``None``: it could not be read."""
+    if status is None:
+        return "The checklist of this business could not be read now: do not say the business is set up."
+    lines = [
+        "The person is setting up the business. Its checklist «Finish setting up your business», read now "
+        f"({status['total'] - status['pending'] - status['unavailable']} of {status['total']} done):"
+    ]
+    for item in status["items"]:
+        state = item["state"]
+        if state == "done":
+            lines.append(f"- Done: {item['title']}.")
+            continue
+        if state == "unavailable":
+            lines.append(f"- Not available yet (nothing to do): {item['title']}.")
+            continue
+        needed = " Needed to invoice." if item["level"] == "legal" else ""
+        who = "" if item["actionable"] else " Only an administrator of the business can do it."
+        lines.append(f"- Pending: {item['title']} — {item['description']} Screen: {item['route']}.{needed}{who}")
+    lines.append("This list is complete: never add a step that is not in it.")
+    return "\n".join(lines)

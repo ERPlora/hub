@@ -108,7 +108,7 @@ def test_schedules_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_schedule_offers_its_sixteen_tools():
     """Schedules' tools are its sixteen operations (``AI``, never ``INTERNAL``; the two reads of the card of a write
     are not tools): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "schedule" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "schedule" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == {name for name, _ in OWN_WORDS}
     assert len(tools) == 16

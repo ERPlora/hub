@@ -30,7 +30,7 @@ def labels(card: dict) -> list[str]:
 
 def inventory_writes() -> list:
     return [
-        op for op in registry.values() if op.app_label == "inventory" and op.kind == "command" and assistant.is_tool(op)
+        op for op in registry.values() if op.app_label == "inventory" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -43,7 +43,7 @@ def test_no_datum_of_a_write_of_inventory_reaches_a_spanish_card_by_its_technica
     technical: dict[str, list[str]] = {}
     for op in writes:
         props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             name, label = field["name"], field["label"]
             if name in SPELLED_ALIKE:
                 assert label == SPELLED_ALIKE[name], (op.name, name)
@@ -66,9 +66,9 @@ def test_the_card_names_a_new_products_data_as_its_form_does():
     arguments = {"initial_stock": "5", "ean13": "8410000000000", "category_ids": ["x"]}
     form = ("initialStock", "ean13", "categories")
     create = get("inventory.product.create")
-    assert labels(assistant.card(create, arguments, "es")) == [SCREENS["form"][key] for key in form]
-    assert labels(assistant.card(create, arguments, "en")) == [SCREENS_EN["form"][key] for key in form]
-    edit = assistant.card(get("inventory.product.update"), {"category_ids": [], "tax_category_key": "iva-21"}, "es")
+    assert labels(assistant.cards.card(create, arguments, "es")) == [SCREENS["form"][key] for key in form]
+    assert labels(assistant.cards.card(create, arguments, "en")) == [SCREENS_EN["form"][key] for key in form]
+    edit = assistant.cards.card(get("inventory.product.update"), {"category_ids": [], "tax_category_key": "iva-21"}, "es")
     assert labels(edit) == [SCREENS["tax"]["label"], SCREENS["form"]["categories"]]
 
 
@@ -77,20 +77,20 @@ def test_the_card_names_an_import_and_its_rehearsal():
     its own), and the rehearsal by what the preview does: it checks the file and creates nothing."""
     rehearsal = {"rows": [{"line": 1, "name": "Vino", "sku": "V1"}], "dry_run": True}
     for name in ("inventory.product.bulk_create", "inventory.category.bulk_create"):
-        assert labels(assistant.card(get(name), {"rows": rehearsal["rows"]}, "es")) == ["Filas del fichero"]
-    assert labels(assistant.card(get("inventory.product.bulk_create"), rehearsal, "es")) == [
+        assert labels(assistant.cards.card(get(name), {"rows": rehearsal["rows"]}, "es")) == ["Filas del fichero"]
+    assert labels(assistant.cards.card(get("inventory.product.bulk_create"), rehearsal, "es")) == [
         "Filas del fichero",
         "Solo revisar",
     ]
-    assert labels(assistant.card(get("inventory.product.bulk_create"), rehearsal, "en")) == ["File rows", "Check only"]
+    assert labels(assistant.cards.card(get("inventory.product.bulk_create"), rehearsal, "en")) == ["File rows", "Check only"]
 
 
 def test_the_card_names_a_category_sold_out_and_a_count_as_their_screens_do():
-    category = assistant.card(get("inventory.category.create"), {"name": "Vinos", "tax_category_key": "iva-21"}, "es")
+    category = assistant.cards.card(get("inventory.category.create"), {"name": "Vinos", "tax_category_key": "iva-21"}, "es")
     assert labels(category) == ["Nombre", SCREENS["categories"]["form"]["tax"]]
-    sold_out = assistant.card(get("inventory.product.set_sold_out"), {"product": "Vino", "sold_out": True}, "es")
+    sold_out = assistant.cards.card(get("inventory.product.set_sold_out"), {"product": "Vino", "sold_out": True}, "es")
     assert labels(sold_out) == ["Producto", SCREENS["products"]["soldOut"]]
-    count = assistant.card(get("inventory.stock.count"), {"product": "Vino", "stock": "4", "reason": "recuento"}, "es")
+    count = assistant.cards.card(get("inventory.stock.count"), {"product": "Vino", "stock": "4", "reason": "recuento"}, "es")
     assert labels(count) == ["Producto", SCREENS["stock"]["countQty"], "Motivo"]
-    receipt = assistant.card(get("inventory.stock.receive"), {"items": [{"product": "Vino", "qty": "6"}]}, "es")
+    receipt = assistant.cards.card(get("inventory.stock.receive"), {"items": [{"product": "Vino", "qty": "6"}]}, "es")
     assert labels(receipt) == [SCREENS["tabs"]["products"]]

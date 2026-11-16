@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.context import Scope
 from live.operations import get, registry
 
@@ -32,7 +33,7 @@ SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["flow"]
 
 #: The writes of Automations the assistant calls, by name.
 TOOLS = sorted(
-    name for name, op in registry.items() if op.app_label == "flow" and op.kind == "command" and assistant.is_tool(op)
+    name for name, op in registry.items() if op.app_label == "flow" and op.kind == "command" and assistant.tools.is_tool(op)
 )
 #: The writes of Automations only the platform runs: the outbox relay, the worker and the scheduled tasks.
 PLATFORM = sorted(
@@ -47,24 +48,24 @@ def test_what_only_the_platform_runs_is_system_only():
     the assistant it could start automations or make up how a call ended. «System only» keeps it out of every
     catalogue, the next one too."""
     assert {"flow.run.react", "flow.run.record_call", "flow.schedule.fire_due"} <= set(PLATFORM)  # positive control
-    assert [name for name in PLATFORM if not assistant.description(get(name)).startswith("System only")] == []
+    assert [name for name in PLATFORM if not shared.description(get(name)).startswith("System only")] == []
 
 
 def test_a_secrets_value_is_never_asked_for_in_a_chat():
     """A secret said in a chat has already reached the model and the history: the person types it in the automation's
     step, on the screen (as ChatGPT's actions, Zapier or Make ask for credentials: in their form, never in the chat)."""
     secret = get("flow.secret.set")
-    assert assistant.description(secret).startswith("Not an assistant tool")
-    assert not assistant.is_tool(secret)
+    assert shared.description(secret).startswith("Not an assistant tool")
+    assert not assistant.tools.is_tool(secret)
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("permissions", [None, {"*"}], ids=["owner", "superuser"])
 def test_not_even_who_may_do_everything_is_offered_them(permissions):
-    tools = assistant.catalog(ctx_for("hub_owner", permissions=permissions))
+    tools = assistant.tools.catalog(ctx_for("hub_owner", permissions=permissions))
     assert {"flow.flow.create", "flow.question.answer"} <= set(tools)  # positive control: flow's tools are offered
     assert sorted(set(NEVER_TOOLS) & set(tools)) == []
-    assert [name for name in NEVER_TOOLS if assistant.is_tool(get(name))] == []
+    assert [name for name in NEVER_TOOLS if assistant.tools.is_tool(get(name))] == []
 
 
 def labels(card: dict) -> list[str]:
@@ -75,12 +76,12 @@ def named_by_flow(op, name: str, title: str | None) -> bool:
     """Whether flow itself names the datum ``name`` of ``op``: by its schema's own title, by the ``verbose_name`` of one
     of its models, or by its own catalog. A title pydantic made up that another app's catalog happens to translate is
     not a name of Automations: it changes if that app's text changes."""
-    made_up = assistant._generated_title(name)
+    made_up = shared.generated_title(name)
     with (APP / "locale/es/LC_MESSAGES/django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     return (
         bool(title and title != made_up)
-        or assistant._verbose_name("flow", op.name.split(".")[1], name) is not None
+        or shared.verbose_name("flow", op.name.split(".")[1], name) is not None
         or own.gettext(made_up) != made_up
     )
 
@@ -93,8 +94,8 @@ def test_no_datum_of_a_write_of_flow_reaches_a_spanish_card_by_its_technical_nam
     technical: dict[str, list[str]] = {}
     for name in TOOLS:
         op = get(name)
-        props = assistant._schema(op).get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        props = shared.input_schema(op).get("properties", {})
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_flow(op, datum, props[datum].get("title")):
                 technical.setdefault(name, []).append(datum)
@@ -104,19 +105,19 @@ def test_no_datum_of_a_write_of_flow_reaches_a_spanish_card_by_its_technical_nam
 def test_the_card_names_who_caused_an_event_as_the_editor():
     """An event an automation reacts to: who caused it is «Quién lo hizo», as the editor's «Which data?» says it."""
     react = get("flow.run.react")
-    assert labels(assistant.card(react, {"actor": "x"}, "es")) == [SCREENS["fields"]["actor"]] == ["Quién lo hizo"]
-    assert labels(assistant.card(react, {"actor": "x"}, "en")) == [SCREENS_EN["fields"]["actor"]]
+    assert labels(assistant.cards.card(react, {"actor": "x"}, "es")) == [SCREENS["fields"]["actor"]] == ["Quién lo hizo"]
+    assert labels(assistant.cards.card(react, {"actor": "x"}, "en")) == [SCREENS_EN["fields"]["actor"]]
 
 
 def test_the_card_names_the_event_an_automation_reacts_to():
     arguments = {"event_id": "x", "event": "sale.sale.completed", "payload": {"total": 1}}
     react = get("flow.run.react")
-    assert labels(assistant.card(react, arguments, "es")) == [
+    assert labels(assistant.cards.card(react, arguments, "es")) == [
         "Referencia de lo que pasó",
         "Qué pasó",
         SCREENS["picker"]["input"],
     ]
-    assert labels(assistant.card(react, arguments, "en")) == [
+    assert labels(assistant.cards.card(react, arguments, "en")) == [
         "Reference of what happened",
         "What happened",
         SCREENS_EN["picker"]["input"],
@@ -126,8 +127,8 @@ def test_the_card_names_the_event_an_automation_reacts_to():
 def test_the_card_names_how_it_starts_and_the_draft_as_the_list():
     for name in ("flow.flow.create", "flow.flow.update"):
         arguments = {"trigger": {"kind": "manual"}}
-        assert labels(assistant.card(get(name), arguments, "es")) == [SCREENS["list"]["filterTrigger"]]
-        assert labels(assistant.card(get(name), arguments, "en")) == [SCREENS_EN["list"]["filterTrigger"]]
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [SCREENS["list"]["filterTrigger"]]
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [SCREENS_EN["list"]["filterTrigger"]]
 
 @HUB_DB
 def test_the_card_names_the_draft_an_automation_is_created_from_as_the_list():
@@ -137,28 +138,28 @@ def test_the_card_names_the_draft_an_automation_is_created_from_as_the_list():
     draft = make_draft()
     create = get("flow.flow.create")
     for language, screens in (("es", SCREENS), ("en", SCREENS_EN)):
-        card = assistant.card(create, {"draft_id": str(draft.id)}, language, ctx=ctx_for(language=language))
+        card = assistant.cards.card(create, {"draft_id": str(draft.id)}, language, ctx=ctx_for(language=language))
         assert said(card) == [(screens["drafts"]["badge"], "Call who did not come")], language
 
 
 def test_the_card_names_what_an_automation_may_do_as_its_permissions_tab():
     grant = get("flow.flow.grant")
     arguments = {"operations": ["sale.sale.void"]}
-    assert labels(assistant.card(grant, arguments, "es")) == [SCREENS["editor"]["tabs"]["permissions"]]
-    assert labels(assistant.card(grant, arguments, "en")) == [SCREENS_EN["editor"]["tabs"]["permissions"]]
+    assert labels(assistant.cards.card(grant, arguments, "es")) == [SCREENS["editor"]["tabs"]["permissions"]]
+    assert labels(assistant.cards.card(grant, arguments, "en")) == [SCREENS_EN["editor"]["tabs"]["permissions"]]
 
 
 def test_the_card_names_the_answer_to_a_question():
     """«Waiting for your answer» asks yes or no: the card says the person's answer, «Respuesta: Sí»."""
     answer = get("flow.question.answer")
-    assert labels(assistant.card(answer, {"approve": True}, "es")) == ["Respuesta"]
-    assert labels(assistant.card(answer, {"approve": True}, "en")) == ["Answer"]
+    assert labels(assistant.cards.card(answer, {"approve": True}, "es")) == ["Respuesta"]
+    assert labels(assistant.cards.card(answer, {"approve": True}, "en")) == ["Answer"]
 
 
 def test_the_card_names_a_secrets_value_as_the_secrets_screen():
     secret = get("flow.secret.set")
-    assert labels(assistant.card(secret, {"value": "x"}, "es")) == [SCREENS["secrets"]["value"]]
-    assert labels(assistant.card(secret, {"value": "x"}, "en")) == [SCREENS_EN["secrets"]["value"]]
+    assert labels(assistant.cards.card(secret, {"value": "x"}, "es")) == [SCREENS["secrets"]["value"]]
+    assert labels(assistant.cards.card(secret, {"value": "x"}, "en")) == [SCREENS_EN["secrets"]["value"]]
 
 
 def test_the_card_names_how_a_call_ended_with_the_words_of_its_step():
@@ -166,13 +167,13 @@ def test_the_card_names_how_a_call_ended_with_the_words_of_its_step():
     editor does, and what went wrong as the history's technical text."""
     record = get("flow.run.record_call")
     arguments = {"kind": "ok", "body": "x", "truncated": False, "detail": "x"}
-    assert labels(assistant.card(record, arguments, "es")) == [
+    assert labels(assistant.cards.card(record, arguments, "es")) == [
         "Cómo terminó",
         SCREENS["fields"]["body"],
         SCREENS["fields"]["truncated"],
         "Texto técnico",
     ]
-    assert labels(assistant.card(record, arguments, "en")) == [
+    assert labels(assistant.cards.card(record, arguments, "en")) == [
         "How it ended",
         SCREENS_EN["fields"]["body"],
         SCREENS_EN["fields"]["truncated"],
@@ -187,18 +188,18 @@ def test_flow_f17_the_assistant_may_leave_a_draft_automation_and_only_a_draft():
     from apps.flow.models import Draft, Flow
 
     owner = ctx_for("hub_owner")
-    propose = assistant.catalog(owner).get("flow.draft.propose")
+    propose = assistant.tools.catalog(owner).get("flow.draft.propose")
     assert propose is not None and propose.kind == "command"
     definition = {
         "trigger": {"kind": "event", "event": "sale.sale.completed", "filter": {"input.total": {"gt": 10000}}},
         "steps": [{"id": "s1", "kind": "command", "operation": "task.task.create", "params": {"title": "Big sale"}}],
     }
-    outcome = assistant.run_tool(owner, propose, json.dumps({"name": "Big sales", "definition": definition, "notes": []}))
+    outcome = shared.run_tool(owner, propose, json.dumps({"name": "Big sales", "definition": definition, "notes": []}))
     assert outcome.outcome == "ok", outcome.content
     draft = Draft.objects.get()
     assert (draft.name, draft.status) == ("Big sales", Draft.Status.PENDING)
     assert Flow.objects.count() == 0
-    assert "flow.draft.propose" not in assistant.catalog(ctx_for("hub_employee"))
+    assert "flow.draft.propose" not in assistant.tools.catalog(ctx_for("hub_employee"))
 
 
 # ── Each record a write names by its id, as its screen names it ────────────────────────────────────────────────────
@@ -234,7 +235,7 @@ def by_an_id(card: dict) -> bool:
 
 
 def card_for(name: str, arguments: dict, language: str, ctx=None) -> dict:
-    return assistant.card(get(name), arguments, language, ctx=ctx or ctx_for(language=language))
+    return assistant.cards.card(get(name), arguments, language, ctx=ctx or ctx_for(language=language))
 
 
 # FLOW-F03 «Encender o pausar», asked to the assistant: the card says which automation, by its name.
