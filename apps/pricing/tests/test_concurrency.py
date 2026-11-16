@@ -10,6 +10,11 @@ when the write reads it is not found, as one deleted before. Both the business's
 admin's (the row's delete()) are landed there.
 
 The detail of a price list that a deletion lands in the middle of answers what it read or 404, never a 500.
+
+A write on a price list holds it from the read that finds it, so a change to the same list by somebody else
+waits for it: unheld, the write saved the whole row it had read and undid that change, or the database refused
+it (a 500). Making a list the general one holds the list that has the mark until it takes it: unheld, the Hub
+admin's deletion of that list went in between and taking the mark found no row (a 500).
 """
 
 from contextlib import contextmanager
@@ -304,17 +309,17 @@ def test_find_list_refuses_to_lock_the_rows_it_is_given(vip_list):
 
 
 @contextmanager
-def changed_by_hand_just_before(statement: str, rule):
-    """The business renames ``rule`` in another session right before the first statement of this one that starts with
-    ``statement``: between the read that found the rule switched off by the platform and the write that switches it
-    on. It commits, or gives up after LOCK_TIMEOUT on the rule this session holds."""
+def changed_by_hand_just_before(statement: str, name: str, data: dict):
+    """The business runs the operation ``name`` with ``data`` in another session right before the first statement
+    of this one that starts with ``statement``: between the read that found the row and the write. It commits, or
+    gives up after LOCK_TIMEOUT on the row this session holds."""
     changes: list = []
 
     def change():
         with atomic():
             with connections[current_alias()].cursor() as cursor:
                 cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
-            run("pricing.rule.update", {"id": str(rule.id), "name": "Renamed by hand"})
+            run(name, data)
 
     def wrapper(execute, sql, params, many, context):
         if not changes and sql.lstrip().startswith(statement):
@@ -335,10 +340,92 @@ def test_a_rule_switched_back_on_with_its_product_is_held_against_a_change_by_ha
     reaction(system_context(A), reaction.input.model_validate({"id": str(world.espresso.id)}))
     recall = get("pricing.catalog.recall_product")
 
-    with changed_by_hand_just_before('UPDATE "pricing_discountrule" SET', rule) as changes:
+    rename = {"id": str(rule.id), "name": "Renamed by hand"}
+    with changed_by_hand_just_before('UPDATE "pricing_discountrule" SET', "pricing.rule.update", rename) as changes:
         recall(system_context(A), recall.input.model_validate({"id": str(world.espresso.id)}))
 
     # Unheld, the business's change went in between and the rule it touched came back on all the same.
     assert held(changes), changes
     rule.refresh_from_db()
     assert (rule.is_active, rule.name) == (True, "Rule ESP")
+
+
+# The general mark and the list a write is on, held from the read that finds them
+
+
+@pytest.fixture
+def lists():
+    return SimpleNamespace(general=make_list("OLD", is_default=True), spring=make_list("SPRING", name="Spring"))
+
+
+#: Each way to make a list the general one, and the code of the list that takes the mark.
+TAKE_THE_MARK = {
+    "price_list.set_default": (lambda: run("pricing.price_list.set_default", {"price_list": "SPRING"}), "SPRING"),
+    "price_list.create": (lambda: run("pricing.price_list.create", {"code": "NEW", "name": "New", "is_default": True}), "NEW"),
+}
+
+
+def general_codes() -> list[str]:
+    return list(PriceList.objects.filter(is_default=True).values_list("code", flat=True))
+
+
+@pytest.mark.parametrize("way", sorted(TAKE_THE_MARK))
+def test_the_general_list_deleted_while_another_takes_its_mark_waits_for_it(lists, way):
+    call, code = TAKE_THE_MARK[way]
+    with deleted_just_before('UPDATE "pricing_pricelist" SET', lists.general, "row") as deletions:
+        call()
+    assert held(deletions), deleted(deletions)
+    assert general_codes() == [code]
+    assert PriceList.objects.filter(pk=lists.general.pk, is_default=False).exists()
+
+
+@pytest.mark.parametrize("way", sorted(TAKE_THE_MARK))
+def test_the_general_list_being_deleted_when_another_takes_its_mark_leaves_the_new_one_general(lists, way):
+    call, code = TAKE_THE_MARK[way]
+    with deleted_in_flight(lists.general, "row") as deletions:
+        call()
+    assert deletions == ["ok"]
+    assert general_codes() == [code]
+    assert not PriceList.objects.filter(pk=lists.general.pk).exists()
+
+
+#: Each write that holds the list SPRING from the read that finds it: the call, the statement it writes with,
+#: what the business does to the same list by hand meanwhile, and what the write leaves the list as. Unheld, the
+#: change by hand went in between: the write's whole-row save undid it (a name, a last day), the database
+#: refused the write (a general list switched off: a 500), or a price went into a list that was switched off.
+LIST_WRITES = {
+    "price_list.update": (
+        lambda: run("pricing.price_list.update", {"price_list": "SPRING", "name": "Spring 2027"}),
+        'UPDATE "pricing_pricelist" SET',
+        ("pricing.price_list.update", {"price_list": "SPRING", "valid_until": "2027-06-30"}),
+        {"name": "Spring 2027", "valid_until": None},
+    ),
+    "price_list.set_default": (
+        lambda: run("pricing.price_list.set_default", {"price_list": "SPRING"}),
+        'UPDATE "pricing_pricelist" SET',
+        ("pricing.price_list.update", {"price_list": "SPRING", "name": "Renamed by hand"}),
+        {"name": "Spring", "is_default": True},
+    ),
+    "price_list.deactivate": (
+        lambda: run("pricing.price_list.deactivate", {"price_list": "SPRING"}),
+        'UPDATE "pricing_pricelist" SET',
+        ("pricing.price_list.set_default", {"price_list": "SPRING"}),
+        {"is_active": False, "is_default": False},
+    ),
+    "price_item.add": (
+        lambda: run("pricing.price_item.add", {"price_list": "SPRING", "product": "ESP-1", "price": 120}),
+        'INSERT INTO "pricing_priceitem"',
+        ("pricing.price_list.deactivate", {"price_list": "SPRING"}),
+        {"is_active": True, "items__price": 120},
+    ),
+}
+
+
+@pytest.mark.parametrize("write", sorted(LIST_WRITES))
+def test_a_price_list_changed_by_hand_while_a_write_holds_it_waits_for_the_write(lists, write):
+    make_product("Espresso", "ESP-1")
+    call, statement, (name, data), left = LIST_WRITES[write]
+    with changed_by_hand_just_before(statement, name, data) as changes:
+        call()
+    assert held(changes), changes
+    assert PriceList.objects.filter(pk=lists.spring.pk, **left).exists()
