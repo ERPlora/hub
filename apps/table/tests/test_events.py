@@ -18,9 +18,9 @@ from live.context import system_context
 from apps.table import events
 from apps.table.models import Hold, TableSession
 
-from .conftest import A, make_hold, make_session, make_table, make_zone, open_check, run
+from .conftest import HUB_DB, A, make_hold, make_session, make_table, make_zone, open_check, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
 

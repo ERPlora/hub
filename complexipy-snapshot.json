@@ -409,7 +409,7 @@
     "functions": [
       {
         "name": "crossing_after_the_first_lock",
-        "complexity": 22
+        "complexity": 20
       }
     ]
   },

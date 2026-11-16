@@ -22,6 +22,7 @@ from live.models import OutboxEvent
 from apps.table.models import Hold, Table, TableSettings, Zone
 
 from .conftest import (
+    HUB_DB,
     ctx_for,
     make_hold,
     make_session,
@@ -31,7 +32,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 MANAGER = "hub_manager"
