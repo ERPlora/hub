@@ -237,6 +237,7 @@ def test_a_row_deleted_while_its_detail_is_read_is_never_a_server_error(salon, d
 # either way). Locked first, it waits for the write and then takes what it added, or answers «Cannot delete»
 # when that protects the row; a write that comes second waits for the deletion and finds nothing.
 
+
 def locks(table: str) -> Callable[[str], bool]:
     """Whether a statement locks rows of ``table``."""
     return lambda sql: f'FROM "{table}"' in sql and "FOR UPDATE" in sql
