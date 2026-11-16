@@ -170,8 +170,8 @@
 990 control/admin.py ERPlora/erplora-next#74
 625 control/models.py ERPlora/erplora-next#74
 1017 control/services.py ERPlora/erplora-next#74
-1553 control/tests/test_admin.py ERPlora/erplora-next#74
-1224 control/tests/test_services.py ERPlora/erplora-next#74
+1549 control/tests/test_admin.py ERPlora/erplora-next#74
+1220 control/tests/test_services.py ERPlora/erplora-next#74
 109 docker/pgbouncer-entrypoint.sh ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 563 frontend/main.test.ts ERPlora/erplora-next#74
