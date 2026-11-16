@@ -1,5 +1,9 @@
 """Fixtures of the printing tests: contexts per role and scope, users with a role on a host, and the
-helpers that run printing's operations by name, the way the other apps and the routes call them."""
+helpers that run printing's operations by name, the way the other apps and the routes call them.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+"""
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -11,10 +15,14 @@ from live.operations import get
 
 from psycopg.conninfo import make_conninfo
 
+from apps.invoice.tests.conftest import catalog_of
 from base.models import Membership
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, and the assistant's catalogue of a person of
+#: business A, that these tests take from here.
+__all__ = ["B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "hub_staff", "in_business_a", "plan_with_room"]
 
 
 def ctx_for(
@@ -70,7 +78,7 @@ def english():
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = Membership.Role.ADMIN):
         user = get_user_model().objects.create_user(username=username, password="pw")
         if host is not None:
             Membership.objects.create(user=user, host=host, role=role)

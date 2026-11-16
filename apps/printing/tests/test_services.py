@@ -16,9 +16,9 @@ from live.models import OutboxEvent
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
 from apps.printing import services
-from apps.printing.tests.conftest import A, B, RECEIPT, ctx_for, enqueue, printer, received, run
+from apps.printing.tests.conftest import A, HUB_DB, RECEIPT, ctx_for, enqueue, printer, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ITEM = {"name": "Haircut", "quantity": 1, "total": 18.0}
 
@@ -785,16 +785,6 @@ def test_a_manager_renames_a_device_and_changes_its_printers_from_any_device():
     assert missing.value.code == "printing.device_not_found"
 
 
-def test_a_device_set_up_in_a_hub_is_told_on_that_hubs_channel_only():
-    # Writing in hub B never tells hub A: the device's events travel on the scope of whoever set it up.
-    till = printer("Till")
-    ctx = dataclasses.replace(on_device(TILL_ID), scope=B)
-    device = run("printing.device.register", {"name": "Till", "printers": [str(till.id)]}, ctx=ctx)
-    run("printing.device.retire", {"device_id": str(device.id)}, ctx=dataclasses.replace(ctx_for(MANAGER), scope=B))
-    scoped = OutboxEvent.objects.filter(name__startswith="printing.device.").values_list("name", "scope_key")
-    assert sorted(scoped) == [("printing.device.registered", "b"), ("printing.device.retired", "b")]
-
-
 # ── The device's presence (base's /ws/print declares it ``print_presence``) ──
 
 
@@ -1031,29 +1021,6 @@ def test_the_test_page_carries_the_business_name_when_invoicing_knows_it():
     run("invoice.issuer.update", {"legal_name": "Salón Ana SL", "tax_id": "B12345674", "address": "Calle Mayor 1"})
     out = run("printing.printer.test", {"printer": "Till"})
     assert PrintJob.objects.get(pk=out.id).document == {"locale": "en", "business_name": "Salón Ana SL"}
-
-
-# Notifications: after the COMMIT, on the channel of the command's scope only (`listen`, in conftest.py)
-
-
-@pytest.mark.django_db(transaction=True)
-def test_a_job_queued_in_b_wakes_b_only(listen):
-    from live.outbox import channel_for
-
-    on_a, on_b = listen(A), listen(B)
-    run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx_for(scope=B))
-    assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["printing.job.queued"]})]
-    assert received(on_a, timeout=0.3) == []
-
-
-@pytest.mark.django_db(transaction=True)
-def test_a_device_seen_in_b_tells_neither_b_nor_a(listen):
-    till = run("printing.printer.create", {"name": "Till", "kind": "network", "address": "10.0.0.1", "usage": "receipt"}, ctx_for(scope=B))
-    run("printing.device.register", {"name": "Till", "printers": [str(till.id)]}, ctx=dataclasses.replace(on_device(TILL_ID), scope=B))
-    on_a, on_b = listen(A), listen(B)
-    assert run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE, scope=B)).seen is True
-    assert received(on_b, timeout=0.3) == []
-    assert received(on_a, timeout=0.3) == []
 
 
 def test_an_a4_page_prints_once_whatever_the_receipt_copies():

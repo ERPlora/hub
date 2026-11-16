@@ -11,9 +11,9 @@ import pytest
 from live.context import system_context
 
 from apps.printing import documents
-from apps.printing.tests.conftest import A, printer, run
+from apps.printing.tests.conftest import A, HUB_DB, printer, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: Every field the app's renderer reads from a receipt (`render_receipt` and its helpers).
 RENDERER_RECEIPT_FIELDS = {
@@ -167,11 +167,11 @@ def test_with_the_receipt_off_the_checkout_prints_nothing(sale):
 def test_a_refused_print_never_spoils_the_checkout_that_asked_for_it(sale):
     # Sales asks inside the charge's transaction: a refusal rolls back only printing's savepoint, so the
     # charge goes on and commits (WORKBOOK PRINTING-F07: a sale never falls because of printing).
-    from django.db import transaction
     from live.errors import OperationError
+    from live.operations import atomic
 
     printer("Till")
-    with transaction.atomic():
+    with atomic():
         with pytest.raises(OperationError):
             run("printing.job.create", {"document_type": "prebill", "document": {"lines": []}})
         out = run("printing.job.create", {"job_key": f"sale-{sale.id}-receipt", "document_type": "receipt", "document": receipt_of(sale)})
