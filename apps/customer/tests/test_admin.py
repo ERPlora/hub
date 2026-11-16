@@ -37,6 +37,10 @@ from apps.customer.models import (
     HealthRecord,
 )
 
+from base.tenancy.tests.concurrency import PLATFORM_HOST
+
+from .conftest import HUB_DB
+
 REGISTERED = {
     Customer: CustomerAdmin,
     CustomerGroup: CustomerGroupAdmin,
@@ -48,7 +52,6 @@ REGISTERED = {
     OrderLink: OrderLinkAdmin,
     HealthRecord: HealthRecordAdmin,
 }
-HOST = "hubs.localhost"  # the admin lives only on the platform host
 
 
 @pytest.fixture
@@ -74,6 +77,7 @@ def test_every_table_is_registered():
     ]
 
 
+@HUB_DB
 def test_the_staff_has_full_crud_on_every_table(superuser):
     # No read-only mixin: what the staff may do is Django's own permissions.
     request = request_by(superuser)
@@ -89,8 +93,8 @@ def test_the_staff_has_full_crud_on_every_table(superuser):
         ) and inline.has_change_permission(request)
 
 
-@pytest.mark.django_db
-def test_the_lists_and_a_card_render(client, superuser):
+@HUB_DB
+def test_the_lists_and_a_card_render(hub_staff):
     ana = Customer.objects.create(name="Ana García", phone="+34600111222")
     field = CustomField.objects.create(name="Allergies")
     CustomFieldValue.objects.create(customer=ana, field=field, value="Latex")
@@ -100,22 +104,21 @@ def test_the_lists_and_a_card_render(client, superuser):
     OrderLink.objects.create(order_id=uuid.uuid7(), customer=ana)
     CustomerGroup.objects.create(name="VIP")
     CustomerTag.objects.create(name="Moroso")
-    client.force_login(superuser)
 
     for model in REGISTERED:
         assert (
-            client.get(
-                f"/admin/customer/{model._meta.model_name}/", HTTP_HOST=HOST
+            hub_staff.get(
+                f"/admin/customer/{model._meta.model_name}/", HTTP_HOST=PLATFORM_HOST
             ).status_code
             == 200
         ), model
         assert (
-            client.get(
-                f"/admin/customer/{model._meta.model_name}/add/", HTTP_HOST=HOST
+            hub_staff.get(
+                f"/admin/customer/{model._meta.model_name}/add/", HTTP_HOST=PLATFORM_HOST
             ).status_code
             == 200
         ), model
-    change = client.get(f"/admin/customer/customer/{ana.pk}/change/", HTTP_HOST=HOST)
+    change = hub_staff.get(f"/admin/customer/customer/{ana.pk}/change/", HTTP_HOST=PLATFORM_HOST)
     assert (
         change.status_code == 200
         and b"Latex" in change.content
@@ -123,10 +126,9 @@ def test_the_lists_and_a_card_render(client, superuser):
     )
 
 
-@pytest.mark.django_db
-def test_the_staff_creates_changes_and_deletes_from_the_admin(client, superuser):
-    client.force_login(superuser)
-    created = client.post(
+@HUB_DB
+def test_the_staff_creates_changes_and_deletes_from_the_admin(hub_staff):
+    created = hub_staff.post(
         "/admin/customer/customergroup/add/",
         {
             "name": "VIP",
@@ -135,11 +137,11 @@ def test_the_staff_creates_changes_and_deletes_from_the_admin(client, superuser)
             "sort_order": 0,
             "is_active": "on",
         },
-        HTTP_HOST=HOST,
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert created.status_code == 302
     group = CustomerGroup.objects.get()
-    changed = client.post(
+    changed = hub_staff.post(
         f"/admin/customer/customergroup/{group.pk}/change/",
         {
             "name": "Gold",
@@ -148,14 +150,14 @@ def test_the_staff_creates_changes_and_deletes_from_the_admin(client, superuser)
             "sort_order": 1,
             "is_active": "on",
         },
-        HTTP_HOST=HOST,
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert changed.status_code == 302
     group.refresh_from_db()
     assert (group.name, group.sort_order) == ("Gold", 1)
-    deleted = client.post(
+    deleted = hub_staff.post(
         f"/admin/customer/customergroup/{group.pk}/delete/",
         {"post": "yes"},
-        HTTP_HOST=HOST,
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert deleted.status_code == 302 and not CustomerGroup.objects.exists()

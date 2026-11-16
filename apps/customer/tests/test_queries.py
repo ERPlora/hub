@@ -67,9 +67,9 @@ from apps.customer.schemas import (
 
 from base.tests.actors import who_did_it
 
-from .conftest import run
+from .conftest import HUB_DB, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOW = datetime(2026, 10, 14, 10, 0, tzinfo=UTC)
 
@@ -1009,7 +1009,6 @@ def test_the_health_query_is_for_the_screen_only():
     assert (op.ai, op.expose_api) == (INTERNAL, False)
 
 
-@pytest.mark.django_db
 def test_without_permission_the_health_block_holds_nothing():
     ana = Customer.objects.create(name="Ana")
     block = run(
@@ -1026,7 +1025,6 @@ def test_without_permission_the_health_block_holds_nothing():
     ) == (ana.id, "none", None, "", None, "", None)
 
 
-@pytest.mark.django_db
 def test_the_health_block_is_the_last_health_decision_and_its_data():
     ana = Customer.objects.create(name="Ana")
     said = timezone.now() - timedelta(days=1)
@@ -1072,7 +1070,6 @@ def test_the_health_block_is_the_last_health_decision_and_its_data():
     )
 
 
-@pytest.mark.django_db
 def test_the_health_data_stays_out_of_the_card_the_list_and_the_export():
     ana = Customer.objects.create(name="Ana")
     HealthRecord.objects.create(customer=ana, allergies="PPD-allergy-marker")
@@ -1084,14 +1081,12 @@ def test_the_health_data_stays_out_of_the_card_the_list_and_the_export():
     assert "PPD-allergy-marker" not in export.csv
 
 
-@pytest.mark.django_db
 def test_the_health_block_of_a_card_that_is_gone_is_not_found():
     ana = Customer.objects.create(name="Ana", deleted_at=timezone.now())
     with pytest.raises(NotFound):
         run("customer.health.detail", HealthDetailIn(customer_id=ana.id))
 
 
-@pytest.mark.django_db
 def test_the_consent_history_and_state_carry_the_health_permission_without_channel():
     ana = Customer.objects.create(name="Ana")
     Consent.objects.create(

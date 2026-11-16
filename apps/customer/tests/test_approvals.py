@@ -21,7 +21,9 @@ from apps.customer.models import Customer, CustomerGroup, CustomField, CustomerT
 from base.models import Credential
 from base.tests.test_people import with_pin
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 HOST = "a.localhost"
 

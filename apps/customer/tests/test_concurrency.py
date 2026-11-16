@@ -58,9 +58,9 @@ from apps.customer.schemas import (
 )
 from apps.customer.queries import CUSTOMER_UNAVAILABLE_CODE
 
-from .conftest import A, run
+from .conftest import HUB_DB_COMMITTED, A, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+pytestmark = HUB_DB_COMMITTED
 
 NOW = datetime(2026, 10, 14, 10, 0, tzinfo=UTC)
 #: How the platform staff delete: from the card's delete page, or with the list's «Delete selected».
