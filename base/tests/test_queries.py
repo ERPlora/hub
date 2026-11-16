@@ -10,10 +10,12 @@ from live.operations import get
 
 from base.models import AppActivation
 from base.schemas import SessionMeIn, SessionMeOut
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-A = Scope("host", "a")
+pytestmark = HUB_DB
 DEMO_MENU = {
     "id": "demo",
     "label": "Demo",
@@ -34,7 +36,7 @@ def test_declaration():
 def test_anonymous():
     assert session_me(language="es") == {
         "user": None,
-        "scope": {"kind": "host", "key": "a"},
+        "scope": {"kind": "host", "key": A.key},
         "permissions": [],
         "menu": [],
         "apps": [],
@@ -94,9 +96,9 @@ def two_apps(monkeypatch, every_app_on):
     ]
     # Patched at the source, so the stand-ins go through the real module_configs() filter.
     monkeypatch.setattr("live.meta.all_live_app_configs", lambda: apps)
-    # ``a`` with every one of them on, as the suite's local hubs have every real module on (the root conftest).
-    AppActivation.objects.filter(host="a").delete()
-    every_app_on("a")
+    # Business A with every one of them on, as it has every real module on (the root conftest).
+    AppActivation.objects.filter(host=A.key).delete()
+    every_app_on(A.key)
     return apps
 
 
@@ -142,15 +144,21 @@ def test_system_actor(two_apps):
     assert [app["label"] for app in me["apps"]] == ["demo", "stock", "reports"]
 
 
-def test_on_a_demo_it_says_when_the_demo_ends():
-    # The shell's banner reads it.
+def a_demo(hub):
+    """``hub`` made a demo that ends now, on the database of its own the worker made for it."""
     from django.utils import timezone
 
-    from base.models import Hub
+    hub.is_demo, hub.expires_at = True, timezone.now()
+    hub.save(update_fields=["is_demo", "expires_at"])
+    return hub
 
-    demo = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="ready", expires_at=timezone.now())
+
+def test_on_a_demo_it_says_when_the_demo_ends(hub_b):
+    # The shell's banner reads it.
+    demo = a_demo(hub_b)
     ctx = OperationContext(scope=Scope("host", demo.slug), actor=None, permissions=frozenset(), language="en")
-    me = get("base.session.me")(ctx, SessionMeIn())
+    with use_hub(demo):
+        me = get("base.session.me")(ctx, SessionMeIn())
     assert me.demo is not None and me.demo.expires_at == demo.expires_at
 
 
@@ -163,30 +171,29 @@ def test_a_module_out_of_the_store_stays_out_of_a_customers_menu_and_apps(make_u
     assert "demo" not in [app["label"] for app in me["apps"]]
 
 
-def test_a_module_out_of_the_store_shows_on_a_demos_hub_and_with_the_setting_on(make_user, settings, every_app_on):
+def test_a_module_out_of_the_store_shows_on_a_demos_hub_and_with_the_setting_on(make_user, settings, hub_b):
     """A demo's hub lists it whatever the setting says; development, the tests and the e2e list it everywhere."""
-    from django.utils import timezone
-
-    from base.models import Hub
-
     settings.SHOW_UNLISTED_MODULES = False
-    demo = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="ready", expires_at=timezone.now())
-    every_app_on(demo.slug)  # a demo is born with every app off: this one turned them on
+    # A demo is born with every app off: this one turned them on.
+    demo = a_demo(hub_b)
     on_demo = OperationContext(
         scope=Scope("host", demo.slug), actor=make_user(), permissions=frozenset({"demo.view"}), language="en"
     )
-    me = get("base.session.me")(on_demo, SessionMeIn()).model_dump(mode="json")
+    with use_hub(demo):
+        me = get("base.session.me")(on_demo, SessionMeIn()).model_dump(mode="json")
     assert (me["menu"], me["apps"]) == ([DEMO_MENU], [{"label": "demo", "state": "on"}])
 
     settings.SHOW_UNLISTED_MODULES = True
     assert session_me(make_user("bea"), {"demo.view"})["menu"] == [DEMO_MENU]
 
 
-@pytest.mark.parametrize("slug", ["a", "acme"])
-def test_on_a_business_or_a_slug_without_a_row_there_is_no_demo(slug):
+@pytest.mark.parametrize("business", ["hub_a", "hub_b"])
+def test_on_a_business_that_is_no_demo_there_is_no_demo(request, business):
     assert session_me().get("demo", "missing") is None
-    ctx = OperationContext(scope=Scope("host", slug), actor=None, permissions=frozenset(), language="en")
-    assert get("base.session.me")(ctx, SessionMeIn()).demo is None
+    hub = request.getfixturevalue(business)
+    ctx = OperationContext(scope=Scope("host", hub.slug), actor=None, permissions=frozenset(), language="en")
+    with use_hub(hub):
+        assert get("base.session.me")(ctx, SessionMeIn()).demo is None
 
 
 def test_an_app_the_business_has_no_right_to_is_off_and_out_of_the_menu(make_user, monkeypatch):
@@ -197,10 +204,10 @@ def test_an_app_the_business_has_no_right_to_is_off_and_out_of_the_menu(make_use
     from base.models import Hub
 
     monkeypatch.setattr(apps.get_app_config("demo"), "premium", True)
-    Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "state": {"modules": []}, "state_version": 1})
+    Hub.objects.filter(slug=A.key).update(state={"modules": []}, state_version=1)
     me = session_me(make_user(), {"demo.view"})
     assert (me["menu"], me["apps"]) == ([], [{"label": "demo", "state": "off"}])
 
-    Hub.objects.filter(slug="a").update(state={"modules": [{"id": "demo", "source": "purchase"}]}, state_version=2)
+    Hub.objects.filter(slug=A.key).update(state={"modules": [{"id": "demo", "source": "purchase"}]}, state_version=2)
     me = session_me(make_user("bea"), {"demo.view"})
     assert (me["menu"], me["apps"]) == ([DEMO_MENU], [{"label": "demo", "state": "on"}])
