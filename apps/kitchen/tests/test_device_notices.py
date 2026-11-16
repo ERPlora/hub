@@ -12,11 +12,10 @@ from live.operations import get
 
 from base.schemas import NoticeListIn
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
-from .conftest import A, add_line, ctx_for, fire, fired_round, open_check, run
+from .conftest import A, HUB_DB, add_line, ctx_for, fire, fired_round, open_check, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture(autouse=True)
@@ -54,7 +53,7 @@ def test_a_round_fired_by_sales_tells_the_device_before_and_after_it_is_saved(cl
     ]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_round_fired_in_b_never_tells_a(hub_a, hub_b):
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))

@@ -14,21 +14,12 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.kitchen.models import KitchenSettings, LogEntry, Station, Ticket, TicketItem
+from base.tenancy.context import use_hub
 
-from .conftest import (
-    A,
-    add_line,
-    charge,
-    ctx_for,
-    fire,
-    fired_round,
-    make_station,
-    open_check,
-    route_product,
-    run,
-)
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, charge, ctx_for, fire, fired_round, make_station
+from .conftest import open_check, route_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 
@@ -986,14 +977,13 @@ def received(session, timeout=1.0, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_ticket_made_in_b_wakes_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_ticket_made_in_b_wakes_b_only(listen, hub_b):
     from live.outbox import channel_for
 
-    from .conftest import B
-
     on_a, on_b = listen(A), listen(B)
-    run("kitchen.ticket.create", {"items": [{"name": "Staff meal"}]}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        run("kitchen.ticket.create", {"items": [{"name": "Staff meal"}]}, ctx_for(scope=B))
     # The ticket and its sheet (Printing's own operation, nested) wake B, each after the COMMIT.
     on_b_events = received(on_b, stop_after=2)
     assert {channel for channel, _ in on_b_events} == {channel_for(B)}

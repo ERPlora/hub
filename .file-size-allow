@@ -56,7 +56,6 @@
 1621 apps/kitchen/queries.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
 1718 apps/kitchen/services.py ERPlora/erplora-next#74
-1004 apps/kitchen/tests/test_services.py ERPlora/erplora-next#74
 906 apps/modifier/queries.py ERPlora/erplora-next#74
 673 apps/modifier/schemas.py ERPlora/erplora-next#74
 687 apps/modifier/services.py ERPlora/erplora-next#74
