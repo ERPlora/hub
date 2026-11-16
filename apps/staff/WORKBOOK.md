@@ -782,7 +782,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   esos registros en sus listas. La segunda existe porque `staff.time_off.detail` trae el motivo y pide un permiso que
   el rol de empleado no tiene, y un empleado también anula su propia solicitud (STAFF-F19). Lo que no se puede leer se
   deja fuera:
-  `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py`
+  `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values_references.py`
   impide que entre un dato sin marca.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
