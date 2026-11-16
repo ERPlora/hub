@@ -7,9 +7,9 @@ from live.errors import Conflict
 
 from apps.appointment.models import Appointment
 
-from .conftest import MONDAY, make_customer, make_member, make_tax, run, wall
+from .conftest import HUB_DB, MONDAY, make_customer, make_member, make_tax, run, wall
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 
 @pytest.fixture

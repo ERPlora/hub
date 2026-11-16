@@ -8,7 +8,8 @@ import datetime as dt
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.appointment.models import (
     Appointment,
@@ -22,6 +23,7 @@ from apps.appointment.models import (
 )
 
 from .conftest import (
+    HUB_DB,
     MONDAY,
     at,
     make_appointment,
@@ -31,11 +33,11 @@ from .conftest import (
     make_service,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 

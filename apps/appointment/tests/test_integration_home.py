@@ -22,8 +22,10 @@ from live.operations import get
 from live.outbox import channel_for
 
 from base.schemas import BellCountersIn
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, MONDAY, at, ctx_for, make_appointment, make_settings, run, wall
+from .conftest import A, B, HUB_DB, HUB_DB_COMMITTED, MONDAY, at, ctx_for, make_appointment, make_salon, make_settings
+from .conftest import run, wall, without_hours
 from .test_queries import employee_linked_to
 
 pytestmark = pytest.mark.usefixtures("anytime")
@@ -65,19 +67,19 @@ def waiting(salon, member=None, start=None, **fields):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_customers_booking_waiting_is_counted_and_leads_to_the_agenda(salon):
     waiting(salon)
     assert bell(ctx_for("hub_admin")) == {**COUNTER, "count": 1}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_old_words(salon):
     waiting(salon)
     assert bell(ctx_for("hub_admin", language="es"))["label"] == "Citas por confirmar"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_past_confirmed_cancelled_or_deleted_booking_does_not_count_and_at_zero_nothing_shows(salon):
     waiting(salon, start=timezone.now() - dt.timedelta(hours=2))
     make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "11:00"), status="confirmed", source="online")
@@ -90,7 +92,7 @@ def test_a_past_confirmed_cancelled_or_deleted_booking_does_not_count_and_at_zer
     assert bell(admin) == {**COUNTER, "count": 1}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_counts_only_her_own_and_the_manager_everybodys(salon, make_user):
     waiting(salon, salon.ana, at(MONDAY, "10:00"))
     waiting(salon, salon.bea, at(MONDAY, "12:00"))
@@ -99,13 +101,13 @@ def test_an_employee_counts_only_her_own_and_the_manager_everybodys(salon, make_
     assert counted(ctx_for("hub_manager")) == 3
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_without_a_professional_of_her_own_is_not_shown_the_counter(salon):
     waiting(salon)
     assert bell(ctx_for("hub_employee")) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_permission_of_citas_there_is_no_counter(salon):
     waiting(salon)
     assert bell(ctx_for("hub_employee", permissions={"base.view_home"})) is None
@@ -114,7 +116,7 @@ def test_without_a_permission_of_citas_there_is_no_counter(salon):
 # ── What refreshes it: every change of the number records one of its events ──────────────────────────────────────
 
 
-def book_online(salon, appointment):
+def book_online(salon, appointment=None, scope=A):
     make_settings(auto_confirm_online=False)
     run(
         "appointment.appointment.create",
@@ -125,6 +127,7 @@ def book_online(salon, appointment):
             "start": wall(MONDAY, "12:00"),
             "source": "online",
         },
+        scope=scope,
     )
 
 
@@ -171,7 +174,7 @@ def to_confirm():
     return apps.get_app_config("appointment").bell[0]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("event", list(CHANGES))
 def test_each_change_of_the_number_records_an_event_that_refreshes_the_bell(salon, make_user, event):
     appointment = waiting(salon)
@@ -186,6 +189,7 @@ def test_each_change_of_the_number_records_an_event_that_refreshes_the_bell(salo
     assert recorded & set(to_confirm().refresh_on) == {event}
 
 
+@HUB_DB
 def test_every_event_it_is_refreshed_on_changes_the_number():
     """Not one more: the counter is re-run on what changes it, and nothing else."""
     assert set(to_confirm().refresh_on) == set(CHANGES)
@@ -214,21 +218,12 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_booking_in_hub_b_re_runs_the_bell_of_b_and_tells_a_nothing(salon, listen):
-    make_settings(auto_confirm_online=False)
+@HUB_DB_COMMITTED
+def test_a_booking_in_hub_b_re_runs_the_bell_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run(
-        "appointment.appointment.create",
-        {
-            "customer_id": str(salon.lucia.id),
-            "services": [{"service_id": str(salon.cut.id)}],
-            "staff_id": str(salon.ana.id),
-            "start": wall(MONDAY, "10:00"),
-            "source": "online",
-        },
-        scope=B,
-    )
+    with use_hub(hub_b):
+        without_hours()
+        book_online(make_salon(), scope=B)
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
     events = {event for _, payload in notes for event in payload["events"]}

@@ -12,9 +12,9 @@ from live.models import OutboxEvent
 from apps.appointment import events
 from apps.appointment.models import Appointment
 
-from .conftest import A, MONDAY, at, make_customer, make_service, make_tax, run, wall
+from .conftest import A, HUB_DB, MONDAY, at, make_customer, make_service, make_tax, run, wall
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 
 @pytest.fixture

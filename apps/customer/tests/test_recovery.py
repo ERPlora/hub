@@ -20,25 +20,26 @@ from datetime import date, timedelta
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import timezone
 from live.operations import get as get_operation
 
 from apps.customer import queries
 from apps.customer.models import Customer, CustomerGroup, CustomerTag, CustomField, CustomFieldValue
 from apps.customer.schemas import CustomerIn
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import ANA, CUSTOMERS, LUIS, Recoveries, fresh, gone, run, run_in
 
+from .conftest import HUB_DB
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    (business := connections[current_alias()]).ensure_connection()
+    return business.connection
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_live_card_with_what_its_create_takes():
     ana = Customer.objects.create(
         name="Ana López",
@@ -86,9 +87,9 @@ def test_the_copy_gives_each_live_card_with_what_its_create_takes():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE customer_customer CASCADE")
 
@@ -102,7 +103,7 @@ def a_card_of_the_copy(card: Customer | None = None, **fields) -> dict:
     return {"id": uuid.uuid7(), "name": "", "phone": "", "email": ""} | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_lacks_only_what_it_no_longer_has_nor_made_again():
     now = timezone.now()
     live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
@@ -121,7 +122,7 @@ def test_the_business_lacks_only_what_it_no_longer_has_nor_made_again():
     assert [card["id"] for card in lacking] == [absent["id"], sharing["id"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_business_holds_deleted_only_the_card_deleted_from_its_card_and_not_made_again():
     now = timezone.now()
     live = Customer.objects.create(name="Marta Ruiz", phone="+34600555666", email="marta@example.com")
@@ -141,7 +142,7 @@ def test_the_business_holds_deleted_only_the_card_deleted_from_its_card_and_not_
     assert held[0] is cards[1]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_into_or_made_again():
     """hub#1284: what another app's recovery matches the card a record of the copy points at by (an appointment's
     customer): the rule ``cards_not_in_business`` tells a card is not lacking by, naming the business's card."""
@@ -166,7 +167,7 @@ def test_a_card_of_the_copy_is_in_the_business_live_in_the_one_it_was_merged_int
     assert queries.card_in_business({"id": erased.pk, "name": live.name, "phone": live.phone, "email": live.email}) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_of_two_cards_made_again_alike_the_business_card_is_the_oldest():
     """hub#1284: two live cards may share name, phone and email (CUSTOMER-F12 only warns): the record of the copy goes
     to the one made first, always the same, whatever order the database gives them in."""
@@ -181,7 +182,7 @@ def test_of_two_cards_made_again_alike_the_business_card_is_the_oldest():
     assert queries.card_in_business(again) == first.pk
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_app_declares_what_it_gives_back():
     [declared] = apps.get_app_config("customer").recoverable_from_copy()
 
@@ -196,7 +197,7 @@ def test_the_app_declares_what_it_gives_back():
     assert declared.reads_since == "0001_initial"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_as_its_recovery_takes_them():
     """hub#1285: what hangs from a card comes back with it, by name: the business makes its own ids. A group or tag as
     the copy holds it, active or not (a card keeps an inactive one); only an active field's value (an inactive field
@@ -270,9 +271,9 @@ def test_the_copy_gives_each_card_with_its_groups_tags_and_custom_field_values_a
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_no_card_to_recover():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE customer_customer CASCADE")
 

@@ -4,13 +4,16 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
 from apps.staff.models import Member, Role, Schedule, ScheduleDay, StaffSettings, TimeOff
 from base.models import HubUser
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 NINE, ONE, TWO, SIX = dt.time(9), dt.time(13), dt.time(14), dt.time(18)
 
@@ -24,7 +27,7 @@ def user(username="ana"):
 
 
 def violates(constraint, create):
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+    with pytest.raises(IntegrityError) as excinfo, atomic():
         create()
     assert constraint in str(excinfo.value)
 

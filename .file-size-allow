@@ -13,7 +13,7 @@
 1660 apps/appointment/queries.py ERPlora/erplora-next#74
 1127 apps/appointment/schemas.py ERPlora/erplora-next#74
 2257 apps/appointment/services.py ERPlora/erplora-next#74
-1129 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
+1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 880 apps/attendance/queries.py ERPlora/erplora-next#74
 711 apps/attendance/services.py ERPlora/erplora-next#74
 560 apps/cart_checkout/queries.py ERPlora/erplora-next#74
@@ -32,8 +32,8 @@
 1130 apps/customer/queries.py ERPlora/erplora-next#74
 1300 apps/customer/schemas.py ERPlora/erplora-next#74
 1882 apps/customer/services.py ERPlora/erplora-next#74
-1105 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
-2761 apps/customer/tests/test_services.py ERPlora/erplora-next#74
+1100 apps/customer/tests/test_queries.py ERPlora/erplora-next#74
+2670 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 1825 apps/flow/queries.py ERPlora/erplora-next#74
@@ -105,7 +105,7 @@
 1088 apps/staff/schemas.py ERPlora/erplora-next#74
 1071 apps/staff/services.py ERPlora/erplora-next#74
 1307 apps/staff/tests/test_queries.py ERPlora/erplora-next#74
-1503 apps/staff/tests/test_services.py ERPlora/erplora-next#74
+1500 apps/staff/tests/test_services.py ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
 1041 apps/table/queries.py ERPlora/erplora-next#74
 895 apps/table/schemas.py ERPlora/erplora-next#74

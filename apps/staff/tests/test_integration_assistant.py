@@ -16,7 +16,7 @@ from apps.staff.models import Member
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
-from .conftest import ctx_for, make_role
+from .conftest import HUB_DB, ctx_for, make_role
 
 SCREENS = json.loads((Path(apps.get_app_config("staff").path) / "frontend/locale/es.json").read_text())["staff"]
 
@@ -145,7 +145,7 @@ def test_a_new_member_tells_the_model_where_the_roles_are_and_checks_its_role_be
     assert (resolve.kind, assistant.tools.is_tool(resolve), resolve.permission) == ("query", False, create.permission)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "role",
     [
@@ -168,7 +168,7 @@ def test_a_new_member_with_a_role_the_business_does_not_have_gets_no_card_and_th
     assert not Member.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_new_member_with_a_role_the_business_has_gets_its_card_and_the_yes_creates_it():
     """Positive control: the role exists (named in any case): the card comes, and the yes creates the member with it."""
     cashier = make_role("Cajero")
