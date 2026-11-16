@@ -160,7 +160,7 @@ D_ROLE_ID = (
 D_ROLE = "Name of the role, when its id is not known (an active role of this business)."
 #: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
 A_PERSON = names("base.hub_user.get")
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id. A schedule says whose it is and a time-off request whose, of what kind and which days: everyone
 # may have a «Regular schedule», and one person can ask for several absences.
 A_MEMBER = names("staff.member.detail", name=("full_name",))

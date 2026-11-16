@@ -30,7 +30,7 @@ class PaymentConfig(LiveAppConfig):
     # Nothing: the till's tenders are the sale app's and nothing here reads them (WORKBOOK «Decisión»).
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). Where the business pays its suppliers from
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). Where the business pays its suppliers from
     # is a payment method (payment.method), and so is its «cuenta bancaria» or «cuenta del banco», named by its phrases:
     # a «cuenta» alone is a table's check.
     assistant_synonyms = (

@@ -1,4 +1,4 @@
-"""erplora.com's AI gateway on ``127.0.0.1``, for the tests of the Hub's assistant (``base/assistant.py``).
+"""erplora.com's AI gateway on ``127.0.0.1``, for the tests of the Hub's assistant (``base/assistant/gateway.py``).
 
 The Hub talks to it with its real network code (``httpx``, signed as every ``/internal`` call): nothing of ours is
 patched. A test scripts what each door answers (``FakeGateway.reply``) in the gateway's own contract

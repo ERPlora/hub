@@ -7,24 +7,16 @@ payload; ``test_relay.py`` drives the worker's real relay end to end.
 import re
 import uuid
 
-import pytest
 from django.utils import timezone
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.service import events
 from apps.service.models import Assignment, Grant, GrantAdjustment, Redemption
 from apps.service.tests.conftest import (
-    make_customer,
-    make_grant,
-    make_member,
-    make_package,
-    make_redemption,
-    make_service,
+    HUB_DB, A, make_customer, make_grant, make_member, make_package, make_redemption, make_service,
 )
 
 PAST_FACT = re.compile(r"^service\.[a-z_]+\.[a-z_]+ed$")
-A = Scope("host", "a")
 
 
 def declared():
@@ -83,7 +75,7 @@ def test_it_reacts_to_a_professional_leaving_and_to_a_card_merged_or_erased():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_professional_who_leaves_stops_performing_every_service_as_the_system():
     ana, bea = make_member("Ana"), make_member("Bea")
     cut, colour = make_service("Cut"), make_service("Colour")
@@ -98,7 +90,7 @@ def test_a_professional_who_leaves_stops_performing_every_service_as_the_system(
     assert list(Assignment.objects.values_list("member_id", flat=True)) == [bea.id]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_two_cards_merged_move_the_vouchers_to_the_one_that_stays():
     package = make_package("Bono", [make_service()], max_uses=5)
     lucia, duplicate = make_customer("Lucía"), make_customer("Lucia P.")
@@ -120,7 +112,7 @@ def test_two_cards_merged_move_the_vouchers_to_the_one_that_stays():
     assert set(Grant.objects.values_list("customer_id", flat=True)) == {lucia.id}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_card_erased_empties_the_free_texts_of_its_vouchers_once():
     cut = make_service()
     lucia, other = make_customer("Lucía"), make_customer("Marta")
@@ -143,7 +135,7 @@ def test_a_card_erased_empties_the_free_texts_of_its_vouchers_once():
     assert (grant.amount, grant.customer_id, Redemption.objects.count()) == (9000, lucia.id, 1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_event_it_does_not_react_to_does_nothing():
     assert events.react(A, "staff.member.created", {"id": str(uuid.uuid7())}) is None
     assert (

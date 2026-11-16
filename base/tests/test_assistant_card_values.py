@@ -19,6 +19,7 @@ import pytest
 from django.conf import settings
 from django.core import checks
 from django.utils import timezone, translation
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.assistant import CHOICES_OF, NAMED, REFERS, choices_of
 from live.errors import Conflict, NotFound
@@ -31,8 +32,7 @@ from base.schemas import names, unless_given
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_record_details import api_key, failed_event, load, signed_in
-from base.tests.test_record_details import device as a_device
+from base.tests.test_record_details import api_key, device as a_device, failed_event, load, signed_in
 from base.tests.test_services_assistant import call, turn
 
 A = Scope("host", "a")
@@ -84,7 +84,7 @@ def values(card: dict) -> dict:
     [("es", "2 nov 2026, 10:00", "Mostrador"), ("en", "Nov 2, 2026, 10:00 AM", "Front desk")],
 )
 def test_a_booking_says_when_and_through_what_as_the_person_reads_them(language, start, source):
-    card = assistant.card(get("appointment.appointment.create"), BOOKING, language)
+    card = assistant.cards.card(get("appointment.appointment.create"), BOOKING, language)
     assert (values(card)["start"], values(card)["source"]) == (start, source)
     assert not AN_ISO_MOMENT.search(json.dumps(card, ensure_ascii=False))
 
@@ -94,7 +94,7 @@ def test_a_booking_says_when_and_through_what_as_the_person_reads_them(language,
     [("es", ("2 nov 2026", "21:30", "En el local")), ("en", ("Nov 2, 2026", "9:30 PM", "In person"))],
 )
 def test_a_table_booking_says_its_day_its_time_and_through_what(language, expected):
-    shown = values(assistant.card(get("reservation.reservation.create"), TABLE_BOOKING, language))
+    shown = values(assistant.cards.card(get("reservation.reservation.create"), TABLE_BOOKING, language))
     assert (shown["date"], shown["time"], shown["source"]) == expected
 
 
@@ -103,7 +103,7 @@ def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock
     the wall-clock time the model sent (the app books it at the business's hour) as it is, summer or winter."""
     op = get("appointment.appointment.create")
     def start(sent: str) -> str:
-        return values(assistant.card(op, {**BOOKING, "start": sent}, "es"))["start"]
+        return values(assistant.cards.card(op, {**BOOKING, "start": sent}, "es"))["start"]
 
     assert start("2026-11-02T09:00:00Z") == "2 nov 2026, 10:00"
     assert start("2026-07-02T08:00:00Z") == "2 jul 2026, 10:00"
@@ -115,18 +115,18 @@ def test_a_moment_is_said_in_the_zone_of_the_business_the_person_works_in():
     """In the person's hub, the business's own zone (Settings › Business), the clock every app reads."""
     hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
     with use_hub(hub):
-        card = assistant.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
+        card = assistant.cards.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
     assert values(card)["start"] == "2 nov 2026, 9:00"
 
 
 def test_what_is_no_moment_no_value_of_its_list_or_no_id_is_shown_as_sent():
     """The write refuses it with its reason; the card makes nothing up, nor hides it."""
     arguments = {**BOOKING, "start": "mañana a las 10", "source": "carrier pigeon"}
-    shown = values(assistant.card(get("appointment.appointment.create"), arguments, "es"))
+    shown = values(assistant.cards.card(get("appointment.appointment.create"), arguments, "es"))
     assert (shown["start"], shown["source"]) == ("mañana a las 10", "carrier pigeon")
     # A reference no mark names, with no id in it (Citas names its professional by its mark: hub#514).
     visit = {"staff_id": "Ana", "start": "2026-11-02T10:00:00+01:00", "source": "phone"}
-    assert values(assistant.card(VISITS, {"first": visit}, "es"))["first"]["staff_id"] == "Ana"
+    assert values(assistant.cards.card(VISITS, {"first": visit}, "es"))["first"]["staff_id"] == "Ana"
 
 
 # ── A record named by its id ──────────────────────────────────────────────────────────────────────────────────────────
@@ -135,8 +135,8 @@ def test_what_is_no_moment_no_value_of_its_list_or_no_id_is_shown_as_sent():
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_record_named_by_its_id_never_reaches_the_card_by_it(language):
     for name, arguments in [("appointment.appointment.create", BOOKING), ("reservation.reservation.create", TABLE_BOOKING)]:
-        assert not AN_ID.search(json.dumps(assistant.card(get(name), arguments, language))), name
-    shown = values(assistant.card(get("appointment.appointment.create"), BOOKING, language))
+        assert not AN_ID.search(json.dumps(assistant.cards.card(get(name), arguments, language))), name
+    shown = values(assistant.cards.card(get("appointment.appointment.create"), BOOKING, language))
     assert "customer_id" not in shown and "staff_id" not in shown
     assert shown["customer"] == "Ana López"
     # Its service left out (nobody at hand reads it): the screen counts it among the more, never by its id (hub#835).
@@ -153,7 +153,7 @@ def test_a_service_whose_name_comes_blank_is_counted_never_said_in_blank(write, 
     op = get(write)
 
     def services(sent: list) -> tuple:
-        shown = list_field(assistant.card(op, {"services": sent}, language), "services")
+        shown = list_field(assistant.cards.card(op, {"services": sent}, language), "services")
         return shown["value"], shown.get(NAMED, False)
 
     assert services([{"service": "Tinte"}]) == ([{"service": "Tinte"}], True)
@@ -189,7 +189,7 @@ VISITS = Operation(
 
 def test_inside_an_object_or_a_list_a_moment_and_a_value_are_said_and_an_id_left_out():
     visit = {"staff_id": MEMBER, "start": "2026-11-02T10:00:00+01:00", "source": "phone"}
-    card = assistant.card(VISITS, {"first": visit, "then": [visit], "staff_ids": [MEMBER, MEMBER]}, "es")
+    card = assistant.cards.card(VISITS, {"first": visit, "then": [visit], "staff_ids": [MEMBER, MEMBER]}, "es")
     said = {"start": "2 nov 2026, 10:00", "source": "Teléfono"}
     # A list of ids still says how many: each one is there, by no id.
     assert values(card) == {"first": said, "then": [said], "staff_ids": [None, None]}
@@ -200,7 +200,7 @@ def test_inside_an_object_or_a_list_a_moment_and_a_value_are_said_and_an_id_left
 def test_a_record_its_schema_marks_is_named_by_the_read_of_its_app_as_the_person(make_user):
     """Base's own: «Remove the PIN» named the person by the id the model sent («Persona: saas:3»)."""
     make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
-    card = assistant.card(get("base.person.pin_remove"), {"person": "saas:3"}, "es", ctx=ctx())
+    card = assistant.cards.card(get("base.person.pin_remove"), {"person": "saas:3"}, "es", ctx=ctx())
     assert values(card) == {"person": "Eva Gil"}
     assert [field["label"] for field in card["fields"]] == ["Persona"]
 
@@ -209,15 +209,15 @@ def test_a_record_its_schema_marks_is_named_by_the_read_of_its_app_as_the_person
 def test_a_record_the_person_may_not_read_or_that_is_not_there_is_left_out_never_by_its_id(make_user):
     make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
     op = get("base.person.pin_remove")
-    assert values(assistant.card(op, {"person": "saas:3"}, "es", ctx=ctx({"base.view_home"}))) == {}
-    assert values(assistant.card(op, {"person": "saas:0"}, "es", ctx=ctx())) == {}
+    assert values(assistant.cards.card(op, {"person": "saas:3"}, "es", ctx=ctx({"base.view_home"}))) == {}
+    assert values(assistant.cards.card(op, {"person": "saas:0"}, "es", ctx=ctx())) == {}
     # Without the person at hand (an automation's card) the read is not run for anybody.
-    assert values(assistant.card(op, {"person": "saas:3"}, "es")) == {}
+    assert values(assistant.cards.card(op, {"person": "saas:3"}, "es")) == {}
 
 
 @pytest.mark.parametrize(("language", "label"), [("es", "Terracota"), ("en", "Terracotta")])
 def test_a_palette_is_said_by_the_name_my_profile_gives_it(language, label):
-    card = assistant.card(get("base.profile.preferences_set"), {"palette": "terracotta"}, language)
+    card = assistant.cards.card(get("base.profile.preferences_set"), {"palette": "terracotta"}, language)
     assert values(card) == {"palette": label}
 
 
@@ -239,7 +239,7 @@ def test_every_record_a_write_of_base_names_by_its_id_is_named_on_its_card(clien
         ("base.blueprint.import", {"retry_of": batch}, {"retry_of": "Peluquería"}),
     ]
     with use_hub(hub_a):
-        shown = {name: values(assistant.card(get(name), arguments, "es", ctx=owner)) for name, arguments, _ in writes}
+        shown = {name: values(assistant.cards.card(get(name), arguments, "es", ctx=owner)) for name, arguments, _ in writes}
     assert shown == {name: expected for name, _, expected in writes}
 
 
@@ -252,7 +252,7 @@ def test_a_device_nobody_named_is_said_by_what_it_is_as_the_devices_list_says_it
             token_digest=access.token_digest("unnamed"), agent="Chrome · macOS", last_entry_at=timezone.now()
         )
         owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
-        assert values(assistant.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {
+        assert values(assistant.cards.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {
             "id": "Chrome · macOS"
         }
 
@@ -264,7 +264,7 @@ def test_a_device_with_no_name_nor_a_browser_it_knows_is_left_out(hub_a, monkeyp
     with use_hub(hub_a):
         device = TrustedDevice.objects.create(token_digest=access.token_digest("bare"), last_entry_at=timezone.now())
         owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
-        assert values(assistant.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {}
+        assert values(assistant.cards.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {}
 
 
 @pytest.mark.django_db
@@ -306,13 +306,13 @@ def test_no_write_lets_an_id_or_an_iso_moment_reach_its_card():
     """Every write the assistant may run: what its schema declares an id or a moment never reaches its card as sent."""
     checked = []
     for name, op in sorted(registry.items()):
-        if op.kind != "command" or not assistant.is_tool(op):
+        if op.kind != "command" or not assistant.tools.is_tool(op):
             continue
         schema = op.input.model_json_schema()
         arguments = ids_and_moments(schema, schema.get("$defs", {}))
         if arguments:
             checked.append(name)
-            text = json.dumps(assistant.card(op, arguments, "es"), ensure_ascii=False)
+            text = json.dumps(assistant.cards.card(op, arguments, "es"), ensure_ascii=False)
             assert not AN_ID.search(text), name
             assert not AN_ISO_MOMENT.search(text), name
     # Not an empty sweep: a booking, a table booking and a work schedule (times in a list) are among them.
@@ -333,7 +333,7 @@ def list_field(card: dict, name: str) -> dict:
 )
 def test_the_permissions_of_a_grant_are_named_item_by_item(language, expected):
     """hub#504: who confirms a grant reads what each permission lets the automation do, as the History names it."""
-    card = assistant.card(
+    card = assistant.cards.card(
         get("flow.flow.grant"),
         {"operations": ["task.task.create", "customer.customer.create"]},
         language,
@@ -347,7 +347,7 @@ def test_the_permissions_of_a_grant_are_named_item_by_item(language, expected):
 @pytest.mark.parametrize(("language", "expected"), [("es", ["Ventas / TPV", "Facturación"]), ("en", ["Sales & POS", "Invoicing"])])
 def test_the_apps_of_a_blueprint_are_named_item_by_item(language, expected):
     """hub#504: who confirms a template reads which apps it loads, by their name, never by their id."""
-    card = assistant.card(
+    card = assistant.cards.card(
         get("base.blueprint.import"), {"apps": ["sale", "invoice"]}, language, ctx=ctx({"*"}, language=language)
     )
     shown = list_field(card, "apps")
@@ -357,10 +357,10 @@ def test_the_apps_of_a_blueprint_are_named_item_by_item(language, expected):
 @pytest.mark.django_db
 def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
     """A stale permission or app is left out, never shown by its code: the screen says the rest and counts it among the more."""
-    grant = assistant.card(
+    grant = assistant.cards.card(
         get("flow.flow.grant"), {"operations": ["task.task.create", "ghost.thing.missing"]}, "es", ctx=ctx({"*"})
     )
-    blueprint = assistant.card(get("base.blueprint.import"), {"apps": ["sale", "ghost"]}, "es", ctx=ctx({"*"}))
+    blueprint = assistant.cards.card(get("base.blueprint.import"), {"apps": ["sale", "ghost"]}, "es", ctx=ctx({"*"}))
     assert list_field(grant, "operations")["value"] == ["Crear una tarea", None]
     assert list_field(blueprint, "apps")["value"] == ["Ventas / TPV", None]
     assert list_field(grant, "operations")[NAMED] is True
@@ -375,10 +375,10 @@ def text_lists() -> dict[str, list[str]]:
         schema = op.input.model_json_schema()
         defs = schema.get("$defs", {})
         for name, prop in schema.get("properties", {}).items():
-            prop = assistant._resolved(prop, defs)
+            prop = shared.resolved(prop, defs)
             if prop.get("type") != "array":
                 continue
-            items = assistant._resolved(prop.get("items", {}), defs)
+            items = shared.resolved(prop.get("items", {}), defs)
             if items.get("type") == "string" and not {"enum", "format", REFERS} & {*prop.keys(), *items.keys()}:
                 found.setdefault(op.name, []).append(name)
     return found
@@ -393,11 +393,11 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
         f"{write}:{name}"
         for write, names in found.items()
         for name in names
-        if NAMED in list_field(assistant.card(get(write), {name: ["sale.sale.create", "vip"]}, "es"), name)
+        if NAMED in list_field(assistant.cards.card(get(write), {name: ["sale.sale.create", "vip"]}, "es"), name)
     ]
     assert named == []
     starts = ["2026-11-02T10:00:00+01:00", "2026-11-09T10:00:00+01:00"]
-    visits = list_field(assistant.card(get("appointment.appointment.bulk_create"), {"starts": starts}, "es"), "starts")
+    visits = list_field(assistant.cards.card(get("appointment.appointment.bulk_create"), {"starts": starts}, "es"), "starts")
     assert (visits["value"], visits.get(NAMED)) == (["2 nov 2026, 10:00", "9 nov 2026, 10:00"], True)
 
 
@@ -430,14 +430,14 @@ def unnamed(op: Operation) -> tuple[list[str], list[str]]:
     entity = op.name.split(".")[1]
 
     def walk(name: str, prop: dict, path: str, depth: int) -> None:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return
-        if prop.get("format") == "uuid" and assistant.refers_of(prop) is None and not is_attempt_key(prop):
+        if prop.get("format") == "uuid" and shared.refers_of(prop) is None and not is_attempt_key(prop):
             references.append(path)
         choices = [value for value in prop.get("enum", []) if isinstance(value, str) and value]
         app_label, field_name = choices_of(op.app_label, name, prop)
-        if choices and not all(assistant._choice_label(app_label, entity, field_name, value) for value in choices):
+        if choices and not all(shared.choice_label(app_label, entity, field_name, value) for value in choices):
             lists.append(path)
         if isinstance(prop.get("items"), dict):
             # A list's mark names the values of its items, as it does on the card.
@@ -464,7 +464,7 @@ def by_app(operations) -> tuple[dict[str, int], dict[str, int]]:
 
 
 def writes() -> list[Operation]:
-    return [op for _, op in sorted(registry.items()) if op.kind == "command" and assistant.is_tool(op)]
+    return [op for _, op in sorted(registry.items()) if op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_every_reference_and_closed_list_of_a_write_is_named_but_the_known_ones():
@@ -630,12 +630,12 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
     """Every write the assistant may run: a datum the screen knows by its name («Registro» for ``id``) that its app
     titles («Cuenta») is called by that title in Spanish; every other one keeps the screen's word — none goes by its
     name as sent («Id»)."""
-    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "5 (Terraza)")
+    monkeypatch.setattr(assistant.cards, "_reference", lambda value, prop, words: "5 (Terraza)")
     titles: dict[str, str] = {}
     for op in writes():
         props = op.input.model_json_schema().get("properties", {})
         arguments = {name: TABLE for name in props if name in KNOWN}
-        for field in assistant.card(op, arguments, "es")["fields"]:
+        for field in assistant.cards.card(op, arguments, "es")["fields"]:
             if card_title(field) != KNOWN[field["name"]]:
                 titles[f"{op.name}:{field['name']}"] = card_title(field)
     assert titles == TITLED_IN_SPANISH
@@ -650,7 +650,7 @@ def test_every_dangerous_write_of_the_platform_flow_and_reservation_titles_the_r
     untitled = []
     checked = []
     for op in writes():
-        if op.app_label not in {"base", "flow", "reservation"} or assistant.risk(op) != "high":
+        if op.app_label not in {"base", "flow", "reservation"} or shared.risk(op) != "high":
             continue
         checked.append(op.name)
         props = op.input.model_json_schema().get("properties", {})
@@ -658,7 +658,7 @@ def test_every_dangerous_write_of_the_platform_flow_and_reservation_titles_the_r
             untitled += [
                 f"{op.name}:{name}"
                 for name in ("id", "ids")
-                if name in props and assistant._own_title(name, props[name].get("title")) is None
+                if name in props and shared.own_title(name, props[name].get("title")) is None
             ]
     assert {
         "reservation.reservation.delete",
@@ -677,16 +677,16 @@ def test_no_preview_titles_a_datum_the_screen_knows_by_its_name():
     them); one that does is called by its title, and comes in here."""
     titled = []
     for op in writes():
-        declared = assistant.preview_of(op)
+        declared = shared.preview_of(op)
         if declared is None:
             continue
         read = registry[declared["operation"]]
-        out = assistant._output_schema(read).get("properties", {})
+        out = shared.output_schema(read).get("properties", {})
         with translation.override("es"):
             titled += [
                 f"{op.name} › {read.name}:{name}"
                 for name in declared["fields"]
-                if name in KNOWN and assistant._own_title(name, out[name].get("title")) is not None
+                if name in KNOWN and shared.own_title(name, out[name].get("title")) is not None
             ]
     assert titled == []
 
@@ -835,7 +835,7 @@ SERVER = {*ADMIN, "demo.view", "demo.manage"}
 
 
 def served(arguments: dict, permissions=SERVER, *, person: bool = True, found: list | None = None, mark=A_DISH) -> dict:
-    card = assistant.card(serving(mark), arguments, "es", ctx=ctx(permissions) if person else None, found=found)
+    card = assistant.cards.card(serving(mark), arguments, "es", ctx=ctx(permissions) if person else None, found=found)
     return values(card)
 
 
@@ -1107,7 +1107,7 @@ def test_a_preview_says_a_moment_as_the_person_reads_it_too(monkeypatch):
     write = declaring({"operation": read.name, "fields": ["name", "since"]})
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(registry, write.name, write)
-    failure, fields = assistant.preview(ctx({*ADMIN, "demo.view", "demo.manage"}), write, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx({*ADMIN, "demo.view", "demo.manage"}), write, {"id": "7"})
     assert failure is None
     assert [(field["name"], field["value"]) for field in fields] == [("name", "Item 7"), ("since", "2 nov 2026, 10:00")]
 
@@ -1156,10 +1156,10 @@ KEYED_ARGUMENTS = {
 def test_an_attempt_key_its_schema_marks_never_reaches_the_card_at_any_depth(language):
     """Its line is left out, inside an object and in each item of a list too (which still says how many it carries),
     and an empty one leaves no empty line: the person reads what the write does, not the key that makes it safe."""
-    card = assistant.card(keyed(), KEYED_ARGUMENTS, language)
+    card = assistant.cards.card(keyed(), KEYED_ARGUMENTS, language)
     assert values(card) == {"note": "Mesa 4", "line": {"text": "Café"}, "lines": [{"text": "Té"}]}
     assert ATTEMPT not in json.dumps(card, ensure_ascii=False)
-    assert values(assistant.card(keyed(), {"note": "Mesa 4", "idempotency_key": None}, language)) == {"note": "Mesa 4"}
+    assert values(assistant.cards.card(keyed(), {"note": "Mesa 4", "idempotency_key": None}, language)) == {"note": "Mesa 4"}
 
 
 class KeyedPreviewOut(Schema):
@@ -1177,7 +1177,7 @@ def test_an_attempt_key_never_reaches_a_preview_either(monkeypatch):
     write = declaring({"operation": read.name, "fields": ["name", "idempotency_key"]})
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(registry, write.name, write)
-    failure, fields = assistant.preview(ctx({*ADMIN, "demo.view", "demo.manage"}), write, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx({*ADMIN, "demo.view", "demo.manage"}), write, {"id": "7"})
     assert failure is None
     assert [(field["name"], field["value"]) for field in fields] == [("name", "Item 7")]
 
@@ -1238,7 +1238,7 @@ def unmarked_attempt_keys(op: Operation) -> list[str]:
     defs = schema.get("$defs", {})
 
     def walk(name: str, prop: dict, path: str, depth: int) -> None:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return
         if prop.get("type") == "string" and ATTEMPT_KEY_NAME.search(name) and not is_attempt_key(prop):
@@ -1293,7 +1293,7 @@ def misplaced_marks(op: Operation) -> list[str]:
     defs = schema.get("$defs", {})
 
     def walk(prop: dict, path: str, depth: int) -> None:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return
         if is_attempt_key(prop) and prop.get("type") != "string":
@@ -1380,7 +1380,7 @@ def test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth(lan
     money the screen writes in the business's currency, the same inside an object or a list as on top (the server
     never words it: «1,50 PLN» beside «15,00 zł»). A whole number that is no amount stays as sent."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": country})
-    card = assistant.card(priced(), PRICED_ARGUMENTS, language, ctx=ctx(language=language))
+    card = assistant.cards.card(priced(), PRICED_ARGUMENTS, language, ctx=ctx(language=language))
     shown = {field["name"]: (field["kind"], field["value"]) for field in card["fields"]}
     assert shown == {
         "price": ("money", 1500),
@@ -1399,7 +1399,7 @@ class WordsOnlyIn(Schema):
 def test_words_alone_make_no_amount_its_mark_does():
     """The words of a description are for the model, and rewriting them changes nothing of the card: the mark says an
     amount. Every amount the assistant shows or fills carries its mark (the ratchet below)."""
-    card = assistant.card(priced(WordsOnlyIn), {"price": 1500, "rate": 1250}, "es")
+    card = assistant.cards.card(priced(WordsOnlyIn), {"price": 1500, "rate": 1250}, "es")
     assert [(field["name"], field["kind"]) for field in card["fields"]] == [("price", "text"), ("rate", "text")]
 
 
@@ -1421,7 +1421,7 @@ def test_a_name_in_cents_alone_makes_no_amount_its_mark_does():
     amount, on top and inside an object or a list: the rest stays as sent."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
     arguments = {"total_cents": 1500, "line": {"text": "Café", "unit_cents": 150}, "lines": [{"text": "Té", "unit_cents": 1200}]}
-    card = assistant.card(priced(NamedCentsIn), arguments, "es", ctx=ctx(language="es"))
+    card = assistant.cards.card(priced(NamedCentsIn), arguments, "es", ctx=ctx(language="es"))
     shown = {field["name"]: (field["kind"], field["value"]) for field in card["fields"]}
     assert shown == {
         "total_cents": ("text", 1500),
@@ -1450,7 +1450,7 @@ def test_an_amount_inside_a_datum_of_a_preview_is_said_in_the_currency_its_read_
     write = declaring({"operation": read.name, "fields": ["totals"]})
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(registry, write.name, write)
-    failure, fields = assistant.preview(ctx({*ADMIN, "demo.view", "demo.manage"}, language="en"), write, {"id": "7"})
+    failure, fields = assistant.cards.preview(ctx({*ADMIN, "demo.view", "demo.manage"}, language="en"), write, {"id": "7"})
     assert failure is None
     assert [(field["name"], field["kind"], field["value"]) for field in fields] == [
         ("totals", "object", {"due": amount(1200, USD), "note": "R1"})
@@ -1460,13 +1460,13 @@ def test_an_amount_inside_a_datum_of_a_preview_is_said_in_the_currency_its_read_
 def test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says():
     """The tool the model fills carries the mark of each amount, at any depth, and its instructions say what the mark
     means: the minor unit of the business's currency. Words like «in cents» are not what tells it."""
-    parameters = assistant.tool_spec(priced())["parameters"]
+    parameters = shared.tool_spec(priced())["parameters"]
     defs = parameters["$defs"]
-    assert assistant._resolved(parameters["properties"]["price"], defs)["money"] is True
-    assert assistant._resolved(parameters["properties"]["hourly_rate"], defs)["money"] is True
+    assert shared.resolved(parameters["properties"]["price"], defs)["money"] is True
+    assert shared.resolved(parameters["properties"]["hourly_rate"], defs)["money"] is True
     assert defs["PricedLineIn"]["properties"]["unit_price"]["money"] is True
-    assert "money" not in assistant._resolved(parameters["properties"]["quantity"], defs)
-    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
+    assert "money" not in shared.resolved(parameters["properties"]["quantity"], defs)
+    text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
     assert '`"money": true`' in text and "17.00 EUR → 1700" in text
     assert "«in cents»" not in text
 
@@ -1487,7 +1487,7 @@ class PaidIn(Schema):
 
 def paid(arguments: dict, language: str = "es") -> dict:
     """The card of a payment of 15.00 with a line of 1.50 and ``arguments``, read as the person: its data by name."""
-    card = assistant.card(
+    card = assistant.cards.card(
         priced(PaidIn), {"amount": 1500, "line": {"text": "Café", "unit_price": 150}, **arguments}, language, ctx=ctx(language=language)
     )
     return {field["name"]: {key: value for key, value in field.items() if key != "label"} for field in card["fields"]}
@@ -1551,7 +1551,7 @@ class PaidLinesIn(Schema):
 def test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts():
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
     line = {"text": "Café", "unit_price": 150, "currency": "USD"}
-    card = assistant.card(priced(PaidLinesIn), {"line": line, "lines": [line, {**line, "currency": ""}]}, "en", ctx=ctx(language="en"))
+    card = assistant.cards.card(priced(PaidLinesIn), {"line": line, "lines": [line, {**line, "currency": ""}]}, "en", ctx=ctx(language="en"))
     assert values(card) == {
         "line": {"text": "Café", "unit_price": amount(150, USD), "currency": "USD"},
         "lines": [{"text": "Café", "unit_price": amount(150, USD), "currency": "USD"}, {"text": "Café", "unit_price": amount(150), "currency": ""}],
@@ -1560,8 +1560,8 @@ def test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts():
 
 def test_the_model_is_told_an_amount_is_in_the_currency_its_write_names():
     """The minor unit of its operation's currency: 1500 is 15.00 dollars in a payment in dollars, ¥1,500 in yen."""
-    assert assistant._resolved(assistant.tool_spec(priced(PaidIn))["parameters"]["properties"]["currency"], {})["currency"] is True
-    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
+    assert shared.resolved(shared.tool_spec(priced(PaidIn))["parameters"]["properties"]["currency"], {})["currency"] is True
+    text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
     assert '`"currency": true`' in text
 
 
@@ -1628,7 +1628,7 @@ WRITER = {*ADMIN, "demo.view", "demo.manage"}
 
 
 def entered(arguments: dict, permissions=WRITER, *, person: bool = True) -> dict:
-    card = assistant.card(priced(LedgerEntryIn), arguments, "es", ctx=ctx(permissions) if person else None)
+    card = assistant.cards.card(priced(LedgerEntryIn), arguments, "es", ctx=ctx(permissions) if person else None)
     return {field["name"]: {key: value for key, value in field.items() if key != "label"} for field in card["fields"]}
 
 
@@ -1691,13 +1691,13 @@ def test_a_record_is_read_only_for_its_amounts_and_one_not_named_leaves_the_busi
 def test_the_model_is_told_an_amount_on_a_record_is_in_that_records_currency():
     """A line of a cart in dollars, a price of a list in yen: its tool carries the mark on the datum that names the
     record, and its instructions say the amount beside it is in the minor unit of that record's currency."""
-    parameters = assistant.tool_spec(priced(LedgerEntryIn))["parameters"]
-    assert assistant._resolved(parameters["properties"]["ledger_id"], parameters.get("$defs", {}))["currency"] == {
+    parameters = shared.tool_spec(priced(LedgerEntryIn))["parameters"]
+    assert shared.resolved(parameters["properties"]["ledger_id"], parameters.get("$defs", {}))["currency"] == {
         "read": "demo.item.ledger",
         "by": "id",
         "code": "code",
     }
-    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
+    text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
     assert '`"currency": {"read": …}`' in text and '`"currency": true`' in text
 
 
@@ -1767,7 +1767,7 @@ def data_of(schema: dict, names: list[str] | None = None) -> list[tuple[str, str
     found: list[tuple[str, str, dict]] = []
 
     def walk(name: str, prop: dict, path: str, depth: int) -> None:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return
         found.append((name, path, prop))
@@ -1786,7 +1786,7 @@ def assistant_data(op: Operation) -> list[tuple[str, str, dict]]:
     """What the assistant shows or fills of the tool ``op``: its input (the model's parameters, a write's card) and,
     for a write with a preview, the data of its read's answer the card shows («What will happen»)."""
     found = data_of(op.input.model_json_schema())
-    declared = assistant.preview_of(op)
+    declared = shared.preview_of(op)
     read = registry.get(declared["operation"]) if isinstance(declared, dict) else None
     if read is not None:
         found += [(name, f"preview:{path}", prop) for name, path, prop in data_of(read.output.model_json_schema(), declared["fields"])]
@@ -1794,7 +1794,7 @@ def assistant_data(op: Operation) -> list[tuple[str, str, dict]]:
 
 
 def tools() -> list[Operation]:
-    return [op for _, op in sorted(registry.items()) if assistant.is_tool(op)]
+    return [op for _, op in sorted(registry.items()) if assistant.tools.is_tool(op)]
 
 
 def unmarked_amounts(op: Operation) -> list[str]:
@@ -1902,7 +1902,7 @@ def unmarked_currencies(op: Operation) -> list[str]:
     found: list[str] = []
 
     def priced(prop: dict, depth: int) -> bool:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return False
         if is_marked_amount(prop):
@@ -1911,7 +1911,7 @@ def unmarked_currencies(op: Operation) -> list[str]:
         return any(priced(each, depth + 1) for each in inner)
 
     def walk(prop: dict, path: str, depth: int) -> None:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return
         props = prop.get("properties", {})
@@ -1919,8 +1919,8 @@ def unmarked_currencies(op: Operation) -> list[str]:
             found.extend(
                 f"{path}.{name}" if path else name
                 for name, inner in props.items()
-                if names_a_currency(name, assistant._resolved(inner, defs))
-                and assistant._resolved(inner, defs).get("currency") is not True
+                if names_a_currency(name, shared.resolved(inner, defs))
+                and shared.resolved(inner, defs).get("currency") is not True
             )
         if isinstance(prop.get("items"), dict):
             walk(prop["items"], f"{path}[]", depth + 1)
@@ -2005,13 +2005,13 @@ def unpriced_record_amounts(op: Operation) -> list[str]:
     found: list[str] = []
 
     def walk(prop: dict, path: str, priced: bool, depth: int) -> None:
-        prop = assistant._resolved(prop, defs)
+        prop = shared.resolved(prop, defs)
         if depth > 8:
             return
         props = prop.get("properties", {})
-        priced = priced or any(assistant._resolved(inner, defs).get("currency") for inner in props.values())
+        priced = priced or any(shared.resolved(inner, defs).get("currency") for inner in props.values())
         for name, inner in props.items():
-            inner = assistant._resolved(inner, defs)
+            inner = shared.resolved(inner, defs)
             here = f"{path}.{name}" if path else name
             if is_marked_amount(inner) and RECORD_CURRENCY.search(str(inner.get("description", ""))) and not priced:
                 found.append(here)

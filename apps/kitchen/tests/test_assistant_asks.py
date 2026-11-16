@@ -143,7 +143,7 @@ ROOM = 2
 
 def test_kitchen_offers_at_least_29_tools():
     """Kitchen's tools are at least 29 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "kitchen" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "kitchen" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) >= 29
 

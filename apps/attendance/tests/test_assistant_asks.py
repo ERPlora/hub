@@ -85,7 +85,7 @@ def test_time_clock_is_listed_so_layer_1_sweeps_every_ask_of_it():
 
 def test_attendance_offers_its_eighteen_tools():
     """Time clock's tools are its eighteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "attendance" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "attendance" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) == 18
     assert {"attendance.settings.update", "attendance.person.detail"} <= tools

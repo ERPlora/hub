@@ -29,7 +29,7 @@ def owner(make_user):
 
 
 def offered(ctx: OperationContext, *asked: str) -> list[str]:
-    return [op.name for op in assistant.relevant(assistant.catalog(ctx), list(asked), ctx.language)]
+    return [op.name for op in assistant.relevance.relevant(assistant.tools.catalog(ctx), list(asked), ctx.language)]
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -49,7 +49,7 @@ def offered(ctx: OperationContext, *asked: str) -> list[str]:
 )
 def test_the_tool_that_does_what_the_owner_asks_is_offered(owner, language, asked, expected):
     ctx = owner(language)
-    assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in assistant.tools.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)
 
 
@@ -77,7 +77,7 @@ EVERYDAY = [
 @pytest.mark.parametrize(("language", "asked", "expected"), EVERYDAY)
 def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, asked, expected):
     ctx = owner(language)
-    assert expected <= set(assistant.catalog(ctx))  # the owner holds them: only the selection can leave one out
+    assert expected <= set(assistant.tools.catalog(ctx))  # the owner holds them: only the selection can leave one out
     got = offered(ctx, asked)
     assert not expected - set(got), expected - set(got)
 
@@ -87,7 +87,7 @@ def test_the_people_of_a_reservation_never_bring_the_staffs_tools(owner):
     """«personas» is not «Personal» (the staff app in Spanish): before live offered the tool of what is asked,
     «reserva una mesa para 4 personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
     got = offered(owner("es"), "reserva una mesa para 4 personas")
-    assert got.index("reservation.reservation.create") == len(assistant.ALWAYS)  # first after what is always at hand
+    assert got.index("reservation.reservation.create") == len(assistant.relevance.ALWAYS)  # first after what is always at hand
     assert sum(name.startswith("staff.") for name in got) <= 1, [name for name in got if name.startswith("staff.")]
 
 
@@ -115,7 +115,7 @@ BLOCK_B = [
 @pytest.mark.parametrize(("index", "asked", "expected"), [(i, q, e) for i, (q, e) in enumerate(BLOCK_B)])
 def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, asked, expected):
     ctx = owner("es")
-    assert expected <= set(assistant.catalog(ctx))  # the owner holds them: only the selection can leave one out
+    assert expected <= set(assistant.tools.catalog(ctx))  # the owner holds them: only the selection can leave one out
     # A turn ranks by the last two questions of the person (``base.assistant.turn``): the battery asks them in order.
     before = BLOCK_B[index - 1][0] if index else None
     for texts in ([asked], [before, asked] if before else [asked]):
@@ -141,7 +141,7 @@ def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, 
     """Before the Hub said what its words mean, these came at 11 to 31, or not at all: «cuenta» shared no word with an
     order and «ticket» brought the kitchen's tickets (live leaves those meanings to each project)."""
     ctx = owner(language)
-    assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in assistant.tools.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]
 
 
@@ -164,7 +164,7 @@ def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, la
     only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before live read «anota»
     and «retira» as editing and removing fails here."""
     ctx = owner(language)
-    assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in assistant.tools.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]
 
 
@@ -175,6 +175,6 @@ def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, la
 def test_a_how_to_question_ranks_the_documentation_first_by_being_one(owner, language, asked):
     """The documentation search is always offered (``ALWAYS``), and a how-to question also ranks it first by itself
     (``HOWTO``): ranked without what is always at hand, it still leads."""
-    tools = assistant.catalog(owner(language))
-    ranking = {**assistant.ranking(tools), "always": ()}
-    assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.DOCS_SEARCH
+    tools = assistant.tools.catalog(owner(language))
+    ranking = {**assistant.relevance.ranking(tools), "always": ()}
+    assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.relevance.DOCS_SEARCH

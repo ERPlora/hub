@@ -40,7 +40,7 @@ def names(exported: list[dict]) -> list[str]:
 
 def test_the_owner_s_export_is_every_tool_of_every_app_by_name_with_its_asks_in_the_language():
     exported = export("--role", "owner", "--language", "es")
-    assert names(exported) == sorted(name for name, op in registry.items() if assistant.is_tool(op))
+    assert names(exported) == sorted(name for name, op in registry.items() if assistant.tools.is_tool(op))
     assert {tool["app_label"] for tool in exported} >= {"base", "sale", "staff"}  # every app, not only the platform
     enable = next(tool for tool in exported if tool["name"] == "base.app.enable")
     assert enable["tool_name"] == "base__app__enable"
@@ -59,7 +59,7 @@ def test_the_asks_come_in_the_language_asked():
 def test_each_role_exports_exactly_the_catalogue_a_member_with_it_has_in_a_turn(make_user, role):
     user = make_user(f"qa-{role}", host=A.key, role=ROLES[role])
     ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="en")
-    assert names(export("--role", role, "--language", "en")) == list(assistant.catalog(ctx))
+    assert names(export("--role", role, "--language", "en")) == list(assistant.tools.catalog(ctx))
 
 
 def test_a_role_without_the_permission_does_not_get_the_tool():

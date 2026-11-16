@@ -93,7 +93,7 @@ def on_card(plan: dict, datum: str) -> list[tuple[str, object]]:
 
 
 def fields_of(write: str, arguments: dict, language: str = "es") -> dict:
-    card = assistant.card(get(write), arguments, language, as_admin(language))
+    card = assistant.cards.card(get(write), arguments, language, as_admin(language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -212,7 +212,7 @@ def test_every_write_of_tasks_that_takes_a_task_or_a_project_by_its_name_is_here
 def test_only_the_writes_that_take_their_record_by_its_name_check_it():
     """Ratchet: a check is a read before the card, which a write that takes no record by its name does not need (and
     whose refusal would hide its card): exactly these, each with the read of its own record."""
-    declared = {op.name: assistant.check_of(op) for op in registry.values() if op.app_label == "task"}
+    declared = {op.name: assistant.cards.check_of(op) for op in registry.values() if op.app_label == "task"}
     assert {name: read for name, read in declared.items() if read is not None} == CHECKS
 
 
@@ -333,7 +333,7 @@ def test_moving_a_task_names_only_the_project_said_by_its_name_whatever_id_comes
     kept = make_project("p-reforma", "Reforma del baño")
     make_project("p-apertura", "Apertura")
     arguments = {"id": str(task.id), "project_id": str(kept.id), "project": "apertura"}
-    shown = [field["value"] for field in assistant.card(get("task.task.update"), arguments, "es", as_admin())["fields"]]
+    shown = [field["value"] for field in assistant.cards.card(get("task.task.update"), arguments, "es", as_admin())["fields"]]
     assert ("Apertura" in shown, "Reforma del baño" in shown) == (True, False)
 
 OTHER = {"task": ("Pedir hielo", "hielo"), "project": ("Reforma del baño", "reforma")}
@@ -351,7 +351,7 @@ def by_its_id_beside_another_name(write: str) -> dict:
 
 @pytest.mark.parametrize("write", sorted(CHECKS))
 def test_a_record_that_comes_by_its_id_names_no_other_one_said_beside_it(write):
-    card = assistant.card(get(write), by_its_id_beside_another_name(write), "es", as_admin())
+    card = assistant.cards.card(get(write), by_its_id_beside_another_name(write), "es", as_admin())
     assert OTHER[two(write)[0]][0] not in [field["value"] for field in card["fields"]]
 
 

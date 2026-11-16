@@ -126,7 +126,7 @@ Said = _text(200, 1)
 #: A raw CSV cell, as typed in the file.
 Cell = _text(500)
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
 A_PRODUCT = names("inventory.product.get")
 A_CATEGORY = names("inventory.category.get")

@@ -36,7 +36,7 @@ class KitchenConfig(LiveAppConfig):
     # station of its product or its category of Inventory (foreign keys of the routing).
     requires = ["sale", "inventory"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). The kitchen's ticket is its «comanda»
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The kitchen's ticket is its «comanda»
     # (kitchen.ticket, as its screens say): «la comanda», «qué comandas», «las comandas de…», named by its phrases and
     # never by the word, which live keeps for a table's order, and a «comandas» said in passing («sin alterar las
     # comandas ya enviadas») names no kitchen ticket. A kitchen's «estación», and its «puesto» named by its phrases («el

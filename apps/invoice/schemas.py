@@ -79,7 +79,7 @@ FIELD_REQUIRED = _("This field is required.")
 SALE = gettext_noop("Sale")
 NEXT_NUMBER = gettext_noop("Next number")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: an invoice and a sale by their numbers, as their screens do; a refund by its sale and what it
 # gave back; a series by its code, its year and its name, as the Series screen's card titles it; the customer by the name
 # on their card. The product of a manual line is Inventory's, which Invoicing does not require: the card leaves it out,

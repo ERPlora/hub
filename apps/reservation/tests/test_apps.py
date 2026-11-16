@@ -162,7 +162,7 @@ IN_PERSON = {"reservation.reservation.seat"}
 def test_seating_is_done_in_person_and_of_normal_risk():
     from live.operations import get
 
-    from base.assistant import risk
+    from live.assistant import risk
 
     seat = get("reservation.reservation.seat")
     assert seat.ai["in_person"] is True
@@ -187,7 +187,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
-        if assistant.is_tool(op):  # what a person types to ask for it (live.E020: reservation is listed)
+        if assistant.tools.is_tool(op):  # what a person types to ask for it (live.E020: reservation is listed)
             expected = expected | {"asks"}
         if op.name in IN_PERSON:
             expected = expected | {"in_person"}

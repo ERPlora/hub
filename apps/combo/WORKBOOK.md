@@ -797,7 +797,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   su nombre, el `combo` de `ComboRefIn` lleva la misma marca leída por ese nombre (`A_MENU_BY_NAME`), y las cuatro
   herramientas cuya entrada es `ComboRefIn` (`combo.combo.update`, `combo.combo.delete`, `combo.combo.set_image` y
   `combo.group.reorder`; `combo.combo.upload_image` no es herramienta) declaran `check: combo.combo.get`
-  (`base.assistant.checked`): antes de dibujar la tarjeta, el turno busca el menú como lo hará la escritura, un nombre
+  (`base.assistant.cards.checked`): antes de dibujar la tarjeta, el turno busca el menú como lo hará la escritura, un nombre
   que encaja con varios o con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id del menú encontrado, así
   que el «sí» vale solo para él (hub#1208, hub#1217; `tests/test_assistant_yes_for_its_card.py`). Las escrituras de un
   plato o una elección por su id o por su nombre dentro del menú declaran el `check` de su propio registro

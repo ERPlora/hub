@@ -9,7 +9,7 @@ used by voice («activate the welcome automation»).
 What a step names (an action, a read, an event) is checked against the apps that are active in
 ``services.py``: a schema knows the shape, not the business.
 
-Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+Each id a write takes is marked with the read that names its record (``names``, base/assistant/cards.py ``REFERS``,
 checked at start by ``base.E009``): the assistant's card says which automation, draft, run or question, as the person
 who confirms reads it, never by the id — an automation and a draft by their name, a run by its automation and when it
 started (``label``, as the History says it), a question by what it asks.

@@ -40,7 +40,7 @@ JOB = gettext_noop("Job")
 ATTEMPT = gettext_noop("Attempt")
 REFERENCE = gettext_noop("Reference")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a printer and a device by their names, as the Printers and Devices screens; a job as the queue
 # titles it («Receipt T-000123»). Whoever prints or sets up the printers reads them all.
 A_PRINTER = names("printing.printer.get", by="printer_id")

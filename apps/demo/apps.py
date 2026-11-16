@@ -26,7 +26,7 @@ class DemoConfig(LiveAppConfig):
     # The technical reference, not sold (its WORKBOOK): registered, but kept out of the public store.
     listed = False
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). An «elemento», as the screens name one, is
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «elemento», as the screens name one, is
     # an item (demo.item).
     assistant_synonyms = (
         ("elemento", "elementos", "item", "items"),
