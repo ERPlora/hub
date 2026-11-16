@@ -10,16 +10,9 @@ from live.errors import Conflict
 from live.operations import get
 from live.outbox import channel_for
 
-from .conftest import (
-    A,
-    B,
-    ctx_for,
-    make_customer,
-    make_grant,
-    make_package,
-    make_service,
-    make_tax,
-)
+from base.tenancy.context import use_hub
+
+from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, make_customer, make_grant, make_package, make_service, make_tax
 
 WAIT = 1.0
 QUIET = 0.3
@@ -53,13 +46,15 @@ def run(name, data, scope=A):
 
 
 # Transactional: the notice leaves after a real COMMIT, so the rows a test starts from are committed too.
-@pytest.mark.django_db(transaction=True)
-def test_a_category_and_a_session_spent_in_hub_b_notify_the_channel_of_b_only(listen):
-    cut = make_service("Cut", tax=make_tax())
-    grant = make_grant(make_package("Bono", [cut], max_uses=5), make_customer())
+@HUB_DB_COMMITTED
+def test_a_category_and_a_session_spent_in_hub_b_notify_the_channel_of_b_only(listen, hub_b):
+    with use_hub(hub_b):
+        cut = make_service("Cut", tax=make_tax())
+        grant = make_grant(make_package("Bono", [cut], max_uses=5), make_customer())
     on_a, on_b = listen(A), listen(B)
-    run("service.category.create", {"name": "Hair"}, scope=B)
-    run("service.grant.redeem", {"id": str(grant.id), "service_id": str(cut.id)}, scope=B)
+    with use_hub(hub_b):
+        run("service.category.create", {"name": "Hair"}, scope=B)
+        run("service.grant.redeem", {"id": str(grant.id), "service_id": str(cut.id)}, scope=B)
     # Everything B's channel heard in the window, not the first two notices: under load a write may come split.
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}
@@ -68,7 +63,7 @@ def test_a_category_and_a_session_spent_in_hub_b_notify_the_channel_of_b_only(li
     assert received(on_a, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_refused_write_notifies_nobody(listen):
     run("service.category.create", {"name": "Hair"})
     on_a = listen(A)

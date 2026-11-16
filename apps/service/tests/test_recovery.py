@@ -21,7 +21,7 @@ import uuid
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload
 from live.models import OutboxEvent
@@ -39,19 +39,19 @@ from apps.service.services import (
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of, giving_back
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
-from .conftest import ctx_for, make_category, make_member, make_service, make_tax
+from .conftest import HUB_DB, ctx_for, make_category, make_member, make_service, make_tax
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    (business := connections[current_alias()]).ensure_connection()
+    return business.connection
 
 
 def create(record: dict, operation: str = "service.service.recover", actor: str = "system") -> dict:
@@ -126,7 +126,7 @@ def test_the_copy_gives_each_service_with_what_its_create_takes_and_whether_it_w
 
 
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE service_service CASCADE")
 
@@ -412,7 +412,7 @@ def test_the_copy_gives_each_service_with_who_performed_it_there_archived_ones_t
 
 
 def test_a_copy_without_the_apps_tables_gives_nobody():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE service_assignment, service_service CASCADE")
 
@@ -738,7 +738,7 @@ def test_the_copy_gives_each_live_category_with_what_its_create_takes_and_the_se
 
 def test_a_copy_without_the_service_table_gives_its_categories_with_no_service():
     hair = make_category("Hair")
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE service_service CASCADE")
 
@@ -746,7 +746,7 @@ def test_a_copy_without_the_service_table_gives_its_categories_with_no_service()
 
 
 def test_a_copy_without_the_category_table_gives_no_category():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE service_category CASCADE")
 
