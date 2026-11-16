@@ -9,16 +9,16 @@ import datetime as dt
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from base.models import Membership
 from base.tenancy import context
-from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
+from base.tenancy.context import current_alias, use_hub
 
 from .conftest import (
+    HUB_DB,
     THURSDAY,
     TOMORROW,
     ctx_for,
@@ -40,14 +40,14 @@ def in_(language: str):
 # ── reservation.reservation.get ──────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_reservation_is_named_by_its_guest_its_day_and_its_time_as_its_dialog_says_it(language):
     booked = make_reservation()
     assert run("reservation.reservation.get", {"id": str(booked.id)}, in_(language)).label == f"Ana García · {WHEN[language]}"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_guest_booked_under_her_phone_is_named_by_it_and_an_erased_one_by_when_alone():
     """A guest who booked herself by WhatsApp without a name goes by her phone; once her data are erased, nothing of
     hers is left to say: the reservation is named by its day and its time."""
@@ -60,7 +60,7 @@ def test_a_guest_booked_under_her_phone_is_named_by_it_and_an_erased_one_by_when
 # ── reservation.waitlist.get ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_waitlist_entry_is_read_by_id_or_by_its_guest_and_named_by_them_and_when(language):
     entry = make_entry()
@@ -71,7 +71,7 @@ def test_a_waitlist_entry_is_read_by_id_or_by_its_guest_and_named_by_them_and_wh
     assert run("reservation.waitlist.get", {"guest": "600222333", "day": TOMORROW.isoformat()}).id == entry.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_or_deleted_entry_is_not_found_and_a_guest_waiting_twice_must_say_which_day():
     gone = make_entry(is_deleted=True)
     for ref in ({"id": str(gone.id)}, {"guest": "Nadie"}):
@@ -88,7 +88,7 @@ def test_a_missing_or_deleted_entry_is_not_found_and_a_guest_waiting_twice_must_
 # ── reservation.time_slot.get ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "label"),
     [("es", "Jueves · 20:00–23:30"), ("en", "Thursday · 8:00 PM–11:30 PM")],
@@ -102,7 +102,7 @@ def test_a_slot_is_read_by_id_or_by_its_weekday_and_start_and_named_by_them_and_
     assert said.id == slot.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_or_removed_slot_is_not_found():
     gone = make_slot(is_deleted=True)
     for ref in ({"id": str(gone.id)}, {"day_of_week": THURSDAY, "start_time": "20:00"}):
@@ -114,7 +114,7 @@ def test_a_missing_or_removed_slot_is_not_found():
 # ── reservation.blocked_date.get ─────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "christmas", "afternoon"),
     [
@@ -133,7 +133,7 @@ def test_a_blocked_date_is_read_by_id_or_by_its_date_and_named_by_it_and_the_hou
     assert run("reservation.blocked_date.get", {"id": str(some.id)}).id == some.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_or_unblocked_date_is_not_found_and_a_date_blocked_twice_must_be_said_by_its_id():
     gone = make_blocked(dt.date(2026, 12, 24), is_deleted=True)
     for ref in ({"id": str(gone.id)}, {"date": "2026-12-24"}):
@@ -157,7 +157,7 @@ READS = [
 ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("name", "made", "permission"), READS)
 def test_each_is_read_with_the_permission_of_its_list_and_only_with_it(name, made, permission):
     record = made()
@@ -198,7 +198,7 @@ def read(client, hub, path: str, record_id) -> tuple[int, dict]:
     return answer.status_code, answer.json()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("path", "made"), ROUTES)
 def test_the_api_reads_one_of_this_business_by_its_id_with_its_label(client, hub_a, as_in_production, path, made):
     signed_in(client, hub_a)
@@ -209,7 +209,7 @@ def test_the_api_reads_one_of_this_business_by_its_id_with_its_label(client, hub
     assert body["id"] == str(record.id) and body["label"]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("path", "made"), ROUTES)
 def test_another_businesss_record_is_not_there(client, hub_a, hub_b, as_in_production, path, made):
     with use_hub(hub_b):
@@ -222,17 +222,17 @@ def test_another_businesss_record_is_not_there(client, hub_a, hub_b, as_in_produ
 # ── The lookups a write shares with its read lock the row for the write, never for the read ───────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_removing_a_slot_or_unblocking_a_date_locks_its_row_first_and_reading_one_locks_nothing():
     """``delete_slot`` and ``delete_blocked`` find their record through the lookups the reads by id share
     (``find_slot``, ``find_block``), locked (``FOR UPDATE``) as they were before they were shared; a read by id
     locks nothing."""
     slot, block = make_slot(), make_blocked()
-    with CaptureQueriesContext(connection) as reading:
+    with CaptureQueriesContext(connections[current_alias()]) as reading:
         run("reservation.time_slot.get", {"id": str(slot.id)})
         run("reservation.blocked_date.get", {"id": str(block.id)})
     assert not [query["sql"] for query in reading.captured_queries if "FOR UPDATE" in query["sql"]]
-    with CaptureQueriesContext(connection) as writing:
+    with CaptureQueriesContext(connections[current_alias()]) as writing:
         run("reservation.time_slot.delete", {"id": str(slot.id)})
         run("reservation.blocked_date.delete", {"id": str(block.id)})
     locked = [query["sql"] for query in writing.captured_queries if "FOR UPDATE" in query["sql"]]

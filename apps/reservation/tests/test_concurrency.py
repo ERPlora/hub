@@ -5,19 +5,17 @@ of a slot goes to one reservation (the old gate's promise), also when a conversi
 a new booking. The losers get their reason and write nothing.
 """
 
-import threading
-
 import pytest
-from django.db import connection
+from live.context import system_context
 from live.errors import OperationError
 
-from live.context import system_context
-
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import card_deleted_on_screen, card_protected, delete_card, reads, writes
+from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.reservation.models import Reservation, WaitlistEntry
+from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile
 
 from .conftest import (
+    HUB_DB_COMMITTED,
     THURSDAY,
     TOMORROW,
     A,
@@ -32,37 +30,10 @@ from .conftest import (
     set_rules,
 )
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 EMPLOYEE = "hub_employee"
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except (
-            Exception
-        ) as error:  # an unexpected failure (a deadlock…) is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def codes(results) -> list:
@@ -142,8 +113,6 @@ def test_a_conversion_and_a_new_booking_racing_for_the_last_place_leave_one():
 # the new row protects the card; a write that comes second waits for the deletion, and finds the card gone (404)
 # or, by phone, makes a new one.
 
-HOW = ["page", "list"]
-
 
 def _reserve(card, by: str):
     who = {"customer_id": str(card.id)} if by == "id" else {"guest_name": card.name, "guest_phone": card.phone}
@@ -168,10 +137,10 @@ def _ana():
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("by", ["id", "phone"])
 @pytest.mark.parametrize("write", sorted(CARD_LINKS))
-def test_the_hub_admin_cannot_delete_a_card_a_reservation_links_meanwhile(write, by, how):
+def test_the_hub_admin_cannot_delete_a_card_a_reservation_links_meanwhile(hub_staff, write, by, how):
     ana = _ana()
     link, table = CARD_LINKS[write]
-    with card_deleted_on_screen(ana, how, writes(table)) as answers:
+    with meanwhile(writes(table), admin_delete(hub_staff, how, ana), first=True) as answers:
         link(ana, by)
     [answer] = answers
     assert card_protected(answer)
@@ -181,10 +150,10 @@ def test_the_hub_admin_cannot_delete_a_card_a_reservation_links_meanwhile(write,
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("write", sorted(CARD_LINKS))
-def test_a_reservation_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(write, how):
+def test_a_reservation_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone(hub_staff, write, how):
     ana = _ana()
     link, _ = CARD_LINKS[write]
-    with card_deleted_on_screen(ana, how, reads("customer_customer")) as answers:
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, how, ana), first=True) as answers:
         with pytest.raises(OperationError) as refused:
             link(ana, "id")
     [answer] = answers
@@ -196,10 +165,10 @@ def test_a_reservation_whose_card_the_hub_admin_deletes_first_is_told_it_is_gone
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("write", sorted(CARD_LINKS))
-def test_a_reservation_by_the_phone_of_a_card_the_hub_admin_deletes_first_makes_a_new_card(write, how):
+def test_a_reservation_by_the_phone_of_a_card_the_hub_admin_deletes_first_makes_a_new_card(hub_staff, write, how):
     ana = _ana()
     link, _ = CARD_LINKS[write]
-    with card_deleted_on_screen(ana, how, reads("customer_customer")) as answers:
+    with meanwhile(reads("customer_customer"), admin_delete(hub_staff, how, ana), first=True) as answers:
         link(ana, "phone")
     [answer] = answers
     assert answer.status_code == 302
@@ -225,9 +194,9 @@ def _merged_into_marta():
 
 
 @pytest.mark.parametrize("how", HOW)
-def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_reservations_to_meanwhile(how):
+def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_reservations_to_meanwhile(hub_staff, how):
     _, booked, entry, marta, move = _merged_into_marta()
-    with card_deleted_on_screen(marta, how, writes("reservation_reservation")) as answers:
+    with meanwhile(writes("reservation_reservation"), admin_delete(hub_staff, how, marta), first=True) as answers:
         move()
     [answer] = answers
     assert card_protected(answer)
@@ -237,9 +206,9 @@ def test_the_hub_admin_cannot_delete_the_card_a_merge_moves_the_reservations_to_
 
 
 @pytest.mark.parametrize("how", HOW)
-def test_a_merge_into_a_card_the_hub_admin_deleted_moves_no_reservation(how):
+def test_a_merge_into_a_card_the_hub_admin_deleted_moves_no_reservation(hub_staff, how):
     ana, booked, entry, marta, move = _merged_into_marta()
-    assert delete_card(marta, how).status_code == 302
+    assert admin_delete(hub_staff, how, marta)().status_code == 302
     assert move().changed == 0
     booked.refresh_from_db()
     entry.refresh_from_db()

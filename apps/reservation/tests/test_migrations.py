@@ -7,26 +7,28 @@ valid number of its country (a short number, letters, an extension) stays as it 
 changes nothing: the typed form is not known any more, and E.164 is what every reader already accepts.
 
 The functions of the ``RunPython`` are called the way the migration runs them, with the app registry and a schema
-editor whose connection is the test database.
+editor whose connection is business A's own database, inside the test's transaction.
 """
 
 from importlib import import_module
 
-import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import connections
 
 from apps.reservation.models import Reservation, WaitlistEntry
+from base.tenancy.context import current_alias
 
-from .conftest import make_entry, make_reservation
+from .conftest import HUB_DB, make_entry, make_reservation
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MIGRATION = import_module("apps.reservation.migrations.0002_guest_phone_e164")
 
 
 class _SchemaEditor:
-    connection = connection
+    @property
+    def connection(self):
+        return connections[current_alias()]
 
 
 KEPT = {

@@ -15,7 +15,8 @@ from live.operations import AI, Operation, registry
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import comparable, place_of_no_ask, probe_phrases
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: The requests of hub#1105's QA (``owner.es.reservation.*`` of ``tests/e2e/qa/probes/owner-es-reservation-*.json``),
 #: as the owner said them: each is offered its existing operation (among the ``MAX_TOOLS`` a turn offers, so the model
@@ -67,7 +68,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_reservation_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None

@@ -1,14 +1,13 @@
 """The book's events (``reservation.<entity>.<fact>``), the contract Tables listens to, and the reactions to
 Customers' events, run as the system through this app's operations."""
 
-import pytest
 from live.operations import NAME_RE
 
 from apps.reservation import events
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.table import events as table_events
 
-from .conftest import A, make_customer, make_entry, make_reservation
+from .conftest import A, HUB_DB, make_customer, make_entry, make_reservation
 
 
 def test_every_event_is_named_app_entity_fact():
@@ -33,7 +32,7 @@ def test_the_reactions_are_the_two_of_customers():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_merge_delivered_moves_the_cards_bookings_as_the_system():
     survivor, absorbed = make_customer("Ana"), make_customer("Ana G.")
     reservation = make_reservation(customer_id=absorbed.id)
@@ -48,7 +47,7 @@ def test_a_merge_delivered_moves_the_cards_bookings_as_the_system():
     assert WaitlistEntry.objects.get(pk=entry.pk).customer_id == survivor.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_erasure_delivered_twice_changes_nothing_the_second_time():
     card = make_customer("Ana")
     make_reservation(customer_id=card.id, guest_phone="+34600111222")
