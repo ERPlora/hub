@@ -5,22 +5,17 @@ general one and not a euro one, and a list created without a currency is in zlot
 hub its own. A list already stored keeps its currency."""
 
 import pytest
-from live.context import Scope
 from live.errors import Conflict, InvalidPayload
 from live.operations import get
 
 from apps.pricing.models import PriceList
+from apps.sale.tests.test_business_currency import business_in
 from base import operations as base_operations
-from base.models import Hub
+from base.tenancy.context import use_hub
 
-from .conftest import B, ctx_for, make_customer, make_group, make_item, make_list, make_product, make_rule, make_service
+from .conftest import B, HUB_DB, A, ctx_for, make_customer, make_group, make_item, make_list, make_product, make_rule, make_service
 
-pytestmark = pytest.mark.django_db
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
+pytestmark = HUB_DB
 
 
 def run(name, data, ctx=None):
@@ -133,23 +128,23 @@ def test_a_list_stored_before_keeps_its_currency_when_the_business_moves():
     assert PriceList.objects.get(code="OLD").currency == "EUR"
 
 
-def test_each_hub_creates_its_lists_in_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
+def test_each_hub_creates_its_lists_in_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
     assert run("pricing.price_list.create", {"code": "VIPA", "name": "VIP"}).currency == "PLN"
-    assert run("pricing.price_list.create", {"code": "VIPB", "name": "VIP"}, ctx_for(scope=B)).currency == "EUR"
+    with use_hub(hub_b):
+        assert run("pricing.price_list.create", {"code": "VIPB", "name": "VIP"}, ctx_for(scope=B)).currency == "EUR"
 
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("ES", "EUR")])
-def test_erploras_own_hub_prices_in_the_currency_of_its_issuer_s_country(settings, country, currency):
-    # ERPlora's own hub has no business on erplora.com (no registry row, create_platform_hub): its lists keep
-    # the currency of its issuer's country, as its sales and invoices do (hub#286), never a 404 for want of a business.
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def test_erploras_own_hub_prices_in_the_currency_of_its_issuer_s_country(settings, platform, country, currency):
+    # ERPlora's own hub has no business on erplora.com (create_platform_hub): its lists keep the currency of its
+    # issuer's country, as its sales and invoices do (hub#286), never a 404 for want of a business.
     settings.PLATFORM_ISSUER_COUNTRY = country
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    product = make_product("Shampoo", "SH-1", price=1250)
-    assert resolve(platform, product_id=str(product.id)).currency == currency
-    assert run("pricing.price_list.create", {"code": "VIP", "name": "VIP"}, platform).currency == currency
+    with use_hub(platform):
+        product = make_product("Shampoo", "SH-1", price=1250)
+        assert resolve(ctx_for(scope=B), product_id=str(product.id)).currency == currency
+        assert run("pricing.price_list.create", {"code": "VIP", "name": "VIP"}, ctx_for(scope=B)).currency == currency
 
 
 # One way to the currency: pricing asks the one question every app that charges asks
@@ -209,15 +204,15 @@ IN_ZLOTYS = {
 
 @pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
 @pytest.mark.parametrize("caller", sorted(IN_ZLOTYS))
-def test_each_operation_takes_the_currency_base_answers(caller, platform_hub, settings, monkeypatch):
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def test_each_operation_takes_the_currency_base_answers(caller, platform_hub, settings, monkeypatch, in_business_a, platform):
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     business_in("ES")
-    scope = Scope("host", "erplora") if platform_hub else ctx_for().scope
+    hub, scope = (platform, B) if platform_hub else (in_business_a, A)
     asked = []
     monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or "PLN")
     through, in_zlotys = IN_ZLOTYS[caller]
-    assert through(ctx_for(scope=scope)) == in_zlotys
+    with use_hub(hub):
+        assert through(ctx_for(scope=scope)) == in_zlotys
     assert asked and set(asked) == {scope}
 
 
@@ -245,10 +240,13 @@ def test_a_rule_s_amount_per_unit_is_in_the_business_s_currency(country, currenc
     assert rules_in() == {currency}
 
 
-def test_each_hub_s_rules_answer_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
-    assert (rules_in(code="FIFTYA"), rules_in(ctx_for(scope=B), code="FIFTYB")) == ({"PLN"}, {"EUR"})
+def test_each_hub_s_rules_answer_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
+    in_a = rules_in(code="FIFTYA")
+    with use_hub(hub_b):
+        in_b = rules_in(ctx_for(scope=B), code="FIFTYB")
+    assert (in_a, in_b) == ({"PLN"}, {"EUR"})
 
 
 def test_a_price_answers_the_currency_of_its_list_not_the_business_s():
