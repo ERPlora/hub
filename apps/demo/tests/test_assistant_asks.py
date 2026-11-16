@@ -15,13 +15,15 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 OWNER, EMPLOYEE = Membership.Role.OWNER, Membership.Role.EMPLOYEE
 #: The role of a probe as its file says it (``"role": "owner"``).
@@ -111,7 +113,7 @@ ELEMENTO = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), ELEMENTO)
 def test_a_phrase_that_names_an_elemento_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(OWNER, "es")
@@ -131,7 +133,7 @@ OWN_WORDS = [
     ("demo.item.delete", "el Ensayo de otoño ya no sirve: que desaparezca para siempre"),
     ("demo.item.add_line", "al Ensayo de otoño le faltan cables nuevos, cuatro"),
 ]
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Demo that needs one, neither
@@ -146,11 +148,11 @@ OWN_WORDS_EN = [
     ("demo.item.stats", "what are the figures altogether?"),
     ("demo.item.update", "Autumn trial is done"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("demo", OWN_WORDS_EN)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_manages_the_items_may_do(catalog_of):
     owner = catalog_of(OWNER, "es")
     employee = catalog_of(EMPLOYEE, "es")
@@ -162,7 +164,7 @@ def test_an_employee_is_never_offered_what_only_who_manages_the_items_may_do(cat
     assert refused and refused <= NOT_THE_EMPLOYEES
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED)
 def test_the_reported_demo_request_offers_its_existing_operation(catalog_of, role, name, phrase):
     assert place_of_no_ask(catalog_of(role, "es"), name, phrase) is not None
@@ -185,7 +187,7 @@ def test_the_probes_that_name_an_item_are_the_four_tools_on_an_item_of_both_role
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), NAMING_PROBES)
 def test_a_probe_that_names_an_item_is_offered_its_tool_which_takes_the_item_by_its_name(catalog_of, role, name, phrase):
     """The tool the probe is offered takes the item as the person said it, so the model sends «Ejemplo QA» and never
@@ -197,7 +199,7 @@ def test_a_probe_that_names_an_item_is_offered_its_tool_which_takes_the_item_by_
     assert not {"id", "called"} & set(parameters.get("required", ()))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_owners_probe_that_says_elemento_is_offered_the_list_that_finds_it_too(catalog_of):
     """«enséñame el elemento «Ejemplo QA»…»: the Hub's «elemento» brings the list beside the detail (positive control of
     the one above: what it no longer needs, a turn still offers when the person's words say it)."""
@@ -205,7 +207,7 @@ def test_the_owners_probe_that_says_elemento_is_offered_the_list_that_finds_it_t
     assert BY_NAME in offered_to(catalog_of(OWNER, "es"), phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", OFFERED_PROBES, ids=[probe["id"] for probe in OFFERED_PROBES])
 def test_every_probe_of_demo_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """Both roles' phrases of layer 2, the ones the model answered right too: a tool of Demo that a new ask elsewhere
