@@ -1,6 +1,9 @@
 """Fixtures of the pricing tests: contexts per role and scope, users with a role on a host, a raw DSN,
 and builders of the data a test starts from (straight to the models: the operations are under test).
 
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+
 The builders import the models lazily, so that the tests of apps.py still collect while models.py
 does not exist. Products, categories and customer groups are Inventory's and Customers' own rows (the
 apps Pricing requires); a service is Services' row, read by its operations.
@@ -10,17 +13,25 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
-from psycopg.conninfo import make_conninfo
 
-from base.models import Membership
+from apps.flow.tests.test_relay import worker_loop
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import db_dsn, make_user, night_elsewhere
+from apps.sale.tests.test_business_currency import platform
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, users with a role on a host, the raw DSN of
+#: control's database, business A at night in another zone and ERPlora's own hub (business B's) as Sales makes them,
+#: the assistant's catalogue of a person of business A, and one tick of the worker's real loop over every business as
+#: Automations runs it, that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "hub_staff", "in_business_a", "make_user",
+    "night_elsewhere", "plan_with_room", "platform", "worker_loop",
+]
 
 #: A fixed business day: the tests never read the real clock.
 TODAY = dt.date(2026, 7, 15)
@@ -55,39 +66,6 @@ def fixed_today(monkeypatch):
         return TODAY
     monkeypatch.setattr(queries, "business_today", lambda: TODAY)
     return TODAY
-
-
-@pytest.fixture
-def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        return user
-
-    return make
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
-
-
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database (the tests
-    with the hubs ``hub_a`` and ``hub_b`` of the root conftest, each with its own database)."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 # Builders: other apps' rows

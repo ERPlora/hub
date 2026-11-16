@@ -15,8 +15,11 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
+from base.tenancy.context import use_hub
 
 from .conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
     A,
     B,
     ctx_for,
@@ -29,7 +32,7 @@ from .conftest import (
     make_service,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin", actor="tester"):
@@ -552,10 +555,11 @@ def received(session, timeout=1.0, stop_after=None):
     return [json.loads(note.payload) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_write_in_scope_b_notifies_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     op = get("pricing.price_list.create")
-    op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
+    with use_hub(hub_b):
+        op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
     assert received(on_b, stop_after=1) == [{"events": ["pricing.price_list.created", "pricing.price_list.default_changed"]}]
     assert received(on_a, timeout=0.3) == []

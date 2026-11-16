@@ -13,9 +13,9 @@ from live.operations import get
 from apps.pricing import events
 from apps.pricing.models import DiscountRule, PriceItem
 
-from .conftest import A, TODAY, ctx_for
+from .conftest import A, HUB_DB, TODAY, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 WHEN = dt.datetime.combine(TODAY, dt.time(12), ZoneInfo("Europe/Madrid")).isoformat()
 
