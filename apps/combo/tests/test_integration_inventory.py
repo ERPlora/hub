@@ -19,9 +19,9 @@ from apps.combo import events
 from apps.combo.models import ChoiceOption
 from apps.inventory.models import Product, StockMovement
 
-from .conftest import A, FOOD, ctx_for, run
+from .conftest import A, FOOD, HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def product(

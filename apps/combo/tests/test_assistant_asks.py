@@ -17,12 +17,14 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: The writes of Menus and combos: they need ``combo.manage``, which an employee does not hold, and none of them is one a
 #: manager approves, so an employee's assistant is never offered them (the QA's employee probes of them are refusals).
@@ -104,7 +106,7 @@ def test_combo_offers_its_eighteen_tools():
     assert not {"combo.combo.upload_image", "combo.option.drop_product"} & tools
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_a_change_of_the_menus(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -118,7 +120,7 @@ def test_the_reported_request_is_a_probe_of_layer_2():
     assert probe_phrases().get(comparable(phrase)) == f"qa20261108.owner.es.{name}"
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_them_again(catalog_of):
     """hub#1091: the owner's request offers the reorder of the choices among the first ten and ahead of every other
     change of Menus and combos, deleting and creating a choice included."""
@@ -131,7 +133,7 @@ def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_
     assert ahead == [], ahead
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The phrases of layer 2 of Menus and combos, the ones the model answered right too: a tool of Menus that a new ask
@@ -146,7 +148,7 @@ def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, 
     assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Menus that needs one, neither
@@ -171,7 +173,7 @@ OWN_WORDS_EN = [
     ("combo.option.reorder", "ice cream should be the first of the desserts"),
     ("combo.option.update", "we've run out of custard for the kids' one"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("combo", OWN_WORDS_EN)
 
 
@@ -192,7 +194,7 @@ def test_the_hub_reads_an_opcion_and_an_eleccion_as_a_choice_of_a_course():
         assert not any(option in concept for concept in shared.asked([phrase]).concepts), phrase
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_choices_named_as_elecciones_bring_their_reorder_only_with_the_hubs_group(catalog_of):
     """A phrase that is no ask and no probe: with the Hub's group of the choices, the reorder of the choices is among the
     first ten; without it, «elecciones» names nothing and the reorder falls out of them."""
@@ -204,7 +206,7 @@ def test_the_choices_named_as_elecciones_bring_their_reorder_only_with_the_hubs_
     assert "combo.option.reorder" not in offered_to(tools, phrase, synonyms=without)[:TOP]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_a_value_of_a_customers_field_takes_no_place_from_the_choices_of_a_menu(catalog_of, role, language):

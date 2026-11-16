@@ -15,10 +15,10 @@ from live.operations import get
 from apps.pricing import queries
 from apps.pricing.schemas import PriceItemDetailOut, PriceItemOut, RuleOut
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.typed_operations import ts_fields
 
 from .conftest import (
+    HUB_DB,
     TODAY,
     categorize,
     ctx_for,
@@ -32,7 +32,7 @@ from .conftest import (
     make_service,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 
@@ -271,8 +271,8 @@ def test_whoever_may_change_a_price_may_read_it():
     assert all(ctx_for(role).has(read.permission) for role in writers)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_price_of_another_business_is_not_found_there(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_price_of_another_business_is_not_found_there(hub_a, hub_b):
     """A business reads its own prices only: the id of another's is no price of its own, never its currency."""
     with use_hub(hub_b):
         theirs = make_item(make_list("DOLARES", currency="USD"), make_product("Shampoo", "SH-1"))
@@ -809,8 +809,8 @@ def test_the_employee_reads_the_catalog_and_a_caller_without_the_permission_does
         by_id("pricing.catalog.get", {"customer_group_id": str(vip.id)}, ctx_for(permissions=set()))
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub_a, hub_b):
     """A business reads its own only: the id of another's is none of its own, never its name. (A service is Services'
     own read, as the person, in the hub they ask in; its tables stay out of a hub's database in these tests:
     ``base/tenancy/tests/hubs.py``, ``portable_apps``.)"""

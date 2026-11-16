@@ -9,10 +9,13 @@ from dataclasses import replace
 from decimal import Decimal
 
 import pytest
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
+from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
+from django.urls import reverse
 from live.models import OutboxEvent
 
 from apps.tax import admin as tax_admin
@@ -26,6 +29,8 @@ from apps.tax.admin import (
 )
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import TAX_REGIONS
+
+from .conftest import HUB_DB, A
 
 
 @pytest.fixture
@@ -57,6 +62,7 @@ def test_the_three_models_are_registered():
     assert admin.site._registry[TaxRule].inlines == [ComponentInline]
 
 
+@HUB_DB
 def test_full_crud_for_the_staff(superuser):
     request = request_by(superuser)
     for model in (TaxCategory, TaxRule, TaxAlias):
@@ -70,10 +76,10 @@ def test_full_crud_for_the_staff(superuser):
     assert inline.has_change_permission(request) and inline.has_delete_permission(request)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_pages_render(client, superuser, shipped):
     generic, root, beer = shipped
-    client.force_login(superuser)
+    on_a_hub(client, superuser)
 
     # The admin lives only on the platform host.
     pages = {
@@ -95,13 +101,13 @@ def test_the_pages_render(client, superuser, shipped):
         assert content in response.content, path
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_support_reads_each_models_own_active_in_spanish(client, superuser, shipped):
     """Support reading Impuestos in Spanish sees a category and a rule «Activa» — in the form, the list's column and
     filter, and the components' table under a rule — and when they were made «Creada el»; an alias «Activo»,
     «Creado el». Not auth's «Activo» for all three."""
     generic, root, beer = shipped
-    client.force_login(superuser)
+    on_a_hub(client, superuser)
 
     def page(path: str) -> str:
         return client.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es").content.decode()
@@ -123,9 +129,9 @@ def test_support_reads_each_models_own_active_in_spanish(client, superuser, ship
     assert ("Por activo" in aliases, ">Activo</a>" in aliases) == (True, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_staff_creates_and_changes_a_category(client, superuser):
-    client.force_login(superuser)
+    on_a_hub(client, superuser)
     created = client.post(
         "/admin/tax/taxcategory/add/",
         {"key": "product.books", "name": "Books", "description": "", "is_active": "on"},
@@ -143,6 +149,7 @@ def test_the_staff_creates_and_changes_a_category(client, superuser):
     assert books.name == "Libros"
 
 
+@HUB_DB
 def test_the_business_tax_settings_are_in_the_admin(superuser):
     # TAX-F11: the staff sees and fixes the region a business keeps, as every other table of the app.
     registered = admin.site._registry[TaxSettings]
@@ -162,7 +169,7 @@ def test_the_business_tax_settings_are_in_the_admin(superuser):
     assert "region_code" in registered.list_display
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_settings_row_cannot_be_deleted_from_the_admin(client, superuser):
     settings = TaxSettings.objects.create(region_code="ES-CN")
     on_a_hub(client, superuser)
@@ -171,6 +178,7 @@ def test_the_settings_row_cannot_be_deleted_from_the_admin(client, superuser):
     assert TaxSettings.objects.filter(pk=settings.pk, region_code="ES-CN").exists()
 
 
+@HUB_DB
 def test_the_staff_cannot_add_a_second_settings_row(superuser):
     # TAX-F11: one row at most (`tax_settings_single_row`); once it exists, «Add» disappears instead of
     # ending in the database's refusal.
@@ -189,19 +197,20 @@ def settings_change(settings: TaxSettings) -> str:
 
 
 def on_a_hub(client, user):
-    """The staff member signed in on the platform host, with hub ``a`` chosen as the SaaS admin's link does."""
+    """The staff member signed in on the platform host, with business A chosen as the SaaS admin's link does."""
     client.force_login(user)
-    client.get("/admin/hub/a/", HTTP_HOST="hubs.localhost")
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST="hubs.localhost")
     return client
 
 
+@HUB_DB
 def test_the_region_is_one_of_the_territories_of_the_business_country(superuser):
     # TAX-F11: the same list the screen offers (the business's country's tax territories), plus none.
     form = admin.site._registry[TaxSettings].get_form(request_by(superuser))()
     assert [value for value, _label in form.fields["region_code"].choices] == ["", *TAX_REGIONS["ES"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("region", ["XX-99", "PT-20", "ES-MD"])
 def test_a_region_the_business_country_has_not_is_the_fields_error(client, superuser, region):
     # TAX-F11: a region that does not exist, of another country or without taxes of its own would leave the
@@ -221,7 +230,7 @@ def test_a_region_the_business_country_has_not_is_the_fields_error(client, super
     assert not OutboxEvent.objects.filter(name="tax.settings.updated").exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_territory_is_kept_through_its_operation(client, superuser):
     # TAX-F11: the admin keeps the region as the screen does (``tax.settings.update``): its actor and its event.
     on_a_hub(client, superuser)
@@ -240,18 +249,28 @@ def test_a_territory_is_kept_through_its_operation(client, superuser):
     assert [payload["region_code"] for payload in kept] == ["ES-CN", None]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_chosen_hub_the_region_is_not_kept(client, superuser):
+    # A business's region is only in its own database: without one chosen, the page goes back to the admin's index,
+    # warning to choose it first.
     settings = TaxSettings.objects.create(region_code="ES-CE")
     client.force_login(superuser)
     changed = client.post(settings_change(settings), {"region_code": "ES-CN"}, HTTP_HOST="hubs.localhost")
-    assert changed.status_code == 200
-    assert changed.context["adminform"].form.non_field_errors() == [str(CHOOSE_A_HUB)]
+    assert (changed.status_code, changed.url) == (302, reverse("admin:index"))
+    assert [message.level for message in get_messages(changed.wsgi_request)] == [messages.WARNING]
+    # The page never hands the form a request without a hub chosen; the form refuses one on its own all the same.
+    request = request_by(superuser)
+    request.session = SessionStore()
+    form_class = admin.site._registry[TaxSettings].get_form(request, settings, change=True)
+    form = form_class({"region_code": "ES-CN"}, instance=settings)
+    assert not form.is_valid()
+    assert form.non_field_errors() == [str(CHOOSE_A_HUB)]
     settings.refresh_from_db()
     assert settings.region_code == "ES-CE"
+    assert not OutboxEvent.objects.filter(name="tax.settings.updated").exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_of_the_operation_is_the_forms_error(client, superuser, monkeypatch):
     # Any refusal of ``tax.settings.update`` (a permission, an inactive app) is told on the form, never a 500.
     staff_context = tax_admin._staff_context

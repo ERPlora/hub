@@ -6,17 +6,18 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 
-from .conftest import make_category, make_group, make_item, make_list, make_product, make_rule
+from .conftest import HUB_DB, make_category, make_group, make_item, make_list, make_product, make_rule
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 

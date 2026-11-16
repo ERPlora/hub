@@ -15,7 +15,7 @@ import uuid
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from live.errors import InvalidPayload
 from live.models import OutboxEvent
 from live.operations import get
@@ -32,11 +32,11 @@ from apps.inventory.tests.test_recovery import (
     made_by_a_recovery,
 )
 from base.recovery import actor_of
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fields_held_since, fresh, run, run_in
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
-from .conftest import FOOD, ctx_for, make_combo, make_group, make_option, make_product, tax_category
+from .conftest import FOOD, HUB_DB, ctx_for, make_combo, make_group, make_option, make_product, tax_category
 
 
 #: An image of the shared library a menu may show (``image_library`` has it).
@@ -44,12 +44,12 @@ LIBRARY_IMAGE = "catalog:hospitality/cafe_solo"
 
 
 def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
+    """The raw connection of business A's database, as the platform's direct one reads the copy."""
+    (business := connections[current_alias()]).ensure_connection()
+    return business.connection
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_choice_of_a_live_product_with_what_its_create_takes():
     lentils, soup = make_product("Lentils", sku="LEN"), make_product("Soup", sku="SOU")
     steak = make_product("Steak", sku="STE")
@@ -77,9 +77,9 @@ def test_the_copy_gives_each_choice_of_a_live_product_with_what_its_create_takes
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE combo_choiceoption CASCADE")
 
@@ -98,7 +98,7 @@ def a_choice_of_a_product_gone(group, sku: str, product_id=None, **fields) -> di
             "is_available": True, "sku": sku} | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_a_choice_the_business_no_longer_offers_in_that_course():
     lentils, soup, steak = make_product("Lentils"), make_product("Soup"), make_product("Steak")
     menu = make_combo()
@@ -124,7 +124,7 @@ def test_lacking_is_a_choice_the_business_no_longer_offers_in_that_course():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_product_gone_gets_its_choices_on_the_one_a_recovery_made_again_with_its_sku():
     burger = made_by_a_recovery("Burger", "BUR")
     menu = make_combo()
@@ -154,13 +154,14 @@ def test_a_product_gone_gets_its_choices_on_the_one_a_recovery_made_again_with_i
     ]
 
 
+@HUB_DB
 def test_with_nothing_read_nothing_is_lacking():
     assert queries.options_not_in_business([]) == []
     assert queries.combos_not_in_business([]) == []
     assert queries.groups_not_in_business([]) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_choice_of_a_course_gone_goes_to_the_one_a_recovery_made_again_for_it():
     lentils, soup = make_product("Lentils"), make_product("Soup")
     menu = make_combo()
@@ -190,7 +191,7 @@ def test_a_choice_of_a_course_gone_goes_to_the_one_a_recovery_made_again_for_it(
 # ── Menus and their courses (hub#1474): one the business withdrew comes back as a new one ──────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_menu_with_what_its_recover_takes():
     day = make_combo("Menu of the day", sort_order=1)
     takeaway = make_combo(
@@ -209,7 +210,7 @@ def test_the_copy_gives_each_menu_with_what_its_recover_takes():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_course_menu_by_menu_in_its_order():
     day, kids = make_combo("Menu of the day"), make_combo("Kids' menu")
     mains = make_group(day, "Mains", sort_order=1, min_choices=1, max_choices=2, allow_repeat=True)
@@ -228,12 +229,12 @@ def test_the_copy_gives_each_course_menu_by_menu_in_its_order():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("table", "read"), [("combo_combo", "combos_in_copy"), ("combo_choicegroup", "groups_in_copy")]
 )
 def test_a_copy_without_the_menus_or_the_courses_table_gives_none(table, read):
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute(f"DROP TABLE {table} CASCADE")
 
@@ -252,7 +253,7 @@ def as_recovered(menu: dict) -> dict:
     return {field: menu[field] for field in fields} | {"tax_category_key": key, "stands_for": menu["id"]}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_a_menu_the_business_no_longer_has():
     held = make_combo("Menu of the day")
     still = a_menu_of_the_copy("Its old name") | {"id": held.id}
@@ -288,7 +289,7 @@ def a_course_of_the_copy(menu_id, name: str = "Sides", **fields) -> dict:
             "allow_repeat": False} | fields
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_lacking_is_a_course_its_menu_no_longer_has():
     menu = make_combo("Menu of the day")
     mains = make_group(menu, "Mains")
@@ -332,7 +333,7 @@ def combo_events() -> list[str]:
     return list(OutboxEvent.objects.filter(name__startswith="combo.").order_by("id").values_list("name", flat=True))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_menu_made_again_is_its_screens_create_with_its_image_and_which_it_stands_for(image_library):  # noqa: F811
     [record] = queries.combos_not_in_business(
         [a_menu_of_the_copy("Vegan menu", kitchen_name="VEGAN", price=1250, sort_order=3, is_active=False,
@@ -350,7 +351,7 @@ def test_a_menu_made_again_is_its_screens_create_with_its_image_and_which_it_sta
     assert combo_events() == ["combo.combo.created", "combo.combo.updated"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "image",
     [
@@ -370,7 +371,7 @@ def test_a_menu_made_again_without_an_image_of_the_library_is_the_screens_create
     assert combo_events() == ["combo.combo.created"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_menu_whose_tax_category_was_turned_off_since_is_refused_as_its_screen_refuses_it():
     off = tax_category("restaurant.closed")
     off.is_active = False
@@ -384,7 +385,7 @@ def test_a_menu_whose_tax_category_was_turned_off_since_is_refused_as_its_screen
     assert not Combo.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_course_made_again_goes_last_in_its_menu_and_keeps_which_it_stands_for():
     menu = make_combo()
     make_group(menu, "Mains")

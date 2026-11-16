@@ -11,9 +11,9 @@ channel), the menu's setting otherwise. The VAT of the parts is what Ventas will
 import pytest
 from live.errors import InvalidPayload
 
-from .conftest import ALCOHOL, ALCOHOL_TO_GO, FOOD, ctx_for, run
+from .conftest import ALCOHOL, ALCOHOL_TO_GO, FOOD, HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def vat(amount: int, key: str) -> tuple[int, int, str]:

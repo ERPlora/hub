@@ -18,9 +18,9 @@ from live.errors import Conflict
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 
-from .conftest import A, ALCOHOL, FOOD, run
+from .conftest import A, ALCOHOL, FOOD, HUB_DB, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def setup(name: str, data: dict):

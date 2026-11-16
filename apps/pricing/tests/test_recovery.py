@@ -15,31 +15,24 @@ from decimal import Decimal
 
 import pytest
 from django.apps import apps
-from django.db import connection
+from django.db import connections
 from live.models import OutboxEvent
 
 from apps.inventory.models import Product
-from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key, gone_altogether
+from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key, direct, gone_altogether
 from apps.pricing import queries
 from apps.pricing.models import PriceItem
 from apps.service.models import Service
 from apps.service.tests.test_recovery import CATEGORIES as SERVICE_CATEGORIES
 from apps.service.tests.test_recovery import NO_LINKS, SERVICES
-from base.models import Hub
 from base.recovery import actor_of
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import Recoveries, fresh, run, run_in
 
-from .conftest import make_item, make_list, make_product, make_service
+from .conftest import HUB_DB, make_item, make_list, make_product, make_service
 
 
-def direct():
-    """The raw connection of the tests' database, as the platform's direct one reads the copy."""
-    connection.ensure_connection()
-    return connection.connection
-
-
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copy_gives_each_price_of_a_live_product_or_of_a_service_with_what_its_add_takes():
     vip = make_list("VIP")
     shampoo = make_product("Shampoo", "SH-1")
@@ -63,9 +56,9 @@ def test_the_copy_gives_each_price_of_a_live_product_or_of_a_service_with_what_i
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_copy_without_the_apps_table_gives_nothing():
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE pricing_priceitem CASCADE")
 
@@ -84,16 +77,7 @@ def a_price_of_the_copy(price_list, *, product=None, service=None, price=1000, m
     }
 
 
-@pytest.fixture
-def at_work():
-    """A business at work (``use_hub``), as the platform always gives back a copy in one: Price Lists asks Services in
-    it which service stands for one of the copy's."""
-    with use_hub(Hub(slug="a")):
-        yield
-
-
-@pytest.mark.django_db
-@pytest.mark.usefixtures("at_work")
+@HUB_DB
 def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free():
     vip, bulk = make_list("VIP"), make_list("BULK")
     shampoo = make_product("Shampoo", "SH-1")
@@ -123,6 +107,7 @@ def test_lacking_is_a_price_the_business_no_longer_has_in_a_place_it_left_free()
     ]
 
 
+@HUB_DB
 def test_with_nothing_read_nothing_is_lacking():
     assert queries.prices_not_in_business([]) == []
 
@@ -137,7 +122,7 @@ def made_by_a_recovery(name: str, sku: str, **fields):
     return make_product(name, sku, created_by=actor_of(uuid.uuid7()), **fields)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_product_no_longer_held_live_is_the_one_a_recovery_made_again_with_its_sku():
     vip = make_list("VIP")
     shampoo = made_by_a_recovery("Shampoo", "SH-1")
@@ -157,7 +142,7 @@ def test_a_product_no_longer_held_live_is_the_one_a_recovery_made_again_with_its
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_copys_product_is_the_business_own_by_its_id_before_any_sku():
     vip = make_list("VIP")
     shampoo = make_product("Shampoo", "SH-2")
@@ -170,7 +155,7 @@ def test_the_copys_product_is_the_business_own_by_its_id_before_any_sku():
     assert lacking["product_id"] == shampoo.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_product_made_again_by_hand_or_deleted_since_takes_none_of_the_copys_prices():
     vip = make_list("VIP")
     # Made again by hand with the SKU: the business's own, priced as the business chose.
@@ -186,7 +171,7 @@ def test_a_product_made_again_by_hand_or_deleted_since_takes_none_of_the_copys_p
     assert [one["product_id"] for one in lacking] == [by_hand["product_id"], deleted["product_id"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_place_of_a_product_made_again_the_business_priced_since_stays_as_it_is():
     vip = make_list("VIP")
     shampoo = made_by_a_recovery("Shampoo", "SH-1")
@@ -210,8 +195,7 @@ def made_again_for(there: uuid.UUID, name: str = "Haircut") -> Service:
     return make_service(name, created_by=actor_of(uuid.uuid7()), stands_for=there)
 
 
-@pytest.mark.django_db
-@pytest.mark.usefixtures("at_work")
+@HUB_DB
 def test_a_service_no_longer_held_is_the_one_a_recovery_made_again_for_it():
     vip = make_list("VIP")
     gone = a_price_of_a_service_gone(vip, price=1500)
@@ -225,8 +209,7 @@ def test_a_service_no_longer_held_is_the_one_a_recovery_made_again_for_it():
     ]
 
 
-@pytest.mark.django_db
-@pytest.mark.usefixtures("at_work")
+@HUB_DB
 def test_the_copys_service_is_the_business_own_while_it_holds_it():
     vip = make_list("VIP")
     haircut = make_service("Haircut")
@@ -237,8 +220,7 @@ def test_the_copys_service_is_the_business_own_while_it_holds_it():
     assert lacking["service_id"] == haircut.id
 
 
-@pytest.mark.django_db
-@pytest.mark.usefixtures("at_work")
+@HUB_DB
 def test_a_service_made_again_by_hand_takes_none_of_the_copys_prices():
     vip = make_list("VIP")
     # Made again by hand with the name: the business's own, priced as the business chose.
@@ -251,8 +233,7 @@ def test_a_service_made_again_by_hand_takes_none_of_the_copys_prices():
     assert lacking["service_id"] == by_hand["service_id"]
 
 
-@pytest.mark.django_db
-@pytest.mark.usefixtures("at_work")
+@HUB_DB
 def test_the_place_of_a_service_made_again_the_business_priced_since_stays_as_it_is():
     vip, bulk = make_list("VIP"), make_list("BULK")
     taken = a_price_of_a_service_gone(vip, price=1500)
@@ -271,8 +252,7 @@ def test_the_place_of_a_service_made_again_the_business_priced_since_stays_as_it
     ]
 
 
-@pytest.mark.django_db
-@pytest.mark.usefixtures("at_work")
+@HUB_DB
 def test_without_services_each_price_keeps_the_copys_service(monkeypatch):
     from live.operations import UnknownOperation
 
