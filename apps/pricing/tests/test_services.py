@@ -546,3 +546,7 @@ def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
         op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
     assert received(on_b, stop_after=1) == [{"events": ["pricing.price_list.created", "pricing.price_list.default_changed"]}]
     assert received(on_a, timeout=0.3) == []
+    # The channel is the command's scope; the rows of the outbox carry theirs, and B's database holds them all.
+    with use_hub(hub_b):
+        assert set(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == {(B.kind, B.key)}
+    assert not OutboxEvent.objects.exists()
