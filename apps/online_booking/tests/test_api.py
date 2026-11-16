@@ -1,7 +1,8 @@
 """The online booking app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to business A's host with Django's sync test client, which sees the test's transaction. The public operations have session routes too (the owner's and the admin's preview); the page
-without a session calls them in-process from base. The platform's reaction has no route.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction. The public
+operations have session routes too (the owner's and the admin's preview); the page without a session calls them
+in-process from base. The platform's reaction has no route.
 """
 
 import pytest

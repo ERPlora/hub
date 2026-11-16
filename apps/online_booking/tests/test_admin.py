@@ -1,8 +1,8 @@
 """Django admin of the online booking app: full CRUD on both tables, for support.
 
 A second write path, for the staff only on hubs.erplora.com with a business chosen: it does not go through the
-operations' rules, so it warns rather than prevents. What the database fills in (ids and timestamps) is shown, not edited; a
-link's hash can be emptied (revoked), never read back as a link.
+operations' rules, so it warns rather than prevents. What the database fills in (ids and timestamps) is shown, not
+edited; a link's hash can be emptied (revoked), never read back as a link.
 """
 
 import pytest
