@@ -18,11 +18,10 @@ from apps.customer.schemas import A_CUSTOMER_REFERENCE
 from base import assistant
 from base.schemas import names
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values import AN_ID
 from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, ctx_for
 from .test_integration_assistant import customer_writes
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -61,7 +60,7 @@ def no_id(said) -> bool:
 # ── A customer ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Customer"), ("es", "Cliente")])
 @pytest.mark.parametrize(
     ("write", "extra"),
@@ -80,7 +79,7 @@ def test_a_write_on_a_card_says_whose_it_is_and_titles_it_as_its_screens_do(writ
     assert (field["value"], field["label"]) == ("Ana López", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Customer"), ("es", "Cliente")])
 @pytest.mark.parametrize(
     ("write", "extra"),
@@ -98,7 +97,7 @@ def test_what_hangs_from_a_card_says_whose_card_it_is(write, extra, language, ti
     assert (field["value"], field["label"]) == ("Ana López", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Duplicate customer"), ("es", "Ficha duplicada")])
 def test_a_merge_says_the_card_that_stays_and_the_duplicate_by_their_names(language, title):
     stays, duplicate = a_card("Ana López"), a_card("Ana Lopez", phone="+34600111222")
@@ -134,14 +133,14 @@ def by_their_ids_beside_other_names() -> tuple[dict, Customer]:
     return arguments, stays
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_a_merge_by_ids_names_only_the_two_cards_it_merges_whatever_names_come_beside_them(language):
     arguments, _ = by_their_ids_beside_other_names()
     assert shown("customer.customer.merge", arguments, language) == {"id": "Ana López", "absorbed_id": "Ana Lopez"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_name_beside_the_id_of_the_other_card_is_still_read():
     """The card that stays said by its name beside the duplicate's id, and the duplicate said by its name beside the id
     of the one that stays: each is the card the merge finds by that name."""
@@ -154,7 +153,7 @@ def test_a_name_beside_the_id_of_the_other_card_is_still_read():
     assert shown("customer.customer.merge", by_id_and_name) == {"id": "Ana López", "absorbed": "Carla Gil"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_yes_to_a_merge_by_ids_merges_those_two_cards_whatever_names_come_beside_them():
     """Control of the above: the merge keeps the card of ``id`` and absorbs the one of ``absorbed_id``; the cards the
     names beside them fit are not touched."""
@@ -232,7 +231,7 @@ def test_words_said_beside_their_own_record_s_id_are_left_unread_beside_it():
     assert {key: value for table in marked for key, value in table.items()} == UNLESS_SAID
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize(("write", "datum"), sorted(UNLESS_SAID))
 def test_a_record_by_its_id_beside_the_words_of_another_is_the_only_one_its_card_says(write, datum, language):
@@ -242,7 +241,7 @@ def test_a_record_by_its_id_beside_the_words_of_another_is_the_only_one_its_card
     assert (said.get(id_datum), datum in said) == (own.name, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), sorted(UNLESS_SAID))
 def test_words_said_alone_name_the_record_their_write_finds_by_them(write, datum):
     own, _ = two(datum)
@@ -250,7 +249,7 @@ def test_words_said_alone_name_the_record_their_write_finds_by_them(write, datum
     assert said[datum] == own.name
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), sorted(UNLESS_SAID))
 def test_words_that_fit_no_record_are_said_as_said(write, datum):
     """As before the mark: the card says what was said, and the write answers that nothing fits."""
@@ -258,7 +257,7 @@ def test_words_that_fit_no_record_are_said_as_said(write, datum):
     assert said[datum] == "Nobody"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_words_that_fit_several_cards_are_said_as_said():
     a_card("Ana López")
     a_card("Ana López")
@@ -274,7 +273,7 @@ def touched(write: str, kind: str) -> object:
     return sorted(MODELS[kind].objects.values_list("name", flat=True))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("write", "datum", "after"),
     [
@@ -295,7 +294,7 @@ def test_the_yes_touches_only_the_record_of_the_id_whatever_words_come_beside_it
     assert touched(write, datum) == after
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_yes_to_a_card_said_by_its_email_deletes_it():
     """Control: nothing changed between the card and the yes."""
     ana, _ = two("customer")
@@ -304,7 +303,7 @@ def test_the_yes_to_a_card_said_by_its_email_deletes_it():
     assert touched("customer.customer.delete", "customer") == ["Bea Ruiz"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_yes_deletes_nobody_when_the_email_its_card_was_said_by_is_another_card_s_meanwhile():
     """The card said «Cliente: Ana López» for ana@example.com; before the yes, that email moves to Bea Ruiz: the yes
     deletes neither, and the card is drawn again."""
@@ -319,7 +318,7 @@ def test_the_yes_deletes_nobody_when_the_email_its_card_was_said_by_is_another_c
     assert touched("customer.customer.delete", "customer") == ["Ana López", "Bea Ruiz"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_yes_deletes_no_group_when_another_fits_its_name_better_meanwhile():
     """A group no longer active said by its name; before the yes, somebody creates an active one with that name, which
     the write would take instead: the yes deletes neither."""
@@ -337,7 +336,7 @@ def test_the_yes_deletes_no_group_when_another_fits_its_name_better_meanwhile():
 # ── Groups, tags and custom fields ────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_groups_and_tags_a_card_is_given_go_by_their_names():
     """«Guardar grupos» and «Guardar etiquetas»: each one the card is given, never by its id."""
     card = a_card()
@@ -350,7 +349,7 @@ def test_the_groups_and_tags_a_card_is_given_go_by_their_names():
     assert no_id(groups) and no_id(tags)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_custom_fields_of_an_edited_card_go_by_their_names():
     card = a_card()
     allergies = CustomField.objects.create(name="Allergies")
@@ -360,7 +359,7 @@ def test_the_custom_fields_of_an_edited_card_go_by_their_names():
     assert said["field_values"] == [{"field_id": "Allergies", "value": "Nuts"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "group", "tag", "field"),
     [("en", "Group", "Tag", "Custom field"), ("es", "Grupo", "Etiqueta", "Campo personalizado")],
@@ -381,7 +380,7 @@ def test_a_write_on_a_group_a_tag_or_a_field_says_which_by_its_name(language, gr
 # ── An open order, by Sales's name for it ─────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Open order"), ("es", "Pedido abierto")])
 def test_putting_a_customer_on_an_order_says_the_order_as_sales_names_it(language, title):
     card, order = a_card(), an_order("Table 4")
@@ -403,14 +402,14 @@ def sales_unavailable(request, monkeypatch):
         monkeypatch.setitem(registry, SALES_NAMES, dataclasses.replace(registry[SALES_NAMES], fn=off))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_sales_the_card_leaves_the_order_out_and_names_the_customer(sales_unavailable):
     card = a_card()
     said = shown("customer.order.link", {"order_id": A_MISSING_ID, "customer_id": str(card.id)})
     assert said == {"customer_id": "Ana López"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_sales_the_read_of_an_order_says_sales_is_unavailable(sales_unavailable):
     with pytest.raises(Conflict) as caught:
         read("customer.order.get", {"order_id": A_MISSING_ID})
@@ -420,7 +419,7 @@ def test_without_sales_the_read_of_an_order_says_sales_is_unavailable(sales_unav
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("needed", "write", "datum"),
     [
@@ -450,7 +449,7 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(needed, w
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("write", "datum"),
     [
@@ -469,14 +468,14 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deleted_card_is_left_out_as_its_screens_leave_it_out():
     """Erasing the data of a card already deleted still works (CUSTOMER-F16), but no screen shows that card."""
     deleted = a_card(deleted_at=timezone.now())
     assert shown("customer.customer.erase", {"id": str(deleted.id)}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     card, vip = a_card(), CustomerGroup.objects.create(name="VIP")
@@ -485,7 +484,7 @@ def test_nobody_behind_the_request_reads_no_record():
     assert said == {"group_ids": [None]}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
@@ -504,7 +503,7 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
             assert shown(write, {"id": str(record.id)}, ctx=in_b) == {}, write
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_words_that_fit_a_record_of_another_business_are_said_as_said(hub_a, hub_b):
     """Each business in its own database: the words that name a record of A name nothing in B (hub#1280)."""
@@ -525,7 +524,7 @@ def test_words_that_fit_a_record_of_another_business_are_said_as_said(hub_a, hub
 # ── A closed list, by the word of its screen ──────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "expected"),
     [
@@ -540,7 +539,7 @@ def test_a_stage_a_source_and_a_channel_go_by_their_word_in_both_languages(langu
     assert {name: said[name] for name in sent} == expected
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "channel", "source"), [("en", "Post", "Web form"), ("es", "Correo postal", "Formulario web")]
 )
@@ -556,7 +555,7 @@ def test_a_consent_says_its_channel_and_where_it_was_given_in_both_languages(lan
 READS = ["customer.group.detail", "customer.tag.detail", "customer.field.detail", "customer.order.get"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_reads_answer_the_name_of_what_they_read():
     vip = CustomerGroup.objects.create(name="VIP")
     allergic = CustomerTag.objects.create(name="Allergic")
@@ -568,7 +567,7 @@ def test_the_reads_answer_the_name_of_what_they_read():
     assert read("customer.order.get", {"order_id": str(order.id)}).name == "Table 4"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("kind", ["group", "tag", "field"])
 def test_the_reads_find_a_group_a_tag_or_a_field_by_its_name_as_their_writes_do(kind):
     """In any case, the active one before one no longer active, as ``find_group`` and its neighbours find it (hub#1280);
@@ -580,7 +579,7 @@ def test_the_reads_find_a_group_a_tag_or_a_field_by_its_name_as_their_writes_do(
         read(f"customer.{kind}.detail", {kind: "Nobody"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("kind", ["group", "tag", "field"])
 def test_the_reads_take_a_group_a_tag_or_a_field_by_its_id_whatever_name_comes_beside_it(kind):
     """The id wins, as in their writes (``_find_named``)."""
@@ -588,7 +587,7 @@ def test_the_reads_take_a_group_a_tag_or_a_field_by_its_id_whatever_name_comes_b
     assert read(f"customer.{kind}.detail", {"id": str(own.id), kind: other.name}).id == own.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", READS)
 def test_the_reads_need_the_right_to_see_the_customers(name):
     denied = ctx_for(permissions=set(ctx_for().permissions) - {"customer.view"})
@@ -597,7 +596,7 @@ def test_the_reads_need_the_right_to_see_the_customers(name):
         read(name, {key: A_MISSING_ID}, denied)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", READS)
 def test_the_reads_say_not_found_for_what_is_not_there(name):
     key = "order_id" if name == "customer.order.get" else "id"

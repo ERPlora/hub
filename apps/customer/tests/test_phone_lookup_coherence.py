@@ -10,10 +10,11 @@ from live.operations import get
 
 from apps.customer.queries import find_customer
 from base.models import Hub
+from base.tenancy.context import use_hub
 
-from .conftest import B, ctx_for, run
+from .conftest import HUB_DB, A, B, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: A Polish mobile written as a Pole types it: no prefix, in groups of three.
 POLISH = "512 345 678"
@@ -23,8 +24,8 @@ SAVED = {"PL": "+48512345678", "ES": "+34512345678", "": "+34512345678"}
 
 @pytest.fixture(params=["PL", "ES", ""], ids=["poland", "spain", "no-country"])
 def business_country(request) -> str:
-    """The country erplora.com registered for the business ``a`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug="a").update(country=request.param)
+    """The country erplora.com registered for business A (``PUT /internal/hubs/{id}``)."""
+    Hub.objects.filter(slug=A.key).update(country=request.param)
     return request.param
 
 
@@ -56,11 +57,14 @@ def test_another_app_names_the_card_by_the_same_digits(business_country, operati
     assert run(operation, data).total == 0
 
 
-def test_each_business_reads_the_digits_in_its_own_country():
-    """``a`` in Poland and ``b`` in Spain save the same digits as two numbers, and each finds its own card by them."""
-    Hub.objects.filter(slug="a").update(country="PL")
-    Hub.objects.update_or_create(slug="b", defaults={"status": "ready", "country": "ES"})
-    in_a, in_b = create(POLISH), create(POLISH, scope=B)
+def test_each_business_reads_the_digits_in_its_own_country(hub_b):
+    """Business A in Poland and B in Spain save the same digits as two numbers, and each finds its own card by them."""
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    Hub.objects.filter(slug=B.key).update(country="ES")
+    in_a = create(POLISH)
+    with use_hub(hub_b):
+        in_b = create(POLISH, scope=B)
     assert (in_a.phone, in_b.phone) == ("+48512345678", "+34512345678")
     assert find_customer(ctx_for(), None, POLISH).id == in_a.id
-    assert find_customer(ctx_for(scope=B), None, POLISH).id == in_b.id
+    with use_hub(hub_b):
+        assert find_customer(ctx_for(scope=B), None, POLISH).id == in_b.id
