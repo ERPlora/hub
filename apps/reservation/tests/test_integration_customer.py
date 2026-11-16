@@ -11,9 +11,9 @@ from apps.customer.models import Customer
 from apps.reservation import events
 from apps.reservation.models import Reservation, WaitlistEntry
 
-from .conftest import A, book, ctx_for, make_customer, open_week, run
+from .conftest import A, HUB_DB, book, ctx_for, make_customer, open_week, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

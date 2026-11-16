@@ -76,7 +76,7 @@
 1034 apps/reservation/queries.py ERPlora/erplora-next#74
 891 apps/reservation/schemas.py ERPlora/erplora-next#74
 1521 apps/reservation/services.py ERPlora/erplora-next#74
-1040 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
+1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 719 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
 615 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
 438 apps/sale/frontend/composables/pos/useTill.ts ERPlora/erplora-next#74
