@@ -14,6 +14,8 @@ import pytest
 from apps.kitchen.models import Ticket
 
 from .conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
     add_line,
     charge,
     ctx_for,
@@ -24,7 +26,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def board():
@@ -194,6 +196,7 @@ def test_a_round_sent_from_the_till_says_its_waiter_by_name(product, ana):
     assert said_by(ticket.id) == ("Ana García", "Ana García", "Ana García", ["Ana García"])
 
 
+@HUB_DB_COMMITTED
 def test_a_round_sent_for_whoever_attends_the_check_names_them_even_after_the_relay(relay, product, ana):
     """KITCHEN-F18, F08, F10: the till sends the round naming who attends the
     check («Atiende»: a member of the team, who may have no login); the card, the detail, the ticket and its paper
@@ -210,6 +213,7 @@ def test_a_round_sent_for_whoever_attends_the_check_names_them_even_after_the_re
     assert said_by(ticket.id) == ("Marta Ruiz", "Marta Ruiz", "Marta Ruiz", ["Marta Ruiz"])
 
 
+@HUB_DB_COMMITTED
 def test_a_round_fired_by_sales_says_its_waiter_by_name_once_the_relay_brings_it(relay, product, ana):
     order = open_check("Table 4")
     line = add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana)).lines[0]

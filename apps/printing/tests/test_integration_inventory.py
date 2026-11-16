@@ -6,16 +6,16 @@ first label printer a device reaches takes it, with the product's name, its SKU 
 never comes out on the receipt printer, and a label asked in one hub wakes that hub's screens only.
 """
 
-import pytest
 from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.outbox import channel_for
 
 from apps.printing.models import PrintJob
-from apps.printing.tests.conftest import A, B, ctx_for, printer, received, run
+from apps.printing.tests.conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, printer, received, run
 from apps.tax.models import TaxCategory
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SKU = "SHA-250"
 TAX = "product.generic"
@@ -90,14 +90,16 @@ def test_the_label_re_runs_the_label_card_and_the_queue():
     assert {"printing.job.summary", "printing.job.list"} <= set(live_registry.affected([queued.name]))
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_label_asked_in_b_wakes_b_only(listen):
-    # A transactional test before this one may have flushed the tax categories the migrations seed.
-    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
-    shampoo = product(B)
+@HUB_DB_COMMITTED
+def test_a_label_asked_in_b_wakes_b_only(listen, hub_b):
+    with use_hub(hub_b):
+        # A transactional test before this one may have flushed the tax categories the migrations seed.
+        TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+        shampoo = product(B)
     on_a, on_b = listen(A), listen(B)
 
-    print_label(shampoo, B)
+    with use_hub(hub_b):
+        print_label(shampoo, B)
 
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["printing.job.queued"]})]
     assert received(on_a, timeout=0.3) == []

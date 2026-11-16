@@ -34,7 +34,7 @@ from apps.kitchen.models import (
     TicketItem,
 )
 
-from .conftest import make_station
+from .conftest import HUB_DB, make_station
 
 MODELS = {
     Station: StationAdmin,
@@ -82,6 +82,7 @@ def test_every_model_is_registered_and_the_dishes_are_an_inline_of_their_ticket(
     assert TicketItemInline.model is TicketItem
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -106,8 +107,8 @@ def test_ids_and_timestamps_are_read_only():
     assert {"id"} <= set(LogEntryAdmin.readonly_fields)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff):
     station = make_station("Grill")
     ticket = make_ticket(label="Table 4")
     TicketItem.objects.create(
@@ -115,7 +116,6 @@ def test_changelists_and_change_pages_render(client, superuser):
     )
     LogEntry.objects.create(ticket=ticket, action="received", notes="First round")
     DayCounter.objects.create(day=dt.date(2026, 10, 14), last_number=7)
-    client.force_login(superuser)
     for path, text in (
         ("/admin/kitchen/station/", b"Grill"),
         (f"/admin/kitchen/station/{station.pk}/change/", b"printer_usage"),
@@ -126,14 +126,13 @@ def test_changelists_and_change_pages_render(client, superuser):
         ("/admin/kitchen/daycounter/", b"2026"),
         ("/admin/kitchen/station/add/", b"destination"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_support_can_repair_a_station_through_the_admin(client, superuser):
+@HUB_DB
+def test_support_can_repair_a_station_through_the_admin(hub_staff):
     station = make_station("Grill")
-    client.force_login(superuser)
     data = {
         "name": "Charcoal grill",
         "color": "#E03131",
@@ -145,7 +144,7 @@ def test_support_can_repair_a_station_through_the_admin(client, superuser):
         "created_by": "",
         "updated_by": "",
     }
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/kitchen/station/{station.pk}/change/", data, HTTP_HOST="hubs.localhost"
     )
     assert response.status_code == 302
@@ -154,8 +153,8 @@ def test_support_can_repair_a_station_through_the_admin(client, superuser):
     assert KitchenSettings.objects.count() == 1
 
 
-@pytest.mark.django_db
-def test_a_dish_shows_its_options_and_its_menu_in_its_ticket(client, superuser):
+@HUB_DB
+def test_a_dish_shows_its_options_and_its_menu_in_its_ticket(hub_staff):
     """KITCHEN-F06, F07: the staff sees on each dish the options chosen and the menu it is a dish of."""
     ticket = make_ticket(label="Table 4")
     TicketItem.objects.create(
@@ -167,7 +166,6 @@ def test_a_dish_shows_its_options_and_its_menu_in_its_ticket(client, superuser):
         menu_name="MENU OF THE DAY",
         menu_dish=1,
     )
-    client.force_login(superuser)
-    response = client.get(f"/admin/kitchen/ticket/{ticket.pk}/change/", HTTP_HOST="hubs.localhost")
+    response = hub_staff.get(f"/admin/kitchen/ticket/{ticket.pk}/change/", HTTP_HOST="hubs.localhost")
     assert response.status_code == 200
     assert b"+CHEESE" in response.content and b"MENU OF THE DAY" in response.content

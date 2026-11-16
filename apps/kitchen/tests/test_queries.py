@@ -18,6 +18,7 @@ from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
     A,
+    HUB_DB,
     add_line,
     charge,
     ctx_for,
@@ -30,7 +31,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def board(**params):
@@ -148,11 +149,13 @@ def test_a_round_never_saved_of_a_check_closed_over_a_day_ago_is_no_longer_read(
 def test_the_rounds_of_open_checks_are_read_apart_from_the_recently_closed(clock, product):
     # The live board re-runs often: the open checks are found by their status (Sales' index), never with
     # an «open OR closed since» that reads every check ever closed.
-    from django.db import connection
+    from django.db import connections
     from django.test.utils import CaptureQueriesContext
 
+    from base.tenancy.context import current_alias
+
     fired_round(product, "Burger")
-    with CaptureQueriesContext(connection) as queries:
+    with CaptureQueriesContext(connections[current_alias()]) as queries:
         assert len(board().cooking) == 1
     reads = [q["sql"] for q in queries if '"fired_at" IS NOT NULL' in q["sql"]]
     assert len(reads) == 2

@@ -23,6 +23,8 @@ from apps.kitchen.models import Ticket, TicketItem
 
 from .conftest import (
     A,
+    HUB_DB,
+    HUB_DB_COMMITTED,
     add_line,
     ctx_for,
     fire,
@@ -33,7 +35,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 FOOD = "restaurant.food"
 
@@ -122,6 +124,7 @@ def dishes(ticket) -> list[tuple]:
     ]
 
 
+@HUB_DB_COMMITTED
 def test_each_dish_of_a_menu_goes_to_its_own_station_under_the_menus_header(relay, menu, product):
     options, _, stations = menu
     order = open_check("Table 4")
@@ -157,6 +160,7 @@ def test_each_dish_of_a_menu_goes_to_its_own_station_under_the_menus_header(rela
     assert dishes(grill) == [("Steak", Decimal("2"), "MENU", "Grill", "No salt")]
 
 
+@HUB_DB_COMMITTED
 def test_on_paper_each_printer_gets_its_dishes_under_the_menus_header(relay, menu):
     options, _, _ = menu
     order = open_check("Table 4")
@@ -178,6 +182,7 @@ def test_on_paper_each_printer_gets_its_dishes_under_the_menus_header(relay, men
     }
 
 
+@HUB_DB_COMMITTED
 def test_a_menu_without_a_kitchen_name_is_headed_by_its_name(relay, menu):
     options, _, _ = menu
     setup("combo.combo.update", {"combo": "Menu of the day", "kitchen_name": ""})
@@ -191,6 +196,7 @@ def test_a_menu_without_a_kitchen_name_is_headed_by_its_name(relay, menu):
     assert [item.menu_name for item in ticket.items] == ["Menu of the day", "Menu of the day"]
 
 
+@HUB_DB_COMMITTED
 def test_two_menus_on_one_check_stay_two_groups(relay, menu):
     options, _, _ = menu
     order = open_check("Table 4")
@@ -229,6 +235,7 @@ def test_the_board_shows_the_dishes_of_a_menu_with_the_ids_they_are_saved_with(m
     ]
 
 
+@HUB_DB_COMMITTED
 def test_voiding_the_menu_in_the_till_strikes_all_its_dishes(relay, menu):
     options, _, _ = menu
     order = open_check("Table 4")
