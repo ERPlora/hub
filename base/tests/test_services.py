@@ -9,10 +9,10 @@ from django.contrib.sessions.middleware import SessionMiddleware
 
 from base.auth import RedeemedUser
 from base.models import Membership
-from base.services import (
+from base.services.sessions import (
+    InactiveUser,
     SAAS_USER_ID_SESSION_KEY,
     SUPPORT_GROUP,
-    InactiveUser,
     open_admin_session_from_saas,
     open_session_from_saas,
 )

@@ -16,7 +16,8 @@ from django.utils import timezone
 from live.context import Scope, system_context
 from live.models import OutboxEvent
 
-from base import recovery, relay, services
+from base import recovery, relay
+from base.services import relay_runs
 
 A = Scope("host", "a")
 
@@ -67,12 +68,12 @@ def deliver(app_label: str, event: OutboxEvent) -> None:
 
 
 def taken(now) -> None:
-    services.relay_take_events(now, listeners=listeners, limit=10, max_depth=relay.MAX_EVENT_DEPTH)
+    relay_runs.relay_take_events(now, listeners=listeners, limit=10, max_depth=relay.MAX_EVENT_DEPTH)
 
 
 def delivered(now) -> None:
     while (
-        services.relay_deliver_next(
+        relay_runs.relay_deliver_next(
             now,
             deliver=deliver,
             listeners=listeners,

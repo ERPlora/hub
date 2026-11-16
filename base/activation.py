@@ -418,8 +418,9 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     if isinstance(kept, list):
         return frozenset(kept)
     from base import services  # base.services imports this module
+    from base.services import provisioning
 
-    row = services.registry_row(hub.pk)
+    row = provisioning.registry_row(hub.pk)
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
     created = services.apps_created(row)

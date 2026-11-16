@@ -979,7 +979,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 - **Alta del hub de plataforma**: `manage.py create_platform_hub` (ensayo; con `--execute` escribe),
   idempotente como el `ensure_platform_hub` del SaaS antiguo. Desde S5 el hub de plataforma es una fila del
   registro (`is_platform`) con su propia BD, como cualquier negocio: si falta, la hace como un alta
-  (`base.services.platform_hub_register` y `base.tenancy.provision`); después, dentro de esa BD, le pone el emisor
+  (`base.services.provisioning.platform_hub_register` y `base.tenancy.provision`); después, dentro de esa BD, le pone el emisor
   de ERPlora desde `PLATFORM_ISSUER_LEGAL_NAME`, `PLATFORM_ISSUER_TAX_ID`,
   `PLATFORM_ISSUER_ADDRESS`, `PLATFORM_ISSUER_POSTAL_CODE`, `PLATFORM_ISSUER_CITY`,
   `PLATFORM_ISSUER_PROVINCE` y `PLATFORM_ISSUER_COUNTRY` (por defecto, los datos de ERPLORA CLOUD SL del

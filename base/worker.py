@@ -21,7 +21,7 @@ went away) is logged and the next tick tries again; a stop request ends the loop
 leaves for after its COMMIT that waits on the network (a call to another system) runs off this loop, in
 ``base.outbound``'s threads, so it never holds the next delivery nor the next task; on its way out the worker gives
 what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them again). On the first tick and
-then every ``REAPER_INTERVAL_SECONDS`` it also purges the demo hubs that ended (``base.services.reap_demos``),
+then every ``REAPER_INTERVAL_SECONDS`` it also purges the demo hubs that ended (``base.services.demos.reap_demos``),
 whatever the scheduler did: a pass that fails is logged and the next one tries again, and the worker
 never stops for it.
 
@@ -98,7 +98,7 @@ from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
 from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
-from base.services import reap_demos
+from base.services.demos import reap_demos
 from base.tenancy import dumps, migrator, move, offboarding, provision, recovery, restore
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
@@ -344,7 +344,7 @@ def _hubs(now: dt.datetime) -> None:
     global _next_hub
     try:
         with use_control():
-            hubs = services.hubs_to_serve(now)
+            hubs = services.provisioning.hubs_to_serve(now)
             active = services.hubs_visited_since((now - ACTIVE_WINDOW).date()) if hubs else frozenset()
     except Exception:
         logger.exception("worker: the hubs to serve could not be read; the next tick tries again.")
@@ -428,7 +428,7 @@ def _activate_in(hub, now: dt.datetime) -> None:
             logger.exception("worker: the tables of %s could not be made in %s.", ",".join(apps), hub.slug)
     ctx = OperationContext(scope=Scope("host", hub.slug), actor="system", permissions=frozenset({"*"}), language="en")
     with use_control():
-        hub = services.registry_row(hub.pk)
+        hub = services.provisioning.registry_row(hub.pk)
     with use_hub(hub):
         get_operation("base.app.activation_settle")(ctx, AppActivationSettleIn(apps=apps, outcome=outcome, error=error))
 
@@ -456,13 +456,13 @@ def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
         return
     try:
         with use_control():
-            hub = services.registry_row(hub_id)
+            hub = services.provisioning.registry_row(hub_id)
             cancelled = stop.is_set if stop is not None else None
             if hub is not None and hub.reset_requested_at is not None:
                 _reset(hub, cancelled)
             elif hub is not None and services.past_retention(hub, now):
                 offboarding.retire(hub.pk, now, cancelled)
-            elif hub is not None and services.offboarding_due(hub):
+            elif hub is not None and services.provisioning.offboarding_due(hub):
                 _offboarding_copy(hub, now, cancelled)
     except dumps.DumpStopped:
         logger.info("worker: the copy of the hub %s was stopped with the worker; it stays due.", hub_id)
@@ -471,10 +471,10 @@ def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
     finally:
         try:
             with use_control():
-                services.release_hub(hub_id, timezone.now())
+                services.provisioning.release_hub(hub_id, timezone.now())
         except Exception:
             logger.exception("worker: the lease of the hub %s could not be given back; it runs out by itself.", hub_id)
-        row = services.registry_row(hub_id) if hub_id else None
+        row = services.provisioning.registry_row(hub_id) if hub_id else None
         if row is not None and row.db_name:
             close_hub_aliases(row)
         close_old_connections()
@@ -629,7 +629,7 @@ def _name_the_businesses_without_a_database() -> None:
     gives it one. A business that left (``cancelled``) without one is no error: it is made one if it comes back."""
     try:
         with use_control():
-            waiting = [hub.slug for hub in services.hubs_on_control() if hub.status == Hub.Status.READY]
+            waiting = [hub.slug for hub in services.hub_registry.hubs_on_control() if hub.status == Hub.Status.READY]
     except Exception:
         logger.exception("worker: the businesses without a database of their own could not be read.")
         return

@@ -20,7 +20,7 @@ from live.context import system_context
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
-from base.services import demo_code_create, demo_create, open_demo_session, reap_demos, redeem_demo_code
+from base.services.demos import demo_code_create, demo_create, open_demo_session, reap_demos, redeem_demo_code
 from control.schemas import FreezeIn
 from control.services import freeze_set
 

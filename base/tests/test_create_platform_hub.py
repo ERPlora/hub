@@ -247,12 +247,12 @@ def test_without_execute_a_missing_platform_hub_is_only_said():
 def test_its_row_is_never_left_due_for_the_worker_to_take_meanwhile():
     """The command makes the platform hub's database itself, under its lease: the worker's pass over ``hub_due``
     never finds the row to take first (it would leave the command with «could not be made»)."""
-    from base import services
+    from base.services import provisioning
     from base.tenancy.context import use_control
     from control.models import Hub, HubDue
 
     with use_control():
-        hub = services.platform_hub_register(PLATFORM.key)
+        hub = provisioning.platform_hub_register(PLATFORM.key)
 
     assert hub.status == Hub.Status.REQUESTED and hub.db_name
     assert not HubDue.objects.filter(pk=hub.pk).exists()

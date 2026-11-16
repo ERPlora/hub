@@ -25,7 +25,7 @@ from apps.staff.models import Member
 from apps.task import events
 from apps.task.models import Comment, Project, Task
 from apps.task.queries import PROJECT_NOT_FOUND, TASK_NOT_FOUND
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
 
 from .conftest import ctx_for, make_member, make_project, make_task
 

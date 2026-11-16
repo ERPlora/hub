@@ -3,12 +3,13 @@
 Every new hub and demo is born ``requested`` with its ``db_name`` (``base.services``: ``base.hub.register``,
 ``base.demo.create``) and due in ``hub_due``; the worker (``base.worker``, :func:`run_due`) or a command
 (:func:`provision`) makes its database under that row's lease, in steps, each noted in control in a short transaction
-of its own (``base.services``, «The provisioning's writes in control»):
+of its own (``base.services.provisioning``):
 
-1. ``creating``: the hub is placed on a cluster (``base.services.place_hub``: the open one with the fewest hubs under
-   its ``max_hubs``; the settings' own server when there are no clusters; ``no_cluster_available`` when none has
-   room) and its database is cloned from that cluster's template of its vertical (``<control>_template[_<vertical>]``,
-   ``base.tenancy.ops``), private to the environment's roles, with its identity (``base_hub_identity``);
+1. ``creating``: the hub is placed on a cluster (``base.services.provisioning.place_hub``: the open one with the fewest
+   hubs under its ``max_hubs``; the settings' own server when there are no clusters; ``no_cluster_available`` when
+   none has room) and its database is cloned from that cluster's template of its vertical
+   (``<control>_template[_<vertical>]``, ``base.tenancy.ops``), private to the environment's roles, with its identity
+   (``base_hub_identity``);
 2. ``migrating``: the apps the clone has (its ``django_migrations``: its template's), its vertical's and ``base`` are
    brought to the code's leaf (``base.tenancy.migrator.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
    template current, so the sign-up is the clone; the lease renewed between apps) and noted in ``Hub.schema_apps``
@@ -17,10 +18,10 @@ of its own (``base.services``, «The provisioning's writes in control»):
    tables the first time the business turns it on (``base.app.enable`` → ``creating`` → the worker's
    ``ensure_schema``);
 3. ``seeding``: inside ``use_hub``, its apps written down: every one off but those its country requires that the
-   platform turns on by itself (``base.services.turn_on_born_apps``: Taxes), on and not chosen, whose tables
-   the step before made; then the SaaS's photo kept on the row (its people, and the blocks of the apps it has on); a
-   newer photo that arrives meanwhile is applied too before ``ready`` (:data:`SEED_ROUNDS`);
-4. ``ready``, and the SaaS of a business hears it after the COMMIT (``base.services.report_ready``).
+   platform turns on by itself (``base.services.hub_registry.turn_on_born_apps``: Taxes), on and not chosen, whose
+   tables the step before made; then the SaaS's photo kept on the row (its people, and the blocks of the apps it has
+   on); a newer photo that arrives meanwhile is applied too before ``ready`` (:data:`SEED_ROUNDS`);
+4. ``ready``, and the SaaS of a business hears it after the COMMIT (``base.services.provisioning.report_ready``).
 
 Every step is safe to run again: a database already there is gone on with (``42P04``), its identity is written once,
 the migrator applies only what is missing. A step that fails leaves the hub ``failed`` with ``attempts``, a readable
@@ -45,7 +46,8 @@ from collections.abc import Callable, Iterable
 from django.utils import timezone
 from live.context import system_context
 
-from base import activation, registry, services
+from base import activation, registry
+from base.services import demos, hub_registry, photo, provisioning
 from base.catalog import template_apps
 from base.schemas import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
@@ -84,7 +86,7 @@ def template_for(hub: Hub) -> str:
     try:
         return names.template_db_name(tenancy_connections.control_name(), hub.vertical or None)
     except names.InvalidDatabaseName as invalid:
-        raise services.ProvisioningFailed("template_missing", str(invalid)) from invalid
+        raise provisioning.ProvisioningFailed("template_missing", str(invalid)) from invalid
 
 
 def provision(
@@ -109,30 +111,30 @@ def provision(
     """
     now = now or timezone.now()
     with use_control():
-        row = services.registry_row(hub.id)
+        row = provisioning.registry_row(hub.id)
         if row is None or (row.status != Hub.Status.READY and row.status not in registry.PREPARING_STATUSES):
             return False
         if row.status == Hub.Status.READY:
             return True
-        if services.claim_hub(hub.id, now, LEASE) is None:
+        if provisioning.claim_hub(hub.id, now, LEASE) is None:
             return False
         try:
             _prepare(hub.id, apps=apps, seed=seed, tell_saas=tell_saas)
         finally:
-            services.release_hub(hub.id, timezone.now())
-        return services.registry_row(hub.id).status == Hub.Status.READY
+            provisioning.release_hub(hub.id, timezone.now())
+        return provisioning.registry_row(hub.id).status == Hub.Status.READY
 
 
 def drop(hub, *, now: dt.datetime | None = None) -> bool:
     """Drop the demo ``hub`` that ended, under its lease, and purge it; whether this call purged it."""
     now = now or timezone.now()
     with use_control():
-        if services.claim_hub(hub.id, now, LEASE) is None:
+        if provisioning.claim_hub(hub.id, now, LEASE) is None:
             return False
         try:
             return _drop(hub.id, now)
         finally:
-            services.release_hub(hub.id, timezone.now())
+            provisioning.release_hub(hub.id, timezone.now())
 
 
 def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: float = DUE_PASS_SECONDS) -> int:
@@ -148,11 +150,11 @@ def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: f
         for _ in range(limit):
             if time.monotonic() - started > budget:
                 break
-            hub_id = services.claim_next_due_hub(now, LEASE)
+            hub_id = provisioning.claim_next_due_hub(now, LEASE)
             if hub_id is None:
                 break
             try:
-                hub = services.registry_row(hub_id)
+                hub = provisioning.registry_row(hub_id)
                 if hub is None:
                     continue
                 if hub.is_demo and registry.is_gone(hub, now):
@@ -165,7 +167,7 @@ def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: f
             except Exception:
                 logger.exception("base.tenancy.provision.pass_failed hub=%s: it is given back and tried again.", hub_id)
             finally:
-                services.release_hub(hub_id, timezone.now())
+                provisioning.release_hub(hub_id, timezone.now())
     return worked
 
 
@@ -192,83 +194,83 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
     apps = list(apps or ())
     step = _Steps()
     try:
-        hub = services.place_hub(hub_id)
-        hub = services.provision_step(hub_id, Hub.Status.CREATING, timezone.now(), LEASE)
+        hub = provisioning.place_hub(hub_id)
+        hub = provisioning.provision_step(hub_id, Hub.Status.CREATING, timezone.now(), LEASE)
         template = template_for(hub)
         try:
             ops.clone_database(hub.db_name, template=template, cluster=hub.cluster)
         except ops.TemplateMissing as missing:
-            raise services.ProvisioningFailed("template_missing", str(missing)) from missing
+            raise provisioning.ProvisioningFailed("template_missing", str(missing)) from missing
         except ops.DatabaseOpsError as refused:
-            raise services.ProvisioningFailed("clone_failed", str(refused)) from refused
+            raise provisioning.ProvisioningFailed("clone_failed", str(refused)) from refused
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
         step.done("creating", hub)
-        hub = services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
+        hub = provisioning.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
         try:
             # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs). The
             # lease is renewed between apps: a long migration never lets another worker take the hub meanwhile.
             migrator.ensure_schema(
                 hub,
                 add=["base", *vertical_apps(hub.vertical), *sorted(activation.born_apps(hub.country)), *apps],
-                heartbeat=lambda: services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE),
+                heartbeat=lambda: provisioning.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE),
             )
-        except services.ProvisioningStopped:
+        except provisioning.ProvisioningStopped:
             raise
         except Exception as error:
-            raise services.ProvisioningFailed("schema_failed", f"{type(error).__name__}: {error}") from error
+            raise provisioning.ProvisioningFailed("schema_failed", f"{type(error).__name__}: {error}") from error
         step.done("migrating", hub)
-        hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
+        hub = provisioning.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
         with use_hub(hub):
             if seed is not None:
                 seed(hub)
             # The apps it is born with on, those its country requires that the platform turns on: after its
             # seeding, which may have written its apps already (the local hubs, every app on), and before the photo,
             # whose blocks belong to the apps it has on.
-            services.turn_on_born_apps(hub)
-            services.apply_kept_photo(hub)
+            hub_registry.turn_on_born_apps(hub)
+            photo.apply_kept_photo(hub)
         for _ in range(SEED_ROUNDS):
             # Ready only with the photo it applied still the row's: one that came meanwhile was kept on the row only
             # (its database was not made yet) and the SaaS never sends it again, so it is applied now and checked again.
-            if services.provision_ready(
+            if provisioning.provision_ready(
                 hub_id, timezone.now(), hub.schema_apps, tell_saas=tell_saas, seeded_version=hub.state_version
             ):
                 break
-            hub = services.registry_row(hub_id)
+            hub = provisioning.registry_row(hub_id)
             with use_hub(hub):
-                services.apply_kept_photo(hub)
+                photo.apply_kept_photo(hub)
         else:
-            raise services.ProvisioningFailed(
+            raise provisioning.ProvisioningFailed(
                 "photo_moving", f"the SaaS's photo kept changing while it was seeded ({SEED_ROUNDS} times)"
             )
         step.done("seeding", hub)
         logger.info("base.tenancy.provision.ready hub=%s database=%s seconds=%.2f", hub.slug, hub.db_name, step.total())
-    except services.ProvisioningStopped as stopped:
+    except provisioning.ProvisioningStopped as stopped:
         logger.info("base.tenancy.provision.stopped hub=%s: %s", hub_id, stopped)
-    except services.ProvisioningFailed as failed:
-        services.provision_failed(hub_id, timezone.now(), str(failed))
+    except provisioning.ProvisioningFailed as failed:
+        provisioning.provision_failed(hub_id, timezone.now(), str(failed))
         logger.warning("base.tenancy.provision.failed hub=%s: %s", hub_id, failed)
     except Exception as error:
-        services.provision_failed(hub_id, timezone.now(), f"unexpected: {type(error).__name__}: {error}")
+        provisioning.provision_failed(hub_id, timezone.now(), f"unexpected: {type(error).__name__}: {error}")
         logger.exception("base.tenancy.provision.failed hub=%s: an unexpected error; it is tried again.", hub_id)
     finally:
         # Its migrator's connection and its own, closed now: a pass over many hubs never holds one per hub.
-        row = services.registry_row(hub_id)
+        row = provisioning.registry_row(hub_id)
         if row is not None and row.db_name:
             tenancy_connections.close_hub_aliases(row)
 
 
 def _drop(hub_id, now: dt.datetime) -> bool:
     """Drop and purge the demo ``hub_id`` that ended, its lease held; whether it was one to drop."""
-    hub = services.demo_dropping(hub_id, now, LEASE)
+    hub = provisioning.demo_dropping(hub_id, now, LEASE)
     if hub is None:
         return False
     # Its database first, outside any transaction of control; its rows after, in base.demo.purge's own.
     try:
-        services.purge_demo_data(hub)
-        services.demo_purge(system_context(registry.REGISTRY_SCOPE), DemoSlugIn(slug=hub.slug))
+        demos.purge_demo_data(hub)
+        demos.demo_purge(system_context(registry.REGISTRY_SCOPE), DemoSlugIn(slug=hub.slug))
     except Exception as error:
-        services.demo_drop_failed(hub_id, now, f"{type(error).__name__}: {error}")
+        provisioning.demo_drop_failed(hub_id, now, f"{type(error).__name__}: {error}")
         raise
     logger.info("base.tenancy.provision.dropped demo=%s database=%s", hub.slug, hub.db_name or "-")
     return True

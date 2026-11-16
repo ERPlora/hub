@@ -33,7 +33,7 @@ from base.auth import RedeemedUser
 from base.models import Membership
 from base.permissions import permissions_for
 from base.registry import REGISTRY_SCOPE
-from base.services import open_admin_session_from_saas, open_session_from_saas
+from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
 from control.models import Hub
 
 # ── Why an operation may have no permission ───────────────────────────────────────────────────────────────────────

@@ -56,7 +56,7 @@ from apps.attendance.schemas import (
 from apps.staff.models import Member
 from base import access
 from base.queries import device_of
-from base.services import acting_hub_user
+from base.services.sessions import acting_hub_user
 
 NO_MEMBER_RECORD = _(
     "Your user is not linked to any staff record: ask a manager to link it in Staff."

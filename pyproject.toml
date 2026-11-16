@@ -139,7 +139,6 @@ max-statements = 50
 "base/metrics.py" = ["B027"]
 "base/queries.py" = ["F811"]
 "base/schemas/__init__.py" = ["F811"]
-"base/services/__init__.py" = ["F401"]
 "base/tenancy/tests/test_business.py" = ["F401"]
 "base/tenancy/tests/test_concurrency.py" = ["F401"]
 "base/tests/test_access_account.py" = ["F401"]
@@ -198,6 +197,7 @@ ignore_imports = [
     "apps.verifactu.queries -> apps.verifactu.apps",
     "base.activation -> base.queries",
     "base.activation -> base.services",
+    "base.activation -> base.services.provisioning",
     "base.activation -> base.tenancy.context",
     "base.api_keys -> base.services",
     "base.approvals -> base.operations",
@@ -208,16 +208,23 @@ ignore_imports = [
     "base.operations -> base.services",
     "base.permissions -> base.tenancy.context",
     "base.registry -> base.tenancy.context",
-    "base.relay -> base.services",
+    "base.relay -> base.services.relay_runs",
     "base.services -> base.middleware",
+    "base.services.sessions -> base.middleware",
     "base.tenancy.context -> base.tenancy.connections",
-    "base.tenancy.cut -> base.services",
+    "base.tenancy.cut -> base.services.photo",
+    "base.tenancy.cut -> base.services.provisioning",
     "base.tenancy.dumps -> base.services",
     "base.tenancy.move -> base.services",
     "base.tenancy.offboarding -> base.services",
-    "base.tenancy.provision -> base.services",
-    "base.tenancy.recovery -> base.services",
+    "base.tenancy.offboarding -> base.services.provisioning",
+    "base.tenancy.provision -> base.services.demos",
+    "base.tenancy.provision -> base.services.hub_registry",
+    "base.tenancy.provision -> base.services.photo",
+    "base.tenancy.provision -> base.services.provisioning",
+    "base.tenancy.recovery -> base.services.provisioning",
     "base.tenancy.restore -> base.services",
+    "base.tenancy.restore -> base.services.provisioning",
     "base.usage -> base.services",
 ]
 

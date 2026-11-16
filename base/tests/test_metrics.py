@@ -328,12 +328,12 @@ def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_registry_that_cannot_be_read_leaves_the_measure_out(hub_a, hub_b, monkeypatch):
     """Without the list of the businesses to read, a reading of none would say nothing waits and hide them all."""
-    from base import services
+    from base.services import provisioning
 
     def broken(now):
         raise RuntimeError("database gone")
 
-    monkeypatch.setattr(services, "hubs_to_serve", broken)
+    monkeypatch.setattr(provisioning, "hubs_to_serve", broken)
 
     with pytest.raises(RuntimeError):
         FiscalBacklog()(timezone.now(), never())

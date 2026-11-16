@@ -22,7 +22,7 @@ from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, factory_data, factory_data_b, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 

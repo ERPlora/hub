@@ -29,7 +29,7 @@ from base.auth import PLATFORM_ADMIN, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST
 from base.models import Hub, Membership, SessionOwner
 from base.operations import HubContextBuilder
-from base.services import open_admin_session_from_saas, open_session_from_saas
+from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_internal import code, signed
