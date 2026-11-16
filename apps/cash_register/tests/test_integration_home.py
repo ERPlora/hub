@@ -15,6 +15,7 @@ import pytest
 from live.context import OperationContext
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
+from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
@@ -234,6 +235,12 @@ def affected(session) -> set[str]:
     return live_registry.affected({event for _, payload in received(session) for event in payload["events"]})
 
 
+def noted_for() -> set[tuple[str, str]]:
+    """The businesses the events of the outbox at hand are written down for: a notice goes out on the command's channel,
+    so only the row tells an event written down for another business."""
+    return set(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
+
+
 # Committed: the notice leaves after a real COMMIT.
 @HUB_DB_COMMITTED
 def test_a_save_and_a_session_in_hub_b_re_run_the_step_and_the_panels_of_b_and_tell_a_nothing(listen, hub_b):
@@ -244,4 +251,5 @@ def test_a_save_and_a_session_in_hub_b_re_run_the_step_and_the_panels_of_b_and_t
         assert steps(ctx_for(scope=B))[STEP]["state"] == "done"
         run("cash_register.session.open", {"opening_balance": 10000}, ctx_for(scope=B))
         assert {panel["operation"] for panel in panels(ctx_for(scope=B)).values()} <= affected(on_b)
+        assert noted_for() == {(B.kind, B.key)}
     assert received(on_a, timeout=QUIET) == []
