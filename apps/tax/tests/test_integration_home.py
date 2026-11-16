@@ -259,6 +259,7 @@ def test_a_rule_created_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(liste
             {"country_code": "PT", "tax_category_key": CATEGORY, "rate_pct": "23"},
             person("hub_admin", B),
         )
+        assert set(OutboxEvent.objects.values_list("scope_key", flat=True)) == {B.key}
 
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}

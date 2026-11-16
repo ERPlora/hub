@@ -814,6 +814,7 @@ def test_a_rule_saved_in_b_notifies_the_channel_of_b_only(listen, hub_b):
     with use_hub(hub_b):
         TaxCategory.objects.create(key="product.notify", name="Notify")
         create_rule(country_code="FR", tax_category_key="product.notify", scope=B)
+        assert [(name, scope) for name, scope, _ in outbox()] == [(events.RULE_CREATED, B.key)]
 
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.RULE_CREATED]})
@@ -1023,6 +1024,7 @@ def test_the_region_kept_on_b_notifies_the_channel_of_b_only(listen, hub_b):
 
     with use_hub(hub_b):
         keep("ES-CN", scope=B)
+        assert [(name, scope) for name, scope, _ in outbox()] == [(events.SETTINGS_UPDATED, B.key)]
 
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.SETTINGS_UPDATED]})
