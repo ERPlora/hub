@@ -18,7 +18,7 @@ from live.operations import atomic, get
 from PIL import Image as PILImage
 
 from apps.website.models import Image, Site
-from apps.website.queries import catalog_cache_key, page_cache_key
+from apps.website.queries import catalog_cache_key, live_version, page_cache_key, published_page
 from apps.website import reviews, services
 from apps.website.tests.conftest import (
     HUB_DB,
@@ -279,6 +279,31 @@ def test_the_team_of_another_hub_never_reads_nor_changes_this_hubs_site(hub_b):
     a = hub_site(A.key)
     assert (a.template, a.content["hero"]["title"], a.published_version, a.is_live) == ("modern", "Draft only", 1, True)
     assert run("website.site.get", ctx=ctx_for(scope=A)).content.hero.title == "Draft only"
+
+
+def test_a_site_kept_for_another_hub_in_this_database_is_never_this_hubs():
+    # Each write and read asks for its own hub's row: one that names another hub, even in this business's database,
+    # is neither read nor changed.
+    theirs = Site.objects.create(
+        hub_id=uuid.uuid7(), template="bold", content=full_content(hero={"title": "Theirs"}), published_version=3, is_live=True
+    )
+    seen = run("website.site.get")
+    assert (seen.template, seen.content.hero.title, seen.published_version, seen.is_live) == ("classic", "", 0, False)
+    # Nor is its publication what this hub's visitors see.
+    assert (published_page(A), live_version(A)) == (None, 0)
+    save(full_content(hero={"title": "Ours"}), template="modern")
+    theirs.refresh_from_db()
+    assert (theirs.template, theirs.content["hero"]["title"]) == ("bold", "Theirs")
+    assert hub_site(A.key).content["hero"]["title"] == "Ours"
+
+
+def test_an_image_kept_for_another_hub_in_this_database_is_no_upload_of_this_hub():
+    theirs = Image.objects.create(
+        hub_id=uuid.uuid7(), key="theirs/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
+    )
+    with pytest.raises(InvalidPayload) as refused:
+        save(full_content(topbar={"logo": {"id": str(theirs.id), "url": ""}}))
+    assert set(refused.value.fields) == {"content.topbar.logo"}
 
 
 def test_taking_offline_a_site_never_saved_keeps_it_unsaved():
