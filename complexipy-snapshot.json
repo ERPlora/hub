@@ -1,0 +1,896 @@
+[
+  {
+    "path": "apps/appointment/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "_book_window",
+        "complexity": 21
+      },
+      {
+        "name": "_move",
+        "complexity": 27
+      },
+      {
+        "name": "update_series",
+        "complexity": 76
+      }
+    ]
+  },
+  {
+    "path": "apps/attendance/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "scoped_records",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "apps/cart_checkout/tests/test_integration_assistant.py",
+    "file_name": "test_integration_assistant.py",
+    "functions": [
+      {
+        "name": "test_whoever_may_run_a_write_reads_the_record_its_card_names",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "apps/cash_register/tests/test_integration_assistant.py",
+    "file_name": "test_integration_assistant.py",
+    "functions": [
+      {
+        "name": "test_whoever_may_run_a_write_reads_the_record_its_card_names",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "apps/combo/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "resolve_line",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/document.py",
+    "file_name": "document.py",
+    "functions": [
+      {
+        "name": "required_grants",
+        "complexity": 24
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/http.py",
+    "file_name": "http.py",
+    "functions": [
+      {
+        "name": "call",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "step_data",
+        "complexity": 16
+      },
+      {
+        "name": "map_params",
+        "complexity": 17
+      },
+      {
+        "name": "operation_problem",
+        "complexity": 17
+      },
+      {
+        "name": "words_for",
+        "complexity": 20
+      },
+      {
+        "name": "_tried_pinned",
+        "complexity": 26
+      },
+      {
+        "name": "try_flow",
+        "complexity": 44
+      },
+      {
+        "name": "catalog_problems",
+        "complexity": 47
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/schemas.py",
+    "file_name": "schemas.py",
+    "functions": [
+      {
+        "name": "document_problems",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "react",
+        "complexity": 16
+      },
+      {
+        "name": "_taken_off",
+        "complexity": 20
+      },
+      {
+        "name": "answer_question",
+        "complexity": 21
+      },
+      {
+        "name": "_advance",
+        "complexity": 38
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/tests/test_field_words.py",
+    "file_name": "test_field_words.py",
+    "functions": [
+      {
+        "name": "PayloadReader::_passed",
+        "complexity": 19
+      },
+      {
+        "name": "PayloadReader::read",
+        "complexity": 31
+      },
+      {
+        "name": "PayloadReader::_name",
+        "complexity": 54
+      }
+    ]
+  },
+  {
+    "path": "apps/flow/tests/test_step_amounts.py",
+    "file_name": "test_step_amounts.py",
+    "functions": [
+      {
+        "name": "money_names",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "apps/inventory/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "filter_products",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/inventory/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "_check_product_row",
+        "complexity": 17
+      },
+      {
+        "name": "bulk_create_products",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/inventory/tests/test_workbook.py",
+    "file_name": "test_workbook.py",
+    "functions": [
+      {
+        "name": "asked_through_platform",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "apps/invoice/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "update_series",
+        "complexity": 17
+      },
+      {
+        "name": "_recipient",
+        "complexity": 26
+      }
+    ]
+  },
+  {
+    "path": "apps/kitchen/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "effective",
+        "complexity": 25
+      }
+    ]
+  },
+  {
+    "path": "apps/kitchen/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "create_ticket",
+        "complexity": 25
+      }
+    ]
+  },
+  {
+    "path": "apps/modifier/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "resolve_selection",
+        "complexity": 29
+      }
+    ]
+  },
+  {
+    "path": "apps/pricing/schemas.py",
+    "file_name": "schemas.py",
+    "functions": [
+      {
+        "name": "rule_problems",
+        "complexity": 25
+      }
+    ]
+  },
+  {
+    "path": "apps/pricing/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "update_price_list",
+        "complexity": 21
+      },
+      {
+        "name": "update_rule",
+        "complexity": 22
+      }
+    ]
+  },
+  {
+    "path": "apps/pricing/tests/test_integration_assistant.py",
+    "file_name": "test_integration_assistant.py",
+    "functions": [
+      {
+        "name": "test_whoever_may_run_a_write_reads_the_record_its_card_names",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "apps/printing/documents.py",
+    "file_name": "documents.py",
+    "functions": [
+      {
+        "name": "problems",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/printing/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "_connection",
+        "complexity": 17
+      },
+      {
+        "name": "update_printer",
+        "complexity": 19
+      },
+      {
+        "name": "create_job",
+        "complexity": 24
+      }
+    ]
+  },
+  {
+    "path": "apps/reservation/engine.py",
+    "file_name": "engine.py",
+    "functions": [
+      {
+        "name": "verdict",
+        "complexity": 33
+      }
+    ]
+  },
+  {
+    "path": "apps/reservation/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "update_reservation",
+        "complexity": 29
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/pricing.py",
+    "file_name": "pricing.py",
+    "functions": [
+      {
+        "name": "value",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "_refund_legs",
+        "complexity": 17
+      },
+      {
+        "name": "_fiscal_document",
+        "complexity": 19
+      },
+      {
+        "name": "_legs",
+        "complexity": 33
+      },
+      {
+        "name": "_complete",
+        "complexity": 41
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/tests/test_admin.py",
+    "file_name": "test_admin.py",
+    "functions": [
+      {
+        "name": "BrowserForm::handle_starttag",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/sale/tests/test_integration_invoice.py",
+    "file_name": "test_integration_invoice.py",
+    "functions": [
+      {
+        "name": "test_sales_refuses_every_problem_verifactu_can_find_on_the_route",
+        "complexity": 24
+      }
+    ]
+  },
+  {
+    "path": "apps/schedule/engine.py",
+    "file_name": "engine.py",
+    "functions": [
+      {
+        "name": "is_open",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "apps/service/tests/test_integration_assistant.py",
+    "file_name": "test_integration_assistant.py",
+    "functions": [
+      {
+        "name": "test_whoever_may_run_a_write_reads_the_record_its_card_names",
+        "complexity": 29
+      }
+    ]
+  },
+  {
+    "path": "apps/table/tests/test_concurrency.py",
+    "file_name": "test_concurrency.py",
+    "functions": [
+      {
+        "name": "crossing_after_the_first_lock",
+        "complexity": 22
+      }
+    ]
+  },
+  {
+    "path": "apps/task/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "resolve_project",
+        "complexity": 17
+      },
+      {
+        "name": "resolve_task",
+        "complexity": 17
+      },
+      {
+        "name": "filter_tasks",
+        "complexity": 22
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/envelope.py",
+    "file_name": "envelope.py",
+    "functions": [
+      {
+        "name": "_recipient_identity",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/gateway.py",
+    "file_name": "gateway.py",
+    "functions": [
+      {
+        "name": "_reply",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "list_records",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "apps/verifactu/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "_representation_payload",
+        "complexity": 19
+      },
+      {
+        "name": "_check_declarable",
+        "complexity": 21
+      },
+      {
+        "name": "_send_chain",
+        "complexity": 52
+      }
+    ]
+  },
+  {
+    "path": "apps/website/reviews.py",
+    "file_name": "reviews.py",
+    "functions": [
+      {
+        "name": "_payload",
+        "complexity": 18
+      },
+      {
+        "name": "parse",
+        "complexity": 30
+      }
+    ]
+  },
+  {
+    "path": "apps/website/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "_save_summary",
+        "complexity": 17
+      }
+    ]
+  },
+  {
+    "path": "apps/whatsapp_inbox/services.py",
+    "file_name": "services.py",
+    "functions": [
+      {
+        "name": "notify",
+        "complexity": 16
+      },
+      {
+        "name": "_tapped",
+        "complexity": 17
+      },
+      {
+        "name": "record_delivery",
+        "complexity": 17
+      },
+      {
+        "name": "send_message",
+        "complexity": 19
+      },
+      {
+        "name": "update_status",
+        "complexity": 20
+      },
+      {
+        "name": "receive_message",
+        "complexity": 32
+      }
+    ]
+  },
+  {
+    "path": "base/api_docs.py",
+    "file_name": "api_docs.py",
+    "functions": [
+      {
+        "name": "public_document",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "base/approvals.py",
+    "file_name": "approvals.py",
+    "functions": [
+      {
+        "name": "_figures_problems",
+        "complexity": 17
+      },
+      {
+        "name": "install",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "base/assistant.py",
+    "file_name": "assistant.py",
+    "functions": [
+      {
+        "name": "stream_turn",
+        "complexity": 33
+      }
+    ]
+  },
+  {
+    "path": "base/blueprint.py",
+    "file_name": "blueprint.py",
+    "functions": [
+      {
+        "name": "_customer_load",
+        "complexity": 17
+      },
+      {
+        "name": "_inventory_product_load",
+        "complexity": 39
+      }
+    ]
+  },
+  {
+    "path": "base/catalog.py",
+    "file_name": "catalog.py",
+    "functions": [
+      {
+        "name": "_uncommented_lines",
+        "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "base/home.py",
+    "file_name": "home.py",
+    "functions": [
+      {
+        "name": "bell_counters",
+        "complexity": 17
+      },
+      {
+        "name": "plan_meter_errors",
+        "complexity": 17
+      },
+      {
+        "name": "module_steps",
+        "complexity": 44
+      }
+    ]
+  },
+  {
+    "path": "base/management/commands/cut_shared_hubs.py",
+    "file_name": "cut_shared_hubs.py",
+    "functions": [
+      {
+        "name": "Command::handle",
+        "complexity": 18
+      },
+      {
+        "name": "Command::_print_plan",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "base/management/commands/seed_local_hubs.py",
+    "file_name": "seed_local_hubs.py",
+    "functions": [
+      {
+        "name": "Command::handle",
+        "complexity": 19
+      }
+    ]
+  },
+  {
+    "path": "base/queries.py",
+    "file_name": "queries.py",
+    "functions": [
+      {
+        "name": "app_list",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "base/services/__init__.py",
+    "file_name": "__init__.py",
+    "functions": [
+      {
+        "name": "_enable",
+        "complexity": 18
+      },
+      {
+        "name": "app_activation_settle",
+        "complexity": 18
+      },
+      {
+        "name": "_assistant_answer",
+        "complexity": 19
+      },
+      {
+        "name": "assistant_turn",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "base/tenancy/cut.py",
+    "file_name": "cut.py",
+    "functions": [
+      {
+        "name": "_strongly_connected",
+        "complexity": 28
+      }
+    ]
+  },
+  {
+    "path": "base/tenancy/move.py",
+    "file_name": "move.py",
+    "functions": [
+      {
+        "name": "_run",
+        "complexity": 20
+      }
+    ]
+  },
+  {
+    "path": "base/tenancy/provision.py",
+    "file_name": "provision.py",
+    "functions": [
+      {
+        "name": "run_due",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/tenancy/router.py",
+    "file_name": "router.py",
+    "functions": [
+      {
+        "name": "_route",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "base/tests/fake_gateway.py",
+    "file_name": "fake_gateway.py",
+    "functions": [
+      {
+        "name": "FakeGateway::_handler",
+        "complexity": 28
+      }
+    ]
+  },
+  {
+    "path": "base/tests/po.py",
+    "file_name": "po.py",
+    "functions": [
+      {
+        "name": "module_texts",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_assistant_asks.py",
+    "file_name": "test_assistant_asks.py",
+    "functions": [
+      {
+        "name": "test_no_ask_copies_a_qa_probe_or_names_a_qa_record",
+        "complexity": 16
+      },
+      {
+        "name": "ranked_phrases",
+        "complexity": 29
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_assistant_card_values.py",
+    "file_name": "test_assistant_card_values.py",
+    "functions": [
+      {
+        "name": "unnamed",
+        "complexity": 18
+      },
+      {
+        "name": "unmarked_currencies",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_database_cut.py",
+    "file_name": "test_database_cut.py",
+    "functions": [
+      {
+        "name": "_names_of",
+        "complexity": 22
+      },
+      {
+        "name": "_steps",
+        "complexity": 32
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_migration_safety.py",
+    "file_name": "test_migration_safety.py",
+    "functions": [
+      {
+        "name": "_why",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_po.py",
+    "file_name": "test_po.py",
+    "functions": [
+      {
+        "name": "copies_of_the_skeleton",
+        "complexity": 27
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_shared_lint.py",
+    "file_name": "test_shared_lint.py",
+    "functions": [
+      {
+        "name": "shared_touches",
+        "complexity": 18
+      }
+    ]
+  },
+  {
+    "path": "base/worker.py",
+    "file_name": "worker.py",
+    "functions": [
+      {
+        "name": "run",
+        "complexity": 32
+      }
+    ]
+  },
+  {
+    "path": "base/ws_print.py",
+    "file_name": "ws_print.py",
+    "functions": [
+      {
+        "name": "PrintSocket::_on_stream",
+        "complexity": 20
+      },
+      {
+        "name": "PrintSocket::_serve",
+        "complexity": 30
+      }
+    ]
+  },
+  {
+    "path": "tests/test_guardrails.py",
+    "file_name": "test_guardrails.py",
+    "functions": [
+      {
+        "name": "database_problems",
+        "complexity": 21
+      },
+      {
+        "name": "alias_touches",
+        "complexity": 25
+      },
+      {
+        "name": "orm_touches",
+        "complexity": 30
+      }
+    ]
+  },
+  {
+    "path": "tests/test_guardrails_suite.py",
+    "file_name": "test_guardrails_suite.py",
+    "functions": [
+      {
+        "name": "fixed_leases",
+        "complexity": 26
+      }
+    ]
+  },
+  {
+    "path": "tests/test_guardrails_tenancy.py",
+    "file_name": "test_guardrails_tenancy.py",
+    "functions": [
+      {
+        "name": "settings_mutation_touches",
+        "complexity": 16
+      }
+    ]
+  },
+  {
+    "path": "tests/test_guardrails_zone.py",
+    "file_name": "test_guardrails_zone.py",
+    "functions": [
+      {
+        "name": "deployment_readings",
+        "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "tests/test_no_internal_references.py",
+    "file_name": "test_no_internal_references.py",
+    "functions": [
+      {
+        "name": "marked_prose",
+        "complexity": 38
+      }
+    ]
+  },
+  {
+    "path": "base/services/hub_registry.py",
+    "file_name": "hub_registry.py",
+    "functions": [
+      {
+        "name": "hub_register",
+        "complexity": 22
+      },
+      {
+        "name": "hub_seed_local",
+        "complexity": 23
+      }
+    ]
+  }
+]
