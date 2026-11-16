@@ -7,15 +7,13 @@ event of another app.
 
 import re
 
-import pytest
-
 from live.operations import NAME_RE
 
 from apps.payment import events
 
-from .conftest import A
+from .conftest import HUB_DB, A
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: A fact in the past: «-ed», or «sent» (irregular, the old module's own word).
 PAST_FACT = re.compile(r"^payment\.(payment|method)\.([a-z_]+ed|sent)$")

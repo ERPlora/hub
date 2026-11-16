@@ -12,8 +12,9 @@ from django.test import RequestFactory
 
 from apps.payment.admin import PaymentAdmin, PaymentCounterAdmin, PaymentMethodAdmin
 from apps.payment.models import Payment, PaymentCounter, PaymentMethod
+from base.tenancy.tests.concurrency import PLATFORM_HOST
 
-from .conftest import make_method, make_payment
+from .conftest import HUB_DB, make_method, make_payment
 
 
 @pytest.fixture
@@ -35,6 +36,7 @@ def test_the_three_models_are_registered():
     assert isinstance(admin.site._registry[PaymentCounter], PaymentCounterAdmin)
 
 
+@HUB_DB
 def test_full_crud_for_the_staff(superuser):
     request = request_by(superuser)
     for model in (PaymentMethod, Payment, PaymentCounter):
@@ -45,13 +47,12 @@ def test_full_crud_for_the_staff(superuser):
         assert model_admin.has_delete_permission(request)
 
 
-@pytest.mark.django_db
-def test_the_pages_render(client, superuser):
+@HUB_DB
+def test_the_pages_render(hub_staff):
     payment = make_payment(
         make_method("BBVA account"), beneficiary_name="Proveedor Norte SL"
     )
     counter = PaymentCounter.objects.create(day=payment.payment_date, last=1)
-    client.force_login(superuser)
     # The admin lives only on the platform host.
     pages = {
         "/admin/payment/paymentmethod/": b"BBVA account",
@@ -66,15 +67,14 @@ def test_the_pages_render(client, superuser):
         "/admin/payment/payment/?q=norte": b"PAY-20261014-0001",
     }
     for path, content in pages.items():
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST=PLATFORM_HOST)
         assert response.status_code == 200, path
         assert content in response.content, path
 
 
-@pytest.mark.django_db
-def test_the_staff_creates_and_changes_a_method(client, superuser):
-    client.force_login(superuser)
-    created = client.post(
+@HUB_DB
+def test_the_staff_creates_and_changes_a_method(hub_staff):
+    created = hub_staff.post(
         "/admin/payment/paymentmethod/add/",
         {
             "name": "Cash drawer",
@@ -82,14 +82,14 @@ def test_the_staff_creates_and_changes_a_method(client, superuser):
             "bank_account_ref": "",
             "is_active": "on",
         },
-        HTTP_HOST="hubs.localhost",
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert created.status_code == 302
     method = PaymentMethod.objects.get(name="Cash drawer")
-    changed = client.post(
+    changed = hub_staff.post(
         f"/admin/payment/paymentmethod/{method.pk}/change/",
         {"name": "Till cash", "method_type": "cash", "bank_account_ref": ""},
-        HTTP_HOST="hubs.localhost",
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert changed.status_code == 302
     method.refresh_from_db()

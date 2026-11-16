@@ -13,10 +13,9 @@ from django.apps import apps
 from live.context import OperationContext, Scope
 from live.operations import get, registry
 
-from apps.payment.tests.conftest import A, ctx_for, make_method, make_payment
+from apps.payment.tests.conftest import HUB_DB, A, B, ctx_for, make_method, make_payment
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID
 
@@ -111,7 +110,7 @@ def make_books() -> Books:
 # ── A method, by its name; a payment, by its reference ────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("write", ON_A_METHOD)
 def test_a_write_on_a_method_says_it_by_its_name_as_the_methods_list_calls_one(write, language):
@@ -122,7 +121,7 @@ def test_a_write_on_a_method_says_it_by_its_name_as_the_methods_list_calls_one(w
     assert (field.get("value"), field.get("label")) == ("BBVA account", one(language, "methods"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("write", ON_A_PAYMENT)
 def test_a_write_on_a_payment_says_it_by_its_reference_as_the_payments_list_calls_one(write, language):
@@ -133,7 +132,7 @@ def test_a_write_on_a_payment_says_it_by_its_reference_as_the_payments_list_call
     assert (field.get("value"), field.get("label")) == ("PAY-20261014-0001", one(language, "payments"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_a_new_payment_says_the_method_it_leaves_from_by_its_name(language):
     books = make_books()
@@ -148,7 +147,7 @@ def test_a_new_payment_says_the_method_it_leaves_from_by_its_name(language):
     assert (field.get("value"), field.get("label")) == ("Cash drawer", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own method or payment, never another of the list (the first, the last, the newest)."""
     books = make_books()
@@ -163,14 +162,14 @@ def test_among_several_the_card_says_the_one_the_write_names():
     assert created == ["BBVA account", "Cash drawer"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_cancellation_says_the_payment_beside_its_reason():
     books = make_books()
     said = shown("payment.payment.cancel", {"id": str(books.flour.id), "reason": "Duplicado"}, "es")
     assert said == {"id": "PAY-20261014-0002", "reason": "Duplicado"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_edit_says_the_method_beside_what_changes_with_its_type_in_each_language():
     """The method by its name; its new type by the label the methods form gives it, never as sent («transfer»)."""
     books = make_books()
@@ -182,7 +181,7 @@ def test_an_edit_says_the_method_beside_what_changes_with_its_type_in_each_langu
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", [*ON_A_METHOD, *ON_A_PAYMENT])
 def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write):
     """Whoever may not read the payments is told no method nor payment: both reads ask for ``view_payment``."""
@@ -195,7 +194,7 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(write):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_method_the_person_may_not_read_is_left_out_of_a_new_payment():
     books = make_books()
     sent = {"method_id": str(books.bbva.id), "amount": 100}
@@ -205,14 +204,14 @@ def test_a_method_the_person_may_not_read_is_left_out_of_a_new_payment():
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", [*ON_A_METHOD, *ON_A_PAYMENT])
 def test_a_record_that_does_not_exist_is_left_out(write):
     make_books()
     assert shown(write, {"id": A_MISSING_ID}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no method nor payment: nothing is read."""
     books = make_books()
@@ -222,11 +221,10 @@ def test_nobody_behind_the_request_reads_no_record():
     assert {field["name"]: field["value"] for field in card["fields"]} == {"reason": "Duplicado"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
+@HUB_DB
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
-    in_a, in_b = as_admin(scope=Scope("host", hub_a.slug)), as_admin(scope=Scope("host", hub_b.slug))
+    in_a, in_b = as_admin(scope=A), as_admin(scope=B)
     with use_hub(hub_a):
         books = make_books()
         on_the_method, on_the_payment = {"id": str(books.bbva.id)}, {"id": str(books.rent.id)}
@@ -246,7 +244,7 @@ def test_no_write_of_payment_goes_by_the_title_pydantic_makes_up():
     assert technical_names(payment_writes()) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_language(language):
     """``technical_names`` sends no person, so a marked datum is out of its card and it never sees its title: each

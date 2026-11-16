@@ -24,7 +24,8 @@ from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import place_in, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB, in_hubs
 
 #: Every write of Payments: an employee only looks (``payment.view_payment``), and none of them is a write a manager
 #: approves, so an employee's assistant is never offered them and answers it has no permission (``expect: refused``).
@@ -90,7 +91,7 @@ def test_payment_offers_its_thirteen_tools():
     assert len(tools) == 13
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_employee_is_never_offered_a_write_of_payments(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -108,13 +109,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert len(TENDERS) >= 3  # positive control: Sales' probes of the till's tenders are read
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_payment_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_payments_offers_its_tool_or_is_refused_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's thirteen phrases and the employee's six of layer 2: what the role holds is offered in the first half
@@ -129,7 +130,7 @@ def test_every_probe_of_payments_offers_its_tool_or_is_refused_without_being_one
     assert_offered_with_room(tools, name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "probe",
     [probe for probe in PROBES if probe["tool"] in TENDER_OF and probe["expect"] != "refused"],
@@ -146,7 +147,7 @@ def test_where_the_business_pays_a_supplier_from_goes_ahead_of_the_tills_tender(
     assert mine < place_in(offered, tender), (mine, place_in(offered, tender))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", TENDERS, ids=lambda probe: f"{probe['id']}")
 def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_suppliers_from(catalog_of, probe):
     """The other way round: how a customer pays at the till (Sales' probes) never puts a Payments' method ahead of the
@@ -160,7 +161,7 @@ def test_a_tender_of_the_till_is_never_taken_for_where_the_business_pays_its_sup
 #: live reads «habilitar» and «activar» as the action ``activate`` of a tool too, not only as turning something on
 #: (``enable``, an app's ``base.app.enable``), so the request to bring Banco QA back is offered ahead of turning an app
 #: on.
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_reported_request_to_bring_a_method_back_goes_ahead_of_turning_an_app_on(catalog_of):
     offered = offered_to(catalog_of(Membership.Role.OWNER, "es"), dict(REPORTED)["payment.method.activate"])
     assert "base.app.enable" in offered  # positive control: turning an app on competes in the ranking
@@ -200,7 +201,7 @@ def without_the_bank_account():
     return kept
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "name", "phrase"), PAYMENT_WORDS)
 def test_a_bank_account_said_by_its_name_brings_the_payments_method(catalog_of, language, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, language)
@@ -236,8 +237,8 @@ def test_each_tool_of_payments_has_its_own_words():
     )
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(
-    OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS]
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(
+    own_words_test(OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
 )
 
 
@@ -255,7 +256,7 @@ OWN_WORDS_EN = [
     ("payment.payment.mark_completed", "Iberdrola says the money has arrived"),
     ("payment.payment.mark_sent", "the Iberdrola money has gone out from the bank"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 #: The English words of ``OWN_WORDS`` that its English asks lift already; the others have their own above.
 ENGLISH_ABOVE = [name for language, name, _ in OWN_WORDS if language == "en" and name not in dict(OWN_WORDS_EN)]
 test_each_tool_has_its_own_english_words = english_coverage_test("payment", OWN_WORDS_EN, ENGLISH_ABOVE)
