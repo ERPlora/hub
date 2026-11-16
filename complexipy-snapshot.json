@@ -720,20 +720,6 @@
     ]
   },
   {
-    "path": "base/tests/test_assistant_card_values.py",
-    "file_name": "test_assistant_card_values.py",
-    "functions": [
-      {
-        "name": "unnamed",
-        "complexity": 18
-      },
-      {
-        "name": "unmarked_currencies",
-        "complexity": 23
-      }
-    ]
-  },
-  {
     "path": "base/tests/test_database_cut.py",
     "file_name": "test_database_cut.py",
     "functions": [
@@ -890,6 +876,26 @@
       {
         "name": "stream_turn",
         "complexity": 33
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_assistant_card_values_amounts.py",
+    "file_name": "test_assistant_card_values_amounts.py",
+    "functions": [
+      {
+        "name": "unmarked_currencies",
+        "complexity": 23
+      }
+    ]
+  },
+  {
+    "path": "base/tests/test_assistant_card_values_references.py",
+    "file_name": "test_assistant_card_values_references.py",
+    "functions": [
+      {
+        "name": "unnamed",
+        "complexity": 18
       }
     ]
   }

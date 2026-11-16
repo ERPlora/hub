@@ -1,16 +1,21 @@
 """The tax app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction.
 """
 
 import json
 
 import pytest
+from django.db import connections
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get
 from apps.tax.api import router
+from base.tenancy.context import current_alias
 from config.api import api
+
+from .conftest import HOST, HUB_DB, A, B
 
 ROUTES = {
     ("GET", "/tax/categories", "tax.category.list"),
@@ -34,11 +39,7 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
+def post(client, path, data, host=HOST, **headers):
     return client.post(
         f"/api{path}",
         json.dumps(data),
@@ -50,13 +51,13 @@ def post(client, path, data, host="a.localhost", **headers):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -77,9 +78,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
+@HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_the_openapi_describes_the_tax_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -92,7 +93,7 @@ def test_the_openapi_describes_the_tax_routes(client):
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/tax/categories"),
@@ -102,7 +103,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_and_calculates_but_does_not_write(employee_client):
     assert get(employee_client, "/tax/categories").status_code == 200
     assert get(employee_client, "/tax/rules").status_code == 200
@@ -122,15 +123,15 @@ def test_an_employee_reads_and_calculates_but_does_not_write(employee_client):
     )
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/tax/categories", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/tax/categories", host=f"{B.key}.localhost").status_code == 403
 
 
 # Validation: 422 per field
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_rule_is_422_per_field(admin_client):
     response = post(
         admin_client,
@@ -151,7 +152,7 @@ def test_an_invalid_rule_is_422_per_field(admin_client):
     assert set(error["fields"]) == {"region_code", "rate_pct", "valid_to"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/tax/rules", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -160,7 +161,7 @@ def test_a_limit_over_100_is_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_category_is_422_on_its_field(admin_client):
     response = post(
         admin_client,
@@ -175,7 +176,7 @@ def test_an_unknown_category_is_422_on_its_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_follows_the_language_of_the_request(admin_client):
     response = post(
         admin_client,
@@ -199,7 +200,7 @@ def test_a_refusal_follows_the_language_of_the_request(admin_client):
 # The flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_change_a_rate_from_a_date(admin_client):
     # TAX-F07 against the seeded Spanish baseline: end 21 % and create 22 % from the day after.
     current = get(
@@ -241,7 +242,7 @@ def test_change_a_rate_from_a_date(admin_client):
     assert (old.json()["tax"], new.json()["tax"]) == (21, 22)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_deactivate_and_bring_back_by_voice(admin_client):
     named = {"country_code": "ES", "tax_category_key": "Restauración — comida"}
     off = post(admin_client, "/tax/rules/deactivate", named)
@@ -252,7 +253,7 @@ def test_deactivate_and_bring_back_by_voice(admin_client):
     assert (on.status_code, on.json()["is_active"]) == (200, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_new_category_its_rule_and_an_alias(admin_client):
     created = post(
         admin_client, "/tax/categories", {"key": "product.books", "name": "Libros"}
@@ -288,7 +289,7 @@ def test_a_new_category_its_rule_and_an_alias(admin_client):
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_bulk_create_and_status(admin_client):
     status = get(admin_client, "/tax/rules/status", country_code="PT").json()
     assert (status["matching_rules"], status["configured"]) == (0, False)
@@ -304,7 +305,7 @@ def test_bulk_create_and_status(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_calculation_without_a_rule_is_a_409(admin_client):
     response = get(
         admin_client,
@@ -319,18 +320,17 @@ def test_a_calculation_without_a_rule_is_a_409(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_rules_that_cannot_be_read_are_an_internal_error_never_a_missing_app(
     admin_client,
 ):
     # An outage reading the rules stops the calculation with the plain «Internal
     # error» of every route (in the reader's language), never «this app is not active» nor the
     # internal text of the failure, and never a guessed rate.
-    from django.db import connection
     from django.utils import translation
     from django.utils.translation import gettext
 
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         cursor.execute("ALTER TABLE tax_taxrule RENAME TO tax_taxrule_hidden")
     try:
         response = admin_client.get(
@@ -340,11 +340,11 @@ def test_rules_that_cannot_be_read_are_an_internal_error_never_a_missing_app(
                 "tax_category_key": "product.generic",
                 "allow_missing_rate": "true",
             },
-            HTTP_HOST="a.localhost",
+            HTTP_HOST=HOST,
             HTTP_ACCEPT_LANGUAGE="es",
         )
     finally:
-        with connection.cursor() as cursor:
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("ALTER TABLE tax_taxrule_hidden RENAME TO tax_taxrule")
     error = response.json()["error"]
     assert (response.status_code, error["code"]) == (500, "internal_error")
@@ -356,7 +356,7 @@ def test_rules_that_cannot_be_read_are_an_internal_error_never_a_missing_app(
 # The business's region (TAX-F11): read by whoever sells, kept by whoever manages taxes
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_sells_reads_the_business_region_but_does_not_change_it(employee_client):
     read = get(employee_client, "/tax/settings")
     assert (read.status_code, read.json()["region_code"], read.json()["regions"]) == (
@@ -368,7 +368,7 @@ def test_whoever_sells_reads_the_business_region_but_does_not_change_it(employee
     assert (denied.status_code, denied.json()["error"]["code"]) == (403, "permission_denied")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_keep_the_business_region_and_calculate_in_it(admin_client):
     kept = post(admin_client, "/tax/settings", {"region_code": "ES-CN"})
     assert (kept.status_code, kept.json()["country_code"], kept.json()["region_code"]) == (200, "ES", "ES-CN")
@@ -386,7 +386,7 @@ def test_keep_the_business_region_and_calculate_in_it(admin_client):
     assert (body["tax"], body["tax_kind"], body["tax_region_code"]) == (700, "igic", "ES-CN")
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("region", "code"),
     [("PT-20", "tax.region_not_available"), ("XX-99", "invalid_payload")],

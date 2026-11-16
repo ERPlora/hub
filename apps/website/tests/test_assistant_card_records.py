@@ -25,7 +25,7 @@ from apps.website.tests.test_queries import products_catalog, services_catalog, 
 from apps.website.tests.test_services import png_bytes, save as save_draft, upload
 from base import assistant
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 pytestmark = pytest.mark.django_db
 

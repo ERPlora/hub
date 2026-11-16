@@ -1347,7 +1347,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   de la app), nunca «Registro»; `product_id` y `category_id` ya salen así por el `verbose_name` de la clave del modelo
   (`StockMovement.product`, `ProductCategory.category`). Sin persona detrás, sin `inventory.view_product` o `inventory.view_category`, con un
   id de otro negocio o de algo eliminado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`);
-  el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
+  el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca.
   Las listas cerradas de sus escrituras (unidad, tipo de producto) ya llevan su etiqueta en `en` + `es` por los
   `choices` de sus modelos.
 - **Requiere `tax`**: producto y categoría tienen FK a `tax.TaxCategory` (`PROTECT`, sin acceso inverso).

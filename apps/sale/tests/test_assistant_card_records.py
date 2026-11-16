@@ -24,7 +24,7 @@ from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 KEY = "card-attempt-0001"
 

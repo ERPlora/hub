@@ -9,10 +9,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, connections
 from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import get
+from live.operations import current_alias, get
 
 from apps.tax import queries, schemas
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
@@ -40,9 +40,9 @@ from apps.tax.schemas import (
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TODAY = date(2026, 6, 27)
 
@@ -472,7 +472,7 @@ def test_the_date_defaults_to_the_business_today(no_seed):
 def test_when_the_rules_cannot_be_read_the_calculation_stops(no_seed):
     # An outage is not «no rate», and allow_missing_rate must not turn it into 0 %.
     rule(category(), "21")
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         cursor.execute("ALTER TABLE tax_taxrule RENAME TO tax_taxrule_hidden")
     try:
         for allow in (False, True):
@@ -484,7 +484,7 @@ def test_when_the_rules_cannot_be_read_the_calculation_stops(no_seed):
                     date=TODAY,
                 )
     finally:
-        with connection.cursor() as cursor:
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("ALTER TABLE tax_taxrule_hidden RENAME TO tax_taxrule")
     assert (
         calculate(amount=10_000, tax_category_key="product.generic", date=TODAY).tax

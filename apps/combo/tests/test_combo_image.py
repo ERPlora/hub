@@ -33,12 +33,13 @@ from apps.combo.schemas import (
 )
 from base.models import Hub
 from base.storage import hub_prefix
+from base.tenancy.context import current_alias
 from base.tests.test_image_catalog import IMAGES, write_library
 from base.tests.test_images import hub_files  # noqa: F401 - the store fixture
 
-from .conftest import ctx_for, make_combo, make_group, make_option, make_product, run
+from .conftest import HOST, HUB_DB, A, ctx_for, make_combo, make_group, make_option, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 FOLDER = "combo/combos/"
 MENU = "catalog:hospitality/menu_dia"
@@ -73,7 +74,7 @@ def upload(combo_id, raw=None, role="hub_admin"):
 
 
 def key(reference: str) -> str:
-    return f"{hub_prefix(Hub.objects.get(slug='a').id)}/{reference.removeprefix('file:')}"
+    return f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}"
 
 
 def test_a_menu_is_born_without_an_image_and_its_photos_are_the_hubs_sessions_only():
@@ -136,12 +137,12 @@ def test_a_photo_takes_the_place_of_the_last_one_and_withdrawing_the_menu_delete
     combo = make_combo()
     first = upload(combo.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         second = upload(combo.id).image
     assert re.fullmatch(rf"file:{FOLDER}[0-9a-f]{{32}}\.webp", second)
     assert not hub_files.exists(key(first)) and hub_files.exists(key(second))
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("combo.combo.delete", {"id": str(combo.id)})
     assert not hub_files.exists(key(second))
 
@@ -170,13 +171,13 @@ def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(library):
 
 def test_the_routes(client, make_user, library):
     combo = make_combo()
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
 
     response = client.post(
         "/api/combo/combos/image",
         json.dumps({"id": str(combo.id), "image": MENU}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
 
     assert response.status_code == 200, response.content

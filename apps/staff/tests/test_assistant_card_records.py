@@ -14,7 +14,7 @@ from apps.staff.models import Member
 from apps.staff.schemas import TimeOffDetailOut
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 from .conftest import HUB_DB, ctx_for, make_member, make_role, make_schedule, make_time_off
 
