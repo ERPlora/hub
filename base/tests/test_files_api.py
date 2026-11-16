@@ -10,7 +10,6 @@ safe to show, as an attachment: never from ``/p/media/`` (public), never a URL o
 import base64
 import json
 
-import psycopg
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
@@ -22,13 +21,15 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
 from base import events, files
 from base.models import Hub
 from base.queries import refuse_past_the_plans_space
 from base.storage import hub_prefix
 from base.tests.routes import assert_bound, spa_route_map
+from base.tests.test_queries_home import listen, received
+
+__all__ = ["listen"]
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -443,31 +444,6 @@ def test_the_business_files_are_never_public(client, make_user, store):
 
 
 # ── Live: a write in hub B reaches B's channel only ─────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def listen(django_db_setup):
-    from django.db import connections
-
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def received(session, timeout=1.0, stop_after=None):
-    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
 @pytest.mark.django_db(transaction=True)
