@@ -55,6 +55,9 @@ class PlatformLineIn(_PlatformPart):
     net_cents: int = Field(ge=-MAX_AMOUNT, le=MAX_AMOUNT, description="Its base, in cents with its sign.")
     tax_cents: int = Field(ge=-MAX_AMOUNT, le=MAX_AMOUNT, description="Its tax, in cents with its sign.")
     total_cents: int = Field(ge=-MAX_AMOUNT, le=MAX_AMOUNT, description="Its total, in cents with its sign.")
+    discount_cents: int = Field(
+        0, ge=0, le=MAX_AMOUNT, description="Its discount without VAT, in cents; net_cents is already discounted."
+    )
 
 
 class PlatformRectifiedIn(_PlatformPart):
