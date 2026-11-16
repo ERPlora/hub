@@ -35,11 +35,11 @@ from django.db.models.functions import Greatest
 from django.http import HttpRequest
 from django.utils import timezone, translation
 from django.utils.translation import gettext, ngettext
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied, Unauthorized
 from live.operations import get as get_operation
-from live.operations import AI, INTERNAL, atomic, operation
-from live.operations import on_commit
+from live.operations import AI, INTERNAL, atomic, on_commit, operation
 from live.outbox import notify, record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
@@ -499,7 +499,7 @@ def has_own_database(hub: Hub | None) -> bool:
             "copy."
         ),
         risk="high",
-        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # Only for live.E020 (it checks the whole app): base.assistant.tools.NOT_FROM_CHAT keeps this out of the chat
         # (pinned by base/tests/test_assistant.py).
         asks={
             "en": ("wipe all the data and start over", "empty the business, I want to start from scratch"),
@@ -2190,7 +2190,7 @@ def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
             screens["/system"] = pgettext("base", "System")
         if ctx.has(queries.VIEW_FILES):
             screens["/files"] = pgettext("base", "Files")
-        for config in assistant.active_apps(ctx.scope).values():
+        for config in assistant.tools.active_apps(ctx.scope).values():
             for nav in getattr(config, "navigation", []) or []:
                 screens.setdefault(nav.path, f"{config.verbose_name} › {nav.label}")
     return screens
@@ -2205,37 +2205,37 @@ def _assistant_read(ctx: OperationContext, name: str) -> dict | None:
         return None
 
 
-def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.ToolOutcome":
+def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOutcome":
     """A tool that did not run, told to the model in the same envelope as an operation's error."""
-    return assistant.ToolOutcome(outcome, code, assistant.error_content(code, message))
+    return shared.ToolOutcome(outcome, code, shared.error_content(code, message))
 
 
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):  # noqa: C901, PLR0911
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card, shown)``: the card
     when the write still waits for its answer, with what it will do when its app declares a preview (BASE-F98), and
-    the fingerprint of what it shows (``shown``, ``assistant.fingerprint``); one that cannot be read is the write's
+    the fingerprint of what it shows (``shown``, ``assistant.cards.fingerprint``); one that cannot be read is the write's
     outcome, and no card is shown. Neither is one for data the write would refuse: the model hears which
     (``invalid_payload``) and asks again with them corrected. The yes is for the card it answers (hub#1208): drawn
     again, a card that no longer shows what ``call.shown`` says — a record found by its name is another, a name or what
     it will do changed — runs nothing and is shown anew; a «no» or a word typed wrong never needs it."""
-    op = assistant.operation_of(call.name, tools)
+    op = shared.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None, ""
     if stopped:
         return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
     if op.kind == "query":
-        return assistant.run_tool(ctx, op, call.arguments), None, ""
+        return shared.run_tool(ctx, op, call.arguments), None, ""
     try:
         arguments = json.loads(call.arguments or "{}")
     except ValueError:
         arguments = None
     if not isinstance(arguments, dict):
-        return assistant.run_tool(ctx, op, call.arguments), None, ""
-    refused = assistant.invalid_arguments(op, arguments)
+        return shared.run_tool(ctx, op, call.arguments), None, ""
+    refused = shared.invalid_arguments(op, arguments)
     if refused is not None:
         return refused, None, ""
     found: list = []
-    card = assistant.card(op, arguments, ctx.language, ctx, found=found)
+    card = assistant.cards.card(op, arguments, ctx.language, ctx, found=found)
     answered = decision is not None and decision.call_id == call.call_id
     if card["blocked"]:
         if not answered:
@@ -2243,16 +2243,16 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):  # noqa: C9
         return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT), None, ""
     if answered and decision.stop:
         return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None, ""
-    if answered and (not decision.accepted or not assistant.confirmed(card, decision.typed)):
+    if answered and (not decision.accepted or not shared.confirmed(card, decision.typed)):
         return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None, ""
-    failure, preview = assistant.preview(ctx, op, arguments, found=found)
+    failure, preview = assistant.cards.preview(ctx, op, arguments, found=found)
     if failure is not None:
         return failure, None, ""
     drawn = {**card, "preview": preview}
-    shown = assistant.fingerprint(drawn, found)
+    shown = assistant.cards.fingerprint(drawn, found)
     if not answered or call.shown != shown:
         return None, drawn, shown
-    return assistant.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None, ""
+    return shared.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None, ""
 
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
@@ -2289,10 +2289,10 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     only on what that card showed (hub#1208: the call it waits on goes back with its ``shown``); a tool this person
     was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
     and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
-    read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
+    read again, in ``setup``). Past ``shared.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
-    tools = assistant.catalog(ctx)
+    tools = assistant.tools.catalog(ctx)
     pending = list(data.pending)
     decision = data.decision
     stopped = False
@@ -2310,18 +2310,18 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
             stopped = decision.stop
             decision = None
         # What ran, or was refused, by its name: a write this person was not offered is named too.
-        op = assistant.operation_of(call.name, tools) or assistant.named(call.name)
+        op = shared.operation_of(call.name, tools) or shared.named(call.name)
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
         with translation.override(ctx.language):
             # Named as its card names it: an app by its name, the platform by its screen.
-            app_name = assistant.app_name(op) if op else ""
+            app_name = assistant.cards.app_name(op) if op else ""
         executed.append(
             {
                 "call_id": call.call_id,
                 "name": op.name if op else call.name,
                 "app": op.app_label if op else "",
                 "app_name": app_name,
-                "screen": assistant.screen(op) if op else "",
+                "screen": assistant.cards.screen(op) if op else "",
                 "kind": op.kind if op else "",
                 "outcome": outcome.outcome,
                 "code": outcome.code,
@@ -2335,21 +2335,21 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         # The card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
-    offered = assistant.relevant(tools, asked[-2:], ctx.language)
-    text = assistant.instructions(
+    offered = assistant.relevance.relevant(tools, asked[-2:], ctx.language)
+    text = assistant.prompt.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
         decimals=business.get("currency_decimals", 2),
         business=business.get("name") or "",
         screens=_assistant_screens(ctx),
         role=_assistant_role(ctx),
-        # What is offered without its permission is a write a manager may approve (``assistant.catalog``).
+        # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
         approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
     if data.setup:
-        text += "\n\n" + assistant.setup_block(_assistant_read(ctx, "base.setup.status"))
+        text += "\n\n" + assistant.prompt.setup_block(_assistant_read(ctx, "base.setup.status"))
     stop = ""
-    if card is None and not stopped and assistant.rounds(messages) >= assistant.MAX_ROUNDS:
+    if card is None and not stopped and shared.rounds(messages) >= shared.MAX_ROUNDS:
         stop = "assistant.too_many_steps"
     return {
         "messages": messages,
@@ -2357,7 +2357,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         "executed": executed,
         "confirm": card,
         "pending": [p.model_dump() for p in pending],
-        "tools": [assistant.tool_spec(op) for op in offered],
+        "tools": [shared.tool_spec(op) for op in offered],
         "instructions": text,
         "continuation": data.continuation,
         "stop": stop,
@@ -2390,8 +2390,8 @@ def _gateway_failure(code: str, message: str) -> OperationError:
 def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
     """Send erplora.com's team an answer the person reports, with the question that led to it."""
     try:
-        return assistant.report(ctx.scope, **data.model_dump())
-    except assistant.GatewayError:
+        return assistant.gateway.report(ctx.scope, **data.model_dump())
+    except assistant.gateway.GatewayError:
         raise _gateway_failure(
             "base.assistant_report_not_sent", gettext("The report could not be sent: try again in a moment.")
         ) from None
@@ -2410,8 +2410,8 @@ def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
 def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> dict:
     """The text of the person's dictation, by erplora.com: it goes to the box, never sent by itself."""
     try:
-        return assistant.transcribe(ctx.scope, audio=data.audio, mime_type=data.mime_type, language=data.language or ctx.language)
-    except assistant.GatewayError as exc:
+        return assistant.gateway.transcribe(ctx.scope, audio=data.audio, mime_type=data.mime_type, language=data.language or ctx.language)
+    except assistant.gateway.GatewayError as exc:
         if exc.status == 413 or exc.code == "payload_too_large":
             raise OperationError(
                 gettext("The recording is too long: dictate a shorter message."), code="base.assistant_audio_too_long", status=413
@@ -2447,8 +2447,8 @@ def assistant_speak(ctx: OperationContext, data: AssistantSpeakIn) -> dict:
     if not settings.ASSISTANT_SERVER_VOICE:
         raise _speech_unavailable()
     try:
-        spoken = assistant.speak(ctx.scope, text=data.text, language=data.language or ctx.language, voice=data.voice)
-    except assistant.GatewayError as exc:
+        spoken = assistant.gateway.speak(ctx.scope, text=data.text, language=data.language or ctx.language, voice=data.voice)
+    except assistant.gateway.GatewayError as exc:
         if exc.code in SPEECH_NOT_CONFIGURED:
             raise _speech_unavailable() from None
         raise _gateway_failure(
@@ -2910,7 +2910,7 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542).
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542).
     ai={
         "description": "Turns on one of this business's apps (by its name as the person says it, or its id), with the "
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
@@ -3011,7 +3011,7 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542).
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542).
     ai={
         "description": "Turns off one of this business's apps (by its name as the person says it, or its id): it "
         "leaves everyone's menu and its screens stop opening; the apps that came along only with it go off too. Nothing "
@@ -3083,7 +3083,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542, hub#539).
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542, hub#539).
     ai={
         "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
         "«failed» in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "

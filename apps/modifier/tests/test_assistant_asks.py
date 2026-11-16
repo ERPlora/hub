@@ -112,7 +112,7 @@ def test_modifiers_is_listed_so_layer_1_sweeps_every_ask_of_it():
 def test_modifier_offers_its_seventeen_tools():
     """Modifiers' tools are its seventeen operations (``AI``, never ``INTERNAL``), the two reactions to a deletion in
     Inventory aside (``SYSTEM``: no role holds them): a silent drop of a tool fails, and each has its own words."""
-    tools = {name for name, op in registry.items() if op.app_label == "modifier" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "modifier" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) == 17
     assert sorted(name for name, _ in OWN_WORDS) == sorted(tools)
@@ -206,7 +206,7 @@ def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hu
     assert comparable(BY_DEFAULT) not in probe_phrases()
     assert_offered_with_room(tools, "modifier.option.update", BY_DEFAULT, room=TOP)
 
-    every = assistant.synonyms()
+    every = assistant.relevance.synonyms()
     without = tuple(group for group in every if "predeterminada" not in group)
     assert len(without) == len(every) - 1  # positive control: one group is left out, the default's
     unread = offered_place(tools, "modifier.option.update", BY_DEFAULT, synonyms=without)

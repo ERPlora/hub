@@ -42,7 +42,7 @@ class FlowConfig(LiveAppConfig):
     # the loop guard follows a chain through that app too (FLOW-F21).
     carried_actors = [RUN_ACTOR]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). An automation (flow.flow), its steps and
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An automation (flow.flow), its steps and
     # the question it waits on (flow.question) are named by their phrases and never by the word: «automatización» shares
     # its stem with «automático» («la respuesta automática»), «pasos» with «pasó» («¿qué pasó con…?», so no «qué paso»
     # nor «de paso») and «pregunta» with its verb («se les pregunta»). A run is its «ejecución» (flow.run), the

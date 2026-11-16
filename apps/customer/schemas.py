@@ -55,7 +55,7 @@ TAG_COLOR = gettext_noop("Tag color")
 CUSTOMER = gettext_noop("Customer")
 CUSTOM_FIELD = gettext_noop("Custom field")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
 # for its name, and without Sales the card leaves it out. A card said by its name beside its own card's id is neither
 # read nor shown: the write takes the card by the id and never looks at the name (``unless_given``, hub#1272).

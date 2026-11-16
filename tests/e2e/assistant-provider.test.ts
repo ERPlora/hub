@@ -37,7 +37,7 @@ const toolOf = (frames: unknown[]) => {
 };
 const user = (content: string) => ({ role: 'user', content });
 
-/** The Hub's system message of a turn whose person reads `name` (base/assistant.py `instructions`: «Answer in <the
+/** The Hub's system message of a turn whose person reads `name` (base/assistant/prompt.py `instructions`: «Answer in <the
  *  name of their language>, …»), as erplora.com's gateway forwards it, its own rules after it. */
 const system = (name: string) => ({
   role: 'system',

@@ -1,5 +1,5 @@
 """What Sales' words mean to the Hub's assistant (``SaleConfig.assistant_synonyms``, gathered by
-``base.assistant.synonyms``): a «cuenta», a check or a tab is a table's open check (``sale.order``), never the
+``base.assistant.relevance.synonyms``): a «cuenta», a check or a tab is a table's open check (``sale.order``), never the
 person's account, and a «ticket», a «tique» or a receipt is a sale's."""
 
 from live import assistant as shared

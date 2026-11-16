@@ -99,7 +99,7 @@ OWN_WORDS = [
 
 def test_tax_offers_its_eighteen_tools():
     """Taxes' assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "tax" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "tax" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert tools == TOOLS
 

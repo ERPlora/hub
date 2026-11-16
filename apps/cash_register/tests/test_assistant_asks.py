@@ -152,7 +152,7 @@ def stops_in_the_chat(description: str) -> list[str]:
 
 
 def cash_register_tools() -> dict[str, Operation]:
-    return {name: op for name, op in registry.items() if op.app_label == "cash_register" and assistant.is_tool(op)}
+    return {name: op for name, op in registry.items() if op.app_label == "cash_register" and assistant.tools.is_tool(op)}
 
 
 def test_no_tool_of_cash_register_makes_the_model_stop_in_the_chat_before_its_card():

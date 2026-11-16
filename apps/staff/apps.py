@@ -41,7 +41,7 @@ class StaffConfig(LiveAppConfig):
     # A hair salon books its professionals from sign-up; a restaurant may go without the app.
     verticals = ["hair_salon"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). To «desactivar» names the deactivation
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). To «desactivar» names the deactivation
     # itself (staff.member.deactivate and every other *.deactivate), not only a switch off, and what one «pide» or
     # «solicita» for oneself, a «solicitud», is a request (staff.time_off.request).
     assistant_synonyms = (

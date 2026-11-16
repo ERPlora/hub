@@ -31,7 +31,7 @@ class ComboConfig(LiveAppConfig):
     # The menus' own photos (COMBO-F14, base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["combo/combos/"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). An «opción» or an «elección» of a course
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «opción» or an «elección» of a course
     # is a choice (combo.option), as of a modifier group (modifier.option). live still reads «ordena» and «orden» as
     # «ordenador»'s stem, so they also name a device.
     assistant_synonyms = (

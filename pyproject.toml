@@ -133,7 +133,6 @@ max-statements = 50
 "apps/whatsapp_inbox/models.py" = ["DJ001"]
 "apps/whatsapp_inbox/schemas.py" = ["B905"]
 "base/access.py" = ["B905"]
-"base/assistant.py" = ["F401"]
 "base/auth.py" = ["F401"]
 "base/files.py" = ["B911"]
 "base/metrics.py" = ["B027"]

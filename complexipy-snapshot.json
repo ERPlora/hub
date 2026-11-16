@@ -558,16 +558,6 @@
     ]
   },
   {
-    "path": "base/assistant.py",
-    "file_name": "assistant.py",
-    "functions": [
-      {
-        "name": "stream_turn",
-        "complexity": 33
-      }
-    ]
-  },
-  {
     "path": "base/blueprint.py",
     "file_name": "blueprint.py",
     "functions": [
@@ -890,6 +880,16 @@
       {
         "name": "app_list",
         "complexity": 21
+      }
+    ]
+  },
+  {
+    "path": "base/assistant/gateway.py",
+    "file_name": "gateway.py",
+    "functions": [
+      {
+        "name": "stream_turn",
+        "complexity": 33
       }
     ]
   }

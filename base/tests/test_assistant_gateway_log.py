@@ -26,7 +26,7 @@ SYNTHESIZE_PATH = "/internal/speech/synthesize"
 
 def frames_of(**kwargs):
     async def collect():
-        return [frame async for frame in assistant.stream_turn(A, **kwargs)]
+        return [frame async for frame in assistant.gateway.stream_turn(A, **kwargs)]
 
     return asyncio.run(collect())
 
@@ -88,18 +88,18 @@ def test_a_refusal_with_no_envelope_still_says_its_status(gateway, caplog):
 @pytest.mark.parametrize(
     "door, path",
     [
-        (lambda: assistant.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es"), TRANSCRIBE_PATH),
-        (lambda: assistant.speak(A, text=QUESTION, language="es", voice=""), SYNTHESIZE_PATH),
-        (lambda: assistant.usage(A), "/internal/assistant/usage"),
+        (lambda: assistant.gateway.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es"), TRANSCRIBE_PATH),
+        (lambda: assistant.gateway.speak(A, text=QUESTION, language="es", voice=""), SYNTHESIZE_PATH),
+        (lambda: assistant.gateway.usage(A), "/internal/assistant/usage"),
         (
-            lambda: assistant.report(A, message_id="m1", reason="other", comment="", question=QUESTION, answer="x"),
+            lambda: assistant.gateway.report(A, message_id="m1", reason="other", comment="", question=QUESTION, answer="x"),
             "/internal/assistant/report",
         ),
     ],
 )
 def test_a_refused_door_leaves_its_door_status_and_code(gateway, caplog, door, path):
     gateway.reply(path, status=503, json={"error": {"code": "assistant.provider_not_configured", "message": "x"}})
-    with pytest.raises(assistant.GatewayError):
+    with pytest.raises(assistant.gateway.GatewayError):
         door()
     line = only_line(caplog)
     assert line.startswith("base.assistant.gateway_refused ")
@@ -121,8 +121,8 @@ def test_a_turn_that_never_reaches_erplora_says_how(settings, caplog):
 
 def test_a_dictation_that_never_reaches_erplora_says_how(settings, caplog):
     settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
-    with pytest.raises(assistant.GatewayError):
-        assistant.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es")
+    with pytest.raises(assistant.gateway.GatewayError):
+        assistant.gateway.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es")
     line = only_line(caplog)
     assert line.startswith("base.assistant.gateway_unreachable ")
     assert f"path={TRANSCRIBE_PATH}" in line and "kind=ConnectError" in line
@@ -131,8 +131,8 @@ def test_a_dictation_that_never_reaches_erplora_says_how(settings, caplog):
 
 def test_a_reading_aloud_that_never_reaches_erplora_says_how(settings, caplog):
     settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
-    with pytest.raises(assistant.GatewayError):
-        assistant.speak(A, text=QUESTION, language="es", voice="")
+    with pytest.raises(assistant.gateway.GatewayError):
+        assistant.gateway.speak(A, text=QUESTION, language="es", voice="")
     line = only_line(caplog)
     assert line.startswith("base.assistant.gateway_unreachable ")
     assert f"path={SYNTHESIZE_PATH}" in line and "kind=ConnectError" in line
@@ -142,8 +142,8 @@ def test_a_reading_aloud_that_never_reaches_erplora_says_how(settings, caplog):
 def test_a_reading_aloud_answered_with_no_audio_leaves_its_line(gateway, caplog):
     """A 200 that is no mp3 (a proxy's page, an empty body) plays nothing: the log says so, never the text."""
     gateway.reply(SYNTHESIZE_PATH, json={"text": QUESTION})
-    with pytest.raises(assistant.GatewayError):
-        assistant.speak(A, text=QUESTION, language="es", voice="")
+    with pytest.raises(assistant.gateway.GatewayError):
+        assistant.gateway.speak(A, text=QUESTION, language="es", voice="")
     line = only_line(caplog)
     assert line.startswith("base.assistant.gateway_refused ")
     assert f"path={SYNTHESIZE_PATH}" in line and "status=200" in line and "code=assistant.not_audio" in line
@@ -195,5 +195,5 @@ def test_an_answered_turn_and_dictation_leave_no_line(gateway, caplog):
     gateway.turn({"type": "text_delta", "text": "Hola"}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     gateway.reply(TRANSCRIBE_PATH, json={"text": "hola", "language": "es"})
     frames_of(**TURN)
-    assistant.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es")
+    assistant.gateway.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es")
     assert lines(caplog) == []

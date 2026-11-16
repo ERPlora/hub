@@ -146,7 +146,7 @@ D_COLOR = "Colour of the project, as #RRGGBB; empty for none."
 # What the assistant's card calls the record a write acts on (its Spanish in this app's catalog), as its list calls one.
 T_TASK = gettext_noop("Task")
 T_PROJECT = gettext_noop("Project")
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a task by its title (what the person says of it: «complete the task clean the store room»), a
 # project by its name, as the screens' «Delete» dialog says it, and a person of the team by their full name, as Staff
 # names them.

@@ -124,7 +124,7 @@ def make_menu(
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -287,7 +287,7 @@ def test_a_record_removed_meanwhile_is_left_out():
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     menu = make_menu()
-    card = assistant.card(get("combo.combo.update"), {"id": str(menu.combo.id), "name": "Menú de noche"}, "en")
+    card = assistant.cards.card(get("combo.combo.update"), {"id": str(menu.combo.id), "name": "Menú de noche"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Menú de noche"}
 
 

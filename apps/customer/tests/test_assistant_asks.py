@@ -8,6 +8,7 @@ each.
 """
 
 import pytest
+from live import assistant as shared
 from live.errors import Conflict
 from live.operations import AI, registry
 
@@ -153,7 +154,7 @@ def test_a_merge_by_two_phones_offers_the_existing_operation_with_room_to_spare(
 
 
 def test_the_merge_instruction_completes_the_action_with_human_references():
-    description = assistant.description(registry["customer.customer.merge"])
+    description = shared.description(registry["customer.customer.merge"])
     for expected in (
         "Use this tool once both cards are known",
         "do not stop at reading or explaining",
@@ -184,7 +185,7 @@ def test_the_reported_merge_keeps_its_confirmation_and_absorbs_the_right_card():
     arguments = {"customer": "611 222 333", "absorbed": "611 222 444"}
     ctx = ctx_for("hub_owner", language="es")
 
-    card = assistant.card(op, arguments, "es", ctx)
+    card = assistant.cards.card(op, arguments, "es", ctx)
     assert op.ai_spec().risk == "high"
     assert [(field["name"], field["value"]) for field in card["fields"]] == [
         ("customer", "Ana QA"),
@@ -209,7 +210,7 @@ def test_a_merge_whose_survivor_fits_two_cards_leaves_it_out_of_the_card_and_mer
     arguments = {"customer": "Ana", "absorbed": "611 222 444"}
     ctx = ctx_for("hub_owner", language="es")
 
-    card = assistant.card(op, arguments, "es", ctx)
+    card = assistant.cards.card(op, arguments, "es", ctx)
     assert [(field["name"], field["value"]) for field in card["fields"]] == [("absorbed", "Ana QA copia")]
 
     with pytest.raises(Conflict) as excinfo:

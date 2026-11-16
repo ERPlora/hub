@@ -170,7 +170,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         # What a person types to ask for it (``asks``, hub#1091): combo is listed in LIVE_ASSISTANT_ASKS_REQUIRED. The
         # upload of the form's own photo and the reaction to Inventory's deletion declare ``ai`` and are no tool.
-        if assistant.is_tool(op):
+        if assistant.tools.is_tool(op):
             expected.add("asks")
         if name in CHECKS:
             expected.add("check")

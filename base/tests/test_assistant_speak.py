@@ -57,7 +57,7 @@ def refused(status: int, code: str) -> dict:
 def test_reading_aloud_is_the_persons_and_never_a_tool_nor_a_transaction():
     op = get("base.assistant.speak")
     assert (op.kind, op.permission, op.database) == ("command", "base.view_home", False)
-    assert not assistant.is_tool(op)
+    assert not assistant.tools.is_tool(op)
     with pytest.raises(PermissionDenied):
         speak(frozenset({"demo.view"}), text="Hola")
 
@@ -164,7 +164,7 @@ def test_with_the_server_voice_off_nothing_is_asked_of_erplora_com(settings, gat
 
 
 def test_erplora_com_slower_than_the_hub_waits_is_a_failure(gateway, monkeypatch):
-    monkeypatch.setattr(assistant, "SPEECH_TIMEOUT", httpx.Timeout(0.2))
+    monkeypatch.setattr(assistant.gateway, "SPEECH_TIMEOUT", httpx.Timeout(0.2))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg", delay=1.0)
     with pytest.raises(OperationError) as caught:
         speak(text="Hola")
@@ -181,7 +181,7 @@ def test_erplora_com_out_of_reach_is_a_failure(settings):
 def test_the_hub_waits_longer_than_erplora_com_waits_for_its_provider():
     """erplora.com waits up to 60 s for the voices' provider (saas ``assistant.media.TIMEOUT``): the Hub waits longer,
     so a slow provider comes back as erplora.com's own refusal, never as the Hub hanging up first."""
-    assert assistant.SPEECH_TIMEOUT.read > 60
+    assert assistant.gateway.SPEECH_TIMEOUT.read > 60
 
 
 @pytest.mark.django_db(transaction=True)
@@ -190,13 +190,13 @@ def test_waiting_for_the_voice_holds_no_transaction(gateway, monkeypatch):
     while erplora.com reads the answer."""
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     seen = []
-    post = assistant._post_audio
+    post = assistant.gateway._post_audio
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post_audio", probe)
+    monkeypatch.setattr(assistant.gateway, "_post_audio", probe)
     speak(text="Hola")
     assert seen == [False]
 
