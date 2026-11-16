@@ -11,16 +11,7 @@ from live.outbox import channel_for
 
 from base.tenancy.context import use_hub
 
-from .conftest import (
-    HUB_DB_COMMITTED,
-    A,
-    B,
-    ctx_for,
-    make_session,
-    make_table,
-    make_zone,
-    run,
-)
+from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, make_session, make_table, make_zone, run
 
 WAIT = 1.0
 QUIET = 0.3
