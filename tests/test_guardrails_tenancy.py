@@ -8,11 +8,10 @@ scanning they share (``source_files``, ``_offenders``), are ``tests/test_guardra
     tests; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
     (``live.operations.on_commit``); no migration of ``base/`` or ``apps/`` asks the router whether a model migrates
     (a ``RunPython``'s hints choose its database).
-(g) Operations that need the hub's own database: in a hub that still shares control's (``db_name=""``) each
-    refuses with its domain error before it reads or writes anything of the business in ``default``, and an API key
-    is refused for that reason (never let through by a session). Production no longer serves such a business at
-    all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
-    legacy.py``). Unlike (a)–(f), these run operations on the test database.
+(g) Operations that need the hub's own database: a business that still shares control's (``db_name=""``, not cut
+    yet) is not served at all. Each of them asked at its host, even by its administrator, answers 503 maintenance
+    having read nothing of any business, only its row in control's registry; an API key there is refused alike
+    (never let through by a session). Unlike (a)–(f), these send requests on the test database.
 """
 
 import ast
