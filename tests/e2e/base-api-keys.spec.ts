@@ -10,7 +10,7 @@
 // flow: BASE-F86 BASE-F87 BASE-F88 BASE-F89
 import { type APIRequestContext, type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, collectProblems, horizontalOverflow, hostPage, psql, shown, untilStill } from './helpers';
+import { A, api, capture, collectProblems, horizontalOverflow, hostPage, psql, saveSessionForTheSweep, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 
 const VIEWPORTS = {
@@ -142,6 +142,43 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     expect(seen.console).toEqual([]);
     expect(seen.page).toEqual([]);
     await outside.dispose();
+    await context.close();
+  });
+}
+
+const FORM_VIEWPORTS = {
+  375: { width: 375, height: 667 },
+  820: { width: 820, height: 1180 },
+  1440: { width: 1440, height: 900 },
+} as const;
+
+for (const [label, viewport] of Object.entries(FORM_VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F86 — the per-app help only takes its text height at ${width}`, async ({ browser }) => {
+    const { context, page } = await signedIn(browser, viewport);
+    await saveSessionForTheSweep(context);
+    await testid(page, 'api-keys-new').click();
+    const hint = dialog(page, 'api-key-form').locator('.api-key-modes > .api-keys-hint');
+    await expect(hint).toBeVisible();
+    await expect(dialog(page, 'api-key-form-apps').locator('table')).toBeVisible();
+    await capture(page, `HUB-1541-api-key-help-${width}`);
+
+    const metrics = await hint.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const text = range.getBoundingClientRect();
+      const table = element.closest('.api-key-form')?.querySelector('[data-testid="api-key-form-apps"] table');
+      if (!(table instanceof HTMLElement)) throw new Error('The per-app table is missing');
+      return {
+        boxHeight: element.getBoundingClientRect().height,
+        textHeight: text.height,
+        tableGap: table.getBoundingClientRect().top - text.bottom,
+      };
+    });
+    expect(metrics.boxHeight).toBeLessThanOrEqual(metrics.textHeight * 1.25 + 1);
+    expect(metrics.tableGap).toBeGreaterThanOrEqual(0);
+    expect(metrics.tableGap).toBeLessThanOrEqual(16);
     await context.close();
   });
 }
