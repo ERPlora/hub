@@ -14,10 +14,11 @@ from live.operations import registry as operation_registry
 
 from base import entitlement
 from base.models import Membership
+from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-HOST = "a.localhost:8000"
+pytestmark = HUB_DB
 
 
 def get(client, path, host=HOST):
@@ -34,14 +35,14 @@ def code(response) -> str:
 
 @pytest.fixture
 def olga(make_user, client):
-    user = make_user("saas:1", host="a", role=Membership.Role.OWNER, first_name="Olga")
+    user = make_user("saas:1", host=A.key, role=Membership.Role.OWNER, first_name="Olga")
     client.force_login(user)
     return user
 
 
 @pytest.fixture
 def eva(make_user):
-    return make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
+    return make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva")
 
 
 def turn_on(client):
@@ -103,7 +104,8 @@ class TestTheDocument:
         assert document["components"]["securitySchemes"] == {"ApiKey": {"type": "http", "scheme": "bearer"}}
         assert document["security"] == [{"ApiKey": []}]
         assert all("security" not in op for op in operations)
-        assert answer["keys_available"] is False
+        # A business is served only from its own database, where its keys live.
+        assert answer["keys_available"] is True
         assert {app["id"] for app in answer["apps"]} == {tag for op in operations for tag in op["tags"]}
         carts = document["paths"]["/api/cart_checkout/carts"]["get"]
         assert carts["description"] == operation_registry["cart_checkout.cart.list"].ai["description"]
