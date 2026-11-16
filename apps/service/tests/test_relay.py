@@ -5,14 +5,15 @@ which runs ``base.relay``) hands them to this app's reactions, and the vouchers 
 that stays, an erased card's vouchers lose their free texts, or the professional who left stops performing every
 service. Once: another tick, or the same notice delivered again, changes nothing. What hub B does runs in B and is
 heard in B only.
+
+The worker's real loop serves each business in its own database and releases its connections once it has served it:
+what these tests write is committed.
 """
 
 import json
-import threading
 
 import psycopg
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.context import Scope
 from live.models import OutboxEvent
@@ -20,38 +21,17 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.service.models import Assignment, Grant, Redemption
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_package, make_redemption, make_service, make_tax
+from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, make_package, make_redemption, make_service, make_tax
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+pytestmark = HUB_DB_COMMITTED
 
 
 def run(name: str, data: dict, scope: Scope = A):
     op = get(name)
     return op(ctx_for(scope=scope), op.input.model_validate(data))
-
-
-@pytest.fixture
-def tick(monkeypatch):
-    """One tick of the worker's real loop, without the SaaS (``register_apps``) and, inside a test's transaction,
-    without releasing the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def once() -> None:
-        stop = threading.Event()
-
-        def wait(_seconds: float) -> bool:
-            stop.set()
-            return True
-
-        now = timezone.now()
-        assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
-
-    return once
 
 
 def newest(name: str) -> OutboxEvent:
@@ -84,7 +64,7 @@ def sell(customer, *, scope: Scope = A, **data):
 
 
 @pytest.fixture
-def cut(db):
+def cut():
     return make_service("Cut", tax=make_tax(), price=2000, duration_minutes=30)
 
 
@@ -104,7 +84,7 @@ def balances(customer) -> dict:
     return {row.id: (row.used, row.remaining, row.status) for row in page.rows}
 
 
-def test_two_cards_merged_in_customers_take_every_voucher_to_the_one_that_stays(bono, tick):
+def test_two_cards_merged_in_customers_take_every_voucher_to_the_one_that_stays(bono, worker_loop):
     lucia = run("customer.customer.create", {"name": "Lucía Pérez"})
     twin = run("customer.customer.create", {"name": "Lucia P."})
     # Two purchases of the same package stay two vouchers, each with its balance; a voided one moves too.
@@ -117,7 +97,7 @@ def test_two_cards_merged_in_customers_take_every_voucher_to_the_one_that_stays(
     shown = balances(lucia)
     assert set(Grant.objects.values_list("customer_id", flat=True)) == {twin.id}
 
-    tick()
+    worker_loop()
 
     assert delivered("customer.customer.merged") == ("delivered", 1)
     assert set(Grant.objects.values_list("customer_id", flat=True)) == {lucia.id}
@@ -134,9 +114,9 @@ def test_two_cards_merged_in_customers_take_every_voucher_to_the_one_that_stays(
     assert recorded("service.grant.reassigned") == 1
     stamps = dict(Grant.objects.values_list("id", "updated_at"))
 
-    tick()
+    worker_loop()
     deliver_again("customer.customer.merged")
-    tick()
+    worker_loop()
 
     assert delivered("customer.customer.merged") == ("delivered", 2)
     assert balances(lucia) == shown
@@ -157,7 +137,7 @@ def free_texts() -> dict:
     return texts
 
 
-def test_a_card_erased_in_customers_loses_every_free_text_of_its_vouchers(bono, cut, tick):
+def test_a_card_erased_in_customers_loses_every_free_text_of_its_vouchers(bono, cut, worker_loop):
     lucia = run("customer.customer.create", {"name": "Lucía Pérez"})
     eva = run("customer.customer.create", {"name": "Eva Sanz"})
     kept = sell(lucia, amount=9000, note="Lucía, cash")
@@ -186,7 +166,7 @@ def test_a_card_erased_in_customers_loses_every_free_text_of_its_vouchers(bono, 
         "Lucía asked for another",
     }
 
-    tick()
+    worker_loop()
 
     assert delivered("customer.customer.erased") == ("delivered", 1)
     assert free_texts() == {lucia.id: set(), eva.id: {"Eva, card", "Eva on Monday"}}
@@ -196,15 +176,15 @@ def test_a_card_erased_in_customers_loses_every_free_text_of_its_vouchers(bono, 
     assert Grant.objects.get(pk=kept.id).amount == 9000
     assert recorded("service.grant.erased") == 1
 
-    tick()
+    worker_loop()
     deliver_again("customer.customer.erased")
-    tick()
+    worker_loop()
     assert delivered("customer.customer.erased") == ("delivered", 2)
     assert free_texts() == {lucia.id: set(), eva.id: {"Eva, card", "Eva on Monday"}}
     assert recorded("service.grant.erased") == 1
     # Customers announces the erasure every time it is asked again: Services hears it and writes nothing.
     run("customer.customer.erase", {"id": str(lucia.id), "reason": "GDPR request"})
-    tick()
+    worker_loop()
 
     assert recorded("customer.customer.erased") == 2
     assert delivered("customer.customer.erased") == ("delivered", 1)
@@ -212,7 +192,7 @@ def test_a_card_erased_in_customers_loses_every_free_text_of_its_vouchers(bono, 
     assert recorded("service.grant.erased") == 1
 
 
-def test_a_card_erased_right_after_a_duplicate_was_merged_into_it_loses_the_duplicates_texts_too(bono, tick):
+def test_a_card_erased_right_after_a_duplicate_was_merged_into_it_loses_the_duplicates_texts_too(bono, worker_loop):
     # Merging and erasing before the next tick: the relay hands both over, in the order they happened.
     lucia = run("customer.customer.create", {"name": "Lucía Pérez"})
     twin = run("customer.customer.create", {"name": "Lucia P."})
@@ -220,7 +200,7 @@ def test_a_card_erased_right_after_a_duplicate_was_merged_into_it_loses_the_dupl
     run("customer.customer.merge", {"id": str(lucia.id), "absorbed_id": str(twin.id)})
     run("customer.customer.erase", {"id": str(lucia.id), "reason": "GDPR request"})
 
-    tick()
+    worker_loop()
 
     grant = Grant.objects.get(pk=sold.id)
     assert (grant.customer_id, grant.note) == (lucia.id, "")
@@ -234,7 +214,7 @@ def performers(service: str) -> list[str]:
     return [row.member_name for row in run("service.assignment.list", {"service": service}).rows]
 
 
-def test_a_professional_who_leaves_in_staff_stops_performing_every_service(cut, tick):
+def test_a_professional_who_leaves_in_staff_stops_performing_every_service(cut, worker_loop):
     make_service("Colour", tax=make_tax("test.colour", "Colour"))
     ana = run("staff.member.create", {"first_name": "Ana", "last_name": "López"})
     run("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"})
@@ -245,7 +225,7 @@ def test_a_professional_who_leaves_in_staff_stops_performing_every_service(cut, 
     assert (performers("Cut"), performers("Colour")) == (["Bea Ruiz"], [])
     assert Assignment.objects.filter(member_id=ana.id).count() == 2
 
-    tick()
+    worker_loop()
 
     assert delivered("staff.member.terminated") == ("delivered", 1)
     assert not Assignment.objects.filter(member_id=ana.id).exists()
@@ -254,9 +234,9 @@ def test_a_professional_who_leaves_in_staff_stops_performing_every_service(cut, 
     assert (bea.full_name, bea.is_primary) == ("Bea Ruiz", True)
     assert recorded("service.assignment.removed") == 2
 
-    tick()
+    worker_loop()
     deliver_again("staff.member.terminated")
-    tick()
+    worker_loop()
 
     assert delivered("staff.member.terminated") == ("delivered", 2)
     assert performers("Cut") == ["Bea Ruiz"]
@@ -285,7 +265,7 @@ def heard(session, timeout: float = 0.5) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-def test_what_hub_b_does_reaches_its_vouchers_and_team_and_is_heard_in_b_only(listen, tick):
+def test_what_hub_b_does_reaches_its_vouchers_and_team_and_is_heard_in_b_only(listen, worker_loop, hub_b):
     on_a, on_b = listen(A), listen(B)
     make_package("Bono 5 cortes", [make_service("Cut", tax=make_tax())], max_uses=5)
     # Hub A: Marta's voucher and Carla, who does cuts.
@@ -293,25 +273,28 @@ def test_what_hub_b_does_reaches_its_vouchers_and_team_and_is_heard_in_b_only(li
     martas = sell(marta, note="Marta, cash")
     carla = run("staff.member.create", {"first_name": "Carla", "last_name": "Ruiz"})
     run("service.assignment.assign", {"service": "Cut", "member": "Carla Ruiz"})
-    # Hub B: two cards merged, one erased and a professional who leaves.
-    keep = run("customer.customer.create", {"name": "Lucía Pérez"}, B)
-    twin = run("customer.customer.create", {"name": "Lucia P."}, B)
-    twins = sell(twin, scope=B)
-    gone = run("customer.customer.create", {"name": "Eva Sanz"}, B)
-    sell(gone, scope=B, note="Eva, card")
-    dani = run("staff.member.create", {"first_name": "Dani", "last_name": "Gil"}, B)
-    run("service.assignment.assign", {"service": "Cut", "member": "Dani Gil"}, B)
-    run("customer.customer.merge", {"id": str(keep.id), "absorbed_id": str(twin.id)}, B)
-    run("customer.customer.erase", {"id": str(gone.id), "reason": "GDPR request"}, B)
-    run("staff.member.terminate", {"id": str(dani.id), "reason": "Moved away"}, B)
+    # Hub B, with the same catalogue: two cards merged, one erased and a professional who leaves.
+    with use_hub(hub_b):
+        make_package("Bono 5 cortes", [make_service("Cut", tax=make_tax())], max_uses=5)
+        keep = run("customer.customer.create", {"name": "Lucía Pérez"}, B)
+        twin = run("customer.customer.create", {"name": "Lucia P."}, B)
+        twins = sell(twin, scope=B)
+        gone = run("customer.customer.create", {"name": "Eva Sanz"}, B)
+        sell(gone, scope=B, note="Eva, card")
+        dani = run("staff.member.create", {"first_name": "Dani", "last_name": "Gil"}, B)
+        run("service.assignment.assign", {"service": "Cut", "member": "Dani Gil"}, B)
+        run("customer.customer.merge", {"id": str(keep.id), "absorbed_id": str(twin.id)}, B)
+        run("customer.customer.erase", {"id": str(gone.id), "reason": "GDPR request"}, B)
+        run("staff.member.terminate", {"id": str(dani.id), "reason": "Moved away"}, B)
     heard(on_a), heard(on_b)  # the operations' own notices
 
-    tick()
+    worker_loop()
 
     assert {"service.grant.reassigned", "service.grant.erased", "service.assignment.removed"} <= heard(on_b)
     assert heard(on_a) == set()
-    assert Grant.objects.get(pk=twins.id).customer_id == keep.id
-    assert not Assignment.objects.filter(member_id=dani.id).exists()
+    with use_hub(hub_b):
+        assert Grant.objects.get(pk=twins.id).customer_id == keep.id
+        assert not Assignment.objects.filter(member_id=dani.id).exists()
     # A's voucher and team are untouched.
     assert Grant.objects.filter(pk=martas.id, customer_id=marta.id, note="Marta, cash").exists()
     assert performers("Cut") == ["Carla Ruiz"]
@@ -319,7 +302,7 @@ def test_what_hub_b_does_reaches_its_vouchers_and_team_and_is_heard_in_b_only(li
     run("staff.member.terminate", {"id": str(carla.id), "reason": "Moved away"})
     heard(on_a)
 
-    tick()
+    worker_loop()
 
     assert "service.assignment.removed" in heard(on_a)
     assert heard(on_b) == set()

@@ -7,18 +7,16 @@ copy carries it on (``base.recovery.carries_on``): the category counts as its ow
 touched since the category came back goes into it.
 """
 
-import pytest
-
 from apps.service import queries
 from apps.service.models import Category, Service
 from base.recovery import giving_back
 from base.tenancy.tests.test_recovery import fresh, run, run_in
 
 from . import test_recovery as whole
-from .conftest import make_category, make_service, make_tax
+from .conftest import HUB_DB, make_category, make_service, make_tax
 from .test_recovery import recoveries  # noqa: F401 - the fixture of the two databases
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_a_category_a_failed_recovery_brought_back_takes_back_what_it_had_inside_from_the_one_that_carries_it_on():

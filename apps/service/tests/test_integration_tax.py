@@ -10,9 +10,9 @@ from live.operations import get
 
 from apps.tax.models import TaxCategory
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin"):

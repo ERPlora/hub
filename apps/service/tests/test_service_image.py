@@ -40,12 +40,13 @@ from apps.service.schemas import (
 from apps.tax.models import TaxCategory
 from base.models import Hub
 from base.storage import hub_prefix
+from base.tenancy.context import current_alias
 from base.tests.test_image_catalog import image_library, webp  # noqa: F401 - the library fixture
 from base.tests.test_images import hub_files  # noqa: F401 - the store fixture
 
-from .conftest import ctx_for
+from .conftest import HOST, HUB_DB, A, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TAX = "service.generic"
 FOLDER = "service/services/"
@@ -94,7 +95,7 @@ def updates():
 
 
 def key(reference: str) -> str:
-    return f"{hub_prefix(Hub.objects.get(slug='a').id)}/{reference.removeprefix('file:')}"
+    return f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}"
 
 
 # ── The model, its migration and its folder ────────────────────────────────────────────────────────────────────
@@ -205,7 +206,7 @@ def test_a_photo_is_kept_as_a_webp_of_512_in_the_services_folder(hub_files):  # 
     changed = upload(photo(), created.id)
 
     assert re.fullmatch(rf"file:{FOLDER}[0-9a-f]{{32}}\.webp", changed.image)
-    assert changed.image_url == f"/p/media/{Hub.objects.get(slug='a').id.hex}/{changed.image.removeprefix('file:')}"
+    assert changed.image_url == f"/p/media/{Hub.objects.get(slug=A.key).id.hex}/{changed.image.removeprefix('file:')}"
     assert PILImage.open(hub_files.open(key(changed.image))).size == (512, 512)
 
 
@@ -215,11 +216,11 @@ def test_a_new_photo_or_an_image_of_the_library_deletes_the_last_photo_once_save
     created = service()
     first = upload(photo(), created.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         second = upload(photo((300, 300)), created.id).image
     assert not hub_files.exists(key(first)) and hub_files.exists(key(second))
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         set_image(CUT, created.id)
     assert not hub_files.exists(key(second))
 
@@ -228,7 +229,7 @@ def test_archiving_the_service_keeps_its_photo_for_when_it_is_restored(hub_files
     created = service()
     own = upload(photo(), created.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("service.service.archive", ServiceRefIn(id=created.id))
     restored = run("service.service.restore", ServiceRefIn(id=created.id))
 
@@ -251,7 +252,7 @@ def test_a_file_that_is_no_photo_is_refused(hub_files):  # noqa: F811
 
 def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(image_library):  # noqa: F811
     created = service("Corte de señora")
-    Hub.objects.filter(slug="a").update(language="es")
+    Hub.objects.filter(slug=A.key).update(language="es")
 
     found = run("service.service.suggest_image", ServiceImageSuggestIn(id=created.id), "hub_employee")
 
@@ -282,15 +283,15 @@ def test_the_list_the_detail_and_the_tills_catalog_say_the_image_and_its_url(ima
 
 def test_the_routes(client, make_user, image_library):  # noqa: F811
     created = service()
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
 
     response = client.post(
         "/api/service/services/image",
         json.dumps({"id": str(created.id), "image": CUT}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
-    found = client.get("/api/service/services/image/suggest", {"id": str(created.id)}, HTTP_HOST="a.localhost")
+    found = client.get("/api/service/services/image/suggest", {"id": str(created.id)}, HTTP_HOST=HOST)
 
     assert response.status_code == 200, response.content
     assert response.json()["image"] == CUT

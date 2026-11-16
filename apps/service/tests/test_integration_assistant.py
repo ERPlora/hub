@@ -32,11 +32,12 @@ from apps.service.schemas import MAX_CENTS
 from base import assistant
 from base.business import business_zone
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
 from base.tests.test_assistant_card_values import AN_ID, list_field, unnamed
 
-from .conftest import ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption, make_service
+from .conftest import (
+    HUB_DB, ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption, make_service,
+)
 
 APP = Path(apps.get_app_config("service").path)
 SCREENS = json.loads((APP / "frontend/locale/es.json").read_text())["service"]
@@ -443,10 +444,10 @@ def assert_left_out(shown: dict) -> None:
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_refund_as_their_screens_do(
-    language, hub_a, no_fallback
+    language, hub_a
 ):
     """«Véndele el bono de la venta de esta mañana», «gasta la sesión en la cita de Lucía»: the card says which sale (by
     its number), which line (by what it charges), which appointment (as Appointments' cards say it) and which refund
@@ -462,9 +463,9 @@ def test_a_write_of_services_names_the_sale_the_lines_the_appointment_and_the_re
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
-def test_the_sessions_a_void_gives_back_name_the_sale_voided(language, said, hub_a, no_fallback):
+def test_the_sessions_a_void_gives_back_name_the_sale_voided(language, said, hub_a):
     """SERVICE-F27: Sales gives back the sessions of a sale it voids with the sale itself as the document."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
@@ -491,9 +492,9 @@ def turn_off_sales_and_appointments(request, monkeypatch):
     return turn_off
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 def test_without_sales_and_appointments_the_card_leaves_them_out_never_by_their_id(
-    hub_a, no_fallback, turn_off_sales_and_appointments
+    hub_a, turn_off_sales_and_appointments
 ):
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
@@ -504,8 +505,8 @@ def test_without_sales_and_appointments_the_card_leaves_them_out_never_by_their_
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(hub_a):
     """The reads of Sales and Appointments run as whoever asks: without their rights, Services names nothing of theirs."""
     hidden = frozenset({"sale.view_sale", "appointment.view_appointment", "appointment.view_own_appointment"})
     ctx = person(hub_a, without=hidden)
@@ -516,8 +517,8 @@ def test_who_may_not_see_sales_nor_appointments_reads_none_of_them_on_the_card(h
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_someone_else(hub_a, no_fallback):
+@HUB_DB
+def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_someone_else(hub_a):
     """An employee sees her own appointments only (Appointments' rule): another's is left out, never by its id."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
@@ -528,23 +529,23 @@ def test_an_employee_reads_the_sale_and_the_lines_but_not_an_appointment_of_some
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_nothing_of_sales_nor_appointments(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_nothing_of_sales_nor_appointments(hub_a):
     with use_hub(hub_a):
         shown = till_cards(a_till(hub_a, a_salon()), None)
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_sale_or_an_appointment_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_sale_or_an_appointment_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in TILL_TITLES["es"]}
     with use_hub(hub_a):
         shown = till_cards(gone, person(hub_a))
     assert_left_out(shown)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_sale_or_an_appointment_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_sale_or_an_appointment_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     with use_hub(hub_b):
         theirs = a_till(hub_b, a_salon())
         named_in_b = till_cards(theirs, person(hub_b))
@@ -565,9 +566,9 @@ def test_the_read_that_names_them_is_no_tool_and_takes_one_record():
             read.input.model_validate(data)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(("language", "said"), [("es", "Anulación de la venta {}"), ("en", "Void of sale {}")])
-def test_the_read_that_names_them_answers_in_the_readers_language(language, said, hub_a, no_fallback):
+def test_the_read_that_names_them_answers_in_the_readers_language(language, said, hub_a):
     """Whatever language is active where it is asked from (a request in the other one, a nested call)."""
     other = {"es": "en", "en": "es"}[language]
     read = get("service.record.get")
@@ -578,8 +579,8 @@ def test_the_read_that_names_them_answers_in_the_readers_language(language, said
     assert named.name == said.format(till["voided_number"])
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_fallback):
+@HUB_DB
+def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a):
     read = get("service.record.get")
     # By name: with a lower one of Services («see services») the read would open to whoever never sees a voucher.
     assert read.permission == "service.view_package_balance"
@@ -587,7 +588,7 @@ def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_
         read(person(hub_a, without=frozenset({read.permission})), read.input.model_validate({"sale_id": str(uuid.uuid7())}))
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(
     ("datum", "code"),
     [
@@ -598,7 +599,7 @@ def test_the_read_that_names_them_needs_the_right_to_see_the_vouchers(hub_a, no_
         ("appointment_id", "service.appointments_unavailable"),
     ],
 )
-def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, no_fallback, monkeypatch):
+def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, monkeypatch):
     for name in BEHIND:
         monkeypatch.delitem(registry, name)
     read = get("service.record.get")
@@ -607,9 +608,9 @@ def test_without_their_app_the_read_says_it_is_unavailable(datum, code, hub_a, n
     assert caught.value.code == code
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a, no_fallback):
+def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a):
     """«Anula ese bono», «quítale ese servicio a Ana»: the card says which service, category, package, professional,
     customer, voucher or session by its name, in the person's language, never by its id."""
     with use_hub(hub_a):
@@ -618,9 +619,9 @@ def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallback):
+def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
     """«Servicio: Corte», «Bono vendido: Bono 5 cortes · …», never «Id: Corte»: the mark alone would name it under its
     field."""
     with use_hub(hub_a):
@@ -630,9 +631,9 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallb
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_the_records_inside_a_list_are_named_too(language, hub_a, no_fallback):
+def test_the_records_inside_a_list_are_named_too(language, hub_a):
     """The services of a new package and the category of each service of a bulk create, at any depth."""
     with use_hub(hub_a):
         salon = a_salon()
@@ -651,10 +652,10 @@ def test_the_records_inside_a_list_are_named_too(language, hub_a, no_fallback):
     assert no_id(package) and no_id(bulk)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 @pytest.mark.parametrize("write", OVER_SESSIONS)
-def test_a_write_over_several_sessions_names_each_and_says_how_many(write, language, hub_a, no_fallback):
+def test_a_write_over_several_sessions_names_each_and_says_how_many(write, language, hub_a):
     """The dangerous writes over the sessions of a sale: whoever types the number sees which they are."""
     with use_hub(hub_a):
         salon = a_salon()
@@ -671,8 +672,8 @@ def test_a_write_over_several_sessions_names_each_and_says_how_many(write, langu
     assert no_id(card)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_services(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_record_of_services(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         shown = cards(a_salon(), None)
@@ -680,8 +681,8 @@ def test_nobody_behind_the_request_reads_no_record_of_services(hub_a, no_fallbac
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a):
     """Whoever may run the writes but see nothing (a key that only writes, say) gets every record left out, never its
     id."""
     writes_only = OperationContext(
@@ -705,8 +706,8 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in TITLES["es"]}
     with use_hub(hub_a):
         shown = cards(gone, person(hub_a))
@@ -714,8 +715,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallba
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's voucher or session is nobody in hub A."""
     with use_hub(hub_b):
         theirs = a_salon()
@@ -728,8 +729,8 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fa
     assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_two_equal_vouchers_of_a_customer_are_told_apart_by_the_day_they_were_sold(hub_a, no_fallback):
+@HUB_DB
+def test_two_equal_vouchers_of_a_customer_are_told_apart_by_the_day_they_were_sold(hub_a):
     with use_hub(hub_a):
         salon = a_salon()
         package, customer = Package.objects.get(pk=salon["package"]), Customer.objects.get(pk=salon["customer"])
@@ -740,8 +741,8 @@ def test_two_equal_vouchers_of_a_customer_are_told_apart_by_the_day_they_were_so
     assert said_of == ["Bono 5 cortes · Lucía Pérez · 3 oct 2026", "Bono 5 cortes · Lucía Pérez · 20 oct 2026"]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_customers_reads_the_voucher_without_its_owner(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_customers_reads_the_voucher_without_its_owner(hub_a):
     """The voucher's name is Services'; the customer's, Customers': the card says no more than the person may read."""
     with use_hub(hub_a):
         salon = a_salon()
