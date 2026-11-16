@@ -150,15 +150,18 @@ def committed_database(django_db_setup, django_db_blocker):
     reach the developer's own database (``default`` is checked to be the test database).
     """
     from base.models import AppActivation
+    from base.tenancy.tests.legacy import use_legacy
     from control.models import Hub
 
     with django_db_blocker.unblock():
         _assert_on_the_test_database()
         before = set(Hub.objects.filter(slug__in=LOCAL_HUBS).values_list("slug", flat=True))
         yield
-        # The root conftest's local_hubs writes them for any test with a db: committed here, so taken back.
+        # The root conftest's local_hubs writes them for any test with a db, in the fallback's tables: committed
+        # here, so taken back from there.
         added = set(LOCAL_HUBS) - before
-        AppActivation.objects.filter(host__in=added).delete()
+        with use_legacy():
+            AppActivation.objects.filter(host__in=added).delete()
         Hub.objects.filter(slug__in=added).delete()
 
 

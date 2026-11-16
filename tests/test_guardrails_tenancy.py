@@ -8,11 +8,10 @@ scanning they share (``source_files``, ``_offenders``), are ``tests/test_guardra
     tests; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
     (``live.operations.on_commit``); no migration of ``base/`` or ``apps/`` asks the router whether a model migrates
     (a ``RunPython``'s hints choose its database).
-(g) Operations that need the hub's own database: in a hub that still shares control's (``db_name=""``) each
-    refuses with its domain error before it reads or writes anything of the business in ``default``, and an API key
-    is refused for that reason (never let through by a session). Production no longer serves such a business at
-    all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
-    legacy.py``). Unlike (a)–(f), these run operations on the test database.
+(g) Operations that need the hub's own database: a business that still shares control's (``db_name=""``, not cut
+    yet) is not served at all. Each of them asked at its host, even by its administrator, answers 503 maintenance
+    having read nothing of any business, only its row in control's registry; an API key there is refused alike
+    (never let through by a session). Unlike (a)–(f), these send requests on the test database.
 """
 
 import ast
@@ -376,48 +375,37 @@ def test_the_modules_run_after_the_commit_only_through_live():
 
 #: Any key's id: no key exists in a hub without its own database.
 ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
-#: The operations that run only in a hub with its own database, with what each answers in one that still shares
-#: control's (``db_name=""``): ``{operation: (payload, status, code)}``, a domain error that never names the
-#: infrastructure. ``base.api_key.detail`` answers as for a key that does not exist (404, ``base/queries/``).
-OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
-    "base.api_key.create": ({"name": "Till", "mode": "full"}, 409, "base.api_keys_unavailable"),
-    "base.api_key.rotate": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
-    "base.api_key.revoke": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
-    "base.api_key.detail": ({"id": ANY_KEY}, 404, "not_found"),
-    "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
-    # A copy of the business's data: none is ever made in a business that shares its database.
-    "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
-    # An app's tables made when it is turned on: only a hub with its own database ever waits for them, so there is
-    # nothing to try again.
-    "base.app.retry": ({"app": "printing"}, 409, "base.app_not_failed"),
+#: The operations that run only in a hub with its own database, with what their screen sends: ``{operation:
+#: payload}``. A business that still shares control's database (``db_name=""``, not cut yet) has nothing of them: it is
+#: not served at all, its host answers 503 maintenance to anyone until its cut gives it a database of its own.
+OWN_DATABASE_OPERATIONS: dict[str, dict] = {
+    "base.api_key.create": {"name": "Till", "mode": "full"},
+    "base.api_key.rotate": {"id": ANY_KEY},
+    "base.api_key.revoke": {"id": ANY_KEY},
+    "base.api_key.detail": {"id": ANY_KEY},
+    "base.hub.reset": {"dry_run": False, "apps": ["sale"], "confirm": "a"},
+    # A copy of the business's data.
+    "base.hub.dump_link": {"id": ANY_KEY},
+    # An app's tables made when it is turned on, in the hub's own database.
+    "base.app.retry": {"app": "printing"},
 }
 #: ``base.hub.reset_apply`` (the worker's emptying of a reset) and ``base.app.activation_settle`` (the worker's step
 #: after making an app's tables) are not above: they are the platform's alone, refused to anyone else before
 #: anything is read (review of hub#490), and to the platform itself on a business without its own database
 #: (base/tests/test_worker_data.py::test_the_emptying_is_never_run_on_a_shared_database,
 #: base/tests/test_app_activation_tables.py).
-#: What the screens of those features read in any hub: in one without its own database the answer says «not available
-#: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
-OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
-    "base.api_key.list": ({}, {"available": False, "keys": []}),
+#: What the screens of those features read in any hub: ``{operation: payload}``.
+OWN_DATABASE_READS: dict[str, dict] = {
+    "base.api_key.list": {},
     # Settings › Data's «Copies» and the last reset.
-    "base.hub.dumps": ({}, {"available": False, "reset": None, "dumps": []}),
-    # System's size of the business's database (BASE-F40): «Usage and plan» reads the same answer, whose people
-    # and devices are control's (Membership, SessionOwner) and stay for every business.
-    "base.plan.usage": ({}, {"database": {"available": False, "bytes": None, "day": None}}),
-}
-#: Tables of a hub that those operations may still read in control's database for a hub without its own, each with its
-#: reason; anything else of a hub's there is the business's data and is never touched.
-SHARED_MODE_READS: dict[str, str] = {
-    "base_appactivation": (
-        "what is on is read before any operation runs; a business without its own database exists only under the "
-        "suite's fallback (base/tenancy/tests/legacy.py), where its apps are still turned on at once."
-    ),
+    "base.hub.dumps": {},
+    # System's size of the business's database (BASE-F40).
+    "base.plan.usage": {},
 }
 
 
 def _business_tables() -> set[str]:
-    """Every table of a hub's model (and of the outbox), but those ``SHARED_MODE_READS`` lets through."""
+    """Every table of a hub's model (and of the outbox)."""
     from django.apps import apps
 
     from base.tenancy import inventory
@@ -426,7 +414,7 @@ def _business_tables() -> set[str]:
         model._meta.db_table
         for model in apps.get_models(include_auto_created=True)
         if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
-    } - set(SHARED_MODE_READS)
+    }
 
 
 def business_touches(sent: dict[str, list[str]], tables: set[str]) -> dict[str, list[str]]:
@@ -454,8 +442,8 @@ def test_the_own_database_checks_see_what_they_must():
     }
     assert business_touches(sent, tables) == {"default": ["sale_order"], "hub_x": ["base_apikey"]}
     assert business_touches({"default": ['SELECT "base_hub"."id" FROM "base_hub"']}, tables) == {}
-    assert "base_hub" not in _business_tables() and "base_appactivation" not in _business_tables()
-    assert {"base_apikey", "sale_order", "live_outboxevent"} <= _business_tables()
+    assert "base_hub" not in _business_tables()
+    assert {"base_apikey", "base_appactivation", "sale_order", "live_outboxevent"} <= _business_tables()
 
 
 def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
@@ -466,78 +454,71 @@ def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
     assert set(defined.values()) <= {"base/services/__init__.py", "base/queries/__init__.py"}, defined
 
 
-def _as_admin_of(slug: str):
-    from live.context import OperationContext, Scope
+@pytest.fixture
+def not_cut(client):
+    """A business that shared control's database and has none of its own yet (``db_name=""``), and ``client`` signed
+    in as its administrator."""
+    from django.contrib.auth import get_user_model
 
-    return OperationContext(scope=Scope("host", slug), actor="ana", permissions=frozenset({"*"}), language="en")
+    from base.models import Membership
+    from control.models import Hub
+
+    hub = Hub.objects.create(slug="not-cut", status=Hub.Status.READY)
+    assert not hub.db_name
+    user = get_user_model().objects.create_user(username="ana", password="pw")
+    Membership.objects.create(user=user, host=hub.slug, role=Membership.Role.ADMIN)
+    client.force_login(user)
+    return hub
 
 
-def _run_in_a_hub_without_its_database(name: str, payload: dict):
-    """``name`` as an administrator of ``a`` (``db_name=""``, no database of its own), in its context; ``(answer or
-    error, sent)``.
-
-    Production never enters such a business (``HubWithoutDatabase``, 503 at its door): only the suite's
-    fallback does (``base/tenancy/tests/legacy.py``), and there these refusals still keep its data untouched."""
-    from live.errors import OperationError
-    from live.operations import get
-
-    from base.models import Hub
-    from base.tenancy import context
+def _asked_at_its_door(client, hub, name: str, payload: dict):
+    """``name`` asked through its route on ``hub``'s host, as its screen asks it; ``(response, sent)``."""
+    from base.api import router
     from base.tenancy.tests import hubs
+    from base.tests.routes import bound_routes
 
-    hub = Hub.objects.get(slug="a")
-    assert not hub.db_name and context.serves_hubs_without_database()
-    op = get(name)
-    with hubs.watched() as sent, context.use_hub(hub):
-        try:
-            outcome = op(_as_admin_of(hub.slug), op.input.model_validate(payload))
-        except OperationError as error:
-            outcome = error
-    return outcome, sent
+    [(method, path)] = [(method, path) for method, path, operation in bound_routes(router) if operation == name]
+    host = f"{hub.slug}.localhost"
+    with hubs.watched() as sent:
+        if method == "GET":
+            response = client.get(f"/api{path}", payload, HTTP_HOST=host)
+        else:
+            response = client.post(f"/api{path}", payload, content_type="application/json", HTTP_HOST=host)
+    return response, sent
 
 
-@pytest.mark.django_db
-@pytest.mark.parametrize("name", sorted(OWN_DATABASE_OPERATIONS))
-def test_in_a_hub_without_its_own_database_each_refuses_and_touches_no_business_data(name):
-    from live.errors import OperationError
-
-    payload, status, code = OWN_DATABASE_OPERATIONS[name]
-
-    refused, sent = _run_in_a_hub_without_its_database(name, payload)
-
-    assert isinstance(refused, OperationError), refused
-    assert (refused.status, refused.code) == (status, code)
+def assert_refused_untouched(response, sent) -> None:
+    """Refused as the business's host refuses a business not served (503 maintenance), having read nothing of any
+    business: only its row in control's registry."""
+    assert (response.status_code, response.json()["error"]["code"]) == (503, "base.hub_maintenance")
     assert set(sent) <= {"default"}, sent
     assert business_touches(sent, _business_tables()) == {}
     assert any('"base_hub"' in statement for statement in sent["default"])
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("name", sorted(OWN_DATABASE_READS))
-def test_in_a_hub_without_its_own_database_its_screen_reads_not_available_and_no_business_data(name):
-    payload, answer = OWN_DATABASE_READS[name]
-
-    read, sent = _run_in_a_hub_without_its_database(name, payload)
-
-    assert read.model_dump(mode="json", include=set(answer)) == answer
-    assert set(sent) <= {"default"}, sent
-    assert business_touches(sent, _business_tables()) == {}
+@pytest.mark.parametrize("name", sorted(OWN_DATABASE_OPERATIONS))
+def test_in_a_hub_without_its_own_database_each_refuses_and_touches_no_business_data(name, client, not_cut):
+    assert_refused_untouched(*_asked_at_its_door(client, not_cut, name, OWN_DATABASE_OPERATIONS[name]))
 
 
 @pytest.mark.django_db
-def test_an_api_key_on_a_hub_without_its_own_database_is_refused_for_that_reason_not_let_through_by_a_session(client):
-    from django.contrib.auth import get_user_model
+@pytest.mark.parametrize("name", sorted(OWN_DATABASE_READS))
+def test_in_a_hub_without_its_own_database_its_screen_reads_not_available_and_no_business_data(name, client, not_cut):
+    assert_refused_untouched(*_asked_at_its_door(client, not_cut, name, OWN_DATABASE_READS[name]))
 
-    from base.models import Membership
 
-    user = get_user_model().objects.create_user(username="ana", password="pw")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.ADMIN)
-    client.force_login(user)
+@pytest.mark.django_db
+def test_an_api_key_on_a_hub_without_its_own_database_is_refused_for_that_reason_not_let_through_by_a_session(
+    client, not_cut
+):
     key = {"HTTP_AUTHORIZATION": "Bearer erpk_live_" + "x" * 43}
+    host = f"{not_cut.slug}.localhost"
 
-    refused = client.get("/api/demo/items", HTTP_HOST="a.localhost", **key)
+    refused = client.get("/api/demo/items", HTTP_HOST=host, **key)
 
-    assert refused.status_code == 401
-    assert refused.json()["error"]["code"] == "base.api_keys_unavailable"
-    # Without the key, the same session goes on as always.
-    assert client.get("/api/demo/items", HTTP_HOST="a.localhost").status_code == 200
+    assert refused.status_code == 503
+    assert refused.json()["error"]["code"] == "base.hub_maintenance"
+    # Without the key, the administrator's own session is refused alike: nobody is let in.
+    without_the_key = client.get("/api/demo/items", HTTP_HOST=host)
+    assert (without_the_key.status_code, without_the_key.json()["error"]["code"]) == (503, "base.hub_maintenance")
