@@ -10,7 +10,6 @@ import dataclasses
 import datetime as dt
 import json
 
-import psycopg
 import pytest
 from django.test import RequestFactory
 from django.utils import timezone
@@ -882,21 +881,6 @@ def test_a_termination_without_an_open_day_changes_nothing(person, clock):
 
 
 # Live notifications: a write in one scope reaches that scope's channel only
-
-
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
 
 
 def received(session, timeout=1.0, stop_after=None):

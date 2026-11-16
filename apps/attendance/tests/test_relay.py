@@ -9,16 +9,14 @@ The worker's real loop serves each business in its own database and releases its
 what these tests write is committed.
 """
 
-import json
 
-import psycopg
 import pytest
 from django.utils import timezone, translation
 from live.models import OutboxEvent
-from live.outbox import channel_for
 
 from apps.attendance import events
 from apps.attendance.models import Correction
+from apps.flow.tests.test_relay import heard
 from base.models import EventDelivery
 from base.tenancy.context import use_hub
 
@@ -142,25 +140,6 @@ def test_a_person_without_an_open_day_leaves_and_nothing_happens(worker_loop, pe
 
 
 # ── Two hubs ─────────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def listen(transactional_db, db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 0.5) -> set[str]:
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
 def test_a_person_who_leaves_hub_b_has_b_day_closed_only_and_is_heard_in_b_only(listen, person, worker_loop, hub_b):

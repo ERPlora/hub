@@ -1,5 +1,5 @@
 """Fixtures of the attendance tests: contexts per role and scope, users with a role on a host, staff
-members linked to them (the real staff app, never a double), a frozen clock and a raw DSN.
+members linked to them (the real staff app, never a double) and a frozen clock.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it."""
@@ -8,12 +8,10 @@ import datetime as dt
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connections
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
-from psycopg.conninfo import make_conninfo
 
 from apps.flow.tests.test_relay import worker_loop
 from apps.invoice.tests.conftest import catalog_of, in_hubs
@@ -126,16 +124,3 @@ def clock(monkeypatch):
 def utc(text: str) -> dt.datetime:
     """``"2026-10-06T08:00"`` → that instant in UTC."""
     return dt.datetime.fromisoformat(text).replace(tzinfo=dt.UTC)
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (LISTEN)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
