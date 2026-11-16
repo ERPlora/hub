@@ -27,6 +27,7 @@ from django.db.migrations.recorder import MigrationRecorder
 
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import migrator, names
+from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import (  # noqa: F401 (fixtures)
     committed_database,
@@ -507,7 +508,8 @@ def switch(db):
 
     yield SimpleNamespace(freeze=freeze, lift=lift)
     Freeze.objects.update(frozen=False, reason="", since=None, by="")
-    OutboxEvent.objects.filter(name__startswith="control.freeze.", created_at__gte=started).delete()
+    with use_control():  # the platform's events, in control's outbox
+        OutboxEvent.objects.filter(name__startswith="control.freeze.", created_at__gte=started).delete()
 
 
 def test_frozen_it_refuses_to_start_says_why_and_migrates_nothing(switch, monkeypatch):
