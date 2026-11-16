@@ -19,6 +19,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
+    HUB_DB,
     NOON,
     A,
     add_line,
@@ -34,7 +35,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

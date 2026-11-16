@@ -16,12 +16,12 @@ import uuid
 import pytest
 from django.utils import timezone
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
-from live.models import OutboxEvent
 
 from apps.sale.models import Order
 from apps.table.models import Hold, SessionMove, Table, TableSession
 
 from .conftest import (
+    HUB_DB,
     add_line,
     charge,
     ctx_for,
@@ -33,19 +33,9 @@ from .conftest import (
     open_check,
     run,
 )
+from .test_services import EMPLOYEE, MANAGER, names
 
-pytestmark = pytest.mark.django_db
-
-EMPLOYEE = "hub_employee"
-MANAGER = "hub_manager"
-
-
-def names(prefix: str = "table.") -> list[str]:
-    return list(
-        OutboxEvent.objects.filter(name__startswith=prefix)
-        .order_by("created_at", "id")
-        .values_list("name", flat=True)
-    )
+pytestmark = HUB_DB
 
 
 def status(table) -> str:

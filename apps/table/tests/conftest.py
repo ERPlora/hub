@@ -5,23 +5,28 @@ The room (zones, tables, holds) is built straight on the models: the operations 
 checks of Sales and the cards of Customers are made by their own apps' operations, never by hand: the
 integration with ``sale`` and ``customer`` is tested as it runs (no mocks). The builders import the
 models lazily, so the tests of apps.py still collect while models.py does not exist.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
 """
 
 import datetime as dt
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.db import connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
-from psycopg.conninfo import make_conninfo
 
-from base.models import Membership
+from apps.sale.tests.conftest import db_dsn, make_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, and what Sales' tests already make of them (users
+#: with a role, the raw DSN of control), that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "db_dsn", "hub_staff", "in_business_a", "make_user", "plan_with_room",
+]
 
 
 def ctx_for(
@@ -64,35 +69,6 @@ def english():
     """Every test starts in English: a request in Spanish leaves its language active on the thread."""
     with translation.override("en"):
         yield
-
-
-@pytest.fixture
-def make_user(db):
-    def make(
-        username: str = "ana",
-        *,
-        host: str | None = "a",
-        role: str = Membership.Role.ADMIN,
-    ):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        return user
-
-    return make
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
 
 
 # ── Builders of the room ─────────────────────────────────────────────────────────────────────────

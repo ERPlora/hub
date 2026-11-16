@@ -16,6 +16,7 @@ from base import assistant
 from base.tests.test_assistant import technical_names
 
 from .conftest import (
+    HUB_DB,
     add_line,
     ctx_for,
     make_customer,
@@ -59,7 +60,7 @@ def test_the_card_names_the_colour_of_a_zone_never_by_its_technical_name():
         assert labels(assistant.cards.card(get(name), {"color": "success"}, "en")) == ["Zone colour"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_table_a_check_goes_to_when_it_is_transferred(room):
     """«Transferir 4 a…»: the table it goes to (by id or by number) and that table's zone."""
     transfer = get("table.session.transfer")
@@ -78,7 +79,7 @@ def test_the_card_names_the_table_a_check_goes_to_when_it_is_transferred(room):
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_check_that_stays_when_two_tables_are_merged(room):
     """«Fusionar 4 con…»: the check that stays, as Sales' merge names it, or the table whose check stays."""
     merge = get("table.session.merge")
@@ -97,7 +98,7 @@ def test_the_card_names_the_check_that_stays_when_two_tables_are_merged(room):
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_customer_and_the_reservation_of_a_table_seated(room):
     """Seating a table for a customer or a reservation: the table sheet's «Cliente» and «Reserva»."""
     seat = get("table.session.open")
@@ -114,7 +115,7 @@ def test_the_card_names_the_customer_and_the_reservation_of_a_table_seated(room)
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_lines_that_move_when_a_check_is_split(room):
     """«Dividir cuenta»: the lines that go to the new check, as Sales names the ones a split moves."""
     split = get("table.session.split")
@@ -123,7 +124,7 @@ def test_the_card_names_the_lines_that_move_when_a_check_is_split(room):
     assert labels(assistant.cards.card(split, arguments, "en", ctx=ctx_for())) == ["Lines to move"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_zone_a_table_moves_to_apart_from_the_zone_it_is_in(room):
     """Editing table 4 of the terrace to take it to the dining room: «Zona» is where it is, never where it goes."""
     update = get("table.table.update")
@@ -187,7 +188,7 @@ def room(product) -> dict[str, str]:
     return {"booking": str(booking)} | {name: str(record.id) for name, record in records.items()}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "parked", "no_zone"), [("es", "Aparcada", "7 (sin zona)"), ("en", "Parked", "7 (no zone)")]
 )
@@ -256,7 +257,7 @@ def test_every_record_a_write_of_table_names_by_its_id_is_named_on_its_card(room
         assert not AN_ID.search(json.dumps(card, ensure_ascii=False)), name
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "zone", "table", "check"), [("es", "Zona", "Mesa", "Cuenta"), ("en", "Zone", "Table", "Check")]
 )
@@ -286,7 +287,7 @@ def test_the_record_a_write_acts_on_is_called_what_it_is_never_id(room, language
     assert called == {name: [label] for (label, _), names in acting_on.items() for name in names}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id(room):
     """The card reads each name as the person who confirms: a waiter without Sales' «view» sees no check of Sales, and
     nobody at hand (an automation's card) reads nothing for anybody."""
