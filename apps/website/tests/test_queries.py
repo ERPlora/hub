@@ -9,21 +9,16 @@ from django.core.cache import cache
 from django.test import RequestFactory
 from live.context import Scope
 from live.errors import NotFound, PermissionDenied
-from live.operations import get
 
 from apps.website.queries import catalog_cache_key, live_version, published_page, read_catalog
 from apps.website.schemas import CatalogSection
 from apps.website import reviews
 from apps.website.tests.conftest import HOST, HUB_DB, PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
+from apps.website.tests.test_services import run
 from base.models import Hub
 from base.tenancy.context import use_hub
 
 pytestmark = HUB_DB
-
-
-def run(name: str, data: dict | None = None, ctx=None):
-    op = get(name)
-    return op(ctx or ctx_for(), op.input(**(data or {})))
 
 
 def save(content=None, template="classic"):
