@@ -257,6 +257,19 @@ class TestThePassIsBound:
         token = granted(client)
         assert code(post(client, SETTINGS, CHANGE, host=B_HOST, **with_pass(token))) == "requires_elevation"
 
+    def test_to_this_business_even_with_its_very_row_in_the_other_one(self, client, adam, eva, hub_b):
+        """The request a pass is for names its business: the same row, in B's database, lets nothing through there."""
+        from base.tenancy.context import use_hub
+
+        Membership.objects.create(user=eva, host=B.key, role=Membership.Role.EMPLOYEE)
+        token = granted(client)
+        row = Approval.objects.values().get()
+        with use_hub(hub_b):
+            Approval.objects.create(**row)
+        assert code(post(client, SETTINGS, CHANGE, host=B_HOST, **with_pass(token))) == "requires_elevation"
+        with use_hub(hub_b):
+            assert Approval.objects.get().used_at is None
+
     def test_for_two_minutes(self, client, adam, eva):
         token = granted(client)
         Approval.objects.update(expires_at=Approval.objects.get().created_at - dt.timedelta(seconds=1))
