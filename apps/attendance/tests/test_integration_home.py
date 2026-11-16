@@ -7,27 +7,21 @@ base, staff and attendance run for real: the panel comes from AttendanceConfig t
 are clocked through attendance's own operations.
 """
 
-import json
-
-import psycopg
 import pytest
-from django.db import connections
 from live.context import OperationContext
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
 from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
 from apps.attendance.models import Record
 from apps.staff.models import Member
+from apps.staff.tests.test_integration_home import affected, received
 from base.schemas import WidgetListIn
 from base.tenancy.context import use_hub
 
 from .conftest import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, run
 
 CLOCKED_IN_NOW = "attendance.clocked_in_now"
-WAIT = 1.0
 QUIET = 0.3
 
 
@@ -139,33 +133,6 @@ def test_a_spanish_request_reads_the_panel_in_spanish(client, make_user):
     assert widgets.status_code == 200
     ours = [widget for widget in widgets.json()["widgets"] if widget["app"] == "attendance"]
     assert [(widget["title"], widget["category"]) for widget in ours] == [("Fichados ahora", "Control horario")]
-
-
-@pytest.fixture
-def listen(django_db_setup):
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
-    sessions = []
-
-    def open_listener(scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_listener
-    for session in sessions:
-        session.close()
-
-
-def received(session, timeout=WAIT):
-    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
-
-
-def affected(session) -> set[str]:
-    return live_registry.affected({event for _, payload in received(session) for event in payload["events"]})
 
 
 # Transactional: the notice leaves after a real COMMIT.

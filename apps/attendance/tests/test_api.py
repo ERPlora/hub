@@ -12,6 +12,7 @@ from apps.attendance.api import router
 from apps.attendance.models import Correction, Record
 from apps.flow.tests.test_api import get, post
 from apps.staff.models import Member
+from base.tests.routes import bound_routes
 from config.api import api
 
 from .conftest import HOST, HUB_DB, B
@@ -57,13 +58,7 @@ def boss(client, make_user):
 
 
 def test_every_route_is_bound_to_its_operation():
-    routes = {
-        (method, path, route.operation_id)
-        for path, view in router.path_operations.items()
-        for route in view.operations
-        for method in route.methods
-    }
-    assert routes == ROUTES
+    assert bound_routes(router) == ROUTES
 
 
 def test_the_api_keeps_parity():

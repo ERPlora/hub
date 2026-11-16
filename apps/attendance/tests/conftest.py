@@ -9,7 +9,7 @@ import datetime as dt
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from django.utils import timezone, translation
+from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
@@ -18,6 +18,8 @@ from psycopg.conninfo import make_conninfo
 from apps.flow.tests.test_relay import worker_loop
 from apps.invoice.tests.conftest import catalog_of, in_hubs
 from apps.staff.models import Member
+from apps.staff.tests.conftest import english
+from apps.staff.tests.test_integration_home import listen
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
@@ -25,10 +27,11 @@ from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
 #: The scopes, marks and fixtures of the businesses' own databases (the platform staff with business A chosen in the
 #: Hub admin, business A on a plan with room for several sessions, one tick of the worker's real loop over every
-#: business) and the assistant's catalogue of a person of business A, that these tests take from here.
+#: business), the assistant's catalogue of a person of business A, every test in English and a listener of the live
+#: notices, that these tests take from here.
 __all__ = [
-    "HOST", "HUB_DB", "HUB_DB_COMMITTED", "A", "B", "catalog_of", "hub_staff", "in_business_a", "in_hubs",
-    "plan_with_room", "worker_loop",
+    "HOST", "HUB_DB", "HUB_DB_COMMITTED", "A", "B", "catalog_of", "english", "hub_staff", "in_business_a", "in_hubs",
+    "listen", "plan_with_room", "worker_loop",
 ]
 
 
@@ -54,13 +57,6 @@ def run(name: str, data, ctx: OperationContext | None = None):
         data if isinstance(data, op.input) else op.input.model_validate(data or {})
     )
     return op(ctx or ctx_for(), payload)
-
-
-@pytest.fixture(autouse=True)
-def english():
-    """Every test starts in English: a request in Spanish leaves its language active on the thread."""
-    with translation.override("en"):
-        yield
 
 
 @pytest.fixture
