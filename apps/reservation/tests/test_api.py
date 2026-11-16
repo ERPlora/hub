@@ -1,8 +1,7 @@
 """The reservation app's routes: each bound to its operation, and the whole book over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. No path parameters: a record travels in the input (query string on GET, body on POST), by
-its id or as a person says it.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction. No path
+parameters: a record travels in the input (query string on GET, body on POST), by its id or as a person says it.
 """
 
 import json
@@ -10,11 +9,12 @@ import json
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.reservation.api import router
 from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import make_reservation, make_table, open_week
+from .conftest import HOST, HUB_DB, A, B, make_reservation, make_table, open_week
 
 ROUTES = {
     ("GET", "/reservation/reservations", "reservation.reservation.list"),
@@ -53,29 +53,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("luis", host="a", role="hub_employee"))
+    client.force_login(make_user("luis", host=A.key, role="hub_employee"))
     return client
 
 
@@ -108,7 +94,7 @@ def test_the_spas_route_map_names_every_reservation_route():
 # ── Authentication and permissions ───────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/reservation/reservations"),
@@ -118,7 +104,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_host_runs_the_book_but_not_its_rules(employee_client):
     open_week()
     for path in (
@@ -167,10 +153,10 @@ def test_the_host_runs_the_book_but_not_its_rules(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
     assert (
-        get(admin_client, "/reservation/reservations", host="b.localhost").status_code
+        get(admin_client, "/reservation/reservations", host=f"{B.key}.localhost").status_code
         == 403
     )
 
@@ -178,7 +164,7 @@ def test_a_role_on_a_is_no_role_on_b(admin_client):
 # ── Validation and refusals ──────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_booking_is_422_per_field(admin_client):
     response = post(
         admin_client,
@@ -193,7 +179,7 @@ def test_an_invalid_booking_is_422_per_field(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/reservation/reservations", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -202,7 +188,7 @@ def test_a_limit_over_100_is_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_full_slot_is_a_409_with_its_code_and_field_in_the_readers_language(
     admin_client,
 ):
@@ -210,16 +196,19 @@ def test_a_full_slot_is_a_409_with_its_code_and_field_in_the_readers_language(
 
     make_slot(THURSDAY, "20:00", "23:30", max_reservations=1)
     make_reservation()
-    response = post(
-        admin_client,
-        "/reservation/reservations",
-        {
-            "guest_name": "Luis",
-            "guest_phone": "600333444",
-            "date": "2026-10-15",
-            "time": "21:00",
-            "party_size": 2,
-        },
+    response = admin_client.post(
+        "/api/reservation/reservations",
+        json.dumps(
+            {
+                "guest_name": "Luis",
+                "guest_phone": "600333444",
+                "date": "2026-10-15",
+                "time": "21:00",
+                "party_size": 2,
+            }
+        ),
+        content_type="application/json",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409
@@ -232,13 +221,14 @@ def test_a_full_slot_is_a_409_with_its_code_and_field_in_the_readers_language(
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_on_behalf_of_another_guest_is_a_409_that_says_nothing_of_the_booking(admin_client):
     other = make_reservation()
-    response = post(
-        admin_client,
-        "/reservation/reservations/cancel",
-        {"id": str(other.id), "on_behalf_of": "01a15d83-0000-7000-8000-000000000000"},
+    response = admin_client.post(
+        "/api/reservation/reservations/cancel",
+        json.dumps({"id": str(other.id), "on_behalf_of": "01a15d83-0000-7000-8000-000000000000"}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409
@@ -251,7 +241,7 @@ def test_a_change_on_behalf_of_another_guest_is_a_409_that_says_nothing_of_the_b
 # ── The whole flow over HTTP ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_booking_confirming_seating_and_completing_over_http(admin_client):
     open_week()
     table = make_table("5")

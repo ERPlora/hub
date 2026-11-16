@@ -15,11 +15,10 @@ from live.operations import get, registry
 
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID, unnamed
 
-from .conftest import GENERIC, ctx_for, run
+from .conftest import GENERIC, HUB_DB, ctx_for, run
 
 FRONTEND = Path(apps.get_app_config("modifier").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["modifier"]
@@ -173,9 +172,9 @@ def test_every_record_a_write_of_modifier_names_by_its_id_is_listed_here():
     assert {op.name: unnamed(op)[0] for op in modifier_writes() if unnamed(op)[0]} == {}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_of_modifier_names_each_record_as_its_screens_do(language, hub_a, no_fallback):
+def test_a_write_of_modifier_names_each_record_as_its_screens_do(language, hub_a):
     """«Borra el grupo», «quita ese suplemento de la hamburguesa»: the card says which group, option, link, product or
     category by its name, in the person's language, never by its id."""
     with use_hub(hub_a):
@@ -184,9 +183,9 @@ def test_a_write_of_modifier_names_each_record_as_its_screens_do(language, hub_a
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallback):
+def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
     """«Grupo: Salsas», «Opción: Ali oli (Salsas)», never «Id: Salsas»: the mark alone would name it under its field."""
     with use_hub(hub_a):
         shown = cards(a_menu(hub_a), in_hub(hub_a, language=language), language)
@@ -195,8 +194,8 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a, no_fallb
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_modifier(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_record_of_modifier(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         shown = cards(a_menu(hub_a), None)
@@ -204,8 +203,8 @@ def test_nobody_behind_the_request_reads_no_record_of_modifier(hub_a, no_fallbac
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a):
     """Whoever may keep the modifiers but see neither them nor the catalogue (a key that only writes, say) gets every
     record left out, never its id."""
     writes_only = OperationContext(
@@ -217,8 +216,8 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in SAID}
     with use_hub(hub_a):
         shown = cards(gone, in_hub(hub_a))
@@ -226,8 +225,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallba
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's group, option, link, product or category is nobody in hub A."""
     with use_hub(hub_b):
         theirs = a_menu(hub_b)
@@ -240,8 +239,8 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fa
     assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens()
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a, no_fallback):
+@HUB_DB
+def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a):
     """«Grande» of the drinks and «Grande» of the chips: whoever confirms deleting one sees which, as the question the
     assistant asks when the name alone is not enough says it."""
     with use_hub(hub_a):
@@ -257,8 +256,8 @@ def test_two_options_with_one_name_are_told_apart_by_their_group(hub_a, no_fallb
     assert said == ["Grande (Bebidas)", "Grande (Patatas)"]
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_link_to_a_category_is_named_by_its_group_and_that_category(hub_a, no_fallback):
+@HUB_DB
+def test_a_link_to_a_category_is_named_by_its_group_and_that_category(hub_a):
     with use_hub(hub_a):
         admin = in_hub(hub_a)
         category = run("inventory.category.create", {"name": "Postres"}, ctx=admin)

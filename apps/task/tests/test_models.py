@@ -5,14 +5,15 @@ import datetime as dt
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
+from live.operations import atomic
 
 from apps.task.models import Comment, Project, Task, TaskCounter
 
-from .conftest import make_comment, make_member, make_project, make_task
+from .conftest import HUB_DB, make_comment, make_member, make_project, make_task
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_keys_are_uuid7():
@@ -34,23 +35,23 @@ def test_the_five_statuses_and_four_priorities_of_the_old_module():
 
 def test_a_number_is_unique():
     make_task(number="TSK-20261014-0001")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_task(number="TSK-20261014-0001")
 
 
 def test_done_and_a_completion_date_go_together():
     now = timezone.now()
     make_task(status="done", completed_at=now)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_task(status="done", completed_at=None)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_task(status="cancelled", completed_at=now)
 
 
 def test_a_task_is_not_its_own_parent():
     task = make_task()
     task.parent = task
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         task.save()
 
 
@@ -82,7 +83,7 @@ def test_an_assignee_record_deleted_from_the_admin_leaves_the_task_unassigned():
 
 def test_a_project_code_is_unique_whatever_the_case():
     make_project(code="Q3-Audit")
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make_project(code="q3-audit", name="Other")
 
 
@@ -94,7 +95,7 @@ def test_a_project_is_born_active_without_colour():
 
 def test_one_counter_per_day():
     TaskCounter.objects.create(day=dt.date(2026, 10, 14))
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         TaskCounter.objects.create(day=dt.date(2026, 10, 14))
 
 

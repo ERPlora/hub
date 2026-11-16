@@ -14,16 +14,11 @@ from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.reservation.models import (
-    BlockedDate,
-    Reservation,
-    Settings,
-    TimeSlot,
-    WaitlistEntry,
-)
+from apps.reservation.models import BlockedDate, Reservation, Settings, TimeSlot, WaitlistEntry
 
 from .conftest import (
     A,
+    HUB_DB,
     NOW,
     THURSDAY,
     TOMORROW,
@@ -40,7 +35,7 @@ from .conftest import (
     set_rules,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 MANAGER = "hub_manager"

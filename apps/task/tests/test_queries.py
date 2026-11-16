@@ -12,9 +12,9 @@ from apps.task.models import Task
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import ctx_for, make_comment, make_member, make_project, make_task
+from .conftest import HUB_DB, ctx_for, make_comment, make_member, make_project, make_task
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 

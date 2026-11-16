@@ -14,19 +14,18 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from live import assistant as shared
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.operations import get, registry
 
 from apps.cash_register.models import Session
-from apps.cash_register.tests.conftest import A, charge, ctx_for, open_session, run
+from apps.cash_register.tests.conftest import HUB_DB, A, B, charge, ctx_for, open_session, run
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID
 from base.tests.test_services_assistant import answered, waiting
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ASK = {"role": "user", "content": "cierra la caja con 250 € contados"}
 
@@ -583,10 +582,9 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
             assert datum not in values(card) and no_id(card), name
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_session_or_drawer_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_test_fallback):
+def test_a_session_or_drawer_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's session or drawer is nobody in hub A."""
-    in_b = ctx_for(scope=Scope("host", hub_b.slug))
+    in_b = ctx_for(scope=B)
     with use_hub(hub_b):
         bar = run("cash_register.register.create", {"name": "Barra B"}, in_b)
         session = run("cash_register.session.open", {"opening_balance": 0, "register_id": str(bar.id)}, in_b)
@@ -594,7 +592,7 @@ def test_a_session_or_drawer_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, h
             assistant.cards.card(get("cash_register.count.add"), {"session_id": str(session.id), "total": 1}, "es", in_b),
             assistant.cards.card(get("cash_register.session.open"), {"register_id": str(bar.id)}, "es", in_b),
         )
-    in_a = ctx_for(scope=Scope("host", hub_a.slug))
+    in_a = ctx_for(scope=A)
     with use_hub(hub_a):
         said = (
             assistant.cards.card(get("cash_register.count.add"), {"session_id": str(session.id), "total": 1}, "es", in_a),

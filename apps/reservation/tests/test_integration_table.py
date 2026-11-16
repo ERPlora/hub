@@ -13,6 +13,7 @@ from apps.sale.models import Order
 from apps.table.models import Hold, TableSession
 
 from .conftest import (
+    HUB_DB,
     MADRID,
     THURSDAY,
     book,
@@ -27,7 +28,7 @@ from .conftest import (
     set_rules,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 

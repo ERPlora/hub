@@ -1,31 +1,34 @@
-"""Fixtures of the modifier tests: contexts per role and scope, users with a role on a host, a raw DSN,
-the real Inventory and Taxes rows a group is linked to (no doubles), and one tick of the worker's real relay.
+"""Fixtures of the modifier tests: contexts per role and scope, and the real Inventory and Taxes rows a group is linked
+to (no doubles).
 
-The models are imported lazily, so that the tests of apps.py still collect while models.py does not
-exist.
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+
+The models are imported lazily, so that the tests of apps.py still collect while models.py does not exist.
 """
 
-import json
-import threading
-
-import psycopg
 import pytest
-from django.contrib.auth import get_user_model
-from django.db import connections
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone, translation
+from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
-from base import catalog, worker
-from base.catalog import RegisterResult
-from base.models import Membership
+from apps.flow.tests.test_relay import heard, listen, worker_loop
+from apps.inventory.tests.test_relay import tick
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import db_dsn, make_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, factory_data_b, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, users with a role on a host and the raw DSN of
+#: control's database as Sales makes them, the assistant's catalogue of a person of business A, a session that hears the
+#: notices of a scope, and one tick of the worker's real loop over every business with the factory data planted again
+#: (Inventory's, on Automations' loop), that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "factory_data", "factory_data_b", "heard",
+    "hub_staff", "in_business_a", "listen", "make_user", "plan_with_room", "tick", "worker_loop",
+]
+
 #: A tax category of Taxes' Spanish factory catalogue (migration tax.0002): restaurant food, 10 %.
 FOOD = "restaurant.food"
 #: The general one (21 %): what a bottled soft drink pays.
@@ -38,15 +41,6 @@ def english():
     Django's LocaleMiddleware leaves it active in the thread for the tests that follow."""
     with translation.override("en"):
         yield
-
-
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database (the tests
-    with the hubs ``hub_a`` and ``hub_b`` of the root conftest, each with its own database)."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 def ctx_for(
@@ -84,22 +78,6 @@ def run(
     return op(ctx or ctx_for(role), op.input.model_validate(data or {}))
 
 
-@pytest.fixture
-def make_user(db):
-    def make(
-        username: str = "ana",
-        *,
-        host: str | None = "a",
-        role: str = Membership.Role.ADMIN,
-    ):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        return user
-
-    return make
-
-
 def make_product(
     name: str = "Burger",
     sku: str = "BUR",
@@ -117,79 +95,3 @@ def make_product(
 def make_category(name: str = "Mains"):
     """A category of the real Inventory app, made through its own operation."""
     return run("inventory.category.create", {"name": name})
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (LISTEN, or reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
-
-
-# ── The worker's relay, as production runs it ────────────────────────────────────────────────────
-
-#: What ``register_apps`` says when it has nothing to write: the tick runs without the SaaS.
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
-
-
-def one_tick() -> None:
-    """One tick of the worker's real loop (``base.worker.run``): the outbox relay hands each new event to the
-    reactions of the apps (``events.py``), as production does."""
-    stop = threading.Event()
-
-    def wait(_seconds: float) -> bool:
-        stop.set()
-        return True
-
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
-
-
-@pytest.fixture
-def tick(db, monkeypatch):
-    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
-    the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return one_tick
-
-
-@pytest.fixture
-def factory_data(transactional_db):
-    """A transactional test starts from a flushed database: Taxes' factory catalogue is planted again, as its
-    migrations do (idempotent)."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    with connections["default"].schema_editor() as editor:
-        for module in ("apps.tax.migrations.0002_factory_catalogue", "apps.tax.migrations.0005_retail_alcohol"):
-            import_module(module).plant(registry, editor)
-
-
-@pytest.fixture
-def listen(factory_data, db_dsn):
-    """``listen(scope)``: a raw session LISTENing on the channel of ``scope`` (it hears only what is committed),
-    on committed data with Taxes' factory catalogue."""
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 0.5) -> set[str]:
-    """The event names the notices on ``session`` carried."""
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}

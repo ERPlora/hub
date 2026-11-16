@@ -8,9 +8,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.modifier.models import ModifierGroup, ModifierOption
 
-from .conftest import FOOD, GENERIC, ctx_with, make_category, make_product, run
+from .conftest import FOOD, GENERIC, HUB_DB, ctx_with, make_category, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def group(name, **fields):

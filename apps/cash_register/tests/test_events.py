@@ -6,10 +6,10 @@ to sale's events and loses nothing without the outbox relay: its live queries on
 
 import re
 
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.cash_register import events
+from apps.cash_register.tests.conftest import A
 
 PAST_FACT = re.compile(r"^cash_register\.[a-z_]+\.[a-z_]+ed$")
 
@@ -57,4 +57,4 @@ def test_the_sale_events_that_change_a_shift():
 def test_it_reacts_to_no_event():
     assert events.REACTIONS == {}
     for name in events.SALE_EVENTS:
-        assert events.react(Scope("host", "a"), name, {"sale_id": "x"}) is None
+        assert events.react(A, name, {"sale_id": "x"}) is None

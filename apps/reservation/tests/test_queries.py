@@ -11,6 +11,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
+    HUB_DB,
     THURSDAY,
     TODAY,
     TOMORROW,
@@ -27,7 +28,7 @@ from .conftest import (
     set_week_hours,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOBODY = ctx_for(permissions=set())
 
