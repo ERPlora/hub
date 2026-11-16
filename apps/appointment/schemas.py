@@ -36,7 +36,7 @@ MAX_BULK_DELETE = 100
 MAX_RANGE_DAYS = 62
 
 #: How the assistant's card names an appointment, a repeating appointment, a blocked period and what booking one takes,
-#: by what their reads answer and never by an id (base/assistant.py).
+#: by what their reads answer and never by an id (base/assistant/cards.py).
 AN_APPOINTMENT = names("appointment.appointment.get", name=("label",))
 A_SERIES = names("appointment.recurring.get", name=("label",))
 A_BLOCK = names("appointment.blocked_time.get", name=("label",))

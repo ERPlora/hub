@@ -54,7 +54,7 @@ T_MENU = gettext_noop("Menu")
 T_COURSE = gettext_noop("Course")
 T_CHOICE = gettext_noop("Choice")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a menu and a course by their name and a choice by its product's, as the builder's «Withdraw»
 # and «Remove» dialogs say them; a product of Inventory by its name, as Inventory's screens say it.
 A_MENU = names("combo.combo.get")

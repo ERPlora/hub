@@ -79,7 +79,7 @@ def without(permissions: set[str], language: str = "en") -> OperationContext:
 
 
 def card_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    return assistant.card(get(write), arguments, language, ctx or as_admin(language))
+    return assistant.cards.card(get(write), arguments, language, ctx or as_admin(language))
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
@@ -98,7 +98,7 @@ def appointment_writes() -> list:
     return [
         op
         for _, op in sorted(registry.items())
-        if op.app_label == "appointment" and op.kind == "command" and assistant.is_tool(op)
+        if op.app_label == "appointment" and op.kind == "command" and assistant.tools.is_tool(op)
     ]
 
 
@@ -319,7 +319,7 @@ def test_nobody_behind_the_request_reads_no_record(salon):
         ("appointment.recurring.delete", {"id": str(diary.series.id)}),
         ("appointment.blocked_time.create", {"title": "Off", "staff_id": str(salon.ana.id)}),
     ):
-        card = assistant.card(get(write), sent, "en")
+        card = assistant.cards.card(get(write), sent, "en")
         assert no_id(card), write
         assert {"id", "staff_id"}.isdisjoint(field["name"] for field in card["fields"]), write
 
@@ -364,7 +364,7 @@ def test_a_block_is_named_in_the_language_of_whoever_reads_it_whatever_the_one_a
 def test_the_read_that_names_a_block_is_no_tool_nor_route():
     """Only the card reads a block by its id: the model reads them by their list, and no screen asks for one."""
     read = get("appointment.blocked_time.get")
-    assert (read.kind, read.expose_api, assistant.is_tool(read)) == ("query", False, False)
+    assert (read.kind, read.expose_api, assistant.tools.is_tool(read)) == ("query", False, False)
     assert read.permission == get("appointment.blocked_time.list").permission
 
 

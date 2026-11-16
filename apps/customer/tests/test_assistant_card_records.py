@@ -31,7 +31,7 @@ SALES_NAMES = "sale.record.get"
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -481,7 +481,7 @@ def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     card, vip = a_card(), CustomerGroup.objects.create(name="VIP")
     write = get("customer.customer.set_groups")
-    said = {field["name"]: field["value"] for field in assistant.card(write, {"id": str(card.id), "group_ids": [str(vip.id)]}, "en")["fields"]}
+    said = {field["name"]: field["value"] for field in assistant.cards.card(write, {"id": str(card.id), "group_ids": [str(vip.id)]}, "en")["fields"]}
     assert said == {"group_ids": [None]}
 
 
@@ -614,4 +614,4 @@ def test_the_reads_refuse_no_id(name):
 @pytest.mark.parametrize("name", READS)
 def test_the_reads_are_no_tool_of_the_assistant(name):
     """The model finds them in its lists; only the card reads them."""
-    assert not assistant.is_tool(get(name))
+    assert not assistant.tools.is_tool(get(name))

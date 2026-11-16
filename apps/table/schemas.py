@@ -6,7 +6,7 @@ number («4») and, when the number repeats, its zone («the terrace»); a zone 
 their name or phone. Every input refuses a field it does not declare; an edit changes only the fields
 it sends. Moments travel ISO 8601 with their zone; money in cents.
 
-Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+Each id a write takes is marked with the read that names its record (``names``, base/assistant/cards.py ``REFERS``,
 checked at start by ``base.E009``): the assistant's card says which zone, table, check, check of Sales, customer,
 reservation or line, as the person who confirms reads it, never by the id. A table by its number with its zone
 («5 (Terrace)»: the number repeats across zones), a check by where it is, a reservation by the name its hold paints

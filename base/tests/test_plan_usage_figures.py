@@ -610,7 +610,7 @@ def test_the_bell_never_calls_erplora_com(hub_a, monkeypatch):
     def refuses(*args, **kwargs):
         raise AssertionError("the bell asked erplora.com")
 
-    monkeypatch.setattr("base.assistant.usage", refuses)
+    monkeypatch.setattr("base.assistant.gateway.usage", refuses)
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     measured(hub_a, s3=100)
 

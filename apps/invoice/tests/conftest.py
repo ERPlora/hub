@@ -119,7 +119,7 @@ def catalog_of(make_user):
             users[role] = make_user(f"asker-{role}", role=role)
         user = users[role]
         ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
-        return assistant.catalog(ctx)
+        return assistant.tools.catalog(ctx)
 
     return of
 

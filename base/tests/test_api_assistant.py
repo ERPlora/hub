@@ -497,14 +497,14 @@ def test_the_turn_asks_the_documentation_before_its_transaction_opens(client, ma
     gateway.reply(DOCS, json={"results": [EXCERPT]})
     gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
     seen = []
-    post_to_gateway = assistant._post
+    post_to_gateway = assistant.gateway._post
 
     def probe(path, payload):
         if path == DOCS:
             seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post_to_gateway(path, payload)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
     got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
 

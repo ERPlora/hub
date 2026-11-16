@@ -4,7 +4,7 @@ real model: the QA reads it to write its own phrases
 and to check which tool the model calls, which card a write shows and what the role is refused.
 
 It names no business: the catalogue is a member's of a business with every app on (the e2e business ``a``), as a
-chat turn builds it (``base.assistant.catalog``, with the role's permissions); ``--apps`` narrows it to those apps.
+chat turn builds it (``base.assistant.tools.catalog``, with the role's permissions); ``--apps`` narrows it to those apps.
 """
 
 import json
@@ -46,5 +46,5 @@ class Command(BaseCommand):
             raise CommandError(f"Unknown app(s): {', '.join(unknown)}. The apps are: {', '.join(sorted(labels))}.")
         ctx = OperationContext(scope=EXPORT_SCOPE, actor=None, permissions=permissions_of_role(ROLES[role]),
                                language=language)
-        tools = assistant.catalog(ctx, active_labels=chosen or labels)
+        tools = assistant.tools.catalog(ctx, active_labels=chosen or labels)
         self.stdout.write(json.dumps(export_catalog(tools, language), ensure_ascii=False, indent=2))

@@ -97,7 +97,7 @@ def test_the_reported_staff_request_offers_its_existing_operation(catalog_of, na
 def test_layer_2_probes_every_staff_tool():
     """The sweep below is whole: there is a probe of layer 2 for every Staff tool, read from its files."""
     probed = {tool for _, tool, _ in staff_probes()}
-    tools = {name for name, op in registry.items() if op.app_label == "staff" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "staff" and assistant.tools.is_tool(op)}
     assert probed == tools, sorted(probed ^ tools)
 
 

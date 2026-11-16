@@ -1278,7 +1278,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   eliminar categorías y bonos, anular, ajustar, alta de golpe y ajustes) y todo campo de entrada su
   `description`. Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la
   pide (`live.E020`: Servicios está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1104), y los `SYNONYMS` del Hub
-  (`base/assistant.py`) leen «bono» como el bono del catálogo y el vendido (`service.package`,
+  (`base/assistant/relevance.py`) leen «bono» como el bono del catálogo y el vendido (`service.package`,
   `service.grant`) y «asignación», o lo que se «asigna», como la asignación de un profesional a un servicio
   (`service.assignment`). Así ver, vender, gastar, anular y ajustar bonos, retener y soltar sesiones,
   restaurar un servicio y asignar, cambiar o quitar un profesional desde el chat (SERVICE-F04, F05, F14 a

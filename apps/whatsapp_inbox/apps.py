@@ -33,7 +33,7 @@ class WhatsappInboxConfig(LiveAppConfig):
     verticals = ["hair_salon", "restaurant"]
     requires = ["customer"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). A «plantilla» and a «mensaje» are the
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «plantilla» and a «mensaje» are the
     # inbox's template and message (whatsapp_inbox.template, whatsapp_inbox.message), as «template» and «message»
     # already are in English; a business template (base.blueprint) or the staff a «plantilla» also names are said with
     # their own words beside it («plantilla de negocio», «el personal»).
