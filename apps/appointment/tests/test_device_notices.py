@@ -13,10 +13,10 @@ from live.operations import get
 
 from base.schemas import NoticeListIn
 
-from .conftest import MONDAY, at, ctx_for, make_appointment, make_customer
+from .conftest import HUB_DB, MONDAY, at, ctx_for, make_appointment, make_customer
 from .test_queries import TUESDAY, employee_linked_to
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture(autouse=True)

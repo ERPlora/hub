@@ -13,25 +13,10 @@ from live.models import OutboxEvent
 from apps.appointment.models import Appointment, BlockedTime, Counter, History, Settings
 from base.api_keys import KeyCaller
 
-from .conftest import (
-    MADRID,
-    MONDAY,
-    assign,
-    at,
-    TESTER,
-    ctx_for,
-    make_appointment,
-    make_customer,
-    make_day,
-    make_service,
-    make_settings,
-    make_shift,
-    pin_clock,
-    run,
-    wall,
-)
+from .conftest import HUB_DB, MADRID, MONDAY, TESTER, assign, at, ctx_for, make_appointment, make_customer, make_day
+from .conftest import make_service, make_settings, make_shift, pin_clock, run, wall
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 
 def book(salon, start="10:00", day=MONDAY, **extra):

@@ -5,15 +5,14 @@ recorded them (as the relay does), and run as the system; repeating one changes 
 import datetime as dt
 import uuid
 
-import pytest
 from live.models import OutboxEvent
 
 from apps.appointment import events
 from apps.appointment.models import Appointment, History, Recurring, RecurringService
 
-from .conftest import A, MONDAY, at, make_appointment, run
+from .conftest import A, HUB_DB, MONDAY, at, make_appointment, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def relay(name: str):

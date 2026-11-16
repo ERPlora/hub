@@ -5,9 +5,9 @@ The front desk's bookings are never pending.
 
 import pytest
 
-from .conftest import MONDAY, make_settings, run, wall
+from .conftest import HUB_DB, MONDAY, make_settings, run, wall
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 
 
 def booking(salon, services, source: str, start: str = "10:00") -> dict:
