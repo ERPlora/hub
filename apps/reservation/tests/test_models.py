@@ -3,8 +3,8 @@
 import datetime as dt
 import uuid
 
-import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.reservation.models import (
     BlockedDate,
@@ -15,6 +15,7 @@ from apps.reservation.models import (
 )
 
 from .conftest import (
+    HUB_DB,
     TOMORROW,
     make_blocked,
     make_customer,
@@ -24,12 +25,12 @@ from .conftest import (
     make_table,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make) -> bool:
     try:
-        with transaction.atomic():
+        with atomic():
             make()
     except IntegrityError:
         return True

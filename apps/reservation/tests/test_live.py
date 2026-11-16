@@ -6,10 +6,11 @@ the labels; a change of the business's hours re-runs the day; the waitlist, the 
 the rules follow their own events.
 """
 
-import pytest
 from live.live_registry import live_registry
 
 from apps.reservation import events
+
+from .conftest import HUB_DB
 
 #: A reservation row also paints its table («5 (Terrace)»).
 BOOK = [*events.RESERVATION_EVENTS, *events.TABLE_EVENTS]
@@ -47,7 +48,7 @@ def test_each_live_query_and_its_events():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_every_live_query_is_one_of_this_apps_reads():
     from live.operations import get
 

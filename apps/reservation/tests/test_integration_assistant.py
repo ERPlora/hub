@@ -15,11 +15,11 @@ from live.operations import get, registry
 from base import assistant
 from base.tenancy import context
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
 
 from .conftest import (
+    HUB_DB,
     TOMORROW,
     ctx_for,
     make_blocked,
@@ -125,7 +125,7 @@ def test_the_card_names_where_a_reservation_came_from_and_the_email_rule_as_rese
     assert labels(assistant.cards.card(rules, {"require_email": True}, "en")) == [SCREENS_EN["settings"]["requireEmail"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_customer_a_channel_acts_for():
     """WhatsApp changing or cancelling the guest's own reservation: on behalf of her customer card, said by its name.
     (A card leaves out a record it cannot name — a datum that is no id of any card, or an automation's card, which
@@ -166,7 +166,7 @@ def card_for(name: str, arguments: dict, language: str, ctx=None) -> dict:
 
 # RESERVATION-F06 «Tomar una reserva a mano», asked to the assistant: the card says for whom and at which table, the
 # table with its zone («5 (Terraza)») as Tables names it, since its number repeats across zones (hub#550).
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "customer", "table"), [("es", "Cliente", "Mesa"), ("en", "Customer", "Table")])
 def test_booking_a_table_names_the_customer_and_the_table_never_by_their_ids(language, customer, table):
     ana = make_customer("Ana García")
@@ -185,7 +185,7 @@ def test_booking_a_table_names_the_customer_and_the_table_never_by_their_ids(lan
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_changing_a_reservation_names_it_its_new_table_and_the_customer_it_is_changed_for(language):
     """RESERVATION-F08: the new table with its zone, as Tables names it; table 7 of the room is another one (hub#550)."""
@@ -203,7 +203,7 @@ def test_changing_a_reservation_names_it_its_new_table_and_the_customer_it_is_ch
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_every_step_of_a_reservation_names_it_by_its_guest_and_when_as_its_dialog_does(language):
     """«Confirm», «Seat», «Complete», «Cancel», «No-show», «Delete», «Edit»: the reservation as the book's own dialog
@@ -214,7 +214,7 @@ def test_every_step_of_a_reservation_names_it_by_its_guest_and_when_as_its_dialo
         assert values(card) == {"id": f"Ana García · {WHEN[language]}"}, step
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_every_step_of_a_waitlist_entry_names_it_by_its_guest_and_when_and_writing_one_down_its_customer(language):
     entry = make_entry()
@@ -228,7 +228,7 @@ def test_every_step_of_a_waitlist_entry_names_it_by_its_guest_and_when_and_writi
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "christmas", "afternoon"),
     [
@@ -246,7 +246,7 @@ def test_removing_a_slot_or_unblocking_a_date_names_it_as_its_list_does(language
     assert values(card_for(unblock, {"id": str(some.id)}, language)) == {"id": afternoon}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "reservation", "slot", "blocked", "entry"),
     [
@@ -281,7 +281,7 @@ def test_every_dangerous_write_titles_the_record_it_names(language, reservation,
     assert said(entry_card) == [(entry, f"Luis Pérez · {WHEN[language]}")]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     """A host who books tables but may not read the customers' cards: the card names the table and leaves the customer
     out — as Customers would not show them that card."""
@@ -294,7 +294,7 @@ def test_a_record_the_person_may_not_read_is_left_out_never_by_its_id():
     assert not by_an_id(card)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 def test_a_record_of_another_business_is_left_out_never_by_its_id(hub_a, hub_b, monkeypatch):
     """Each business reads its own book: a reservation of business B named to business A's assistant is not there."""
     monkeypatch.setattr(context, "_test_fallback", None)
