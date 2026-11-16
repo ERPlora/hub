@@ -19,6 +19,7 @@ from base.operations import (
     is_platform_host,
     is_platform_hub,
 )
+from base.tenancy.tests.business import HOST, HUB_DB, A
 
 
 def request_for(host: str, user=None, language: str = "en"):
@@ -217,11 +218,11 @@ def test_a_superusers_request_holds_nothing_on_a_business_s_host_without_a_membe
     assert HubContextBuilder().from_request(request_for("a.localhost", superuser)).permissions == frozenset()
 
 
-@pytest.mark.django_db
-def test_refresh_sees_a_revoked_membership(make_user):
-    user = make_user(host="a", role="hub_admin")
+@HUB_DB
+def test_refresh_sees_a_revoked_membership(make_user, hub_a):
+    user = make_user(host=A.key, role="hub_admin")
     builder = HubContextBuilder()
-    ctx = builder.from_request(request_for("a.localhost", user, language="es"))
+    ctx = builder.from_request(request_for(HOST, user, language="es"))
     assert ctx.has("demo.manage")
 
     Membership.objects.filter(user=user).delete()
@@ -231,28 +232,28 @@ def test_refresh_sees_a_revoked_membership(make_user):
     assert dataclasses.replace(refreshed, permissions=ctx.permissions) == ctx
 
 
-@pytest.mark.django_db
-def test_refresh_sees_a_role_change(make_user):
-    user = make_user(host="a", role="hub_employee")
+@HUB_DB
+def test_refresh_sees_a_role_change(make_user, hub_a):
+    user = make_user(host=A.key, role="hub_employee")
     builder = HubContextBuilder()
-    ctx = builder.from_request(request_for("a.localhost", user))
+    ctx = builder.from_request(request_for(HOST, user))
     Membership.objects.filter(user=user).update(role="hub_manager")
     assert builder.refresh(ctx).has("demo.manage")
 
 
-@pytest.mark.django_db
-def test_refresh_rereads_the_user_itself(superuser):
+@HUB_DB
+def test_refresh_rereads_the_user_itself(superuser, hub_a):
     builder = HubContextBuilder()
-    ctx = builder.from_request(request_for("a.localhost", superuser))
+    ctx = builder.from_request(request_for(HOST, superuser))
     superuser.__class__.objects.filter(pk=superuser.pk).update(is_superuser=False)
     assert builder.refresh(ctx).permissions == frozenset()
 
 
-@pytest.mark.django_db
-def test_refresh_of_a_deactivated_user(make_user):
-    user = make_user(host="a", role="hub_admin")
+@HUB_DB
+def test_refresh_of_a_deactivated_user(make_user, hub_a):
+    user = make_user(host=A.key, role="hub_admin")
     builder = HubContextBuilder()
-    ctx = builder.from_request(request_for("a.localhost", user))
+    ctx = builder.from_request(request_for(HOST, user))
     user.__class__.objects.filter(pk=user.pk).update(is_active=False)
     assert builder.refresh(ctx).permissions == frozenset()
 
@@ -309,7 +310,7 @@ def test_erploras_own_hub_is_the_one_of_its_slug(settings):
     assert is_platform_hub(Scope("host", "a")) is False
 
 
-@pytest.mark.django_db
+@HUB_DB
 class TestRefreshHearsTheHostGate:
     """A live stream (and the print socket) holds its context open, so the host gate (``base.middleware``) is not
     asked again: before every re-run, ``refresh`` reads the registry with the gate's own rule. A hub that stopped
@@ -326,16 +327,16 @@ class TestRefreshHearsTheHostGate:
             pytest.param({"status": "failed"}, id="preparation-failed"),
         ],
     )
-    def test_a_hub_that_stopped_serving_ends_the_stream_with_the_gate_s_envelope(self, make_user, client, change):
+    def test_a_hub_that_stopped_serving_ends_the_stream_with_the_gate_s_envelope(self, hub_a, make_user, client, change):
         from live.errors import Unauthorized
 
         from base.models import Hub
 
-        user = make_user(host="a", role="hub_admin")
+        user = make_user(host=A.key, role="hub_admin")
         builder = HubContextBuilder()
-        ctx = builder.from_request(request_for("a.localhost", user, language="es"))
-        Hub.objects.filter(slug="a").update(**change)
-        gate = client.get("/api/live", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+        ctx = builder.from_request(request_for(HOST, user, language="es"))
+        Hub.objects.filter(slug=A.key).update(**change)
+        gate = client.get("/api/live", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
 
         with pytest.raises(Unauthorized) as ended:
             builder.refresh(ctx)
@@ -362,28 +363,28 @@ class TestRefreshHearsTheHostGate:
 
         assert (ended.value.status, ended.value.code) == (410, "base.hub_gone")
 
-    def test_a_hub_whose_row_is_gone_ends_the_stream_as_not_found(self, make_user, client):
+    def test_a_hub_whose_row_is_gone_ends_the_stream_as_not_found(self, hub_a, make_user, client):
         from live.errors import Unauthorized
 
         from base.models import Hub
 
-        user = make_user(host="a", role="hub_admin")
+        user = make_user(host=A.key, role="hub_admin")
         builder = HubContextBuilder()
-        ctx = builder.from_request(request_for("a.localhost", user))
-        Hub.objects.filter(slug="a").delete()
-        gate = client.get("/api/live", HTTP_HOST="a.localhost")
+        ctx = builder.from_request(request_for(HOST, user))
+        Hub.objects.filter(slug=A.key).delete()
+        gate = client.get("/api/live", HTTP_HOST=HOST)
 
         with pytest.raises(Unauthorized) as ended:
             builder.refresh(ctx)
 
         assert (ended.value.status, ended.value.envelope()) == (404, gate.json())
 
-    def test_a_hub_in_its_grace_days_keeps_serving(self, make_user):
+    def test_a_hub_in_its_grace_days_keeps_serving(self, hub_a, make_user):
         from base.models import Hub
 
-        user = make_user(host="a", role="hub_admin")
+        user = make_user(host=A.key, role="hub_admin")
         builder = HubContextBuilder()
-        ctx = builder.from_request(request_for("a.localhost", user))
-        Hub.objects.filter(slug="a").update(state={"status": "past_due"})
+        ctx = builder.from_request(request_for(HOST, user))
+        Hub.objects.filter(slug=A.key).update(state={"status": "past_due"})
 
         assert builder.refresh(ctx).has("demo.manage")

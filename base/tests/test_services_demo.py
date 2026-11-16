@@ -30,14 +30,10 @@ from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from base import files, registry, services
-from base.services import demos
 from base.models import DemoCode, Hub, Membership
-from base.storage import hub_prefix
-from base.tenancy import names, ops, provision
-from base.tenancy.connections import control_name
-from control.models import HubDue
 from base.queries import demo_get
 from base.schemas import DemoCodeIn, DemoCreateIn, DemoSlugIn
+from base.services import demos
 from base.services.demos import (
     demo_code_create,
     demo_create,
@@ -50,8 +46,18 @@ from base.services.demos import (
     redeem_demo_code,
 )
 from base.services.sessions import InactiveUser
+from base.storage import hub_prefix
+from base.tenancy import names, ops, provision
+from base.tenancy.connections import control_name
+from base.tenancy.context import use_control, use_hub
+from base.tenancy.tests.business import HUB_DB, A
+from base.tests.test_auth_views import demo
+from control.models import HubDue
 
 pytestmark = pytest.mark.django_db
+
+#: A demo ready on a database of its own (``hub_b``'s), as the worker leaves one.
+__all__ = ["demo"]
 
 SYSTEM = system_context(registry.REGISTRY_SCOPE)
 ANA = hashlib.sha256(b"ana's browser").hexdigest()
@@ -80,7 +86,9 @@ def lapse(slug: str) -> None:
 
 
 def events(name: str) -> list[dict]:
-    return list(OutboxEvent.objects.filter(name=name).values_list("payload", flat=True))
+    """What the platform's operations recorded: control's outbox."""
+    with use_control():
+        return list(OutboxEvent.objects.filter(name=name).values_list("payload", flat=True))
 
 
 def a_user_context(**fields) -> OperationContext:
@@ -94,11 +102,20 @@ def a_request(rf):
     return request
 
 
-def entered(rf, slug: str, session_key: str = ANA):
-    """The demo ``slug`` as its browser leaves it once inside: a code spent and the owner's session open."""
+def open_session(request, hub: Hub, *, inside: Hub | None = None):
+    """``open_demo_session`` as the demo's ``/auth/callback`` runs it: inside the demo's own database, or the one that
+    stands in for it here (``inside``) when the worker never made the demo's (``base/tenancy/tests/test_provision.py``):
+    a test case reaches only the databases its mark names."""
+    with use_hub(inside or hub):
+        return open_demo_session(request, hub)
+
+
+def entered(rf, slug: str, session_key: str = ANA, *, inside: Hub):
+    """The demo ``slug`` as its browser leaves it once inside: a code spent and the owner's session open in
+    ``inside``'s database."""
     Hub.objects.filter(slug=slug).update(status="ready")
     redeemed = redeem_demo_code(slug, code_for(slug, session_key).code)
-    open_demo_session(a_request(rf), redeemed.hub)
+    open_session(a_request(rf), redeemed.hub, inside=inside)
     return redeemed
 
 
@@ -377,11 +394,12 @@ class TestRedeem:
         assert redeem_demo_code(demo.slug, code) is None
 
 
+@HUB_DB
 class TestOpenSession:
-    def test_opens_a_session_as_the_demo_s_owner_never_staff(self, rf):
-        hub = Hub.objects.get(slug=create().slug)
+    def test_opens_a_session_as_the_demo_s_owner_never_staff(self, rf, demo):
+        hub = Hub.objects.get(slug=demo)
         request = a_request(rf)
-        user = open_demo_session(request, hub)
+        user = open_session(request, hub)
         assert (user.username, user.first_name, user.is_staff, user.is_superuser, user.has_usable_password()) == (
             f"demo:{hub.slug}",
             "Demo",
@@ -393,27 +411,27 @@ class TestOpenSession:
         assert request.session["_auth_user_id"] == str(user.pk)
         assert request.session["demo_slug"] == hub.slug
 
-    def test_entering_again_keeps_one_user_and_one_role(self, rf):
-        hub = Hub.objects.get(slug=create().slug)
-        first = open_demo_session(a_request(rf), hub)
-        again = open_demo_session(a_request(rf), hub)
+    def test_entering_again_keeps_one_user_and_one_role(self, rf, demo):
+        hub = Hub.objects.get(slug=demo)
+        first = open_session(a_request(rf), hub)
+        again = open_session(a_request(rf), hub)
         assert first.pk == again.pk
         assert Membership.objects.filter(host=hub.slug).count() == 1
 
-    def test_a_demo_user_raised_to_staff_by_hand_is_lowered_again(self, rf):
-        hub = Hub.objects.get(slug=create().slug)
-        user = open_demo_session(a_request(rf), hub)
+    def test_a_demo_user_raised_to_staff_by_hand_is_lowered_again(self, rf, demo):
+        hub = Hub.objects.get(slug=demo)
+        user = open_session(a_request(rf), hub)
         get_user_model().objects.filter(pk=user.pk).update(is_staff=True, is_superuser=True, first_name="Root")
-        user = open_demo_session(a_request(rf), hub)
+        user = open_session(a_request(rf), hub)
         assert (user.is_staff, user.is_superuser, user.first_name) == (False, False, "Demo")
 
-    def test_a_demo_user_deactivated_in_the_admin_is_refused(self, rf):
-        hub = Hub.objects.get(slug=create().slug)
-        user = open_demo_session(a_request(rf), hub)
+    def test_a_demo_user_deactivated_in_the_admin_is_refused(self, rf, demo):
+        hub = Hub.objects.get(slug=demo)
+        user = open_session(a_request(rf), hub)
         get_user_model().objects.filter(pk=user.pk).update(is_active=False)
         request = a_request(rf)
         with pytest.raises(InactiveUser):
-            open_demo_session(request, hub)
+            open_session(request, hub)
         assert "_auth_user_id" not in request.session
 
 
@@ -450,18 +468,20 @@ class TestExpire:
         staff = a_user_context(is_staff=True, is_superuser=True)
         assert demo_expire(staff, DemoSlugIn(slug=demo.slug)).status == "expired"
 
+    @HUB_DB
     @pytest.mark.parametrize("host", ["a", "demo"])
-    def test_staff_acting_on_a_business_s_scope_never_ends_one(self, host):
+    def test_staff_acting_on_a_business_s_scope_never_ends_one(self, host, hub_a, demo):
         """ERPlora's staff passes only on the platform's scope (the Hub admin, REGISTRY_SCOPE); on a
         business's host, its own or the demo's, it is no more than anyone there."""
-        demo = create()
+        there = Hub.objects.get(slug=demo) if host == "demo" else hub_a
+        ended = there if host == "demo" else Hub.objects.get(slug=create().slug)
         user = get_user_model().objects.create_user(username="ana", password="pw", is_staff=True, is_superuser=True)
-        Membership.objects.create(user=user, host="a", role=Membership.Role.ADMIN)
-        scope = Scope("host", demo.slug if host == "demo" else host)
-        with pytest.raises(PermissionDenied) as refused:
-            demo_expire(OperationContext(scope=scope, actor=user, permissions=frozenset({"*"})), DemoSlugIn(slug=demo.slug))
+        Membership.objects.create(user=user, host=A.key, role=Membership.Role.ADMIN)
+        scope = Scope("host", there.slug)
+        with use_hub(there), pytest.raises(PermissionDenied) as refused:
+            demo_expire(OperationContext(scope=scope, actor=user, permissions=frozenset({"*"})), DemoSlugIn(slug=ended.slug))
         assert refused.value.code == "base.internal_only"
-        assert Hub.objects.get(slug=demo.slug).status == "requested"
+        assert Hub.objects.get(slug=ended.slug).status == ended.status
 
     @pytest.mark.parametrize("fields", [{}, {"is_staff": True}, {"is_superuser": True}])
     def test_nobody_else_ends_one(self, fields):
@@ -498,10 +518,11 @@ class TestGet:
 
 
 class TestReaper:
-    def test_purges_only_the_demos_whose_time_is_up(self, rf):
+    @HUB_DB
+    def test_purges_only_the_demos_whose_time_is_up(self, rf, hub_b):
         ended, live = create(ANA), create(BEA)
-        entered(rf, ended.slug, ANA)
-        entered(rf, live.slug, BEA)
+        entered(rf, ended.slug, ANA, inside=hub_b)
+        entered(rf, live.slug, BEA, inside=hub_b)
         code_for(ended.slug, ANA)
         lapse(ended.slug)
         assert reap_demos() == 1
@@ -649,9 +670,10 @@ class TestReaper:
         dropped = []
         monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
         hub = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="expired")
-        before = {model: model.objects.count() for model in (OutboxEvent, Hub, Membership)}
-        assert purge_demo_data(hub) is None
-        assert {model: model.objects.count() for model in before} == before
+        with use_control():
+            before = {model: model.objects.count() for model in (OutboxEvent, Hub, Membership)}
+            assert purge_demo_data(hub) is None
+            assert {model: model.objects.count() for model in before} == before
         assert dropped == []
 
     @pytest.fixture

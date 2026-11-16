@@ -2,52 +2,56 @@
 rings the hub's ``hub_due``; the worker makes the tables (``base.tenancy.migrator.ensure_schema(hub, add=[app,
 *requires])``) and turns it ``on`` (its event and live notice), or ``failed`` with why, tried again at 1, 5 and 15
 minutes and then every hour, or by hand (``base.app.retry``). An app whose tables the hub has is on at once (200), and
-turning one off never drops them. A hub without its own database keeps turning apps on at once.
+turning one off never drops them. A hub without its own database is never entered: no app goes on there.
 """
 
 import datetime as dt
 
 import pytest
 from django.apps import apps
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.errors import Conflict
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 
 from base import activation, events
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation
-from base.tenancy.context import use_hub
+from base.tenancy.context import HubContextMissing, HubWithoutDatabase, use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.business import HOST, HUB_DB, A
 from control.models import Hub, HubDue
 
 # ── The row: its states and what a failure leaves on it ─────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("state", [ON, OFF, CREATING, FAILED])
-def test_a_row_is_on_off_creating_or_failed(state):
-    row = AppActivation.objects.create(host="c", app="task", state=state, chosen=True)
-    row.refresh_from_db()
+def test_a_row_is_on_off_creating_or_failed(state, hub_a):
+    with use_hub(hub_a):
+        row = AppActivation.objects.create(host="c", app="task", state=state, chosen=True)
+        row.refresh_from_db()
     assert row.state == state
     assert (row.attempts, row.last_error, row.next_attempt_at) == (0, "", None)
 
 
-@pytest.mark.django_db
-def test_a_failed_row_keeps_its_attempts_its_error_and_its_next_try():
+@HUB_DB
+def test_a_failed_row_keeps_its_attempts_its_error_and_its_next_try(hub_a):
     at = timezone.now() + dt.timedelta(minutes=5)
-    AppActivation.objects.create(
-        host="c", app="task", state=FAILED, chosen=True, attempts=2, last_error="schema_failed: boom", next_attempt_at=at
-    )
-    row = AppActivation.objects.get(host="c", app="task")
+    with use_hub(hub_a):
+        AppActivation.objects.create(
+            host="c", app="task", state=FAILED, chosen=True, attempts=2, last_error="schema_failed: boom",
+            next_attempt_at=at,
+        )
+        row = AppActivation.objects.get(host="c", app="task")
     assert (row.attempts, row.last_error, row.next_attempt_at) == (2, "schema_failed: boom", at)
 
 
-@pytest.mark.django_db
-def test_any_other_state_is_refused_by_the_database():
-    with pytest.raises(IntegrityError), transaction.atomic():
+@HUB_DB
+def test_any_other_state_is_refused_by_the_database(hub_a):
+    with use_hub(hub_a), pytest.raises(IntegrityError), atomic():
         AppActivation.objects.create(host="c", app="task", state="activating", chosen=False)
 
 
@@ -267,16 +271,21 @@ def test_which_app_a_name_names_tells_it_being_set_up_or_failed_as_the_apps_scre
     assert said == {"Printing": "creating", "Website": "failed", "sale": "on", "Invoicing": "off"}
 
 
+def never_reached(name: str, ctx: OperationContext, data: dict) -> None:
+    """The operation ``name`` never runs for a business without its own database: it is not entered
+    (``HubWithoutDatabase``; its host answers 503 maintenance), and from control a hub's operation is refused."""
+    hub, _ = Hub.objects.update_or_create(slug="c", defaults={"status": "ready", "db_name": ""})
+    op = get(name)
+    with pytest.raises(HubWithoutDatabase), use_hub(hub):
+        op(ctx, op.input.model_validate(data))
+    with pytest.raises(HubContextMissing):
+        op(ctx, op.input.model_validate(data))
+
+
 @pytest.mark.django_db
-def test_a_hub_without_its_own_database_turns_an_app_on_at_once():
-    Hub.objects.update_or_create(slug="c", defaults={"status": "ready", "db_name": ""})
-    op = get("base.app.enable")
+def test_a_hub_without_its_own_database_is_never_entered_to_turn_an_app_on():
     ctx = OperationContext(scope=Scope("host", "c"), actor="ana", permissions=frozenset({"*"}), language="en")
-
-    answer = op(ctx, op.input.model_validate({"app": "printing"})).model_dump(mode="json")
-
-    assert answer["state"] == "on"
-    assert AppActivation.objects.get(host="c", app="printing").state == ON
+    never_reached("base.app.enable", ctx, {"app": "printing"})
 
 
 # ── What the Apps screen reads ──────────────────────────────────────────────────────────────────────────────────
@@ -311,9 +320,9 @@ def test_the_session_tells_an_app_being_created_activating_and_keeps_it_out_of_t
 # ── Over HTTP: 202 while its tables are made ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
-def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch):
+def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch, hub_a):
     import json
 
     from django.contrib.auth import get_user_model
@@ -330,11 +339,11 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
 
     monkeypatch.setattr(services, "app_enable", Answering())
     user = get_user_model().objects.create(username="ana")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     client.force_login(user)
 
     answered = client.post(
-        "/api/apps/enable", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST="a.localhost:8000"
+        "/api/apps/enable", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=HOST
     )
 
     assert (answered.status_code, answered.json()) == (
@@ -343,10 +352,10 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
     )
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
+@HUB_DB  # the host gate reads business A's row (base.middleware)
 @pytest.mark.parametrize("path", ["/api/apps/enable", "/api/apps/retry"])
-def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_same_schema(client, path):
-    served = client.get("/api/openapi.json", HTTP_HOST="a.localhost:8000").json()
+def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_same_schema(client, path, hub_a):
+    served = client.get("/api/openapi.json", HTTP_HOST=HOST).json()
 
     assert {
         status: response["content"]["application/json"]["schema"]["$ref"]
@@ -354,16 +363,16 @@ def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_s
     } == {"200": "#/components/schemas/AppChangeOut", "202": "#/components/schemas/AppChangeOut"}
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
-def test_the_openapi_of_disable_only_documents_200_because_it_never_accepts(client):
-    served = client.get("/api/openapi.json", HTTP_HOST="a.localhost:8000").json()
+@HUB_DB  # the host gate reads business A's row (base.middleware)
+def test_the_openapi_of_disable_only_documents_200_because_it_never_accepts(client, hub_a):
+    served = client.get("/api/openapi.json", HTTP_HOST=HOST).json()
 
     assert list(served["paths"]["/api/apps/disable"]["post"]["responses"]) == ["200"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
-def test_the_retry_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch):
+def test_the_retry_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch, hub_a):
     import json
 
     from django.contrib.auth import get_user_model
@@ -380,11 +389,11 @@ def test_the_retry_route_answers_202_while_its_tables_are_made_and_200_once_on(c
 
     monkeypatch.setattr(services, "app_retry", Answering())
     user = get_user_model().objects.create(username="ana")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     client.force_login(user)
 
     answered = client.post(
-        "/api/apps/retry", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST="a.localhost:8000"
+        "/api/apps/retry", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=HOST
     )
 
     assert (answered.status_code, answered.json()) == (
@@ -492,15 +501,9 @@ def test_only_the_platform_settles_what_the_worker_made(hub_a):
 
 
 @pytest.mark.django_db
-def test_the_platforms_settle_never_runs_on_a_shared_database():
+def test_the_platforms_settle_never_runs_for_a_business_without_its_own_database():
     from live.context import system_context
 
-    Hub.objects.update_or_create(slug="c", defaults={"status": "ready", "db_name": ""})
-    AppActivation.objects.create(host="c", app="printing", state=OFF, chosen=False)
-    op = get("base.app.activation_settle")
-
-    with pytest.raises(Conflict) as refused:
-        op(system_context(Scope("host", "c")), op.input.model_validate({"apps": ["printing"], "outcome": "created"}))
-
-    assert refused.value.code == "base.app_shared_database"
-    assert AppActivation.objects.get(host="c", app="printing").state == OFF
+    never_reached(
+        "base.app.activation_settle", system_context(Scope("host", "c")), {"apps": ["printing"], "outcome": "created"}
+    )
