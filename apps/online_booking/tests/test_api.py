@@ -11,7 +11,7 @@ from live.ninja import ensure_api_parity
 from apps.appointment.models import Appointment
 from apps.flow.tests.test_api import get, post
 from apps.online_booking.api import router
-from base.tests.routes import spa_routes
+from base.tests.routes import published_routes, spa_routes
 from config.api import api
 
 from .conftest import HOST, HUB_DB, TUESDAY, at, booking_data, make_appointment
@@ -66,14 +66,7 @@ def test_the_api_keeps_parity():
 
 @HUB_DB
 def test_the_openapi_describes_the_online_booking_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
-    served = {
-        (method.upper(), path.removeprefix("/api"), op["operationId"])
-        for path, methods in paths.items()
-        for method, op in methods.items()
-        if op["operationId"].startswith("online_booking.")
-    }
-    assert served == ROUTES
+    assert published_routes(client, "online_booking.", HOST) == ROUTES
 
 
 def test_the_spas_route_map_names_every_online_booking_route():
