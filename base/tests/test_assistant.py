@@ -15,7 +15,7 @@ import pytest
 from django.conf import settings
 from django.utils import translation
 from live import assistant as shared
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import OperationError
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
@@ -24,9 +24,11 @@ from pydantic import ConfigDict, SecretStr
 from base import assistant, entitlement
 from base.models import Membership
 from base.permissions import permissions_for
-from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests.card_values import assert_a_sent_amount_is_in_the_business_currency
+from base.tests.fake_gateway import gateway, signed
 
-A = Scope("host", "a")
+__all__ = ["gateway", "in_business_a", "signed"]
 MANAGER = frozenset({"base.view_home", "demo.*"})
 EMPLOYEE = frozenset({"base.view_home", "demo.view"})
 
@@ -38,7 +40,7 @@ def ctx(permissions=MANAGER, *, actor="ana", language="en", scope=A):
 # ── Tools: what the assistant may use for this person ────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_a_tool_is_named_without_dots_and_read_back_from_its_name():
     assert shared.tool_name("cash_register.session.close") == "cash_register__session__close"
     tools = assistant.tools.catalog(ctx({"*"}))
@@ -46,7 +48,7 @@ def test_a_tool_is_named_without_dots_and_read_back_from_its_name():
     assert shared.operation_of("demo__item__nothing", tools) is None
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
     names = set(assistant.tools.catalog(ctx(EMPLOYEE)))
     assert "demo.item.list" in names
@@ -55,7 +57,7 @@ def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
     assert "base.access.settings_update" not in names
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "name, why",
     [
@@ -70,13 +72,13 @@ def test_what_is_not_a_tool_is_never_offered_even_to_who_may_do_everything(name,
     assert name not in assistant.tools.catalog(ctx({"*"})), why
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_app_the_business_has_no_right_to_offers_no_tool(monkeypatch):
     monkeypatch.setattr(entitlement, "blocked_apps", lambda scope: frozenset({"demo"}))
     assert not [name for name in assistant.tools.catalog(ctx({"*"})) if name.startswith("demo.")]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_assistants_own_operations_are_not_its_tools():
     assert not [name for name in assistant.tools.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
 
@@ -84,10 +86,7 @@ def test_the_assistants_own_operations_are_not_its_tools():
 #: Writes only the platform runs, of both shapes their permission takes (``<app>.system``, ``system.<app>``), each with
 #: an ``ai=`` that does not start with «System only»: «Platform reaction…», «Platform only…», «Lower the stock…».
 PLATFORM_WRITES = {
-    "appointment.customer.erase",
-    "online_booking.customer.erase",
-    "table.hold.expire",
-    "inventory.stock.apply_sale",
+    "appointment.customer.erase", "online_booking.customer.erase", "table.hold.expire", "inventory.stock.apply_sale",
     "service.grant.reassign",
 }
 
@@ -104,6 +103,7 @@ def owner(make_user) -> OperationContext:
     return ctx(permissions_for(make_user("olga", host=A.key, role=Membership.Role.OWNER), A))
 
 
+@HUB_DB
 def test_no_operation_of_the_platform_is_a_tool_whatever_its_ai_says(owner):
     """The platform's reactions and scheduled tasks (erasing or reassigning the customer of an appointment, expiring a
     hold, lowering the stock of a sale) must not be tools of whoever holds «*» just because their ``ai=`` does not start
@@ -113,6 +113,7 @@ def test_no_operation_of_the_platform_is_a_tool_whatever_its_ai_says(owner):
     assert [name for name in platform if assistant.tools.is_tool(registry[name])] == []
 
 
+@HUB_DB
 def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, superuser):
     """The tools a superuser's turn gets (``base.assistant.turn``: ``catalog`` of the person's own permissions): on a
     business's host those of a person without a role, since ERPlora's staff holds nothing there without a Membership
@@ -129,14 +130,14 @@ def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, s
 # ── By relevance: a turn offers the tools of what was asked, never the whole catalogue ────────────────────────────
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_a_turn_offers_at_most_its_share_of_the_catalogue():
     tools = assistant.tools.catalog(ctx({"*"}))
     assert len(tools) > shared.MAX_TOOLS
     assert len(assistant.relevance.relevant(tools, ["hola"], "es")) <= shared.MAX_TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_app_named_in_the_persons_own_language_comes_first():
     tools = assistant.tools.catalog(ctx({"*"}))
     offered = assistant.relevance.relevant(tools, ["¿Cuántos clientes tengo este mes?"], "es")
@@ -146,14 +147,14 @@ def test_the_app_named_in_the_persons_own_language_comes_first():
     assert "customer.customer.list" in first
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_what_the_person_asks_to_do_ranks_the_operation_that_does_it():
     tools = assistant.tools.catalog(ctx({"*"}))
     offered = [op.name for op in assistant.relevance.relevant(tools, ["crea un servicio Corte caballero a 15 €"], "es")]
     assert "service.service.create" in offered
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
     """Asked «what version of ERPlora do I have?», the assistant has a tool that answers it."""
     tools = assistant.tools.catalog(ctx({"base.view_home", "base.administer_hub"}))
@@ -162,13 +163,13 @@ def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
     assert "base.system.status" not in assistant.tools.catalog(ctx(EMPLOYEE))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_checklist_read_is_always_at_hand():
     tools = assistant.tools.catalog(ctx({"*"}))
     assert "base.setup.status" in [op.name for op in assistant.relevance.relevant(tools, ["zzz"], "es")]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("permissions", [EMPLOYEE, MANAGER, {"*"}])
 def test_the_documentation_search_is_always_at_hand_for_everybody(permissions):
     """Everything it is asked, it answers with our own information, inventing nothing: a how-to question («¿cómo abro
@@ -363,7 +364,7 @@ def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it
     assert "titled" not in price[0]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_title_the_read_of_a_preview_wrote_is_marked_so_too(settle):
     """What a dangerous write will do (BASE-F98) is said as what it sends: the read titles its owner and its person."""
     failure, fields = assistant.cards.preview(ctx(language="es"), settle, {"id": "7"})
@@ -786,7 +787,7 @@ def shown(fields: list[dict]) -> list[tuple]:
     return [(field["name"], field["kind"], field["value"]) for field in fields]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_dangerous_write_shows_what_its_app_says_it_will_do_read_as_the_person(settle):
     """In the order its app names them, by their names in the person's language, an amount in cents as money; what
     the read hides from this person (none, as a blind count's expected cash) or leaves empty is not there."""
@@ -806,21 +807,21 @@ def test_a_write_without_a_preview_reads_nothing_and_its_card_is_as_before():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_preview_the_person_may_not_read_is_refused_never_read_for_them(settle):
     """The read runs with the person's own session and permissions, as its screen would: never with more."""
     failure, fields = assistant.cards.preview(ctx({"base.view_home", "demo.manage"}), settle, {"id": "7"})
     assert (failure.outcome, failure.code, fields) == ("refused", "permission_denied", None)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_preview_that_fails_says_why_never_an_empty_one(settle):
     failure, fields = assistant.cards.preview(ctx(), settle, {"id": "gone"})
     assert (failure.outcome, failure.code, fields) == ("error", "demo.item_not_found", None)
     assert json.loads(failure.content)["error"]["message"] == "This item is not there any more."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_preview_whose_data_do_not_fit_comes_back_with_the_field(settle):
     failure, fields = assistant.cards.preview(ctx(), settle, {"reason": "sin id"})
     assert (failure.outcome, failure.code, fields) == ("error", "invalid_payload", None)
@@ -848,7 +849,7 @@ def count_preview(answer: dict, output: type[Schema] = CountPreviewOut) -> Opera
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("difference", [13790, -490, 0], ids=["over", "short", "even"])
 def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(monkeypatch, difference):
     """A cash difference over came as a bare amount
@@ -865,8 +866,7 @@ def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(
         {"name": "expected_balance", "kind": "money", "value": 11210},
         {"name": "difference", "kind": "money", "value": difference, "signed": True},
     ]
-    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
-    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+    assert_a_sent_amount_is_in_the_business_currency()
 
 
 class PricedPreviewOut(Schema):
@@ -890,7 +890,7 @@ def priced(monkeypatch, answer: dict) -> list[dict]:
     return [{key: value for key, value in field.items() if key != "label"} for field in fields]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("answer", "money"),
     [
@@ -912,11 +912,10 @@ def test_an_amount_of_a_preview_carries_the_currency_its_read_answers(monkeypatc
         {"name": "total_cents", "kind": "money", "value": -12100, "money": money},
         {"name": "difference", "kind": "money", "value": 4200, "signed": True, "money": money},
     ]
-    price = next(field for field in assistant.cards.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
-    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+    assert_a_sent_amount_is_in_the_business_currency()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_preview_whose_read_answers_no_currency_invents_none(monkeypatch):
     """Without a currency in the read's answer (Cash register's close: the drawer is in the business's), its amounts
     carry none and the card paints them in the business's, as before."""
@@ -1057,14 +1056,14 @@ def note(monkeypatch):
     return write
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_write_whose_check_refuses_its_data_gets_no_card_and_says_why(note):
     failure, fields = assistant.cards.preview(ctx(), note, {"id": "gone", "note": "x"})
     assert (failure.outcome, failure.code, fields) == ("error", "demo.item_not_found", None)
     assert json.loads(failure.content)["error"]["message"] == "This item is not there any more."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_check_that_passes_leaves_a_normal_writes_card_as_it_was(note):
     """Nothing of the check's answer reaches the card: a normal write has no preview."""
     assert assistant.cards.preview(ctx(), note, {"id": "7", "note": "x"}) == (None, None)
@@ -1076,7 +1075,7 @@ class StrictCheckIn(Schema):
     id: str = Field(min_length=1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_check_reads_only_the_data_its_own_input_takes(monkeypatch):
     """The write's other data (its note) never reach its check: a read that refuses data it does not take still lets
     a write whose data it takes reach its card."""
@@ -1089,13 +1088,13 @@ def test_a_check_reads_only_the_data_its_own_input_takes(monkeypatch):
     assert failure.code == "demo.item_not_found"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_check_the_person_may_not_read_is_refused_never_read_for_them(note):
     failure, fields = assistant.cards.preview(ctx({"base.view_home", "demo.manage"}), note, {"id": "7"})
     assert (failure.outcome, failure.code, fields) == ("refused", "permission_denied", None)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_dangerous_write_is_checked_before_its_preview_is_read(monkeypatch):
     """The check refuses first: the preview is never read for data the write refuses."""
     read: list[str] = []
@@ -1151,7 +1150,7 @@ def test_the_checks_of_today_are_declared_right(note):
 # ── A tool runs as the person, by its own operation ──────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_tool_runs_by_its_operation_with_the_persons_permissions():
     outcome = shared.run_tool(ctx(), get("demo.item.create"), '{"name": "Mesa 4"}')
     assert outcome.outcome == "ok"
@@ -1160,14 +1159,14 @@ def test_a_tool_runs_by_its_operation_with_the_persons_permissions():
     assert created["id"] in listed.content
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_tool_the_person_may_not_use_is_refused_and_writes_nothing():
     outcome = shared.run_tool(ctx(EMPLOYEE), get("demo.item.create"), '{"name": "Mesa 4"}')
     assert (outcome.outcome, outcome.code) == ("refused", "permission_denied")
     assert "Mesa 4" not in shared.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}").content
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
     outcome = shared.run_tool(ctx(), get("demo.item.create"), '{"name": ""}')
     assert (outcome.outcome, outcome.code) == ("error", "invalid_payload")
@@ -1331,7 +1330,7 @@ def test_the_allowance_is_asked_signed_and_for_this_business(gateway):
     gateway.reply("/internal/assistant/usage", json={"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False})
     assert assistant.gateway.usage(A) == {"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
     seen = gateway.sent("/internal/assistant/usage")[0]
-    assert seen.body == {"hub": "a"}
+    assert seen.body == {"hub": A.key}
     assert signed(seen)
 
 
@@ -1347,7 +1346,7 @@ def test_a_report_goes_to_erplora_with_the_question_and_the_answer(gateway):
     answer = assistant.gateway.report(A, message_id="m1", reason="incorrect", comment="", question="¿Qué vendí?", answer="Nada")
     assert answer == {"sent": True, "duplicate": False}
     seen = gateway.sent("/internal/assistant/report")[0]
-    assert seen.body == {"hub": "a", "message_id": "m1", "reason": "incorrect", "comment": "", "question": "¿Qué vendí?", "answer": "Nada"}
+    assert seen.body == {"hub": A.key, "message_id": "m1", "reason": "incorrect", "comment": "", "question": "¿Qué vendí?", "answer": "Nada"}
     assert signed(seen)
 
 
@@ -1361,7 +1360,7 @@ def test_a_report_that_could_not_be_sent_says_so(gateway):
 def test_a_dictation_is_transcribed_by_erplora(gateway):
     gateway.reply("/internal/speech/transcribe", json={"text": "cobra la mesa 4", "language": "es"})
     assert assistant.gateway.transcribe(A, audio="UklGRg==", mime_type="audio/webm", language="es") == {"text": "cobra la mesa 4", "language": "es"}
-    assert gateway.sent("/internal/speech/transcribe")[0].body == {"hub": "a", "audio": "UklGRg==", "mime_type": "audio/webm", "language": "es"}
+    assert gateway.sent("/internal/speech/transcribe")[0].body == {"hub": A.key, "audio": "UklGRg==", "mime_type": "audio/webm", "language": "es"}
 
 
 # ── The turn, streamed ───────────────────────────────────────────────────────────────────────────────────────────
@@ -1390,7 +1389,7 @@ def test_the_answer_arrives_piece_by_piece_and_closes_with_what_to_keep(gateway)
     assert frames[-1]["append"] == [{"role": "assistant", "content": "Hola, Ana"}]
     assert frames[-1]["pending"] == []
     sent = gateway.sent("/internal/assistant/chat/stream")[0]
-    assert sent.body["hub"] == "a" and sent.body["messages"] == TURN["messages"]
+    assert sent.body["hub"] == A.key and sent.body["messages"] == TURN["messages"]
     assert signed(sent)
 
 

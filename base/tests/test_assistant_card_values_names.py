@@ -10,7 +10,10 @@ from ninja import Field, Schema
 
 from base import assistant
 from base.schemas import names, unless_given
+from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.card_values import ADMIN, ctx, reference_errors, values
+
+__all__ = ["in_business_a"]
 
 
 # ── A record said by its name inside another, and words that cannot be read (hub#1245) ────────────────────────────────
@@ -116,27 +119,27 @@ def test_names_marks_the_data_a_record_is_read_with_and_words_said_as_said():
     assert names("demo.item.dish") == {"refers": {"read": "demo.item.dish", "by": "id", "name": ["name"]}}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_said_by_its_name_inside_another_is_read_with_the_data_its_mark_names(dish_reads):
     assert served({"menu": "Vegano", "dish": "postres"}) == {"menu": "Vegano", "dish": "Postres caseros"}
     assert dish_reads == [{"menu": "Vegano", "dish": "postres"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_only_the_data_its_mark_names_go_with_it(dish_reads):
     """The table's ``id`` stays out of the dish's read, though that read takes an ``id`` of its own."""
     served({"id": "T-9", "menu": "Vegano", "dish": "postres"})
     assert dish_reads == [{"menu": "Vegano", "dish": "postres"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_inside_an_object_the_data_beside_it_are_those_of_its_own_object(dish_reads):
     shown = served({"menu": "Infantil", "line": {"menu": "Vegano", "dish": "postres"}})
     assert shown["line"] == {"menu": "Vegano", "dish": "Postres caseros"}
     assert dish_reads == [{"menu": "Vegano", "dish": "postres"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_inside_an_object_a_datum_takes_nothing_from_the_object_around_it(dish_reads):
     """A line that names no menu is read with none, though the write around it names one: it is said as said."""
     shown = served({"menu": "Vegano", "line": {"dish": "postres"}})
@@ -144,7 +147,7 @@ def test_inside_an_object_a_datum_takes_nothing_from_the_object_around_it(dish_r
     assert dish_reads == [{"dish": "postres"}]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "arguments",
     [{"menu": "Infantil", "dish": "postres"}, {"menu": "Vegano", "dish": "helados"}, {"dish": "postres"}],
@@ -156,7 +159,7 @@ def test_words_that_cannot_be_read_are_said_as_said(dish_reads, arguments):
     assert found == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_words_nobody_may_read_or_with_nobody_at_hand_are_said_as_said(dish_reads):
     arguments = {"menu": "Vegano", "dish": "postres"}
     assert served(arguments, ADMIN)["dish"] == "postres"
@@ -167,21 +170,21 @@ def test_words_nobody_may_read_or_with_nobody_at_hand_are_said_as_said(dish_read
     assert dish_reads == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_record_found_by_its_name_goes_in_what_the_yes_is_for(dish_reads):
     found: list = []
     served({"menu": "Vegano", "dish": "postres"}, found=found)
     assert found == ["D-1"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_found_that_has_no_name_is_said_as_said_and_goes_in_what_the_yes_is_for(dish_reads):
     found: list = []
     assert served({"menu": "Degustación", "dish": "sorpresa"}, found=found)["dish"] == "sorpresa"
     assert found == ["D-5"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_as_said_words_that_cannot_be_read_are_left_out(dish_reads):
     """``as_said`` is the mark's to say: a datum that names a record otherwise is left out, as ever."""
     mark = names("demo.item.dish", by="dish", within=("menu",))
@@ -202,7 +205,7 @@ def test_unless_given_is_a_mark_left_unread_beside_those_data_and_leaves_the_mar
     assert "unless" not in A_DISH["refers"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_name_beside_the_record_the_write_takes_instead_is_neither_read_nor_shown(dish_reads):
     """The write takes the dish by its id and never looks at the name beside it: the card says no other dish."""
     found: list = []
@@ -211,14 +214,14 @@ def test_a_name_beside_the_record_the_write_takes_instead_is_neither_read_nor_sh
     assert (dish_reads, found) == ([], [])
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("dish_id", [None, ""], ids=["none", "empty"])
 def test_without_the_record_that_leaves_it_unread_a_name_is_read_as_ever(dish_reads, dish_id):
     shown = served({"menu": "Vegano", "dish_id": dish_id, "dish": "postres"}, mark=UNLESS_ITS_ID)
     assert shown["dish"] == "Postres caseros"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_inside_an_object_only_its_own_record_leaves_its_name_unread(dish_reads):
     shown = served(
         {"dish_id": "D-2", "line": {"menu": "Vegano", "dish": "postres"}}, mark=UNLESS_ITS_ID

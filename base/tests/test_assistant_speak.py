@@ -12,18 +12,20 @@ import httpx
 import pytest
 from django.db import connections
 from django.utils import translation
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import OperationError, PermissionDenied
 from live.operations import get
 from pydantic import ValidationError
 
 from base import assistant
-from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tests.fake_gateway import gateway, signed
 
-pytestmark = pytest.mark.django_db
+__all__ = ["gateway", "in_business_a", "signed"]
 
-A = Scope("host", "a")
-HOST = {"HTTP_HOST": "a.localhost:8000"}
+pytestmark = HUB_DB
+
+HOST = {"HTTP_HOST": f"{A.key}.localhost"}
 EMPLOYEE = frozenset({"base.view_home", "demo.view"})
 SYNTHESIZE = "/internal/speech/synthesize"
 #: The first bytes of an mp3 (an ID3 header, then a frame's sync word).
@@ -67,7 +69,7 @@ def test_an_answer_is_read_aloud_as_an_mp3_in_the_voice_chosen(gateway):
     spoken = speak(text="  Tienes 3 mesas abiertas.  ", language="es", voice=A_VOICE)
     assert spoken == {"content_type": "audio/mpeg", "content_base64": base64.b64encode(MP3).decode()}
     [seen] = gateway.sent(SYNTHESIZE)
-    assert seen.body == {"hub": "a", "text": "Tienes 3 mesas abiertas.", "language": "es", "voice": A_VOICE}
+    assert seen.body == {"hub": A.key, "text": "Tienes 3 mesas abiertas.", "language": "es", "voice": A_VOICE}
     assert signed(seen)
 
 
@@ -184,7 +186,7 @@ def test_the_hub_waits_longer_than_erplora_com_waits_for_its_provider():
     assert assistant.gateway.SPEECH_TIMEOUT.read > 60
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_waiting_for_the_voice_holds_no_transaction(gateway, monkeypatch):
     """The till waits on the hub's connection (one transaction at a time on the Free plan): none is open
     while erplora.com reads the answer."""
@@ -216,7 +218,7 @@ def test_the_route_is_bound_to_its_operation():
 
 
 def test_the_panel_gets_the_mp3_itself(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     response = post(client, {"text": "Hola", "language": "es", "voice": A_VOICE}, HTTP_ACCEPT="audio/mpeg")
     assert (response.status_code, response["Content-Type"], response.content) == (200, "audio/mpeg", MP3)
@@ -227,14 +229,14 @@ def test_the_panel_gets_the_mp3_itself(client, make_user, gateway):
 
 
 def test_an_integration_that_only_reads_json_gets_the_operations_output(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="application/json")
     assert response.json() == {"content_type": "audio/mpeg", "content_base64": base64.b64encode(MP3).decode()}
 
 
 def test_without_the_server_voice_the_route_answers_the_envelope(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(SYNTHESIZE, **refused(503, "assistant.speech_unavailable"))
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
     assert response.status_code == 503
@@ -243,7 +245,7 @@ def test_without_the_server_voice_the_route_answers_the_envelope(client, make_us
 
 def test_with_the_server_voice_off_the_route_answers_the_envelope_without_asking(client, make_user, settings, gateway):
     settings.ASSISTANT_SERVER_VOICE = False
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
     assert (response.status_code, response.json()["error"]["code"]) == (503, "base.assistant_speech_unavailable")
     assert gateway.requests == []
@@ -257,7 +259,7 @@ def test_the_shell_tells_the_panel_whether_there_is_a_server_voice(client, make_
     from base.tests.test_spa import json_block
 
     settings.ASSISTANT_SERVER_VOICE = on
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     _, home = json_block(client.get("/demo/items", **HOST), "hub-home")
     assert home["server_voice"] is on
 
@@ -268,7 +270,7 @@ def test_nobody_without_a_session_has_anything_read(client, gateway):
 
 
 def test_a_text_too_long_is_refused_by_the_hub(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = post(client, {"text": "a" * 4097})
     assert response.status_code == 422
     assert "text" in response.json()["error"]["fields"]
