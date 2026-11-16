@@ -16,14 +16,14 @@ import pytest
 from live.operations import get, registry
 
 from apps.task.models import Comment, Project, Task
-from apps.task.tests.conftest import ctx_for, make_member, make_project, make_task
+from apps.task.tests.conftest import HUB_DB, ctx_for, make_member, make_project, make_task
 from apps.task.tests.test_integration_assistant import SCREENS, SCREENS_EN, task_writes
 from base import assistant
 from base.schemas import names
 from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 BY_ITS_NAME = ("task.task.delete", {"task": "llamar"})
 

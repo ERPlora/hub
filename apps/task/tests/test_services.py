@@ -18,10 +18,11 @@ from live.outbox import channel_for
 from apps.task import events as task_events
 from apps.task.models import Comment, Project, Task
 from base.models import HubUser, Membership
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_comment, make_member, make_project, make_task
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_comment, make_member, make_project, make_task
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 WAIT = 1.0
 QUIET = 0.3
@@ -380,7 +381,7 @@ def test_a_comment_or_a_task_of_someone_the_business_s_database_does_not_know_ye
     # A session opened before the business's database knew them: their first write signs with a person of its
     # own, and they own what they created.
     late = django_user_model.objects.create_user(username="saas:late", first_name="Eva")
-    Membership.objects.create(user=late, host="a", role="hub_employee")
+    Membership.objects.create(user=late, host=A.key, role="hub_employee")
     ctx = ctx_for("hub_employee", actor=late)
 
     task = run("task.task.create", {"title": "Restock"}, ctx=ctx)
@@ -530,25 +531,30 @@ def received(session, timeout=WAIT, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen, hub_b):
+    in_a = make_task("Clean the store room")  # straight to the model: it tells nobody
     on_a, on_b = listen(A), listen(B)
 
-    task_id = run("task.task.create", {"title": "Clean the store room"}, ctx=ctx_for(scope=B)).id
+    with use_hub(hub_b):
+        run("task.task.create", {"title": "Clean the store room"}, ctx=ctx_for(scope=B))
+        assert OutboxEvent.objects.get(name=task_events.TASK_CREATED).scope_key == B.key
 
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [task_events.TASK_CREATED]})]
     assert received(on_a, timeout=QUIET) == []
 
     # Positive control: the same listener of A does hear a command run in A.
-    run("task.task.update", {"id": str(task_id), "priority": "high"}, ctx=ctx_for(scope=A))
+    run("task.task.update", {"id": str(in_a.id), "priority": "high"}, ctx=ctx_for(scope=A))
+    assert OutboxEvent.objects.get(name=task_events.TASK_UPDATED).scope_key == A.key
     assert received(on_a, stop_after=1) == [(channel_for(A), {"events": [task_events.TASK_UPDATED]})]
     assert received(on_b, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_refused_command_notifies_nobody(listen):
-    task = make_task(status="done", completed_at=timezone.now())
+@HUB_DB_COMMITTED
+def test_a_refused_command_notifies_nobody(listen, hub_b):
+    with use_hub(hub_b):
+        task = make_task(status="done", completed_at=timezone.now())
     on_b = listen(B)
-    with pytest.raises(Conflict):
+    with use_hub(hub_b), pytest.raises(Conflict):
         run("task.task.complete", {"id": str(task.id)}, ctx=ctx_for(scope=B))
     assert received(on_b, timeout=QUIET) == []

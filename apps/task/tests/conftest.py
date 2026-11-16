@@ -2,23 +2,34 @@
 record of their own), a raw DSN, and builders of the data a test starts from (straight to the models:
 the operations are under test).
 
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+
 The builders import the models lazily, so that the tests of apps.py still collect while models.py
 does not exist.
 """
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
-from psycopg.conninfo import make_conninfo
 
+from apps.flow.tests.test_relay import worker_loop
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import db_dsn
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases (the platform staff with business A chosen in the Hub
+#: admin, business A on a plan with room for several sessions, the worker's real loop over them, the raw DSN of control
+#: where the live notices go, the assistant's catalogue of a person of business A) that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "hub_staff", "in_business_a", "plan_with_room",
+    "worker_loop",
+]
 
 
 def ctx_for(
@@ -57,7 +68,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
         first_name: str = "",
         last_name: str = "",
@@ -72,19 +83,6 @@ def make_user(db):
         return user
 
     return make
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
 
 
 # Builders

@@ -10,17 +10,18 @@ asks and the guard that no ask copies a probe of layer 2.
 import json
 from pathlib import Path
 
-import pytest
 from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import comparable, probe_phrases
 from base.tests.test_assistant_asks import probes_test, reported_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: Writes on what the whole team shares that only who runs it holds (``task.delete``, ``task.manage_project``), none
 #: of them a manager approves: an employee's assistant is never offered them.
@@ -56,7 +57,7 @@ def test_task_offers_at_least_17_tools():
     assert len(tools) >= 17
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_an_employee_is_never_offered_what_only_who_runs_the_team_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -101,9 +102,9 @@ def test_the_guests_of_a_table_are_no_comment():
     )
 
 
-test_the_reported_task_request_offers_its_existing_operation = reported_test(REPORTED)
+test_the_reported_task_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
 
 
 #: The owner's seventeen phrases of layer 2, the ones the model answered right too: a tool of Tasks that a new ask
 #: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
-test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks = probes_test(PROBES, "task")
+test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "task"))
