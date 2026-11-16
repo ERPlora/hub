@@ -22,10 +22,11 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.tax.models import TaxCategory, TaxRule
-from apps.tax.tests.conftest import A, B
+from apps.tax.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, empty_tax_tables
 from base import activation
 from base.models import AppActivation
 from base.schemas import SetupStatusIn
+from base.tenancy.context import use_hub
 
 STEP = "tax.rules"
 CATEGORY = "product.generic"
@@ -70,7 +71,7 @@ def rule(category: TaxCategory, **fields) -> TaxRule:
     return TaxRule.objects.create(category=category, **{"country_code": "ES", "rate_pct": Decimal("21"), **fields})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_without_rules_has_your_taxes_pending_and_it_leads_to_the_rules(generic):
     item = step()
     assert {name: item[name] for name in ("key", "state", "level", "required", "actionable", "route", "order", "icon")} == {
@@ -89,7 +90,7 @@ def test_a_hub_without_rules_has_your_taxes_pending_and_it_leads_to_the_rules(ge
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_words_of_the_notice(generic):
     # A Spanish reader never reads a module's step in English.
     item = step(person(language="es"))
@@ -99,13 +100,13 @@ def test_in_spanish_it_says_the_words_of_the_notice(generic):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_factory_spanish_rules_tick_it():
     # TAX-F16: every hub is born with the Spanish VAT rules, so a new hub is done already.
     assert step()["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_root_rule_of_the_business_s_country_in_force_today_ticks_it_whatever_its_class(generic):
     # Only the business's country counts: Spain here, with no country registered. A rule of another country
     # would never price its sales.
@@ -115,7 +116,7 @@ def test_one_root_rule_of_the_business_s_country_in_force_today_ticks_it_whateve
     assert step()["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_rule_that_does_not_apply_today_does_not_tick_it(generic):
     # Ended yesterday, starting tomorrow, deactivated, or a component hanging from a root that is off: the till could
     # not price a sale with any of them.
@@ -128,7 +129,7 @@ def test_a_rule_that_does_not_apply_today_does_not_tick_it(generic):
     assert step()["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_manages_taxes_is_told_and_who_only_reads_them_is_not(generic):
     # Important, never ⛔: who cannot set the rates up is not told (base's rule). The employee only reads them.
     assert step(person("hub_admin"))["state"] == "pending"
@@ -143,13 +144,15 @@ def never_turned_on() -> None:
     activation.forget(A.key)
 
 
-@pytest.mark.django_db
-def test_with_taxes_off_the_home_does_not_ask_for_its_rates(generic):
+@HUB_DB
+def test_with_taxes_off_the_home_does_not_ask_for_its_rates(generic, hub_b):
     # base brings only the steps of the modules on in the scope: Taxes off, no step of its own (the Home asks to turn
     # it on instead: base.mandatory.tax, base/tests/test_queries_home.py).
     never_turned_on()
     assert step() is None
-    assert step(person(scope=B))["state"] == "pending"
+    with use_hub(hub_b):
+        empty_tax_tables()
+        assert step(person(scope=B))["state"] == "pending"
 
 
 def create_one(category, existing):
@@ -194,7 +197,7 @@ def start_from(change, category):
     return None
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "event,change,state",
     [(event, change, state) for event, cases in CHANGES.items() for change, state in cases],
@@ -245,16 +248,17 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_rule_created_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen):
-    # A transactional test may start after another one flushed the factory catalogue.
-    TaxCategory.objects.get_or_create(key=CATEGORY, defaults={"name": "Generic"})
+@HUB_DB_COMMITTED
+def test_a_rule_created_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run(
-        "tax.rule.create",
-        {"country_code": "PT", "tax_category_key": CATEGORY, "rate_pct": "23"},
-        person("hub_admin", B),
-    )
+    with use_hub(hub_b):
+        # A transactional test may start after another one emptied business B's factory catalogue.
+        TaxCategory.objects.get_or_create(key=CATEGORY, defaults={"name": "Generic"})
+        run(
+            "tax.rule.create",
+            {"country_code": "PT", "tax_category_key": CATEGORY, "rate_pct": "23"},
+            person("hub_admin", B),
+        )
 
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}

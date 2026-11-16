@@ -18,7 +18,8 @@ from base.models import Membership
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB, in_hubs
 
 #: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
 #: its writes (categories, aliases, rules one by one or in a batch, their end, deactivation and reactivation, and the
@@ -104,7 +105,7 @@ def test_tax_offers_its_eighteen_tools():
     assert tools == TOOLS
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_decides_what_is_charged(catalog_of):
     for role in (Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.MANAGER):
         assert {name for name in catalog_of(role, "es") if name.startswith("tax.")} == TOOLS, role
@@ -120,13 +121,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_tax_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Taxes that a
@@ -141,7 +142,7 @@ def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, 
     assert_offered_with_room(tools, name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_request_offers_its_tool_before_the_switch_of_an_app(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -157,7 +158,7 @@ def test_every_tool_of_taxes_has_its_own_words():
     assert {name for name, _ in OWN_WORDS} == TOOLS
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Taxes that needs one, neither
@@ -182,5 +183,5 @@ OWN_WORDS_EN = [
     ("tax.settings.get", "which territory do we operate in?"),
     ("tax.settings.update", "go back to the national one, nothing special"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("tax", OWN_WORDS_EN)
