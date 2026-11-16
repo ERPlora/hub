@@ -11,21 +11,16 @@ from io import StringIO
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import RequestFactory
+from django.contrib.sessions.middleware import SessionMiddleware
 from live.context import system_context
 
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
-from base.services.demos import (
-    demo_code_create,
-    demo_create,
-    reap_demos,
-    redeem_demo_code,
-)
+from base.services.demos import demo_code_create, demo_create, reap_demos, redeem_demo_code
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_services_demo import open_session
 from control.schemas import FreezeIn

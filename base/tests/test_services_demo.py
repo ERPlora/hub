@@ -30,10 +30,17 @@ from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from base import files, registry, services
+from base.services import demos
 from base.models import DemoCode, Hub, Membership
+from base.storage import hub_prefix
+from base.tenancy import names, ops, provision
+from base.tenancy.connections import control_name
+from base.tenancy.context import use_control, use_hub
+from base.tenancy.tests.business import HUB_DB, A
+from base.tests.test_auth_views import demo
+from control.models import HubDue
 from base.queries import demo_get
 from base.schemas import DemoCodeIn, DemoCreateIn, DemoSlugIn
-from base.services import demos
 from base.services.demos import (
     demo_code_create,
     demo_create,
@@ -46,13 +53,6 @@ from base.services.demos import (
     redeem_demo_code,
 )
 from base.services.sessions import InactiveUser
-from base.storage import hub_prefix
-from base.tenancy import names, ops, provision
-from base.tenancy.connections import control_name
-from base.tenancy.context import use_control, use_hub
-from base.tenancy.tests.business import HUB_DB, A
-from base.tests.test_auth_views import demo
-from control.models import HubDue
 
 pytestmark = pytest.mark.django_db
 

@@ -14,13 +14,7 @@ from django.apps import apps
 from django.db import IntegrityError, connections
 from live.assistant import description, risk
 from live.context import OperationContext, Scope
-from live.errors import (
-    AppInactive,
-    Conflict,
-    NotFound,
-    OperationError,
-    PermissionDenied,
-)
+from live.errors import AppInactive, Conflict, NotFound, OperationError, PermissionDenied
 from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.operations import atomic, get
@@ -34,19 +28,13 @@ from base.models import AppActivation, Hub
 from base.schemas import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import current_alias, use_hub
-from base.tenancy.tests.business import (
-    HOST,
-    HUB_DB,
-    HUB_DB_COMMITTED,
-    A,
-    B,
-    in_business_a,
-)
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import at_once, in_a_thread, plan_with_room
 from base.tests.routes import assert_bound
 
 #: Business A entered for every test with the database, room for two of its sessions at once, and control's LISTEN.
 __all__ = ["db_dsn", "in_business_a", "listen", "plan_with_room"]
+
 ADMIN = "base.administer_hub"
 HOME = "base.view_home"
 
