@@ -106,7 +106,7 @@
 1088 apps/staff/schemas.py ERPlora/erplora-next#74
 1071 apps/staff/services.py ERPlora/erplora-next#74
 1307 apps/staff/tests/test_queries.py ERPlora/erplora-next#74
-1503 apps/staff/tests/test_services.py ERPlora/erplora-next#74
+1500 apps/staff/tests/test_services.py ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
 1041 apps/table/queries.py ERPlora/erplora-next#74
 895 apps/table/schemas.py ERPlora/erplora-next#74
