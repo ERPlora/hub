@@ -12,13 +12,14 @@ import pytest
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
+from apps.whatsapp_inbox.tests.conftest import HUB_DB
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import PROBES, TOP, assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place
 from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 #: The requests of hub#1108's QA (``owner.es.whatsapp_inbox.*`` of ``owner-es-whatsapp_inbox-2026-11-08.json``), as the
 #: owner said them: before the inbox said its asks, none of these tools was among the ones a turn offers
@@ -131,7 +132,7 @@ def test_the_hub_reads_plantilla_and_mensaje_as_the_inboxs_template_and_message(
     )
 
 
-test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups = by_group_test(BY_GROUP)
+test_a_request_in_spanish_brings_its_tool_among_the_first_ten_by_the_inboxs_groups = in_hubs(by_group_test(BY_GROUP))
 
 
 
@@ -139,7 +140,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_whatsapp_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
@@ -152,7 +153,7 @@ def test_layer_2_probes_every_whatsapp_tool():
     assert probed == tools, sorted(probed ^ tools)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("role", "name", "phrase"), whatsapp_probes())
 def test_every_whatsapp_probe_of_layer_2_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
     """Not only the six the QA found unreachable: each request of the QA of the inbox, in the words it was said in and
@@ -168,7 +169,7 @@ def test_every_tool_of_the_inbox_has_its_own_words():
     assert sorted(named) == sorted(tools), sorted(set(named) ^ tools)
 
 
-test_the_owners_own_words_reach_each_tool_of_the_inbox_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_the_owners_own_words_reach_each_tool_of_the_inbox_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of the WhatsApp inbox that needs one, neither
@@ -207,11 +208,11 @@ OWN_WORDS_EN = [
     ("whatsapp_inbox.template_sample.detail", "what file did I upload as header?"),
     ("whatsapp_inbox.template_sample.upload", "use this video at the top of the message"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("whatsapp_inbox", OWN_WORDS_EN)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", RUN_THE_BUSINESS)
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("name", REWRITTEN)

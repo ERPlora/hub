@@ -9,12 +9,11 @@ from live.models import OutboxEvent
 
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, ctx_for, receive, run, system, template
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 
 pytestmark = [
-    pytest.mark.django_db(databases=hubs.HUB_DATABASES),
+    HUB_DB,
     pytest.mark.usefixtures("no_test_fallback"),
 ]
 

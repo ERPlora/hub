@@ -14,9 +14,9 @@ from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, card, connect, ctx_for, receive, run, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, card, connect, ctx_for, receive, run, template
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:

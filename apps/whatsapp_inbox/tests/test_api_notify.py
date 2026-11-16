@@ -7,20 +7,21 @@ import pytest
 import respx
 
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import connect, receive
+from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, connect, receive
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 PATH = "/api/whatsapp_inbox/messages/notify"
 
 
 def post(client, data):
-    return client.post(PATH, json.dumps(data), content_type="application/json", HTTP_HOST="a.localhost")
+    return client.post(PATH, json.dumps(data), content_type="application/json", HTTP_HOST=HOST)
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("luis", host="a", role="hub_employee"))
+    client.force_login(make_user("luis", host=A.key, role="hub_employee"))
     return client
 
 
@@ -31,7 +32,7 @@ def test_it_is_201_queued_to_the_exact_number_and_a_number_without_conversation_
     connect()
     receive("wamid.1")
     respx.post("http://saas.test/internal/whatsapp/send").mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         sent = post(employee_client, {"phone": "+34600111222", "text": "¡Confirmada!"})
     assert (sent.status_code, sent.json()["status"]) == (201, "queued")
     assert Message.objects.get(pk=sent.json()["id"]).status == "sent"

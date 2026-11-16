@@ -20,7 +20,7 @@ from apps.whatsapp_inbox.admin import (
     TemplateAdmin,
 )
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
-from apps.whatsapp_inbox.tests.conftest import NOW, receive
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, receive
 
 
 @pytest.fixture
@@ -45,6 +45,7 @@ def test_every_model_is_registered():
     assert MessageInline in admin.site._registry[Conversation].inlines
 
 
+@HUB_DB
 def test_full_crud_except_messages_which_are_read_only(superuser):
     request = request_by(superuser)
     for model in (Channel, Conversation, Note, Template):
@@ -63,15 +64,14 @@ def test_full_crud_except_messages_which_are_read_only(superuser):
     assert not inline.has_change_permission(request)
 
 
-@pytest.mark.django_db
-def test_the_pages_render(client, superuser):
+@HUB_DB
+def test_the_pages_render(hub_staff):
     receive("wamid.1")
     conversation = Conversation.objects.get()
     message = Message.objects.get()
     note = Note.objects.create(conversation=conversation, text="Llamar", created_at=NOW)
     template = Template.objects.create(name="recordatorio", language="es")
     channel = Channel.objects.create()
-    client.force_login(superuser)
     host = {"HTTP_HOST": "hubs.localhost"}
     for path in (
         "/admin/whatsapp_inbox/conversation/",
@@ -82,7 +82,7 @@ def test_the_pages_render(client, superuser):
         f"/admin/whatsapp_inbox/template/{template.pk}/change/",
         f"/admin/whatsapp_inbox/channel/{channel.pk}/change/",
     ):
-        assert client.get(path, **host).status_code == 200, path
+        assert hub_staff.get(path, **host).status_code == 200, path
 
 
 def test_the_channel_admin_shows_the_number_and_keeps_only_its_timestamp_read_only():
@@ -100,8 +100,8 @@ def test_the_template_admin_has_no_legacy_business_column():
     assert "host" not in templates.readonly_fields
 
 
-@pytest.mark.django_db
-def test_the_admin_in_spanish_says_the_inboxs_own_words(client, superuser):
+@HUB_DB
+def test_the_admin_in_spanish_says_the_inboxs_own_words(hub_staff):
     """The messages' list filters by «origen» (who sent it) and by «procedencia» (live or its history), two filters
     with two names; a template says when it was «Sincronizada el» and «Borrada el», and the channel «Sincronizado el»:
     the inbox's words, not the «origen» and «eliminado el» of Clientes nor the «recibido el» of Facturación, loaded
@@ -109,10 +109,9 @@ def test_the_admin_in_spanish_says_the_inboxs_own_words(client, superuser):
     receive("wamid.1")
     template = Template.objects.create(name="recordatorio", language="es", synced_at=NOW, deleted_at=NOW)
     channel = Channel.objects.create(synced_at=NOW)
-    client.force_login(superuser)
 
     def page(path: str) -> str:
-        response = client.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es")
         assert response.status_code == 200, path
         return response.content.decode()
 
