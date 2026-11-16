@@ -11,8 +11,11 @@ from live.operations import Operation, registry
 from ninja import Field, Schema
 
 from base import assistant
+from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.card_values import ADMIN, VisitIn, ctx, is_attempt_key, values, writes
 from base.tests.test_services_assistant import call, turn
+
+__all__ = ["in_business_a"]
 
 
 # ── An attempt key: never on the card, always in the write ────────────────────────────────────────────────────────────
@@ -70,7 +73,7 @@ class KeyedPreviewOut(Schema):
     idempotency_key: str = Field(json_schema_extra={"attempt_key": True})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_attempt_key_never_reaches_a_preview_either(monkeypatch):
     """«What will happen» of a dangerous card (BASE-F98) says its data by the same rule: a key its read answers is not
     there, even when its app names it among the preview's data."""
@@ -85,7 +88,7 @@ def test_an_attempt_key_never_reaches_a_preview_either(monkeypatch):
     assert [(field["name"], field["value"]) for field in fields] == [("name", "Item 7")]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_yes_runs_the_write_with_its_attempt_keys_as_sent(monkeypatch):
     """The card leaves the keys out; the write the yes runs gets every one of them whole, at any depth."""
     received = []
@@ -98,7 +101,7 @@ def test_the_yes_runs_the_write_with_its_attempt_keys_as_sent(monkeypatch):
     assert received == [KEYED_ARGUMENTS]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_line_the_assistant_adds_twice_with_its_key_is_one_line():
     """A real write: Demo's line, its card without its key (its item by its name, hub#670); the yes adds it, and the
     same line again — a retry with the same key — answers the line already there instead of adding another."""

@@ -23,13 +23,15 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from base.models import AccessSettings, Approval, Hub, Membership
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tenancy.tests.hubs import HUB_DATABASES
 from base.tests.test_people import with_badge, with_pin
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-HOST = "a.localhost:8000"
-B_HOST = "b.localhost:8000"
+pytestmark = HUB_DB
+
+B_HOST = f"{B.key}.localhost"
 APPROVABLE = "base.access.settings_update"
 SETTINGS = "/access/settings/update"
 CHANGE = {"pin_policy": "always", "pin_inactivity_minutes": 5, "pin_length": 4}
@@ -63,21 +65,21 @@ def approvable(monkeypatch):
 
 @pytest.fixture
 def adam(make_user):
-    user = make_user("saas:2", host="a", role=Membership.Role.ADMIN, first_name="Adam")
+    user = make_user("saas:2", host=A.key, role=Membership.Role.ADMIN, first_name="Adam")
     with_pin("saas:2", "2580")
     return user
 
 
 @pytest.fixture
 def eva(make_user, client):
-    user = make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
+    user = make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva")
     client.force_login(user)
     return user
 
 
 @pytest.fixture
 def mario(make_user):
-    user = make_user("saas:4", host="a", role=Membership.Role.MANAGER, first_name="Mario")
+    user = make_user("saas:4", host=A.key, role=Membership.Role.MANAGER, first_name="Mario")
     with_pin("saas:4", "1357")
     return user
 
@@ -201,7 +203,7 @@ class TestApproving:
         assert response.status_code == 403 and code(response) == "base.approver_cannot"
 
     def test_nothing_is_approved_for_who_already_holds_the_permission(self, client, adam, make_user):
-        olga = make_user("saas:1", host="a", role=Membership.Role.OWNER, first_name="Olga")
+        olga = make_user("saas:1", host=A.key, role=Membership.Role.OWNER, first_name="Olga")
         client.force_login(olga)
         asked = {"operation": APPROVABLE, "fingerprint": "0" * 64}
         response = approve(client, asked, "saas:2")
@@ -246,14 +248,27 @@ class TestThePassIsBound:
 
     def test_to_the_person_who_asked(self, client, adam, eva, make_user):
         token = granted(client)
-        ana = make_user("saas:5", host="a", role=Membership.Role.EMPLOYEE, first_name="Ana")
+        ana = make_user("saas:5", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Ana")
         client.force_login(ana)
         assert code(post(client, SETTINGS, CHANGE, **with_pass(token))) == "requires_elevation"
 
-    def test_to_this_business(self, client, adam, eva):
-        Membership.objects.create(user=eva, host="b", role=Membership.Role.EMPLOYEE)
+    def test_to_this_business(self, client, adam, eva, hub_b):
+        Membership.objects.create(user=eva, host=B.key, role=Membership.Role.EMPLOYEE)
         token = granted(client)
         assert code(post(client, SETTINGS, CHANGE, host=B_HOST, **with_pass(token))) == "requires_elevation"
+
+    def test_to_this_business_even_with_its_very_row_in_the_other_one(self, client, adam, eva, hub_b):
+        """The request a pass is for names its business: the same row, in B's database, lets nothing through there."""
+        from base.tenancy.context import use_hub
+
+        Membership.objects.create(user=eva, host=B.key, role=Membership.Role.EMPLOYEE)
+        token = granted(client)
+        row = Approval.objects.values().get()
+        with use_hub(hub_b):
+            Approval.objects.create(**row)
+        assert code(post(client, SETTINGS, CHANGE, host=B_HOST, **with_pass(token))) == "requires_elevation"
+        with use_hub(hub_b):
+            assert Approval.objects.get().used_at is None
 
     def test_for_two_minutes(self, client, adam, eva):
         token = granted(client)
@@ -342,7 +357,7 @@ class TestTheExport:
 
     def test_its_hours_are_the_businesss_and_not_the_deployments(self, client, adam, eva):
         """hub#687: 9:00 UTC is 10:00 in Madrid and 9:00 in the Canaries."""
-        Hub.objects.filter(slug="a").update(timezone="Atlantic/Canary")
+        Hub.objects.filter(slug=A.key).update(timezone="Atlantic/Canary")
         recorded(at=dt.datetime(2026, 11, 2, 9, 0, tzinfo=dt.UTC))
         client.force_login(adam)
         assert lines(exported(client))[1][0] == "2026-11-02 09:00"
@@ -417,7 +432,7 @@ class TestNotOfTheBusiness:
     it would approve."""
 
     def test_a_session_of_another_business_is_refused_flat(self, client, adam, make_user):
-        stranger = make_user("saas:9", host="b", role=Membership.Role.EMPLOYEE, first_name="Zoe")
+        stranger = make_user("saas:9", host=B.key, role=Membership.Role.EMPLOYEE, first_name="Zoe")
         client.force_login(stranger)
         response = post(client, SETTINGS, CHANGE)
         assert response.status_code == 403, response.content
@@ -477,6 +492,12 @@ THIRTY = {"pin_policy": "always", "pin_inactivity_minutes": 30}
 
 def declare(monkeypatch, figures: dict, config: str = "base") -> None:
     monkeypatch.setattr(apps.get_app_config(config), "approval_figures", figures, raising=False)
+
+
+def selling_in_spain(monkeypatch, figures: dict) -> None:
+    """Business A in Spain, its currency the euro, with Sales' approvals saying ``figures``."""
+    Hub.objects.update_or_create(slug=A.key, defaults={"status": "ready", "name": "A", "country": "ES"})
+    declare(monkeypatch, figures, config="sale")
 
 
 def asked_in(client, language: str, body=THIRTY) -> dict:
@@ -570,12 +591,6 @@ class TestTheFigureOfEachHub:
 
     pytestmark = pytest.mark.django_db(databases=HUB_DATABASES)
 
-    @pytest.fixture(autouse=True)
-    def as_in_production(self, monkeypatch):
-        from base.tenancy import context
-
-        monkeypatch.setattr(context, "_test_fallback", None)
-
     def test_each_record_says_only_its_own(self, client, hub_a, hub_b, monkeypatch):
         from django.contrib.auth import get_user_model
 
@@ -617,21 +632,17 @@ class TestTheFiguresOfTheTill:
 
     @pytest.fixture(autouse=True)
     def in_spain(self, monkeypatch):
-        from base.models import Hub
-
-        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
-        declare(monkeypatch, self.SENTENCES, config="sale")
+        selling_in_spain(monkeypatch, self.SENTENCES)
 
     def said(self, name: str, language: str = "en", **data) -> str:
         from django.utils import translation
-        from live.context import Scope
         from live.operations import get as get_operation
 
         from base.approvals import figures_of, label_of
 
         op = get_operation(name)
         with translation.override(language):
-            return label_of(op, figures_of(op, op.input.model_validate(data)), Scope("host", "a"))
+            return label_of(op, figures_of(op, op.input.model_validate(data)), A)
 
     def test_a_line_discount_says_its_percent(self):
         line = {"order_id": "0190a1b2-0000-7000-8000-000000000001", "line_id": "0190a1b2-0000-7000-8000-000000000002"}
@@ -650,14 +661,14 @@ class TestTheFiguresOfTheTill:
     def test_the_amount_is_in_the_business_s_currency(self):
         from base.models import Hub
 
-        Hub.objects.filter(slug="a").update(country="JP")
+        Hub.objects.filter(slug=A.key).update(country="JP")
         order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
         assert self.said(self.CHECK, discount_percent="0", discount_amount=500, **order) == "Discount the check by ¥500"
 
     def test_a_business_whose_currency_is_unknown_says_the_words_of_always(self):
         from base.models import Hub
 
-        Hub.objects.filter(slug="a").delete()
+        Hub.objects.filter(slug=A.key).delete()
         order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
         assert self.said(self.CHECK, discount_percent="0", discount_amount=500, **order) == "Discount the check above the maximum"
 
@@ -720,10 +731,7 @@ class TestTheFiguresTheReviewAdded:
 
     @pytest.fixture(autouse=True)
     def in_spain(self, monkeypatch):
-        from base.models import Hub
-
-        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
-        declare(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]}, config="sale")
+        selling_in_spain(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]})
 
     def test_the_record_says_the_amount_in_the_business_s_currency(self, client, adam, eva):
         recorded(operation=self.CHECK, figures={"discount_amount": 500})

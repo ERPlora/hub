@@ -159,7 +159,7 @@
 1182 base/tenancy/tests/test_provision.py ERPlora/erplora-next#74
 1203 base/tenancy/tests/test_recovery.py ERPlora/erplora-next#74
 1496 base/tests/test_app_activation.py ERPlora/erplora-next#74
-1522 base/tests/test_assistant.py ERPlora/erplora-next#74
+1521 base/tests/test_assistant.py ERPlora/erplora-next#74
 1145 base/tests/test_queries_home.py ERPlora/erplora-next#74
 1058 base/tests/test_worker.py ERPlora/erplora-next#74
 1196 base/tests/test_ws_print.py ERPlora/erplora-next#74

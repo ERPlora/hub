@@ -9,13 +9,14 @@ included, so a tool found here is found in any business with fewer apps on.
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
 
 
 @pytest.fixture
@@ -32,7 +33,7 @@ def offered(ctx: OperationContext, *asked: str) -> list[str]:
     return [op.name for op in assistant.relevance.relevant(assistant.tools.catalog(ctx), list(asked), ctx.language)]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     ("language", "asked", "expected"),
     [
@@ -73,7 +74,7 @@ EVERYDAY = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "asked", "expected"), EVERYDAY)
 def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, asked, expected):
     ctx = owner(language)
@@ -82,7 +83,7 @@ def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, a
     assert not expected - set(got), expected - set(got)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_people_of_a_reservation_never_bring_the_staffs_tools(owner):
     """«personas» is not «Personal» (the staff app in Spanish): before live offered the tool of what is asked,
     «reserva una mesa para 4 personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
@@ -111,7 +112,7 @@ BLOCK_B = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("index", "asked", "expected"), [(i, q, e) for i, (q, e) in enumerate(BLOCK_B)])
 def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, asked, expected):
     ctx = owner("es")
@@ -135,7 +136,7 @@ HUB_WORDS = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "asked", "expected"), HUB_WORDS)
 def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub said what its words mean, these came at 11 to 31, or not at all: «cuenta» shared no word with an
@@ -157,7 +158,7 @@ RETIRA_AND_ANOTA = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "asked", "expected"), RETIRA_AND_ANOTA)
 def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub read live with «anota» and «retira» among its verbs, they asked for no action and the tool came
@@ -168,7 +169,7 @@ def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, la
     assert expected in offered(ctx, asked)[:10]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     ("language", "asked"), [("es", "¿cómo invito a alguien a mi negocio?"), ("en", "how do I split a check?")]
 )

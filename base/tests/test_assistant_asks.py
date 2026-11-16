@@ -4,7 +4,7 @@ model and no network, in every pull request.
 Every tool of an app listed in ``LIVE_ASSISTANT_ASKS_REQUIRED`` says what a person types to ask for it (its ``asks``,
 ``live.E020``), and each of those phrases, ranked exactly as a chat turn ranks (``base.assistant.relevance.ranking``: the same
 ``ALWAYS`` first, the same ``APP_WORDS``, the Hub's own words and ``HOWTO``), brings its tool among the first ten
-offered, against the real catalogue of each role of the Hub (``base.assistant.tools.catalog`` of a member of business ``a``,
+offered, against the real catalogue of each role of the Hub (``base.assistant.tools.catalog`` of a member of business A,
 which has every module on: the largest catalogue a role can have). What a role may not run is not in its catalogue at
 all. An app joins the list in the same pull request that completes its asks, and stays in it while any of its tools
 says one; the ones still missing are reported per app (``AsksBacklog``), never failed. How many asks of each listed
@@ -30,14 +30,16 @@ from django.conf import settings
 from live import assistant as shared
 from live.assistant_qa import Miss, misses, report, uncovered
 from live.checks import check_assistant_asks
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.operations import MIN_ASKS, Operation, registry
 
 from base import approvals, assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
+
 LANGUAGES = ("en", "es")
 ROLES = tuple(Membership.Role)
 #: The apps whose tools all say their asks (``live.E020``): read from the settings, so each app that joins is tested.
@@ -67,7 +69,7 @@ class AsksReach(UserWarning):
 
 
 def members(make_user, prefix: str) -> Callable[[str, str], OperationContext]:
-    """``of(role, language)``: the context of a member of business ``a`` with ``role``, who asks in ``language``."""
+    """``of(role, language)``: the context of a member of business A with ``role``, who asks in ``language``."""
     users = {}
 
     def of(role: str, language: str) -> OperationContext:
@@ -101,12 +103,12 @@ def backlog(tools: Iterable[Operation], language: str) -> Counter[str]:
     return Counter(name.split(shared.SEPARATOR)[0] for name in uncovered({op.name: op for op in tools}, language))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", ROLES)
 @pytest.mark.parametrize("language", LANGUAGES)
 @pytest.mark.parametrize("label", LISTED)
 def test_each_ask_of_a_listed_app_brings_its_tool_among_the_first_ten(context_of, label, language, role):
-    assert label in assistant.tools.active_apps(A)  # on in business a: its tools are in the catalogue, the sweep is real
+    assert label in assistant.tools.active_apps(A)  # on in business A: its tools are in the catalogue, the sweep is real
     tools = assistant.tools.catalog(context_of(role, language))
     ranked = {name: op for name, op in tools.items() if op.app_label == label}
     if role == Membership.Role.OWNER:  # who runs the business holds every tool of an app on: the sweep is whole
@@ -173,19 +175,6 @@ def probe_phrases() -> dict[str, str]:
 #: How far down the tools a turn offers (``MAX_TOOLS``, 40) a person's own words may bring their tool: half of them, so
 #: twenty tools of the apps that say their asks later may climb past it before the model loses it.
 WITH_ROOM = 20
-
-
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business ``a``, in ``language``. Its people are
-    not ``context_of``'s, so a test may take both: an app's test imports this one alone, and its ``make_user`` is the
-    one of the app's ``conftest.py``."""
-    context_of = members(make_user, "asker")
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        return assistant.tools.catalog(context_of(role, language))
-
-    return of
 
 
 def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
@@ -364,14 +353,14 @@ def own_words_test(cases: list, language: str | None = None, *, ids: list[str] |
     asks (``assert_its_asks_bring``): ``(name, phrase)`` said in ``language``, or ``(language, name, phrase)``."""
     if language is None:
 
-        @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+        @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
         @pytest.mark.parametrize(("language", "name", "phrase"), cases, ids=ids)
         def said_in_its_language(catalog_of, language, name, phrase):
             assert_its_asks_bring(catalog_of(OWNER, language), name, phrase, language)
 
         return said_in_its_language
 
-    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize(("name", "phrase"), cases, ids=ids)
     def said_in_one_language(catalog_of, name, phrase):
         assert_its_asks_bring(catalog_of(OWNER, language), name, phrase, language)
@@ -383,7 +372,7 @@ def english_words_test(cases: list) -> Callable:
     """The test that each ``(name, phrase)`` of ``cases``, a person's own words in English for a tool of the app, is
     lifted by the tool's English asks for the owner (``assert_its_asks_lift``)."""
 
-    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize(("name", "phrase"), cases)
     def lifted(catalog_of, name, phrase):
         assert_its_asks_lift(catalog_of(OWNER, "en"), name, phrase, "en")
@@ -418,7 +407,7 @@ def reported_test(reported: list) -> Callable:
     """The test that each ``(name, phrase)`` of ``reported``, the owner's request of the real-model QA in Spanish, is
     offered its existing operation (``assert_offered_with_room``)."""
 
-    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize(("name", "phrase"), reported)
     def offered(catalog_of, name, phrase):
         assert_offered_with_room(catalog_of(OWNER, "es"), name, phrase)
@@ -431,7 +420,7 @@ def probes_test(probes: list[dict], label: str) -> Callable:
     without being one of its asks (``assert_offered_with_room``): a tool that a new ask elsewhere pushes out of the
     first half of the ones a turn offers fails here before the real-model QA sees it."""
 
-    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize("probe", probes, ids=[probe["id"] for probe in probes])
     def offered(catalog_of, probe):
         assert (probe["app"], probe["role"], probe["language"]) == (label, "owner", "es")
@@ -445,7 +434,7 @@ def by_group_test(cases: list) -> Callable:
     ``TOP`` by the group of the Hub's words (``base.assistant.relevance.ranking``) that says ``word``, and not without that
     group."""
 
-    @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+    @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
     @pytest.mark.parametrize(("name", "phrase", "word"), cases)
     def by_its_group(catalog_of, name, phrase, word):
         tools = catalog_of(OWNER, "es")
@@ -476,7 +465,7 @@ def with_asks(tools: dict[str, Operation], name: str, language: str, asks: tuple
     return {**tools, name: dataclasses.replace(op, ai=dataclasses.replace(op.ai_spec(), asks=said))}
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), LIFTED)
 def test_english_asks_overwritten_with_filler_no_longer_lift_their_tool(context_of, name, phrase):
     """The English asks of a tool, overwritten with filler while its Spanish ones stay, leave a person's English words
@@ -692,7 +681,7 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_platform_request_offers_its_existing_operation(context_of, name, phrase):
     assert place_of_no_ask(assistant.tools.catalog(context_of(Membership.Role.OWNER, "es")), name, phrase) is not None
@@ -717,7 +706,7 @@ SAMPLE = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "name", "phrase"), SAMPLE)
 def test_the_layer_ranks_each_phrase_where_a_turn_of_the_hub_offers_its_tool(context_of, language, name, phrase):
     """``misses`` is given the turn's own ranking (``base.assistant.relevance.ranking``): the place it gives a tool is the one
@@ -736,7 +725,7 @@ def test_the_layer_ranks_each_phrase_where_a_turn_of_the_hub_offers_its_tool(con
     assert places[phrase] == turn.index(name) + 1
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", ROLES)
 def test_a_tool_the_role_may_not_run_is_not_in_its_catalogue(context_of, role):
     ctx = context_of(role, "en")
@@ -773,7 +762,7 @@ def test_the_tools_still_without_asks_are_reported_per_app_and_none_of_a_listed_
     warnings.warn(AsksBacklog(f"Assistant tools without asks per app (en/es of its tools): {said}"), stacklevel=1)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_how_many_asks_of_each_listed_app_reach_their_tool_without_their_own_words_is_reported(context_of):
     """Counting its own phrase, every ask reaches its tool (the sweep above); without it (``own_asks=False``: the tool
     keeps its other asks and its description) is how a phrase nobody wrote yet would fare. Reported per listed app and
