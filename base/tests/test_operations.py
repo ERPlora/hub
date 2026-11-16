@@ -310,6 +310,12 @@ def test_erploras_own_hub_is_the_one_of_its_slug(settings):
     assert is_platform_hub(Scope("host", "a")) is False
 
 
+def a_stream_of_an_admin_of_a(make_user, language: str = "en"):
+    """The builder and the context a live stream of an admin of business A holds open."""
+    builder = HubContextBuilder()
+    return builder, builder.from_request(request_for(HOST, make_user(host=A.key, role="hub_admin"), language=language))
+
+
 @HUB_DB
 class TestRefreshHearsTheHostGate:
     """A live stream (and the print socket) holds its context open, so the host gate (``base.middleware``) is not
@@ -332,9 +338,7 @@ class TestRefreshHearsTheHostGate:
 
         from base.models import Hub
 
-        user = make_user(host=A.key, role="hub_admin")
-        builder = HubContextBuilder()
-        ctx = builder.from_request(request_for(HOST, user, language="es"))
+        builder, ctx = a_stream_of_an_admin_of_a(make_user, language="es")
         Hub.objects.filter(slug=A.key).update(**change)
         gate = client.get("/api/live", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
 
@@ -368,9 +372,7 @@ class TestRefreshHearsTheHostGate:
 
         from base.models import Hub
 
-        user = make_user(host=A.key, role="hub_admin")
-        builder = HubContextBuilder()
-        ctx = builder.from_request(request_for(HOST, user))
+        builder, ctx = a_stream_of_an_admin_of_a(make_user)
         Hub.objects.filter(slug=A.key).delete()
         gate = client.get("/api/live", HTTP_HOST=HOST)
 
@@ -382,9 +384,7 @@ class TestRefreshHearsTheHostGate:
     def test_a_hub_in_its_grace_days_keeps_serving(self, hub_a, make_user):
         from base.models import Hub
 
-        user = make_user(host=A.key, role="hub_admin")
-        builder = HubContextBuilder()
-        ctx = builder.from_request(request_for(HOST, user))
+        builder, ctx = a_stream_of_an_admin_of_a(make_user)
         Hub.objects.filter(slug=A.key).update(state={"status": "past_due"})
 
         assert builder.refresh(ctx).has("demo.manage")

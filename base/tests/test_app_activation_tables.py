@@ -320,9 +320,9 @@ def test_the_session_tells_an_app_being_created_activating_and_keeps_it_out_of_t
 # ── Over HTTP: 202 while its tables are made ────────────────────────────────────────────────────────────────────
 
 
-@HUB_DB
-@pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
-def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch, hub_a):
+def answers_over_http(client, monkeypatch, route: str, command: str, state: str, status: int) -> None:
+    """An owner of business A posts to ``route`` while its command (``base.services.<command>``) answers ``state``:
+    the route answers ``status`` with the command's answer."""
     import json
 
     from django.contrib.auth import get_user_model
@@ -337,19 +337,23 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
         def __call__(self, ctx, data):
             return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
 
-    monkeypatch.setattr(services, "app_enable", Answering())
+    monkeypatch.setattr(services, command, Answering())
     user = get_user_model().objects.create(username="ana")
     Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     client.force_login(user)
 
-    answered = client.post(
-        "/api/apps/enable", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=HOST
-    )
+    answered = client.post(route, json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=HOST)
 
     assert (answered.status_code, answered.json()) == (
         status,
         {"app": "printing", "state": state, "chosen": True, "along": [], "already": False},
     )
+
+
+@HUB_DB
+@pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
+def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch, hub_a):
+    answers_over_http(client, monkeypatch, "/api/apps/enable", "app_enable", state, status)
 
 
 @HUB_DB  # the host gate reads business A's row (base.middleware)
@@ -373,33 +377,7 @@ def test_the_openapi_of_disable_only_documents_200_because_it_never_accepts(clie
 @HUB_DB
 @pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
 def test_the_retry_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch, hub_a):
-    import json
-
-    from django.contrib.auth import get_user_model
-
-    from base import services
-    from base.models import Membership
-    from base.schemas import AppChangeIn, AppChangeOut
-
-    class Answering:
-        input = AppChangeIn
-
-        def __call__(self, ctx, data):
-            return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
-
-    monkeypatch.setattr(services, "app_retry", Answering())
-    user = get_user_model().objects.create(username="ana")
-    Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
-    client.force_login(user)
-
-    answered = client.post(
-        "/api/apps/retry", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=HOST
-    )
-
-    assert (answered.status_code, answered.json()) == (
-        status,
-        {"app": "printing", "state": state, "chosen": True, "along": [], "already": False},
-    )
+    answers_over_http(client, monkeypatch, "/api/apps/retry", "app_retry", state, status)
 
 
 @own
