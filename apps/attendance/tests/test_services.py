@@ -896,10 +896,14 @@ def test_clocking_in_in_b_notifies_b_only(listen, person, hub_b):
     with use_hub(hub_b):
         _, ctx_b = person(scope=B)
         run("attendance.record.clock_in", {}, ctx_b)
+        noted_in_b = list(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.CLOCKED_IN]})
     ]
     assert received(on_a, timeout=0.3) == []
+    # The notice leaves on the operation's channel whatever the event says: the event itself is B's, in B's database.
+    assert noted_in_b == [(B.kind, B.key)]
+    assert outbox() == []
     # Positive control: the same listener of A hears a command run in A.
     _, ctx_a = person("Bea", "Ruiz", scope=A)
     run("attendance.record.clock_in", {}, ctx_a)
