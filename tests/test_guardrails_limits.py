@@ -1,5 +1,5 @@
-"""Guardrail 12 of the tenancy (plan 2026-10-22-fase-2-tenencia §2; PLAN-DB §5 «Límite por plan»): every transaction
-on a hub's alias holds a place of its hub's limiter in this process and carries its plan's ``statement_timeout``.
+"""Guardrail of the tenancy's limit per plan: every transaction on a hub's alias holds a place of its hub's limiter
+in this process and carries its plan's ``statement_timeout``.
 
 With two hubs with a database of their own (``hub_a``, ``hub_b``) and no plan in their photo (Free: one transaction at
 once per process, 5 s): a second transaction at once in A waits the bounded time and answers 503 ``base.hub_busy``, or
@@ -24,7 +24,8 @@ from live.context import OperationContext, Scope
 from live.executor import Executor, Stream, Subscription
 from live.operations import get as get_operation
 
-from base import access, registry, services
+from base import access, registry
+from base.services import provisioning
 from base.models import Membership
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context, identity, limits, names
@@ -51,7 +52,8 @@ def short_wait(monkeypatch) -> float:
 
 
 class Held:
-    """Another thread's transaction in a hub's database, open (its first statement ran) until :meth:`end`."""
+    """Another thread's transaction in a hub's database, open (its first statement ran) until :meth:`end`, however long
+    the test takes to get there: it waits for that fact, never for a clock a loaded machine outruns (hub#762)."""
 
     def __init__(self, hub) -> None:
         self.hub = hub
@@ -67,7 +69,7 @@ class Held:
                 with transaction.atomic(using=alias), connections[alias].cursor() as cursor:
                     cursor.execute("SELECT 1")
                     self.opened.set()
-                    self.done.wait(10)
+                    self.done.wait()
         except Exception as exc:  # noqa: BLE001 - reported to the test, which fails on it
             self.failure.append(exc)
         finally:
@@ -80,15 +82,17 @@ class Held:
 
 @contextmanager
 def held_open(hub) -> Iterator[Held]:
+    """``hub``'s place taken by :class:`Held` for the whole block. Both waits are for a fact the thread always reaches —
+    its transaction open or failed, then ended — and the place is given back even when opening it failed."""
     held = Held(hub)
     held.thread.start()
-    assert held.opened.wait(5)
-    assert held.failure == []
     try:
+        held.opened.wait()
+        assert held.failure == []
         yield held
     finally:
         held.end()
-        held.thread.join(5)
+        held.thread.join()
     assert held.failure == []
 
 
@@ -167,16 +171,24 @@ def test_a_six_second_statement_in_a_free_hub_is_cancelled_by_its_statement_time
 
 
 @HUB_DB_COMMITTED
-def test_a_busy_hub_never_slows_another(hub_a, hub_b, short_wait):
+def test_a_busy_hub_never_slows_another(hub_a, hub_b, short_wait, monkeypatch):
+    """B gets its rows without its limiter ever waiting for a place while A's place is taken from before B asks until
+    after B has them; A, asked the same way, waits and does not get in. Facts, not B's time against a threshold a
+    loaded machine outruns (hub#762): a B that waits on A, even one that gets in once the wait is over, fails at once."""
+
+    def b_waits(timeout=None):
+        raise AssertionError("B's limiter waited for a place while only A was busy")
+
+    monkeypatch.setattr(limits.limiter_for(hubs.HUB_B_ALIAS)._condition, "wait", b_waits)
     with held_open(hub_a):
-        started = time.monotonic()
+        a_places = limits.limiter_for(hubs.HUB_A_ALIAS)
+        assert a_places.in_use == 1
         listed_in_b = list_items(hub_b)
-        in_b = time.monotonic() - started
+        assert a_places.in_use == 1
         with pytest.raises(limits.HubBusy):
             list_items(hub_a)
 
     assert listed_in_b == []
-    assert in_b < short_wait
 
 
 # ── Every way in obeys it: the live executor, the API, the admin ────────────────────────────────────────────────────
@@ -266,6 +278,8 @@ def test_an_api_request_on_a_busy_hub_answers_503_with_the_envelope(client, hub_
 
     with held_open(hub_a):
         busy = client.get("/api/demo/items", HTTP_HOST=host)
+        # A's place is still taken once the answer is back: busy all along, however late the request came.
+        assert limits.limiter_for(hubs.HUB_A_ALIAS).in_use == 1
     free = client.get("/api/demo/items", HTTP_HOST=host)
 
     assert busy.status_code == 503
@@ -489,9 +503,9 @@ def test_a_process_whose_limiter_was_already_made_is_corrected_by_the_first_use_
 
 ROWS = {
     "the host gate": lambda hub: registry.hub_by_slug(hub.slug),
-    "the worker": lambda hub: next(row for row in services.hubs_to_serve(timezone.now()) if row.pk == hub.pk),
-    "the registry by id": lambda hub: services.registry_row(hub.pk),
-    "the registry by slug": lambda hub: services.registry_row_by_slug(hub.slug),
+    "the worker": lambda hub: next(row for row in provisioning.hubs_to_serve(timezone.now()) if row.pk == hub.pk),
+    "the registry by id": lambda hub: provisioning.registry_row(hub.pk),
+    "the registry by slug": lambda hub: provisioning.registry_row_by_slug(hub.slug),
     "a row without the field loaded": lambda hub: Hub.objects.defer("is_platform").get(pk=hub.pk),
 }
 

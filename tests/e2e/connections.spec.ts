@@ -1,4 +1,4 @@
-// PoC §8.8 (first half): every stream of the process shares ONE `LISTEN` connection on the control
+// Every stream of the process shares ONE `LISTEN` connection on the control
 // database (`application_name = 'live-listener'`), and it stays when the streams go. If it is killed
 // (`pg_terminate_backend`) the Listener reconnects and the open screens keep receiving changes.
 import { type Page, expect, test } from '@playwright/test';

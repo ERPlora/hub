@@ -6,20 +6,18 @@ each order keeps its own currency (a record is never rewritten) and says the dec
 gives the forint none)."""
 
 import pytest
-from live.context import OperationContext, Scope
+from django.db import connections
+from django.test.utils import CaptureQueriesContext
+from live.context import OperationContext
 from live.models import OutboxEvent
 
 from apps.cart_checkout.models import Cart, Order
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in
+from base.tenancy.context import current_alias, use_hub
 
-from .conftest import A, B, ctx_for, make_cart, make_item, make_order
+from .conftest import HUB_DB, A, B, ctx_for, make_cart, make_item, make_order
 
-pytestmark = pytest.mark.django_db
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
+pytestmark = HUB_DB
 
 
 def run(name: str, data: dict, ctx: OperationContext | None = None):
@@ -35,7 +33,7 @@ def created_currency() -> str:
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("SE", "SEK"), ("HU", "HUF"), ("ES", "EUR")])
 def test_a_cart_without_a_currency_is_born_in_the_currency_of_the_business_s_country(country, currency):
-    # cart_checkout#32, #34: a hub that did not work in euros got euro carts from the screen, the assistant and the API.
+    # A hub that does not work in euros never gets euro carts from the screen, the assistant or the API.
     business_in(country)
     cart = run("cart_checkout.cart.create", {"session_token": "sess_1"})
     assert cart.currency == currency
@@ -48,11 +46,12 @@ def test_a_currency_the_customer_asked_for_still_wins():
     assert run("cart_checkout.cart.create", {"session_token": "sess_1", "currency": "eur"}).currency == "EUR"
 
 
-def test_each_hub_creates_its_carts_in_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
+def test_each_hub_creates_its_carts_in_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
     assert run("cart_checkout.cart.create", {"session_token": "sess_a"}).currency == "PLN"
-    assert run("cart_checkout.cart.create", {"session_token": "sess_b"}, ctx_for(scope=B)).currency == "EUR"
+    with use_hub(hub_b):
+        assert run("cart_checkout.cart.create", {"session_token": "sess_b"}, ctx_for(scope=B)).currency == "EUR"
 
 
 def test_an_api_key_with_only_the_cart_permission_gets_the_business_s_currency():
@@ -62,13 +61,12 @@ def test_an_api_key_with_only_the_cart_permission_gets_the_business_s_currency()
 
 
 @pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("JP", "JPY")])
-def test_erploras_own_hub_creates_its_carts_in_the_currency_of_its_issuer_s_country(settings, country, currency):
-    # Phase 1's platform hub has no business on erplora.com and every module is on in it: its carts go in the
-    # currency of its issuer's country, as its sales and invoices do, never a 404 because there is no business to read.
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def test_erploras_own_hub_creates_its_carts_in_the_currency_of_its_issuer_s_country(settings, platform, country, currency):
+    # ERPlora's own hub has no business on erplora.com and every module is on in it: its carts go in the currency of its
+    # issuer's country, as its sales and invoices do, never a 404 because there is no business to read.
     settings.PLATFORM_ISSUER_COUNTRY = country
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    assert run("cart_checkout.cart.create", {"session_token": "sess_1"}, platform).currency == currency
+    with use_hub(platform):
+        assert run("cart_checkout.cart.create", {"session_token": "sess_1"}, ctx_for(scope=B)).currency == currency
 
 
 def test_the_model_invents_no_currency():
@@ -120,3 +118,39 @@ def test_a_cart_in_yen_counts_its_lines_in_whole_yen():
     make_item(cart, unit_price=150)
     read = run("cart_checkout.cart.get", {"cart_id": str(cart.id)})
     assert (read.currency, read.currency_decimals, read.items[0].unit_price) == ("JPY", 0, 150)
+
+
+def money_of_line(cart) -> set:
+    """(currency, currency_decimals) of ``cart``'s lines as every operation that gives a line back says them: its add,
+    its list, its read, its change and its cart's read (hub#915)."""
+    added = run(
+        "cart_checkout.item.add",
+        {"cart_id": str(cart.id), "product_ref": "p-1", "product_name": "Champú", "quantity": "2", "unit_price": 150},
+    ).item
+    listed = run("cart_checkout.item.list", {"cart_id": str(cart.id)}).rows
+    read = run("cart_checkout.item.get", {"item_id": str(added.id)})
+    changed = run("cart_checkout.item.update", {"item_id": str(added.id), "quantity": "3"}).item
+    in_cart = run("cart_checkout.cart.get", {"cart_id": str(cart.id)}).items
+    return {(line.currency, line.currency_decimals) for line in [added, *listed, read, changed, *in_cart]}
+
+
+@pytest.mark.parametrize(("currency", "decimals"), [("PLN", 2), ("JPY", 0), ("USD", 2)])
+def test_a_cart_s_line_says_its_cart_s_currency_and_its_decimals(currency, decimals):
+    # hub#915: a line's price and total are in its cart's currency, which may not be the business's: a line that did
+    # not say it was told in the business's (Automations, the assistant).
+    business_in("ES")
+    assert money_of_line(make_cart("sess_1", currency=currency)) == {(currency, decimals)}
+
+
+def test_the_list_of_a_cart_s_lines_reads_its_cart_once_however_many_lines_it_has():
+    # hub#915: each line says its cart's currency; the list reads it from the cart it already has, not once per line.
+    def reads_listing(lines: int) -> int:
+        cart = make_cart(f"sess_{Cart.objects.count()}", currency="PLN")
+        for number in range(lines):
+            make_item(cart, product_ref=f"p-{number}")
+        with CaptureQueriesContext(connections[current_alias()]) as reads:
+            assert len(run("cart_checkout.item.list", {"cart_id": str(cart.id)}).rows) == lines
+        return len(reads)
+
+    reads_listing(1)  # The first read of an operation warms what every later one reuses.
+    assert reads_listing(1) == reads_listing(4)

@@ -21,9 +21,9 @@ from live.operations import get, registry
 from apps.staff.models import Member
 from apps.staff.schemas import CommissionReportIn
 
-from .conftest import A, ctx_for, make_member, make_role
+from .conftest import HUB_DB, A, ctx_for, make_member, make_role
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 CARD = [{"method": "card"}]
 # A Wednesday, 10:00 in Madrid (the business's zone): its week starts on Monday the 17th.

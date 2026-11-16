@@ -11,12 +11,11 @@ from decimal import Decimal
 
 import psycopg
 import pytest
-from django.db import connection, transaction
 from django.utils import translation
 from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 from live.outbox import channel_for
 
 from apps.inventory import events
@@ -33,6 +32,7 @@ from apps.inventory.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoverIn,
     CategoryRefIn,
     ConfigOut,
     ConfigPatchIn,
@@ -41,6 +41,7 @@ from apps.inventory.schemas import (
     ImportReportOut,
     ProductCategoryIn,
     ProductCategoryLinkOut,
+    ProductImageIn,
     ProductImportIn,
     ProductIn,
     ProductOut,
@@ -55,12 +56,16 @@ from apps.inventory.schemas import (
     WriteOffIn,
 )
 from apps.tax.models import TaxCategory
+from base.tenancy.context import use_hub
+from base.tenancy.tests.concurrency import in_a_thread
+from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
-from .conftest import A, B, ctx_for, ctx_with
+from .conftest import A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, ctx_with
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TAX = "test.general"
+LATTE = "catalog:hospitality/cafe_con_leche"
 
 
 @pytest.fixture(autouse=True)
@@ -193,7 +198,7 @@ def test_declarations(name, permission, input, output, risk):
     op = get(name)
     # Every action is reachable by API (WORKBOOK, change 12) and by the assistant, with its risk.
     assert (op.kind, op.permission, op.input, op.output, op.expose_api) == ("command", permission, input, output, True)
-    assert set(op.ai) == {"description", "risk"} and op.ai["description"]
+    assert set(op.ai) == {"description", "risk", "asks"} and op.ai["description"]
     assert op.ai["risk"] == risk
 
 
@@ -217,6 +222,15 @@ def test_the_reactions_to_sales_run_only_as_the_system(name, input):
 
 
 # inventory.product.create (INVENTORY-F01, F08, F20, F26)
+
+
+def test_a_product_is_created_active_unless_it_is_asked_inactive():
+    """hub#1282: what a separate copy gives back comes back as it was, a product turned off included (INVENTORY-F03):
+    it stays out of the till until it is turned on."""
+    created, off = create("Coffee", "CAF-1"), create("Tea", "TEA-1", is_active=False)
+
+    assert (created.is_active, off.is_active) == (True, False)
+    assert dict(Product.objects.values_list("sku", "is_active")) == {"CAF-1": True, "TEA-1": False}
 
 
 def test_create_a_product_with_its_categories_in_one_step():
@@ -603,6 +617,270 @@ def test_an_employee_cannot_delete():
     )
 
 
+# inventory.product.restore (INVENTORY-F34)
+
+
+def restore(product_id, ctx=None, **given):
+    op = get("inventory.product.restore")
+    return op(ctx or system_context(A), op.input.model_validate({"id": str(product_id)} | given))
+
+
+def restored_payload(product_id, sku, name, **fields):
+    """What ``inventory.product.restored`` says: the product as it comes back."""
+    return {
+        "id": str(product_id),
+        "sku": sku,
+        "name": name,
+        "product_type": "physical",
+        "price": 100,
+        "cost": 0,
+        "unit": "ud",
+        "tax_category_key": TAX,
+        "is_active": True,
+        "is_sold_out": False,
+        "track_stock": None,
+        **fields,
+    }
+
+
+def test_restore_brings_a_deleted_product_back_the_same_with_its_movements_and_says_so():
+    created = create("Coffee", "CAF-1", ean13="8412345678905", initial_stock="5")
+    receive((created.id, "2"))
+    sold_out(created.id)
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    clear_outbox()
+
+    back = restore(created.id)
+
+    # The same product: its id, its codes, its stock and every movement hang from it again; back on sale, active and
+    # without the day's «sold out» it had when it was deleted.
+    assert (back.id, back.sku, back.ean13, back.stock) == (created.id, "CAF-1", "8412345678905", Decimal("7.000"))
+    product = Product.objects.get()
+    assert (product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out) == (False, None, True, False)
+    # Who changed it last is whoever brought it back (the system), no longer who deleted it.
+    assert product.updated_by == "system"
+    assert [kind for kind, _, _ in movements(created.id)] == ["initial", "reception"]
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+def test_restore_keeps_the_categories_it_still_has():
+    drinks = Category.objects.create(name="Drinks")
+    created = create("Coffee", "CAF-1", category_ids=[drinks.id])
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    restore(created.id)
+
+    assert list(ProductCategory.objects.values_list("product_id", "category_id")) == [(created.id, drinks.id)]
+
+
+def test_restoring_a_live_product_changes_nothing_and_says_so_again():
+    # A cut before the COMMIT runs it again (repeatable): the second time finds it live.
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    restore(created.id)
+    clear_outbox()
+
+    assert restore(created.id).id == created.id
+
+    assert Product.objects.get().is_deleted is False
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+@pytest.mark.parametrize(
+    "again, code",
+    [({"sku": "CAF-1"}, "inventory.sku_taken"), ({"sku": "CAF-2", "ean13": "8412345678905"}, "inventory.ean13_taken")],
+)
+def test_one_whose_sku_or_ean13_another_live_product_took_since_does_not_come_back(again, code):
+    first = create("Coffee", "CAF-1", ean13="8412345678905")
+    run("inventory.product.delete", ProductRefIn(id=first.id))
+    create("Coffee again", **again)
+    clear_outbox()
+
+    error = refused(Conflict, lambda: restore(first.id))
+
+    assert error.code == code
+    assert Product.objects.get(pk=first.id).is_deleted is True
+    assert outbox() == []
+
+
+def test_restoring_an_unknown_product_is_not_found():
+    refused(NotFound, lambda: restore(uuid.uuid7()))
+    assert outbox() == []
+
+
+def test_restore_brings_back_the_image_of_the_library_it_had(image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.set_image", ProductImageIn(id=created.id, image=LATTE))
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    assert restore(created.id).image == LATTE
+    assert Product.objects.get().image == LATTE
+
+
+def deleted_without_its_image(created) -> None:
+    """``created`` deleted as deleting left a product before it kept the image of the library: without any."""
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    Product.objects.filter(pk=created.id).update(image="")
+    clear_outbox()
+
+
+def test_one_deleted_without_its_image_gets_back_the_one_of_the_library_the_copy_had(image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    deleted_without_its_image(created)
+
+    back = restore(created.id, image=LATTE)
+
+    assert (back.image, Product.objects.get().image) == (LATTE, LATTE)
+    # One change, as it comes back: the product is restored with it, and said once.
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+@pytest.mark.parametrize(
+    "copy",
+    [
+        "catalog:hospitality/gone_since",  # the library no longer has it
+        # A photo of its own: deleted with the product. A fixed name: every process must collect the same test id.
+        "file:inventory/products/0193a1b2c3d47e8f9a0b1c2d3e4f5a6b.webp",
+    ],
+)
+def test_an_image_that_cannot_come_back_leaves_the_product_restored_without_any(copy, image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    deleted_without_its_image(created)
+
+    back = restore(created.id, image=copy)
+
+    assert (back.is_active, back.image, Product.objects.get().image) == (True, "", "")
+
+
+def test_with_the_library_unread_the_one_restored_gets_the_image_as_the_copy_had_it(settings, tmp_path):
+    created = create("Coffee", "CAF-1")
+    deleted_without_its_image(created)
+    settings.CATALOG_DIR = str(tmp_path / "nowhere")
+
+    assert restore(created.id, image=LATTE).image == LATTE
+
+
+def test_the_image_a_deleted_product_kept_is_the_one_it_comes_back_with(image_library):  # noqa: F811
+    created = create("Coffee", "CAF-1")
+    run("inventory.product.set_image", ProductImageIn(id=created.id, image="catalog:hospitality/cafe_solo"))
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+
+    restore(created.id, image=LATTE)
+
+    assert Product.objects.get().image == "catalog:hospitality/cafe_solo"
+
+
+def test_restoring_a_live_product_never_gives_it_an_image(image_library):  # noqa: F811
+    # A cut before the COMMIT runs it again: the second time finds it live, as the business has it.
+    created = create("Coffee", "CAF-1")
+    clear_outbox()
+
+    restore(created.id, image=LATTE)
+
+    assert Product.objects.get().image == ""
+    assert outbox() == [(events.PRODUCT_RESTORED, restored_payload(created.id, "CAF-1", "Coffee"))]
+
+
+def test_restore_is_the_platforms_without_a_route():
+    op = get("inventory.product.restore")
+    assert (op.kind, op.permission, op.expose_api, op.repeatable) == ("command", "inventory.system", False, True)
+    # What a recovery gives it of the product in the copy: its id, and the image it showed there.
+    assert set(op.input.model_fields) == {"id", "image"}
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    created = create()
+    run("inventory.product.delete", ProductRefIn(id=created.id))
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: restore(created.id, ctx_for("hub_owner")))
+    assert Product.objects.get().is_deleted is True
+
+
+# inventory.product.recover (INVENTORY-F01, INVENTORY-F30, BASE-F114)
+
+def recover_product(ctx=None, **data):
+    op = get("inventory.product.recover")
+    product = {"name": "Latte", "sku": "LAT-1", "price": 250, "tax_category_key": TAX} | data
+    return op(ctx or system_context(A), op.input.model_validate(product))
+
+
+def test_a_product_recovered_is_created_as_its_screen_does_with_the_image_of_the_library_it_had(image_library):  # noqa: F811
+    drinks = Category.objects.create(name="Drinks")
+
+    back = recover_product(category_ids=[str(drinks.id)], is_active=False, image=LATTE)
+
+    product = Product.objects.get()
+    assert (back.id, back.image) == (product.pk, LATTE)
+    assert (product.name, product.sku, product.price, product.is_active, product.image) == (
+        "Latte",
+        "LAT-1",
+        250,
+        False,
+        LATTE,
+    )
+    assert (product.created_by, product.updated_by) == ("system", "system")
+    # As the screen does it: the create with its categories, then its image.
+    assert [name for name, _ in outbox()] == [
+        events.PRODUCT_CREATED,
+        events.PRODUCT_CATEGORIZED,
+        events.PRODUCT_UPDATED,
+    ]
+
+
+def test_a_product_recovered_without_an_image_is_the_screens_create(image_library):  # noqa: F811
+    back = recover_product()
+
+    assert (back.image, Product.objects.get().image) == ("", "")
+    assert [name for name, _ in outbox()] == [events.PRODUCT_CREATED]
+
+
+def test_an_image_the_library_no_longer_has_stays_out_and_the_product_comes_back(image_library):  # noqa: F811
+    back = recover_product(image="catalog:hospitality/gone_since")
+
+    assert (back.sku, Product.objects.get().image) == ("LAT-1", "")
+    assert [name for name, _ in outbox()] == [events.PRODUCT_CREATED]
+
+
+def test_with_the_library_unread_the_image_comes_back_as_the_copy_had_it(settings, tmp_path):
+    settings.CATALOG_DIR = str(tmp_path / "nowhere")
+
+    back = recover_product(image=LATTE)
+
+    assert (back.image, Product.objects.get().image) == (LATTE, LATTE)
+
+
+def test_a_photo_of_its_own_never_comes_back(image_library):  # noqa: F811
+    # It was deleted with the product (INVENTORY-F31), and no row may point at a file it does not own.
+    back = recover_product(image=f"file:inventory/products/{uuid.uuid7().hex}.webp")
+
+    assert (back.image, Product.objects.get().image) == ("", "")
+
+
+def test_a_product_recovered_that_its_create_refuses_is_not_created(image_library):  # noqa: F811
+    TaxCategory.objects.filter(key=TAX).update(is_active=False)
+
+    error = refused(InvalidPayload, lambda: recover_product(image=LATTE))
+
+    assert list(error.fields) == ["tax_category_key"]
+    assert not Product.objects.exists()
+    assert outbox() == []
+
+
+def test_recovering_a_product_is_the_platforms_without_a_route():
+    op = get("inventory.product.recover")
+    assert (op.kind, op.permission, op.output, op.expose_api, op.repeatable) == (
+        "command",
+        "inventory.system",
+        ProductOut,
+        False,
+        True,
+    )
+    # What the screen's create takes, and the image the product showed in the copy.
+    assert issubclass(op.input, ProductIn) and "image" in op.input.model_fields
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: recover_product(ctx_for("hub_owner")))
+    assert not Product.objects.exists()
+
+
 # inventory.product.set_sold_out (INVENTORY-F29)
 
 
@@ -850,6 +1128,70 @@ def test_an_employee_cannot_touch_categories():
             "inventory.category.create", CategoryIn(name="Drinks"), "hub_employee"
         ),
     )
+
+
+# inventory.category.recover (INVENTORY-F07, INVENTORY-F34)
+
+
+def recover_category(ctx=None, **data):
+    op = get("inventory.category.recover")
+    return op(ctx or system_context(A), op.input.model_validate(data))
+
+
+def test_recover_creates_the_category_as_its_screen_does_with_its_deleted_products_back_in_it():
+    cake = create("Cake", "CAK-1")
+    brownie = create("Brownie", "BRO-1")
+    run("inventory.product.delete", ProductRefIn(id=cake.id))
+    clear_outbox()
+
+    back = recover_category(
+        name="Desserts", color="#cc0066", tax_category_key=TAX, product_ids=[str(brownie.id), str(cake.id)]
+    )
+
+    assert (back.name, back.slug, back.color, back.tax_category_key) == ("Desserts", "desserts", "#cc0066", TAX)
+    made = Category.objects.get(pk=back.id)
+    assert (made.created_by, made.updated_by) == ("system", "system")
+    # Only the deleted one goes back in, so it comes back inside it when restored; the live one stays as it is.
+    assert list(ProductCategory.objects.filter(category=made).values_list("product_id", flat=True)) == [cake.id]
+    assert outbox() == [
+        (events.CATEGORY_CREATED, {"id": str(back.id), "name": "Desserts"}),
+        (events.PRODUCT_CATEGORIZED, {"product_id": str(cake.id), "category_id": str(back.id)}),
+    ]
+    restore(cake.id)
+    assert list(Product.objects.get(pk=cake.id).categories.values_list("name", flat=True)) == ["Desserts"]
+
+
+def test_recover_without_products_is_the_screens_create():
+    back = recover_category(name="Wines", product_ids=[str(uuid.uuid7())])
+
+    assert (back.name, back.slug, back.product_count) == ("Wines", "wines", 0)
+    assert not ProductCategory.objects.exists()
+    assert outbox() == [(events.CATEGORY_CREATED, {"id": str(back.id), "name": "Wines"})]
+
+
+def test_recover_with_a_tax_category_no_longer_active_is_refused():
+    TaxCategory.objects.filter(key=TAX).update(is_active=False)
+
+    error = refused(InvalidPayload, lambda: recover_category(name="Desserts", tax_category_key=TAX))
+
+    assert list(error.fields) == ["tax_category_key"]
+    assert not Category.objects.exists()
+
+
+def test_recover_is_the_platforms_without_a_route():
+    op = get("inventory.category.recover")
+    assert (op.kind, op.permission, op.input, op.output, op.expose_api, op.repeatable) == (
+        "command",
+        "inventory.system",
+        CategoryRecoverIn,
+        CategoryOut,
+        False,
+        True,
+    )
+    assert op.ai["risk"] == "normal" and op.ai["description"]
+    # Not a permission of any role: the owner holds every permission inventory declares, not this one.
+    refused(PermissionDenied, lambda: recover_category(ctx_for("hub_owner"), name="Desserts"))
+    assert not Category.objects.exists()
 
 
 # inventory.category.bulk_create (INVENTORY-F10)
@@ -1336,7 +1678,7 @@ def test_selling_without_stock_lets_the_balance_go_negative():
 @pytest.mark.parametrize("kind", ["untracked", "business_off"])
 def test_a_write_off_of_an_article_without_stock_control_is_refused_and_says_why(kind):
     # The screen offers it only to articles that track stock; by the assistant or the API a write-off
-    # that would do nothing is not a silent success either (2026-10-14).
+    # that would do nothing is not a silent success either.
     if kind == "business_off":
         configure(track_stock=False)
     created = create(initial_stock="5", track_stock=False if kind == "untracked" else None)
@@ -1771,19 +2113,19 @@ def test_a_money_only_refund_moves_nothing_and_is_noted_once():
 
 def test_the_real_refund_of_sales_reaches_the_stock():
     """With the payload Sales really records (its app is imported here only, in the tests)."""
-    from apps.sale.tests.conftest import run as sale_run
+    from apps.sale.tests.conftest import ctx_for as sale_ctx_for, run as sale_run
 
     run("inventory.product.create", ProductIn(name="Coffee", sku="COF", price=1210, tax_category_key="product.generic", initial_stock="10"))
-    sale = sale_run("sale.sale.complete", {"idempotency_key": "inv-svc-refund-01", "lines": [{"product": "COF", "quantity": "2"}], "payments": [{"method": "card"}]})
+    sale = sale_run("sale.sale.complete", {"idempotency_key": "inv-svc-refund-01", "lines": [{"product": "COF", "quantity": "2"}], "payments": [{"method": "card"}]}, sale_ctx_for(scope=A))
     events.react(A, "sale.sale.completed", OutboxEvent.objects.filter(name="sale.sale.completed").latest("created_at").payload)
     sale_run(
         "sale.sale.refund",
         {
-            "sale_id": str(sale.id),
-            "reason": "a cup back",
+            "sale_id": str(sale.id), "reason": "a cup back",
             "allocations": [{"payment_id": str(sale.payments[0].id), "amount": 1210}],
             "lines": [{"line_id": str(sale.lines[0].id), "quantity": "1"}],
         },
+        sale_ctx_for(scope=A),
     )
     payload = OutboxEvent.objects.filter(name="sale.sale.refunded").latest("created_at").payload
     op = get("inventory.stock.restore_refund")
@@ -1817,17 +2159,14 @@ def received(session, timeout=1.0, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_write_in_scope_b_notifies_b_only(listen):
-    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+@HUB_DB_COMMITTED
+def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-
-    get("inventory.product.create")(
-        ctx_for("hub_admin", B),
-        ProductIn(
-            name="Coffee", sku="CAF", price=1, tax_category_key=TAX, initial_stock="1"
-        ),
-    )
+    with use_hub(hub_b):
+        TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+        get("inventory.product.create")(
+            ctx_for("hub_admin", B), ProductIn(name="Coffee", sku="CAF", price=1, tax_category_key=TAX, initial_stock="1")
+        )
 
     assert received(on_b, stop_after=1) == [
         {"events": [events.PRODUCT_CREATED, events.STOCK_CHANGED]}
@@ -1835,15 +2174,15 @@ def test_a_write_in_scope_b_notifies_b_only(listen):
     assert received(on_a, timeout=0.3) == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_marking_a_product_sold_out_in_scope_b_notifies_b_only(listen):
-    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
-    croquettes = get("inventory.product.create")(
-        ctx_for("hub_admin", B), ProductIn(name="Croquettes", sku="CRO", price=1, tax_category_key=TAX)
-    )
-    on_a, on_b = listen(A), listen(B)
-
-    get("inventory.product.set_sold_out")(ctx_for("hub_admin", B), ProductSoldOutIn(id=croquettes.id, sold_out=True))
+@HUB_DB_COMMITTED
+def test_marking_a_product_sold_out_in_scope_b_notifies_b_only(listen, hub_b):
+    with use_hub(hub_b):
+        TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+        croquettes = get("inventory.product.create")(
+            ctx_for("hub_admin", B), ProductIn(name="Croquettes", sku="CRO", price=1, tax_category_key=TAX)
+        )
+        on_a, on_b = listen(A), listen(B)
+        get("inventory.product.set_sold_out")(ctx_for("hub_admin", B), ProductSoldOutIn(id=croquettes.id, sold_out=True))
 
     # The till's catalog of B re-runs on this event (live.py); the one of A hears nothing.
     assert received(on_b, stop_after=1) == [{"events": [events.PRODUCT_UPDATED]}]
@@ -2032,6 +2371,7 @@ QUIET_JOIN = 0.3
 
 
 def _in_thread(target):
+    """Runs ``target`` in its own thread and session of the business at work; its outcome under result or error."""
     outcome = {}
 
     def body():
@@ -2039,10 +2379,8 @@ def _in_thread(target):
             outcome["result"] = target()
         except Exception as error:  # the outcome is asserted by the test
             outcome["error"] = error
-        finally:
-            connection.close()
 
-    thread = threading.Thread(target=body)
+    thread = in_a_thread(body, [None])
     thread.start()
     return thread, outcome
 
@@ -2052,7 +2390,7 @@ def _first_holds(write):
     done, release = threading.Event(), threading.Event()
 
     def first():
-        with transaction.atomic():
+        with atomic():
             result = write()
             done.set()
             release.wait(5)
@@ -2088,8 +2426,8 @@ def test_inventory_f16_a_sale_keeps_the_number_it_arrived_with_even_one_too_long
     assert stock_of(coffee.id) == Decimal("3")
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_sales_of_the_last_unit_at_once_lower_it_once():
+@HUB_DB_COMMITTED
+def test_two_sales_of_the_last_unit_at_once_lower_it_once(plan_with_room):
     last = create("Last", initial_stock="1")
     holder, held, release = _first_holds(lambda: sell(uuid.uuid7(), line(last.id, "1")))
 
@@ -2101,7 +2439,7 @@ def test_two_sales_of_the_last_unit_at_once_lower_it_once():
     assert len(movements(last.id, "sale")) == 1
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize(
     ("start", "crosses_on"),
     [
@@ -2109,7 +2447,7 @@ def test_two_sales_of_the_last_unit_at_once_lower_it_once():
         ("12", "the second"),  # neither alone would cross from the balance it started with: never lost
     ],
 )
-def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, crosses_on):
+def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, crosses_on, plan_with_room):
     article = create("Article", initial_stock=start, low_stock_threshold="10")
     holder, held, release = _first_holds(lambda: sell(uuid.uuid7(), line(article.id, "1")))
 
@@ -2125,8 +2463,8 @@ def test_inventory_f18_two_sales_at_once_say_the_crossing_exactly_once(start, cr
     assert said == [("below", "11.000", "10.000")], crosses_on
 
 
-@pytest.mark.django_db(transaction=True)
-def test_the_same_sale_delivered_twice_at_once_lowers_once():
+@HUB_DB_COMMITTED
+def test_the_same_sale_delivered_twice_at_once_lowers_once(plan_with_room):
     coffee, sale = create("Coffee", initial_stock="10"), uuid.uuid7()
     holder, held, release = _first_holds(lambda: sell(sale, line(coffee.id, "3")))
 
@@ -2138,8 +2476,8 @@ def test_the_same_sale_delivered_twice_at_once_lowers_once():
     assert len(movements(coffee.id, "sale")) == 1
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_sale_and_its_void_at_once_leave_the_stock_as_it_was():
+@HUB_DB_COMMITTED
+def test_a_sale_and_its_void_at_once_leave_the_stock_as_it_was(plan_with_room):
     coffee, sale = create("Coffee", initial_stock="10"), uuid.uuid7()
     holder, held, release = _first_holds(lambda: sell(sale, line(coffee.id, "3")))
 
@@ -2151,8 +2489,8 @@ def test_a_sale_and_its_void_at_once_leave_the_stock_as_it_was():
     assert [movement_type for movement_type, _, _ in movements(coffee.id)] == ["initial", "sale", "void"]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_write_offs_of_the_whole_balance_at_once_take_it_once():
+@HUB_DB_COMMITTED
+def test_two_write_offs_of_the_whole_balance_at_once_take_it_once(plan_with_room):
     wine = create("Wine", initial_stock="2")
     holder, held, release = _first_holds(lambda: write_off(wine.id, "2"))
 

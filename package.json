@@ -17,8 +17,12 @@
     "@erplora/ui": "workspace:*",
     "@ionic/vue": "8.8.9",
     "bootstrap": "~5.3.8",
+    "fflate": "0.8.3",
+    "htmlparser2": "12.0.0",
     "jsbarcode": "3.12.3",
+    "mammoth": "1.13.0",
     "pdfjs-dist": "6.4.299",
+    "read-excel-file": "9.3.14",
     "vue": "^3.5.0",
     "vue-router": "^4.0.0"
   },

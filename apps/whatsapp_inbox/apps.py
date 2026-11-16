@@ -19,7 +19,7 @@ class WhatsappInboxConfig(LiveAppConfig):
     icon = "ion:chatbubbles-outline"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your business's WhatsApp in the Hub: read, answer, assign and close every conversation."
     )
@@ -33,6 +33,14 @@ class WhatsappInboxConfig(LiveAppConfig):
     verticals = ["hair_salon", "restaurant"]
     requires = ["customer"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «plantilla» and a «mensaje» are the
+    # inbox's template and message (whatsapp_inbox.template, whatsapp_inbox.message), as «template» and «message»
+    # already are in English; a business template (base.blueprint) or the staff a «plantilla» also names are said with
+    # their own words beside it («plantilla de negocio», «el personal»).
+    assistant_synonyms = (
+        ("plantilla", "plantillas", "template", "templates"),
+        ("mensaje", "mensajes", "message", "messages"),
+    )
     # Not declared on purpose: ``whatsapp_inbox.receive``, which only the system context holds (the
     # doors erplora.com calls through /internal and the reactions to Customers).
     permissions = [
@@ -56,8 +64,8 @@ class WhatsappInboxConfig(LiveAppConfig):
         ],
         "hub_employee": ["whatsapp_inbox.view", "whatsapp_inbox.reply"],
     }
-    # Phase 2: the worker reaches every hub (hub_due) and hands erplora.com again, with SKIP LOCKED,
-    # the messages and erasures whose delivery after the COMMIT never ended (cron in UTC).
+    # The worker reaches every hub (hub_due) and hands erplora.com again, with SKIP LOCKED, the messages and erasures
+    # whose delivery after the COMMIT never ended (cron in UTC).
     scheduled_tasks = [
         {
             "name": "resume_deliveries",
@@ -77,10 +85,8 @@ class WhatsappInboxConfig(LiveAppConfig):
             "/whatsapp_inbox/settings",
         ),
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21; WHATSAPP_INBOX-F09): the old module's counter of the bell
-    # (``whatsapp_inbox.needs_attention``, whatsapp_inbox#244), here the customers waiting for an answer the inbox's
-    # summary counts, leading to the inbox. No steps of «Finish setting up your business» nor panels of the dashboard:
-    # the old module had none.
+    # The bell counts the customers waiting for an answer the inbox's summary counts, leading to the inbox
+    # (WHATSAPP_INBOX-F09).
     bell = [
         BellCounter(
             key="awaiting_reply",
@@ -101,8 +107,8 @@ class WhatsappInboxConfig(LiveAppConfig):
         "measured": "synced_at",
         "label": _("WhatsApp"),
     }
-    # hub#2303 (round 2026-10-23): the installed app tells the device of each message of a customer left waiting for
-    # an answer, with who and what she wrote; a tap opens that conversation in the inbox.
+    # The installed app tells the device of each message of a customer left waiting for an answer, with who and what she
+    # wrote; a tap opens that conversation in the inbox.
     notices = [
         DeviceNotice(
             key="awaiting_reply",

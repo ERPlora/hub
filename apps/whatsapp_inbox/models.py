@@ -1,12 +1,11 @@
 """Models of the WhatsApp inbox: the channel's state, conversations, their messages and notes, and the
 copy of the templates Meta approved (WORKBOOK «Para quien lo mantiene → Modelo»).
 
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
-are per scope. Phase 2 moves them to each hub's database. A conversation is live while ``erased_at``
-is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a conversation is with,
-who sent a message from the Hub and who wrote a note hang from the person in the business's own database
-(``base.HubUser``), never from control's user (tenancy W10): the columns ``*_hub_user_id`` are new, the old ones wait
-empty for a later deploy to drop them (``migrations/0010_hub_users``).
+Each business has these tables in its own database; only the live notifications are per scope. A conversation is live
+while ``erased_at`` is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a
+conversation is with, who sent a message from the Hub and who wrote a note hang from the person in the business's own
+database (``base.HubUser``), never from control's user: the columns ``*_hub_user_id`` are new, the old ones wait empty
+for a later deploy to drop them (``migrations/0010_hub_users``).
 """
 
 import datetime as dt
@@ -37,9 +36,9 @@ class Channel(UUIDModel):
     """The business's WhatsApp number as erplora.com reports it: one row per business, written only by what the SaaS
     says (its photo, and its answer when the Hub connects or disconnects the number).
 
-    Phase 1 shares the tables, so the business is the row's ``host`` (the first label of its host, as
-    ``base.Membership``): each business's photo applies to its own row with its own version. Phase 2 keeps one row in
-    each hub's database.
+    Each business keeps one row in its own database: the database holds it to one by the unique business column left
+    from when the businesses shared these tables (``migrations/0005``), empty in every row the code writes since
+    ``0011`` and ``0012``.
     """
 
     class Status(models.TextChoices):
@@ -47,19 +46,13 @@ class Channel(UUIDModel):
         CONNECTED = "connected", pgettext_lazy("whatsapp channel", "Connected")
         RECONNECT_NEEDED = "reconnect_needed", pgettext_lazy("whatsapp channel", "Needs reconnecting")
 
-    host = models.CharField(
-        _("host"),
-        max_length=63,
-        editable=False,
-        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
-    )
     status = models.CharField(
         _("status"), max_length=20, choices=Status.choices, default=Status.NOT_CONNECTED
     )
     # The business's own number (E.164) and the name WhatsApp shows for it.
     phone_number = models.CharField(_("phone number"), max_length=16, blank=True)
     display_name = models.CharField(_("display name"), max_length=200, blank=True)
-    # The plan's monthly allowance of messages sent (0 = the plan includes none, ADR-0474; there is no
+    # The plan's monthly allowance of messages sent (0 = the plan includes none; there is no
     # «unlimited») and what is spent, with the month (``YYYY-MM``) the figure counts: another month's figure
     # counts as nothing spent.
     monthly_limit = models.PositiveIntegerField(_("monthly limit"), default=0)
@@ -67,17 +60,12 @@ class Channel(UUIDModel):
     usage_month = models.CharField(_("month of the figure"), max_length=7, blank=True)
     # The SaaS's version of this state: an older push is ignored.
     version = models.BigIntegerField(_("version"), default=0)
-    synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
+    synced_at = models.DateTimeField(pgettext_lazy("whatsapp channel", "synced at"), null=True, blank=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("WhatsApp channel")
         verbose_name_plural = _("WhatsApp channels")
-        constraints = [
-            models.UniqueConstraint(
-                fields=["host"], name="whatsapp_inbox_channel_one_per_host"
-            ),
-        ]
 
     def __str__(self) -> str:
         return self.phone_number or str(self.get_status_display())
@@ -154,16 +142,6 @@ class Conversation(UUIDModel):
     )
     # The number erplora.com has to forget, kept only until it confirms (then emptied).
     erase_phone = models.CharField(_("number to erase at erplora.com"), max_length=16, blank=True)
-    # Phase 1 shares the tables: the business that erased it, for whom erplora.com forgets the number (empty before
-    # 0007: such an erasure is resumed as the worker's scope, as it was).
-    erase_host = models.CharField(
-        _("business that erased it"),
-        max_length=63,
-        blank=True,
-        default="",
-        editable=False,
-        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
-    )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -246,8 +224,9 @@ class Message(UUIDModel):
     origin = models.CharField(
         _("origin"), max_length=10, choices=Origin.choices, default=Origin.CUSTOMER
     )
+    # Where the message came from (live, or the history the connection brings): «origin» already says who sent it.
     source = models.CharField(
-        _("source"), max_length=10, choices=Source.choices, default=Source.LIVE
+        pgettext_lazy("whatsapp message", "source"), max_length=10, choices=Source.choices, default=Source.LIVE
     )
     # Meta's message type as it came (text, image, audio, video, document, sticker, location,
     # contacts, interactive, button, reaction, template, media_placeholder, unsupported…).
@@ -284,16 +263,6 @@ class Message(UUIDModel):
     wa_message_id = models.CharField(_("WhatsApp message id"), max_length=255, null=True, blank=True)
     # The key the Hub sends with a message (Idempotency-Key): a retry never sends it twice.
     client_message_id = models.UUIDField(_("send key"), null=True, blank=True)
-    # Phase 1 shares the tables: the business that sent it from the Hub, for whom erplora.com sends it (empty for
-    # what arrives, and for what the Hub sent before 0007: such a message is resumed as the worker's scope, as it was).
-    host = models.CharField(
-        _("host"),
-        max_length=63,
-        blank=True,
-        default="",
-        editable=False,
-        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
-    )
     reply_to = models.CharField(_("answers"), max_length=255, blank=True)
     # The option the customer tapped (a template's quick reply, an interactive button or list row): its id.
     reply_id = models.CharField(_("option tapped"), max_length=256, blank=True)
@@ -409,20 +378,13 @@ class TemplateSample(UUIDModel):
     the template with it: its hand-over to erplora.com (door 8) carries it every time. Rows are never deleted: a
     template, its edit waiting in ``draft`` or a hand-over on its way may still name one.
 
-    Phase 1 shares the tables, so a sample belongs to the business in ``host`` (as ``Template``); phase 2 keeps it in
-    each hub's database."""
+    Each business keeps its samples in its own database."""
 
     class Kind(models.TextChoices):
         IMAGE = "IMAGE", pgettext_lazy("whatsapp template header", "Image")
         VIDEO = "VIDEO", pgettext_lazy("whatsapp template header", "Video")
         DOCUMENT = "DOCUMENT", pgettext_lazy("whatsapp template header", "Document")
 
-    host = models.CharField(
-        _("host"),
-        max_length=63,
-        editable=False,
-        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
-    )
     header_format = models.CharField(_("header type"), max_length=10, choices=Kind.choices)
     key = models.CharField(_("file in the store"), max_length=255, editable=False)
     sha256 = models.CharField(_("sha256"), max_length=64, editable=False)
@@ -451,8 +413,7 @@ class Template(UUIDModel):
     erplora.com (door 8) as a message's status does; a template deleted here keeps its row (``deleted_at``) so
     Meta's next list never brings it back, and ``delete_state`` follows its deletion at Meta (door 9).
 
-    Phase 1 shares the tables, so a template belongs to the business in ``host`` (as ``Channel``): its photo, its
-    list, its edits and its sends only ever reach its own. Phase 2 keeps them in each hub's database.
+    Each business keeps its templates in its own database.
     """
 
     class Category(models.TextChoices):
@@ -489,12 +450,6 @@ class Template(UUIDModel):
         PENDING = "pending", _("Being deleted at Meta")
         DONE = "done", _("Deleted")
 
-    host = models.CharField(
-        _("host"),
-        max_length=63,
-        editable=False,
-        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
-    )
     name = models.CharField(_("name"), max_length=512)
     language = models.CharField(_("language"), max_length=15)
     category = models.CharField(
@@ -530,7 +485,7 @@ class Template(UUIDModel):
     variables = models.PositiveSmallIntegerField(_("variables"), default=0)
     rejected_reason = models.CharField(_("Meta's reason"), max_length=500, blank=True)
     meta_id = models.CharField(_("Meta id"), max_length=64, blank=True)
-    synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
+    synced_at = models.DateTimeField(pgettext_lazy("whatsapp template", "synced at"), null=True, blank=True)
     # An edit of a template Meta has, waiting for erplora.com to register it (category, header_format, header,
     # header_sample, body, body_examples, footer, buttons); empty when there is none.
     draft = models.JSONField(_("changes not yet at Meta"), null=True, blank=True)
@@ -544,7 +499,7 @@ class Template(UUIDModel):
     submit_error_code = models.CharField(_("error code"), max_length=64, blank=True)
     submit_error = models.CharField(_("error"), max_length=500, blank=True)
     submit_at = models.DateTimeField(_("handed over at"), null=True, blank=True)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    deleted_at = models.DateTimeField(pgettext_lazy("whatsapp template", "deleted at"), null=True, blank=True)
     delete_state = models.CharField(
         _("deletion at Meta"), max_length=10, choices=DeleteState.choices, default=DeleteState.NONE, blank=True
     )
@@ -556,9 +511,10 @@ class Template(UUIDModel):
         verbose_name_plural = _("templates")
         ordering = ["name", "language", "id"]
         constraints = [
-            # One live template per business, name and language: one deleted here frees them.
+            # One live template per name and language: one deleted here frees them. In the database it still holds
+            # the old business column (``migrations/0012``), where every row the code writes has it empty.
             models.UniqueConstraint(
-                fields=["host", "name", "language"],
+                fields=["name", "language"],
                 condition=Q(deleted_at__isnull=True),
                 name="whatsapp_inbox_template_live_host_name_language_unique",
             ),

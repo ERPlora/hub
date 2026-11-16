@@ -1,17 +1,18 @@
 // flow: PRINTING-F01
-// Printing's hooks of the Home (FIX-PRINTING-SETUP-HOOKS; the old hub's core item «Configura la impresora» and its bell
-// row «Nadie está imprimiendo «…»», old-hub:HUB_SHELL-F63; docs/reference/old-hub/dashboard-*.png), as the owner of hub
-// `a` reads them in Spanish: «Configura la impresora» pending and «Recomendado» in «Termina de configurar tu negocio»
+// Printing's hooks of the Home, the step «Configura la impresora» and the bell row «Nadie está imprimiendo «…»», as
+// the owner of hub `a` reads them in Spanish: «Configura la impresora» pending and «Recomendado» in «Termina de configurar tu negocio»
 // while no device set up prints the receipts, its «Configurar» leading to Printing → Devices; a receipt queued on a
 // receipt printer no device reaches rings the bell without a reload once it has waited a minute (`psql()` moves it
-// back; the bell reads the clock every 30 s, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF), its row «Nadie está imprimiendo «Recibo» (N)»
+// back; the bell reads the clock every 30 s), its row «Nadie está imprimiendo «Recibo» (N)»
 // leads to Printing → Printers, whose receipts' card says «Sin dispositivo» and where to set one up; the device set up
-// from it quiets the bell and the card and ticks the step, live; retired, the step is pending again. In each of the three sizes, leaving the capture `FIX-PRINTING-SETUP-HOOKS-<width>` with the bell
-// open. What it makes is «e2e Hooks …», deleted before and after; the devices set up before it are parked (retired)
+// from it quiets the bell and the card and ticks the step, live; retired, the step is pending again. In each of the
+// three sizes, leaving a capture with the bell open. What it makes is «e2e Hooks …», deleted before and after; the
+// devices set up before it are parked (retired)
 // for the run and put back after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { setupStep } from './home-helpers';
 import { liveStreamsSettled, spanishOwner } from './live-streams';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
@@ -91,27 +92,13 @@ async function setUpDevice(context: BrowserContext, device: string): Promise<str
 /** The operations Printing → Devices subscribes, which the Home does not. */
 const DEVICES_OPS = ['printing.device.list', 'printing.printer.list'];
 
-const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
-const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
-const pill = (page: Page): Locator => step(page).locator('[data-testid="setup-pill"]');
+const { row: step, pill, unfolded } = setupStep(STEP);
 const stalledRow = (page: Page): Locator =>
   page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Nadie está imprimiendo «Recibo» \(\d+\)\s*$/ });
 
-/** «Ver todo»: a «Recomendado» step is folded while more important ones are pending (two rows on a phone). */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-  await expect(step(page)).toBeVisible();
-}
-
-async function badgeSays(page: Page, total: number, options = {}): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
-  else await expect(bellBadge(page)).toHaveCount(0, options);
-}
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
-  test(`${KEY} PRINTING-F01 «Configura la impresora» and «Nadie está imprimiendo «Recibo»» on the Home, live — ${label}`, async ({
+  test(`PRINTING-F01: «Configura la impresora» and «Nadie está imprimiendo «Recibo»» on the Home, live — ${label}`, async ({
     browser,
   }) => {
     const { context, page, streams } = await spanishOwner(browser, { width, height });
@@ -160,12 +147,9 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await openBell(page);
       const row = stalledRow(page);
       await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capturedFitting(page, `${KEY}-${label}`, label);
 
-      // The row leads to the printers, where the receipts' card says why and where to fix it (gh:hub#2016).
+      // The row leads to the printers, where the receipts' card says why and where to fix it.
       await row.click();
       await expect(page).toHaveURL(`${A}/printing/printers`);
       const why = shown(page).locator('[data-testid=printing-summary-no-device-receipt]');

@@ -5,6 +5,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { priceItem } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import PriceItemFormModal from './PriceItemFormModal.vue';
@@ -106,5 +107,34 @@ describe('PriceItemFormModal', () => {
     const s = await setup({}, 'es');
     expect(s.inDoc('pricing-item-form')?.getAttribute('aria-label')).toBe('Nuevo precio');
     expect(s.field('min_quantity').label).toBe('Desde la cantidad');
+  });
+});
+
+// The product or service is a Combo, named by the key of the id it sends: `product_id` or `service_id`.
+describe('PriceItemFormModal: fields refused with the same words (hub#888)', () => {
+  const FIELD_OF: Record<string, string> = { product_id: 'article', service_id: 'article' };
+  describe.each(['product', 'service'])('a price of a %s', (kind) => {
+    itTellsTheCorrectedFieldApart([`${kind}_id`, 'min_quantity', 'price'], async (locale, refusal) => {
+      const s = await setup({}, locale);
+      if (kind === 'service') await ionValue(s.field('kind'), 'service');
+      s.article().vm.$emit('update:modelValue', { id: 'a1', label: 'Shampoo' });
+      await settle();
+      await ionValue(s.field('price'), '12', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+    }, 'price');
+  });
+});
+
+describe('PriceItemFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup({ item: priceItem() });
+    const price = s.field('price').value as string;
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('pricing-item-form'),
+      change: () => ionValue(s.field('price'), '9,99', 'ionInput'),
+      restore: () => ionValue(s.field('price'), price, 'ionInput'),
+    });
   });
 });

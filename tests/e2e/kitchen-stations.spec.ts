@@ -2,8 +2,8 @@
 // Inventory app: «Add station» creates one (a name another live station has is refused inside the panel); a tap on
 // its row edits, renames and deactivates it; «Route» sends a product and a category of the catalogue to a station
 // and «Remove» takes a route away; «Delete» asks first, refuses a station with routes and deletes it once it has
-// none. The list keeps its rows on a phone and on a tablet (hub#2327, kitchen#131) and the panel has one main button
-// (kitchen#121). Each screen in 390×844, 834×1112 and 1440×900 (`APP-KITCHEN-<flow>-<size>`). What a run creates —
+// none. The list keeps its rows on a phone and on a tablet and the panel has one main button
+//. Each screen in 390×844, 834×1112 and 1440×900 (`APP-KITCHEN-<flow>-<size>`). What a run creates —
 // stations «E2E KST <run> …», products `E2E-KST-<run>-…` and the category «E2E KST <run>» — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -87,7 +87,7 @@ test('KITCHEN-F01, F02: «Add station» creates one, a taken name is refused in 
     await view.locator('[data-testid=kitchen-stations-primary-action]').click();
     const form = page.locator('ion-modal[data-testid=kitchen-station-form]');
     await expect(form).toBeVisible();
-    // kitchen#121: the panel has one main button, its own.
+    // The panel has one main button, its own.
     await expect(form.locator('[data-testid=kitchen-station-form-submit]')).toHaveText('Create station');
     await form.locator('[data-testid=kitchen-station-form-name] input').fill(GRILL);
     await choose(page, form.locator('[data-testid=kitchen-station-form-printer_usage]'), 'Bar');
@@ -110,7 +110,7 @@ test('KITCHEN-F01, F02: «Add station» creates one, a taken name is refused in 
     await expect(form).toBeHidden();
     await expect(row(page, BAR)).toBeVisible();
 
-    // hub#2327, kitchen#131: on a phone and on a tablet the list keeps its rows in view.
+    // On a phone and on a tablet the list keeps its rows in view.
     // The station's colour stays beside its name however narrow the column (it shrank to nothing at 834 and 390).
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
@@ -119,7 +119,7 @@ test('KITCHEN-F01, F02: «Add station» creates one, a taken name is refused in 
       const dot = await row(page, GRILL).locator('.kitchen-stations__dot').boundingBox();
       expect(dot?.width ?? 0, `${size.label}: the colour dot keeps its size`).toBeGreaterThan(8);
     }
-    // kitchen#131: on a tablet or a phone on its side, editing a station keeps the list with its rows (it shrank
+    // On a tablet or a phone on its side, editing a station keeps the list with its rows (it shrank
     // to the toolbar while the edit box was open).
     for (const size of [{ width: 1024, height: 600 }, { width: 844, height: 390 }, { width: 667, height: 375 }]) {
       await page.setViewportSize(size);

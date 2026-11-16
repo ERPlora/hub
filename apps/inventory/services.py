@@ -61,6 +61,7 @@ from apps.inventory.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoverIn,
     CategoryRefIn,
     ConfigOut,
     ConfigPatchIn,
@@ -76,7 +77,9 @@ from apps.inventory.schemas import (
     ProductIn,
     ProductOut,
     ProductPatchIn,
+    ProductRecoverIn,
     ProductRefIn,
+    ProductRestoreIn,
     PrintLabelOut,
     ProductSoldOutIn,
     ProductsOut,
@@ -145,6 +148,7 @@ _PRODUCT_CONSTRAINTS = {
 @operation(
     "inventory.product.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.add_product",
     input=ProductIn,
     output=ProductOut,
@@ -153,6 +157,18 @@ _PRODUCT_CONSTRAINTS = {
         "description": "Create a product of the catalog with its tax category, its categories and, if given, "
         "its initial stock.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add a new product: Iced Coffee, 3.50",
+                "create the product Croissant at 2 euros",
+                "add a lemon tart to my catalog at 4 euros",
+            ),
+            "es": (
+                "crea un producto nuevo: Café helado a 3,50",
+                "da de alta el cruasán, vale 2 euros",
+                "añade una tarta de limón al catálogo a 4 euros",
+            ),
+        },
     },
 )
 def create_product(ctx: OperationContext, data: ProductIn) -> dict:
@@ -182,6 +198,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         pricing_unit=pricing_unit,
         tax_category=tax_category,
         track_stock=None if data.product_type == Product.Type.SERVICE else data.track_stock,
+        is_active=data.is_active,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
     )
@@ -207,6 +224,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
 @operation(
     "inventory.product.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.import_product",
     input=ProductImportIn,
     output=ImportReportOut,
@@ -215,6 +233,16 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         "description": "Create many products at once (a CSV import): each row created, skipped because its SKU "
         "already exists, or failed with its reason; dry_run only checks.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "import my product catalog from a CSV file",
+                "load all the items of this CSV into the catalog",
+            ),
+            "es": (
+                "importa mi catálogo de productos desde un archivo CSV",
+                "carga todos los artículos de este CSV en el catálogo",
+            ),
+        },
     },
 )
 def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
@@ -278,6 +306,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
 @operation(
     "inventory.product.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductPatchIn,
     output=ProductOut,
@@ -286,6 +315,18 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
         "description": "Change a product, named by its id, SKU or name: its data, active or not, its stock "
         "control and its categories. The SKU, the type and the stock are not changed here.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "change the price of the coffee to 1.80",
+                "rename the Tea product and make it inactive",
+                "the croissant now costs 2.20",
+            ),
+            "es": (
+                "cámbiale el precio al café a 1,80",
+                "renombra el producto Té y desactívalo",
+                "el cruasán ahora cuesta 2,20",
+            ),
+        },
     },
 )
 def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
@@ -331,6 +372,7 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
 @operation(
     "inventory.product.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.delete_product",
     input=ProductRefIn,
     output=DeletedOut,
@@ -339,14 +381,25 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
         "description": "Delete a product of the catalog, named by its id, SKU or name (logically: its movements "
         "stay and its SKU and EAN-13 are freed).",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the product Old Tea",
+                "remove the croissant from the catalog",
+            ),
+            "es": (
+                "borra el producto Té viejo",
+                "quita el cruasán del catálogo",
+            ),
+        },
     },
 )
 def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
-    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved."""
+    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved. An
+    image of the library is ERPlora's, not the business's: it stays, so that restoring it (INVENTORY-F34) shows it."""
     product = find_product(data.id, data.product, lock=True)
     photo = product.image
     product.is_deleted, product.is_active, product.deleted_at = True, False, timezone.now()
-    product.image = ""
+    product.image = photo if images.kind_of(photo) == images.CATALOG else ""
     product.updated_by = _actor(ctx)
     product.save(update_fields=["is_deleted", "is_active", "deleted_at", "image", "updated_by", "updated_at"])
     images.let_go(ctx, photo)
@@ -355,8 +408,43 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
 
 
 @operation(
+    "inventory.product.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ProductRestoreIn,
+    output=ProductOut,
+    ai={
+        "description": "Bring a deleted product back to the catalog, the same product with its stock movements and "
+        "its image of the library (run by the platform when ERPlora's staff recovers the business from a separate "
+        "copy).",
+        "risk": "normal",
+    },
+)
+def restore_product(ctx: OperationContext, data: ProductRestoreIn) -> dict:
+    """INVENTORY-F34: a deleted product back in every list and in the till, the same product (deleting keeps it,
+    INVENTORY-F04): its id, its codes, its categories, its stock and its image of the library, with every movement that
+    hangs from it. One deleted before deleting kept that image has none: it gets back the one it showed in the copy,
+    as one made again does (``base.images.from_copy``). Active and on sale, as unarchiving does: the «sold out» it had
+    was another day's. Not while another live product holds its SKU or its EAN-13 (it was made again since). Repeating
+    it on a product already back answers well and announces again, as deleting does, and changes nothing of it."""
+    product = find_product(data.id, None, lock=True, rows=Product.objects.all())
+    if product.is_deleted:
+        product.is_deleted, product.deleted_at, product.is_active, product.is_sold_out = False, None, True, False
+        product.image = product.image or images.from_copy(ctx, data.image)
+        product.updated_by = _actor(ctx)
+        _save(
+            product,
+            update_fields=["is_deleted", "deleted_at", "is_active", "is_sold_out", "image", "updated_by", "updated_at"],
+        )
+    record_event(ctx, events.PRODUCT_RESTORED, _product_payload(product))
+    return load_product(product.id, ctx.scope)
+
+
+@operation(
     "inventory.product.set_sold_out",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductSoldOutIn,
     output=ProductOut,
@@ -365,6 +453,18 @@ def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
         "description": "Mark a product sold out («86»: the till stops offering it, it stays active) or put it "
         "back on sale, named by its id, SKU or name.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "mark the Tea as sold out for today",
+                "we ran out of croissants, stop offering them",
+                "put the coffee back on sale",
+            ),
+            "es": (
+                "marca el té con hielo como agotado",
+                "se nos han acabado los cruasanes, que no se vendan",
+                "vuelve a poner a la venta el café",
+            ),
+        },
     },
 )
 def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
@@ -378,7 +478,30 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
     return load_product(product.id, ctx.scope)
 
 
-# The product's image (round 2026-10-30, base.images)
+@operation(
+    "inventory.product.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ProductRecoverIn,
+    output=ProductOut,
+    ai={
+        "description": "Make again a product the business no longer holds, with the image of the library it had (run "
+        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def recover_product(ctx: OperationContext, data: ProductRecoverIn) -> dict:
+    """BASE-F114: a product of a separate copy made again as its screen makes it, all or nothing: the product by
+    ``inventory.product.create``, then the image of the library it showed there (INVENTORY-F30), unless the library no
+    longer has it; never a photo of its own, deleted with the product (``base.images.from_copy``)."""
+    made = create_product(ctx, ProductIn.model_validate(data.model_dump(include=set(ProductIn.model_fields))))
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_product(made.id, None), image)
+    return load_product(made.id, ctx.scope)
+
+
+# The product's image (base.images)
 
 #: Where a product's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "inventory/products/"
@@ -387,6 +510,7 @@ PHOTOS = "inventory/products/"
 @operation(
     "inventory.product.set_image",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductImageIn,
     output=ProductOut,
@@ -396,6 +520,18 @@ PHOTOS = "inventory/products/"
         "leche»), named by its id, SKU or name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
         "inventory.product.suggest_image or base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "put an image on the latte",
+                "set the image of the croissant",
+                "remove the image of the tea",
+            ),
+            "es": (
+                "ponle una imagen al café con leche",
+                "pon una imagen al cruasán",
+                "quita la imagen del producto té",
+            ),
+        },
     },
 )
 def set_image(ctx: OperationContext, data: ProductImageIn) -> dict:
@@ -444,6 +580,7 @@ def _change_image(ctx: OperationContext, product: Product, image: str) -> None:
 @operation(
     "inventory.product.print_label",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.view_product",
     input=ProductRefIn,
     output=PrintLabelOut,
@@ -452,6 +589,16 @@ def _change_image(ctx: OperationContext, product: Product, image: str) -> None:
         "description": "Print the barcode label of a product (its name, its SKU as the code and its price) on the "
         "printer of the «Label» function, named by its id, SKU or name; each call prints one label.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "print a label for the coffee",
+                "I need the barcode label of the croissant",
+            ),
+            "es": (
+                "imprime una etiqueta del café",
+                "necesito la etiqueta con el código de barras del cruasán",
+            ),
+        },
     },
 )
 def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
@@ -488,11 +635,27 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
 @operation(
     "inventory.product_category.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductCategoryIn,
     output=ProductCategoryLinkOut,
     expose_api=True,
-    ai={"description": "Put a product in a category so that the till groups it there.", "risk": "normal"},
+    ai={
+        "description": "Put a product in a category so that the till groups it there.",
+        "risk": "normal",
+        "asks": {
+            "en": (
+                "put the coffee in the Breakfasts category",
+                "classify the croissant as bakery",
+                "move the tea to the drinks family",
+            ),
+            "es": (
+                "clasifica el café en la categoría Desayunos",
+                "mete el cruasán en la familia Bollería",
+                "clasifica el té en la categoría Bebidas",
+            ),
+        },
+    },
 )
 def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict:
     product = find_product(data.product_id, data.product, lock=True)
@@ -506,11 +669,25 @@ def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict
 @operation(
     "inventory.product_category.remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_product",
     input=ProductCategoryIn,
     output=ProductCategoryLinkOut,
     expose_api=True,
-    ai={"description": "Take a product out of a category.", "risk": "normal"},
+    ai={
+        "description": "Take a product out of a category.",
+        "risk": "normal",
+        "asks": {
+            "en": (
+                "take the coffee out of the drinks category",
+                "unclassify the croissant from bakery",
+            ),
+            "es": (
+                "saca el café de la categoría bebidas",
+                "quita el cruasán de la familia Bollería",
+            ),
+        },
+    },
 )
 def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict:
     product = find_product(data.product_id, data.product, lock=True)
@@ -527,28 +704,71 @@ def remove_product_category(ctx: OperationContext, data: ProductCategoryIn) -> d
 @operation(
     "inventory.category.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.add_category",
     input=CategoryIn,
     output=CategoryOut,
     expose_api=True,
-    ai={"description": "Create a product category; its slug is made from the name when not given.", "risk": "normal"},
+    ai={
+        "description": "Create a product category; its slug is made from the name when not given.",
+        "risk": "normal",
+        "asks": {
+            "en": (
+                "create a category called Desserts",
+                "add a new family for the till: Wines",
+            ),
+            "es": (
+                "crea una categoría que se llame Postres",
+                "añade una familia nueva para el TPV: Vinos",
+            ),
+        },
+    },
 )
 def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
+    return load_category(_new_category(ctx, data).id)
+
+
+@operation(
+    "inventory.category.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=CategoryRecoverIn,
+    output=CategoryOut,
+    ai={
+        "description": "Bring a deleted category back as a new one, with the deleted products it had back in it (run "
+        "by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
+    """INVENTORY-F07: the category created as its screen creates it, and each of ``product_ids`` the business still
+    holds deleted put back in it, so that restoring it (INVENTORY-F34) brings it back inside. A live product stays as
+    the business keeps it."""
+    category = _new_category(ctx, data)
+    for product in held(Product.objects.filter(pk__in=data.product_ids, is_deleted=True).order_by("id")):
+        ProductCategory.objects.create(product=product, category=category)
+        _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category.id)
+    return load_category(category.id)
+
+
+def _new_category(ctx: OperationContext, data: CategoryIn) -> Category:
     tax_category = _tax_category(data.tax_category_key) if data.tax_category_key else None
     category = Category.objects.create(
-        **data.model_dump(exclude={"slug", "tax_category_key"}),
+        **data.model_dump(include=CategoryIn.model_fields.keys() - {"slug", "tax_category_key"}),
         slug=data.slug or slugify(data.name),
         tax_category=tax_category,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
     )
     record_event(ctx, events.CATEGORY_CREATED, {"id": str(category.id), "name": category.name})
-    return load_category(category.id)
+    return category
 
 
 @operation(
     "inventory.category.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.add_category",
     input=CategoryImportIn,
     output=ImportReportOut,
@@ -557,6 +777,16 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
         "description": "Create many categories at once (a CSV import); one whose name already exists is skipped, "
         "so repeating the file duplicates nothing.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "import product categories from a CSV file",
+                "load these categories from a CSV",
+            ),
+            "es": (
+                "importa las categorías de producto desde un archivo CSV",
+                "carga estas categorías desde un CSV",
+            ),
+        },
     },
 )
 def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dict:
@@ -602,6 +832,7 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
 @operation(
     "inventory.category.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.change_category",
     input=CategoryPatchIn,
     output=CategoryOut,
@@ -610,6 +841,16 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
         "description": "Change a category, named by its id or name; what is not sent (icon, colour, order, "
         "description) is kept.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "rename the Drinks category to Beverages",
+                "change the colour of the Desserts family",
+            ),
+            "es": (
+                "renombra la categoría Bebidas a Refrescos",
+                "cámbiale el color a la familia Postres",
+            ),
+        },
     },
 )
 def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
@@ -634,6 +875,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
 @operation(
     "inventory.category.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.delete_category",
     input=CategoryRefIn,
     output=DeletedOut,
@@ -641,6 +883,16 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
     ai={
         "description": "Delete a category, named by its id or name: its products stay, only unlinked from it.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the Desserts category",
+                "remove the family Wines from the till",
+            ),
+            "es": (
+                "borra la categoría Postres",
+                "quita la familia Vinos del TPV",
+            ),
+        },
     },
 )
 def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
@@ -662,6 +914,7 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
 @operation(
     "inventory.stock.receive",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.adjust_stock",
     input=ReceiveIn,
     output=ProductsOut,
@@ -670,6 +923,18 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
         "description": "Record goods received: raises the stock of one or more products (by id, SKU or name), "
         "with the unit cost and the delivery note's number.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "I just received 20 coffees, delivery note A-123",
+                "a delivery arrived: add 10 boxes of tea to the stock",
+                "record the goods that came in today",
+            ),
+            "es": (
+                "ha llegado un pedido: recibe 20 cafés con el albarán A-123",
+                "entra mercancía: 10 cajas de té al stock",
+                "registra la entrada de mercancía del proveedor de hoy",
+            ),
+        },
     },
 )
 def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
@@ -706,6 +971,7 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
 @operation(
     "inventory.stock.count",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.adjust_stock",
     input=CountIn,
     output=ProductOut,
@@ -714,6 +980,18 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
         "description": "Apply a stock count: the product's balance becomes the ABSOLUTE value counted, with a "
         "mandatory reason; the ledger records the difference.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "I counted 12 croissants, fix the stock",
+                "do a stock count: the coffee is really 45",
+                "inventory count of the tea: 8 left",
+            ),
+            "es": (
+                "he contado 12 cruasanes, corrige el stock",
+                "haz un recuento: del café hay 45 de verdad",
+                "recuento del té: quedan 8",
+            ),
+        },
     },
 )
 def count_stock(ctx: OperationContext, data: CountIn) -> dict:
@@ -733,6 +1011,7 @@ def count_stock(ctx: OperationContext, data: CountIn) -> dict:
 @operation(
     "inventory.stock.write_off",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.adjust_stock",
     input=WriteOffIn,
     output=ProductOut,
@@ -741,6 +1020,18 @@ def count_stock(ctx: OperationContext, data: CountIn) -> dict:
         "description": "Write off stock without a sale (waste, breakage, own consumption) with its reason; a "
         "service or an article without stock control is refused (there is no stock to lower).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "write off 2 coffees, they broke",
+                "discard 3 croissants, they went stale",
+                "take out of stock what we used ourselves",
+            ),
+            "es": (
+                "da de baja 2 cafés que se han roto",
+                "tira 3 cruasanes que se han puesto malos",
+                "quita del stock lo que hemos consumido nosotros",
+            ),
+        },
     },
 )
 def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
@@ -749,7 +1040,7 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
         raise _service_has_no_stock("product_id" if data.product_id is not None else "product")
     _check_grid(data.qty, product.unit, "qty")
     settings = current_settings()
-    # Never a silent success: a write-off that would lower nothing says so (2026-10-14).
+    # Never a silent success: a write-off that would lower nothing says so.
     if not tracks_stock(product, settings):
         raise Conflict(str(STOCK_NOT_TRACKED), code="inventory.stock_not_tracked", fields={"qty": str(STOCK_NOT_TRACKED)})
     if not settings.allow_sell_without_stock and product.stock < data.qty:
@@ -766,6 +1057,7 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
 @operation(
     "inventory.config.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="inventory.manage_settings",
     input=ConfigPatchIn,
     output=ConfigOut,
@@ -774,6 +1066,18 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
         "description": "Change the inventory settings: allow selling without stock, the default low-stock "
         "threshold and whether stock is tracked (an article's own decision wins).",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "let me sell products even with no stock",
+                "change the default low stock threshold to 5",
+                "stop tracking stock",
+            ),
+            "es": (
+                "deja vender productos aunque no haya stock",
+                "pon el aviso de stock bajo en 5 por defecto",
+                "no quiero controlar el stock",
+            ),
+        },
     },
 )
 def update_config(ctx: OperationContext, data: ConfigPatchIn) -> dict:
@@ -1044,7 +1348,7 @@ def _locked(product_ids: set[UUID]) -> dict[UUID, Product]:
     return {product.id: product for product in products}
 
 
-def _move(
+def _move(  # noqa: PLR0913
     ctx: OperationContext,
     product: Product,
     movement_type: str,
@@ -1076,7 +1380,7 @@ def _move(
     return movement
 
 
-def _crossing(
+def _crossing(  # noqa: PLR0913, PLR0917
     ctx: OperationContext, product: Product, settings: Settings, previous: Decimal, movement_type: str, reference: str
 ) -> None:
     """INVENTORY-F18: an article with stock control crossing its threshold, down («below») or up («recovered»).
@@ -1162,7 +1466,7 @@ def _refund_result(note: RefundStock, *, applied: bool, movements: int) -> dict:
 # Imports
 
 
-def _check_product_row(
+def _check_product_row(  # noqa: PLR0911, PLR0913, PLR0917
     row, name: str, sku: str, settings: Settings, tax_categories: dict, currency: str
 ) -> dict | str:
     """The fields of a new product from one CSV row (its name and SKU already read, its amounts in the business's

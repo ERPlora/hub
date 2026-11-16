@@ -9,8 +9,8 @@
 //   - loading it again changes nothing: a price changed by hand stays, nothing is duplicated, and the report says
 //     «You had it already».
 // What the template brings to Inventory (its SKUs and its category names, read from the template itself) is taken out
-// of `a` before each test and after the last one, through Inventory's own operations (phase 1: `a` and `b` share these
-// rows). Tables are never loaded. Each viewport leaves its capture `CLOSE-INVENTORY-<width>`.
+// of `a` before each test and after the last one, through Inventory's own operations. Tables are never loaded. Each
+// viewport leaves its capture.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

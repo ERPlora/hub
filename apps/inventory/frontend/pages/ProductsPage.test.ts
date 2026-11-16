@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, EMPLOYEE, errorFrame, flush, mountInventory, ok, page, POLISH, product, refusal, subId, UNITS, type ApiCall, type MountOptions } from '../__tests__/mount-inventory';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
@@ -126,7 +127,7 @@ describe('ProductsPage: the list', () => {
     ]);
     const chip = s.testid('inventory-products-unconfigured-p3');
     expect(chip.find('span').text()).toBe('Not configured · Missing tax category');
-    // FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED - Cut to «…» in a narrow column, its whole text stays on hand.
+    // Cut to «…» in a narrow column, its whole text stays on hand.
     expect(chip.attributes('title')).toBe('Not configured · Missing tax category');
     await chip.trigger('click');
     await flush();
@@ -134,7 +135,7 @@ describe('ProductsPage: the list', () => {
     expect([form.props('open'), (form.props('product') as { id: string }).id]).toEqual([true, 'p3']);
   });
 
-  it('hub#703: Status keeps the room to read «Not configured» only while a row carries it, and a refresh leaves the columns alone', async () => {
+  it('Status keeps the room to read «Not configured» only while a row carries it, and a refresh leaves the columns alone', async () => {
     const s = await setup();
     const columns = () => s.prop<Array<{ key: string; minWidth?: string }>>('columns');
     const floor = () => columns().find((c) => c.key === 'status')?.minWidth;
@@ -192,7 +193,6 @@ describe('ProductsPage: the list', () => {
     expect(s.params('inventory.product.list')).toEqual([{ name: 'caf', price_min: 220, sort: '-price', limit: 50, offset: 0 }]);
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel, on their columns: name, SKU, price and stock (as typed) and status', async () => {
     const s = await setup();
     await s.show(LIST);
@@ -235,7 +235,7 @@ describe('ProductsPage: the list', () => {
     const panel = s.testid('inventory-products-filters-panel');
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="inventory-products-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
-    // A closed list opens as a popover: no «CANCEL»/«OK» of an alert in English (hub#1736).
+    // A closed list opens as a popover: no «CANCEL»/«OK» of an alert in English.
     expect((panel.get('[data-testid="inventory-products-filter-status"]').element as HTMLElement & { interface?: string }).interface).toBe('popover');
     set('sku', 'ionInput', 'CAF');
     set('price_min', 'ionInput', '2,20');
@@ -260,6 +260,21 @@ describe('ProductsPage: the list', () => {
     });
     expect(s.params('inventory.product.list')).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No products');
+  });
+
+  // WORKBOOK «Productos»: the price ends are read like the price field, so a negative one says it cannot be negative.
+  it('a negative price end says it cannot be negative, in both languages, and does not filter', async () => {
+    const en = await setup();
+    await en.show(page([]));
+    await en.filter({ price_min: '-5' });
+    const es = await setup({ locale: 'es' });
+    await es.show(page([]));
+    await es.filter({ price_max: '-5' });
+    expect([en.prop('filterErrors'), es.prop('filterErrors'), en.params('inventory.product.list')]).toEqual([
+      { price_min: 'This amount cannot be negative.' },
+      { price_max: 'Este importe no puede ser negativo.' },
+      [{ sort: 'name', limit: 50, offset: 0 }],
+    ]);
   });
 
   it('a filter the server refused (a 422 of the list) is said under it, and the rows stay', async () => {
@@ -319,7 +334,7 @@ describe('ProductsPage: actions', () => {
     const s = await setup();
     await s.show(LIST);
     const actions = s.prop<Array<{ id: string; label: string; hidden?: (row: unknown) => boolean; menuOnly?: boolean }>>('actions');
-    // hub#530: «Details» lives in «⋮», since tapping the row already opens the same sheet: its inline button took
+    // «Details» lives in «⋮», since tapping the row already opens the same sheet: its inline button took
     // the room the «Not configured» chip needs at 1280 once the list grew its «Photo» column.
     expect(actions.map((a) => [a.id, a.label, !!a.menuOnly])).toEqual([
       ['detail', 'Details', true],
@@ -463,7 +478,7 @@ describe('ProductsPage: import and export', () => {
     s.wrapper.findComponent(CsvButtons).vm.$emit('export');
     await flush();
     expect(s.query(s.calls('/api/inventory/products/export')[0])).toEqual({ sku: 'CAF', price_min: '200', sort: 'name' });
-    expect(mocks.save).toHaveBeenCalledWith('inventario-productos.csv', '﻿Nombre;SKU\n', 'text/csv');
+    expect(mocks.save).toHaveBeenCalledWith('inventario-productos.csv', '﻿Nombre;SKU\n', 'text/csv', expect.any(Function));
   });
 
   it('importing a file opens «Check the import» with its columns', async () => {
@@ -517,7 +532,7 @@ describe('ProductsPage', () => {
   });
 });
 
-describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ProductsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
@@ -528,5 +543,17 @@ describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
     await s.show(LIST);
     expect(s.rows()[0].text()).toContain(formatMoney(220, 'en', { currency: 'PLN', decimals: 2 }));
     expect(s.rows()[0].text()).not.toContain('€');
+  });
+});
+
+describe('ProductsPage: «Price» is read as every amount of the Hub', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['price_min', 'price_max'],
+    params: ['price_min', 'price_max'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.show(page([]));
+      return { filter: s.filter, query: () => s.params('inventory.product.list').at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

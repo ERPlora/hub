@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { click, mountSale } from '../../__tests__/mount-sale';
 import TableButton from './TableButton.vue';
+import source from './TableButton.vue?raw';
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   return mountSale(TableButton, { props: { tableNumber: null, ...props }, locale });
@@ -28,5 +29,11 @@ describe('TableButton', () => {
     expect(trigger.attributes('aria-label')).toBe('Assign table: Table 4');
     expect(trigger.attributes('title')).toBe('Assign table: Table 4');
     expect(trigger.classes()).toContain('pos-table-trigger--assigned');
+  });
+
+  it('gives the table trigger a 44px touch target on coarse-pointer devices', () => {
+    expect(source).toMatch(
+      /@media \(pointer: coarse\)\s*\{\s*\.pos-table-trigger\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,
+    );
   });
 });

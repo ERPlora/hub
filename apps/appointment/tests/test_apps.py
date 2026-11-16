@@ -6,7 +6,9 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs
+
+from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
     "appointment.view_appointment",
@@ -20,7 +22,7 @@ PERMISSIONS = [
     "appointment.manage_schedule",
     "appointment.manage_settings",
 ]
-#: Deleting and the settings are the owner's and the admin's (the old module's admin).
+#: Deleting and the settings are the owner's and the admin's.
 ADMIN_ONLY = {"appointment.delete_appointment", "appointment.manage_settings"}
 #: The employee sees and manages their own agenda (WORKBOOK «Quién puede qué»).
 EMPLOYEE = {
@@ -79,16 +81,16 @@ def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
 
 
 def test_what_each_role_gets():
-    config = appointment()
-    for role in ("hub_owner", "hub_admin"):
-        assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    assert (
-        permissions_for_role([config], "hub_manager") == set(PERMISSIONS) - ADMIN_ONLY
-    )
-    assert permissions_for_role([config], "hub_employee") == EMPLOYEE
+    everything = set(PERMISSIONS)
+    assert grants_by_role(appointment()) == {
+        "hub_owner": everything,
+        "hub_admin": everything,
+        "hub_manager": everything - ADMIN_ONLY,
+        "hub_employee": EMPLOYEE,
+    }
 
 
-def test_navigation_is_the_old_modules_single_entry_with_a_registered_icon():
+def test_navigation_is_a_single_entry_with_a_registered_icon():
     entries = appointment().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [
@@ -98,14 +100,23 @@ def test_navigation_is_the_old_modules_single_entry_with_a_registered_icon():
     ]
 
 
+#: The reads that are no assistant tool: what names a blocked period on the assistant's card (hub#635); the model reads
+#: the blocks by their list.
+INTERNAL_READS = {"appointment.blocked_time.get"}
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
-    from live.operations import registry
+    from live.operations import INTERNAL, registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("appointment.")}
     assert ops, "the appointment app declares no operation"
+    assert {name for name, op in ops.items() if op.ai is INTERNAL} == INTERNAL_READS
     for name, op in ops.items():
+        if name in INTERNAL_READS:
+            assert (op.kind, op.expose_api) == ("query", False), name
+            continue
         assert op.ai and op.ai.get("description"), name
         if op.kind == "command":
             assert op.ai.get("risk") in {"normal", "high"}, name
@@ -127,9 +138,9 @@ def test_cancelling_marking_a_no_show_charging_and_deleting_are_high_risk():
 
 
 def test_it_tells_the_device_of_the_customers_own_bookings_and_cancellations():
-    """APPOINTMENT-F28 (old-hub:HUB_SHELL-F66): «New appointment · {customer}» or «Appointment cancelled · {customer}»,
-    with the services, «{day} at {hour}» and the professional; a tap opens the agenda on that day. Of the agenda the
-    person sees (its query's own rule), refreshed by a booking and a cancellation."""
+    """«New appointment · {customer}» or «Appointment cancelled · {customer}», with the services, «{day} at {hour}» and
+    the professional; a tap opens the agenda on that day. Of the agenda the person sees (its query's own rule),
+    refreshed by a booking and a cancellation."""
     from live.meta import DeviceNotice, SetupCheck
 
     booked, cancelled = appointment().notices
@@ -151,13 +162,13 @@ def test_it_tells_the_device_of_the_customers_own_bookings_and_cancellations():
         assert list(notice.refresh_on) == ["appointment.appointment.created", "appointment.appointment.cancelled"]
 
 
-# ── The Home's hooks (PLAN-HUB round 2026-10-21) ────────────────────────────────────────────────────
+# ── The Home's hooks ────────────────────────────────────────────────────────────────────────────────
 
 #: What changes how many upcoming bookings wait for confirmation in the agenda the person sees: one is booked
-#: pending; it is confirmed, started, completed (charged at the till), cancelled or deleted; it moves (to the past
-#: or to another professional) or its professional leaves. Never a no-show (only once its start is past, when it
-#: no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged into
-#: another (same professional, time and state).
+#: pending; it is confirmed, started, completed (charged at the till), cancelled, deleted or restored; it moves (to
+#: the past or to another professional) or its professional leaves. Never a no-show (only once its start is past,
+#: when it no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged
+#: into another (same professional, time and state).
 TO_CONFIRM = [
     "appointment.appointment.created",
     "appointment.appointment.confirmed",
@@ -167,13 +178,13 @@ TO_CONFIRM = [
     "appointment.appointment.rescheduled",
     "appointment.appointment.unassigned",
     "appointment.appointment.deleted",
+    "appointment.appointment.restored",
 ]
 
 
 def test_the_bell_counts_the_appointments_to_confirm():
-    """The old module's counter of the bell (its module.json ``bell``, appointments#169, hub#1678): «Appointments to
-    confirm», on the query the agenda's «N to confirm» reads, leading to the agenda. Whoever sees an agenda sees it
-    (its query counts the person's own, or everybody's for whoever sees them all)."""
+    """The bell's «Appointments to confirm», on the query the agenda's «N to confirm» reads, leading to the agenda.
+    Whoever sees an agenda sees it (its query counts the person's own, or everybody's for whoever sees them all)."""
     [counter] = appointment().bell
     assert isinstance(counter, BellCounter)
     assert (
@@ -210,6 +221,4 @@ def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
 
 
 def test_citas_has_no_setup_steps_nor_panels():
-    # The old module declared neither (its module.json has no `setup` nor `widgets`), and the old hub's
-    # setup_status.rs only listed the core's own steps (apps, business details, printer, team).
     assert (appointment().setup, appointment().widgets) == ([], [])

@@ -8,8 +8,8 @@ hold. The rest carry ids and numbers, never a name or a free note (WORKBOOK «Lo
 Reactions, each through an operation of this app run as the system, in its own transaction: two cards
 merged move the absorbed card's reservations and waitlist entries (``customer.customer.merged``,
 RESERVATION-F21); an erased card empties their personal data (``customer.customer.erased``, F22). The
-outbox relay (phase 2, in the worker) hands each delivered event to ``react``; every reaction is
-idempotent, so a repeated delivery changes nothing.
+worker's outbox relay hands each delivered event to ``react``; every reaction is idempotent, so a repeated
+delivery changes nothing.
 """
 
 from typing import Any

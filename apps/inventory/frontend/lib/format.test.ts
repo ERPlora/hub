@@ -1,7 +1,8 @@
 // How the inventory screens paint money, counts, quantities and tax rates, all with the page
 // language's own number format (Intl): money of the business from cents, counts grouped as the language groups them,
-// quantities exact and ungrouped without trailing zeros (as the server's CSV writes them: 2,5 · 3 ·
-// 0,532), a movement's quantity with its sign, and a rate as the language writes a percentage.
+// quantities exact without trailing zeros and grouped as every screen of the Hub groups them (2,5 · 3 · 0,532 ·
+// 12.345, the platform's formatQuantity), a movement's quantity with its sign, and a rate as the language writes a
+// percentage.
 import { describe, expect, it } from 'vitest';
 
 import { formatCount, formatMoney, formatPercent, formatQuantity, formatShortDateTime, formatSignedQuantity } from './format';
@@ -23,9 +24,9 @@ describe('formatMoney', () => {
     expect(formatMoney(1210, 'en', { currency: 'JPY', decimals: 0 })).toBe('¥1,210');
   });
 
-  it('until the business’s currency is known a figure has no symbol, never the euro', () => {
-    expect(formatMoney(1250, 'es')).toBe('12,50');
-    expect(formatMoney(1250, 'en')).toBe('12.50');
+  it('until the business’s currency is known an amount is a dash, never the euro', () => {
+    expect(formatMoney(1250, 'es')).toBe('—');
+    expect(formatMoney(1250, 'en')).toBe('—');
   });
 
   // hub#525: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
@@ -33,20 +34,26 @@ describe('formatMoney', () => {
     expect(formatMoney(123456789, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^1\.234\.567,89\s€$/);
     expect(formatMoney(123456, 'en', { currency: 'EUR', decimals: 2 })).toBe('€1,234.56');
     expect(formatMoney(1500, 'es', { currency: 'JPY', decimals: 0 })).toMatch(/^1\.500\s¥$/);
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(formatMoney(99999, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^999,99\s€$/);
   });
 });
 
 describe('formatQuantity', () => {
-  it('is exact: no trailing zeros, the language decimal mark, never grouped', () => {
+  it('is exact: no trailing zeros, the language decimal mark', () => {
     expect(formatQuantity('2.500', 'es')).toBe('2,5');
     expect(formatQuantity('2.500', 'en')).toBe('2.5');
     expect(formatQuantity('3.000', 'es')).toBe('3');
     expect(formatQuantity('0.532', 'es')).toBe('0,532');
-    expect(formatQuantity('12345.000', 'es')).toBe('12345');
     expect(formatQuantity('-4.250', 'es')).toBe('-4,25');
     expect(formatQuantity(7, 'en')).toBe('7');
+  });
+
+  // hub#974: a stock of 12500 read «12500» here and «12.500» on the till; it is written as every screen writes it.
+  it('groups the thousands from four digits on, as the till and the invoice do', () => {
+    expect(formatQuantity('12345.000', 'es')).toBe('12.345');
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+    expect(formatQuantity('1500.000', 'en')).toBe('1,500');
   });
 
   it('never invents a figure from what is not one', () => {
@@ -60,6 +67,8 @@ describe('formatSignedQuantity', () => {
     expect(formatSignedQuantity('2.000', 'es')).toBe('+2');
     expect(formatSignedQuantity('-1.500', 'es')).toBe('-1,5');
     expect(formatSignedQuantity('0.000', 'es')).toBe('0');
+    expect(formatSignedQuantity('1500.000', 'es')).toBe('+1.500');
+    expect(formatSignedQuantity('-2500.000', 'es')).toBe('-2.500');
   });
 });
 
@@ -80,7 +89,7 @@ describe('formatCount', () => {
 });
 
 describe('formatShortDateTime', () => {
-  // inventory#130, inventory#139: the ledger's date on a tablet keeps its time, also for an older year.
+  // The ledger's date on a tablet keeps its time, also for an older year.
   it('is the numeric date with the year and the time, in the page language and its time zone', () => {
     const at = '2025-03-07T08:05:00Z';
     expect(formatShortDateTime(at, 'es', 'Europe/Madrid')).toBe('7/3/25, 9:05');

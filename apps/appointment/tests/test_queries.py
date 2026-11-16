@@ -13,10 +13,13 @@ from live.errors import NotFound
 
 from apps.appointment.models import Appointment, History
 
+from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
+    HUB_DB,
     MONDAY,
+    TESTER,
     assign,
     at,
     make_appointment,
@@ -33,7 +36,7 @@ from .conftest import (
     wall,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 TUESDAY = MONDAY + dt.timedelta(days=1)
 
 
@@ -202,6 +205,17 @@ def test_the_history_lists_every_change_in_order(salon):
     ]
 
 
+@pytest.mark.parametrize("caller, who, by_platform", who_did_it(TESTER, "tester"))
+def test_the_history_says_whether_a_person_or_the_platform_did_it(salon, caller, who, by_platform):
+    """A person and an API key are named; the platform's own marks are kept, and the line says the platform did it."""
+    pending = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="pending")
+    run("appointment.appointment.confirm", {"id": str(pending.id)}, actor=caller)
+
+    page = run("appointment.appointment.history", {"id": str(pending.id)})
+
+    assert [(h.action, h.actor, h.by_platform) for h in page.rows] == [("confirmed", who, by_platform)]
+
+
 # A customer's visits (her card's block)
 
 
@@ -231,7 +245,7 @@ def test_a_customers_visits_come_newest_first_with_their_notes(salon):
     )
 
 
-# gh:appointments#143, #146 · gh:hub#1662 — a model reading a stranger's message (a flow's step gets every
+# A model reading a stranger's message (a flow's step gets every
 # read of the app) composes these reads: what is the salon's (its notes, a cancellation's reason) and the
 # customer's contact never reach a caller that is not a person. The team, and its assistant with the person's
 # own session, read them; the day's agenda carries neither, for anybody.
@@ -266,7 +280,7 @@ def test_a_caller_who_is_not_a_person_reads_a_visit_without_the_salons_notes_nor
     assert not set(agenda.rows[0].model_dump()) & set(private)
 
 
-# gh:appointments#151 — a flow's template prints a value as it comes, with no clock nor formatter: an
+# A flow's template prints a value as it comes, with no clock nor formatter: an
 # automation confirming a booking says «el martes a las 10:30» because the appointment gives its day and its
 # hour ready to read, in the language of whoever asks, on the business's clock (24 hours, as the old
 # product's messages; the year kept: a booking can be months away).
@@ -339,7 +353,7 @@ def test_the_upcoming_live_appointments_of_a_service_are_counted_with_the_first_
     )
 
 
-# APPOINTMENT-G01 (old-hub:HUB_SHELL-F66) — what the hub tells the team as it happens: a booking or a
+# APPOINTMENT-F28 — what the hub tells the team as it happens: a booking or a
 # cancellation the customer made herself (WhatsApp, the online booking), newest first, with what the notice says
 # (who, which services, the day and the hour ready to say, with whom). One given or cancelled at the front desk is
 # not told (who did it knows); an employee hears only her own agenda's; nothing older than the window.
@@ -788,7 +802,7 @@ def _tied_series(salon):
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(salon, operation, tied, column):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     ids, filters = tied(salon)
     assert_reads_backwards(listed_with(run, operation, column, **filters), sorted(ids))

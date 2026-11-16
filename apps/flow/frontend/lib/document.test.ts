@@ -77,7 +77,7 @@ describe('the document', () => {
 
   it('what is sent to the server', () => {
     const doc = { ...emptyDocument(), name: ' Weekly ', trigger: { kind: 'schedule' as const, every: 'day' as const, time: '09:00' }, steps: [CMD] };
-    // The switch is `flow.flow.set_enabled`'s alone (review 2026-10-15, item 3).
+    // The switch is `flow.flow.set_enabled`'s alone.
     expect(toPayload(doc)).toEqual({ name: 'Weekly', trigger: { kind: 'schedule', every: 'day', time: '09:00' }, steps: [CMD] });
   });
 });
@@ -195,6 +195,7 @@ describe('the server says where it is wrong', () => {
 
 describe('the data a step can insert', () => {
   const catalog = {
+    off_apps: [],
     events: [],
     actions: [
       { name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: ['id', 'number'] },
@@ -219,6 +220,20 @@ describe('the data a step can insert', () => {
       { path: 'steps.s1.count', group: 's1', example: undefined },
       { path: 'steps.s3.id', group: 's3', example: undefined },
       { path: 'steps.s3.number', group: 's3', example: undefined },
+    ]);
+  });
+
+  it('what a step leaves inside an object, by its path, each right after its object (FLOW-F11, hub#963)', () => {
+    // The catalog answers the paths the engine resolves (`step_data`), a list's insides never among them.
+    const add = { name: 'cart_checkout.item.add', kind: 'command', app: 'cart_checkout', app_name: 'Cart', description: '', fields: [], outputs: ['item', 'item.unit_price', 'item.line_total', 'removed', 'cart', 'cart.total_amount'] };
+    const steps: Step[] = [{ id: 's1', kind: 'command', operation: 'cart_checkout.item.add', params: {} }];
+    expect(dataChoices(steps, 1, null, { off_apps: [], events: [], actions: [add] } as CatalogOut)).toEqual([
+      { path: 'steps.s1.item', group: 's1', example: undefined },
+      { path: 'steps.s1.item.unit_price', group: 's1', example: undefined },
+      { path: 'steps.s1.item.line_total', group: 's1', example: undefined },
+      { path: 'steps.s1.removed', group: 's1', example: undefined },
+      { path: 'steps.s1.cart', group: 's1', example: undefined },
+      { path: 'steps.s1.cart.total_amount', group: 's1', example: undefined },
     ]);
   });
 

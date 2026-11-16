@@ -43,6 +43,7 @@ describe('CategoryStrip', () => {
 
   it('asks for more categories when the server has more than the strip holds', async () => {
     const m = await setup({ hasMore: true });
+    expect(m.find('pos-category-more').element.tagName.toLowerCase()).toBe('ion-button');
     await click(m.find('pos-category-more').element);
     expect(m.wrapper.emitted('loadMore')).toHaveLength(1);
     const none = await setup();

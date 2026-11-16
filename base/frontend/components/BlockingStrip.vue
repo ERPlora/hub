@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// The blocking strip over every screen (hub#374; BASE-G22): while a ⛔ step is pending (`blocking_pending` of
-// `base.setup.status`, live) the invoice is refused, so it says the CONSEQUENCE — never «error»: nothing is
-// broken, something is missing — and names each missing step with its way in. On the Home's «Summary» it stands
-// down: the checklist there says strictly more, a screenful below; on «Activity» (`/#actividad`) it is back.
+// While a step that blocks invoicing is pending (`blocking_pending` of `base.setup.status`), every screen says the
+// consequence — never «error»: nothing is broken, something is missing — and names each missing step with its way in.
+// The Home's «Summary» hides it because its own checklist says more just below. On a screen 500 px high or less (a
+// phone on its side) it shrinks to one line with a single «Set up», so the top bar and the tab bar stay on screen.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import type { SetupItem } from '../operations';
 import { blockingItems } from '../lib/home';
+import { useLowHeight } from '../lib/phone';
 
 /** The hash of the Home's «Activity» tab. */
 const ACTIVITY_HASH = '#actividad';
@@ -27,12 +28,17 @@ const reachable = (path: string) => path !== '' && router.resolve(path).name !==
 // On the very screen that sets the step up, «Set up» would lead nowhere: the step is only named.
 const here = (path: string) => router.resolve(path).path === route.path;
 const canConfigure = (item: SetupItem) => item.actionable && reachable(item.route) && !here(item.route);
+
+const low = useLowHeight();
+/** On a low screen, the one step «Set up» leads to. */
+const firstToConfigure = computed(() => items.value.find(canConfigure));
 </script>
 
 <template>
   <div
     v-if="shown"
     class="blocking-strip"
+    :class="{ 'blocking-strip--low': low }"
     role="alert"
     data-testid="blocking-strip"
   >
@@ -44,34 +50,46 @@ const canConfigure = (item: SetupItem) => item.actionable && reachable(item.rout
       <p class="blocking-strip-title">
         {{ $t('base.blocking.title') }}
       </p>
-      <p class="blocking-strip-text">
-        {{ $t('base.blocking.body') }}
-      </p>
-      <ul class="blocking-strip-items">
-        <li
-          v-for="item in items"
-          :key="item.key"
-          class="blocking-strip-item"
-          data-testid="blocking-item"
-        >
-          <HubIcon :name="item.icon" />
-          <strong>{{ item.title }}</strong>
-          <ion-button
-            v-if="canConfigure(item)"
-            size="small"
-            fill="outline"
-            color="danger"
-            :data-testid="`blocking-configure-${item.key}`"
-            @click="router.push(item.route)"
+      <ion-button
+        v-if="low && firstToConfigure"
+        size="small"
+        fill="outline"
+        color="danger"
+        :data-testid="`blocking-configure-${firstToConfigure.key}`"
+        @click="router.push(firstToConfigure.route)"
+      >
+        {{ $t('base.blocking.configure') }}
+      </ion-button>
+      <template v-if="!low">
+        <p class="blocking-strip-text">
+          {{ $t('base.blocking.body') }}
+        </p>
+        <ul class="blocking-strip-items">
+          <li
+            v-for="item in items"
+            :key="item.key"
+            class="blocking-strip-item"
+            data-testid="blocking-item"
           >
-            {{ $t('base.blocking.configure') }}
-          </ion-button>
-          <em
-            v-else-if="!item.actionable"
-            class="blocking-strip-note"
-          >{{ $t('base.setup.delegatedHint') }}</em>
-        </li>
-      </ul>
+            <HubIcon :name="item.icon" />
+            <strong>{{ item.title }}</strong>
+            <ion-button
+              v-if="canConfigure(item)"
+              size="small"
+              fill="outline"
+              color="danger"
+              :data-testid="`blocking-configure-${item.key}`"
+              @click="router.push(item.route)"
+            >
+              {{ $t('base.blocking.configure') }}
+            </ion-button>
+            <em
+              v-else-if="!item.actionable"
+              class="blocking-strip-note"
+            >{{ $t('base.setup.delegatedHint') }}</em>
+          </li>
+        </ul>
+      </template>
     </div>
   </div>
 </template>
@@ -130,5 +148,30 @@ const canConfigure = (item: SetupItem) => item.actionable && reachable(item.rout
 
 .blocking-strip-note {
   color: var(--ion-color-medium-shade, #555);
+}
+
+/* As low as a phone on its side: one line of 48 px at most, «Set up» and 4 above and under it. It may wrap on
+   a window too narrow for both, never cut. By touch «Set up» is a 44 px target and the line is just
+   that: at 568x320 the till keeps 150 px, room for a tile with a name in two lines (147 px). */
+.blocking-strip--low {
+  align-items: center;
+  padding-block: 4px;
+}
+
+@media (pointer: coarse) {
+  .blocking-strip--low {
+    padding-block: 0;
+  }
+}
+
+.blocking-strip--low .blocking-strip-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.blocking-strip--low ion-button {
+  margin: 0;
 }
 </style>

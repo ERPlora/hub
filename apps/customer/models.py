@@ -1,9 +1,4 @@
-"""Models of the customer app: the cards, their segmentation, their timeline, purchases and consent.
-
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
-are per scope. Phase 2 moves them to each hub's database. Money is in cents.
-
-A card is live while ``deleted_at`` is empty; deleted (CUSTOMER-F07), merged into another
+"""Money is in cents. A card is live while ``deleted_at`` is empty; deleted (CUSTOMER-F07), merged into another
 (``merged_into``, F13) or erased (``erased_at``, F16) it is no longer read by anyone.
 """
 
@@ -35,7 +30,7 @@ class CustomerGroup(UUIDModel):
         verbose_name_plural = _("groups")
         ordering = ["name", "id"]
         constraints = [
-            # One active group per name, whatever its case (customers#94): an inactive one frees it.
+            # One active group per name, whatever its case: an inactive one frees it.
             models.UniqueConstraint(
                 Lower("name"),
                 condition=Q(is_active=True),

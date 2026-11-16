@@ -1,7 +1,6 @@
 """Django admin of the schedule app: full CRUD on every model, the intervals as lines of their day.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables; ids and audit dates are read only.
+The Hub admin has full CRUD over all of a hub's tables; ids and audit dates are read only.
 """
 
 import pytest
@@ -20,7 +19,7 @@ from apps.schedule.admin import (
 )
 from apps.schedule.models import Override, ScheduleSettings, SpecialDay, WeekDay
 
-from .conftest import make_override, make_special_day
+from .conftest import HUB_DB, make_override, make_special_day
 
 MODELS = {
     WeekDay: (WeekDayAdmin, WeekDayIntervalInline),
@@ -49,6 +48,7 @@ def test_every_model_is_registered_with_its_intervals_inline():
         assert list(model_admin.inlines) == ([inline] if inline else []), model
 
 
+@HUB_DB
 def test_full_crud_for_the_platform_staff(superuser):
     request = request_by(superuser)
     for model, (_model_admin, inline) in MODELS.items():
@@ -72,10 +72,9 @@ def test_ids_and_audit_dates_are_read_only():
     assert set(ScheduleSettingsAdmin.readonly_fields) == {"id", "updated_at"}
 
 
-@pytest.mark.django_db
-def test_a_special_day_is_added_from_the_admin(client, superuser):
-    client.force_login(superuser)
-    added = client.post(
+@HUB_DB
+def test_a_special_day_is_added_from_the_admin(hub_staff):
+    added = hub_staff.post(
         "/admin/schedule/specialday/add/",
         {
             "date": "2026-12-25",
@@ -93,15 +92,14 @@ def test_a_special_day_is_added_from_the_admin(client, superuser):
     assert SpecialDay.objects.get().name == "Christmas"
 
 
-@pytest.mark.django_db
-def test_the_pages_render_on_the_platform_host(client, superuser):
+@HUB_DB
+def test_the_pages_render_on_the_platform_host(hub_staff):
     eve = make_special_day("2026-12-24", "Christmas Eve", ("10:00", "13:00"))
     summer = make_override(
         "2026-08-01", "2026-08-31", "Summer hours", ("10:00", "14:00")
     )
     monday = WeekDay.objects.get(weekday=0)
     ScheduleSettings.objects.create()
-    client.force_login(superuser)
     for url, text in (
         ("/admin/schedule/weekday/", b"Monday"),
         (f"/admin/schedule/weekday/{monday.pk}/change/", b"09:00"),
@@ -112,6 +110,6 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         ("/admin/schedule/schedulesettings/", b"schedule settings"),
         ("/admin/schedule/specialday/add/", b"recurring_yearly"),
     ):
-        response = client.get(url, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url

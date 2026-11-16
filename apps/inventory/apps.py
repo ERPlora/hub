@@ -16,7 +16,7 @@ class InventoryConfig(LiveAppConfig):
     icon = "ion:cube-outline"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your catalog with its stock: products, categories, goods received, counts and low-stock alerts."
     )
@@ -32,9 +32,19 @@ class InventoryConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # Each product and category points at a tax category (tax.TaxCategory).
     requires = ["tax"]
-    # The products' own photos (round 2026-10-30, base.images): served by /p/media/ to the hub's sessions only.
+    # The products' own photos (base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["inventory/products/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «unidades» are the units of measure
+    # (inventory.unit), and a «albarán», the «mercancía» or what «entran» (never «entrada»: its stem is that of «entre»)
+    # is the goods inventory.stock.receive records.
+    assistant_synonyms = (
+        ("unidad", "unidades", "unit", "units"),
+        (
+            "albaran", "mercancia", "entran", "recibir", "recibe", "recibido", "receive", "received", "goods",
+            "delivery note",
+        ),
+    )
     permissions = [
         "inventory.view_product",
         "inventory.view_category",
@@ -70,8 +80,8 @@ class InventoryConfig(LiveAppConfig):
             path="/inventory",
         )
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's `setup` and `widgets` (it had no `bell`), on the
-    # Panel's own queries. Registered icons only: the old `trending-down-outline` waits in UI-REQUESTS.md.
+    # The Home's hooks, on the Panel's own queries. Registered icons only: `trending-down-outline` waits in
+    # UI-REQUESTS.md.
     setup = [
         SetupStep(
             key="catalog",
@@ -88,7 +98,7 @@ class InventoryConfig(LiveAppConfig):
         )
     ]
     widgets = [
-        # A KPI says its name once, in its title (gh:hub#1105); the money one in the hub's currency (gh:inventory#123).
+        # A KPI says its name once, in its title; the money one is in the hub's currency.
         Widget(
             key="low_stock_count",
             title=_("Low-stock products"),
@@ -143,3 +153,40 @@ class InventoryConfig(LiveAppConfig):
             options={"valueFormat": "number"},
         ),
     ]
+
+    def recoverable_from_copy(self) -> list:
+        """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114), in this
+        order: first each category the business lacks, by ``inventory.category.recover``, with the deleted products it
+        had back in it; then each product it still holds deleted, the same, by ``inventory.product.restore``
+        (INVENTORY-F34), and each it no longer holds, by ``inventory.product.recover`` (the screen's create and its
+        image of the library), in its categories here; last, each product the business kept live goes back into the
+        category brought back, by the screen's ``inventory.product_category.add``, counted apart because it touches
+        what the business has."""
+        from apps.inventory import queries  # the models are not loaded yet when this module is
+        from base.recovery import Recoverable
+
+        return [
+            Recoverable(
+                label=_("Product categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.categories_not_in_business,
+                create="inventory.category.recover",
+            ),
+            Recoverable(
+                label=_("Products"),
+                reads_since="0005_product_image",
+                read=queries.products_in_copy,
+                missing=queries.products_not_in_business,
+                create="inventory.product.recover",
+                deleted=queries.products_deleted_in_business,
+                restore="inventory.product.restore",
+            ),
+            Recoverable(
+                label=_("Product links to categories"),
+                reads_since="0001_initial",
+                read=queries.product_links_in_copy,
+                missing=queries.product_links_not_in_business,
+                create="inventory.product_category.add",
+            ),
+        ]

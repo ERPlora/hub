@@ -11,7 +11,7 @@
 // F02: erplora.com's own test seed gives `a` its number there (whatsapp-helpers.ts, `seedErplora`); disconnecting it from
 // Settings, asked first, has erplora.com (door 12) disconnect it, and «Your number» says «Not connected» at once,
 // without reloading.
-// Each in three sizes (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12[-F02]-390|834|1440). What it creates is deleted.
+// Each in three sizes. What it creates is deleted.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';

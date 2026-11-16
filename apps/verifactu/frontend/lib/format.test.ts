@@ -1,10 +1,9 @@
 // How the VeriFactu screens paint numbers and days (WORKBOOK «Para quien lo mantiene»: money travels in
 // signed cents, quantities and rates as decimal strings, days as `YYYY-MM-DD`). One place turns them into
-// text in the page's language with `Intl`, and the euros a person types into cents: no page formats by
-// hand.
+// text in the page's language with `Intl`: no page formats by hand.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromEuros, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, plain } from './format';
+import { formatDate, formatMoney, formatPercent, formatUnitPrice, plain } from './format';
 
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
@@ -18,7 +17,7 @@ describe('formatUnitPrice', () => {
     expect(formatUnitPrice(null, 'en')).toBe('—');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     expect(plain(formatUnitPrice('123456.00', 'es'))).toBe('1.234,56 €');
     expect(plain(formatUnitPrice('123456.78', 'es'))).toBe('1.234,5678 €');
     expect(plain(formatUnitPrice('1234567.00', 'es'))).toBe('12.345,67 €');
@@ -34,7 +33,7 @@ describe('formatMoney', () => {
     expect(spaced(formatMoney(-1210, 'es'))).toBe('-12,10 €');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
     // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
     expect(spaced(formatMoney(123456, 'es'))).toBe('1.234,56 €');
@@ -58,14 +57,6 @@ describe('formatPercent', () => {
   });
 });
 
-describe('formatQuantity', () => {
-  it('paints a quantity with only the decimals it has, and its sign', () => {
-    expect(formatQuantity('2.000', 'en')).toBe('2');
-    expect(formatQuantity('0.532', 'es')).toBe('0,532');
-    expect(formatQuantity('-1.000', 'en')).toBe('-1');
-  });
-});
-
 describe('formatDate', () => {
   it('paints a calendar day in the page language without moving it to the day before', () => {
     expect(formatDate('2026-09-29', 'es')).toBe('29/9/2026');
@@ -77,22 +68,5 @@ describe('formatDate', () => {
     expect(formatDate('', 'es')).toBe('—');
     expect(formatDate(null, 'es')).toBe('—');
     expect(formatDate('yesterday', 'es')).toBe('yesterday');
-  });
-});
-
-describe('centsFromEuros', () => {
-  it('reads what a person types, with a comma or a dot, into whole cents', () => {
-    expect(centsFromEuros('12,5')).toBe(1250);
-    expect(centsFromEuros(' 12.50 ')).toBe(1250);
-    expect(centsFromEuros('0,01')).toBe(1);
-    expect(centsFromEuros(7)).toBe(700);
-  });
-
-  it('empty, negative or not an amount is nothing', () => {
-    expect(centsFromEuros('')).toBeUndefined();
-    expect(centsFromEuros(null)).toBeUndefined();
-    expect(centsFromEuros('12,345')).toBeUndefined();
-    expect(centsFromEuros('-3')).toBeUndefined();
-    expect(centsFromEuros('abc')).toBeUndefined();
   });
 });

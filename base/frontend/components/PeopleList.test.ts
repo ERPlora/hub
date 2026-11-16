@@ -1,10 +1,20 @@
-// Employees › Personal (BASE-G11, G138, G142; the old hub's EmployeesPage): the people of the business, live, with
-// how each one gets in, their role and whether they entered yet; the plan's places and, when every one is taken, why;
-// inviting and changing roles on erplora.com («Members» of the business). A list that cannot be read says so.
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
+import {
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  followPass,
+  installedApp,
+  leaveInstalledApp,
+  mountBase,
+  passRefused,
+  placedUpgrade,
+  SIGNED,
+  subId,
+  tap,
+} from '../__tests__/mount-base';
 import type { Person, Seats } from '../operations';
 import PeopleList from './PeopleList.vue';
 
@@ -100,7 +110,7 @@ describe('PeopleList', () => {
     expect(en.wrapper.find('[data-testid="people-seats"]').text()).toBe('1 person');
   });
 
-  it('every place taken (BASE-G138): why, and «Upgrade plan» on the web', async () => {
+  it('every place taken: why, and «Upgrade plan» on the web', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     const m = await open({ locale: 'es' });
     await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
@@ -112,18 +122,31 @@ describe('PeopleList', () => {
 
   it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
-    const tab = { opener: {}, location: { href: 'about:blank' } };
-    const open_ = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-    const url = 'http://localhost:8001/hub-pass/?pass=abc';
-    const m = await open({ onApi: () => Response.json({ url }) });
+    const m = await open({ onApi: () => Response.json({ url: SIGNED }) });
     await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
 
-    tap(m.wrapper.get('a[data-testid="people-upgrade"]').element);
-    await flush();
+    expect(await followPass(m, m.wrapper.get('a[data-testid="people-upgrade"]').element)).toEqual({ next: 'plan', to: SIGNED });
+  });
 
-    expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
-    expect(tab.location.href).toBe(url);
-    open_.mockRestore();
+  it('its «Upgrade plan» is the platform’s PlanUpgradeLink to this business’s plan page, not a copy of its own', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const m = await open({ locale: 'es' });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+    expect(placedUpgrade(m.wrapper.get('[data-testid="people-full"]'))).toEqual({
+      url: PLAN_URL,
+      testid: 'people-upgrade',
+      says: 'Mejorar plan',
+    });
+  });
+
+  it('when the pass cannot be signed, its «Upgrade plan» opens the plan page as usual', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = await open({ onApi: passRefused });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+
+    expect(await followPass(m, m.wrapper.get('a[data-testid="people-upgrade"]').element)).toEqual({ next: 'plan', to: PLAN_URL });
+    error.mockRestore();
   });
 
   it('«Upgrade plan» sells: never on the app surfaces', async () => {
@@ -145,7 +168,7 @@ describe('PeopleList', () => {
     expect(m.wrapper.text()).toContain('Las personas se invitan, se les cambia el rol y se quitan en erplora.com');
   });
 
-  // gh:hub#439: on the tablet's app «Invite on erplora.com» did nothing (its webview opens no `_blank`).
+  // The installed app's webview opens nothing on a `_blank` link.
   it('in the installed app, inviting opens «Members» in the system browser, and in a browser the link opens its tab', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     const browser = await open();
@@ -163,7 +186,7 @@ describe('PeopleList', () => {
     expect(invoke).toHaveBeenCalledWith('open_external_url', { url: MEMBERS_URL });
   });
 
-  it('the Google Play copy has no way to erplora.com’s panel (gh:hub#1897): only where it is done', async () => {
+  it('the Google Play copy has no way to erplora.com’s panel: only where it is done', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     installedApp('play');
     const m = await open();

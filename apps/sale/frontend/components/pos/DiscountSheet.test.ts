@@ -3,10 +3,11 @@
 // and «Remove». It hands the discount up; the page picks the door (the manager's above the cap) and a
 // refusal is read in the sheet.
 import { describe, expect, it, vi } from 'vitest';
-import { h, ref } from 'vue';
 
-import { click, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, errorFrame, expectWaitsForTheYen, settle } from '../../__tests__/mount-sale';
+import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../../lib/format';
+import { mountDiscountSheet } from './__tests__/discount-sheet';
 import DiscountSheet from './DiscountSheet.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -14,23 +15,11 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const open = ref(true);
-  const m = await mountSale(
-    {
-      setup: () => () =>
-        h(DiscountSheet, {
-          open: open.value,
-          'onUpdate:open': (v: boolean) => (open.value = v),
-          name: null,
-          amount: 0,
-          pending: false,
-          error: null,
-          ...props,
-        }),
-    },
-    { locale },
-  );
+/** How the sheet is mounted: `business: null`, `base.business.get` never answers (its money unknown, hub#921). */
+type Options = { business?: null };
+
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', options: Options = {}) {
+  const m = await mountDiscountSheet(props, { locale, ...options });
   await m.live();
   await settle();
   const press = async (...keys: string[]) => {
@@ -41,13 +30,13 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     m.find('pos-discount-mode').element.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
     await settle();
   };
-  return { ...m, open, press, sheet, mode };
+  return { ...m, press, sheet, mode };
 }
 
 describe('DiscountSheet: the ticket', () => {
   it('is «Ticket discount», in percent, with «%» and the currency to choose', async () => {
     const m = await setup({}, 'es');
-    expect(m.find('pos-discount-title').text()).toBe('Descuento del ticket');
+    expect(m.find('pos-discount-title').text()).toBe('Descuento del tique');
     const options = m.find('pos-discount-mode').findAll('ion-segment-button').map((b) => (b.element as HTMLElement & { value?: string }).value);
     expect(options).toEqual(['percent', 'amount']);
     expect(m.find('pos-discount-mode').findAll('ion-label').map((l) => l.element.innerHTML.trim())).toEqual(['%', '€']);
@@ -106,5 +95,41 @@ describe('DiscountSheet: a line', () => {
   it('a refusal is read in the sheet', async () => {
     const m = await setup({ name: 'Steak', error: 'That discount is over what this business allows without the manager.' });
     expect(m.find('pos-discount-error').text()).toBe('That discount is over what this business allows without the manager.');
+  });
+});
+
+describe('DiscountSheet: before the business answers its money (hub#921)', () => {
+  it('a fixed amount waits in grey and hands up nothing; once the yen arrives «1500» is 1500', async () => {
+    const m = await setup({ amount: 500 }, 'en', { business: null });
+    await m.press('1', '5', '0', '0');
+    await expectWaitsForTheYen(m, 'pos-discount-apply', () => m.sheet().emitted('apply') ?? []);
+    expect(plain(m.find('pos-discount-value').text())).toBe('¥1,500');
+    await click(m.find('pos-discount-apply').element);
+    expect(m.sheet().emitted('apply')).toEqual([[{ percent: '0', amount: 1500 }]]);
+  });
+
+  it('a percentage reads no money: it does not wait for the business', async () => {
+    const m = await setup({}, 'en', { business: null });
+    await m.press('1', '0');
+    await click(m.find('pos-discount-apply').element);
+    expect(m.sheet().emitted('apply')).toEqual([[{ percent: '10', amount: 0 }]]);
+  });
+});
+
+describe('DiscountSheet: a business whose money cannot be read (hub#938)', () => {
+  it('a fixed amount says so with «Retry» instead of waiting in grey without a word; once the yen arrives it lights up', async () => {
+    const m = await setup({ amount: 500 }, 'en', { business: null });
+    await m.press('1', '5', '0', '0');
+    await expectWindowSaysMoneyUnreadable(m, 'pos-discount-apply', () => m.sheet().emitted('apply') ?? []);
+  });
+
+  it('a percentage reads no money: the failure says nothing there and it still applies', async () => {
+    const m = await setup({}, 'en', { business: null });
+    m.net.lastStream().push(errorFrame(m.subId('base.business.get'), 'base.hub_busy'));
+    await settle();
+    await m.press('1', '0');
+    expect(m.inDoc('base-money-error')).toBeNull();
+    await click(m.find('pos-discount-apply').element);
+    expect(m.sheet().emitted('apply')).toEqual([[{ percent: '10', amount: 0 }]]);
   });
 });

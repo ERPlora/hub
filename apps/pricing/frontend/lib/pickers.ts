@@ -1,7 +1,7 @@
 // The searches behind the pricing forms' pickers (`Combo` of @erplora/ui): each asks the server for what
 // the person types, 20 at a time, and turns every row into an option. Products and categories are
 // Inventory's, services Services', customer groups Customers' (the active ones): read through their own
-// operations, never their models. A catalog price is in the business's `money` (a bare figure until it answers).
+// operations, never their models. A catalog price is in the business's `money` (a dash until it answers).
 import type { ComboOption, ComboSearch } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 

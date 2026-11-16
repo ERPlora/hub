@@ -1,4 +1,4 @@
-"""The shared image library (round 2026-10-30, «blueprints con imágenes»): one copy of ERPlora/blueprints' ``img/`` for
+"""The shared image library: one copy of ERPlora/blueprints' ``img/`` for
 every hub, which a product, a service or a set menu points at with ``catalog:<folder>/<name>``, never with a URL (a
 ``.blueprint.zip`` never changes, and a URL baked into it rots when a domain, a bucket or a CDN does).
 

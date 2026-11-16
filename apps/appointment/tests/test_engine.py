@@ -2,7 +2,7 @@
 times of a day, the business's clock, and the dates a series repeats on.
 
 Cases from the current product's tests (`availability*.test.py`, `create_overlap`, `busy_agenda_booking`,
-`recurring_*`, `series_*`) and from its WORKFLOW (APPOINTMENTS-F02, F13, F14), on our own data.
+`recurring_*`, `series_*`) and from its WORKFLOW (APPOINTMENT-F02, F13, F14), on our own data.
 """
 
 import datetime as dt

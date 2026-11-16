@@ -14,9 +14,10 @@ from django.db.models.functions import Coalesce, Lower, NullIf
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
-from apps.customer.phones import DEFAULT_COUNTRY, InvalidPhone, candidates, to_e164
+from apps.customer.phones import InvalidPhone, candidates, to_e164
+from apps.customer.queries import business_country
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock, gateway, samples
 from apps.whatsapp_inbox.models import (
@@ -48,14 +49,18 @@ from apps.whatsapp_inbox.schemas import (
     MessagePage,
     MessageRefIn,
     NoteListIn,
+    NoteOut,
     NotePage,
+    NoteRefIn,
     NoticesIn,
     NoticesOut,
     PageIn,
     SummaryIn,
     SummaryOut,
     TemplateListIn,
+    TemplateNamedOut,
     TemplatePage,
+    TemplateRefIn,
     TemplateSampleOut,
     TemplateSampleRefIn,
 )
@@ -132,19 +137,14 @@ _TEMPLATE_REASONS = {
 
 #: What a phone typed in the search box may hold besides digits.
 _PHONE_TEXT = re.compile(r"^[\d\s+().\-/]+$")
-#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (ADR-0474: no packs).
+#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (no packs).
 PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
 
 
-def business_country(ctx: OperationContext | None = None) -> str:
-    """The country a number without prefix belongs to. Phase 1 has no settings per business: Spain."""
-    return DEFAULT_COUNTRY
-
-
-def e164(raw: str, ctx: OperationContext | None = None, *, from_whatsapp: bool = False) -> str:
+def e164(raw: str, ctx: OperationContext, *, from_whatsapp: bool = False) -> str:
     """``raw`` as the conversation's key (E.164). WhatsApp's bare digits are international; a number a
-    person typed is national unless it says its country (gh:whatsapp_inbox#279: ``600222333`` is Spain's,
-    never +60's).
+    person typed is one of the business's country unless it says its own, as Customers reads a card's phone
+    (in a Spanish business ``600222333`` is Spain's, never +60's; hub#527).
 
     Raises ``InvalidPhone`` when it is no number.
     """
@@ -194,16 +194,18 @@ AWAITING_REPLY = Q(status=Conversation.Status.OPEN) & (
     Q(last_message_direction=Message.Direction.INBOUND) | Q(needs_attention=True)
 )
 MESSAGE_NOT_FOUND = _("That message no longer exists.")
+NOTE_NOT_FOUND = _("That note no longer exists.")
+TEMPLATE_GONE = _("That template no longer exists.")
 
 
-def _matching_ids(reference: str) -> list[UUID]:
+def _matching_ids(ctx: OperationContext, reference: str) -> list[UUID]:
     """The live conversations ``reference`` names (at most two: one is enough to answer).
 
     A number (any format) is compared as a number. A name is compared as people say it (``name_key``:
     no case, accents, emoji or extra spaces), to the WhatsApp name and to the live card's name.
     """
     text = reference.strip()
-    numbers = candidates(text, business_country()) if _PHONE_TEXT.match(text) else set()
+    numbers = candidates(text, business_country(ctx)) if _PHONE_TEXT.match(text) else set()
     rows = live_conversations()
     if numbers:
         return list(rows.filter(phone__in=numbers).values_list("id", flat=True)[:2])
@@ -226,6 +228,7 @@ def _matching_ids(reference: str) -> list[UUID]:
 
 
 def find_conversation(
+    ctx: OperationContext,
     conversation_id: UUID | None,
     reference: str | None = None,
     *,
@@ -236,7 +239,7 @@ def find_conversation(
     names. ``lock`` locks its row until the end of the command; ``live=False`` also finds an erased one,
     by its id only. ``NotFound`` when there is none, ``Conflict`` when the reference fits several."""
     if conversation_id is None:
-        ids = _matching_ids(reference or "")
+        ids = _matching_ids(ctx, reference or "")
         if not ids:
             raise NotFound(
                 NO_CONVERSATION_MATCHES % {"reference": reference},
@@ -262,8 +265,8 @@ def find_conversation(
 
 
 def channel(scope: Scope) -> Channel | None:
-    """The number of the business of ``scope`` (phase 1: its host), or ``None`` before erplora.com spoke of it."""
-    return Channel.objects.filter(host=scope.key).first()
+    """The number of the business of ``scope``, or ``None`` before erplora.com spoke of it."""
+    return Channel.objects.first()
 
 
 def send_blocked(row: Channel | None) -> str | None:
@@ -418,6 +421,18 @@ _SORTS = {
     output=ConversationPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me all the WhatsApp conversations",
+                "which chats assigned to me are unread?",
+                "list the closed conversations of the inbox",
+            ),
+            "es": (
+                "muéstrame todas las conversaciones de la bandeja",
+                "¿qué chats tengo asignados sin leer?",
+                "enséñame las conversaciones cerradas de WhatsApp",
+            ),
+        },
         "description": "Lists the business's WhatsApp conversations, latest activity first: search by the "
         "customer's or profile's name or by the number written any way; filter by status (open, pending, "
         "closed), assignment (me, none, a person) or unread."
@@ -473,13 +488,25 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
     output=ConversationDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "open Nuria's WhatsApp conversation",
+                "who has Jorge's chat and what status is it in?",
+                "can I still write freely to Elena or only with a template?",
+            ),
+            "es": (
+                "abre el chat de WhatsApp de Nuria",
+                "¿quién lleva la conversación de Jorge y en qué estado está?",
+                "¿a Elena todavía le puedo escribir sin plantilla?",
+            ),
+        },
         "description": "One WhatsApp conversation, named by its id, its number or the customer's name: its "
         "customer card, who has it, its status, and whether a free text can be sent now (within 24 hours of "
         "the customer's last message) or only an approved template."
     },
 )
 def conversation_get(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    return conversation_detail(ctx, find_conversation(data.id, data.conversation))
+    return conversation_detail(ctx, find_conversation(ctx, data.id, data.conversation))
 
 
 @operation(
@@ -490,6 +517,18 @@ def conversation_get(ctx: OperationContext, data: ConversationRefIn) -> dict:
     output=ByPhoneOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is there a WhatsApp chat with +34 600 123 456?",
+                "find the live conversation of +44 7700 900123",
+                "has +34 622 000 111 written to us on WhatsApp?",
+            ),
+            "es": (
+                "¿tenemos un chat abierto con el +34 600 123 456?",
+                "busca la conversación del +34 622 000 111",
+                "¿nos ha escrito por WhatsApp el +34 699 555 444?",
+            ),
+        },
         "description": "The live conversation of an exact international number (+34600111222), or none. A "
         "number not in international format matches nobody: used to tell a customer something by WhatsApp."
     },
@@ -516,6 +555,18 @@ def conversation_by_phone(ctx: OperationContext, data: ByPhoneIn) -> dict:
     output=SummaryOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how is the WhatsApp inbox doing?",
+                "give me a summary of the inbox",
+                "give me the inbox figures: open, unread and waiting chats",
+            ),
+            "es": (
+                "¿cómo va la bandeja de WhatsApp?",
+                "dame un resumen de la bandeja de entrada",
+                "¿cuántos chats hay abiertos, sin leer o esperándonos?",
+            ),
+        },
         "description": "How the WhatsApp inbox stands: open conversations, those with unread messages, those "
         "waiting for an answer from the business, and whether this month's messages of the plan are spent."
     },
@@ -541,6 +592,18 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
     output=AwaitingCountOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many WhatsApp conversations are awaiting a reply?",
+                "how many chats still need our reply?",
+                "count the conversations waiting for an answer",
+            ),
+            "es": (
+                "¿cuántos chats de WhatsApp esperan que les respondamos?",
+                "¿a cuánta gente le debemos una respuesta por WhatsApp?",
+                "¿cuántas conversaciones siguen sin respuesta?",
+            ),
+        },
         "description": "How many WhatsApp customers are waiting for an answer from the business: open "
         "conversations whose last message is the customer's."
     },
@@ -561,6 +624,18 @@ NOTICES_WINDOW = dt.timedelta(hours=24)
     output=NoticesOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who has written to us on WhatsApp lately?",
+                "any WhatsApp notices from customers waiting?",
+                "what did the last people who wrote on WhatsApp say?",
+            ),
+            "es": (
+                "¿quién nos ha escrito últimamente por WhatsApp?",
+                "¿hay avisos de WhatsApp de gente esperando?",
+                "¿qué dijeron los últimos que escribieron por WhatsApp?",
+            ),
+        },
         "description": "The WhatsApp customers left waiting for an answer lately, the newest first: who, what she "
         "wrote last and when (each new message of hers is news again)."
     },
@@ -599,12 +674,24 @@ def notices(ctx: OperationContext, data: NoticesIn) -> dict:
     output=MessagePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the messages of Nuria's chat",
+                "read me the WhatsApp thread with Jorge",
+                "were our last messages to Elena delivered and read?",
+            ),
+            "es": (
+                "enséñame los mensajes del chat de Nuria",
+                "léeme el hilo de WhatsApp con Jorge",
+                "¿le han llegado a Elena nuestros mensajes y los ha leído?",
+            ),
+        },
         "description": "The messages of a WhatsApp conversation (named by its id, number or customer's name), "
         "newest first: who said what and when, attachments, and whether each one sent was delivered and read."
     },
 )
 def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
-    conversation = find_conversation(params.id, params.conversation)
+    conversation = find_conversation(ctx, params.id, params.conversation)
     rows = (
         Message.objects.filter(conversation=conversation)
         .select_related("sent_by")
@@ -621,6 +708,18 @@ def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
     output=MessageGetOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "open the message Nuria just sent",
+                "what did that WhatsApp message say and when did it arrive?",
+                "which options did we give her in the message she is answering?",
+            ),
+            "es": (
+                "abre el mensaje que acaba de mandar Nuria",
+                "¿qué decía ese mensaje de WhatsApp y cuándo llegó?",
+                "¿qué opciones le dimos en el mensaje al que responde?",
+            ),
+        },
         "description": "One WhatsApp message by its id (the one an automation started on): what it says, who said it "
         "and when, its conversation's exact international number, what to call the customer, whether anything "
         "can be sent now and the options the business last offered her, which she may be answering."
@@ -677,28 +776,50 @@ def last_offered(message: Message) -> str:
     output=NotePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what notes does Nuria's conversation have?",
+                "show me the internal notes on Jorge's chat",
+                "did anyone leave a note on this WhatsApp?",
+            ),
+            "es": (
+                "¿qué notas tiene la conversación de Nuria?",
+                "enséñame las notas internas del chat de Jorge",
+                "¿alguien dejó una nota en este WhatsApp?",
+            ),
+        },
         "description": "The internal notes of a WhatsApp conversation, newest first: what the team wrote about it."
     },
 )
 def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
-    conversation = find_conversation(params.id, params.conversation)
+    conversation = find_conversation(ctx, params.id, params.conversation)
     rows = Note.objects.filter(conversation=conversation).order_by("-created_at", "-id")
     me = actor_id(ctx)
     return page(rows, params, lambda note: note_out(ctx, note, me))
+
+
+# Not an assistant tool: what names a note on the card of ``whatsapp_inbox.note.delete`` (``schemas.A_NOTE``), by its
+# text; the model finds the notes of a conversation in their list.
+@operation(
+    "whatsapp_inbox.note.get",
+    kind="query",
+    permission="whatsapp_inbox.view",
+    input=NoteRefIn,
+    output=NoteOut,
+    ai=INTERNAL,
+)
+def get_note(ctx: OperationContext, data: NoteRefIn) -> dict:
+    note = Note.objects.filter(pk=data.id, conversation__erased_at__isnull=True).first()
+    if note is None:
+        raise NotFound(str(NOTE_NOT_FOUND), code="whatsapp_inbox.note_not_found")
+    return note_out(ctx, note, actor_id(ctx))
 
 
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────
 
 
 def templates_of(scope: Scope) -> QuerySet:
-    """The templates of the business of ``scope`` (phase 1: its host), and only those."""
-    return Template.objects.filter(host=scope.key)
-
-
-def templates_of_every_business() -> QuerySet:
-    """Every business's templates, only for the worker's ``delivery.resume``: phase 1 runs it on one fixed scope
-    (``WORKER_SCOPE_SLUG``) over the shared table, and it hands each template over as its own business (``host``);
-    phase 2 runs it in each hub's database, which holds that hub's alone."""
+    """The templates of the business of ``scope``."""
     return Template.objects.all()
 
 
@@ -730,7 +851,7 @@ def template_fillable(row: Template) -> bool:
 
 
 def template_sendable(row: Template) -> bool:
-    """Whether it goes as it is, with nothing to choose: a file header only with its own file (an automation's)."""
+    """Whether it goes as it is, with nothing to choose: a file header only with its own file."""
     return template_fillable(row) and (row.header_format not in FILE_HEADERS or row.header_sample_id is not None)
 
 
@@ -783,9 +904,8 @@ def sample_out(sample: TemplateSample | None) -> dict | None:
 
 
 def _its_own(row: Template) -> TemplateSample | None:
-    """The template's header file, only if it is its business's (phase 1 shares the tables)."""
-    sample = row.header_sample
-    return sample if sample is not None and sample.host == row.host else None
+    """The template's header file."""
+    return row.header_sample
 
 
 def _draft_out(row: Template) -> dict | None:
@@ -793,7 +913,7 @@ def _draft_out(row: Template) -> dict | None:
     if not draft:
         return None
     sample = draft.get("header_sample")
-    kept = TemplateSample.objects.filter(pk=sample, host=row.host).first() if sample else None
+    kept = TemplateSample.objects.filter(pk=sample).first() if sample else None
     return {
         **draft,
         "header_format": draft.get("header_format", "TEXT" if draft.get("header") else ""),
@@ -839,6 +959,18 @@ def template_out(row: Template) -> dict:
     output=TemplatePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which WhatsApp templates has Meta approved?",
+                "list our message templates",
+                "is the welcome template still in review?",
+            ),
+            "es": (
+                "¿cuáles de mis plantillas ha aprobado Meta?",
+                "enséñame las plantillas de mensajes",
+                "¿sigue en revisión la plantilla de bienvenida?",
+            ),
+        },
         "description": "The business's WhatsApp message templates as Meta judged them (APPROVED ones can be "
         "sent), with their text and how many variables they take; search by name."
     },
@@ -858,6 +990,24 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     return page(rows.order_by("name", "language", "id"), params, template_out)
 
 
+# Not an assistant tool: what names a template on the card of its change, its deletion or its new hand-over to Meta
+# (``schemas.A_TEMPLATE``), as Settings lists it (also one deleted here that Meta still has); the model finds the
+# templates in their list. Whoever sends reads the templates, as their list.
+@operation(
+    "whatsapp_inbox.template.get",
+    kind="query",
+    permission="whatsapp_inbox.reply",
+    input=TemplateRefIn,
+    output=TemplateNamedOut,
+    ai=INTERNAL,
+)
+def get_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
+    row = listed_templates(ctx.scope).filter(pk=data.id).first()
+    if row is None:
+        raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
+    return {"id": row.id, "name": row.name, "language": row.language, "label": f"{row.name} ({row.language})"}
+
+
 @operation(
     "whatsapp_inbox.template_sample.detail",
     kind="query",
@@ -867,14 +1017,25 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     output=TemplateSampleOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which file is the header of that template?",
+                "is the template's header a photo, a video or a PDF?",
+                "how big is the header file I uploaded?",
+            ),
+            "es": (
+                "¿qué archivo lleva de cabecera la plantilla?",
+                "¿la cabecera de la plantilla es una foto, un vídeo o un PDF?",
+                "¿cuánto pesa el archivo de cabecera que subí?",
+            ),
+        },
         "description": "One file of a WhatsApp template's header by its id (the one whatsapp_inbox.template_sample."
         "upload answered): its name, whether it is a photo, a video or a document, and its size."
     },
 )
 def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> dict:
-    """F29, F33: a header's file as its upload answered it, only of the business that asks (phase 1 shares the
-    tables, as ``Template``)."""
-    sample = TemplateSample.objects.filter(pk=data.id, host=ctx.scope.key).first()
+    """F29, F33: a header's file as its upload answered it."""
+    sample = TemplateSample.objects.filter(pk=data.id).first()
     if sample is None:
         raise NotFound(str(SAMPLE_NOT_FOUND), code="whatsapp_inbox.sample_not_found")
     return sample_out(sample)
@@ -888,12 +1049,24 @@ def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> 
     output=ChannelOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "is our WhatsApp number connected?",
+                "how many WhatsApp messages have we sent this month?",
+                "how much of the plan's WhatsApp allowance is left?",
+            ),
+            "es": (
+                "¿tenemos conectado el número de WhatsApp?",
+                "¿cuánto consumo de WhatsApp llevamos este mes?",
+                "¿cuánto cupo de WhatsApp nos queda en el plan?",
+            ),
+        },
         "description": "The business's WhatsApp number as erplora.com reports it (connected or not) and the "
         "messages sent this month against the plan's allowance."
     },
 )
 def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
-    row = channel(ctx.scope) or Channel(host=ctx.scope.key)
+    row = channel(ctx.scope) or Channel()
     month = clock.allowance_month()
     return {
         "status": row.status,
@@ -934,6 +1107,18 @@ def team(ctx: OperationContext, roles: dict[str, str] | None = None) -> QuerySet
     input=AgentListIn,
     output=AgentPage,
     ai={
+        "asks": {
+            "en": (
+                "which agents can answer the WhatsApp inbox?",
+                "which of our people answer WhatsApp conversations?",
+                "find Jorge among the WhatsApp agents",
+            ),
+            "es": (
+                "¿quién del equipo atiende la bandeja de WhatsApp?",
+                "¿qué personas pueden llevar las conversaciones de WhatsApp?",
+                "busca a Jorge entre los agentes de WhatsApp",
+            ),
+        },
         "description": "The people of the business a WhatsApp conversation can be assigned to; search by name."
     },
 )

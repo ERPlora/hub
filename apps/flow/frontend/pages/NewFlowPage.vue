@@ -6,11 +6,12 @@
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
-import { IonButton, IonSpinner } from '@ionic/vue';
+import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import FlowEditor from '../components/FlowEditor.vue';
+import LoadingNote from '../components/LoadingNote.vue';
 import { useLeaveGuard } from '../composables/useLeaveGuard';
 import { provideBusinessClock } from '../composables/usePhrasing';
 import { emptyDocument, type FlowDocument } from '../lib/document';
@@ -67,12 +68,10 @@ function onSaved(flow: FlowOut): void {
         {{ $t('flow.guide.back') }}
       </IonButton>
     </div>
-    <div
+    <LoadingNote
       v-else-if="!ready"
-      class="flow-new__loading"
-    >
-      <IonSpinner name="dots" /> {{ $t('flow.loading') }}
-    </div>
+      data-testid="flow-new-loading"
+    />
     <FlowEditor
       v-else
       :key="draft?.id ?? 'blank'"
@@ -86,12 +85,3 @@ function onSaved(flow: FlowOut): void {
     />
   </AppPage>
 </template>
-
-<style scoped>
-.flow-new__loading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--ep-muted, var(--ion-color-medium));
-}
-</style>

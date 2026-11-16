@@ -1,5 +1,4 @@
-"""The assistant's catalogue did not move when ``ai=`` became typed and mandatory (``live.E017``; PLAN §30,
-docs/plans/2026-10-30-asistente-saas.md §2, T1).
+"""The assistant's catalogue did not move when ``ai=`` became typed and mandatory (``live.E017``).
 
 Before, the Hub decided a tool by the words of an ``ai=`` dictionary and by its permission: no description, «Not an
 assistant tool…»/«System only…», no permission or one no app declares (the platform's reactions and scheduled tasks),
@@ -10,15 +9,17 @@ manager, an employee and a superuser are offered exactly the tools it gives them
 """
 
 import pytest
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.meta import all_live_app_configs
 from live.operations import AI, Operation, registry
 
 from base import approvals, assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
-A = Scope("host", "a")
+#: Business A, entered for every test with its own database (``in_business_a``).
+__all__ = ["in_business_a"]
 
 #: The words a dictionary started with to say it was no tool, and what was never done from the chat, as they were.
 LEGACY_NOT_A_TOOL = ("Not an assistant tool", "System only")
@@ -48,7 +49,7 @@ def legacy_is_tool(op: Operation, declared_permissions: frozenset[str]) -> bool:
 
 def legacy_catalog(ctx: OperationContext) -> list[str]:
     declared = frozenset(permission for config in all_live_app_configs() for permission in config.permissions)
-    on = assistant.active_apps(ctx.scope)
+    on = assistant.tools.active_apps(ctx.scope)
     return [
         name
         for name, op in sorted(registry.items())
@@ -62,16 +63,16 @@ def person(user) -> OperationContext:
     return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.MANAGER, Membership.Role.EMPLOYEE])
 def test_a_person_of_the_business_is_offered_the_same_tools(make_user, role):
     ctx = person(make_user("eva", host=A.key, role=role))
     expected = legacy_catalog(ctx)
     assert expected  # not an empty sweep
-    assert list(assistant.catalog(ctx)) == expected
+    assert list(assistant.tools.catalog(ctx)) == expected
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_superuser_is_offered_the_same_tools_and_none_only_the_platform_runs(superuser):
     """«*» reaches every permission: only the old rule of the platform's permissions kept their reactions out. Said
     outright: a superuser holds «*» on the platform's scope alone, nothing on a business's host (``base.permissions``)."""
@@ -79,4 +80,4 @@ def test_a_superuser_is_offered_the_same_tools_and_none_only_the_platform_runs(s
     expected = legacy_catalog(ctx)
     assert expected and "demo.item.create" in expected  # «*» reached a write no approval offers: not an empty sweep
     assert "table.hold.expire" not in expected and "staff.member.current" not in expected
-    assert list(assistant.catalog(ctx)) == expected
+    assert list(assistant.tools.catalog(ctx)) == expected

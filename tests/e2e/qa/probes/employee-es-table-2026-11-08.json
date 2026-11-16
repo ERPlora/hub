@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.table.settings.get","app":"table","tool":"table.settings.get","role":"employee","language":"es","phrase":"¿a los cuántos minutos se marca una mesa en amarillo y luego en rojo?","expect":"read"},
+    {"id":"qa20261108.employee.es.table.session.link_order","app":"table","tool":"table.session.link_order","role":"employee","language":"es","phrase":"asocia la Cuenta QA del TPV a la cuenta vacía de la mesa 4 de Comedor QA","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.table.session.restore","app":"table","tool":"table.session.restore","role":"employee","language":"es","phrase":"recupera la cuenta aparcada de la mesa 1 y siéntala ahora en la mesa 3 de Comedor QA","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.table.table.create","app":"table","tool":"table.table.create","role":"employee","language":"es","phrase":"pon una mesa nueva número 91 en Comedor QA, cuadrada y para cuatro personas","expect":"refused"},
+    {"id":"qa20261108.employee.es.table.table.delete","app":"table","tool":"table.table.delete","role":"employee","language":"es","phrase":"quita la mesa 90 de Comedor QA del plano, que ya no la usamos","expect":"refused"},
+    {"id":"qa20261108.employee.es.table.zone.delete","app":"table","tool":"table.zone.delete","role":"employee","language":"es","phrase":"borra la zona Comedor QA y todo lo que tenga dentro","expect":"refused"}
+  ]
+}

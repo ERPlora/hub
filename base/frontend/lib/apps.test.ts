@@ -1,6 +1,6 @@
-// The rules of the Apps screen (BASE-G67…G74) the browser applies to `base.app.list`: which apps each tab lists,
+// The rules of the Apps screen the browser applies to `base.app.list`: which apps each tab lists,
 // the tab of an address, what comes along with an app, who it comes with, and when «Open» is offered; and turning an
-// app on or off (PLAN-HUB §9): when each is offered, what comes along or goes with it, and what goes off first.
+// app on or off: when each is offered, what comes along or goes with it, and what goes off first.
 import { describe, expect, it } from 'vitest';
 
 import type { AppRow } from '../operations';
@@ -36,6 +36,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    mandatory: false,
     ...fields,
   };
 }
@@ -53,7 +54,7 @@ describe('the tabs of Apps', () => {
     expect(appsOfTab(APPS, 'paid').map((row) => row.id)).toEqual(['customer', 'invoice', 'stock']);
   });
 
-  it('a free app never shows under «Paid» (hub#2655: «Free» in the paid tab)', () => {
+  it('a free app never shows under «Paid»', () => {
     expect(appsOfTab([TAX, app('sale')], 'paid')).toEqual([]);
   });
 
@@ -63,11 +64,11 @@ describe('the tabs of Apps', () => {
     expect(TAB_HASH).toEqual({ mine: '', all: '#all', paid: '#paid' });
   });
 
-  it('with nothing sold apart there is no «Paid»: an old link to #paid opens «Add apps» (PLAN §32)', () => {
+  it('with nothing sold apart there is no «Paid»: an old link to #paid opens «Add apps»', () => {
     expect(['', '#all', '#paid', '#other'].map((hash) => tabOf(hash, false))).toEqual(['mine', 'all', 'all', 'mine']);
   });
 
-  it('says whether the catalogue sells any app apart: every app in every plan sells none (PLAN §32)', () => {
+  it('says whether the catalogue sells any app apart: every app in every plan sells none', () => {
     expect(sellsApart([TAX, app('sale')])).toBe(false);
     expect(sellsApart([])).toBe(false);
     expect(sellsApart(APPS)).toBe(true);
@@ -102,7 +103,7 @@ describe('«Open»', () => {
   });
 });
 
-describe('turning an app on or off (PLAN-HUB §9)', () => {
+describe('turning an app on or off', () => {
   // sale needs tax and customer; both came along with it, and the business chose task itself.
   const SALE = app('sale', { name: 'Sales', requires: ['customer', 'tax'] });
   const TAX_ = app('tax', { name: 'Taxes', chosen: false, required_by: ['sale'] });
@@ -147,6 +148,14 @@ describe('turning an app on or off (PLAN-HUB §9)', () => {
     expect(goesOffWith(invoice, needed)).toEqual([]);
   });
 
+  it('never names one the business’s country requires on: it stays on, as the server keeps it (hub#997)', () => {
+    const mandatoryTax = { ...TAX_, mandatory: true };
+    expect(goesOffWith(SALE, [SALE, mandatoryTax, CUSTOMER_, TASK])).toEqual(['Customers']);
+    // One that could not be set up binds nothing yet: it goes with the app it came with.
+    const failedTax = { ...TAX_, mandatory: true, state: 'failed' as const };
+    expect(goesOffWith(SALE, [SALE, failedTax, CUSTOMER_, TASK])).toEqual(['Customers', 'Taxes']);
+  });
+
   it('names the apps to turn off first: the chosen ones on that need it, else every one that does', () => {
     expect(offFirst(TAX_, ON)).toEqual(['Sales']);
     const verifactu = app('verifactu', { name: 'VeriFactu', requires: ['invoice', 'sale', 'tax'] });
@@ -162,7 +171,7 @@ describe('turning an app on or off (PLAN-HUB §9)', () => {
   });
 });
 
-describe('an app whose tables the business’s database is still getting (S3)', () => {
+describe('an app whose tables the business’s database is still getting', () => {
   // flow is being set up; website could not be; sale (being set up) needs customer, which came along with it.
   const FLOW = app('flow', { name: 'Flows', state: 'creating', path: null });
   const WEBSITE = app('website', { name: 'Website', state: 'failed', path: null });

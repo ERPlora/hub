@@ -1,10 +1,9 @@
-// Printing → Devices in Chrome (PRINTING-F18; apps/printing/WORKBOOK.md; FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE):
-// an employee's session took the jobs of any printer by naming it. Now the owner sets up the browser's device
-// from Devices («Print from this device», with its printer), the list marks it as this device and the note says
-// what it prints; the employee's session takes the jobs only from that device (by the API, the device's side of
-// /ws/print), never from another, and once the owner retires it, not from it either, nor does its hello on /ws/print
-// get in with the owner's session (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED). The employee reads the page
-// without setting anything up. Screenshots of the flow in the three viewports. What is made here is deleted
+// Printing → Devices in Chrome (PRINTING-F18; apps/printing/WORKBOOK.md): an employee's session never takes the jobs
+// of a printer just by naming it. The owner sets up the browser's device from Devices («Print from this device», with
+// its printer), the list marks it as this device and the note says what it prints; the employee's session takes the
+// jobs only from that device (by the API, the device's side of /ws/print), never from another, and once the owner
+// retires it, not from it either, nor does its hello on /ws/print get in with the owner's session. The employee reads
+// the page without setting anything up. Screenshots of the flow in the three viewports. What is made here is deleted
 // after it.
 // flow: PRINTING-F18
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -13,6 +12,7 @@ import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers'
 import { dialog, fill } from './inventory-helpers';
 import { FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
+import { rowAction } from './service-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -49,17 +49,6 @@ async function browserDevice(page: Page): Promise<string> {
 
 async function claimAs(context: BrowserContext, printer: string, device: string) {
   return api<{ job: { id: string } | null; error?: { code: string } }>(context, A, 'POST', '/printing/jobs/claim', { printers: [printer], device });
-}
-
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const hook = `printing-devices-row-${id}-${action}`;
-  const inline = shown(page).locator(`[data-testid=${hook}]`);
-  if ((await inline.count()) > 0 && (await inline.first().isVisible())) {
-    await inline.first().click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=printing-devices-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
 test('PRINTING-F18: only the device the owner set up takes the queue, with anybody’s session', async ({ page, context, browser }) => {
@@ -123,7 +112,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
     attempt: 1,
   });
   expect([foreign.status, foreign.data.error?.code]).toEqual([409, 'printing.job_not_yours']);
-  // The queue names the device by its name, never by its id (hub#2551).
+  // The queue names the device by its name, never by its id.
   const jobs = await api<{ rows: { id: string; device: string }[] }>(employee.context, A, 'GET', `/printing/jobs?printer_id=${printer}`);
   expect(jobs.data.rows.map((job) => job.device)).toEqual([DEVICE_NAME]);
   expect(JSON.stringify(jobs.data)).not.toContain(mine);
@@ -137,7 +126,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   // Retired, it takes nothing more: not even with the owner's session.
   const listed = await api<{ rows: Device[] }>(context, A, 'GET', '/printing/devices');
   const set = listed.data.rows.find((device) => device.name === DEVICE_NAME)!;
-  await rowAction(page, set.id, 'retire');
+  await rowAction(page, 'printing-devices', set.id, 'retire');
   await page.locator('ion-modal').getByRole('button', { name: /Yes, retire|Sí, retirar/ }).click();
   await expect(row).toHaveCount(0);
   await expect(shown(page).locator('[data-testid=printing-devices-add]')).toBeVisible();
@@ -147,8 +136,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
     expect([after.status, after.data.error?.code]).toEqual([403, 'printing.device_not_registered']);
   }
   // Nor is it let in by its hello on /ws/print, with the owner's session that pairs a device new here: refused at
-  // once instead of a ready and a refusal at every claim, and not set up again
-  // (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED).
+  // once instead of a ready and a refusal at every claim, and not set up again.
   const hello = await page.evaluate(
     ({ printerId, deviceId }) =>
       new Promise<{ frames: { type: string; code?: string }[]; close: number }>((resolve, reject) => {

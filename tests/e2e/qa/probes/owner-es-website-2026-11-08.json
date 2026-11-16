@@ -1,0 +1,10 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.owner.es.website.catalog.categories","app":"website","tool":"website.catalog.categories","role":"owner","language":"es","phrase":"¿qué familias de productos de Inventario puedo elegir para el catálogo de la web?","expect":"read"},
+    {"id":"qa20261108.owner.es.website.site.get","app":"website","tool":"website.site.get","role":"owner","language":"es","phrase":"enséñame cómo está quedando la web, qué versión hay publicada y si tengo cambios sin publicar","expect":"read"},
+    {"id":"qa20261108.owner.es.website.site.save","app":"website","tool":"website.site.save","role":"owner","language":"es","phrase":"lee primero todo el borrador actual y, sin perder ninguna sección, cambia solo el título principal a «Restaurante QA, cocina de mercado»","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.website.site.publish","app":"website","tool":"website.site.publish","role":"owner","language":"es","phrase":"publica el borrador de la web para que los visitantes vean ya los cambios y el catálogo actual","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.website.site.unpublish","app":"website","tool":"website.site.unpublish","role":"owner","language":"es","phrase":"deja la web fuera de línea temporalmente sin borrar el borrador ni el contenido publicado","expect":"card","decide":"cancel"}
+  ]
+}

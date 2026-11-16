@@ -1,0 +1,13 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.owner.es.demo.item.detail","app":"demo","tool":"demo.item.detail","role":"owner","language":"es","phrase":"enséñame el elemento «Ejemplo QA» con su nota, su estado y todas sus líneas en orden","expect":"read","lookups":["demo.item.list"]},
+    {"id":"qa20261108.owner.es.demo.item.list","app":"demo","tool":"demo.item.list","role":"owner","language":"es","phrase":"lista los elementos de ejemplo que contengan QA y sigan abiertos","expect":"read"},
+    {"id":"qa20261108.owner.es.demo.item.open_count","app":"demo","tool":"demo.item.open_count","role":"owner","language":"es","phrase":"¿cuántos elementos de demostración quedan sin cerrar?","expect":"read"},
+    {"id":"qa20261108.owner.es.demo.item.stats","app":"demo","tool":"demo.item.stats","role":"owner","language":"es","phrase":"dame el recuento total de ejemplos, abiertos, terminados y líneas","expect":"read"},
+    {"id":"qa20261108.owner.es.demo.item.create","app":"demo","tool":"demo.item.create","role":"owner","language":"es","phrase":"crea un elemento de demostración llamado Ejemplo QA, abierto y con la nota «prueba de QA»","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.demo.item.add_line","app":"demo","tool":"demo.item.add_line","role":"owner","language":"es","phrase":"añade al final de Ejemplo QA una línea «primera prueba» con cantidad 2 y referencia 01a1c000-0000-7000-8000-000000000001","expect":"card","decide":"confirm"},
+    {"id":"qa20261108.owner.es.demo.item.update","app":"demo","tool":"demo.item.update","role":"owner","language":"es","phrase":"cambia Ejemplo QA a «Ejemplo terminado QA», márcalo como hecho y actualiza su nota a «cerrado en QA»","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.owner.es.demo.item.delete","app":"demo","tool":"demo.item.delete","role":"owner","language":"es","phrase":"elimina Ejemplo QA junto con todas sus líneas; entiendo que no se puede deshacer","expect":"card","decide":"cancel"}
+  ]
+}

@@ -1,8 +1,7 @@
-"""Inventory on the Home (PLAN-HUB round 2026-10-21; FIX-INVENTORY-SETUP-HOOKS): base's own queries bring «Your
-catalog» to whoever may add products (pending with no active product, done with one, physical or a service, and
-pending again when every product is turned off or deleted; INVENTORY-F28) and Inventory's four panels to whoever reads
-the products, each answered by the Panel's own queries as that person (INVENTORY-F17); a product added in hub B re-runs
-B's checklist and panels and tells A nothing.
+"""Inventory on the Home: base's own queries bring «Your catalog» to whoever may add products (pending with no active
+product, done with one, physical or a service, and pending again when every product is turned off or deleted;
+INVENTORY-F28) and Inventory's four panels to whoever reads the products, each answered by the Panel's own queries as
+that person (INVENTORY-F17); a product added in hub B re-runs B's checklist and panels and tells A nothing.
 
 base and inventory run for real: the step and the panels come from InventoryConfig through base's own queries.
 """
@@ -17,9 +16,10 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.inventory.schemas import ProductIn, ProductPatchIn, ProductRefIn
-from apps.inventory.tests.conftest import A, B, ctx_for, ctx_with
+from apps.inventory.tests.conftest import A, B, HOST, HUB_DB, HUB_DB_COMMITTED, ctx_for, ctx_with
 from apps.tax.models import TaxCategory
 from base.schemas import SetupStatusIn, WidgetListIn
+from base.tenancy.context import use_hub
 
 STEP = "inventory.catalog"
 PANELS = [
@@ -67,7 +67,7 @@ def state(ctx=None) -> str:
     return steps(ctx or ctx_for())[STEP]["state"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_without_products_has_your_catalog_pending_and_it_leads_to_the_products(general):
     item = steps(ctx_for("hub_manager"))[STEP]
     assert {key: item[key] for key in ("state", "level", "required", "actionable", "route", "order", "icon")} == {
@@ -85,14 +85,14 @@ def test_a_hub_without_products_has_your_catalog_pending_and_it_leads_to_the_pro
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("product_type", ["physical", "service"])
 def test_one_active_product_physical_or_a_service_ticks_it(general, product_type):
     create("Haircut" if product_type == "service" else "Coffee", "ONE", product_type=product_type)
     assert state() == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_turning_off_or_deleting_every_product_sends_it_back_to_pending(general):
     coffee = create("Coffee", "COF")
     tea = create("Tea", "TEA")
@@ -106,14 +106,14 @@ def test_turning_off_or_deleting_every_product_sends_it_back_to_pending(general)
     assert state() == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_add_products_is_not_told_about_the_step(general):
     employee = ctx_for("hub_employee")
     assert employee.has("inventory.view_product") and not employee.has("inventory.add_product")
     assert STEP not in steps(employee)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_manager_is_offered_the_four_panels_followed_live(general):
     offered = panels(ctx_for("hub_manager"))
     assert list(offered) == PANELS
@@ -123,17 +123,17 @@ def test_a_manager_is_offered_the_four_panels_followed_live(general):
         "inventory.in_stock": ("inventory.stock.get_summary", False, True, "stat"),
         "inventory.low_stock_products": ("inventory.product.list_low_stock", True, True, "bar-list"),
     }
-    # The picker groups them under the app's own name (gh:inventory#126).
+    # The picker groups them under the app's own name.
     assert {panel["category"] for panel in offered.values()} == {"Inventory"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_the_panels_as_the_inventory_panel(general):
     # INVENTORY-F17's actors include the employee: the Home shows them what Inventory → Panel already shows them.
     assert list(panels(ctx_for("hub_employee"))) == PANELS
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_may_not_read_the_products_gets_no_panel_and_is_refused_the_figures_by_hand(general):
     """Hiding a panel is not the gate: the live stream runs the panel's own query as the person, so the queries
     refuse whoever may not read the products."""
@@ -146,7 +146,7 @@ def test_whoever_may_not_read_the_products_gets_no_panel_and_is_refused_the_figu
             answer(panel, outsider)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_panel_paints_its_figure_from_its_own_query(general):
     # Coffee: 3 left at cost 1.50 (450 cents of stock), under its threshold of 5. Milk: 1.5 litres at 0.80, under
     # 2. Beans: 40 at 2.00, above 10. Haircut: a service, no stock. Old: turned off, never counted.
@@ -175,7 +175,7 @@ def test_each_panel_paints_its_figure_from_its_own_query(general):
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_lowest_stock_panel_shows_five_the_one_with_less_first(general):
     for n in range(7):
         create(f"Item {n}", f"IT{n}", initial_stock=str(n), low_stock_threshold="10", track_stock=True)
@@ -184,18 +184,18 @@ def test_the_lowest_stock_panel_shows_five_the_one_with_less_first(general):
     assert [row["name"] for row in rows] == ["Item 0", "Item 1", "Item 2", "Item 3", "Item 4"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_spanish_request_reads_the_step_and_the_panels_in_spanish(general, client, make_user):
-    """gh:hub#868: the old checklist said «Your catalog» in English although the module carried its Spanish."""
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
-    setup = client.get("/api/home/setup", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    """A Spanish request never reads «Your catalog» in English: the module carries its Spanish."""
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
+    setup = client.get("/api/home/setup", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert setup.status_code == 200
     (item,) = [item for item in setup.json()["items"] if item["key"] == STEP]
     assert (item["title"], item["description"]) == (
         "Tu catálogo",
         "Añade al menos un producto para que haya algo que vender.",
     )
-    widgets = client.get("/api/home/widgets", HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE="es")
+    widgets = client.get("/api/home/widgets", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert widgets.status_code == 200
     ours = [widget for widget in widgets.json()["widgets"] if widget["app"] == "inventory"]
     assert [(widget["title"], widget["category"]) for widget in ours] == [
@@ -226,16 +226,17 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_product_added_in_hub_b_re_runs_the_step_and_the_panels_of_b_and_tells_a_nothing(listen):
-    TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+@HUB_DB_COMMITTED
+def test_a_product_added_in_hub_b_re_runs_the_step_and_the_panels_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    create("Coffee", "COF", scope=B)
-    notes = received(on_b)
-    assert {channel for channel, _ in notes} == {channel_for(B)}
-    events = {event for _, payload in notes for event in payload["events"]}
-    affected = live_registry.affected(events)
-    assert "base.setup.status" in affected
-    assert {panel["operation"] for panel in panels(ctx_for(scope=B)).values()} <= affected
-    assert steps(ctx_for(scope=B))[STEP]["state"] == "done"
+    with use_hub(hub_b):
+        TaxCategory.objects.get_or_create(key=TAX, defaults={"name": "General"})
+        create("Coffee", "COF", scope=B)
+        notes = received(on_b)
+        assert {channel for channel, _ in notes} == {channel_for(B)}
+        events = {event for _, payload in notes for event in payload["events"]}
+        affected = live_registry.affected(events)
+        assert "base.setup.status" in affected
+        assert {panel["operation"] for panel in panels(ctx_for(scope=B)).values()} <= affected
+        assert steps(ctx_for(scope=B))[STEP]["state"] == "done"
     assert received(on_a, timeout=QUIET) == []

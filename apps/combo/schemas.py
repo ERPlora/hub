@@ -28,7 +28,8 @@ from pydantic import (
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
 from base.images import MAX_UPLOAD_BASE64
-from base.schemas import CatalogImageOut, names
+from base.recovery import ImageInCopyIn
+from base.schemas import CatalogImageOut, names, unless_given
 
 T = TypeVar("T")
 
@@ -47,6 +48,37 @@ REPEATED_ID = _("Each one goes once in the list.")
 # How the Menus screens name the data the models do not (the assistant's card names each datum by its title).
 VAT_CATEGORY = gettext_noop("VAT category")
 NEW_PRODUCT = gettext_noop("New product")
+# What the assistant's card calls the record a write acts on by its id (its Spanish in this app's catalog), as the
+# screens call one («Withdraw this menu?», «Course · Starters»), never «Record».
+T_MENU = gettext_noop("Menu")
+T_COURSE = gettext_noop("Course")
+T_CHOICE = gettext_noop("Choice")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
+# asks, never by its id: a menu and a course by their name and a choice by its product's, as the builder's «Withdraw»
+# and «Remove» dialogs say them; a product of Inventory by its name, as Inventory's screens say it.
+A_MENU = names("combo.combo.get")
+# What a person says by its name, when its id is not known: the card reads it by that name too, as the write will find
+# it, so it shows what the write acts on («Menú vegano» when the person said «vegano», hub#1217), and words it cannot
+# read (two fit, none does) as said, never off the card (hub#1245). A course is found inside its menu and a choice by
+# its product inside its menu and its course: each is read with them (``within``), never with the write's ``id``, which
+# is the record of the write (a course's, a choice's) and no menu's. Beside the id the write takes its record by
+# instead (the datum's own, or the one of the record that holds it: a course's menu is the course's own), the card
+# neither reads nor shows the name, which the write does not use (``unless_given``, hub#1250), nor the id of a menu or
+# a course beside the id of a course or a choice, or of the course a choice is said in (hub#1278).
+A_MENU_BY_NAME = names("combo.combo.get", by="combo", as_said=True)
+A_COURSE_BY_NAME = names("combo.group.get", by="group", within=("combo_id", "combo"), as_said=True)
+A_CHOICE_BY_NAME = names(
+    "combo.option.get",
+    by="product",
+    within=("combo_id", "combo", "group_id", "group"),
+    name=("product_name",),
+    as_said=True,
+)
+A_PRODUCT_BY_NAME = names("inventory.product.get", by="product", as_said=True)
+A_COURSE = names("combo.group.get")
+A_CHOICE = names("combo.option.get", name=("product_name",))
+A_PRODUCT = names("inventory.product.get")
 
 #: Ninety-nine billion euros in cents: far above any price, inside a bigint (Inventory's bound).
 MAX_CENTS = 9_999_999_999_999
@@ -84,12 +116,20 @@ Picks = Annotated[int, Field(ge=0, le=MAX_PICKS)]
 Order = Annotated[int, Field(ge=0, le=MAX_ORDER)]
 SupplyKind = Literal["service", "goods"]
 Direction = Literal["asc", "desc"]
-GroupIds = Annotated[
-    list[UUID], Field(min_length=1, max_length=MAX_GROUPS), AfterValidator(_unique)
-]
-OptionIds = Annotated[
-    list[UUID], Field(min_length=1, max_length=MAX_OPTIONS), AfterValidator(_unique)
-]
+
+
+def _ids(mark: dict, most: int):
+    """Records by their ids, each one once: the assistant's card names each one as ``mark`` says."""
+    return Annotated[
+        list[Annotated[UUID, Field(json_schema_extra=mark)]],
+        Field(min_length=1, max_length=most),
+        AfterValidator(_unique),
+    ]
+
+
+GroupIds = _ids(A_COURSE, MAX_GROUPS)
+OptionIds = _ids(A_CHOICE, MAX_OPTIONS)
+ProductIds = _ids(A_PRODUCT, MAX_OPTIONS)
 
 # Field descriptions shared by several schemas (the assistant reads them).
 D_COMBO_ID = "The menu's id. Give it, or its name in `combo`."
@@ -159,8 +199,8 @@ class Page(Schema, Generic[T]):
 
 
 class ComboRefIn(In):
-    id: UUID | None = Field(None, description=D_COMBO_ID)
-    combo: Reference | None = Field(None, description=D_COMBO)
+    id: UUID | None = Field(None, title=T_MENU, description=D_COMBO_ID, json_schema_extra=A_MENU)
+    combo: Reference | None = Field(None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id"))
 
     @model_validator(mode="after")
     def _combo_named(self):
@@ -168,14 +208,13 @@ class ComboRefIn(In):
         return self
 
 
-# The menu's image (COMBO-F14; round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The menu's image (COMBO-F14, base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ComboImageIn(ComboRefIn):
-    id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=names("combo.combo.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the menu shows: an image of the shared library by its reference, "
@@ -198,15 +237,23 @@ class ComboImageSuggestIn(ComboRefIn):
 class _ComboOfIn(In):
     """The menu something belongs to, by id or by name."""
 
-    combo_id: UUID | None = Field(None, description=D_COMBO_ID)
-    combo: Reference | None = Field(None, description=D_COMBO)
+    combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=A_MENU)
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "combo_id")
+    )
 
 
 class _GroupOfIn(_ComboOfIn):
     """The course something belongs to: its id, or its name with its menu."""
 
-    group_id: UUID | None = Field(None, description=D_GROUP_ID)
-    group: Reference | None = Field(None, description=D_GROUP)
+    combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=unless_given(A_MENU, "group_id"))
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "combo_id", "group_id")
+    )
+    group_id: UUID | None = Field(None, description=D_GROUP_ID, json_schema_extra=A_COURSE)
+    group: Reference | None = Field(
+        None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "group_id")
+    )
 
     def _group_named(self) -> None:
         if self.group_id is None and (
@@ -216,8 +263,12 @@ class _GroupOfIn(_ComboOfIn):
 
 
 class GroupRefIn(_ComboOfIn):
-    id: UUID | None = Field(None, description=D_GROUP_ID)
-    group: Reference | None = Field(None, description=D_GROUP)
+    combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=unless_given(A_MENU, "id"))
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id", "combo_id")
+    )
+    id: UUID | None = Field(None, title=T_COURSE, description=D_GROUP_ID, json_schema_extra=A_COURSE)
+    group: Reference | None = Field(None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "id"))
 
     @model_validator(mode="after")
     def _course_named(self):
@@ -229,16 +280,30 @@ class GroupRefIn(_ComboOfIn):
 
 
 class OptionRefIn(_ComboOfIn):
+    combo_id: UUID | None = Field(
+        None, description=D_COMBO_ID, json_schema_extra=unless_given(A_MENU, "id", "group_id")
+    )
+    combo: Reference | None = Field(
+        None, description=D_COMBO, json_schema_extra=unless_given(A_MENU_BY_NAME, "id", "combo_id", "group_id")
+    )
     id: UUID | None = Field(
-        None, description="The choice's id. Give it, or its product with its menu."
+        None,
+        title=T_CHOICE,
+        description="The choice's id. Give it, or its product with its menu.",
+        json_schema_extra=A_CHOICE,
     )
     group_id: UUID | None = Field(
-        None, description="The course of the choice, when the product is in several."
+        None,
+        description="The course of the choice, when the product is in several.",
+        json_schema_extra=unless_given(A_COURSE, "id"),
     )
-    group: Reference | None = Field(None, description=D_GROUP)
+    group: Reference | None = Field(
+        None, description=D_GROUP, json_schema_extra=unless_given(A_COURSE_BY_NAME, "id", "group_id")
+    )
     product: Reference | None = Field(
         None,
         description="The SKU or name of the choice's product, when its id is not known.",
+        json_schema_extra=unless_given(A_CHOICE_BY_NAME, "id"),
     )
 
     @model_validator(mode="after")
@@ -295,6 +360,13 @@ class ComboIn(In):
     )
 
 
+class ComboRecoverIn(ComboIn, ImageInCopyIn):
+    """A menu of a separate copy the business no longer has: what ``combo.combo.create`` takes and the image it showed
+    there."""
+
+    stands_for: UUID = Field(description="The menu of the copy it is made again for, by its id there.")
+
+
 class ComboPatchIn(ComboRefIn):
     """Only the fields sent change."""
 
@@ -336,6 +408,12 @@ class GroupIn(_ComboOfIn):
         return self
 
 
+class GroupRecoverIn(GroupIn):
+    """A course of a separate copy its menu no longer has: what ``combo.group.create`` takes."""
+
+    stands_for: UUID = Field(description="The course of the copy it is made again for, by its id there.")
+
+
 class GroupPatchIn(GroupRefIn):
     """Only the fields sent change; the ceiling is checked against what the course keeps."""
 
@@ -362,8 +440,10 @@ class GroupReorderIn(ComboRefIn):
 
 
 class OptionIn(_GroupOfIn):
-    product_id: UUID | None = Field(None, description=D_PRODUCT_ID)
-    product: Reference | None = Field(None, description=D_PRODUCT)
+    product_id: UUID | None = Field(None, description=D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
+    product: Reference | None = Field(
+        None, description=D_PRODUCT, json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "product_id")
+    )
     price_delta: Delta = Field(0, description=D_DELTA)
     is_available: bool = Field(
         True, description="false: sold out today, kept but not offered."
@@ -377,7 +457,7 @@ class OptionIn(_GroupOfIn):
 
 
 class OptionBulkIn(_GroupOfIn):
-    product_ids: OptionIds = Field(
+    product_ids: ProductIds = Field(
         title=gettext_noop("Products"),
         description="The products to add, by id, in the order they go in (no supplement).",
     )
@@ -395,11 +475,13 @@ class OptionPatchIn(OptionRefIn):
         None,
         title=NEW_PRODUCT,
         description="Id of the product that replaces the current one.",
+        json_schema_extra=A_PRODUCT,
     )
     new_product: Reference | None = Field(
         None,
         title=NEW_PRODUCT,
         description="SKU or name of the product that replaces the current one.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "new_product_id"),
     )
     price_delta: Delta | None = Field(None, description=D_DELTA)
     is_available: bool | None = Field(
@@ -501,8 +583,11 @@ class OptionOut(Schema):
     product_id: UUID
     product_name: str
     sku: str
-    catalog_price: int = Field(description="The product's catalogue price, in cents.")
-    price_delta: int
+    catalog_price: int = Field(
+        description="The product's catalogue price, in cents.",
+        json_schema_extra={"money": True},
+    )
+    price_delta: int = Field(json_schema_extra={"money": True})
     is_available: bool
     sort_order: int
     status: Literal[
@@ -528,7 +613,7 @@ class ComboOut(Schema):
     id: UUID
     name: str
     kitchen_name: str
-    price: int
+    price: int = Field(json_schema_extra={"money": True})
     supply_kind: SupplyKind
     tax_category_key: str | None
     tax_category_name: str | None
@@ -599,7 +684,7 @@ class SaleComboOut(Schema):
     id: UUID
     name: str
     kitchen_name: str
-    price: int
+    price: int = Field(json_schema_extra={"money": True})
     supply_kind: SupplyKind
     sort_order: int
     image: str = Field(
@@ -640,10 +725,11 @@ class ResolvedOut(Schema):
     name: str
     kitchen_name: str
     supply_kind: SupplyKind
-    price: int = Field(description="Today's closed price, in cents.")
-    supplements: int = Field(description="The supplements of the picks, in cents.")
+    price: int = Field(description="Today's closed price, in cents.", json_schema_extra={"money": True})
+    supplements: int = Field(description="The supplements of the picks, in cents.", json_schema_extra={"money": True})
     amount: int = Field(
-        description="What the menu charges: the amount ordered, or price plus supplements."
+        description="What the menu charges: the amount ordered, or price plus supplements.",
+        json_schema_extra={"money": True},
     )
     split: bool = Field(
         description="true: one sale line per component, each at its own tax category and amount."

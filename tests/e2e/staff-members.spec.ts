@@ -7,26 +7,17 @@
 // removed after it (and before, if a run died half-way).
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { staffCleanUp } from './staff-helpers';
+import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
 const PHONE = { width: 390, height: 844 };
 
 /** Removes every record this spec family creates (first names «E2E…», roles «E2E…»). */
-function cleanup(): void {
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
-  psql(
-    [
-      `delete from staff_timeoff where member_id in (${members})`,
-      `delete from staff_scheduleday where schedule_id in (select id from staff_schedule where member_id in (${members}))`,
-      `delete from staff_schedule where member_id in (${members})`,
-      `delete from staff_member where first_name like '${TAG}%'`,
-      `delete from staff_role where name like '${TAG}%'`,
-    ].join('; '),
-  );
-}
+const cleanup = (): void => staffCleanUp(TAG);
 
-// flow: ninguno (spec e2e de Personal) — FIX-HUB-E2E-STAFF-MEMBERS-FRESH-DB
+// flow: none — the e2e spec of Staff.
 test.beforeAll(async ({ browser }) => {
   cleanup();
   // The employee's account exists in the hub only after their first sign-in (the SaaS creates it on the
@@ -55,17 +46,6 @@ const FILTER_VIEWPORTS = [
 
 /** A row of the Staff list by the person's name. */
 const rowOf = (page: Page, name: string) => shown(page).locator('[data-testid=staff-members-row]', { hasText: name });
-
-/** Clicks a row action, from its button or, when the box folded it, from the row's «⋮» menu. */
-async function rowAction(page: Page, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=staff-members-row-${id}-${action}]`);
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=staff-members-row-${id}-menu]`).click();
-  await page.locator(`ion-popover [data-testid=staff-members-row-${id}-${action}]`).click();
-}
 
 async function fillNew(page: Page, first: string, last: string): Promise<void> {
   await shown(page).locator('[data-testid=staff-members-add]').click();
@@ -126,24 +106,40 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
       hubUserIdOf(EMPLOYEE.email),
     );
 
-    // STAFF-F02: a row opens «Edit · {name}»; only what changed is saved.
+    // STAFF-F02: a row opens «Edit · {name}»; only what changed is saved. What is typed before the whole record
+    // arrives stays and is saved (hub#1347): the record is held until the email has been typed.
+    let arrive!: () => void;
+    const held = new Promise<void>((resolve) => (arrive = resolve));
+    const isDetail = (url: URL) => url.pathname === '/api/staff/members/detail';
+    await page.route(isDetail, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const email = page.locator('[data-testid=staff-member-form-email] input');
     await rowOf(page, aloneName).getByText(aloneName).click();
     await expect(page.locator('ion-modal[data-testid=staff-member-form] ion-title')).toHaveText(`Edit · ${aloneName}`);
-    await expect(page.locator('[data-testid=staff-member-form-email] input')).toHaveValue('ana.e2e@example.com');
-    await page.locator('[data-testid=staff-member-form-email] input').fill('ana.changed@example.com');
+    await expect(page.locator('[data-testid=staff-member-form-loading]')).toBeVisible();
+    await expect(email).toHaveValue('ana.e2e@example.com');
+    await email.fill('ana.changed@example.com');
+    await capture(page, 'staff-members-edit-before-record');
+    arrive();
+    await expect(page.locator('[data-testid=staff-member-form-loading]')).toHaveCount(0);
+    await expect(email).toHaveValue('ana.changed@example.com');
+    await page.unroute(isDetail);
     await page.locator('[data-testid=staff-member-form-submit]').click();
+    await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeHidden();
     await expect(rowOf(page, aloneName)).toContainText('ana.changed@example.com');
 
     // STAFF-F05: «Deactivate» asks first; the row turns Inactive by itself.
     const aloneId = await memberId(context, aloneName);
-    await rowAction(page, aloneId, 'deactivate');
+    await rowAction(page, 'staff-members', aloneId, 'deactivate');
     await expect(page.locator('ion-modal[data-testid=staff-member-deactivate]')).toContainText(`Take ${aloneName} off the floor?`);
     await page.screenshot({ path: shot('staff-members-deactivate') });
     await page.locator('[data-testid=staff-member-deactivate-submit]').click();
     await expect(rowOf(page, aloneName)).toContainText('Inactive');
 
     // STAFF-F06: «Terminate» with a reason; the person leaves the list; the reason is kept.
-    await rowAction(page, aloneId, 'terminate');
+    await rowAction(page, 'staff-members', aloneId, 'terminate');
     await page.locator('[data-testid=staff-member-terminate-reason] textarea').fill('Moves abroad');
     await page.screenshot({ path: shot('staff-members-terminate') });
     await page.locator('[data-testid=staff-member-terminate-submit]').click();
@@ -172,8 +168,8 @@ test('on a phone (390×844) Staff is cards, with the same actions', async ({ bro
   }
 });
 
-// flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-1: Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
+// flow: none — the column filters sit behind the table's funnel.
+test('Staff filters by Email behind the funnel, with its count, the panel open at every width', async ({ browser }) => {
   const stamp = Date.now().toString(36);
   const kept = `${TAG} Ana Fil${stamp}`;
   const other = `${TAG} Bea Fil${stamp}`;

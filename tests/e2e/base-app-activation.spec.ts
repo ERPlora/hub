@@ -1,21 +1,20 @@
-// Turning an app on and off, and the plan's limit of apps (PLAN-HUB §9, ronda 2026-10-24b; BASE-F18, F23, F24), in the
+// Turning an app on and off, and the plan's limit of apps (BASE-F18, F23, F24), in the
 // three viewports, as the owner of hub `a`: Apps counts the apps the business chose against the plan's `max_apps`
 // (Gratis, 20); «Turn off» Tasks asks with its name and, confirmed, takes it out of «My apps» and of the topbar's «My
 // apps» (the menu), and its screens say why they do not open; «Turn on» brings it back. With 20 chosen apps on, the
-// 21st is refused with the plan's notice and «Upgrade plan» (erplora.com's plans). Each flow leaves its capture
-// `APP-BASE-ACTIVATION-<step>-<width>`. The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`,
+// 21st is refused with the plan's notice and «Upgrade plan» (erplora.com's plans). Each flow leaves a capture at each
+// width. The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`,
 // signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are put back before and after
 // each test to every app on with the roots chosen, as `seed_local_hubs` leaves the local hubs (a business is born with
-// every app off, PLAN-HUB round 2026-10-27: `a` stands for a hub of before, which kept them on).
-// In Spanish, the flows of FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS, each with its capture
-// `FIX-HUB-BASE-APP-ACTIVATION-<flow>-<width>`: «Activar» an app the business does not use (BASE-F18); «Desactivar»
+// every app off: `a` stands for a hub from before that, which kept them on).
+// In Spanish, each flow with its capture: «Activar» an app the business does not use (BASE-F18); «Desactivar»
 // Reservations names Tables, which came along only with it, and «Activar» brings both back, naming it (BASE-F19,
 // BASE-F23, BASE-F24); Tables while Reservations needs it is refused with what to turn off first, in a notice that
-// stays until it is closed (BASE-F25, hub#2594); and VeriFactu, with a ticket whose record is not in the AEAT yet,
+// stays until it is closed (BASE-F25); and VeriFactu, with a ticket whose record is not in the AEAT yet,
 // offers no «Desactivar» and says its own reason on its row, as the server does when asked directly (BASE-F25,
 // VERIFACTU-F32, hub#618). That ticket is issued through Invoicing's API and deleted after the run with its record
 // (`cleanInvoices`), the numbering given back.
-// flow: BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
+// flow: BASE-F14 BASE-F16 BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 
@@ -25,6 +24,7 @@ import {
   A,
   api,
   appRow,
+  capture,
   horizontalOverflow,
   HUB_DIR,
   hostPage,
@@ -49,7 +49,7 @@ const VIEWPORTS = {
 const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
 /** The copy the run keeps of `a`'s photo. */
 const BACKUP = 'e2e_base_app_activation_photo_before';
-/** Gratis (PLAN §32): 20 apps the business chooses. */
+/** Gratis: 20 apps the business chooses. */
 const GRATIS = { slug: 'free', max_users: 0, max_devices: 0, max_apps: 20 };
 
 let hubId = '';
@@ -183,8 +183,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const tasksScreen = listed.data.apps.find((app) => app.id === 'task')?.path ?? '';
       expect(tasksScreen, 'Tasks has a screen for the owner').toBeTruthy();
 
-      // The baseline: every app on, the roots chosen (17 with the reference app of development) of Gratis's 20.
-      await expect(testid(page, 'apps-counter')).toHaveText('17 of 20 apps turned on');
+      // The baseline: every app on (27 with the reference app of development), the roots chosen (17) of Gratis's 20:
+      // the counter says both (hub#1286).
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 17 of 20 in your plan');
       await search(page, 'Tasks');
       await expect(appRow(page, 'task')).toBeVisible();
       expect(await menuApps(page)).toContain('Tasks');
@@ -207,7 +208,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.screenshot({ path: shot(`APP-BASE-ACTIVATION-confirm-off-${width}`) });
       await confirm.getByRole('button', { name: 'Turn off' }).click();
       await expect(appRow(page, 'task')).toHaveCount(0);
-      await expect(testid(page, 'apps-counter')).toHaveText('16 of 20 apps turned on');
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 16 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).not.toContain('Tasks');
       await snap(page, 'off', width);
 
@@ -239,7 +240,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Off');
       await testid(page, 'apps-row-task-toggle').click();
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Installed');
-      await expect(testid(page, 'apps-counter')).toHaveText('17 of 20 apps turned on');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 17 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Tasks');
       await snap(page, 'on-again', width);
       expect(psql("select state || ':' || chosen from base_appactivation where host = 'a' and app = 'task'")).toBe('on:true');
@@ -248,7 +249,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 
-  test(`PLAN-HUB §9 — a Gratis business with 20 apps chosen cannot turn on the 21st at ${width}`, async ({ browser }) => {
+  test(`a Gratis business with 20 apps chosen cannot turn on the 21st at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/apps#all');
     try {
       // 20 apps chosen and on, Website off: what an existing business of Gratis may have, at its limit.
@@ -268,7 +269,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await pushPhoto(GRATIS);
       await page.reload();
 
-      await expect(testid(page, 'apps-counter')).toHaveText('20 of 20 apps turned on');
+      // Every app on but Website (26), 20 of them chosen: the plan's part is at its limit.
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 20 of 20 in your plan');
       await search(page, 'Website');
       await expect(appRow(page, 'website').locator('[data-testid="apps-state"]')).toHaveText('Off');
       await testid(page, 'apps-row-website-toggle').click();
@@ -298,7 +300,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const off = await api<{ app: string; state: string }>(context, A, 'POST', '/apps/disable', { app: 'flow' });
       expect(off, 'Automations off before the flow').toMatchObject({ status: 200, data: { app: 'flow', state: 'off' } });
       await page.reload();
-      await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('26 apps activadas · 16 de 20 de tu plan');
       await expect(shown(page).locator('[data-testid="apps-row"]').first()).toBeVisible();
       expect(await namesCutShort(page), `every name whole or ending in «…» at ${width}`).toEqual([]);
       expect(await menuApps(page)).not.toContain('Automatizaciones');
@@ -310,7 +312,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, 'Automatizaciones está activada.')).toBeVisible();
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
       await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
-      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       expect(stored('flow')).toBe('on:true');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Automatizaciones');
 
@@ -329,7 +331,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await pushPhoto(GRATIS);
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {
-      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['Reservas', 'Mesas']));
       await search(page, 'Reservas');
 
@@ -345,7 +347,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await askOff.getByRole('button', { name: 'Desactivar' }).click();
       await expect(toast(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation')).toHaveCount(0);
-      await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      // Both go off (two fewer turned on); only Reservations was chosen (one fewer of the plan's).
+      await expect(testid(page, 'apps-counter')).toHaveText('25 apps activadas · 16 de 20 de tu plan');
       expect([stored('reservation'), stored('table')]).toEqual(['off:false', 'off:false']);
       await expect
         .poll(async () => (await menuApps(page)).filter((name) => name === 'Reservas' || name === 'Mesas'), {
@@ -367,7 +370,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await askOn.getByRole('button', { name: 'Activar' }).click();
       await expect(toast(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
       await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
-      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      await expect(testid(page, 'apps-counter')).toHaveText('27 apps activadas · 17 de 20 de tu plan');
       // Reservations chosen; Tables came along with it, so it does not count.
       expect([stored('reservation'), stored('table')]).toEqual(['on:true', 'on:false']);
       await expect
@@ -394,7 +397,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(refused).toContainText('No se ha cambiado nada');
       await expect(refused).toContainText('Desactiva antes Reservas.');
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
-      await page.waitForTimeout(5_000); // longer than the 4.5 s of an error toast (hub#2594)
+      await page.waitForTimeout(5_000); // longer than the 4.5 s of an error toast
       await expect(refused).toBeVisible();
       await expect(appRow(page, 'table').locator('[data-testid="apps-state"]')).toHaveText('Activa');
       expect(stored('table'), 'nothing written').toBe(before);
@@ -464,14 +467,73 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
-// ── S3: an app whose tables the business's own database lacks is set up first (PLAN-DB §7; BASE-F21, F22) ───────────
+// hub#997 (part 2): an app the business's country requires — `a` has none, so it is in Spain: Taxes everywhere,
+// VeriFactu in Spain — says «Obligatoria en España» next to its state, on or off (BASE-F14, BASE-F16). Taxes on offers
+// no «Desactivar» and says base's reason, as the server does when asked directly (BASE-F25), and turning off Sales,
+// which it came along with, leaves it on and never names it (BASE-F23). `a` stands here for a business that turned on
+// Sales alone: Taxes and Customers came along with it, everything else is off (VeriFactu too).
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F14 BASE-F23 BASE-F25 — an app mandatory in Spain says so, never goes off and stays on when Sales goes, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    psql(
+      [
+        "update base_appactivation set state = 'off', chosen = false where host = 'a'",
+        "update base_appactivation set state = 'on', chosen = (app = 'sale') where host = 'a' and app in ('sale', 'tax', 'customer')",
+      ].join('; '),
+    );
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      const mandatory = 'Impuestos es obligatoria para los negocios de España: no se puede desactivar.';
+      await search(page, 'Impuestos');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-mandatory"]')).toHaveText('Obligatoria en España');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-refusal"]')).toHaveText(mandatory);
+      await expect(testid(page, 'apps-row-tax-toggle')).toHaveCount(0);
+      await snap(page, 'mandatory', width);
+      await capture(page, `FIX-HUB-997-MANDATORY-MINE-${width}`);
+      // The server says the same if asked anyway, and nothing is written.
+      const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'tax' });
+      expect(direct.status).toBe(409);
+      expect(direct.data.error).toMatchObject({ code: 'base.app_vetoed', message: mandatory, app: 'tax' });
+      expect(stored('tax'), 'nothing written').toBe('on:false');
+
+      // BASE-F23 — «Desactivar» Sales names Customers, which came along only with it, never Taxes, which stays on.
+      await search(page, 'Ventas');
+      await expect(appRow(page, 'sale').locator('[data-testid="apps-mandatory"]')).toHaveCount(0);
+      await testid(page, 'apps-row-sale-toggle').click();
+      const askOff = page.locator('.ep-confirm-dialog').last();
+      await expect(askOff).toContainText('Clientes se desactiva con ella: solo la necesitaba Ventas / TPV.');
+      await expect(askOff).not.toContainText('Impuestos');
+      await askOff.getByRole('button', { name: 'Desactivar' }).click();
+      await expect(toast(page, 'Ventas / TPV está desactivada. También se ha desactivado: Clientes.')).toBeVisible();
+      expect([stored('sale'), stored('customer'), stored('tax')]).toEqual(['off:false', 'off:false', 'on:false']);
+      await search(page, 'Impuestos');
+      await expect(appRow(page, 'tax').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+
+      // BASE-F16 — in «Añadir apps», VeriFactu, off, is labelled too, and can be turned on.
+      await page.goto(`${A}/apps#all`);
+      await search(page, 'VeriFactu');
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-mandatory"]')).toHaveText('Obligatoria en España');
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
+      await expect(testid(page, 'apps-row-verifactu-toggle')).toContainText('Activar');
+      await snap(page, 'mandatory-off', width);
+      await capture(page, `FIX-HUB-997-MANDATORY-ALL-${width}`);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// ── An app whose tables the business's own database lacks is set up first (BASE-F21, F22) ───────────────────────────
 // `a` has its own database with every app's tables (`seed_local_hubs`); control's copy of what it has
 // (`base_hub.schema_apps`) is told it lacks Printing, so turning Printing on goes through the whole path of a business
 // whose database does not have it: the Hub answers 202 «creating», the run's worker (`run_worker --databases-only`) makes
 // its tables (`ensure_schema`, a no-op on tables already there: the DDL itself is pytest's, on real databases) and turns
 // it on, and the screen and the topbar's «My apps» follow without reloading. «Turning on…» and «Could not turn on» are
 // written on the row (the worker set off, or a failure as it leaves it) so each is seen and captured whatever the
-// worker's tick; «Retry» goes through the API and the worker again. Captures `APP-BASE-ACTIVATION-S3-<step>-<width>`.
+// worker's tick; «Retry» goes through the API and the worker again. Each step is captured at each width.
 
 /** The copy the run keeps of what control knows `a`'s database has. */
 const SCHEMA = 'e2e_base_app_activation_schema_apps';

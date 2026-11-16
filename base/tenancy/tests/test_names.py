@@ -1,9 +1,9 @@
-"""Names of the hubs' databases (PLAN-DB §3 and §14.12; plan 2026-10-22-fase-2-tenencia §4, step 1).
+"""Names of the hubs' databases.
 
 A hub's database is the control database's name, ``_`` and the hub's whole UUID in hex (``hub_<hex>``; pre's
 ``pre_hub_<hex>``); a demo's is the control database's, ``_demo_`` and its hex (``hub_demo_<hex>``; pre's
-``pre_hub_demo_<hex>``: round 2026-10-30 of PLAN-DB, proposal (e)). Nothing is ever truncated (the first half of a UUIDv7 is its date),
-every name is validated against the control database it belongs to and reaches SQL only as ``sql.Identifier``.
+``pre_hub_demo_<hex>``). Nothing is ever truncated (the first half of a UUIDv7 is its date), every name is validated
+against the control database it belongs to and reaches SQL only as ``sql.Identifier``.
 """
 
 import uuid
@@ -62,7 +62,7 @@ def test_the_names_of_a_control_database_are_valid(name):
         f"hub_{HEX.upper()}",  # not lowercase hex
         f"hub_{HEX[:-1]}g",  # not hex
         f"pre_hub_{HEX}",  # another control database's
-        f"demo_{HEX}",  # a demo without its control database (before round 2026-10-30)
+        f"demo_{HEX}",  # a demo without its control database's name
         f"pre_hub_demo_{HEX}",  # another control database's demo
         f"hub_demo_{HEX[:-1]}",  # a truncated demo
         f"hub_{HEX}; DROP DATABASE hub",
@@ -141,7 +141,7 @@ def test_only_a_hubs_or_a_demos_database_passes_as_one_a_template_never():
         names.validate_hub(f"pre_hub_{HEX}", control="hub")
 
 
-# ── The copy a hub leaves behind when it moves (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ────────────────
+# ── The copy a hub leaves behind when it moves ───────────────────────────────────────────────────────────────────────
 
 
 def test_a_moved_copy_is_its_control_databases_move_and_the_hex_of_its_hub():
@@ -159,7 +159,55 @@ def test_only_a_moved_copy_passes_as_one_never_a_hub_a_demo_or_a_template():
             names.validate_moved(other, control="hub")
 
 
+# ── The database a restore replaced, kept aside (base.tenancy.restore) ───────────────────────────────────────────────
+
+
+def test_a_kept_copy_is_its_control_databases_old_and_the_hex_of_its_own_uuid7():
+    kept = uuid.uuid7()
+    assert names.kept_db_name("hub", kept) == f"hub_old_{kept.hex}"
+    assert names.kept_db_name("pre_hub", kept) == f"pre_hub_old_{kept.hex}"
+    # It fits after the longest control database, as a demo's does.
+    assert names.kept_db_name("c" * names.MAX_CONTROL, kept)
+    assert names.is_kept(f"hub_old_{HEX}", control="hub")
+
+
+def test_a_left_behind_copy_is_a_moved_or_a_kept_one_never_a_hub_a_demo_or_a_template():
+    for copy in (f"hub_move_{HEX}", f"hub_old_{HEX}"):
+        assert names.is_left_behind(copy, control="hub")
+        assert names.validate_left_behind(copy, control="hub") == copy
+    for other in (f"hub_{HEX}", f"hub_demo_{HEX}", "hub_template", f"pre_hub_old_{HEX}", f"hub_old_{HEX[:-1]}"):
+        assert not names.is_left_behind(other, control="hub")
+        with pytest.raises(names.InvalidDatabaseName):
+            names.validate_left_behind(other, control="hub")
+    # Neither is a hub's own database to drop with it (``ops.drop_database``).
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate_hub(f"hub_old_{HEX}", control="hub")
+
+
 def test_a_moved_copy_is_no_hubs_own_database_to_drop_with_it():
     # ``validate_hub`` (``ops.drop_database``) takes a hub's or a demo's database only: a copy is dropped by the move.
     with pytest.raises(names.InvalidDatabaseName):
         names.validate_hub(f"hub_move_{HEX}", control="hub")
+
+
+# ── A hub's database as it was at a moment, made aside (base.tenancy.restore, «restore aside») ───────────────────────
+
+
+def test_a_copy_aside_is_its_control_databases_copy_and_the_hex_of_its_own_uuid7():
+    made = uuid.uuid7()
+    assert names.copy_db_name("hub", made) == f"hub_copy_{made.hex}"
+    assert names.copy_db_name("pre_hub", made) == f"pre_hub_copy_{made.hex}"
+    # It fits after the longest control database, as a demo's does.
+    assert names.copy_db_name("c" * names.MAX_CONTROL, made)
+    assert names.is_copy_aside(f"hub_copy_{HEX}", control="hub")
+    for other in (f"hub_{HEX}", f"hub_old_{HEX}", f"pre_hub_copy_{HEX}", f"hub_copy_{HEX[:-1]}"):
+        assert not names.is_copy_aside(other, control="hub")
+
+
+def test_a_copy_aside_is_closed_to_the_app_and_only_dropped_as_a_left_behind_copy_never_a_hubs_database():
+    copy = f"hub_copy_{HEX}"
+    # Left behind: no process registers an alias of it (``connections.register_hub_alias``), the worker drops it.
+    assert names.is_left_behind(copy, control="hub")
+    assert names.validate_left_behind(copy, control="hub") == copy
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate_hub(copy, control="hub")

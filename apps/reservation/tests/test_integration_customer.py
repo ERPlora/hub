@@ -11,9 +11,9 @@ from apps.customer.models import Customer
 from apps.reservation import events
 from apps.reservation.models import Reservation, WaitlistEntry
 
-from .conftest import A, book, ctx_for, make_customer, open_week, run
+from .conftest import A, HUB_DB, book, ctx_for, make_customer, open_week, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 
@@ -46,8 +46,8 @@ ONLY_BOOKING = {"reservation.add_reservation", "reservation.view_reservation"}
 
 
 def test_who_may_only_book_finds_the_guests_card_by_her_phone():
-    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED: booking by phone looked the card up with the caller's own
-    # rights in Customers, so an automation that may book was refused («customer.view») and booked nothing.
+    # The card is looked up for the booking, not with the caller's own rights in Customers: an automation that may
+    # book and not read Customers («customer.view») still books.
     card = make_customer("Ana García", phone="600111222")
     out = book(guest_phone="600 111 222", ctx=ctx_for(permissions=ONLY_BOOKING))
     assert out.customer_id == card.id
@@ -184,9 +184,6 @@ def test_seating_a_reservation_of_an_erased_card_seats_it_without_the_card():
     run("customer.customer.erase", {"id": str(out.customer_id)}, system_context(A))
     seated = run("reservation.reservation.seat", {"id": str(out.id)})
     assert seated.status == "seated" and seated.table_session_id is not None
-
-
-# ── Review of 2026-10-15 ─────────────────────────────────────────────────────────────────────────
 
 
 def test_a_phone_typed_with_a_chosen_card_is_the_one_kept():

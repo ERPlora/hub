@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:111b767314cccaaa7222b0c57689db66add06672a52c2329ea97930b5a1cdb5b -->
+<!-- generated from WORKBOOK.md sha256:c17f63ce331a609e58955d32739ca1871a764ba77d70162e029ab545bd26b0d7 -->
 
 ## What it is for and who it is for
 
@@ -115,6 +115,12 @@ Title "Group — {name}" and its rule. Two sections:
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
 
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); a supplement rewritten by itself in the business's currency is no change.
+
 ## Flows
 
 | ID | Flow | Status |
@@ -128,6 +134,7 @@ Title "Group — {name}" and its rule. Two sections:
 | MODIFIER-F07 | Charge the supplement: price and VAT | done |
 | MODIFIER-F08 | Have the supplement show on the kitchen ticket | done |
 | MODIFIER-F09 | Unlink the groups of a product or a category that is deleted | done |
+| MODIFIER-F10 | Recover the modifier groups, and those of a product or of a category, from a separate copy | done |
 
 ### MODIFIER-F01 Look up and search the groups
 Status: done
@@ -163,7 +170,8 @@ In: what the person types.
 Out: the group (announces: group created). It creates no options or links.
 If it fails: an empty name or one of more than 255 characters, a minimum or maximum outside 0–50 or a
 maximum below the minimum show under their field; a name another group already has, "There is already
-a group with that name." under the Name. What was typed stays.
+a group with that name." under the Name. The reason of a field goes as soon as that field is corrected, even if
+another one says the same (hub#888). What was typed stays.
 Involved: none
 
 ### MODIFIER-F03 Change or delete a group
@@ -181,7 +189,9 @@ single operation (announces: group deleted). What was already ordered or sold do
 freezes the supplement in the line.
 If it fails: the same refusals as when creating; lowering the maximum below the options that already
 come by default, "This group has more options chosen by default than its maximum.". A group that does
-not exist, "This group does not exist.".
+not exist, "This group does not exist.". Through the assistant, a name that fits several groups or none brings up
+no card, and if before the "yes" another group fits better what was said, nothing is changed or deleted and the new
+card comes up (BASE-F97).
 Involved: SALE-F11
 
 ### MODIFIER-F04 Add, change or remove the options of a group
@@ -203,11 +213,20 @@ In: the group, name, kitchen ticket name, supplement, own tax category, order an
 default.
 Out: the option (announces: option created, changed or deleted). Deleting it takes it out of the
 catalogue: what was already ordered keeps its frozen copy, also on the kitchen ticket.
-If it fails: an empty name or one repeated in the group, a supplement that is not an amount, a tax
+If it fails: "Create" and "Save" are grey while the name is missing and while the business has not yet
+said its currency, because the supplement is read in it (without it, "150" yen would be saved as 15,000); until
+then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł"
+are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938). An
+empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their
-field. An option with its own tax category is charged on a separate line, which cannot be worth zero or
+field; the one of the name, the kitchen ticket name, the supplement, the tax category or the order goes as soon as
+that field is corrected, even if another one says the same (hub#888), and the one of "Chosen by default" as soon as
+that switch is changed, without saving again (hub#1437). An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more
-than zero.". A group holds up to 100 options.
+than zero.". A group holds up to 100 options. Through the assistant, when changing or removing an option, a group
+said by its name that fits several or none brings up no card, and if before the "yes" another group fits better what
+was said, nothing is touched and the new card comes up (BASE-F97).
 Involved: SALE-F11
 
 ### MODIFIER-F05 Link a group to products or categories, and unlink it
@@ -226,7 +245,10 @@ Out: the link (announces: link made or removed). At the till, the item asks for 
 **all** its categories, each group only once.
 If it fails: a product or a category that does not exist or is deleted, "This product does not exist in
 this hub." or "This category no longer exists."; a link that already exists, "This group already
-applies there.".
+applies there.". Through the assistant, unlinking a group said by its name that fits several or none brings up no
+card, and if before the "yes" another group fits better what was said, nothing is unlinked and the new card comes up
+(BASE-F97). A link to a product or a category already deleted brings up no card either ("This group does not apply
+there."): MODIFIER-F09 removes it.
 Involved: INVENTORY-F01, INVENTORY-F06
 
 ### MODIFIER-F06 Choose the options when selling an item
@@ -312,8 +334,76 @@ In: Inventory's notice (product deleted, category deleted).
 Out: the links removed. While the notice arrives, a link to something deleted is no longer seen in the
 group's sheet nor asked at the till.
 If it fails: repeating the notice changes nothing; the deletion of one business never removes the
-links of another.
-Involved: INVENTORY-F04, INVENTORY-F07
+links of another. If ERPlora's staff later recover the product from a separate copy, its groups come back with it
+(MODIFIER-F10).
+Involved: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
+
+### MODIFIER-F10 Recover the modifier groups, and those of a product or of a category, from a separate copy
+Status: done
+Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
+Screen: none of Modifiers: in the Hubs admin, Separate copies › "Recover into the business…", with **Modifier groups,
+Modifier options, Modifier groups of categories, Modifier groups of products** ticked (it is, like everything that can
+be brought back)
+Steps:
+1. The staff recover from a separate copy with **Modifier groups, Modifier options, Modifier groups of categories,
+   Modifier groups of products** ticked. Modifiers always goes after Inventory, in whatever order it is asked: a deleted category or
+   product that comes back is already live when its groups are linked to it.
+2. First, each group of the copy the business no longer has (it deleted it, and deleting it takes its options and its
+   links with it, F03) is created again as the Modifiers screen creates it (F02), with its name, its kitchen ticket
+   name, its minimum and its maximum, whether an option can be repeated and its order, and with its options as the
+   group's sheet adds them (F04), each with its name, its kitchen ticket name, its supplement, its own tax category,
+   whether it comes chosen by default and its order. It comes back as a new group, with another identifier, and in the
+   next steps its links of the copy are made to that one: the one the recovery brought back with its name.
+3. Then, each option that in the copy had a group the business keeps (the same one, even renamed, or the one an
+   earlier recovery brought back with its name) and that this group no longer has, because the business took it away
+   (F04), is added again as the group's sheet adds it (F04), with its name, its kitchen ticket name, its supplement,
+   its own tax category and its order. If in the copy it came chosen by default, it comes back chosen only if the
+   group has room for it: it never takes that from the ones the business chose. In a "choose one" group that already
+   comes with another one by default, or in one that already comes with as many as its maximum, it comes back not
+   chosen and its note says so.
+4. Each group that in the copy hung from a product live in it and that the business no longer has linked to that
+   product is linked again, as the group's sheet links it (MODIFIER-F05): the product asks again at the till for its
+   sauces, its doneness or its extras. A product the business no longer had at all comes back as a new one, with
+   another identifier (INVENTORY-F01): its groups are linked to that one, the one the recovery made with its SKU.
+5. Before that, the same with each group that in the copy hung from a category live in it and that the business no
+   longer has linked to that category: all the category's products ask for it again. A deleted category always comes
+   back as a new one, with another identifier (INVENTORY-F07): its groups are linked to that one, the one the recovery
+   brought back with its name.
+6. Recoveries counts each thing apart: "Modifier groups: 1 created", "Modifier options: 1 created", "Modifier groups
+   of categories: 2 created" and "Modifier groups of products: 2 created".
+In: the separate copy and what the business has today.
+Out: a group for each one that was missing, with its group-created notice (`modifier.group.created`) and that of each of
+its options (`modifier.option.created`), an option for each one a group the business keeps was missing, with its
+option-created notice (`modifier.option.created`), and a link for each one that was missing, with its link-made notice
+(`modifier.link.attached`), all made by the recovery, so no automation starts (FLOW-F21); nothing else. The open screens
+of Modifiers, the till and Kitchen's routing see at once the product that comes back, as they saw it being deleted;
+those of Modifiers and the till, also each group that hangs again from a category or a product.
+If it fails: a link the business still has stays as it is, and one whose group the business has linked to that product
+or that category again is not repeated: the business's own stays, and asking again links nothing twice. A group the
+business unlinked from a product by hand after the copy comes back too, like everything the business no longer has
+(BASE-F114). What the group's sheet does not accept today does not come back and Recoveries says why, by the link's
+identifier in the copy: a product that stays deleted or that the business no longer has (Products was not recovered, or
+the business already made another one by hand with its SKU, which keeps the groups it linked to it) or a group the
+business deleted and already made again by hand with its name ("not_found: …"). That group made by hand stays as the
+business left it, with its options and its links: no other one is created with its name, and nothing is added to it or
+linked. A group the business keeps, even renamed, stays with the options it has, changed or not, and only gets back the
+ones it took away; one the business already made again with its name in that group, the case aside, is not repeated: the
+business's own stays. An option chosen by default that does not fit comes back not chosen, the business's stay chosen,
+and its count says so ("Modifier options: 1 created, 1 with notes"), with the note "came back not chosen by default: its
+group already comes with "Ketchup"" by the option's identifier in the copy. An option the group's sheet does not accept
+today (its own tax category is no longer active in Taxes, or the group already has 100 options) does not come back and
+its reason says why, and none comes back to a group the business deleted and made again by hand ("not_found: …"). The
+options of a group that comes back whole in that same recovery come back with it and are not counted twice: of those,
+one the group's sheet does not accept today (its own tax category is no longer active in Taxes) does not come back: the
+group comes back without it, its count says so ("Modifier groups: 1 created, 1 with notes") and its page says in "notes"
+which option and why, by the group's identifier in the copy. Asking again creates no group twice: the one the recovery
+brought back is the business's already. The product a recovery made is known by its SKU, whether this recovery made it
+or an earlier one: asked again from an earlier copy, it gets back the groups the business unlinked from it afterwards,
+like everything it no longer has. The same with the categories: one that stays deleted (Products was not recovered) or
+that the business already made again by hand with its name, which keeps the groups it linked to it, gets none and
+Recoveries says why ("not_found: …"); the one a recovery brought back is known by its name, whether this recovery
+brought it back or an earlier one.
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ## Services: what goes in and what comes out
 
@@ -322,7 +412,29 @@ own session) and the API, with the same rules and the same permissions. Designed
 named by its id or its name ("group Sauces"), an option by its id or its name and its group ("option No
 onion of Extras"), a product by its id, its SKU or its name and a category by its id or its name. If a
 name fits several, it is refused saying which ones (409 `*_ambiguous`). Before changing anything, the assistant asks
-for confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id.
+for confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id. A group
+said by its name when changing or deleting it, when changing or removing one of its options or when unlinking it from a
+product or a category is looked up as the action will look it up (the same name before one that contains it), and the
+card shows the group that will be touched, with its full name ("Group: Spicy sauces" when "sauce" was said). If what
+was said fits several groups or none, no card comes up: the assistant hears "«sauces» names several groups: Spicy
+sauces, Sweet sauces. Say which one." and asks which one, or "This group does not exist.". The "yes" counts only for
+what the card showed: if, before confirming, someone creates a group that fits better what was said ("Sauce" when the
+card said "Spicy sauces"), nothing is touched and the new card comes up. When adding an option to a group or applying
+it said by its name, the card shows the group it found all the same and the "yes" counts only for it; if what was said
+fits several groups, the card shows it as it was said and the action asks which one. An option said by its name comes
+up as it is found, with its group ("Option: Aioli (Spicy sauces)" when "aio" was said), or as it was said if it fits
+several (hub#1245). If the group, the option or the link comes by its identifier beside another group's name, the
+card neither reads nor shows that name, which the action does not use: it says the record of the identifier (hub#1250).
+An option by its identifier is looked for inside the group said beside it, so that group does come up. When letting
+a group go by the link's identifier, the card does not show either the group, the product or the category whose
+identifier comes beside it, which the action does not look at (hub#1278). When applying or letting go a group, a
+product said by its SKU or its name and a category said by its name are looked up as the action will look them up,
+and the card shows the one that will be touched ("Product: Pizza" when "pizz" was said); when applying it, if what was
+said fits several, the card shows it as it was said and the action asks which one, and the "yes" counts only for what
+it showed: if, before confirming, someone creates one that fits better what was said, nothing is applied and the new
+card comes up. If the product, the category or the link comes by its identifier beside the name of another product or
+another category, the card does not show that name, which the action does not use: it says the one of the identifier
+(hub#1291).
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -350,7 +462,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Adds an option to a group | manage | F04 | `modifier.option.create` |
 | Changes an option (what is not sent stays) | manage | F04 | `modifier.option.update` |
 | Deletes an option | manage | F04 | `modifier.option.delete` |
-| Links a group to a product or a category | manage | F05 | `modifier.link.attach` |
+| Links a group to a product or a category | manage | F05, F10 | `modifier.link.attach` |
 | Unlinks a group from a product or a category | manage | F05 | `modifier.link.detach` |
 
 ### What it announces
@@ -359,7 +471,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 |---|---|---|---|
 | Group created, changed or deleted | F02, F03 | The group (`id`, `name`) | `modifier.group.created`, `.updated`, `.deleted` |
 | Option created, changed or deleted | F04 | The option, its group, its name and its supplement | `modifier.option.created`, `.updated`, `.deleted` |
-| Link made or removed | F05, F09 | The group and the product or the category | `modifier.link.attached`, `.detached` |
+| Link made or removed | F05, F09, F10 | The group and the product or the category | `modifier.link.attached`, `.detached` |
 
 ### What it reacts to
 
@@ -373,6 +485,8 @@ The groups, a group, the options, the links and the groups of a product can be f
 - **Inventory** (requirement): its products and categories, which each link points at, and the
   categories of each product, to know which groups it carries at the till.
 - **Taxes** (requirement): the own tax category of an option.
+- **From the platform**: the recovery from a separate copy (BASE-F114), to which Modifiers says which groups, with
+  their options, and which links to categories and products it gives back (F10).
 
 ### Who uses it
 
@@ -388,5 +502,4 @@ The groups, a group, the options, the links and the groups of a product can be f
 | See groups, options and links; ask for the groups of a product and price a choice | yes | yes | yes | yes | `modifier.view` |
 | Create, change and delete groups and options; link and unlink | yes | yes | yes | no | `modifier.manage` |
 
-The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee.
+The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

@@ -1,4 +1,4 @@
-"""Django admin of the invoice app, for the platform's staff (hubs.erplora.com, PLAN §17–§18).
+"""Django admin of the invoice app, for the platform's staff (hubs.erplora.com).
 
 Series and issuer: full CRUD, ids and dates read-only. Invoices and their lines: every field is shown and
 the fiscal ones are read-only; there is no adding (the number comes only from the operations) and no
@@ -18,7 +18,9 @@ from apps.invoice.admin import (
     IssuerAdmin,
 )
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
-from apps.invoice.tests.conftest import run
+from apps.invoice.tests.conftest import A, HUB_DB, run
+
+PLATFORM_HOST = "hubs.localhost"
 
 FISCAL = {
     "invoice_type",
@@ -65,6 +67,12 @@ def superuser(db):
     )
 
 
+def staff_in_business_a(client, user) -> None:
+    """The staff signed in on the platform's host, with business A chosen, as the admin's business picker leaves them."""
+    client.force_login(user)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM_HOST)
+
+
 def request_by(user):
     request = RequestFactory().get("/admin/")
     request.user = user
@@ -78,6 +86,7 @@ def test_the_four_models_are_registered():
     assert admin.site._registry[Invoice].inlines == [InvoiceLineInline]
 
 
+@HUB_DB
 def test_series_and_issuer_have_full_crud(superuser):
     request = request_by(superuser)
     for model in (InvoiceSeries, Issuer):
@@ -89,6 +98,7 @@ def test_series_and_issuer_have_full_crud(superuser):
         assert {"id", "updated_at"} <= set(model_admin.get_readonly_fields(request))
 
 
+@HUB_DB
 def test_an_issued_invoice_is_read_with_its_fiscal_fields_read_only_and_never_deleted(
     superuser,
 ):
@@ -112,7 +122,7 @@ def test_an_issued_invoice_is_read_with_its_fiscal_fields_read_only_and_never_de
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_pages_render(client, superuser, issuer):
     invoice = run(
         "invoice.invoice.create",
@@ -131,7 +141,7 @@ def test_the_pages_render(client, superuser, issuer):
         },
     )
     series = InvoiceSeries.objects.get(code="FACT")
-    client.force_login(superuser)
+    staff_in_business_a(client, superuser)
     pages = {
         "/admin/invoice/invoice/": invoice.number.encode(),
         f"/admin/invoice/invoice/{invoice.id}/change/": b"Hair course",
@@ -142,12 +152,12 @@ def test_the_pages_render(client, superuser, issuer):
         f"/admin/invoice/issuer/{Issuer.objects.get().pk}/change/": b"Calle Mayor 1",
     }
     for path, content in pages.items():
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = client.get(path, HTTP_HOST=PLATFORM_HOST)
         assert response.status_code == 200, path
         assert content in response.content, path
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_staff_can_change_the_notes_of_an_invoice_and_nothing_fiscal(
     client, superuser, issuer
 ):
@@ -165,7 +175,7 @@ def test_the_staff_can_change_the_notes_of_an_invoice_and_nothing_fiscal(
             ],
         },
     )
-    client.force_login(superuser)
+    staff_in_business_a(client, superuser)
     response = client.post(
         f"/admin/invoice/invoice/{invoice.id}/change/",
         {
@@ -178,14 +188,14 @@ def test_the_staff_can_change_the_notes_of_an_invoice_and_nothing_fiscal(
             "lines-0-id": str(invoice.lines[0].id),
             "lines-0-invoice": str(invoice.id),
         },
-        HTTP_HOST="hubs.localhost",
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert response.status_code == 302, response.content[:2000]
     stored = Invoice.objects.get(pk=invoice.id)
     assert (stored.notes, stored.total_amount) == ("Checked by support", 165)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_series_keeps_its_identity_and_freezes_its_numbering_once_it_numbers(
     superuser, issuer
 ):
@@ -221,9 +231,9 @@ def test_a_series_keeps_its_identity_and_freezes_its_numbering_once_it_numbers(
     assert identity | numbering <= set(series_admin.get_readonly_fields(request, shop))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_issuer_form_checks_the_tax_id(client, superuser):
-    client.force_login(superuser)
+    staff_in_business_a(client, superuser)
     form = {
         "legal_name": "Peluquería Ana SL",
         "tax_id": "B12345675",
@@ -235,13 +245,13 @@ def test_the_issuer_form_checks_the_tax_id(client, superuser):
         "source": "manual",
         "singleton": "on",
     }
-    refused = client.post("/admin/invoice/issuer/add/", form, HTTP_HOST="hubs.localhost")
+    refused = client.post("/admin/invoice/issuer/add/", form, HTTP_HOST=PLATFORM_HOST)
     assert refused.status_code == 200 and b"tax ID is not valid" in refused.content
     assert not Issuer.objects.exists()
     saved = client.post(
         "/admin/invoice/issuer/add/",
         {**form, "tax_id": "b-12345674"},
-        HTTP_HOST="hubs.localhost",
+        HTTP_HOST=PLATFORM_HOST,
     )
     assert saved.status_code == 302, saved.content[:2000]
     assert Issuer.objects.get().tax_id == "B12345674"

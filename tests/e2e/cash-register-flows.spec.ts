@@ -7,9 +7,10 @@
 // the settings it changes go back as they were.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
+import { discardChanges, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CRF-${RUN}`;
@@ -34,7 +35,7 @@ async function flowShots(page: Page, flow: string, ready: (page: Page) => Promis
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready(page);
     // A new size relays the shell out (menu, tabs): one page header on screen once it settled, never a
-    // second copy of the page under the first (hub#1987 saw one on Android).
+    // second copy of the page under the first (as seen on Android).
     await expect
       .poll(() =>
         page.evaluate(
@@ -218,16 +219,21 @@ test('CASH_REGISTER-F01, F02: the settings and the drawers, in three sizes', asy
 
 test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three sizes', async ({ page, context }) => {
   await login(page, A, '/cash_register/sessions');
+  await saveSessionForTheSweep(context);
   await closeLeftOpen(context);
   await sessionsReady(page);
 
-  // F03: «Open session», with a finger-sized button (cash_register#12).
+  // F03: «Open session», with a finger-sized button.
   const openButton = shown(page).locator('[data-testid=cash-register-new-session]');
   expect((await openButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await openButton.click();
   const open = dialog(page, 'cash-register-open');
   await expect(open).toBeVisible();
+  // hub#1160: the float is read as any price of the Hub: «0,515» is no amount in euros, said under it on leaving.
+  await fill(open, 'cash-register-open-balance', '0,515');
+  await expect(open.locator('[data-testid=cash-register-open-balance]')).toContainText(/This is not an amount\.|Esto no es un importe\./);
   await fill(open, 'cash-register-open-balance', '50,00');
+  await expect(open.locator('[data-testid=cash-register-open-balance] input')).toHaveValue(/^50[.,]00$/);
   await flowShots(page, 'CASH_REGISTER-F03', async () => {
     await expect(open.locator('[data-testid=cash-register-open-submit]')).toBeVisible();
   });
@@ -246,13 +252,18 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-movement]`).first().click();
   const movement = dialog(page, 'cash-register-movement');
   await expect(movement).toBeVisible();
+  // hub#1160: «12,555» is 12.555 €, as in a price: rewritten in the page format on leaving the field.
+  await fill(movement, 'cash-register-movement-amount', '12,555');
+  await expect(movement.locator('[data-testid=cash-register-movement-amount] input')).toHaveValue(/^12555[.,]00$/);
   await flowShots(page, 'CASH_REGISTER-F05', async () => {
     await expect(movement.locator('[data-testid=cash-register-movement-submit]')).toBeVisible();
   });
+  // As it opened, the window closes without asking (BASE-F05).
+  await fill(movement, 'cash-register-movement-amount', '');
   await movement.locator('[data-testid=cash-register-movement-cancel]').click();
   await expect(movement).toBeHidden();
 
-  // F06: the count by notes and coins (cash_register#114: no face value cut on the phone).
+  // F06: the count by notes and coins (no face value cut on the phone).
   await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-count]`).first().click();
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
@@ -262,10 +273,12 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await flowShots(page, 'CASH_REGISTER-F06', async () => {
     await expect(count.locator('[data-testid=cash-register-count-total]')).toBeVisible();
   });
+  // With notes counted, «Cancel» asks before throwing the count away (BASE-F05, hub#1234).
   await count.locator('[data-testid=cash-register-count-cancel]').click();
+  await discardChanges(page);
   await expect(count).toBeHidden();
 
-  // F09: the close, with the expected and the difference while typing (cash_register#83, #90).
+  // F09: the close, with the expected and the difference while typing.
   await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-close]`).first().click();
   const close = dialog(page, 'cash-register-close');
   await expect(close).toBeVisible();
@@ -281,6 +294,27 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await expect(close).toBeHidden();
   const closed = await detailOf(context, session.id);
   expect([closed.status, closed.expected_balance]).toEqual(['closed', 6210]);
+});
+
+test('BASE-F05: the windows of a shift ask «Discard changes?» on every way out with something typed (hub#1234)', async ({ page, context }) => {
+  await login(page, A, '/cash_register/sessions');
+  await closeLeftOpen(context);
+  /** A window of the sessions screen, by the button that opens it and a field that opens blank. */
+  const shift = (flow: string, form: string, add: string, field: string): UnsavedFormCase => ({
+    app: 'cash_register',
+    flow,
+    route: '/cash_register/sessions',
+    add: (on) => shown(on).locator(`[data-testid=${add}]`).filter({ visible: true }).first(),
+    form,
+    field,
+  });
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F03', 'cash-register-open', 'cash-register-new-session', 'cash-register-open-notes'), 'HUB-1234-open');
+  const id = await openByApi(context, 5000);
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F05', 'cash-register-movement', `cash-register-sessions-row-${id}-movement`, 'cash-register-movement-concept'), 'HUB-1234-movement');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F06', 'cash-register-count', `cash-register-sessions-row-${id}-count`, 'cash-register-count-notes'), 'HUB-1234-count');
+  await expectWaysOutAskOnDirtyForm(page, shift('CASH_REGISTER-F09', 'cash-register-close', `cash-register-sessions-row-${id}-close`, 'cash-register-close-notes'), 'HUB-1234-close');
+  expect((await detailOf(context, id)).status).toBe('open');
+  await closeByApi(context, id, 5000);
 });
 
 test('CASH_REGISTER-F04: with the drawer on and no session, the till refuses cash', async ({ page, context }) => {
@@ -460,7 +494,7 @@ test('CASH_REGISTER-F12: the drawer’s figures above the sessions, short in red
   await flowShots(page, 'CASH_REGISTER-F12', async (p) => {
     await expect(shown(p).locator('[data-testid=cash-register-figures]')).toBeVisible();
   });
-  // On a tablet the amount stays on one line and the card titles are whole (outfitkit#246, #248).
+  // On a tablet the amount stays on one line and the card titles are whole.
   await page.setViewportSize({ width: 834, height: 1112 });
   const amount = figures.locator('[data-testid=cash-register-figures-expected]');
   // One line is about 1.2–1.5 times the font size; two lines pass twice it.

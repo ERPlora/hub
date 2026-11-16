@@ -58,8 +58,7 @@ describe('AutomationsPage', () => {
     expect(some.wrapper.findComponent(FlowGallery).props('flows')).toEqual([flow('f1')]);
   });
 
-  // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF: the list of the automations used to
-  // subscribe only once the count arrived, so the stream was closed (net::ERR_ABORTED) and opened again on every visit.
+  // Subscribing to the list only once the count arrived would close the stream (net::ERR_ABORTED) and open it again.
   it('opens one live stream for the whole page: the automations arriving reopen nothing', async () => {
     const m = await setup('/flow/automations', [flow('f1')]);
     await m.reopen();
@@ -111,7 +110,7 @@ describe('AutomationsPage', () => {
   });
 });
 
-describe('AutomationsPage: review 2026-10-15, item 5', () => {
+describe('AutomationsPage: an unreadable catalog and what waits for an answer', () => {
   it('a catalog that could not be read is said, with «Retry»', async () => {
     const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] } });
     await m.live();
@@ -140,10 +139,82 @@ describe('AutomationsPage: review 2026-10-15, item 5', () => {
   });
 });
 
+// hub#950: with the business slow, the page showed only the gallery while the automations, the questions and the
+// drafts were still being read, as if there were none: it says «Loading…» above the gallery until each has its
+// first answer (WORKBOOK «Estados de cada pantalla · Cargando»); a list that could not be read says so, with «Retry».
+describe('AutomationsPage: loading, empty and error of what sits above the gallery (hub#950)', () => {
+  const ABOVE = ['flow.flow.list', 'flow.question.list', 'flow.draft.list'] as const;
+  const EMPTY = { 'flow.flow.list': page([], 0, 100), 'flow.question.list': page([], 0), 'flow.draft.list': page([], 0) };
+  const MATCH = { 'flow.flow.list': { limit: 100 }, 'flow.question.list': {}, 'flow.draft.list': {} };
+
+  async function opened() {
+    const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [200, CATALOG] } });
+    await m.live();
+    await settle();
+    return m;
+  }
+  const loading = (m: Awaited<ReturnType<typeof opened>>) => m.find('flow-page-loading');
+  /** Whether `testid` comes before the gallery in the page. */
+  const aboveGallery = (m: Awaited<ReturnType<typeof opened>>, testid: string) =>
+    !!(m.find(testid).element.compareDocumentPosition(m.wrapper.findComponent(FlowGallery).element) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('says «Loading…» above the gallery once the catalog is in, while the rest is still being read', async () => {
+    const m = await opened();
+    expect(m.wrapper.findComponent(FlowGallery).props('catalog')).toEqual(CATALOG);
+    expect(loading(m).exists()).toBe(true);
+    expect(loading(m).text()).toBe('Loading…');
+    // Read out by a screen reader as the table's own «Loading…» is; the dots are decoration.
+    expect(loading(m).attributes('role')).toBe('status');
+    expect(loading(m).find('ion-spinner').attributes('aria-hidden')).toBe('true');
+    expect(aboveGallery(m, 'flow-page-loading')).toBe(true);
+  });
+
+  it.each(ABOVE)('still says «Loading…» while only %s has not answered, and stops when it does', async (late) => {
+    const m = await opened();
+    for (const op of ABOVE) if (op !== late) await m.result(op, EMPTY[op], MATCH[op]);
+    await settle();
+    expect(loading(m).exists()).toBe(true);
+    await m.result(late, EMPTY[late], MATCH[late]);
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    expect(m.wrapper.findComponent(FlowGallery).exists()).toBe(true);
+  });
+
+  it('says «Loading…» while the catalog is read again after «Retry», with the rest already in', async () => {
+    const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] } });
+    await m.live();
+    await settle();
+    for (const op of ABOVE) await m.result(op, EMPTY[op], MATCH[op]);
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    let answer!: (response: Response) => void;
+    m.net.onApi(() => new Promise<Response>((resolve) => (answer = resolve)));
+    await click(m.find('flow-catalog-retry').element);
+    expect(loading(m).exists()).toBe(true);
+    answer(Response.json(CATALOG));
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    expect(m.wrapper.findComponent(FlowGallery).props('catalog')).toEqual(CATALOG);
+  });
+
+  it('a list that could not be read stops «Loading…» and says so in red with «Retry», above the gallery', async () => {
+    const m = await opened();
+    for (const op of ABOVE) if (op !== 'flow.flow.list') await m.result(op, EMPTY[op], MATCH[op]);
+    for (const sub of m.params('flow.flow.list')) {
+      m.net.lastStream().push(errorFrame(m.subId('flow.flow.list', sub), 'internal_error'));
+    }
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    expect((m.wrapper.findComponent(FlowList).element as HTMLElement).style.display).not.toBe('none');
+    expect(m.find('flow-list-retry').exists()).toBe(true);
+    expect(aboveGallery(m, 'flow-list-retry')).toBe(true);
+  });
+});
+
 describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 to F36)', () => {
   it('a fix its app made never waits for the owner: nothing to press above «Your automations»', async () => {
-    // FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE: its app's condition already counts, so the old
-    // «… starts in more cases than it should» with «Update it» would say what is no longer true.
+    // Its app's condition already counts, so «… starts in more cases than it should» with «Update it» would say what
+    // is no longer true.
     const m = await setup('/flow/automations', [flow('f1')]);
     const installed = { flow_id: 'f1', name: 'My gap', enabled: true, outdated: true, missing_grants: [], repair: { 'input.by_customer': { eq: true } } };
     const gap = {
@@ -159,9 +230,9 @@ describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 t
   });
 });
 
-// FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE: on a phone «New automation», icon and words, took the bar and left
-// the title as «A…». There it is its «+» alone, still named «New automation» (Material's top app bar, iOS's
-// navigation bars); from a tablet on, its icon and its words, as before.
+// On a phone «New automation» with its icon and words would take the bar and leave the title as «A…». There it is
+// its «+» alone, still named «New automation» (Material's top app bar, iOS's navigation bars); from a tablet on, its
+// icon and its words.
 describe('AutomationsPage: «New automation» on a phone', () => {
   /** A window whose phone query answers `phone`, and can be resized. */
   function screenOf(phone: boolean) {

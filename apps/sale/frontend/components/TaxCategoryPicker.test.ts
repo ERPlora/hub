@@ -84,6 +84,12 @@ describe('TaxCategoryPicker: the field', () => {
     expect(s.field().errorText).toBe('Choose the VAT this department charges.');
     expect(s.field().classList.contains('ion-invalid')).toBe(true);
   });
+
+  // hub#888: a form window (FormModal) tells the refused field a person corrects by the `name` of its field.
+  it('hands its name to its field, as the form knows it', async () => {
+    const s = await setup({ name: 'tax_category_key' });
+    expect((s.field() as Control & { name?: string }).name).toBe('tax_category_key');
+  });
 });
 
 describe('TaxCategoryPicker: the choices, searched on the server', () => {
@@ -146,6 +152,21 @@ describe('TaxCategoryPicker: the choices, searched on the server', () => {
     expect(s.wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['restaurant.food']);
     expect(s.inDoc('tax-search')).toBeNull();
     expect(plain(String(s.field().value))).toBe('Restaurant — food · 10%');
+  });
+
+  // hub#888: nothing is typed in the field, so the form around it hears the choice as from a keystroke in it (a
+  // window takes the mark off its refused field so); closing the list changes nothing and says nothing.
+  it('choosing one tells the form around it, from its field; closing the list does not', async () => {
+    const s = await setup();
+    await s.result(OP, PAGE);
+    const heard: EventTarget[] = [];
+    s.wrapper.element.addEventListener('input', (event: Event) => heard.push(event.target as EventTarget));
+    await s.open();
+    await click(s.inDoc('tax-close'));
+    expect(heard).toEqual([]);
+    await s.open();
+    await click(s.wrapper.find('[data-testid="tax-option"][data-value="restaurant.food"]').element);
+    expect(heard).toEqual([s.field()]);
   });
 
   it('closes with its close button, choosing nothing', async () => {

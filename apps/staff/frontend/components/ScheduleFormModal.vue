@@ -5,18 +5,24 @@
 // proposes Monday to Friday with the business's default working day (`staff.settings.get`, followed
 // live; until it arrives, its own defaults) and sends `staff.schedule.create` for the member; editing sends
 // `staff.schedule.update`, which replaces the whole week. The server judges: a day's problem goes under
-// that day's row (its `days.<i>` named back to the weekday), a week without working days on the week.
+// that day's row (its `days.<i>` named back to the weekday), a week without working days on the week, and
+// each goes as soon as the person changes that day or the week.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import {
   blankScheduleForm,
-  dayErrors,
+  dayKey,
   daysPayload,
   DEFAULT_WORKDAY,
+  refusalByDay,
   type ScheduleForm,
   scheduleFormFromRecord,
   type WeekRow,
@@ -38,6 +44,8 @@ const props = withDefaults(
 
 const open = defineModel<boolean>('open', { default: false });
 
+const canDismiss = useUnsavedFormOnOpen('staff-schedule-form', () => form.value, open);
+
 const t = useT();
 /** The business's default working day (Staff › Settings, STAFF-F22): what a new week proposes. */
 const { data: settings } = useLive('staff.settings.get', {});
@@ -48,8 +56,17 @@ const sentDays = shallowRef<DayIn[]>([]);
 const creation = useCommand('staff.schedule.create');
 const update = useCommand('staff.schedule.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
-const error = computed(() => (props.schedule ? update.error.value : creation.error.value));
-const errorsByDay = computed(() => dayErrors(error.value?.fields ?? {}, sentDays.value));
+const error = computed(() => refusalByDay(props.schedule ? update.error.value : creation.error.value));
+/** The key of a day's refusal. Every control of that day carries it as its `name`, so FormModal takes the day's
+ *  reason away as soon as the person changes any of them. */
+const dayKeyOf = (weekday: number): string | undefined => dayKey(weekday, sentDays.value);
+/** What the refusal still says of a day. */
+function dayReason(fieldErrors: Readonly<Record<string, string>>, weekday: number): string | undefined {
+  const key = dayKeyOf(weekday);
+  return key === undefined ? undefined : fieldErrors[key];
+}
+/** A week without working days is refused on top of the week: a change to the week takes it away. */
+const weekChanged = useGroupChange('weekGroup');
 const title = computed(() => (props.schedule ? t('staff.schedules.form.titleEdit', { name: props.schedule.name }) : t('staff.schedules.form.titleNew')));
 
 watch(
@@ -71,6 +88,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 
 function setDay(weekday: number, change: Partial<WeekRow>): void {
   form.value = { ...form.value, week: form.value.week.map((day) => (day.weekday === weekday ? { ...day, ...change } : day)) };
+  weekChanged();
 }
 
 async function save(): Promise<void> {
@@ -105,6 +123,7 @@ const HOURS = [
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-schedule-form"
     :title="title"
     :submit-label="schedule ? $t('staff.save') : $t('staff.schedules.form.create')"
@@ -113,9 +132,12 @@ const HOURS = [
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-schedule-form">
+      <div
+        class="staff-schedule-form"
+      >
         <ion-input
           data-testid="staff-schedule-form-name"
+          name="name"
           :value="form.name"
           :label="$t('staff.schedules.form.name')"
           :placeholder="$t('staff.schedules.form.namePlaceholder')"
@@ -130,6 +152,7 @@ const HOURS = [
         <div class="staff-schedule-form__pair">
           <ion-input
             data-testid="staff-schedule-form-effective_from"
+            name="effective_from"
             type="date"
             :value="form.effective_from"
             :label="$t('staff.schedules.form.effectiveFrom')"
@@ -142,6 +165,7 @@ const HOURS = [
           />
           <ion-input
             data-testid="staff-schedule-form-effective_until"
+            name="effective_until"
             type="date"
             :value="form.effective_until"
             :label="$t('staff.schedules.form.effectiveUntil')"
@@ -162,7 +186,11 @@ const HOURS = [
         >
           {{ $t('staff.schedules.form.isDefault') }}
         </ion-checkbox>
-        <fieldset class="staff-week">
+        <FieldGroup
+          ref="weekGroup"
+          name="days"
+          class="staff-week"
+        >
           <legend class="staff-week__legend">
             {{ $t('staff.schedules.form.week') }}
           </legend>
@@ -181,6 +209,7 @@ const HOURS = [
           >
             <ion-checkbox
               :data-testid="`staff-schedule-form-day-${day.weekday}-working`"
+              :name="dayKeyOf(day.weekday)"
               class="staff-week__name"
               label-placement="end"
               justify="start"
@@ -199,6 +228,7 @@ const HOURS = [
               >
                 <ion-input
                   :data-testid="`staff-schedule-form-day-${day.weekday}-${hour.part}`"
+                  :name="dayKeyOf(day.weekday)"
                   class="staff-week__time"
                   type="time"
                   :value="day[hour.key]"
@@ -220,14 +250,14 @@ const HOURS = [
               :data-testid="`staff-schedule-form-day-${day.weekday}-off`"
             >{{ $t('staff.schedules.form.notWorking') }}</span>
             <p
-              v-if="errorsByDay[day.weekday]"
+              v-if="dayReason(fieldErrors, day.weekday)"
               class="staff-week__error"
               :data-testid="`staff-schedule-form-day-${day.weekday}-error`"
             >
-              {{ errorsByDay[day.weekday] }}
+              {{ dayReason(fieldErrors, day.weekday) }}
             </p>
           </div>
-        </fieldset>
+        </FieldGroup>
       </div>
     </template>
   </FormModal>
@@ -246,9 +276,6 @@ const HOURS = [
 .staff-week {
   display: grid;
   gap: 10px;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 .staff-week__legend {
   padding: 0;
@@ -256,6 +283,7 @@ const HOURS = [
   font-weight: 600;
 }
 .staff-week__day {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -263,22 +291,29 @@ const HOURS = [
   padding-top: 8px;
   border-top: 1px solid var(--ion-border-color, #e5e3dd);
 }
-/* The day's name is the checkbox label: clickable, and the accessible name of the box. */
+/* The day's name is the checkbox label: clickable, and the accessible name of the box. It keeps its whole width, so
+   it never breaks; the minimum lines up «Off» on every day in English and Spanish. */
 .staff-week__name {
-  width: 7.5rem;
+  min-width: 8.5rem;
   font-weight: 600;
 }
-.staff-week__name::part(label) {
-  white-space: normal;
-}
+/* The four hours go two by two in columns: start · «to» · end · «break», then the break's start · «to» · end. The
+   fields share what the words leave instead of a fixed width, so «Inicio descanso» reads whole. */
 .staff-week__hours {
-  display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
 }
-.staff-week__time {
-  width: 7.5rem;
+/* On a narrow phone «break» takes a line of its own between the two pairs, so the fields keep room for their hour. */
+@container (max-width: 21rem) {
+  .staff-week__hours {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .staff-week__hours > .staff-week__sep:nth-child(4) {
+    grid-column: 1 / -1;
+  }
 }
 .staff-week__sep {
   color: var(--ion-color-medium-shade, #5f5f5f);

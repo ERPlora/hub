@@ -1,8 +1,8 @@
 """Django admin of the schedule app: full CRUD on every model, for the platform's staff.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables. The intervals are lines of their day. A raw admin write records no event and skips the rules of
-engine.py (sorted, never overlapping): the screens and the assistant go through services.py.
+The Hub admin has full CRUD over all of a hub's tables. The intervals are lines of their day. A raw admin
+write records no event and skips the rules of engine.py (sorted, never overlapping): the screens and the
+assistant go through services.py.
 """
 
 from django.contrib import admin

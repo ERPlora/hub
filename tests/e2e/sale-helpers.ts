@@ -8,8 +8,8 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { createProduct, type Product } from './inventory-helpers';
-import { cleanInvoices, issuedIds } from './invoice-helpers';
+import { cleanInventory, createProduct, photoLoaded, type Product } from './inventory-helpers';
+import { cleanInvoices, ensureIssuer, issuedIds, parkIssuer, unparkIssuer } from './invoice-helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -77,6 +77,53 @@ export async function newestSaleOf(context: BrowserContext, sku: string): Promis
  *  `apps/sale/frontend/pages/PosPage.vue` (`PHONE`, `NARROW_TILL`): this window, or a till narrower than that. */
 const TILL_PHONE = { media: '(max-width: 820px), (max-height: 500px)', narrowerThan: 700 };
 
+/** The till (`/sale/pos`) painted: its frame, and its grid's first product or its empty state. */
+export async function tillReady(page: Page): Promise<void> {
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
+}
+
+/**
+ * Whether the till takes `button` — a tile of its grid or a row of its search, both Ionic buttons (SALE-F07,
+ * INVENTORY-F29): `data-aria-disabled` on the button, which greys it, and `aria-disabled` on its native button, which a
+ * screen reader announces. Never the host's own `aria-disabled`: Ionic moves it to the native button when it loads and
+ * leaves a later one on the host, where nothing reads it (hub#1337). A refused one still takes the tap, to say why.
+ */
+export async function expectTakes(button: Locator, takes: boolean): Promise<void> {
+  await expect(button).toHaveAttribute('data-aria-disabled', String(!takes));
+  const native = button.locator('button');
+  await expect(native).toHaveCount(1);
+  if (takes) await expect(native).not.toHaveAttribute('aria-disabled', 'true');
+  else await expect(native).toHaveAttribute('aria-disabled', 'true');
+}
+
+/** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
+export const TILL_TILE = ':scope > ion-button.pos-tile';
+
+/** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
+export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
+
+/** That one grid of the till is on screen and its first tile is `testid`'s (COMBO-F07, SALE-F12: the menus go first). */
+export async function expectFirstTile(page: Page, testid: string | RegExp): Promise<void> {
+  const grid = tillGrid(page);
+  await expect(grid, 'one grid of the till on screen').toHaveCount(1);
+  await expect(grid.locator(TILL_TILE).first()).toHaveAttribute('data-testid', testid);
+}
+
+/**
+ * The width the photo of `tile` loaded at, once it is on screen: the image named after its item `name`, as ItemImage.vue
+ * names it, never a style class of the tile, which a restyle renames. With `src`, it is also that image.
+ */
+export async function tilePhotoLoaded(tile: Locator, name: string, src?: string): Promise<number> {
+  const photo = tile.getByAltText(name, { exact: true });
+  if (src !== undefined) await expect(photo).toHaveAttribute('src', src);
+  return photoLoaded(photo.locator('xpath=..'));
+}
+
+/** The lines of the check on screen that sell `product`. */
+export const linesOf = (page: Page, product: { name: string }): Locator =>
+  shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });
+
 /**
  * Whether the till on screen is a phone's, once it has laid itself out for the window. It does so a frame after a
  * resize (its media query and its ResizeObserver): read straight after `setViewportSize`, the cart button is the
@@ -108,6 +155,30 @@ export async function openTillCart(page: Page): Promise<void> {
     await till.locator('[data-testid=pos-cart-fab]').click();
   }
   await expect(till).toHaveClass(/pos-till--cart-open/);
+}
+
+/** On the till (`/sale/pos`, already open), `product` found by its SKU in the search and put in the cart, as a cashier
+ *  sells it. */
+export async function addToTill(page: Page, product: { id: string; sku: string }): Promise<void> {
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator('[data-testid=pos-search-trigger]').click();
+  const search = page.locator('[data-testid=pos-search]');
+  await search.locator('input').fill(product.sku);
+  await search.locator(`[data-testid=pos-search-${product.id}]`).click();
+}
+
+/** On the till, `product` added (`addToTill`) and «Charge» pressed while no tax rule prices it (TAX-F11, TAX-F19): no
+ *  total, and the checkout says why with nothing to confirm. The refusal, for its screenshots. */
+export async function chargeRefused(page: Page, product: Product): Promise<Locator> {
+  await addToTill(page, product);
+  await expect(shown(page).locator('[data-testid=pos-total]')).toHaveText('—');
+  await shown(page).locator('[data-testid=pos-charge]').click();
+  const sheet = page.locator('[data-testid=sale-checkout-modal]');
+  await expect(sheet).toBeVisible();
+  const refusal = sheet.locator('[data-testid=sale-checkout-read-error]');
+  await expect(refusal).toContainText(`«${product.name}» cannot be charged: no tax rule applies to its tax category`);
+  await expect(sheet.locator('[data-testid=sale-checkout-confirm]')).toHaveAttribute('aria-disabled', 'true');
+  return refusal;
 }
 
 /** The sizes where a notice of the till is read: the fleet's three and the lowest phone. */
@@ -147,12 +218,114 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   return dish;
 }
 
+/** The room a spec made (its zones named `<tag>…`, their tables and the seatings on them), and the checks of Sales its
+ *  seating opened (they carry no line nor any sale). */
+export function cleanRoom(tag: string): void {
+  const tables = `select id from table_table where zone_id in (select id from table_zone where name like '${tag}%')`;
+  const sessions = `select id from table_tablesession where table_id in (${tables})`;
+  const orders = psql(`select order_id from table_tablesession where id in (${sessions}) and order_id is not null`)
+    .split('\n')
+    .filter(Boolean)
+    .map((id) => `'${id}'`)
+    .join(', ');
+  psql(
+    [
+      `delete from table_sessionmove where session_id in (${sessions})`,
+      `delete from table_tablesession where id in (${sessions})`,
+      `delete from table_hold where table_id in (${tables})`,
+      ...(orders ? [`delete from sale_order where id in (${orders})`] : []),
+      `delete from table_table where id in (${tables})`,
+      `delete from table_zone where name like '${tag}%'`,
+    ].join('; '),
+  );
+}
+
+/** For a spec that seats a table (SALE-F19, SALE-F20): the zone `zone` and its table `number`, for four, through Tables'
+ *  operations, in a context already signed in to hub `a`. Whoever calls it deletes them after the run. */
+export async function zoneWithTable(context: BrowserContext, zone: string, number: string): Promise<{ zoneId: string; tableId: string }> {
+  const created = await api<{ id: string }>(context, A, 'POST', '/table/zones', { name: zone });
+  expect(created.status, `zone ${JSON.stringify(created.data)}`).toBe(201);
+  const table = await api<{ id: string }>(context, A, 'POST', '/table/tables', { zone_id: created.data.id, number, capacity: 4 });
+  expect(table.status, `table ${JSON.stringify(table.data)}`).toBe(201);
+  return { zoneId: created.data.id, tableId: table.data.id };
+}
+
 /** The till on screen in `lang` (the Hub's language cookie, which the sign-in has just set from the account). */
 export async function tillIn(page: Page, context: BrowserContext, lang: string): Promise<void> {
   await login(page, A, '/sale/pos');
   await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
   await page.reload();
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+}
+
+/** The languages a till spec reads in: each one's name in the test's title, the Hub's language and the browser's locale. */
+export const TILL_LANGUAGES = [
+  { name: 'English', lang: 'en', locale: 'en-US' },
+  { name: 'Spanish', lang: 'es', locale: 'es-ES' },
+] as const;
+
+/** For the `beforeAll` of a spec that sells with and without the red strip of a hub that cannot issue invoices yet:
+ *  `dishForTheTill`, and hub `a` with an issuer, as a business with its data complete has (no strip). The runs with the
+ *  strip park it (`tillUnderStrip`); `cleanTillAndIssuer` deletes it if the spec set it up. */
+export async function dishWithAnIssuer(browser: Browser, label: string, run: string): Promise<Product> {
+  const dish = await dishForTheTill(browser, label, run);
+  const context = await browser.newContext({ baseURL: A });
+  await login(await context.newPage(), A, '/sale/pos');
+  await ensureIssuer(context);
+  await context.close();
+  return dish;
+}
+
+/** The `afterAll` of such a spec: its sales, its products and the issuer it set up go, and the cash register comes back
+ *  as it was. */
+export function cleanTillAndIssuer(): void {
+  try {
+    cleanSales();
+    cleanInventory();
+    cleanInvoices();
+  } finally {
+    restoreDrawer();
+  }
+}
+
+/** What `tillUnderStrip` opens: the till in `lang` (`locale`), under the red strip of a hub that cannot issue invoices yet
+ *  when `strip` (hub `a`'s issuer parked in the table `parked` meanwhile) or without it. */
+export interface TillUnderStrip {
+  strip: boolean;
+  parked: string;
+  locale: string;
+  lang: string;
+}
+
+/**
+ * For a `describe` of a spec that sells with and without the strip: its `beforeAll` opens the till at 1440x900 as
+ * `till` says (the strip there or not, checked) and runs `then` on it; its `afterAll` closes it and puts hub `a`'s
+ * issuer back, even if the till never opened. Returns the till's page, for the tests of that `describe`.
+ */
+export function tillUnderStrip(till: TillUnderStrip, then?: (page: Page) => Promise<void>): () => Page {
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  test.beforeAll(async ({ browser }) => {
+    if (till.strip) parkIssuer(till.parked);
+    context = await browser.newContext({ baseURL: A, locale: till.locale, viewport: { width: 1440, height: 900 } });
+    page = await context.newPage();
+    await tillIn(page, context, till.lang);
+    const notice = shown(page).locator('[data-testid=blocking-strip]');
+    if (till.strip) await expect(notice, 'the strip of a hub that cannot issue invoices yet').toBeVisible();
+    else await expect(notice, 'a hub with its issuer has no strip').toBeHidden();
+    if (then) await then(page);
+  });
+  test.afterAll(async () => {
+    try {
+      await context?.close();
+    } finally {
+      if (till.strip) unparkIssuer(till.parked);
+    }
+  });
+  return () => {
+    if (!page) throw new Error('tillUnderStrip(): the till is not open: its beforeAll failed');
+    return page;
+  };
 }
 
 /** The till in `lang`, with `dish` on a check of its own and that check on screen. */

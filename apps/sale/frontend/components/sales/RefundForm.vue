@@ -57,6 +57,8 @@ const picked = shallowRef<Picked>({});
 const reason = shallowRef('');
 /** Why the last refund did not go through. */
 const failure = shallowRef('');
+const original = ref<string>();
+const unsaved = computed(() => original.value !== undefined && JSON.stringify({ typed: typed.value, destinations: destinations.value, picked: picked.value, reason: reason.value }) !== original.value);
 
 const tenders = computed<TenderOption[]>(() => [...(data.value?.tenders ?? [])].sort((a, b) => a.position - b.position));
 const nothingLeft = computed(
@@ -76,6 +78,7 @@ const stopSeeding = watch(
   (now) => {
     if (!now) return;
     propose(now, picked.value);
+    original.value = JSON.stringify({ typed: typed.value, destinations: destinations.value, picked: picked.value, reason: reason.value });
     stopSeeding();
   },
   { immediate: true, flush: 'sync' },
@@ -137,7 +140,7 @@ async function confirm(): Promise<void> {
   emit('refunded');
 }
 
-defineExpose({ confirm });
+defineExpose({ confirm, unsaved });
 </script>
 
 <template>

@@ -1,5 +1,5 @@
-// Android's Back button on the installed app (BASE-F05, gh:hub#1906; ported from the old hub's
-// `apps/web/src/router/back-closes-overlay.ts`, origin/develop): it closes what is open on top BEFORE it leaves the
+// Android's Back button on the installed app (BASE-F05; ported from the old hub's
+// `apps/web/src/router/back-closes-overlay.ts`): it closes what is open on top BEFORE it leaves the
 // screen, and only Home leaves the app.
 //
 // On the installed Android app, Tauri's activity turns the system Back into `webView.goBack()` — but only while nobody
@@ -14,13 +14,17 @@
 //
 // A press, topmost first:
 //   1. a presented Ionic overlay in the document (modal, alert, popover, action sheet, loading) — dismissed with role
-//      `backdrop` like Ionic's own hardware back; one that cannot be dismissed (`backdropDismiss: false`) HOLDS it;
+//      `backdrop` like Ionic's own hardware back; one that cannot be dismissed (`backdropDismiss: false`) HOLDS it, and
+//      so does a window holding what the person typed and has not saved, which asks first (`holdUnsavedChanges`,
+//      hub#1015: «Keep editing» or «Discard changes»; a second Back closes that question, i.e. keeps editing) and,
+//      on «Discard changes», is closed as who already asked (role `handler`): its FormModal, which asks the same
+//      question on its own ways out (`canDismiss`, hub#1023), is not asked twice;
 //   2. an open `ion-menu` (the drawer); one still sliding in or out HOLDS the press (Ionic ignores a close mid-slide,
 //      and the screen must not move under it);
 //   3. the mounted app, through the `erplora:back` contract below;
 //   and with nothing open:
 //   4. on a detail view, the screen's own Back (the topbar's: history inside the app, else its `backHref`);
-//   5. on the root of an app, Home, with history behind or not: a screen of an app has no Back (PLAN-MIGRATIONS §16),
+//   5. on the root of an app, Home, with history behind or not: a screen of an app has no Back,
 //      and Home is where the menu's «Home» and the «My apps» sheet's lead;
 //   6. on Home, out of the app (`leave_app`), what the system Back does on a start screen.
 //
@@ -74,11 +78,61 @@ async function shownMenu(doc: Document): Promise<{ menu: IonicMenu; open: boolea
   return undefined;
 }
 
+/**
+ * A window that holds what the person typed and has not saved (hub#1015; Cloudscape, Shopify's `leaveConfirmation`,
+ * Power Platform): while it holds something, Back on it asks first instead of closing it.
+ */
+export interface UnsavedChanges {
+  /** An element of the window (its fields), or nothing while it is closed: the overlay that contains it is the window. */
+  inside: () => Element | null | undefined;
+  /** Does it hold changes not saved yet? Read on each press. */
+  dirty: () => boolean;
+  /** «Discard changes?»: resolves `true` to throw them away and close the window, `false` to keep editing. */
+  confirmDiscard: () => Promise<boolean>;
+}
+
+const unsavedWindows = new Set<UnsavedChanges>();
+
+/** A window signs up as holding what the person types; it calls what this returns when it goes. */
+export function holdUnsavedChanges(window: UnsavedChanges): () => void {
+  unsavedWindows.add(window);
+  return () => {
+    unsavedWindows.delete(window);
+  };
+}
+
+/** The window shown by `overlay` that holds unsaved changes now, if any (what layer 1 asks before it closes one). */
+export function unsavedChangesIn(overlay: Element): UnsavedChanges | undefined {
+  for (const window of unsavedWindows) {
+    const fields = window.inside();
+    if (fields && overlay.contains(fields) && window.dirty()) return window;
+  }
+  return undefined;
+}
+
+/** Ionic's role for a dismissal by who already asked: it skips the overlay's own `canDismiss`. */
+const ASKED = 'handler';
+
+/** Asks the window first; it closes only once the person chose to discard, and then without asking again (hub#1023). */
+function askThenClose(window: UnsavedChanges, overlay: IonicOverlay): void {
+  window
+    .confirmDiscard()
+    .then((discard) => {
+      if (discard) void overlay.dismiss(undefined, ASKED);
+    })
+    .catch((error: unknown) => console.error('base: could not ask whether to discard the changes', error));
+}
+
 /** Closes the topmost thing open on the screen, if any (layers 1–3). */
 export async function closeTopmostLayer(doc: Document = document, win: Window = window): Promise<BackOutcome> {
   const overlay = topmostPresentedOverlay(doc);
   if (overlay) {
     if (!overlay.backdropDismiss) return 'held';
+    const unsaved = unsavedChangesIn(overlay);
+    if (unsaved) {
+      askThenClose(unsaved, overlay);
+      return 'held';
+    }
     // Not awaited on purpose (as Ionic does): a `canDismiss` that asks for confirmation must not block the Back of the
     // alert it opens.
     void overlay.dismiss(undefined, 'backdrop');

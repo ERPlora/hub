@@ -1,11 +1,16 @@
 """Fixtures of the flow tests: contexts per role and scope, a frozen clock, a raw DSN, and builders of
 the data a test starts from (straight to the models: the operations are under test).
 
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
+of B asks for ``hub_b`` and enters it.
+
 The builders import the models lazily, so that the tests of apps.py still collect while models.py
 does not exist. Other apps are always the real ones (task, customer, sale…), never a double.
 """
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -17,10 +22,19 @@ from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
+from base.tenancy.context import current_alias
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases that these tests take from here.
+__all__ = ["B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "hub_staff", "in_business_a", "plan_with_room"]
+
 MADRID = dt.timezone(dt.timedelta(hours=2))
+#: The frozen «now» of a test that sets the clock: noon of 15 October 2026 in Madrid.
+NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=ZoneInfo("Europe/Madrid"))
+#: The assistant's door at erplora.com, and the quota it answers with.
+CHAT = "/internal/assistant/chat"
+QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 
 
 def ctx_for(
@@ -81,11 +95,11 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
 
     def tick():
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return relay.run(timezone.now())
 
     def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return run(name, data, ctx)
 
     tick.request = request
@@ -94,7 +108,7 @@ def worker(monkeypatch, django_capture_on_commit_callbacks):
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN, first_name: str = ""):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = Membership.Role.ADMIN, first_name: str = ""):
         user = get_user_model().objects.create_user(username=username, password="pw", first_name=first_name)
         if host is not None:
             Membership.objects.create(user=user, host=host, role=role)
@@ -116,7 +130,7 @@ def clock(monkeypatch):
 
 @pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
     params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],
@@ -170,6 +184,23 @@ def make_flow(name: str = "Welcome", **fields):
     fields.setdefault("grants", ["task.task.create"])
     fields.setdefault("enabled", True)
     return Flow.objects.create(name=name, **fields)
+
+
+def due_daily_flow(monkeypatch):
+    """A flow every day at 09:00 whose 09:00 has not fired, with the clock at 12:00 of 2026-10-15 in Madrid."""
+    from zoneinfo import ZoneInfo
+
+    from apps.flow.models import Flow
+
+    madrid = ZoneInfo("Europe/Madrid")
+    now = dt.datetime(2026, 10, 15, 12, 0, tzinfo=madrid)
+    monkeypatch.setattr(timezone, "now", lambda: now)
+    return make_flow(
+        trigger_kind=Flow.Trigger.SCHEDULE,
+        trigger_event="",
+        schedule={"every": "day", "time": "09:00"},
+        next_fire_at=dt.datetime(2026, 10, 15, 9, 0, tzinfo=madrid),
+    )
 
 
 def make_run(flow, **fields):

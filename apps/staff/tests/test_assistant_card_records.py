@@ -1,7 +1,7 @@
-"""FIX-HUB-STAFF-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#495): the card of a write of Staff says which person, role,
-schedule or time-off request it acts on by its name, read as whoever asks, never by its id, and left out when that
-person may not read it. A schedule says whose it is and a time-off request says whose, of what kind and which days:
-every person has a «Regular schedule», and one person can ask for several absences.
+"""The card of a write of Staff (hub#495) says which person, role, schedule or time-off request it acts on by its name,
+read as whoever asks, never by its id, and left out when that person may not read it. A schedule says whose it is and a
+time-off request says whose, of what kind and which days: every person has a «Regular schedule», and one person can ask
+for several absences.
 """
 
 import pytest
@@ -14,17 +14,16 @@ from apps.staff.models import Member
 from apps.staff.schemas import TimeOffDetailOut
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
-from .conftest import ctx_for, make_member, make_role, make_schedule, make_time_off
+from .conftest import HUB_DB, ctx_for, make_member, make_role, make_schedule, make_time_off
 
 WEEK = [{"weekday": 0, "start_time": "09:00", "end_time": "17:00"}]
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -40,7 +39,7 @@ def read(name: str, data: dict, ctx=None):
 # ── A person ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Staff member"), ("es", "Miembro del personal")])
 @pytest.mark.parametrize("write", ["staff.member.update", "staff.member.deactivate", "staff.member.terminate"])
 def test_a_write_on_a_record_says_whose_it_is_and_titles_it_as_the_card_titles_a_name(write, language, title):
@@ -49,7 +48,7 @@ def test_a_write_on_a_record_says_whose_it_is_and_titles_it_as_the_card_titles_a
     assert (field["value"], field["label"]) == ("Ana López", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Staff member"), ("es", "Miembro del personal")])
 def test_a_new_schedule_and_a_new_absence_say_whose_they_are(language, title):
     member = make_member("Bea", "Ruiz")
@@ -66,7 +65,7 @@ def test_a_new_schedule_and_a_new_absence_say_whose_they_are(language, title):
 # ── A role ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Role"), ("es", "Rol")])
 def test_a_record_says_its_role_by_its_name(language, title):
     role = make_role("Stylist")
@@ -79,7 +78,7 @@ def test_a_record_says_its_role_by_its_name(language, title):
         assert (field["value"], field["label"]) == ("Stylist", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_each_row_of_a_batch_says_its_role_by_its_name():
     """The case the issue names: the people a batch adds, each with the role they take, never by its id."""
     stylist, waiter = make_role("Stylist"), make_role("Waiter")
@@ -94,7 +93,7 @@ def test_each_row_of_a_batch_says_its_role_by_its_name():
     assert not AN_ID.search(str(rows))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Role"), ("es", "Rol")])
 def test_editing_a_role_says_which_one_and_also_one_retired_to_bring_it_back(language, title):
     """A retired role can be brought back (STAFF-F04): the only way to read it is by this name."""
@@ -107,7 +106,7 @@ def test_editing_a_role_says_which_one_and_also_one_retired_to_bring_it_back(lan
 # ── A schedule ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "title"), [("en", "Schedule"), ("es", "Horario")])
 @pytest.mark.parametrize(
     ("write", "extra"),
@@ -124,7 +123,7 @@ def test_a_write_on_a_schedule_says_whose_it_is_and_its_name(write, extra, langu
     assert (field["value"], field["label"]) == ("Ana López · Summer", title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_of_a_schedule_answers_its_week_and_how_the_card_names_it():
     schedule = make_schedule(make_member("Ana", "López"), name="Summer")
     answer = read("staff.schedule.detail", {"id": str(schedule.id)})
@@ -135,7 +134,7 @@ def test_the_read_of_a_schedule_answers_its_week_and_how_the_card_names_it():
 # ── A time-off request ────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "title", "expected"),
     [
@@ -150,7 +149,7 @@ def test_a_write_on_a_time_off_says_whose_it_is_of_what_kind_and_which_days(writ
     assert (field["value"], field["label"]) == (expected, title)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "expected"), [("en", "Ana López · Vacation · Nov 2, 2026"), ("es", "Ana López · Vacaciones · 2 nov 2026")]
 )
@@ -159,7 +158,7 @@ def test_a_time_off_of_one_day_says_that_day_once(language, expected):
     assert shown("staff.time_off.approve", {"id": str(time_off.id)}, language)["id"] == expected
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_withdrawing_their_own_request_reads_which_one():
     """An employee holds neither «see the detail of time off» nor «manage time off», and withdraws their own request
     (STAFF-F19): the card names it with what their list already shows them."""
@@ -171,7 +170,7 @@ def test_an_employee_withdrawing_their_own_request_reads_which_one():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_that_names_a_time_off_never_carries_what_is_private():
     """Its reason and notes are only for managers and the person: the read that names it has them nowhere."""
     time_off = make_time_off(make_member(), "2026-11-02", reason="Surgery", notes="Private")
@@ -183,7 +182,7 @@ def test_the_read_that_names_a_time_off_never_carries_what_is_private():
 # ── A closed list, by the word of its screen ──────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "status", "leave_type"), [("en", "On leave", "Sick leave"), ("es", "De baja", "Baja por enfermedad")]
 )
@@ -198,7 +197,7 @@ def test_a_status_and_a_type_of_absence_go_by_their_word_in_both_languages(langu
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("needed", "write", "datum"),
     [
@@ -225,13 +224,13 @@ def test_what_the_person_may_not_read_is_left_out_never_said_by_its_id(needed, w
     assert not AN_ID.search(str(said))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ["staff.member.deactivate", "staff.role.update", "staff.schedule.delete", "staff.time_off.approve"])
 def test_what_does_not_exist_is_left_out(write):
     assert shown(write, {"id": A_MISSING_ID}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_records_of_someone_who_left_are_left_out_as_their_screens_leave_them_out():
     member = make_member(status=Member.Status.TERMINATED)
     schedule = make_schedule(member)
@@ -241,8 +240,7 @@ def test_the_records_of_someone_who_left_are_left_out_as_their_screens_leave_the
     assert shown("staff.time_off.approve", {"id": str(time_off.id)}) == {}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
+@HUB_DB
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
@@ -267,7 +265,7 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
 # ── The reads that name them ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_of_a_role_needs_the_right_to_see_the_staff():
     role = make_role()
     allowed = ctx_for()
@@ -276,7 +274,7 @@ def test_the_read_of_a_role_needs_the_right_to_see_the_staff():
         read("staff.role.detail", {"id": str(role.id)}, ctx_for(permissions=set(allowed.permissions) - {"staff.view"}))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_of_a_time_off_needs_the_right_to_see_the_time_off():
     time_off = make_time_off(make_member(), "2026-11-02")
     allowed = ctx_for()
@@ -285,7 +283,7 @@ def test_the_read_of_a_time_off_needs_the_right_to_see_the_time_off():
         read("staff.time_off.get", {"id": str(time_off.id)}, ctx_for(permissions=set(allowed.permissions) - {"staff.view_time_off"}))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", ["staff.role.detail", "staff.time_off.get"])
 def test_the_reads_say_not_found_for_what_is_not_there(name):
     with pytest.raises(NotFound):
@@ -301,4 +299,4 @@ def test_the_reads_refuse_no_id(name):
 @pytest.mark.parametrize("name", ["staff.role.detail", "staff.time_off.get"])
 def test_the_reads_are_no_tool_of_the_assistant(name):
     """The model finds them in its lists; only the card reads them."""
-    assert not assistant.is_tool(get(name))
+    assert not assistant.tools.is_tool(get(name))

@@ -141,6 +141,7 @@ def test_product_in_defaults():
         "pricing_unit": None,
         "track_stock": None,
         "category_ids": [],
+        "is_active": True,
     }
 
 

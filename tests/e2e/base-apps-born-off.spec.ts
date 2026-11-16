@@ -1,18 +1,35 @@
-// A business is born with every app off (PLAN-HUB round 2026-10-27) and «Start with a business like yours» on the
-// Home turns on the apps of the template it uses, then loads its catalogue (BASE-G131; `base.blueprint.import`), in the
+// A hub without rows of its apps has every app off (a business signs up with Taxes on:
+// base-sign-up-taxes-on.spec.ts) and «Start with a business like yours» on the
+// Home turns on the apps of the template it uses, then loads its catalogue (`base.blueprint.import`), in the
 // three viewports, as the owner of hub `a` put back to how a business is born:
 //   - Apps says nothing is on: «My apps» is empty with its notice, and an app of the catalogue is «Off» in «Add apps»;
 //   - the Home offers the card; «Use this one» on the restaurant ends in «Your apps and your catalogue are ready», and
 //     the Home's «My apps» has the apps it turned on without a reload;
 //   - the template's apps are on (its roots chosen, what they need along), «Active» in «My apps», and its products
 //     and tables are in, through the apps' own lists.
-// `a` is emptied of what a template brings first (phase 1: `a` and `b` share those rows), and after each test the load
+// `a` is emptied of what a template brings first, and after each test the load
 // is undone and `a` gets back its rows with every app on (the ones `seed_local_hubs` wrote, as every other spec finds
-// it). Each step leaves its capture `APPS-BORN-OFF-<step>-<width>`.
-// flow: BASE-G131 BASE-G67
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+// it). Each step leaves a capture at each width.
+// And in a business of Spain, at 375, 768 and 1440: Settings › Data › «Use
+// template» reviews the restaurant's without VeriFactu (Invoicing and Kitchen «turn on»), the load goes in whole and
+// VeriFactu stays «Off» in Apps with nothing refusing it, for its owner to turn on.
+// flow: BASE-F31 VERIFACTU-F01
+import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, emptyOfTemplateData, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { appRowsCopy, bounceTasks } from './app-rows-helpers';
+import {
+  A,
+  api,
+  emptyOfTemplateData,
+  horizontalOverflow,
+  hostPage,
+  psql,
+  registerBusinessIn,
+  registrationOf,
+  shot,
+  shown,
+  untilStill,
+} from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -21,7 +38,7 @@ const VIEWPORTS = {
 } as const;
 
 /** The copy the run keeps of `a`'s rows (every app on), put back after each test. */
-const ROWS = 'e2e_base_apps_born_off_rows';
+const appRows = appRowsCopy('e2e_base_apps_born_off_rows');
 const TEMPLATE = 'restaurant.en';
 
 interface App {
@@ -42,31 +59,18 @@ async function snap(page: Page, step: string, width: number): Promise<void> {
   await page.screenshot({ path: shot(`APPS-BORN-OFF-${step}-${width}`) });
 }
 
-/** Tasks turned `first` and then `then` through Apps (`/api/apps/<enable|disable>`): a change the Hub forgets its
- * cache of the apps off for, at its COMMIT, leaving the rest as it was (Tasks needs only Staff). */
-async function bounceTasks(context: BrowserContext, first: 'enable' | 'disable', then: 'enable' | 'disable'): Promise<void> {
-  for (const action of [first, then]) {
-    const answer = await api(context, A, 'POST', `/apps/${action}`, { app: 'task' });
-    expect(answer.status, `Tasks: ${action} ${JSON.stringify(answer.data)}`).toBe(200);
-  }
-}
-
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(() => {
   const kept = Number(psql("select count(*) from base_appactivation where host = 'a' and state = 'on'"));
   if (!kept) throw new Error("`a` has no app on: run `manage.py seed_local_hubs` on this run's database first.");
-  psql(`drop table if exists ${ROWS}; create table ${ROWS} as select * from base_appactivation where host = 'a'`);
-});
-
-test.afterAll(() => {
-  psql(`drop table if exists ${ROWS}`);
+  appRows.keep();
 });
 
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-G131 — a business born with every app off starts from a template at ${width}`, async ({ browser }) => {
+  test(`a business born with every app off starts from a template at ${width}`, async ({ browser }) => {
     test.setTimeout(240_000);
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
     let loadId = '';
@@ -80,7 +84,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(born.status).toBe(200);
       expect(born.data.apps.filter((app) => app.state !== 'off')).toEqual([]);
 
-      // BASE-G67 — Apps: nothing in «My apps»; in «Add apps», an app of the catalogue is «Off».
+      // Apps: nothing in «My apps»; in «Add apps», an app of the catalogue is «Off».
       await page.goto(`${A}/apps`);
       await expect(testid(page, 'tab-mine')).toHaveClass(/segment-button-checked/);
       await expect(testid(page, 'apps-empty')).toContainText('You have no apps yet.');
@@ -94,7 +98,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'inventory').locator('[data-testid="apps-state"]')).toContainText('Off');
       await snap(page, 'all-off', width);
 
-      // BASE-G131 — the Home offers the card; «Use this one» turns on the template's apps, then loads it.
+      // The Home offers the card; «Use this one» turns on the template's apps, then loads it.
       await page.goto(`${A}/`);
       const card = testid(page, 'blueprint-card');
       await expect(card).toBeVisible();
@@ -147,8 +151,80 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         expect(undone.status, 'the load is undone').toBe(200);
       }
       // `a` back to every app on; a change through Apps forgets what the Hub keeps of its apps off for a minute.
-      psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
+      appRows.putBack();
       await bounceTasks(context, 'disable', 'enable');
+      await context.close();
+    }
+  });
+}
+
+/** The sizes of hub#998's check: a phone, a tablet upright and a desktop. */
+const SPAIN_VIEWPORTS = {
+  375: { width: 375, height: 667 },
+  768: { width: 768, height: 1024 },
+  1440: { width: 1440, height: 900 },
+} as const;
+/** The review's note on an app of the template that is off (`base.data.review.appTurnsOn`). */
+const TURNS_ON = 'It is off in your business: loading it turns it on.';
+
+for (const [label, viewport] of Object.entries(SPAIN_VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`VERIFACTU-F01 BASE-F31 — a template reviewed and loaded in a business of Spain leaves VeriFactu off at ${width}`, async ({
+    browser,
+  }) => {
+    test.setTimeout(240_000);
+    const registration = registrationOf('a');
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
+    let loadId = '';
+    try {
+      await registerBusinessIn(registration, 'ES');
+      await emptyOfTemplateData(context, A);
+      psql("delete from base_appactivation where host = 'a'");
+      await bounceTasks(context, 'enable', 'disable');
+
+      // Settings › Data › «Use template»: the review names what the load turns on, and VeriFactu is not in it.
+      await page.goto(`${A}/settings#data`);
+      await shown(page).locator(`[data-testid="templates-row-${TEMPLATE}-use"]`).click();
+      const review = testid(page, 'review');
+      await expect(review).toBeVisible();
+      const reviewed = (id: string) => review.locator(`[data-testid="review-app"][data-id="${id}"]`);
+      await expect(reviewed('invoice')).toContainText(TURNS_ON);
+      await expect(reviewed('kitchen')).toContainText(TURNS_ON);
+      await expect(reviewed('verifactu')).toHaveCount(0);
+      await snap(page, 'spain-review', width);
+
+      const imported = page.waitForResponse(
+        (response) => response.url().endsWith('/api/settings/data/blueprints/import') && response.request().method() === 'POST',
+      );
+      await review.locator('[data-testid="review-import"]').click();
+      const answer = await imported;
+      const load = (await answer.json()) as { id: string; status: string; report: { apps: { id: string }[] } };
+      loadId = load.id;
+      expect([answer.status(), load.status], JSON.stringify(load.report)).toEqual([200, 'complete']);
+      expect(load.report.apps.map((app) => app.id)).not.toContain('verifactu');
+      await expect(testid(page, 'report-status')).toContainText('Everything went in.');
+      await snap(page, 'spain-report', width);
+
+      // VeriFactu stays off, with nothing refusing it: its owner turns it on. What the sector needs came on.
+      const after = await api<{ apps: App[] }>(context, A, 'GET', '/apps');
+      const state = Object.fromEntries(after.data.apps.map((app) => [app.id, app.state]));
+      expect([state.verifactu, state.invoice, state.kitchen]).toEqual(['off', 'on', 'on']);
+      await page.goto(`${A}/apps#all`);
+      await testid(page, 'apps-search').locator('input').fill('VeriFactu');
+      const verifactu = appRow(page, 'verifactu');
+      await expect(verifactu.locator('[data-testid="apps-state"]')).toContainText('Off');
+      await expect(verifactu.locator('[data-testid="apps-refusal"]')).toHaveCount(0);
+      await expect(verifactu).toContainText('Turn on');
+      await snap(page, 'spain-apps', width);
+    } finally {
+      if (loadId) {
+        const undone = await api(context, A, 'POST', '/settings/data/imports/undo', { id: loadId });
+        expect(undone.status, 'the load is undone').toBe(200);
+      }
+      appRows.putBack();
+      await bounceTasks(context, 'disable', 'enable');
+      await registerBusinessIn(registration, registration.country);
       await context.close();
     }
   });

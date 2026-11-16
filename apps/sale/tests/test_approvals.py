@@ -1,5 +1,5 @@
-"""What the cashier's role does not allow at the till, a manager approves on the spot with their PIN (BASE-F84; the old
-hub's HUB_SHELL-F51; Square, Toast, Lightspeed and Shopify's manager override): SALE-F30 and F31 (void and refund a
+"""What the cashier's role does not allow at the till, a manager approves on the spot with their PIN (BASE-F84;
+Square, Toast, Lightspeed and Shopify's manager override): SALE-F30 and F31 (void and refund a
 sale), F20 (void an item sent to the kitchen), F14 (a discount above the maximum, on a line, on the check or at the
 charge), F09 (an open price) and F18 (delete an open check with something on it).
 
@@ -24,16 +24,14 @@ from live.operations import get as operation
 
 from apps.invoice.models import Invoice
 from apps.sale.models import Order, OrderLine, Sale, SaleLine
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HOST, HUB_DB, run
 from apps.sale.tests.test_integration_invoice import ISSUER
 from apps.sale.tests.test_integration_service import charged_with_voucher
 from apps.service.models import Redemption
 from base.models import Credential
 from base.tests.test_people import with_pin
 
-pytestmark = pytest.mark.django_db
-
-HOST = "a.localhost"
+pytestmark = HUB_DB
 
 #: The commands of the till a manager may approve, and what the dialog says is approved.
 APPROVABLE = {
@@ -343,7 +341,7 @@ class TestOpenPrice:
 
 
 # ── SALE-F14 and F09 What is approved, with its figure ───────────────────────────────────────────────────────────────
-# sales#398, sales#403, hub#2180: the manager read «Discount a line above the maximum» and approved blind. «An
+# The manager read «Discount a line above the maximum» and approved blind. «An
 # approval is needed» says how much they approve, as Square, Toast and Lightspeed print it («Discount 50% requires
 # manager»): the sentences of ``approval_figures`` (BASE-F84), filled with the figures of that very request in the
 # language of whoever asks; an amount in the business's currency. A figure in zero or empty fills no hole: the next

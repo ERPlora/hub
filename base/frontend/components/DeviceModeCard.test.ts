@@ -1,6 +1,3 @@
-// «This device» of Settings › General (BASE-G72): whether the device in hand is shared (the PIN pad, a shift) or
-// personal (the session stays open). The mark moves only when the Hub confirms; only an administrator changes it; a
-// browser that is not a device of the business yet says how to make it one.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';

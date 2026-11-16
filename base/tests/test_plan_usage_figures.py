@@ -1,6 +1,6 @@
-"""System › «Usage and plan» reads ``base.plan.usage`` (BASE-F40; PLAN-HUB, round 2026-11-01g): every figure of the business
-against what its plan really gives, with two real hubs so one never sees the other's. What was not measured yet comes as
-nothing, never as a zero. The bell's row is worked out here, with no call to erplora.com.
+"""System › «Usage and plan» reads ``base.plan.usage`` (BASE-F40): every figure of the business against what its plan
+really gives, with two real hubs so one never sees the other's. What was not measured yet comes as nothing, never as a
+zero. The bell's row is worked out here, with no call to erplora.com.
 """
 
 import datetime as dt
@@ -610,7 +610,7 @@ def test_the_bell_never_calls_erplora_com(hub_a, monkeypatch):
     def refuses(*args, **kwargs):
         raise AssertionError("the bell asked erplora.com")
 
-    monkeypatch.setattr("base.assistant.usage", refuses)
+    monkeypatch.setattr("base.assistant.gateway.usage", refuses)
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     measured(hub_a, s3=100)
 

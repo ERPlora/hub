@@ -1,5 +1,5 @@
-"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry (plan 2026-10-17, §1.3), with
-every app on and its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off);
+"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry, with
+every app on and its roots chosen (a business is born with every app off);
 the apps of a local hub that already turned some on or off stay as they are.
 
 The host gate (``base.middleware``) answers 404 to a slug without a row in the registry (``base.Hub``), so a
@@ -8,9 +8,9 @@ Local development only (``DEBUG``): production's hubs are the SaaS's, registered
 Idempotent, through its operation (``base.hub.seed_local``). ``--check`` writes nothing and fails unless both are
 ready (``base.hub.by_slugs``): the e2e's global setup asks it before the first spec.
 
-Each has a database of its own (``<control>_<hex>``; S5: there is no shared database), made here at once from
+Each has a database of its own (``<control>_<hex>``; there is no shared database), made here at once from
 ``<control>_template`` with every app's tables and every app on, under its ``hub_due`` lease (``migrate_hubs`` makes the
-template first); a local hub of phase 1 left on control's database gets its own the same way. ``a`` and ``b`` turn every
+template first); a local hub still on control's database gets its own the same way. ``a`` and ``b`` turn every
 app on, so while some app cannot live in a hub's own database (``base.tenancy.migrator.portable_apps``: its tables
 refer to control's users) it refuses and writes nothing. A local hub that already has its own keeps it.
 """
@@ -19,11 +19,11 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from live.context import system_context
 
-from base import services
+from base.services import hub_registry, provisioning
 from base.queries import hubs_by_slugs
 from base.registry import REGISTRY_SCOPE
 from base.schemas import HubsBySlugIn, HubSeedLocalIn
-from base.services import hub_seed_local
+from base.services.hub_registry import hub_seed_local
 from base.tenancy import migrator, provision
 
 
@@ -70,10 +70,10 @@ class Command(BaseCommand):
         answer = hub_seed_local(ctx, HubSeedLocalIn(slugs=list(LOCAL_HUBS)))
         for seeded in answer.hubs:
             said = OUTCOMES[seeded.outcome]
-            hub = services.registry_row_by_slug(seeded.slug)
+            hub = provisioning.registry_row_by_slug(seeded.slug)
             if hub.db_name and hub.status != hub.Status.READY:
-                if not provision.provision(hub, apps=every_app, seed=services.turn_every_app_on, tell_saas=False):
-                    failed = services.registry_row_by_slug(seeded.slug)
+                if not provision.provision(hub, apps=every_app, seed=hub_registry.turn_every_app_on, tell_saas=False):
+                    failed = provisioning.registry_row_by_slug(seeded.slug)
                     raise CommandError(
                         f"{seeded.slug}: its own database could not be made ({failed.status}: "
                         f"{failed.last_error or 'held by another process'}). Run `manage.py migrate_hubs` "

@@ -27,6 +27,7 @@ from pydantic import (
 
 from apps.task.models import TEXT_MAX_LENGTH, TITLE_MAX_LENGTH, Task
 from base.business import business_zone
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -142,12 +143,37 @@ D_DUE_DATE = "The day it is due (YYYY-MM-DD); a date and time counts as its day 
 D_TAGS = "Free labels of the task (at most 20, each up to 50 characters)."
 D_COLOR = "Colour of the project, as #RRGGBB; empty for none."
 
+# What the assistant's card calls the record a write acts on (its Spanish in this app's catalog), as its list calls one.
+T_TASK = gettext_noop("Task")
+T_PROJECT = gettext_noop("Project")
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
+# asks, never by its id: a task by its title (what the person says of it: «complete the task clean the store room»), a
+# project by its name, as the screens' «Delete» dialog says it, and a person of the team by their full name, as Staff
+# names them.
+A_TASK = names("task.task.detail", name=("title",))
+A_PROJECT = names("task.project.detail")
+# A task or a project said by its name, when its id is not known: a task is found by its number or its title alone and
+# a project by its code or its name alone, so the card reads it by what was said, as the write will find it, and shows
+# the one the write acts on («Llamar al proveedor» when the person said «llamar», hub#1219), not only the words said;
+# words it cannot read (two fit, none does) it says as said, never off the card, so the writes that cannot check it (a
+# comment's task, a new task's project and parent task, the project a task is moved to) read it too (hub#1245). Beside
+# the id the write takes it by instead, the card neither reads nor shows it (``unless_given``, hub#1250); moving a task
+# is the other way round: the project said by its name wins over ``project_id``, which is then left unread.
+A_TASK_BY_NAME = names("task.task.detail", by="task", name=("title",), as_said=True)
+A_PROJECT_BY_NAME = names("task.project.detail", by="project", as_said=True)
+A_MEMBER = names("staff.member.detail", name=("full_name",))
+
 
 def _named(value: str | None, info: ValidationInfo, id_field: str, message) -> str | None:
     """The text reference is required when the id is not given (and the id itself is valid)."""
     if value is None and id_field in info.data and info.data[id_field] is None:
         raise ValueError(str(message))
     return value
+
+
+def _said_by(text_field: str, id_field: str, message):
+    """The validator of ``text_field`` in a schema that names a record by ``id_field`` or by that text."""
+    return field_validator(text_field)(lambda value, info: _named(value, info, id_field, message))
 
 
 class In(Schema):
@@ -175,23 +201,21 @@ class Page(Schema, Generic[T]):
 
 
 class TaskRefIn(In):
-    id: UUID | None = Field(None, description=D_TASK_ID)
-    task: Reference | None = Field(None, validate_default=True, description=D_TASK)
+    id: UUID | None = Field(None, title=T_TASK, description=D_TASK_ID, json_schema_extra=A_TASK)
+    task: Reference | None = Field(
+        None, validate_default=True, description=D_TASK, json_schema_extra=unless_given(A_TASK_BY_NAME, "id")
+    )
 
-    @field_validator("task")
-    @classmethod
-    def _task_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "id", NO_TASK)
+    _task_named = _said_by("task", "id", NO_TASK)
 
 
 class ProjectRefIn(In):
-    id: UUID | None = Field(None, description=D_PROJECT_ID)
-    project: Reference | None = Field(None, validate_default=True, description=D_PROJECT)
+    id: UUID | None = Field(None, title=T_PROJECT, description=D_PROJECT_ID, json_schema_extra=A_PROJECT)
+    project: Reference | None = Field(
+        None, validate_default=True, description=D_PROJECT, json_schema_extra=unless_given(A_PROJECT_BY_NAME, "id")
+    )
 
-    @field_validator("project")
-    @classmethod
-    def _project_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "id", NO_PROJECT)
+    _project_named = _said_by("project", "id", NO_PROJECT)
 
 
 class MemberReleaseIn(In):
@@ -267,15 +291,23 @@ class TaskIn(In):
     description: Description = Field("", description=D_DESCRIPTION)
     priority: TaskPriority = Field("medium", description=D_PRIORITY)
     due_date: DueDate = Field(None, description=D_DUE_DATE)
-    project_id: UUID | None = Field(None, description=D_PROJECT_ID)
-    project: Reference | None = Field(None, description=D_PROJECT)
+    project_id: UUID | None = Field(None, description=D_PROJECT_ID, json_schema_extra=A_PROJECT)
+    project: Reference | None = Field(
+        None, description=D_PROJECT, json_schema_extra=unless_given(A_PROJECT_BY_NAME, "project_id")
+    )
     parent_id: UUID | None = Field(
-        None, description="Id of the task this one is a subtask of. Give it, or its number or title in `parent`."
+        None,
+        description="Id of the task this one is a subtask of. Give it, or its number or title in `parent`.",
+        json_schema_extra=A_TASK,
     )
     parent: Reference | None = Field(
-        None, description="Number or title of the task this one is a subtask of, when its id is not known."
+        None,
+        description="Number or title of the task this one is a subtask of, when its id is not known.",
+        json_schema_extra=unless_given(A_TASK_BY_NAME, "parent_id"),
     )
-    assigned_to_id: UUID | None = Field(None, description="Id of the staff member who will do it.")
+    assigned_to_id: UUID | None = Field(
+        None, description="Id of the staff member who will do it.", json_schema_extra=A_MEMBER
+    )
     assignee: MemberName | None = Field(
         None,
         title=gettext_noop("Assigned to"),
@@ -291,8 +323,12 @@ class TaskPatchIn(TaskRefIn):
     description: Description | None = Field(None, description=D_DESCRIPTION)
     priority: TaskPriority | None = Field(None, description=D_PRIORITY)
     due_date: DueDate = Field(None, description=D_DUE_DATE + " Send null to clear it.")
-    project_id: UUID | None = Field(None, description=D_PROJECT_ID + " Send null to take it out.")
-    project: Reference | None = Field(None, description=D_PROJECT)
+    project_id: UUID | None = Field(
+        None,
+        description=D_PROJECT_ID + " Send null to take it out.",
+        json_schema_extra=unless_given(A_PROJECT, "project"),
+    )
+    project: Reference | None = Field(None, description=D_PROJECT, json_schema_extra=A_PROJECT_BY_NAME)
     tags: Tags | None = Field(None, description=D_TAGS + " Replaces the list.")
 
 
@@ -305,7 +341,9 @@ class SetStatusIn(TaskRefIn):
 class AssignIn(TaskRefIn):
     """One person (by id, by name or the caller); nobody unassigns the task."""
 
-    member_id: UUID | None = Field(None, title=gettext_noop("Assigned to"), description=D_MEMBER_ID)
+    member_id: UUID | None = Field(
+        None, title=gettext_noop("Assigned to"), description=D_MEMBER_ID, json_schema_extra=A_MEMBER
+    )
     member: MemberName | None = Field(None, title=gettext_noop("Assigned to"), description=D_MEMBER)
     to_me: bool = Field(
         False, title=gettext_noop("Assign to me"), description="true: assign it to the caller's own staff record."
@@ -333,21 +371,17 @@ class CommentListIn(PageIn):
     task_id: UUID | None = Field(None, description=D_TASK_ID)
     task: Reference | None = Field(None, validate_default=True, description=D_TASK)
 
-    @field_validator("task")
-    @classmethod
-    def _task_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "task_id", NO_TASK)
+    _task_named = _said_by("task", "task_id", NO_TASK)
 
 
 class CommentIn(In):
-    task_id: UUID | None = Field(None, description=D_TASK_ID)
-    task: Reference | None = Field(None, validate_default=True, description=D_TASK)
+    task_id: UUID | None = Field(None, description=D_TASK_ID, json_schema_extra=A_TASK)
+    task: Reference | None = Field(
+        None, validate_default=True, description=D_TASK, json_schema_extra=unless_given(A_TASK_BY_NAME, "task_id")
+    )
     text: CommentText = Field(description="The comment (up to 5000 characters).")
 
-    @field_validator("task")
-    @classmethod
-    def _task_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "task_id", NO_TASK)
+    _task_named = _said_by("task", "task_id", NO_TASK)
 
 
 # Projects
@@ -371,7 +405,9 @@ class ProjectIn(In):
     code: Code = Field(description="Short code of the project, unique in the business (q3-audit).")
     name: ProjectName = Field(description="Name of the project.")
     color: Color = Field("", description=D_COLOR)
-    owner_id: UUID | None = Field(None, description="Id of the staff member who owns the project.")
+    owner_id: UUID | None = Field(
+        None, description="Id of the staff member who owns the project.", json_schema_extra=A_MEMBER
+    )
     owner: MemberName | None = Field(
         None, description="Name of the staff member who owns the project, when the id is not known."
     )
@@ -386,7 +422,9 @@ class ProjectPatchIn(ProjectRefIn):
         None, description="false takes the project out of use (its tasks stay); true brings it back."
     )
     owner_id: UUID | None = Field(
-        None, description="Id of the staff member who owns the project. Send null to clear it."
+        None,
+        description="Id of the staff member who owns the project. Send null to clear it.",
+        json_schema_extra=A_MEMBER,
     )
     owner: MemberName | None = Field(None, description="Name of the owner, when the id is not known.")
 

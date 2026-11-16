@@ -6,7 +6,9 @@
 // at under its field.
 import { describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, click, ionChecked, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
+import { resolveIcon } from '../../../../packages/ui/src/shell/icons';
+import { EMPLOYEE, click, flush, ionChecked, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
+import { between, pressEnter, refusalMarks } from '../../../../base/frontend/__tests__/settings-form';
 import type { SettingsOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
 
@@ -59,7 +61,9 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.find('attendance-settings-read-only').exists()).toBe(false);
   });
 
-  it('saves only what changed and says so', async () => {
+  // As every settings page and FormModal (hub#897): what a save says is said where the person tapped «Save»; and Enter in
+  // a field submits the form (Ionic puts a hidden submit button in it), the same save.
+  it('saves only what changed and says so right above «Save»; Enter in a field saves too', async () => {
     const s = await setup();
     s.answerBy({ '/api/attendance/settings': [200, { ...DEFAULTS, auto_close_after_hours: 10, saved: true }] });
     await ionValue(s.field('auto_close_after_hours'), '10', 'ionInput');
@@ -67,6 +71,10 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     await settle();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/attendance/settings', query: {}, body: { auto_close_after_hours: 10 } }]);
     expect(s.find('attendance-settings-saved').text()).toContain('Settings saved.');
+    expect(between(s.field('auto_close_after_hours'), s.find('attendance-settings-saved').element, s.field('save'))).toBe(true);
+    await ionValue(s.field('auto_close_after_hours'), '8', 'ionInput');
+    await pressEnter(s.find('attendance-settings-form').element);
+    expect(s.sent().at(-1)?.body).toEqual({ auto_close_after_hours: 8 });
   });
 
   // ATTENDANCE-F03: the location is asked only of a personal device, which an administrator marks as such on
@@ -102,6 +110,19 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.sent()[0].body).toEqual({ geofence_radius_m: 250, workplace_lat: 40.4168, workplace_lng: -3.7038 });
   });
 
+  // The workplace is one place: changing either coordinate sends both, and emptying them sends none.
+  it.each([
+    [{ workplace_lat: '40.5' }, { workplace_lat: 40.5, workplace_lng: -3.7 }],
+    [{ workplace_lat: '', workplace_lng: '' }, { workplace_lat: null, workplace_lng: null }],
+  ])('typing %o sends the workplace whole: %o', async (typed, body) => {
+    const s = await setup({ data: { ...DEFAULTS, workplace_lat: 40.4, workplace_lng: -3.7, workplace_set: true } });
+    s.answerBy({ '/api/attendance/settings': [200, DEFAULTS] });
+    for (const [key, value] of Object.entries(typed)) await ionValue(s.field(key), value, 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect(s.sent().map((call) => call.body)).toEqual([body]);
+  });
+
   it('a business that asks for the location without a workplace is told', async () => {
     const s = await setup({ data: { ...DEFAULTS, require_location: true } });
     expect(s.field('require_location').checked).toBe(true);
@@ -119,7 +140,7 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
 
   // The notice goes where the person tapped, under «Use my current location»: on a phone that button sits below
   // the fold, and the banner up top (which keeps the save's errors) went unseen.
-  it('a denied location says so under «Use my current location» and keeps what was typed', async () => {
+  it('a denied location says so under «Use my current location», keeps what was typed, and goes once a coordinate is typed', async () => {
     const { GeoError } = await import('../lib/geo');
     geo.getPosition.mockRejectedValueOnce(new GeoError('denied'));
     const s = await setup();
@@ -128,7 +149,9 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     const notice = s.find('attendance-settings-location-error');
     expect(notice.text()).toBe('Location access is denied. Allow location in this browser to read the workplace position, or type the coordinates.');
     expect(s.field('use-location').closest('section')?.contains(notice.element)).toBe(true);
-    expect(s.find('attendance-settings-error').exists()).toBe(false);
+    expect(s.find('attendance-settings-save-error').exists()).toBe(false);
+    await ionValue(s.field('workplace_lat'), '40.4', 'ionInput');
+    expect(s.find('attendance-settings-location-error').exists()).toBe(false);
   });
 
   it('a new tap on «Use my current location» lifts the last notice', async () => {
@@ -194,7 +217,7 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.sent()).toEqual([]);
     expect(s.field(name).errorText).toBe(message);
     expect(s.field(name).classList.contains('ion-invalid')).toBe(true);
-    expect(s.find('attendance-settings-error').exists()).toBe(false);
+    expect(s.find('attendance-settings-save-error').exists()).toBe(false);
   });
 
   it('clears a field’s mark once it is fixed, and then saves', async () => {
@@ -223,29 +246,115 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.field('auto_close_after_hours').errorText).toBe('Too many');
   });
 
-  // The banner up top keeps only the save's errors (the location's go under its button): a failed save still says so.
-  it('a failed save says so in the banner up top, not under «Use my current location»', async () => {
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
+    const BOTH = 'Fill in both latitude and longitude, or leave both empty.';
+    const HOURS = 'Ensure this value is less than or equal to 24.';
+    const REFUSAL = { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { workplace_lng: BOTH, auto_close_after_hours: HOURS } } };
+
+    /** Saves a workplace and the hours, and the server refuses the longitude and the hours. */
+    async function refused() {
+      const s = await setup();
+      s.answerBy({ '/api/attendance/settings': [422, REFUSAL] });
+      await ionValue(s.field('workplace_lat'), '40.4', 'ionInput');
+      await ionValue(s.field('workplace_lng'), '-3.7', 'ionInput');
+      await ionValue(s.field('auto_close_after_hours'), '20', 'ionInput');
+      await click(s.field('save'));
+      await settle();
+      return { ...s, ...refusalMarks(s.field, () => s.find('attendance-settings-save-error').exists()) };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('workplace_lng'), s.says('auto_close_after_hours')]).toEqual([BOTH, HOURS]);
+      await ionValue(s.field('auto_close_after_hours'), '10', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('auto_close_after_hours'), s.marked('auto_close_after_hours')]).toEqual(['', false]);
+      expect([s.says('workplace_lng'), s.marked('workplace_lng')]).toEqual([BOTH, true]);
+    });
+
+    // As what the screen judges itself: the workplace is a pair, so fixing either coordinate lifts both marks.
+    it('the coordinates are a pair: changing the latitude lifts the longitude’s message, and not the hours’', async () => {
+      const s = await refused();
+      await ionValue(s.field('workplace_lat'), '40.5', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('workplace_lng'), s.marked('workplace_lng')]).toEqual(['', false]);
+      expect(s.says('auto_close_after_hours')).toBe(HOURS);
+    });
+  });
+
+  // The save's notices are every settings page's, right above «Save» (hub#897); the location's go under its button.
+  it('a failed save says so right above «Save», not under «Use my current location»', async () => {
     const s = await setup();
     s.answerBy({ '/api/attendance/settings': [500, { error: { code: 'error', message: 'Boom' } }] });
     await ionValue(s.field('auto_close_after_hours'), '20', 'ionInput');
     await click(s.field('save'));
     await settle();
-    expect(s.find('attendance-settings-error').text()).toBe('Boom');
+    expect(s.find('attendance-settings-save-error').text()).toBe('Boom');
+    expect(between(s.field('auto_close_after_hours'), s.find('attendance-settings-save-error').element, s.field('save'))).toBe(true);
     expect(s.find('attendance-settings-location-error').exists()).toBe(false);
     expect(s.field('auto_close_after_hours').value).toBe('20');
   });
 
-  it('an employee reads them, read-only, without Save', async () => {
+  it('«Save» is on with nothing changed: a tap sends nothing and says the settings are saved', async () => {
+    const s = await setup();
+    expect(s.field('save').disabled).toBe(false);
+    await click(s.field('save'));
+    await settle();
+    expect([s.sent(), s.find('attendance-settings-saved').exists()]).toEqual([[], true]);
+  });
+
+  // hub#894: a save fails with no connection, the hours are typed back to what is saved and «Save» again. What is on
+  // screen is what is saved, so it says only that: the failed save's red notice goes with it, until the next refusal.
+  it('a failed save, the field typed back and «Save» again: only «Settings saved.», the red notice goes', async () => {
+    const s = await setup();
+    s.net.onApi(() => Promise.reject(new TypeError('Failed to fetch')));
+    await ionValue(s.field('auto_close_after_hours'), '13', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect(s.find('attendance-settings-save-error').exists()).toBe(true);
+    await ionValue(s.field('auto_close_after_hours'), '12', 'ionInput');
+    expect(s.find('attendance-settings-save-error').exists()).toBe(true);
+    await click(s.field('save'));
+    await settle();
+    expect([s.sent().length, s.find('attendance-settings-saved').exists(), s.find('attendance-settings-save-error').exists()]).toEqual([1, true, false]);
+    await ionValue(s.field('auto_close_after_hours'), '13', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect([s.sent().length, s.find('attendance-settings-saved').exists(), s.find('attendance-settings-save-error').exists()]).toEqual([2, false, true]);
+  });
+
+  it('«Save» shows its save icon, and a spinner instead while saving', async () => {
+    const s = await setup();
+    let answer!: (response: Response) => void;
+    s.net.onApi(() => new Promise<Response>((resolve) => (answer = resolve)));
+    const icon = () => (s.field('save').querySelector('ion-icon') as (HTMLElement & { icon?: string }) | null)?.icon;
+    const spins = () => !!s.field('save').querySelector('ion-spinner');
+    expect([icon(), spins()]).toEqual([resolveIcon('lucide:save'), false]);
+    await ionValue(s.field('auto_close_after_hours'), '10', 'ionInput');
+    await click(s.field('save'));
+    expect([icon(), spins(), s.field('save').disabled]).toEqual([undefined, true, true]);
+    answer(Response.json({ ...DEFAULTS, auto_close_after_hours: 10, saved: true }));
+    await flush();
+    await flush();
+    expect([icon(), spins(), s.field('save').disabled]).toEqual([resolveIcon('lucide:save'), false, false]);
+  });
+
+  it('an employee reads them, read-only, without Save: their form saves nothing', async () => {
     const s = await setup({ session: EMPLOYEE, data: { ...DEFAULTS, require_location: true, workplace_lat: 40.4, workplace_lng: -3.7, workplace_set: true } });
     expect(s.find('attendance-settings-read-only').text()).toContain('Only a manager or an administrator can change these settings.');
     expect([s.field('require_location').disabled, s.field('workplace_lat').disabled, s.field('auto_close_after_hours').disabled]).toEqual([true, true, true]);
     expect(s.find('attendance-settings-save').exists()).toBe(false);
     expect(s.find('attendance-settings-use-location').exists()).toBe(false);
+    await s.find('attendance-settings-form').trigger('submit');
+    await settle();
+    expect([s.sent(), s.find('attendance-settings-saved').exists()]).toEqual([[], false]);
   });
 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     expect(s.field('auto_close_after_hours').label).toBe('Marcar a revisar tras (horas)');
     expect(s.find('attendance-settings-use-location').text()).toContain('Usar mi ubicación actual');
+    expect(s.field('save').textContent?.trim()).toBe('Guardar');
   });
 });

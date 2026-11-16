@@ -29,6 +29,9 @@ msgstr "Categorías"
 msgid "Rules"
 msgstr "Reglas"
 
+msgid "Rule"
+msgstr "Regla"
+
 msgid "Aliases"
 msgstr "Alias"
 
@@ -103,14 +106,28 @@ msgstr "descripción"
 msgid "system"
 msgstr "de sistema"
 
+# An alias (masculine), the same words as the apps before.
 msgid "active"
-msgstr "activa"
+msgstr "activo"
 
 msgid "created at"
 msgstr "creado el"
 
 msgid "updated at"
 msgstr "actualizado el"
+
+# A tax category and a tax rule, feminine.
+msgctxt "tax"
+msgid "active"
+msgstr "activa"
+
+msgctxt "tax"
+msgid "created at"
+msgstr "creada el"
+
+msgctxt "tax"
+msgid "updated at"
+msgstr "actualizada el"
 
 msgid "tax category"
 msgstr "categoría fiscal"

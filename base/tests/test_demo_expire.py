@@ -1,7 +1,9 @@
-"""``manage.py demo_expire <slug>``: end a demo now and purge it at once (plan 2026-10-17, §1.7).
+"""``manage.py demo_expire <slug>``: end a demo now and purge it at once.
 
 Support's tool and the e2e's clock: through its operations (``base.demo.expire``, then one pass of the reaper), in
-every environment (not only ``DEBUG``), and it says how the demo was left.
+every environment (not only ``DEBUG``), and it says how the demo was left. While the platform is frozen for a database
+upgrade (``control.freeze.set``; hub#930) it ends the demo all the same and leaves its database where it is: a ``DROP
+DATABASE`` meanwhile would never reach the upgrade's copy; the reaper drops it once the freeze is lifted.
 """
 
 import hashlib
@@ -18,23 +20,27 @@ from live.context import system_context
 from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
-from base.services import demo_code_create, demo_create, open_demo_session, redeem_demo_code
+from base.services.demos import demo_code_create, demo_create, reap_demos, redeem_demo_code
+from base.tenancy.tests.business import HUB_DB
+from base.tests.test_services_demo import open_session
+from control.schemas import FreezeIn
+from control.services import freeze_set
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 OWNER = hashlib.sha256(b"ana's browser").hexdigest()
 
 
-def entered_demo() -> str:
+def entered_demo(inside: Hub) -> str:
     """A demo its browser entered: made ready by the worker (``base.tenancy.provision``), a code spent and the
-    owner's session open; its slug."""
+    owner's session open in ``inside``'s database, which stands in for the demo's own; its slug."""
     ctx = system_context(REGISTRY_SCOPE)
     slug = demo_create(ctx, DemoCreateIn(session_key=OWNER)).slug
     Hub.objects.filter(slug=slug).update(status="ready")
     redeemed = redeem_demo_code(slug, demo_code_create(ctx, DemoCodeIn(slug=slug, session_key=OWNER)).code)
     request = RequestFactory().post("/auth/callback")
     SessionMiddleware(lambda request: None).process_request(request)
-    open_demo_session(request, redeemed.hub)
+    open_session(request, redeemed.hub, inside=inside)
     return slug
 
 
@@ -45,9 +51,9 @@ def expire(slug: str) -> str:
 
 
 @pytest.mark.parametrize("debug", [True, False])
-def test_ends_the_demo_and_purges_it_at_once(settings, debug):
+def test_ends_the_demo_and_purges_it_at_once(settings, debug, hub_b):
     settings.DEBUG = debug
-    slug = entered_demo()
+    slug = entered_demo(hub_b)
     output = expire(slug)
     hub = Hub.objects.get(slug=slug)
     assert (hub.status, hub.purged_at is not None) == ("purged", True)
@@ -57,8 +63,8 @@ def test_ends_the_demo_and_purges_it_at_once(settings, debug):
     assert output.strip() == f"{slug}: purged"
 
 
-def test_a_demo_already_purged_says_so_again():
-    slug = entered_demo()
+def test_a_demo_already_purged_says_so_again(hub_b):
+    slug = entered_demo(hub_b)
     expire(slug)
     assert expire(slug).strip() == f"{slug}: purged"
 
@@ -68,3 +74,19 @@ def test_a_slug_that_names_no_demo_is_an_error_and_changes_nothing(slug):
     with pytest.raises(CommandError, match="no demo"):
         expire(slug)
     assert Hub.objects.get(slug="a").status == "ready"
+
+
+def test_frozen_it_ends_the_demo_and_leaves_its_database_for_after_the_freeze(hub_b):
+    platform = system_context(REGISTRY_SCOPE)
+    slug = entered_demo(hub_b)
+    freeze_set(platform, FreezeIn(frozen=True, reason="Aurora upgrade"))
+
+    output = expire(slug)
+
+    assert Hub.objects.get(slug=slug).status == "expired"
+    assert output.strip() == f"{slug}: expired (frozen: its database is dropped once the freeze is lifted)"
+
+    freeze_set(platform, FreezeIn(frozen=False))
+    reap_demos()
+
+    assert Hub.objects.get(slug=slug).status == "purged"

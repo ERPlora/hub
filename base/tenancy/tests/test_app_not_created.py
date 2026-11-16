@@ -1,6 +1,6 @@
-"""A model of an app a business has not created yet, touched where no operation's gate is (hub#608; PLAN-DB §4, spec
-2026-10-11 «tablas al activar» §9): an ``events.py``, the admin, a task. The ``TenantRouter`` answers the 404
-``app_inactive`` an app that is off answers, before any SQL, never a ``relation … does not exist``.
+"""A model of an app a business has not created yet, touched where no operation's gate is: an ``events.py``, the admin,
+a task. The ``TenantRouter`` answers the 404 ``app_inactive`` an app that is off answers, before any SQL, never a
+``relation … does not exist``.
 
 Real databases, committed (no test case: the migrator registers its own aliases): two businesses cloned from a template
 with the platform alone, both confirmed by the migrator as every ready hub is, A with Printing's tables and B without.
@@ -25,7 +25,8 @@ from live.operations import atomic, get
 
 from apps.printing.models import Printer, PrintJob
 from apps.tax.models import TaxCategory
-from base import activation, services
+from base import activation, relay
+from base.services import relay_runs
 from base.activation import ON
 from base.middleware import HubDatabaseMiddleware
 from base.models import AppActivation, EventDelivery, HubUser, TaskSchedule
@@ -125,7 +126,7 @@ def test_no_sql_reaches_the_database_so_the_transaction_goes_on(two_businesses):
 
 
 def test_an_operation_whose_row_says_on_without_its_tables_answers_the_same_404(two_businesses):
-    """A row or a cache behind what the database has (PLAN-DB §9, «caché atrasada sin tablas») never reaches the SQL."""
+    """A row or a cache behind what the database has (a stale cache without the tables) never reaches the SQL."""
     _, without_it = two_businesses
     op = get("printing.job.list")
     ctx = OperationContext(scope=Scope("host", without_it.slug), actor="ana", permissions=frozenset({"*"}), language="en")
@@ -307,15 +308,16 @@ def test_a_reaction_that_touches_it_fails_as_a_refusal_of_the_business_and_is_tr
     _, without_it = two_businesses
     now = timezone.now()
 
-    with use_hub(without_it), caplog.at_level(logging.WARNING, logger="base.services"):
+    with use_hub(without_it), caplog.at_level(logging.WARNING, logger="base.services.relay_runs"):
         event = OutboxEvent.objects.create(
             scope_kind="host", scope_key=without_it.slug, name="sale.sale.paid", actor="ana"
         )
         delivery = EventDelivery.objects.create(event=event, app_label="inventory", next_attempt_at=now)
-        outcome = services.relay_deliver_next(
+        outcome = relay_runs.relay_deliver_next(
             now,
             deliver=lambda app_label, event: PrintJob.objects.count(),
             listeners=lambda event: [],
+            carried=relay.carried,
             max_depth=3,
             max_attempts=3,
             backoff=lambda attempts: dt.timedelta(seconds=2),
@@ -334,11 +336,11 @@ def test_a_task_that_touches_it_is_logged_with_the_refusal_and_moves_to_its_next
     now = timezone.now()
     later = now + dt.timedelta(hours=1)
 
-    with use_hub(without_it), caplog.at_level(logging.ERROR, logger="base.services"):
+    with use_hub(without_it), caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
         schedule = TaskSchedule.objects.create(
             app_label="demo", name="touches", operation="demo.touches", cron="0 * * * *", next_run=now
         )
-        outcome = services.run_next_due_task(
+        outcome = relay_runs.run_next_due_task(
             now, execute=lambda name: PrintJob.objects.count(), reschedule=lambda cron, at: later
         )
         schedule.refresh_from_db()

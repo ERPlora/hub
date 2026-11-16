@@ -7,7 +7,7 @@
 // `errors`, painted under its field («More details» opens when the field is in there). A number or a
 // date the browser cannot read (31/02, «tres») reaches the page as "", so saving would empty the field:
 // `readable()` tells it under its field, worded as the server's refusal, and the parent does not save.
-// The country is the shared Combo (the product's `ok-combo`, customers#72): typing its name, or its code, filters
+// The country is the shared Combo (the product's `ok-combo`): typing its name, or its code, filters
 // the ~250 countries; the card keeps the ISO code, and clearing the field leaves it without one.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';

@@ -16,12 +16,13 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import gettext_noop
+from django.utils.translation import gettext_noop, pgettext_lazy
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
-from base.schemas import CatalogImageOut, names
+from base.recovery import ImageInCopyIn, RecoveredOut
+from base.schemas import CatalogImageOut, exactly_one, names
 
 T = TypeVar("T")
 
@@ -36,7 +37,8 @@ MAX_LINES = 255
 MAX_MINUTES = 1440
 
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
-SAY_WHICH_CATEGORY = _("Say which category: its id, or its name.")
+# Its own context: said as its siblings are («su id o su nombre»), not as Inventory says it.
+SAY_WHICH_CATEGORY = pgettext_lazy("service", "Say which category: its id, or its name.")
 SAY_WHICH_PACKAGE = _("Say which package: its id, or its name.")
 SAY_WHICH_MEMBER = _("Say which professional: their id, or their name.")
 SAY_WHICH_CUSTOMER = _(
@@ -64,11 +66,13 @@ VOUCHER_SOLD = gettext_noop("Voucher sold")
 VOUCHER_SESSION = gettext_noop("Voucher session")
 VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a service, a category, a package and a customer by their names, a professional by their full
 # name; who does what by the service and the professional; a voucher sold and its sessions by the package, the owner and
 # the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale and its
-# line, the appointment and the line of an order are of apps Services does not require: the card leaves them out.
+# line, the appointment, the line of an open check and the refund or the void that gives sessions back are of apps
+# Services does not require: its own read names them by theirs (``service.record.get``), the sale by its
+# number, a line by what it charges, the appointment as Appointments' cards say it and a refund or a void by its sale.
 A_SERVICE = names("service.service.get")
 A_CATEGORY = names("service.category.get")
 A_PACKAGE = names("service.package.get")
@@ -77,6 +81,12 @@ A_GRANT = names("service.grant.get", name=("label",))
 A_SESSION = names("service.session.get", name=("label",))
 A_MEMBER = names("staff.member.detail", name=("full_name",))
 A_CUSTOMER = names("customer.customer.detail")
+A_SALE = names("service.record.get", by="sale_id")
+A_SALE_LINE = names("service.record.get", by="sale_line_id")
+AN_APPOINTMENT = names("service.record.get", by="appointment_id")
+A_CHECK_LINE = names("service.record.get", by="order_line_id")
+A_RETURN = names("service.record.get", by="reference")
+ONE_RECORD = _("Say one record, by its id.")
 #: How far ahead of this server's clock a purchase may be dated (the till's clock may run fast).
 CLOCK_SKEW = timedelta(minutes=5)
 
@@ -211,7 +221,7 @@ class ServiceRefIn(In):
         return self
 
 
-# The service's image (SERVICE-F34, F35; round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The service's image (SERVICE-F34, F35; base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
@@ -267,6 +277,20 @@ class ByIdIn(In):
 
 class NoIn(In):
     pass
+
+
+class RecordRefIn(In):
+    """One record of Sales or Appointments a write of Services names, by its id: exactly one (``service.record.get``)."""
+
+    sale_id: UUID | None = Field(None, description="A sale of Sales.")
+    sale_line_id: UUID | None = Field(None, description="A line of a sale of Sales.")
+    appointment_id: UUID | None = Field(None, description="An appointment of Appointments.")
+    order_line_id: UUID | None = Field(None, description="A line of an open check of Sales.")
+    reference: UUID | None = Field(None, description="A refund of Sales, or a sale it voided.")
+
+    @model_validator(mode="after")
+    def _one(self):
+        return exactly_one(self, ONE_RECORD)
 
 
 # ── Services ──────────────────────────────────────────────────────────────────────────────────
@@ -444,10 +468,10 @@ class ServiceOut(Schema):
     category_id: UUID | None
     category_name: str | None
     pricing_type: PricingType
-    price: int
-    min_price: int | None
-    max_price: int | None
-    cost: int
+    price: int = Field(json_schema_extra={"money": True})
+    min_price: int | None = Field(json_schema_extra={"money": True})
+    max_price: int | None = Field(json_schema_extra={"money": True})
+    cost: int = Field(json_schema_extra={"money": True})
     duration_minutes: int
     buffer_before: int
     buffer_after: int
@@ -484,9 +508,9 @@ class ServiceSaleOut(Schema):
     id: UUID
     name: str
     pricing_type: PricingType
-    price: int
-    min_price: int | None
-    max_price: int | None
+    price: int = Field(json_schema_extra={"money": True})
+    min_price: int | None = Field(json_schema_extra={"money": True})
+    max_price: int | None = Field(json_schema_extra={"money": True})
     duration_minutes: int
     buffer_before: int
     buffer_after: int
@@ -721,6 +745,88 @@ class MemberReleaseIn(In):
     id: UUID = Field(description="The professional who left.")
 
 
+#: The most professionals a service of a separate copy comes back with.
+MAX_PERFORMERS = 500
+
+
+class AssignmentOfCopyIn(In):
+    """A professional who performed a service in a separate copy of the business, as the copy held it."""
+
+    member_id: UUID = Field(description="The professional (Staff), by id: the same in the copy and in the business.")
+    custom_duration: Minutes | None = Field(None, description="Their own duration in minutes; none = the service's.")
+    custom_price: Cents | None = Field(
+        None, description="Their own price in cents (minor units of the business's currency); none = the service's."
+    )
+    is_primary: bool = Field(False, description="Whether it was their main service.")
+    is_active: bool = Field(True, description="Whether the assignment was switched on.")
+
+
+class ServiceRecoverIn(ServiceIn, ImageInCopyIn):
+    """A service of a separate copy the business no longer has: what ``service.service.create`` takes, the image it
+    showed there and who performed it there (the business makes its own ids)."""
+
+    assignments: list[AssignmentOfCopyIn] = Field(
+        [], max_length=MAX_PERFORMERS, description="Who performed it in the copy."
+    )
+    stands_for: UUID = Field(description="The service of the copy it is made again for, by its id there.")
+
+
+class ServiceRecoveredOut(ServiceOut, RecoveredOut):
+    """A service made again from a separate copy, and who of those who performed it there it came back without."""
+
+
+#: The most services of a separate copy another app asks about at once.
+MAX_STANDING_FOR = 10_000
+
+
+class StandingForIn(In):
+    """Services of a separate copy of the business, by their ids there."""
+
+    ids: list[UUID] = Field(max_length=MAX_STANDING_FOR, description="The services of the copy, by their ids there.")
+
+
+class StandingForOut(Schema):
+    """The business's service that stands for each of them it no longer holds."""
+
+    standing_for: dict[UUID, UUID] = Field(description="By the id in the copy, the id of the service here.")
+
+
+#: The most services or subcategories a category of a separate copy takes back.
+MAX_INSIDE = 10_000
+
+
+class CategoryRecoverIn(CategoryIn):
+    """A category of a separate copy the business no longer has: what ``service.category.create`` takes and what it
+    had inside it there, each by its id, the same in the copy and in the business."""
+
+    stands_for: UUID | None = Field(
+        None, description="The category of the copy it comes back for, which the business may still hold deleted."
+    )
+    service_ids: list[UUID] = Field([], max_length=MAX_INSIDE, description="The services it had inside it.")
+    subcategory_ids: list[UUID] = Field([], max_length=MAX_INSIDE, description="The categories that hung from it.")
+
+
+class CategoryRecoveredOut(CategoryOut, RecoveredOut):
+    """A category made again from a separate copy, and what of what it had inside it there it came back without."""
+
+
+class ServiceLinkIn(In):
+    """A service the business kept, and the category a recovery brought back for the one it was in."""
+
+    service_id: UUID = Field(description="The service, the same in the copy and in the business.")
+    category_id: UUID = Field(description="The category brought back.")
+
+
+class SubcategoryLinkIn(In):
+    """A subcategory the business kept, and the category a recovery brought back for the one it hung from."""
+
+    category_id: UUID = Field(description="The subcategory, the same in the copy and in the business.")
+    parent_id: UUID = Field(description="The category brought back.")
+    stands_for: UUID = Field(
+        description="The category of the copy it hung from, which the business may still hold deleted."
+    )
+
+
 class AssignmentOut(Schema):
     id: UUID
     service_id: UUID
@@ -728,14 +834,15 @@ class AssignmentOut(Schema):
     member_id: UUID
     member_name: str
     custom_duration: int | None
-    custom_price: int | None
+    custom_price: int | None = Field(json_schema_extra={"money": True})
     is_primary: bool
     is_active: bool
     duration: int = Field(
         description="What it lasts with this professional: their own duration or the service's."
     )
     price: int = Field(
-        description="What it costs with this professional: their own price or the service's."
+        description="What it costs with this professional: their own price or the service's.",
+        json_schema_extra={"money": True},
     )
 
 
@@ -749,10 +856,10 @@ class EligibleOut(Schema):
     color: str
     booking_buffer: int
     custom_duration: int | None
-    custom_price: int | None
+    custom_price: int | None = Field(json_schema_extra={"money": True})
     is_primary: bool
     duration: int
-    price: int
+    price: int = Field(json_schema_extra={"money": True})
 
 
 class ReleasedOut(Schema):
@@ -887,8 +994,8 @@ class PackageOut(Schema):
     description: str
     discount_type: DiscountType
     discount_percent_bp: int
-    discount_amount: int
-    fixed_price: int | None
+    discount_amount: int = Field(json_schema_extra={"money": True})
+    fixed_price: int | None = Field(json_schema_extra={"money": True})
     validity_days: int | None
     max_uses: int | None
     is_active: bool
@@ -947,9 +1054,12 @@ class GrantIn(In):
         description="The sale that charged it (Sales), if it went through the till: its line stops counting for who "
         "sold it and each session counts for who does it. A voucher with an amount that does not say it counts for "
         "nobody as its sessions are done.",
+        json_schema_extra=A_SALE,
     )
     sale_line_id: UUID | None = Field(
-        None, description="The line of that sale that charged it; only needed when the sale charged several (Sales)."
+        None,
+        description="The line of that sale that charged it; only needed when the sale charged several (Sales).",
+        json_schema_extra=A_SALE_LINE,
     )
     granted_at: datetime | None = Field(
         None,
@@ -990,9 +1100,9 @@ class GrantOut(Schema):
     granted_at: datetime
     source: GrantSource
     sale_id: UUID | None
-    amount: int
-    net_amount: int
-    tax_amount: int
+    amount: int = Field(json_schema_extra={"money": True})
+    net_amount: int = Field(json_schema_extra={"money": True})
+    tax_amount: int = Field(json_schema_extra={"money": True})
     note: str
     max_uses: int | None = Field(
         description="Sessions in all: the ones sold plus the adjustments; null = unlimited."
@@ -1030,7 +1140,7 @@ class OrphanOut(Schema):
     customer_id: UUID
     customer_deleted_at: datetime
     granted_at: datetime
-    amount: int
+    amount: int = Field(json_schema_extra={"money": True})
     remaining: int | None
     is_expired: bool
 
@@ -1105,11 +1215,17 @@ class RedeemIn(GrantRefIn):
         None, description="The service performed, by id; the voucher must cover it.", json_schema_extra=A_SERVICE
     )
     service: Said | None = Field(None, description="The service performed, by name.")
+    member_id: UUID | None = Field(
+        None,
+        description="The professional (Staff) who did it, by id: its value counts in their production.",
+        json_schema_extra=A_MEMBER,
+    )
+    member: Said | None = Field(None, description="The professional (Staff) who did it, by name.")
     appointment_id: UUID | None = Field(
-        None, description="The appointment it is spent on (Appointments), if any."
+        None, description="The appointment it is spent on (Appointments), if any.", json_schema_extra=AN_APPOINTMENT
     )
     sale_id: UUID | None = Field(
-        None, description="The sale it is spent on (Sales), if any."
+        None, description="The sale it is spent on (Sales), if any.", json_schema_extra=A_SALE
     )
     note: Note = Field("", description="A free note.")
 
@@ -1131,6 +1247,8 @@ class RedemptionOut(Schema):
     grant_id: UUID
     service_id: UUID | None
     service_name: str | None
+    member_id: UUID | None = Field(description="The professional who did it; null = nobody said.")
+    member_name: str | None
     redeemed_at: datetime
     remaining: int | None = Field(
         description="Sessions left after this one; null = unlimited."
@@ -1191,6 +1309,10 @@ class MovementOut(Schema):
     customer_name: str | None
     service_id: UUID | None
     service_name: str | None
+    member_id: UUID | None = Field(
+        description="The professional who did a session; null = nobody said (and on an adjustment)."
+    )
+    member_name: str | None
     sale_id: UUID | None
     appointment_id: UUID | None
     note: str
@@ -1250,7 +1372,8 @@ class HoldIn(In):
         description="The service of the line; the voucher must cover it.", json_schema_extra=A_SERVICE
     )
     order_line_id: UUID = Field(
-        description="The line of the open check (Sales) the session pays: one session per line."
+        description="The line of the open check (Sales) the session pays: one session per line.",
+        json_schema_extra=A_CHECK_LINE,
     )
 
 
@@ -1265,7 +1388,7 @@ class SettleIn(In):
         title=VOUCHER_SESSIONS,
         description="The sessions held for the lines the sale charges.",
     )
-    sale_id: UUID = Field(description="The sale charged (Sales).")
+    sale_id: UUID = Field(description="The sale charged (Sales).", json_schema_extra=A_SALE)
     customer_id: UUID | None = Field(
         description="The sale's customer: it must own the vouchers.", json_schema_extra=A_CUSTOMER
     )
@@ -1281,6 +1404,7 @@ class ReturnIn(In):
     reference: UUID = Field(
         title=gettext_noop("Refund or void"),
         description="The refund, or the sale voided, that gives them back (Sales).",
+        json_schema_extra=A_RETURN,
     )
     reason: Note = Field("", description="Why, as the refund or the void says it.")
 
@@ -1303,7 +1427,7 @@ class SessionOut(Schema):
     value: int | None = Field(
         description="What the session is worth, VAT included, in cents (minor units of the business's currency): "
         "what is left of the voucher's price ÷ the sessions it has left, fixed when delivered; null until then and "
-        "on an unlimited voucher."
+        "on an unlimited voucher.", json_schema_extra={"money": True}
     )
 
 

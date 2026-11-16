@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.inventory.product.get","app":"inventory","tool":"inventory.product.get","role":"employee","language":"es","phrase":"¿me enseñas la ficha del Café para comprobar su precio y su IVA?","expect":"read","lookups":["inventory.product.list"]},
+    {"id":"qa20261108.employee.es.inventory.unit.list","app":"inventory","tool":"inventory.unit.list","role":"employee","language":"es","phrase":"¿qué unidades puedo elegir al apuntar una recepción de mercancía?","expect":"read"},
+    {"id":"qa20261108.employee.es.inventory.product.print_label","app":"inventory","tool":"inventory.product.print_label","role":"employee","language":"es","phrase":"saca una etiqueta del Café para ponerla en el paquete","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.inventory.config.update","app":"inventory","tool":"inventory.config.update","role":"employee","language":"es","phrase":"cambia los avisos de stock para que salten solo cuando quede una unidad","expect":"refused"},
+    {"id":"qa20261108.employee.es.inventory.product.set_image","app":"inventory","tool":"inventory.product.set_image","role":"employee","language":"es","phrase":"sustituye la foto del Café por la primera que encuentres en la biblioteca","expect":"refused"},
+    {"id":"qa20261108.employee.es.inventory.product.update","app":"inventory","tool":"inventory.product.update","role":"employee","language":"es","phrase":"pon el Café a 2,10 € y cambia su descripción por «Café especial QA»","expect":"refused"}
+  ]
+}

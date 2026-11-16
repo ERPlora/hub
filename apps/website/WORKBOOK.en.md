@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6a0e550ed7ba1f382520e20ef6129ca84138b01b747feb42662374eee30e903d -->
+<!-- generated from WORKBOOK.md sha256:30d95211d2fc273353cd8d902529094b1c23370940bfafa10b0c45d0265c77c6 -->
 
 ## What it is for and who it is for
 
@@ -56,7 +56,9 @@ switches between the two.
   colour with the photo tinted in it, huge capitals and strong buttons). All four suit a restaurant, a salon, a shop
   or a service.
 - **Colours**: eight palettes as cards showing their colours on the light and the dark page, the chosen one
-  highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**. Under
+  highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**; up to
+  three to a row, and two when a name would not fit whole that way (a 375 px phone): a name is never split inside a
+  word. Under
   them, two colour fields (**Main colour** and **Second colour**) with the chosen palette's: changing them makes the
   palette yours, and **Reset colours** then appears and gives the palette's own back. Choosing another palette shows
   its own (the changes to the previous one are dropped). Each palette has a light and a dark version and reads well in
@@ -95,7 +97,7 @@ page: your phone or a private window) and, if the page is not online, that the a
 sign-in.
 
 ### The public page
-The chosen template with what is published, at the business's address (modern redesign of 2026-10-22): a sticky see-through top bar with the
+The chosen template with what is published, at the business's address: a sticky see-through top bar with the
 logo, the name, the sections' menu (folded on a phone) and **Log in** (an outline pill); a header with the cover photo
 (or, without one, a soft gradient of the palette, never empty), the title in large type, the tagline and two pills:
 **Chat on WhatsApp** (or **Contact us**, to the contact section, without WhatsApp) and **Find us** (to the address);
@@ -155,7 +157,6 @@ what the owner writes, as written.
 | WEBSITE-F12 | Show the Google reviews | done |
 
 ### WEBSITE-F01 Fill in and save the draft
-<!-- origin: new (an editor of fixed sections with a draft and autosave, like Square Online, Wix, Squarespace and Shopify; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -176,7 +177,6 @@ business's website: upload it again.».
 Involved: WEBSITE-F02, WEBSITE-F03, WEBSITE-F04, WEBSITE-F11, WEBSITE-F12
 
 ### WEBSITE-F02 Choose the design, the palette and the background
-<!-- origin: new (templates that swap without losing the content and palettes in light and dark, like Squarespace, Wix and Square Online; PLAN §29, extension of 2026-10-22) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -194,7 +194,6 @@ If it fails: a colour written wrong is not saved and the field says so:
 Involved: WEBSITE-F01, WEBSITE-F06
 
 ### WEBSITE-F03 Show or hide a section
-<!-- origin: new (fixed sections that hide instead of being deleted, like Square Online's and Wix's; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -210,7 +209,6 @@ If it fails: as when saving (WEBSITE-F01); hiding never deletes what was written
 Involved: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Upload an image
-<!-- origin: new (images in the business's file store, served from its own address; PLAN §29 and PLAN-HUB block 7) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, API
 Screen: Website
@@ -221,7 +219,8 @@ Steps:
    the photo out of the list). It saves as in WEBSITE-F01.
 In: a jpeg, png or webp file of up to 5 MB and 8000 pixels a side; its content is checked, not only its name.
 Out: the image kept in the business's file store under a name taken from its content (the same image twice is one
-file), served from the business's own address and kept a year by the browser. Notice `website.image.uploaded`.
+file), served from the business's own address and kept a year by the browser; the name of the file it was first
+uploaded with is kept too, which is how the assistant names it. Notice `website.image.uploaded`.
 If it fails: under the field: «The file did not arrive whole: choose it again.», «The file is empty.», «The image may
 weigh 5 MB at most.», «This file is not a PNG image.» (or JPEG, WEBP), «The image may be 8000 pixels a side at
 most.» or, if the image does not fit in your plan's space (the same one Files' files take), «There is no space left
@@ -230,7 +229,6 @@ anyway.
 Involved: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Show the catalog
-<!-- origin: new (the website's catalog comes from the POS's own products and services, as in Square Online and Shopify; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -254,7 +252,6 @@ error; if the categories cannot be read, «The categories could not be loaded» 
 Involved: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 See the preview
-<!-- origin: new (a real preview beside the editor and in its own tab on a phone, like Squarespace, Wix and Shopify; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator
 Screen: Website
@@ -271,7 +268,6 @@ preview**.
 Involved: WEBSITE-F01, WEBSITE-F02, WEBSITE-F05, WEBSITE-F12
 
 ### WEBSITE-F07 Publish
-<!-- origin: new (a draft apart from what is published, behind a confirmation, like Square Online, Wix and Squarespace; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -288,7 +284,6 @@ If it fails: «The website could not be published» and what is published stays 
 Involved: WEBSITE-F05, WEBSITE-F10, WEBSITE-F12
 
 ### WEBSITE-F08 Take the page offline
-<!-- origin: new (unpublishing without losing anything, like Wix's and Square Online's «Unpublish»; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant, API
 Screen: Website
@@ -304,7 +299,6 @@ If it fails: «The website could not be taken offline» and the page stays onlin
 Involved: WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F09 Share the address and the QR
-<!-- origin: new (a QR to print and a link to copy, like Square's and Toast's QR; PLAN §29) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, manager, API
 Screen: Share and QR
@@ -318,10 +312,9 @@ Out: the business's public address, its own on erplora.com as the browser sees i
 device the address opens the app (to see the page: the phone or a private window) and, if the page is not online,
 that it still leads to the team's sign-in.
 If it fails: if it cannot be copied, «The link could not be copied: select it and copy it by hand.».
-Involved: WEBSITE-F07, WEBSITE-F10
+Involved: WEBSITE-F07, WEBSITE-F10, BASE-F112 (inside the app)
 
 ### WEBSITE-F10 Visit the public page
-<!-- origin: new (the business's website at its own address, with «Log in» for the team; PLAN §29, Ioan's decision of 21/10) -->
 Status: done (server, public page and e2e)
 Actor: anyone, without an account
 Screen: The public page
@@ -332,14 +325,15 @@ Steps:
    app as always.
 In: the business's address.
 Out: the published page, with its own security policy (no user scripts: only the page's bundle), without cookies and
-kept a minute by the browser; the tab shows the logo or the name's initial.
+kept a minute by the browser; the tab shows the logo or the name's initial. The page tells search engines which is its
+main address: the business's own domain if it opens there (BASE-F110), also from this address, which does not redirect
+because it is still the team's way in; without an own domain, this one.
 If it fails: not published, taken offline or with the app off, the address leads to the team's sign-in; whoever
 makes more than 60 reads a minute from one connection waits a moment. On the business's own domain (BASE-F110) it is the
 same page: **Log in** leads to its address on erplora.com and, with no page to show, the domain says there is nothing there.
 Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Show a photo gallery
-<!-- origin: new (a salon's gallery of its work, like Fresha's, Booksy's and Square Online's; PLAN §29, extension of 2026-10-22) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant (ordering or removing photos already uploaded), API
 Screen: Website
@@ -357,7 +351,6 @@ uploaded to this business's website: upload it again.» under the gallery.
 Involved: WEBSITE-F04, WEBSITE-F10
 
 ### WEBSITE-F12 Show the Google reviews
-<!-- origin: new (the Google Business Profile's rating and reviews with «Write a review», like Fresha, Square Online and Wix; PLAN §29, extension of 2026-10-22) -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, assistant (the link), API
 Screen: Website
@@ -394,6 +387,8 @@ speaks) and the API, with the same rules and the same permissions.
 | The draft, its publication status and the public address (can be followed live) | view | F01–F03, F07, F08 | `website.site.get` |
 | The draft painted as the public page (HTML, for the preview) | manage | F06 | `website.site.preview` |
 | The categories of Inventory or Services to choose from | manage | F05 | `website.catalog.categories` |
+| An uploaded image by the name of its file: what the assistant's card reads to name it (BASE-F97) | view | F04, F11 | `website.image.get` |
+| A category of Inventory or Services by its name: what the assistant's card reads to name it (BASE-F97) | manage | F05 | `website.category.get` |
 | The QR of the public address, in PNG or SVG | view | F09 | `website.qr.get` |
 | What is published, without the hidden sections (no session) | anyone | F10 | `website.public.site` |
 | The published catalog, read at that moment and with the prices in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
@@ -421,7 +416,14 @@ to 8 pm» → it reads the draft, puts the five days with the interval `09:00`�
 rest as it was) and calls `website.site.save`; if she adds «and publish it», `website.site.publish`. Not assistant
 tools, on purpose: the preview (`website.site.preview`, an HTML page), the image upload (`website.image.upload`, a
 file in base64 up to 5 MB) and the QR (`website.qr.get`, an image in base64), which are used from the screen, nor the
-visitors' three public reads (`website.public.*`).
+visitors' three public reads (`website.public.*`), nor the two with which its card names an image or a category
+(`website.image.get` and `website.category.get`).
+
+Before saving, the assistant asks for confirmation with its card (BASE-F97), which sums up what changes in the
+editor's words, never dumping the whole website or its codes: the design («Modern»), the theme (the «Forest» palette,
+custom colours if any and the «Dark» background), each section hidden or shown again («Gallery: hidden») and, by their
+names, the other sections whose content changes («Content: Header, Contact»). If the draft does not change, it says
+«No changes».
 
 ### What it announces
 

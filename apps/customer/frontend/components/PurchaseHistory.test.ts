@@ -53,10 +53,10 @@ describe('PurchaseHistory: the currency of each sale (customer-business-currency
     expect(amounts(s)).toEqual(['25,50 zł', '10,00 €', '2.550 ¥']);
   });
 
-  it('a sale without a currency of its own is in the business\'s, and a bare figure until it answers', async () => {
+  it('a sale without a currency of its own is in the business\'s, and a dash until it answers', async () => {
     const s = await setup();
     await s.result(s.call, LIST, pageOf([{ ...purchase('p1', 'confirmed', 2550), currency: '', currency_decimals: null }]));
-    expect(amounts(s)).toEqual(['25.50']);
+    expect(amounts(s)).toEqual(['—']);
     await s.result(s.call, 'base.business.get', business(POLISH));
     expect(amounts(s)).toEqual(['zł 25.50']);
   });

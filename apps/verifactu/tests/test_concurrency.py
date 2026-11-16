@@ -5,47 +5,25 @@ two with the same previous fingerprint; the same invoice delivered twice at once
 the queue at once never send the same chain twice (``SKIP LOCKED`` on its send control).
 """
 
-import threading
 import time
 
 import pytest
-from django.db import connection
+from django.db import connections
 
 from apps.verifactu import gateway
 from apps.verifactu.models import Record
+from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, answering, manual, run
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once
 
-from apps.verifactu.tests.conftest import A, answering, manual, run
-
-pytestmark = pytest.mark.django_db(transaction=True)
+# Business A on a plan with room for the sessions of the test at once: Free's lets one transaction in at a time, and
+# the devices would queue for it instead of racing for the chain's row locks.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 @pytest.fixture(autouse=True)
 def _committed(committed_factory_data):
     """Every test here starts from the committed factory data and the issuer (``conftest``)."""
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def tickets(count: int):
@@ -115,14 +93,13 @@ def test_the_same_invoice_twice_at_once_is_one_record(invoice_does_not_seal):
 def test_a_chain_held_too_long_leaves_the_document_pending_and_its_reaction_seals_it(monkeypatch):
     """A transient database error at the emission (another device holds the chain's lock past the lock timeout):
     Invoicing keeps the document «pending» and VeriFactu's reaction to its notice seals it once the lock is free."""
-    from django.db import connection as default
-
     from apps.invoice import services as invoicing
     from apps.invoice.models import Invoice
     from apps.verifactu.models import Chain
     from apps.verifactu.tests.conftest import deliver
 
     tickets(1)  # the chain's head exists, committed
+    business = connections[current_alias()]
     real = invoicing.get_operation
 
     def busy_database(name):
@@ -131,7 +108,7 @@ def test_a_chain_held_too_long_leaves_the_document_pending_and_its_reaction_seal
             return operation
 
         def short_wait(ctx, data):
-            with default.cursor() as cursor:
+            with business.cursor() as cursor:
                 cursor.execute("SET LOCAL lock_timeout = '200ms'")
             return operation(ctx, data)
 
@@ -141,7 +118,7 @@ def test_a_chain_held_too_long_leaves_the_document_pending_and_its_reaction_seal
     monkeypatch.setattr(invoicing, "get_operation", busy_database)
     import psycopg
 
-    other = psycopg.connect(**default.get_connection_params(), autocommit=False)  # another device, own session
+    other = psycopg.connect(**business.get_connection_params(), autocommit=False)  # another device, own session
     try:
         with other.cursor() as cursor:
             cursor.execute(f"SELECT 1 FROM {Chain._meta.db_table} FOR UPDATE")

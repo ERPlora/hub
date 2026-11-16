@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dd9c53806f807b9f8071855e9c85f70b4bd37c08733a2564f89b46e3c54e7973 -->
+<!-- generated from WORKBOOK.md sha256:a728971217d04a8096d8e5376a5a053f4b391b690bbc91638dca78cc7f917cae -->
 
 ## What it is for and who it is for
 
@@ -34,11 +34,11 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 - **Asking for the guests when seating, transferring and joining checks, taking a table out of service**
   and the list of closed checks with their amount (Toast and Lightspeed).
 - **A table with its check open is not freed by hand**: it is charged, moved to another table or the
-  check is deleted (Toast, Square, Lightspeed and Odoo; tables#124 of the current product).
+  check is deleted (Toast, Square, Lightspeed and Odoo).
 - **Seating at a reserved table is allowed and spends the booking; going over the capacity warns but does
   not prevent it.**
-- **A reserved table is painted Reserved only close to the time of its booking** (market decision on
-  question 1 of the current product). Before that the table stays Available and shows the next booking
+- **A reserved table is painted Reserved only close to the time of its booking** (market decision).
+  Before that the table stays Available and shows the next booking
   with its time. This is how they do it:
 
   | Product | How it solves it | Source |
@@ -53,10 +53,10 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   | Tabit | The table's upcoming bookings can be seen from it | [support-us.tabit.cloud](https://support-us.tabit.cloud/hc/en-us/article_attachments/4408025435794) |
 
   **Wins:** Reserved from **60 minutes before** the booking's time until its window ends; before that,
-  the table stays Available with "Ana · 21:00". **Why not the old way** (Reserved from the moment it is
-  confirmed, even a week ahead): it blocked the table the whole service and a party seated at noon
-  "spent" the evening's booking.
-- **A deactivated table or zone leaves service** (decision on question 7): it is not painted on the
+  the table stays Available with "Ana · 21:00". **Why not from the moment it is confirmed** (even a
+  week ahead): it would block the table the whole service and a party seated at noon would "spend" the
+  evening's booking.
+- **A deactivated table or zone leaves service** (market decision): it is not painted on the
   service plan and cannot be seated; it stays in "Edit plan", in **Tables** and in **Zones**, like
   [Lightspeed — deactivating a table](https://k-series-support.lightspeedhq.com/hc/articles/1260804656729),
   [Toast — removing a table from the service area](https://support.toasttab.com/article/Creating-Service-Areas-and-Table-Setup-1493049150430)
@@ -156,7 +156,8 @@ with its decimals), never in euros if the business charges in another.
 ### Settings
 Menu **Tables → Settings**: "Ask for the guests when seating a table", "Amber warning (minutes)" and
 "Red warning (minutes)", and "Save". Only whoever can change them sees it (by default, the owner and the
-administrator).
+administrator). On a phone it fits whole, in Spanish and in English: the switch's long sentence breaks onto two
+lines and "Save" shows complete at the end (hub#866).
 
 ## States of each screen
 
@@ -170,6 +171,12 @@ administrator).
 
 In all of them: "Reconnecting…" while the live connection is recovered (what is drawn stays), "This app
 is not active in this business" and "You do not have permission".
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
@@ -222,8 +229,9 @@ Steps:
 In: the name, the description, the colour and the order.
 Out: the zone (announces: `table.zone.created`).
 If it fails: without a name, the button does not turn on. A name another zone already has: "There is
-already a zone with that name.". An employee does not see the "+"; if they ask for it through the API,
-it is refused for lack of permission.
+already a zone with that name.". The reason of a field shows under it and goes away as soon as that field
+is corrected, even if another one says the same (hub#888). An employee does not see the "+"; if they ask
+for it through the API, it is refused for lack of permission.
 Involved: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Add tables
@@ -250,7 +258,8 @@ all switched off or deleted (TABLE-F04), the step goes back to pending by itself
 does not tick it.
 If it fails: a number repeated in the zone (regardless of case and spaces), through any door: "There is
 already a table with that number in this zone.". A zone deleted in the meantime: "That zone does not
-exist in this business.".
+exist in this business.". In the **Tables** window, the reason of a field shows under it and goes away as
+soon as that field is corrected, even if another one says the same (hub#888).
 Involved: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Place the tables on the plan
@@ -284,7 +293,8 @@ In: the chosen table.
 Out: the changed table (announces: `table.table.updated`) or the deleted one (announces:
 `table.table.deleted`).
 If it fails: inside the window: "The table number is required", "There is already a table with that
-number in this zone.", "That table does not exist in this business."; deleting a table with an open
+number in this zone.", "That table does not exist in this business.", each reason under its field until
+that field is corrected, even if another one says the same (hub#888); deleting a table with an open
 check: "That table has an open check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
@@ -320,13 +330,14 @@ In: the chosen zone.
 Out: the changed zone (announces: `table.zone.updated`) or the deleted one (announces:
 `table.zone.deleted`).
 If it fails: "That zone still has tables. Move them to another zone or delete them first." or "That zone
-does not exist in this business.".
+does not exist in this business.". The reason of a field shows under it until that field is corrected,
+even if another one says the same (hub#888).
 Involved: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Create many tables at once
 Status: done
 Actor: manager, assistant
-Screen: assistant and API (the current product had no screen for this either)
+Screen: assistant and API
 Steps:
 1. Ask the assistant "create 12 tables on the Terrace, from T1 to T12, for 4".
 2. They are created at once (from 1 to 100), numbered with the prefix and the starting number that are
@@ -347,12 +358,15 @@ Steps:
 2. Set "Amber warning (minutes)" and "Red warning (minutes)" (from 1 to 600; the red one cannot be lower
    than the amber one).
 3. Tap "Save".
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 4. Unticked, tapping a free table seats it with its capacity (with the booking's guests if it is
    Reserved). In **Sessions**, the time of an open check turns amber and red from those minutes. Without
    ever saving: it asks, 60 and 90 minutes.
 In: the three values.
 Out: the room settings (announces: `table.settings.updated`).
-If it fails: a value out of range shows in its field.
+If it fails: a value out of range shows in its field. As in the form windows, the notice goes as soon as
+something is changed and a field's reason as soon as that field is corrected; both come back if the next try
+is refused too. A refusal that names no field stays until the next try (hub#854).
 Involved: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 See how the room is
@@ -377,8 +391,8 @@ Involved: TABLE-F10, TABLE-F25, TABLE-F29, SALE-F19
 
 ### TABLE-F10 Seat a party at a free or reserved table
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In **Floor plan → Service**, tap an Available or Reserved table. "Guests at table N" is asked, with
    the capacity (or the booking's guests) already set.
@@ -388,6 +402,7 @@ Steps:
 3. If you want, before seating "Assign customer" puts the card on the check (TABLE-F32).
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
    checks** of the till sees it). Whoever seats is the server of the check.
+5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
 In: the table and the guests; on a Reserved one, the booking's guests.
 Out: the table check opened with its guests, the time and the server (announces:
 `table.session.opened`); its check in Sales (announces: `sale.order.opened`); the bookings held at that
@@ -458,12 +473,13 @@ Involved: TABLE-F24, SALE-F19
 
 ### TABLE-F14 Correct the guests of an occupied table
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In the window of the occupied table tap "Guests".
 2. The question comes with the current guests; change them with a shortcut or with "−" / "+" and "Save".
 3. The table shows the new guests. On a split table the chosen check is corrected.
+4. With the assistant: "one more joined table 4, make it five"; on a split table, say which of its checks.
 In: the open check of the table.
 Out: the check's guests (announces: `table.session.updated`).
 If it fails: a check already closed, transferred, merged or parked is not corrected (the message of
@@ -472,8 +488,8 @@ Involved: TABLE-F10, TABLE-F17
 
 ### TABLE-F15 Move the check to another table (transfer)
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In the window of the occupied table tap "Transfer".
 2. The plan says "Transfer N to…" and "Pick a free table": only the Available and Reserved ones can be
@@ -482,6 +498,7 @@ Steps:
 4. The check is the same one, now at the destination table, with its guests, its server, its notes, its
    arrival time and its new title in Sales ("Table M"); the origin one stays free if it has no other
    check left, and the destination one, Occupied (if it was Reserved, it spends the booking).
+5. With the assistant: "move table 4 to 6".
 In: the origin check and the destination table.
 Out: the origin check "Transferred" and a new table check at the destination with the same Sales check
 (announces: `table.session.transferred`).
@@ -513,8 +530,8 @@ Involved: TABLE-F17, SALE-F24
 
 ### TABLE-F17 Split the check of a table
 Status: done
-Actor: employee, manager
-Screen: Floor plan (Service)
+Actor: employee, manager, assistant
+Screen: Floor plan (Service); assistant
 Steps:
 1. In the window of the occupied table tap "Split check".
 2. Mark the lines that go to the new check (those of its check in Sales, each with its amount in the
@@ -522,6 +539,8 @@ Steps:
 3. Tables opens a second check at the same table (1 guest) and Sales moves the marked lines to it, in
    the same operation. Charging one closes only that one: the table stays Occupied with the other. It
    can be split even if the table is blocked or deactivated: nobody new is seated.
+4. With the assistant: "split table 4's check, they're paying separately" (naming no lines, the new one
+   is born empty).
 In: the open check of the table and the lines that move.
 Out: two open table checks at the same table, the new one hanging from the original (announces:
 `table.session.split` and `sale.order.opened`).
@@ -610,10 +629,12 @@ Involved: TABLE-F18, TABLE-F19, TABLE-F23
 ### TABLE-F23 Delete a closed check from the history
 Status: done
 Actor: administrator, assistant
-Screen: Sessions
+Screen: Sessions; assistant
 Steps:
 1. In **Sessions → Closed** (or **All**), "Delete" on a finished check and confirm it.
 2. It disappears from **Sessions**; it stays stored as deleted and its trail through the tables is kept.
+3. With the assistant: "delete table 4's closed check from the history"; it finds the check itself and
+   asks for confirmation.
 In: the table check.
 Out: the deleted check (announces: `table.session.deleted`).
 If it fails: an open or parked check is not deleted: "That check is still open: close it before
@@ -725,7 +746,7 @@ Involved: TABLE-F09, TABLE-F25
 ### TABLE-F30 Hold or release a table by hand
 Status: done
 Actor: manager, employee, assistant
-Screen: assistant and API (the current product had no screen for this either)
+Screen: assistant and API
 Steps:
 1. Ask the assistant to set a table aside ("keep table 6 for Pedro from 21:00 to 23:00, 4 people").
 2. From an hour before, the table shows Reserved, with the name and the time; asking for it again with
@@ -763,10 +784,12 @@ Steps:
 2. The check of the table stays with that card: Sales gets it back when charging. "Remove customer" lets
    it go.
 3. The assistant can also seat with a customer: "seat Ana García at table 4, there are 3 of us".
+4. If the card is deleted in Customers, the check stops saying her name; if ERPlora's staff recover it from the
+   separate copy (CUSTOMER-F33), it says it again at once, also on the floor plan and the room that are open.
 In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
-Involved: CUSTOMER-F17, CUSTOMER-F19, TABLE-F10
+Involved: CUSTOMER-F17, CUSTOMER-F19, CUSTOMER-F33, TABLE-F10
 
 ## Tables: what goes in and what comes out
 
@@ -915,6 +938,6 @@ hears every notice of Tables, like those of any app.
 | View settings | yes | yes | yes | yes | `table.view_settings` |
 | Change settings | yes | yes | no | no | `table.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`);
-the cashier of the current product is an employee. Seating, splitting and joining also ask for "Build the
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
+Seating, splitting and joining also ask for "Build the
 check" of Sales (`sale.add_sale`), which the four roles have.

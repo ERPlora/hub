@@ -3,23 +3,16 @@
 // service-business-currency; `useBusinessMoney`, the platform's: its country's currency with the decimals the
 // server counts it in, never the browser's Intl, which gives the forint none): 1500 is ¥1,500 in Japan and
 // 15,00 € in Spain, as Sales charges it, written with the platform's `formatMoney`: its thousands grouped from four
-// digits on, as every screen writes them. Until the business answers an amount is a figure without a symbol, never
-// the euro by default. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
+// digits on, as every screen writes them. Until the business answers an amount is a dash, never
+// the euro by default nor guessed decimals. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
 // it as a percentage with at most two decimals.
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
-
-/** The decimals of an amount while the currency is unknown. */
-const UNKNOWN_DECIMALS = 2;
-
-/** The decimals of an amount in `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while it is unknown. */
-export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
+export { filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
-const decimalMarks = new Map<string, string>();
 
 function numberFormat(locale: string, kind: 'percent' | 'plain'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;
@@ -31,16 +24,6 @@ function numberFormat(locale: string, kind: 'percent' | 'plain'): Intl.NumberFor
     };
     found = new Intl.NumberFormat(locale, options[kind]);
     formats.set(key, found);
-  }
-  return found;
-}
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
   }
   return found;
 }
@@ -76,4 +59,13 @@ export function formatDate(value: string | null | undefined, locale: string, tim
     days.set(key, found);
   }
   return found.format(date);
+}
+
+/** A translator of the app's catalogue: what `useT()` gives. */
+type Translate = (key: string, named?: Record<string, unknown>) => string;
+
+/** What a courtesy or a correction moved, «1 session» / «2 sessions» and «1 day» / «30 days» (hub#1147): each
+ *  count goes to the catalogue as `count`, so vue-i18n picks its singular or plural; never «session(s)». */
+export function sessionsAndDays(t: Translate, sessions: number, days: number): { sessions: string; days: string } {
+  return { sessions: t('service.counts.sessions', { count: sessions }), days: t('service.counts.days', { count: days }) };
 }

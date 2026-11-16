@@ -2,11 +2,14 @@
 // ShareDialog — «Share and QR»: the website's address to copy, its QR code to download (a PNG to print, an SVG to
 // scale; `website.qr.get`, served as the image file it is) and, honestly, why that address opens the app on the
 // owner's own device: she is signed in there, and a session gets the shell on `/`. While the site is not online the
-// address still opens the team's sign-in page, and the dialog says so.
-import { HubIcon, toastSuccess } from '@erplora/ui/shell';
+// address still opens the team's sign-in page, and the dialog says so. Each download brings the image with the session
+// and hands it to the Hub's `saveFile`: the browser's downloads, or the installed app's, which says where (hub#1041).
+import { fetchFile } from '@erplora/ui/sdk';
+import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonModal, IonTitle, IonToolbar } from '@ionic/vue';
 import { ref } from 'vue';
 
+import { saveFile } from '../../../../base/frontend/lib/download';
 import { useT } from '../composables/useT';
 
 defineProps<{
@@ -20,11 +23,22 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 
 const t = useT();
 const QR = '/api/website/qr';
+const QR_TYPES = { png: 'image/png', svg: 'image/svg+xml' } as const;
 const copyFailed = ref(false);
 
 function close(): void {
   copyFailed.value = false;
   emit('update:open', false);
+}
+
+async function downloadQr(format: keyof typeof QR_TYPES): Promise<void> {
+  try {
+    const { blob, name } = await fetchFile(`${QR}?format=${format}`, QR_TYPES[format]);
+    await saveFile(name || `website-qr.${format}`, blob, t);
+  } catch (error) {
+    console.error('website: the QR did not come', error);
+    void toastError(t('base.download.refusal.failed'));
+  }
 }
 
 async function copy(url: string): Promise<void> {
@@ -112,9 +126,8 @@ async function copy(url: string): Promise<void> {
       <div class="ws-share__downloads">
         <ion-button
           fill="outline"
-          :href="`${QR}?format=png`"
-          download="website-qr.png"
           data-testid="website-share-png"
+          @click="downloadQr('png')"
         >
           <HubIcon
             slot="start"
@@ -124,9 +137,8 @@ async function copy(url: string): Promise<void> {
         </ion-button>
         <ion-button
           fill="outline"
-          :href="`${QR}?format=svg`"
-          download="website-qr.svg"
           data-testid="website-share-svg"
+          @click="downloadQr('svg')"
         >
           <HubIcon
             slot="start"

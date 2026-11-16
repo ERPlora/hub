@@ -18,7 +18,7 @@
   when they are painted, never kept with the snapshot: it is in every key of what is cached, so a business whose
   country (hence its currency) changes on erplora.com is never shown the old one until an entry expires.
 
-Every read is of the request hub's own row (``hub_id``; phase 1: the tables are shared, models.py).
+Every read is of the request hub's own row (``hub_id``).
 """
 
 import base64
@@ -37,7 +37,7 @@ from live.errors import AppInactive, NotFound
 from live.operations import INTERNAL, get, operation, registry
 
 from apps.website import reviews
-from apps.website.models import Site
+from apps.website.models import Image, Site
 from apps.website.qr import CONTENT_TYPES, public_url, qr_image
 from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site, reviews_view
 from apps.website.schemas import (
@@ -46,7 +46,11 @@ from apps.website.schemas import (
     CatalogSection,
     CategoriesIn,
     CategoriesOut,
+    CategoryIn,
+    CategoryOut,
     Content,
+    ImageIn,
+    ImageNameOut,
     NoIn,
     PreviewOut,
     PublicSiteOut,
@@ -64,6 +68,8 @@ from base.throttle import RateLimited, allow, client_address
 #: The app's label: what ``base.relay.active_apps`` names when the module is on in a hub.
 WEBSITE = "website"
 NOT_PUBLISHED = _("This website is not published.")
+IMAGE_NOT_FOUND = _("This image was not uploaded to this business's website: upload it again.")
+CATEGORY_NOT_FOUND = _("This category is not in Inventory or Services.")
 MODULE_OFF = _("The website is not on in this business.")
 #: The public reads a visitor may make per hub and address in a window.
 PUBLIC_LIMIT = 60
@@ -156,6 +162,18 @@ def shown_reviews(slug: str, content: dict, snapshot: dict | None) -> dict | Non
     output=SiteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the website",
+                "is my web page online?",
+                "which version of the website is published?",
+            ),
+            "es": (
+                "¿mi página web ya está en internet?",
+                "dime qué pone ahora en la web del negocio",
+                "¿la web tiene algo pendiente de publicar?",
+            ),
+        },
         "description": "The business's website: its template, colours and the content of each section as it is being "
         "edited, which version is published, whether it is online and whether the draft has unpublished changes."
     },
@@ -229,7 +247,19 @@ def get_qr(ctx: OperationContext, data: QrIn) -> dict:
     input=CategoriesIn,
     output=CategoriesOut,
     expose_api=True,
-    ai={"description": "The categories of Inventory's products or Services' services the website's catalog can show."},
+    ai={
+        "asks": {
+            "en": (
+                "which categories can the website's catalog show?",
+                "what categories can I choose for the catalog on my web page?",
+            ),
+            "es": (
+                "¿qué categorías se pueden enseñar en la página web?",
+                "¿qué categorías de servicios puede mostrar el catálogo de la web?",
+            ),
+        },
+        "description": "The categories of Inventory's products or Services' services the website's catalog can show.",
+    },
 )
 def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
     if not _source_on(ctx.scope, data.source):
@@ -237,6 +267,51 @@ def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
     reader = replace(ctx, permissions=ctx.permissions | SOURCES[data.source])
     rows = _service_categories(reader) if data.source == "service" else _product_categories(reader)
     return {"categories": [{"id": row.id, "name": row.name} for row in rows]}
+
+
+# What the assistant's card reads to name a record a save keeps (hub#679): no tool, no route, nothing live.
+
+
+@operation(
+    "website.image.get",
+    kind="query",
+    permission="website.view",
+    input=ImageIn,
+    output=ImageNameOut,
+    expose_api=False,
+    ai=INTERNAL,
+)
+def get_image(ctx: OperationContext, data: ImageIn) -> dict:
+    """An image of this business's website by the name of its file; one uploaded before it was kept, by its format and
+    size («PNG 1200 × 800»)."""
+    image = Image.objects.filter(hub_id=hub_id(ctx.scope), id=data.id).first()
+    if image is None:
+        raise NotFound(str(IMAGE_NOT_FOUND), code="website.image_not_found")
+    kind = image.content_type.rpartition("/")[2].upper()
+    return {"id": image.id, "name": image.filename or f"{kind} {image.width} × {image.height}"}
+
+
+@operation(
+    "website.category.get",
+    kind="query",
+    permission="website.manage",
+    input=CategoryIn,
+    output=CategoryOut,
+    expose_api=False,
+    ai=INTERNAL,
+)
+def get_category(ctx: OperationContext, data: CategoryIn) -> dict:
+    """A category the catalog can show, by its name: among Inventory's or Services' (the ones on in the business), as
+    the editor lists them (``website.catalog.categories``)."""
+    for source in SOURCES:
+        if not _source_on(ctx.scope, source):
+            continue
+        reader = replace(ctx, permissions=ctx.permissions | SOURCES[source])
+        rows = _service_categories(reader) if source == "service" else _product_categories(reader)
+        found = next((row for row in rows if row.id == data.id), None)
+        if found is not None:
+            return {"id": found.id, "name": found.name}
+    raise NotFound(str(CATEGORY_NOT_FOUND), code="website.category_not_found")
 
 
 # The public reads
@@ -254,9 +329,8 @@ def _count_visitor(ctx: OperationContext) -> None:
 def _live(scope: Scope) -> QuerySet[Site]:
     """The live publication of ``scope``'s hub: the one guard of every public path, the API's reads and ``/``.
 
-    404 ``app_inactive`` while the module is off in the hub (phase 1: every installed app is on,
-    ``base.relay.active_apps``; phase 2: the hub's activation), 404 for a scope that is no hub; then only that hub's
-    row, and only while it is published and online."""
+    404 ``app_inactive`` while the module is off in the hub (``base.relay.active_apps``), 404 for a scope that is no
+    hub; then only that hub's row, and only while it is published and online."""
     if WEBSITE not in relay.active_apps(scope):
         raise AppInactive(str(MODULE_OFF))
     return Site.objects.filter(LIVE, hub_id=hub_id(scope))
@@ -388,7 +462,7 @@ def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
 # The cache
 
 
-def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str, *, own_domain: bool = False) -> str:
+def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str, *, own_domain: bool = False) -> str:  # noqa: PLR0913
     """The rendered page of ``slug``'s publication ``version`` in ``lang`` on ``day`` (the opening hours mark today),
     priced in ``currency`` (the business's), for this deploy's bundle; ``own_domain``, the page painted for its own
     domain, which is another page (``public_home``).

@@ -1,19 +1,25 @@
 """Every visible text of the printing app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.printing import documents, models, queries, schemas, services
-from apps.printing.tests.conftest import RECEIPT
-from base.tests.po import po_entries
+from apps.printing.tests.conftest import HOST, HUB_DB, RECEIPT, A
+from base.tests.po import catalogue_key as source
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("printing").path) / "locale" / "es" / "LC_MESSAGES"
 TEMPLATE = Path(apps.get_app_config("printing").path) / "templates" / "printing" / "test_page.html"
@@ -23,19 +29,9 @@ def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows: menu, store, admin, choices, messages and the titles
     of its schemas."""
     config = apps.get_app_config("printing")
-    lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
-    for module in (queries, services, schemas, models, documents):
-        lazies += [value for value in vars(module).values() if isinstance(value, Promise)]
-    for model in config.get_models():
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-            and isinstance(field.verbose_name, Promise)
-        ]
+    lazies = [*config_texts(config)]
+    lazies += module_texts(queries, services, schemas, models, documents)
+    lazies += [text for text in model_texts(config.get_models()) if isinstance(text, Promise)]
     lazies += [
         *models.Usage.labels,
         *models.Printer.Kind.labels,
@@ -47,45 +43,21 @@ def visible_texts() -> set[str]:
     with translation.override("en"):
         texts = {source(text) for text in lazies}
     texts |= set(re.findall(r'{% translate "([^"]+)" %}', TEMPLATE.read_text()))
-    return texts | schema_titles()
-
-
-def source(text) -> str:
-    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
-    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
-    Spanish)."""
-    args = getattr(text, "_args", ())
-    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
-
-
-def schema_titles() -> set[str]:
-    """The titles printing's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones printing wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "printing"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+    return texts | operation_titles("printing")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Impresión by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=110, with_context=2) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts():
@@ -95,14 +67,14 @@ def test_spanish_texts():
         assert str(services.PRINTER_EXISTS) == "Ya hay una impresora con ese nombre."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/printing/printers",
         json.dumps({"name": "Caja", "kind": "network", "address": "no es una ip", "usage": "receipt"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 422
@@ -114,7 +86,7 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
 def test_a_printer_and_a_job_say_their_own_words_in_spanish():
     """A printer is «activa» and a job «Cancelado», «cancelado el»: printing's words, never the ones of an earlier
     app that says the same English (auth's «activo», appointment's «Cancelada» and «cancelada el»), as the admin
-    shows them (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    shows them."""
     with translation.override("es"):
         said = {
             "is_active": str(models.Printer._meta.get_field("is_active").verbose_name),
@@ -124,19 +96,18 @@ def test_a_printer_and_a_job_say_their_own_words_in_spanish():
     assert said == {"is_active": "activa", "cancelled_at": "cancelado el", "cancelled": "Cancelado"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_job_cancelled_meanwhile_is_refused_in_printing_s_words(client, make_user):
     """Cancelling or sending back a job someone already cancelled says it is «cancelado» (a job), not appointment's
-    «cancelada»: the queue's cancel window and its notice show the server's refusal as it came
-    (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    «cancelada»: the queue's cancel window and its notice show the server's refusal as it came."""
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
 
     def post(path: str, data: dict):
         return client.post(
             f"/api/printing/{path}",
             json.dumps(data),
             content_type="application/json",
-            HTTP_HOST="a.localhost",
+            HTTP_HOST=HOST,
             HTTP_ACCEPT_LANGUAGE="es",
         )
 

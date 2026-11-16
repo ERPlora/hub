@@ -191,7 +191,7 @@ async function continueManually(): Promise<void> {
       >
         {{ integrity.text }}
         <template v-if="head?.validated_at">
-          {{ $t('verifactu.recovery.checked', { total: head.total, date: formatDateTime(head.validated_at, locale) }) }}
+          {{ $t('verifactu.recovery.checked', { count: head.total, date: formatDateTime(head.validated_at, locale) }) }}
         </template>
       </InlineFeedback>
       <p class="verifactu-recovery__note">

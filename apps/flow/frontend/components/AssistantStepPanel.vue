@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The form of «Ask the assistant» (WORKBOOK FLOW-F37; old hub HUB-F95): what it is asked, with data inserted (filled
+// The form of «Ask the assistant» (WORKBOOK FLOW-F37): what it is asked, with data inserted (filled
 // in when it runs); the reads and actions it may use — only those the assistant can use, each one a permission of the
 // automation (FLOW-F12) —; the data a tool always gets, fixed by the automation, that the assistant never sees nor
 // changes («On behalf of the customer» = their card); whether a change waits for a yes in «Waiting for your answer»
@@ -50,6 +50,15 @@ const addable = computed<ComboOption[]>(() =>
     .map((action) => ({ id: action.name, label: label(action.name), hint: action.app_name, app: action.app_name }))
     .sort((a, b) => a.app.localeCompare(b.app, phrasing.value.locale) || a.label.localeCompare(b.label, phrasing.value.locale))
     .map(({ id: name, label: text, hint }) => ({ id: name, label: text, hint })),
+);
+
+/** The chosen ones whose app is off in this business, with that app: missing from the catalog for that (hub#1054). */
+const offTools = computed(() =>
+  props.step.tools.flatMap((name) => {
+    if (props.catalog?.actions.some((action) => action.name === name)) return [];
+    const app = props.catalog?.off_apps?.find((off) => off.app === name.split('.', 1)[0]);
+    return app ? [{ name, app: app.app_name }] : [];
+  }),
 );
 
 /** The chosen ones that wait for the yes of someone who may do them, said under the mode while it asks first. */
@@ -204,6 +213,11 @@ function setRounds(text: string | null | undefined): void {
         class="flow-assistant__bad"
         :data-testid="`flow-assistant-tools-error-${id}`"
       >{{ error('tools') }}</span>
+      <span
+        v-else-if="offTools.length"
+        class="flow-assistant__bad"
+        :data-testid="`flow-assistant-tools-off-${id}`"
+      >{{ offTools.map((tool) => $t('flow.assistant.toolOff', { action: label(tool.name), app: tool.app })).join(' ') }}</span>
       <span class="flow-card__hint">{{ $t('flow.assistant.toolsHint') }}</span>
     </div>
     <div

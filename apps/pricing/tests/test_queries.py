@@ -4,6 +4,7 @@
 import datetime as dt
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -12,10 +13,12 @@ from live.errors import Conflict, NotFound
 from live.operations import get
 
 from apps.pricing import queries
+from apps.pricing.schemas import PriceItemDetailOut, PriceItemOut, RuleOut
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
+from base.tests.typed_operations import ts_fields
 
 from .conftest import (
+    HUB_DB,
     TODAY,
     categorize,
     ctx_for,
@@ -29,7 +32,7 @@ from .conftest import (
     make_service,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 
@@ -116,8 +119,8 @@ def test_a_deleted_group_has_no_name_and_an_inactive_list_is_still_readable():
 
 
 def test_tied_lists_follow_the_list_s_direction_and_empty_values_stay_last():
-    """hub#2355 (the old product's rule, 2026-09-28; Sales, Cash register, Inventory and Tasks follow it): ties on the
-    sorted column come by code in the list's own direction, never always ascending; empty values go last both ways."""
+    """Ties on the sorted column (the rule Sales, Cash register, Inventory and Tasks follow too) come by code in the
+    list's own direction, never always ascending; empty values go last both ways."""
     from apps.pricing.models import PriceList
 
     # Created out of code order, so that the code tie-break is not the id one.
@@ -183,8 +186,8 @@ def test_the_prices_are_searched_filtered_and_sorted_and_read_across_lists():
 
 
 def test_tied_prices_follow_the_list_s_direction():
-    """hub#2355: prices tied on the sorted column come by their from quantity, then by id, in the list's own
-    direction (two products with the same name and price, two breaks each)."""
+    """Prices tied on the sorted column come by their from quantity, then by id, in the list's own direction (two
+    products with the same name and price, two breaks each)."""
     from apps.pricing.models import PriceItem
 
     price_list = make_list("VIP")
@@ -268,8 +271,8 @@ def test_whoever_may_change_a_price_may_read_it():
     assert all(ctx_for(role).has(read.permission) for role in writers)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_price_of_another_business_is_not_found_there(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_price_of_another_business_is_not_found_there(hub_a, hub_b):
     """A business reads its own prices only: the id of another's is no price of its own, never its currency."""
     with use_hub(hub_b):
         theirs = make_item(make_list("DOLARES", currency="USD"), make_product("Shampoo", "SH-1"))
@@ -331,7 +334,7 @@ def test_the_rules_are_searched_filtered_and_sorted():
 
 
 def test_tied_rules_follow_the_list_s_direction():
-    """hub#2355: rules tied on the sorted column come by code in the list's own direction."""
+    """Rules tied on the sorted column come by code in the list's own direction."""
     from apps.pricing.models import DiscountRule
 
     # Created out of code order, so that the code tie-break is not the id one.
@@ -561,8 +564,8 @@ def test_each_type_of_rule_and_the_best_single_one_wins():
 
 
 def test_rules_count_a_product_sold_by_weight_in_the_unit_of_its_price():
-    # Coffee at 20 €/kg, sold in grams (market-decision 2026-10-15: Odoo, Business Central, Dynamics 365
-    # Commerce): an amount per unit is per kg, buy 2 get 1 gives 1 kg of every 3 kg, a tier or a minimum
+    # Coffee at 20 €/kg, sold in grams (as Odoo, Business Central and Dynamics 365
+    # Commerce count it): an amount per unit is per kg, buy 2 get 1 gives 1 kg of every 3 kg, a tier or a minimum
     # of 3 needs 3 kg. Never grams: 0,50 € off each of 250 grams would give the coffee away.
     coffee = make_product("Coffee", "CF", price=2000, unit="g", pricing_unit="kg")
     fixed = make_rule("FIX", "fixed", amount=50)
@@ -678,8 +681,8 @@ def test_the_employee_asks_for_prices_and_a_caller_without_the_permission_does_n
         op(ctx_for(permissions=set()), data)
 
 
-# What the assistant's card names a record by (FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS): a price by its
-# article and its list, a rule by its id, and what a price or a rule points at in another app by its id
+# What the assistant's card names a record by: a price by its article and its list, a rule by its id, and what a price
+# or a rule points at in another app by its id
 
 
 def by_id(name: str, data: dict, ctx):
@@ -806,8 +809,8 @@ def test_the_employee_reads_the_catalog_and_a_caller_without_the_permission_does
         by_id("pricing.catalog.get", {"customer_group_id": str(vip.id)}, ctx_for(permissions=set()))
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub_a, hub_b):
     """A business reads its own only: the id of another's is none of its own, never its name. (A service is Services'
     own read, as the person, in the hub they ask in; its tables stay out of a hub's database in these tests:
     ``base/tenancy/tests/hubs.py``, ``portable_apps``.)"""
@@ -825,3 +828,18 @@ def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub
                 by_id(name, data, in_a)
     with use_hub(hub_b):  # positive control: they are there, in their own business
         assert [by_id(name, data, in_b).id for name, data in reads] == [rule.id, hair.id, vip.id]
+
+
+# ── The typed outputs declare the schema fields ────────────────────────────────────────────────
+
+OPERATIONS_TS = Path(__file__).resolve().parents[1] / "frontend" / "operations.d.ts"
+
+
+@pytest.mark.parametrize(
+    ("interface", "schema"),
+    [("PriceItemOut", PriceItemOut), ("PriceItemDetailOut", PriceItemDetailOut), ("RuleOut", RuleOut)],
+)
+def test_the_typed_outputs_declare_their_schema_fields(interface, schema):
+    # The pages read what the server answers through these TypeScript types (vue-tsc checks them): a field the
+    # schema answers and the type does not declare is invisible to them, as the currency was (hub#942).
+    assert ts_fields(interface, OPERATIONS_TS) == set(schema.model_fields)

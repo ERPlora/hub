@@ -3,11 +3,14 @@
 from decimal import Decimal
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.demo.models import Item, ItemLine
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 
 def make_item(name="Table 1", **fields):
@@ -65,7 +68,7 @@ def test_client_line_id_is_unique_per_item():
     add(item, 1, client_line_id=key)
     add(other, 1, client_line_id=key)  # another item may reuse it
 
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+    with pytest.raises(IntegrityError) as excinfo, atomic():
         add(item, 2, client_line_id=key)
 
     assert "demo_line_client_id_unique" in str(excinfo.value)

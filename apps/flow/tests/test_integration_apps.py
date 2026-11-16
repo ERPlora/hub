@@ -23,9 +23,9 @@ from apps.flow.models import FlowRun
 from apps.reservation.models import Reservation
 from apps.task.models import Task
 
-from .conftest import A, ctx_for, run
+from .conftest import A, HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -277,7 +277,7 @@ def test_a_chain_of_real_events_is_stopped_when_it_would_start_itself_again():
     assert Task.objects.count() == 2
 
 
-# ── Booking a table by the guest's phone (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED) ─────────────
+# ── Booking a table by the guest's phone ───────────────────────────────────────────────────────────────────────
 
 
 #: «Book a table» with what a call or a message gives: the guest's name and phone, never her card.

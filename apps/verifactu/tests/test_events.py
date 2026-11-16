@@ -2,14 +2,13 @@
 outbox. It is the backup: Invoicing asks by name inside its own emission (sealed by the issuer); the reaction,
 run as the system, seals only what that emission could not (``invoice_does_not_seal``)."""
 
-import pytest
 from live.models import OutboxEvent
 
 from apps.verifactu import events
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import A, deliver, manual
+from apps.verifactu.tests.conftest import HUB_DB, A, deliver, manual
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_the_events_it_records_are_named_app_entity_fact():

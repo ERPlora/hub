@@ -6,7 +6,7 @@
 // sale-approval.spec.ts) but never reads the figures. A marked
 // line is charged on its own (SALE-F22) with its ticket, and the rest closes the check; on full screen
 // the checkout sheet still opens and charges on top of the till. In Spanish its search boxes are named by
-// their hint, never Ionic's English «search text» (flow: sale-pos, FIX-HUB-SALE-SEARCHBARS-NAMED-IN-ENGLISH).
+// their hint, never Ionic's English «search text» (flow: sale-pos).
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -14,7 +14,7 @@ import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers'
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, expectTakes, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let water: Product;
@@ -37,7 +37,7 @@ test.afterAll(() => {
   cleanInventory();
   restoreDrawer();
   // What it charged reached the kitchen: Kitchen is free and on in every business (base.entitlement), and «Charge»
-  // sends what is pending first (sales#439). Not read from `/me`, which the till also reads: a Kitchen said «off» by
+  // sends what is pending first. Not read from `/me`, which the till also reads: a Kitchen said «off» by
   // mistake would stop both the rounds and this check. Without it the check below would be empty by mistake.
   if (charged > 0) expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
   if (tickets === 'null') return;
@@ -84,7 +84,7 @@ async function addBySearch(page: Page, product: Product): Promise<void> {
 const lineOf = (page: Page, name: string) =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).filter({ has: page.locator('[data-testid=pos-qty-plus], [data-testid$=-void]') });
 
-test('SALE-F01: the owner sells two shirts in cash, gets the change and the ticket with its 21 % VAT', async ({ page, context }) => {
+test('SALE-F01: the owner sells two shirts in cash, gets the change and the ticket with its 21 % VAT @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/pos');
   await tillReady(page);
@@ -123,7 +123,7 @@ test('SALE-F01: the owner sells two shirts in cash, gets the change and the tick
   expect(sale.payments.map((p) => [p.method_type, p.tendered, p.change])).toEqual([['cash', 5000, 2580]]);
 });
 
-test('SALE-F05 and F13: a check with a customer found in the till and a quick note is charged by card', async ({ page, context }) => {
+test('SALE-F05 and F13: a check with a customer found in the till and a quick note is charged by card @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   await login(page, A, '/sale/pos');
   const note = await api<{ id: string }>(context, A, 'POST', '/sale/quick_notes', { text: `e2e no ice ${RUN}`, sort_order: 1 });
@@ -214,7 +214,7 @@ test('full screen: the whole page goes full screen and the checkout sheet opens 
   await login(page, A, '/sale/pos');
   await tillReady(page);
   await shown(page).locator('[data-testid=pos-screen-menu]').click();
-  await shown(page).locator('[data-testid=pos-fullscreen]').click();
+  await page.locator('ion-popover [data-testid=pos-fullscreen]').click();
   // The page itself, not a piece of it: the sheets live in the app's root, outside the till.
   await expect.poll(() => page.evaluate(() => document.fullscreenElement === document.documentElement)).toBe(true);
   try {
@@ -245,8 +245,7 @@ test('SALE-F07: a product without tax category is marked and never enters the ch
   const result = search.locator(`[data-testid=pos-search-${untaxed.id}]`);
   await expect(result).toBeVisible();
   await expect(result).toContainText(/tax|IVA/);
-  // Announced as unavailable in the browser too (an ion-item drops a hand-set aria-disabled).
-  await expect(result).toHaveAttribute('aria-disabled', 'true');
+  await expectTakes(result, false);
   // It still takes the tap (to say why), so the mouse clicks it as a finger would.
   await result.click({ force: true });
   await expect(lineOf(page, untaxed.name)).toHaveCount(0);
@@ -328,7 +327,7 @@ test('the employee charges at the till and sees «Void» and «Refund» on their
     await page.goto(`${A}/sale/sales`);
     await shown(page).locator('[data-testid=sales-table-row]').first().waitFor({ state: 'visible' });
     await expect(shown(page).locator('[data-testid=sales-kpis]')).toHaveCount(0);
-    // Since FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (hub#250) the cashier sees «Void» and «Refund»: either asks a
+    // The cashier sees «Void» and «Refund» (hub#250): either asks a
     // manager's approval, which sale-approval.spec.ts walks end to end.
     const sold = await newestSaleOf(context, water.sku);
     await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-void]`).first()).toBeVisible();

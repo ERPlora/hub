@@ -1,34 +1,16 @@
-// The API's documentation (BASE-G150, G04; the old hub's ApiDocsPage, without Swagger UI: production enforces Trusted
-// Types): `base.api_doc.get` asked once (the document is far bigger than a live result may be), and only once the live
-// `base.api_doc.settings` says it is shown — hidden, nothing is asked, so no refused request reaches the console; one
-// section per app with its routes — method, path, what it does — and each route's parameters and body on opening it; how
-// to call it (a key from Employees › API keys, as a bearer), said too when this business cannot make keys yet;
-// «Download the OpenAPI file». Hidden, it says so, and who runs the business is sent to Settings › General to show it; a
-// document that cannot be read says so with «Retry»; none published, says so.
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
-import { saveFile } from '../lib/data';
+import { OPENAPI_HEAD, TAX_CATEGORY_LIST } from '../__tests__/openapi-document';
+import { saveFile } from '../lib/download';
 import ApiDocsPage from './ApiDocsPage.vue';
 
-vi.mock('../lib/data', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/data')>()), saveFile: vi.fn() }));
+vi.mock('../lib/download', () => ({ saveFile: vi.fn(async () => true) }));
 
 const DOCUMENT = {
-  openapi: '3.1.0',
-  info: { title: 'ERPlora Hub API', version: '1' },
-  paths: {
-    '/api/tax/categories': {
-      get: {
-        operationId: 'tax.category.list',
-        summary: 'Category List',
-        description: 'Lists the tax categories.',
-        tags: ['tax'],
-        parameters: [{ in: 'query', name: 'limit', required: false, schema: { type: 'integer' }, description: 'How many.' }],
-        responses: {},
-      },
-    },
-  },
+  ...OPENAPI_HEAD,
+  paths: { '/api/tax/categories': { get: { ...TAX_CATEGORY_LIST, responses: {} } } },
   components: { securitySchemes: { ApiKey: { type: 'http', scheme: 'bearer' } } },
 };
 const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', read: true, write: false }], keys_available: true };
@@ -82,8 +64,9 @@ describe('ApiDocsPage', () => {
   it('«Download the OpenAPI file» saves the document', async () => {
     const m = await open(Response.json(ANSWER));
     await m.wrapper.get('[data-testid="api-docs-download"]').trigger('click');
-    const [name, blob] = vi.mocked(saveFile).mock.calls[0];
+    const [name, blob, t] = vi.mocked(saveFile).mock.calls[0];
     expect(name).toMatch(/^erplora-.*openapi\.json$/);
+    expect(t('base.download.savedTo', { path: 'Download/x' })).toBe('Saved to Download/x');
     expect(JSON.parse(await (blob as Blob).text())).toEqual(DOCUMENT);
   });
 

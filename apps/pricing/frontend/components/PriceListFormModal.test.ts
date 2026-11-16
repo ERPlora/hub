@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { click, ionChecked, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
@@ -196,5 +197,51 @@ describe('PriceListFormModal', () => {
     const s = await setup({}, 'es');
     expect(s.inDoc('pricing-list-form')?.getAttribute('aria-label')).toBe('Nueva tarifa');
     expect([s.field('currency').label, s.field('tax').label]).toEqual(['Divisa', 'Impuesto']);
+  });
+});
+
+describe('PriceListFormModal: fields refused with the same words (hub#888)', () => {
+  /** Each field of the window by the key the server refuses it under. */
+  const TESTID: Record<string, string> = {
+    code: 'code',
+    customer_group_id: 'group',
+    name: 'name',
+    currency: 'currency',
+    tax_included: 'tax',
+    valid_from: 'valid_from',
+    valid_until: 'valid_until',
+  };
+  itTellsTheCorrectedFieldApart(Object.keys(TESTID), async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await ionValue(s.field('code'), 'VIP', 'ionInput');
+    await ionValue(s.field('name'), 'VIP members', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
+  }, 'tax_included');
+});
+
+describe('PriceListFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup({ priceList: priceList() });
+    const name = s.field('name').value as string;
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('pricing-list-form'),
+      change: () => ionValue(s.field('name'), 'Staff prices', 'ionInput'),
+      restore: () => ionValue(s.field('name'), name, 'ionInput'),
+    });
+  });
+
+  it("a new list: the business's currency proposed after it opened is no change; another one asks", async () => {
+    const s = await setup({}, 'en', null);
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('pricing-list-form')!;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.result('base.business.get', business(POLISH));
+    await settle();
+    expect(s.field('currency').value).toBe('PLN');
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('currency'), 'EUR', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
   });
 });

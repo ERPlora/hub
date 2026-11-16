@@ -1,0 +1,26 @@
+{% load i18n static %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+The one layout of the Hub's gate pages (a hub being prepared, gone, moving or suspended, the sign-in to retry or paused,
+the jump to the sign-in and a cut of the database): each page says only its own title, its head and its words. Rendered
+without the request: no context processors, no database, no scripts nor inline styles (strict CSP, no nonce), save the
+jump's, which brings the response's nonce: its look is base/gate.css, a static file.
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block robots %}<meta name="robots" content="noindex">{% endblock %}
+  {% block head %}{% endblock %}
+  <title>{% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'base/gate.css' %}">
+  {% block scripts %}{% endblock %}
+</head>
+<body>
+  {% block page %}
+  <main>
+    {% include "base/_gate_brand.html" %}
+    {% block content %}{% endblock %}
+  </main>
+  {% endblock %}
+</body>
+</html>

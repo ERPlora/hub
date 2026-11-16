@@ -1,8 +1,7 @@
 """``manage.py register_apps [--check] [--force]``: the Hub's modules into the SaaS's ``shared`` schema.
 
-Round 16 (PLAN §21; spec §4.2 and §4.3). The worker runs the same function before its loop (with
-its tranche); until then, by hand. ``--check`` validates the registry without any database or
-network (the image's build runs it); ``--force`` writes over a newer release, only for a
+The worker runs the same function before its loop; this command runs it by hand. ``--check`` validates the registry
+without any database or network (the image's build runs it); ``--force`` writes over a newer release, only for a
 deliberate rollback. Any failure exits non-zero with the reason, and nothing is written.
 """
 

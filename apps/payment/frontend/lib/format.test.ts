@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import * as format from './format';
-import { decimalMark, formatDay, formatMoney, localDay, paymentMoney, STATUS_TONE } from './format';
+import { formatDay, formatMoney, localDay, paymentMoney, STATUS_TONE } from './format';
 
 const nbsp = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -19,19 +19,19 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(1250, 'en', { currency: 'PLN', decimals: 2 }))).toBe('zł 12.50');
   });
 
-  it('while the money is unknown, a figure without a symbol: never the euro by default', () => {
-    expect(nbsp(formatMoney(25000, 'es'))).toBe('250,00');
-    expect(formatMoney(123456, 'en')).toBe('1,234.56');
+  it('while the money is unknown, an amount is a dash: never the euro by default', () => {
+    expect(nbsp(formatMoney(25000, 'es'))).toBe('—');
+    expect(formatMoney(123456, 'en')).toBe('—');
     expect('CURRENCY' in format).toBe(false);
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090, payments#20)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
     // «12.345,67 €», and unlike Carts and Price lists, which paint «1.234,56 €».
     expect(nbsp(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
     expect(nbsp(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-    expect(nbsp(formatMoney(123456, 'es'))).toBe('1.234,56');
+    expect(nbsp(formatMoney(123456, 'es'))).toBe('—');
   });
 
   it('uses the decimals the server counts the currency in, never the browser’s', () => {
@@ -72,12 +72,6 @@ describe('localDay', () => {
   it('is the device’s own day as YYYY-MM-DD (what «New payment» starts with), never the UTC one', () => {
     expect(localDay(new Date(2026, 9, 14, 0, 30))).toBe('2026-10-14');
     expect(localDay(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
-  });
-});
-
-describe('decimalMark', () => {
-  it('is the page language’s', () => {
-    expect([decimalMark('es'), decimalMark('en')]).toEqual([',', '.']);
   });
 });
 

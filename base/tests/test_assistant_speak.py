@@ -1,4 +1,4 @@
-"""«Read aloud» in the server's voice (round 2026-11-03n, PLAN-HUB §73): ``base.assistant.speak`` asks erplora.com
+"""«Read aloud» in the server's voice: ``base.assistant.speak`` asks erplora.com
 (``POST /internal/speech/synthesize``, signed as every ``/internal`` call) for the mp3 of an answer in the voice the
 person chose, and ``POST /api/assistant/speak`` hands it to the panel as ``audio/mpeg``. When erplora.com cannot read
 it (no voice configured, down, too slow), the Hub says so in its own envelope and the panel reads with the device's
@@ -12,18 +12,20 @@ import httpx
 import pytest
 from django.db import connections
 from django.utils import translation
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import OperationError, PermissionDenied
 from live.operations import get
 from pydantic import ValidationError
 
 from base import assistant
-from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tests.fake_gateway import gateway, signed
 
-pytestmark = pytest.mark.django_db
+__all__ = ["gateway", "in_business_a", "signed"]
 
-A = Scope("host", "a")
-HOST = {"HTTP_HOST": "a.localhost:8000"}
+pytestmark = HUB_DB
+
+HOST = {"HTTP_HOST": f"{A.key}.localhost"}
 EMPLOYEE = frozenset({"base.view_home", "demo.view"})
 SYNTHESIZE = "/internal/speech/synthesize"
 #: The first bytes of an mp3 (an ID3 header, then a frame's sync word).
@@ -34,7 +36,7 @@ A_VOICE = "a-voice"
 @pytest.fixture(autouse=True)
 def server_voice(settings):
     """The server's voice turned on (``ASSISTANT_SERVER_VOICE``), as a deployment with a voice provider has it; the
-    default (off, round 2026-11-04a) is tested by name below."""
+    default (off) is tested by name below."""
     settings.ASSISTANT_SERVER_VOICE = True
 
 
@@ -57,7 +59,7 @@ def refused(status: int, code: str) -> dict:
 def test_reading_aloud_is_the_persons_and_never_a_tool_nor_a_transaction():
     op = get("base.assistant.speak")
     assert (op.kind, op.permission, op.database) == ("command", "base.view_home", False)
-    assert not assistant.is_tool(op)
+    assert not assistant.tools.is_tool(op)
     with pytest.raises(PermissionDenied):
         speak(frozenset({"demo.view"}), text="Hola")
 
@@ -67,7 +69,7 @@ def test_an_answer_is_read_aloud_as_an_mp3_in_the_voice_chosen(gateway):
     spoken = speak(text="  Tienes 3 mesas abiertas.  ", language="es", voice=A_VOICE)
     assert spoken == {"content_type": "audio/mpeg", "content_base64": base64.b64encode(MP3).decode()}
     [seen] = gateway.sent(SYNTHESIZE)
-    assert seen.body == {"hub": "a", "text": "Tienes 3 mesas abiertas.", "language": "es", "voice": A_VOICE}
+    assert seen.body == {"hub": A.key, "text": "Tienes 3 mesas abiertas.", "language": "es", "voice": A_VOICE}
     assert signed(seen)
 
 
@@ -155,7 +157,7 @@ def test_its_refusals_are_said_in_the_persons_language(gateway):
 
 
 def test_with_the_server_voice_off_nothing_is_asked_of_erplora_com(settings, gateway):
-    """Round 2026-11-04a: no voice provider for now, so the Hub never asks (the panel reads with the device's voice)."""
+    """Off, as by default without a voice provider: the Hub never asks (the panel reads with the device's voice)."""
     settings.ASSISTANT_SERVER_VOICE = False
     with pytest.raises(OperationError) as caught:
         speak(text="Hola")
@@ -164,7 +166,7 @@ def test_with_the_server_voice_off_nothing_is_asked_of_erplora_com(settings, gat
 
 
 def test_erplora_com_slower_than_the_hub_waits_is_a_failure(gateway, monkeypatch):
-    monkeypatch.setattr(assistant, "SPEECH_TIMEOUT", httpx.Timeout(0.2))
+    monkeypatch.setattr(assistant.gateway, "SPEECH_TIMEOUT", httpx.Timeout(0.2))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg", delay=1.0)
     with pytest.raises(OperationError) as caught:
         speak(text="Hola")
@@ -181,22 +183,22 @@ def test_erplora_com_out_of_reach_is_a_failure(settings):
 def test_the_hub_waits_longer_than_erplora_com_waits_for_its_provider():
     """erplora.com waits up to 60 s for the voices' provider (saas ``assistant.media.TIMEOUT``): the Hub waits longer,
     so a slow provider comes back as erplora.com's own refusal, never as the Hub hanging up first."""
-    assert assistant.SPEECH_TIMEOUT.read > 60
+    assert assistant.gateway.SPEECH_TIMEOUT.read > 60
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_waiting_for_the_voice_holds_no_transaction(gateway, monkeypatch):
-    """The till waits on the hub's connection (one transaction at a time on the Free plan, PLAN §14.2): none is open
+    """The till waits on the hub's connection (one transaction at a time on the Free plan): none is open
     while erplora.com reads the answer."""
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     seen = []
-    post = assistant._post_audio
+    post = assistant.gateway._post_audio
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post_audio", probe)
+    monkeypatch.setattr(assistant.gateway, "_post_audio", probe)
     speak(text="Hola")
     assert seen == [False]
 
@@ -216,7 +218,7 @@ def test_the_route_is_bound_to_its_operation():
 
 
 def test_the_panel_gets_the_mp3_itself(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     response = post(client, {"text": "Hola", "language": "es", "voice": A_VOICE}, HTTP_ACCEPT="audio/mpeg")
     assert (response.status_code, response["Content-Type"], response.content) == (200, "audio/mpeg", MP3)
@@ -227,14 +229,14 @@ def test_the_panel_gets_the_mp3_itself(client, make_user, gateway):
 
 
 def test_an_integration_that_only_reads_json_gets_the_operations_output(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="application/json")
     assert response.json() == {"content_type": "audio/mpeg", "content_base64": base64.b64encode(MP3).decode()}
 
 
 def test_without_the_server_voice_the_route_answers_the_envelope(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.reply(SYNTHESIZE, **refused(503, "assistant.speech_unavailable"))
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
     assert response.status_code == 503
@@ -243,7 +245,7 @@ def test_without_the_server_voice_the_route_answers_the_envelope(client, make_us
 
 def test_with_the_server_voice_off_the_route_answers_the_envelope_without_asking(client, make_user, settings, gateway):
     settings.ASSISTANT_SERVER_VOICE = False
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
     assert (response.status_code, response.json()["error"]["code"]) == (503, "base.assistant_speech_unavailable")
     assert gateway.requests == []
@@ -257,7 +259,7 @@ def test_the_shell_tells_the_panel_whether_there_is_a_server_voice(client, make_
     from base.tests.test_spa import json_block
 
     settings.ASSISTANT_SERVER_VOICE = on
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     _, home = json_block(client.get("/demo/items", **HOST), "hub-home")
     assert home["server_voice"] is on
 
@@ -268,7 +270,7 @@ def test_nobody_without_a_session_has_anything_read(client, gateway):
 
 
 def test_a_text_too_long_is_refused_by_the_hub(client, make_user, gateway):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = post(client, {"text": "a" * 4097})
     assert response.status_code == 422
     assert "text" in response.json()["error"]["fields"]

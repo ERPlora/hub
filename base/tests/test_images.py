@@ -1,4 +1,4 @@
-"""The image of a row an app sells (round 2026-10-30): ``base.images``, what Inventory, Services and Combos share.
+"""The image of a row an app sells: ``base.images``, what Inventory, Services and Combos share.
 
 A product, a service or a set menu keeps one reference: ``catalog:<folder>/<name>`` (an image of the shared library,
 ``base.image_catalog``), ``file:<app>/<folder>/<uuid7 hex>.webp`` (a photo of its own, under its hub's prefix of the
@@ -184,6 +184,33 @@ def test_what_is_no_image_of_the_library_is_refused(image_library, reference):  
         "base.image_unknown",
         {"photo": "Choose an image of the library or upload a photo."},
     )
+
+
+# ── What comes back with a row recovered from a separate copy of the business ───────────────────────────────────
+
+
+def test_an_image_of_the_library_comes_back_from_a_copy(image_library):  # noqa: F811
+    assert images.from_copy(ctx(), "catalog:hospitality/cafe_solo") == "catalog:hospitality/cafe_solo"
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "",
+        # The library no longer has it: the row comes back with its initials, as a template leaves it.
+        "catalog:hospitality/churros",
+        # A copy is of the database, never of the files: the photo went with the row.
+        f"file:{FOLDER}0193a1b2c3d47e8f9a0b1c2d3e4f5a6b.webp",
+    ],
+)
+def test_what_is_no_image_of_the_library_never_comes_back_from_a_copy(image_library, reference):  # noqa: F811
+    assert images.from_copy(ctx(), reference) == ""
+
+
+def test_with_the_library_unread_an_image_comes_back_from_a_copy_as_it_was(settings, tmp_path):
+    settings.CATALOG_DIR = str(tmp_path / "nowhere")
+
+    assert images.from_copy(ctx(), "catalog:hospitality/cafe_solo") == "catalog:hospitality/cafe_solo"
 
 
 # ── A photo of its own: what comes in ───────────────────────────────────────────────────────────────────────────

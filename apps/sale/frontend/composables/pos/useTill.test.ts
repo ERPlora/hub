@@ -218,7 +218,7 @@ describe('useTill: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(s.sent().filter((c) => c.path === '/api/kitchen/tickets/send').at(-1)?.body).toEqual({ order_id: 'o1', priority: 'normal' });
   });
 
-  it('says when the round went but its sheet did not print (hub#2257)', async () => {
+  it('says when the round went but its sheet did not print', async () => {
     const s = await setup();
     s.reply(CHECK);
     await s.till().addProduct(product({ id: 'p1' }), null);

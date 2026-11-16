@@ -1,5 +1,5 @@
-"""The Hub's templates bring every product and service with an image of the shared library (round 2026-10-30;
-INVENTORY-F33 step 3, SERVICE-F34): ``base/seeds/<vertical>.<language>.json``.
+"""The Hub's templates bring every product and service with an image of the shared library (INVENTORY-F33 step 3,
+SERVICE-F34): ``base/seeds/<vertical>.<language>.json``.
 
 Each row of ``inventory.product`` and ``service.service`` names an image with ``catalog:<folder>/<name>``: the
 restaurant's from ``hospitality/`` (one from ``retail/``, the only honest picture the library has for it), the hair
@@ -7,7 +7,7 @@ salon's from ``beauty_hair/``. The reference must be in the real manifest of ERP
 checked out beside this repo (CI clones it there): without it these tests fail, they never skip. An image is chosen by
 its title and its words, and each one shares a word with what the product is called in the seed's language, or says
 here why not. A product the library has no honest picture of loads without one, and says here why: the library holds
-one drawing per file and never shows one product's drawing under another's name (ERPlora/blueprints, 2026-10-31).
+one drawing per file and never shows one product's drawing under another's name (ERPlora/blueprints).
 """
 
 import json

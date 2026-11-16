@@ -6,6 +6,7 @@ its id or by its exact name, phone or email (``find_customer``); groups, tags an
 
 import csv
 import io
+import json
 from decimal import Decimal
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import AI, INTERNAL, operation
+from psycopg import sql
 
 from apps.customer.models import (
     Activity,
@@ -28,7 +30,7 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.phones import DEFAULT_COUNTRY, candidates
+from apps.customer.phones import candidates
 from apps.customer.schemas import (
     ActivityListIn,
     ActivityPage,
@@ -50,20 +52,30 @@ from apps.customer.schemas import (
     ExportOut,
     FieldListIn,
     FieldPage,
+    FieldRefIn,
+    FieldRow,
+    FieldValueOfCopyIn,
     GroupListIn,
+    GroupOfCopyIn,
     GroupPage,
+    GroupRefIn,
+    GroupRow,
     HealthDetailIn,
     HealthOut,
     OrderCustomerOut,
     OrderIn,
     OrderListIn,
+    OrderNamedOut,
     OrderPage,
     PageIn,
     PhoneMatchOut,
     PurchaseListIn,
     PurchasePage,
     TagListIn,
+    TagOfCopyIn,
     TagPage,
+    TagRefIn,
+    TagRow,
 )
 from apps.customer.search import normalize, search_term
 from base import operations as platform
@@ -78,6 +90,7 @@ SEVERAL_CUSTOMERS_MATCH = _(
 GROUP_UNAVAILABLE = _("That group no longer exists.")
 TAG_UNAVAILABLE = _("That tag no longer exists.")
 FIELD_UNAVAILABLE = _("That field no longer exists.")
+SALES_UNAVAILABLE = _("Sales is not active in this business.")
 SEVERAL_MATCH = _("Several match “%(reference)s”: give the id.")
 
 CUSTOMER_UNAVAILABLE_CODE = "customer.customer_unavailable"
@@ -109,21 +122,23 @@ EXPORT_COLUMNS = (
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 
-def business_country(ctx: OperationContext | None = None) -> str:
-    """The country a phone without prefix belongs to. Phase 1 has no settings per business: Spain."""
-    return DEFAULT_COUNTRY
+def business_country(ctx: OperationContext) -> str:
+    """The country a phone without prefix belongs to (CUSTOMER-F10, F11): ``ctx``'s business's, as erplora.com
+    registered it, Spain without one (``base.operations.business_country``). Saving a card and every lookup by its
+    phone, in this app and in the others (``find_customer``), read it here, so the two never part (hub#527)."""
+    return platform.business_country(ctx.scope)
 
 
 # ── Lookups shared with services.py ─────────────────────────────────────────────────────────────
 
 
-def _matching_ids(reference: str) -> list[UUID]:
+def _matching_ids(ctx: OperationContext, reference: str) -> list[UUID]:
     """The live cards whose email, phone or name is exactly ``reference`` (at most two: one is enough)."""
     text = reference.strip()
     cards = Customer.objects.live()
     if "@" in text:
         return list(cards.filter(email__iexact=text).values_list("id", flat=True)[:2])
-    numbers = candidates(text, business_country())
+    numbers = candidates(text, business_country(ctx))
     if numbers:
         return list(
             cards.filter(phone__in=numbers)
@@ -136,13 +151,15 @@ def _matching_ids(reference: str) -> list[UUID]:
 
 
 def find_customer(
+    ctx: OperationContext,
     customer_id: UUID | None,
     reference: str | None,
     *,
     lock: bool = False,
     live: bool = True,
 ) -> Customer:
-    """The card ``customer_id`` names or, without it, the one live card ``reference`` names.
+    """The card ``customer_id`` names or, without it, the one live card ``reference`` names, a phone read in ``ctx``'s
+    business's country as the card's was saved (``business_country``).
 
     ``lock`` locks its row until the end of the command's transaction; ``live=False`` also finds a
     deleted, merged or erased card, by its id only. ``NotFound`` (``customer.customer_unavailable``)
@@ -150,7 +167,7 @@ def find_customer(
     several cards.
     """
     if customer_id is None:
-        ids = _matching_ids(reference or "")
+        ids = _matching_ids(ctx, reference or "")
         if not ids:
             raise NotFound(
                 NO_CUSTOMER_MATCHES % {"reference": reference},
@@ -171,15 +188,20 @@ def find_customer(
     return customer
 
 
-def _find_named(
+def _by_id(rows: QuerySet, item_id: UUID, *, missing, code: str):
+    """The row of ``rows`` with ``item_id``; ``NotFound`` (``code``) when there is none."""
+    found = rows.filter(pk=item_id).first()
+    if found is None:
+        raise NotFound(missing, code=code)
+    return found
+
+
+def _find_named(  # noqa: PLR0913
     model, item_id: UUID | None, name: str | None, *, missing, code: str, lock: bool
 ):
     rows = model.objects.select_for_update() if lock else model.objects.all()
     if item_id is not None:
-        found = rows.filter(pk=item_id).first()
-        if found is None:
-            raise NotFound(missing, code=code)
-        return found
+        return _by_id(rows, item_id, missing=missing, code=code)
     matches = list(rows.filter(name__iexact=(name or "").strip()))
     active = [row for row in matches if row.is_active]
     chosen = active or matches
@@ -191,6 +213,19 @@ def _find_named(
             code=code.replace("_unavailable", "_ambiguous"),
         )
     return chosen[0]
+
+
+def named(model, name: str):
+    """The group, tag or custom field the business has under ``name``, the case aside: the active one first, as a
+    card's selection by name takes it (``set_groups``, ``set_tags``); ``None`` when it has none."""
+    return model.objects.filter(name__iexact=name.strip()).order_by("-is_active", "id").first()
+
+
+def lost_since_copy(model, items: list) -> list:
+    """Those of ``items``, groups, tags or custom fields of a card of a separate copy, the business deleted since: it
+    holds none of its ``model`` by their id there. One it still has, renamed or deactivated, is its own (hub#1356)."""
+    held = set(model.objects.filter(pk__in=[item.id for item in items if item.id]).values_list("pk", flat=True))
+    return [item for item in items if item.id not in held]
 
 
 def find_group(
@@ -381,7 +416,7 @@ def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
     ),
 )
 def customer_detail(ctx: OperationContext, data: CustomerRefIn) -> dict:
-    return load_detail(find_customer(data.id, data.customer))
+    return load_detail(find_customer(ctx, data.id, data.customer))
 
 
 @operation(
@@ -500,6 +535,16 @@ def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
 # ── Groups, tags and custom fields ──────────────────────────────────────────────────────────────
 
 
+def _groups() -> QuerySet:
+    """The groups as their list shows them, with how many live cards are in each."""
+    return CustomerGroup.objects.annotate(customer_count=_customer_count("customers"))
+
+
+def _tags() -> QuerySet:
+    """The tags as their list shows them, with how many live cards have each."""
+    return CustomerTag.objects.annotate(customer_count=_customer_count("customers"))
+
+
 @operation(
     "customer.group.list",
     kind="query",
@@ -515,7 +560,7 @@ def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
     ),
 )
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
-    groups = CustomerGroup.objects.annotate(customer_count=_customer_count("customers"))
+    groups = _groups()
     if params.search:
         groups = groups.filter(
             Q(name__icontains=params.search) | Q(description__icontains=params.search)
@@ -547,7 +592,7 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     ),
 )
 def list_tags(ctx: OperationContext, params: TagListIn) -> dict:
-    tags = CustomerTag.objects.annotate(customer_count=_customer_count("customers"))
+    tags = _tags()
     if params.search:
         tags = tags.filter(name__icontains=params.search)
     filters = {"is_active": params.is_active, "color": params.color}
@@ -587,6 +632,47 @@ def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
     return page(_ordered(fields, params.sort, params.descending), params)
 
 
+# Not assistant tools: what names a group, a tag or a custom field on the card of a write (``schemas.A_GROUP``,
+# ``A_TAG``, ``A_FIELD``), also one no longer active, which a change brings back; the model finds them in their lists.
+# Said by its name (``schemas.A_GROUP_SAID``…), the one its write finds by it (``find_group``…, hub#1280).
+@operation(
+    "customer.group.detail",
+    kind="query",
+    permission="customer.view",
+    input=GroupRefIn,
+    output=GroupRow,
+    ai=INTERNAL,
+)
+def group_detail(ctx: OperationContext, data: GroupRefIn) -> CustomerGroup:
+    group_id = data.id if data.id is not None else find_group(None, data.group).id
+    return _by_id(_groups(), group_id, missing=GROUP_UNAVAILABLE, code="customer.group_unavailable")
+
+
+@operation(
+    "customer.tag.detail",
+    kind="query",
+    permission="customer.view",
+    input=TagRefIn,
+    output=TagRow,
+    ai=INTERNAL,
+)
+def tag_detail(ctx: OperationContext, data: TagRefIn) -> CustomerTag:
+    tag_id = data.id if data.id is not None else find_tag(None, data.tag).id
+    return _by_id(_tags(), tag_id, missing=TAG_UNAVAILABLE, code="customer.tag_unavailable")
+
+
+@operation(
+    "customer.field.detail",
+    kind="query",
+    permission="customer.view",
+    input=FieldRefIn,
+    output=FieldRow,
+    ai=INTERNAL,
+)
+def field_detail(ctx: OperationContext, data: FieldRefIn) -> CustomField:
+    return find_field(data.id, data.field)
+
+
 # ── A card's timeline, purchases, consent and orders ────────────────────────────────────────────
 
 
@@ -610,7 +696,7 @@ def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
     ),
 )
 def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer)
+    customer = find_customer(ctx, params.customer_id, params.customer)
     entries = Activity.objects.filter(customer=customer)
     if params.search:
         entries = entries.filter(
@@ -635,7 +721,7 @@ def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
     ),
 )
 def list_purchases(ctx: OperationContext, params: PurchaseListIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer)
+    customer = find_customer(ctx, params.customer_id, params.customer)
     purchases = Purchase.objects.filter(customer=customer)
     if params.search:
         purchases = purchases.filter(sale_id__icontains=params.search.strip())
@@ -696,7 +782,7 @@ def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     ai=AI(
         "Whether a customer agreed to be sent marketing (offers, news) by email, SMS, WhatsApp, phone or post: the "
         "consent in force, one row per purpose and channel, granted or withdrawn. The last fact wins, so a "
-        "withdrawal is in force on the next read. Ask it before writing to anybody.",
+        "withdrawal is in force on the next read. Read it before writing to anybody.",
         asks={
             "en": ("can I send Luis marketing emails?", "has Marta agreed to WhatsApp messages?"),
             "es": (
@@ -708,7 +794,7 @@ def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     ),
 )
 def consent_state(ctx: OperationContext, data: ConsentStateIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer)
+    customer = find_customer(ctx, data.customer_id, data.customer)
     return {"customer_id": customer.id, "rows": consent_states(customer)}
 
 
@@ -728,7 +814,7 @@ def consent_state(ctx: OperationContext, data: ConsentStateIn) -> dict:
     ),
 )
 def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer)
+    customer = find_customer(ctx, params.customer_id, params.customer)
     facts = Consent.objects.filter(customer=customer)
     if params.search:
         text = params.search
@@ -782,11 +868,32 @@ def order_customer(ctx: OperationContext, data: OrderIn) -> dict:
     ),
 )
 def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer)
+    customer = find_customer(ctx, params.customer_id, params.customer)
     links = OrderLink.objects.filter(customer=customer)
     if params.search:
         links = links.filter(order_id__icontains=params.search.strip())
     return page(links.order_by("-linked_at", "-id"), params)
+
+
+#: Sales's read that names one of its records by its id (an open check by ``order_id``).
+SALES_NAMES = "sale.record.get"
+
+
+# Not an assistant tool: what names the open order on the card of ``customer.order.link`` (``schemas.A_ORDER``). The
+# order is Sales's, which Customers does not require: its name comes from Sales's own read, through the platform's one
+# door (BASE-F84), with that read's permission. Sales off or absent → 409 ``customer.sales_unavailable``.
+@operation(
+    "customer.order.get",
+    kind="query",
+    permission="customer.view",
+    input=OrderIn,
+    output=OrderNamedOut,
+    ai=INTERNAL,
+)
+def get_order(ctx: OperationContext, data: OrderIn) -> dict:
+    unavailable = Conflict(str(SALES_UNAVAILABLE), code="customer.sales_unavailable")
+    named = platform.call(ctx, SALES_NAMES, {"order_id": str(data.order_id)}, unavailable=unavailable)
+    return {"order_id": data.order_id, "name": named.name}
 
 
 
@@ -834,10 +941,190 @@ def load_health(customer: Customer) -> dict:
     ai=INTERNAL,
 )
 def health_detail(ctx: OperationContext, data: HealthDetailIn) -> dict:
-    return load_health(find_customer(data.customer_id, data.customer))
+    return load_health(find_customer(ctx, data.customer_id, data.customer))
 
 
 def keeps_fiscal_documents() -> bool:
     """Whether this database holds the card sales of its customers (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
     too, for what it asks is whether a database can go, and that cannot be undone."""
     return Purchase.objects.exists()
+
+
+def has_live_twin(name: str, phone: str, email: str) -> bool:
+    """A live card with the same name, phone and email, the case of the name and the email aside: the same card made
+    again (an import of a row already imported; a card brought back from a copy already, hub#1257).
+
+    Only the three together: two people may share a phone or an email (CUSTOMER-F12).
+    """
+    return _live_twins(name, phone, email).exists()
+
+
+def _live_twins(name: str, phone: str, email: str) -> QuerySet[Customer]:
+    """The live cards ``has_live_twin`` finds, the oldest first."""
+    return Customer.objects.live().filter(name__iexact=name, phone=phone, email__iexact=email).order_by("created_at", "id")
+
+
+def card_in_business(card: dict) -> UUID | None:
+    """hub#1284: the business's live card that is ``card`` of a separate copy (its ``id``, ``name``, ``phone`` and
+    ``email`` there), what another app's recovery matches a record of the copy that points at it by, by the rule
+    ``cards_not_in_business`` tells a card is not lacking by: the same card while live, the one it was merged into since
+    (it lives on in that one, CUSTOMER-F13), or one made again (``has_live_twin``: by hand, or brought back already).
+    ``None`` when the business has none: deleted and not made again, gone, or erased (never another card, CUSTOMER-F16).
+    """
+    seen: set[UUID] = set()
+    current = card["id"]
+    while current is not None and current not in seen:
+        seen.add(current)
+        row = Customer.objects.filter(pk=current).values("deleted_at", "merged_into", "erased_at").first()
+        if row is None:
+            break
+        if row["erased_at"] is not None:
+            return None
+        if row["deleted_at"] is None:
+            return current
+        current = row["merged_into"]
+    return _live_twins(card["name"], card["phone"], card["email"]).values_list("pk", flat=True).first()
+
+
+#: What a card of a separate copy gives its create (``CustomerIn``), as the copy's columns hold it since
+#: ``0001_initial`` (``cards_in_copy``).
+CARD_FIELDS = (
+    "name",
+    "email",
+    "phone",
+    "tax_id",
+    "company_name",
+    "address",
+    "city",
+    "postal_code",
+    "country",
+    "avatar",
+    "birthday",
+    "anniversary",
+    "source",
+    "lifecycle_stage",
+    "preferred_channel",
+    "notes",
+)
+
+
+def cards_in_copy(conn) -> list[dict]:
+    """hub#1257: each live card of a separate copy of the business (not deleted, merged nor erased: those three set
+    ``deleted_at``), with its ``id`` there and what ``customer.customer.create`` takes, by id; nothing where the app's
+    table is not there. ``conn`` is the copy's direct, read-only connection (``recoverable_from_copy`` on this app's
+    config: the copy is no business and has no alias), so it is read by its own SQL over the model's names, never the
+    ORM."""
+    table = Customer._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return []
+    read = ("id", *CARD_FIELDS)
+    column = {field: sql.Identifier(Customer._meta.get_field(field).column) for field in (*read, "deleted_at")}
+    query = sql.SQL("SELECT {} FROM {} WHERE {} IS NULL ORDER BY {}").format(
+        sql.SQL(", ").join(column[field] for field in read), sql.Identifier(table), column["deleted_at"], column["id"]
+    )
+    return [dict(zip(read, row, strict=True)) for row in conn.execute(query)]
+
+
+def recoverable_cards_in_copy(conn) -> list[dict]:
+    """hub#1285: each card of ``cards_in_copy`` with what hung from it in the copy, as ``customer.customer.recover``
+    and ``customer.customer.restore`` take it (``HungInCopyIn``): its groups and its tags, active or not (a card keeps
+    an inactive one), and its values of the copy's active custom fields (an inactive field shows on no card and takes
+    no value, CUSTOMER-F29), each named as the copy named it and with its id there, in the order its card shows them. The same connection and rule as
+    ``cards_in_copy``: its own SQL over the models' names, never the ORM."""
+    cards = cards_in_copy(conn)
+    if not cards:
+        return []
+    hanging = {card["id"]: {"groups": [], "tags": [], "field_values": []} for card in cards}
+    read = (
+        ("groups", _members_in_copy(conn, "groups", tuple(GroupOfCopyIn.model_fields))),
+        ("tags", _members_in_copy(conn, "tags", tuple(TagOfCopyIn.model_fields))),
+        ("field_values", _values_in_copy(conn)),
+    )
+    for key, rows in read:
+        for card_id, item in rows:
+            if card_id in hanging:
+                hanging[card_id][key].append(item)
+    return [card | hanging[card["id"]] for card in cards]
+
+
+def _members_in_copy(conn, relation: str, read: tuple[str, ...]) -> list[tuple[UUID, dict]]:
+    """Each group or tag (``relation`` of a card) of each card of the copy: the card's id and its ``read`` columns, by
+    name."""
+    field = Customer._meta.get_field(relation)
+    through, model = field.remote_field.through._meta, field.related_model._meta
+    columns = [sql.Identifier("m", field.m2m_column_name())]
+    columns += [sql.Identifier("x", model.get_field(name).column) for name in read]
+    query = sql.SQL("SELECT {} FROM {} m JOIN {} x ON x.{} = m.{} ORDER BY x.{}, x.{}").format(
+        sql.SQL(", ").join(columns),
+        sql.Identifier(through.db_table),
+        sql.Identifier(model.db_table),
+        sql.Identifier(model.pk.column),
+        sql.Identifier(field.m2m_reverse_name()),
+        sql.Identifier(model.get_field("name").column),
+        sql.Identifier(model.pk.column),
+    )
+    return [(row[0], dict(zip(read, row[1:], strict=True))) for row in conn.execute(query)]
+
+
+def _values_in_copy(conn) -> list[tuple[UUID, dict]]:
+    """Each value of an active custom field of each card of the copy: the card's id and the field as its create takes
+    it, with the value, in the order the card shows them. A select's options are read as their JSON text, whatever
+    the connection makes of a ``jsonb``."""
+    value, field = CustomFieldValue._meta, CustomField._meta
+    read = tuple(name for name in FieldValueOfCopyIn.model_fields if name != "value")
+    columns = [sql.Identifier("v", value.get_field("customer").column)]
+    columns += [
+        sql.SQL("{}::text").format(sql.Identifier("f", field.get_field(name).column))
+        if name == "options"
+        else sql.Identifier("f", field.get_field(name).column)
+        for name in read
+    ]
+    columns += [sql.Identifier("v", value.get_field("value").column)]
+    query = sql.SQL("SELECT {} FROM {} v JOIN {} f ON f.{} = v.{} WHERE f.{} ORDER BY f.{}, f.{}, f.{}").format(
+        sql.SQL(", ").join(columns),
+        sql.Identifier(value.db_table),
+        sql.Identifier(field.db_table),
+        sql.Identifier(field.pk.column),
+        sql.Identifier(value.get_field("field").column),
+        sql.Identifier(field.get_field("is_active").column),
+        sql.Identifier(field.get_field("sort_order").column),
+        sql.Identifier(field.get_field("name").column),
+        sql.Identifier(field.pk.column),
+    )
+    found = []
+    for row in conn.execute(query):
+        item = dict(zip((*read, "value"), row[1:], strict=True))
+        found.append((row[0], item | {"options": json.loads(item["options"])}))
+    return found
+
+
+def cards_not_in_business(cards: list[dict]) -> list[dict]:
+    """hub#1257: the cards of a separate copy (``cards_in_copy``) the business no longer has, in their order, for
+    ``customer.customer.create``. Not lacking: any card it still holds, live, deleted (it comes back the same,
+    ``cards_deleted_in_business``), merged into another (it lives on in that one, CUSTOMER-F13) or erased (never
+    brought back, CUSTOMER-F16), and one made again (``has_live_twin``: by hand, or brought back already)."""
+    held = set(Customer.objects.filter(pk__in=[card["id"] for card in cards]).values_list("pk", flat=True))
+    return [
+        card
+        for card in cards
+        if card["id"] not in held and not has_live_twin(card["name"], card["phone"], card["email"])
+    ]
+
+
+def cards_deleted_in_business(cards: list[dict]) -> list[dict]:
+    """hub#1306: the cards of a separate copy (``cards_in_copy``) the business still holds deleted (CUSTOMER-F07), in
+    their order, for ``customer.customer.restore``: the same card back with all that hangs from it. Never one merged
+    into another or erased, and never one made again since (``has_live_twin``)."""
+    deleted = set(
+        Customer.objects.filter(
+            pk__in=[card["id"] for card in cards],
+            deleted_at__isnull=False,
+            merged_into__isnull=True,
+            erased_at__isnull=True,
+        ).values_list("pk", flat=True)
+    )
+    return [
+        card
+        for card in cards
+        if card["id"] in deleted and not has_live_twin(card["name"], card["phone"], card["email"])
+    ]

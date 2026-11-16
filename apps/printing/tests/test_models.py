@@ -3,15 +3,17 @@
 import hashlib
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
+from apps.printing.tests.conftest import HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make):
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 
@@ -125,7 +127,7 @@ def test_the_factory_job_is_pending_with_one_copy():
 def test_a_printer_with_jobs_is_never_deleted():
     till = a_printer()
     a_job(printer=till)
-    with pytest.raises(Exception), transaction.atomic():
+    with pytest.raises(Exception), atomic():
         till.delete()
 
 
@@ -134,7 +136,7 @@ def a_device(**more) -> PrintDevice:
 
 
 def test_a_device_is_known_by_the_digest_of_its_own_id_never_by_the_id():
-    # hub#2551: the id a device sends is its credential; the database keeps its SHA-256, which proves nothing.
+    # The id a device sends is its credential; the database keeps its SHA-256, which proves nothing.
     assert PrintDevice.key_of("till-1") == hashlib.sha256(b"till-1").hexdigest()
     assert PrintDevice.key_of("  till-1 ") == PrintDevice.key_of("till-1")
     a_device()
@@ -147,7 +149,7 @@ def test_a_device_reaches_printers_and_one_with_jobs_is_never_deleted():
     till.printers.add(a_printer())
     assert [p.name for p in till.printers.all()] == ["Till"]
     a_job(print_device=till, device="Till")
-    with pytest.raises(Exception), transaction.atomic():
+    with pytest.raises(Exception), atomic():
         till.delete()
 
 

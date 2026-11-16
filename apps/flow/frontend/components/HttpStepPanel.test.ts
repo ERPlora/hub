@@ -1,4 +1,4 @@
-// The form of «Call another system» (WORKBOOK FLOW-F27; the old module's flows-f16): method, address (it
+// The form of «Call another system» (WORKBOOK FLOW-F27): method, address (it
 // says which permission it will ask for), headers, what to send and how long to wait. Every value is
 // text with data, secrets or the call's key inserted ({{…}}); the server's refusals show by field.
 import { describe, expect, it } from 'vitest';

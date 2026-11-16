@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// The Hub's empty conversation of the assistant (BASE-G111, G121; the old hub's empty drawer), in the shared panel's
-// `empty` slot (BackgroundChrome): the sentence — the setup's when the panel was opened from «Finish setting up your
-// business» — and the shortcuts: «What is left to set up?» and, for up to four pending steps this person can do,
-// «How do I set up “…”?», each asked at once with the setup. The checklist is read live while this shows; if it
-// cannot be read, only the first shortcut stays.
+// The assistant's empty conversation, in the shared panel's `empty` slot: «What is left to set up?» and a shortcut for
+// each of up to four pending setup steps this person can do. If the checklist cannot be read, only the first stays.
 import { AssistantEmpty } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';

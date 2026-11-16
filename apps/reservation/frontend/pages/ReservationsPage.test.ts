@@ -8,13 +8,14 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { itFillsThePage } from '../__tests__/list-fills-the-page';
 import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
 import DayBar from '../components/DayBar.vue';
+import en from '../locale/en.json';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
-import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -193,14 +194,78 @@ describe('ReservationsPage', () => {
   });
 });
 
-describe('ReservationsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
-  it('keeps its column filters behind the table’s funnel, as the old table: the list is not pushed down', async () => {
+// RESERVATION-F09 and F13 (hub#862): whoever opens the book tomorrow sees why a reservation was cancelled,
+// next to «Cancelled», in the row and in the card — what the staff typed, as typed, or the book's own
+// release of a pending one nobody confirmed (the code `unconfirmed`, translated). Nothing without a reason.
+describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F13)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const BY_STAFF = reservationRow({ id: 'r4', status: 'cancelled', cancellation_reason: 'Plans changed' });
+  const RELEASED = reservationRow({ id: 'r5', status: 'cancelled', cancellation_reason: 'unconfirmed' });
+  const SILENT = reservationRow({ id: 'r6', status: 'cancelled', cancellation_reason: '' });
+  /** A stale reason on a reservation that is not cancelled says nothing. */
+  const STALE = reservationRow({ id: 'r7', status: 'confirmed', cancellation_reason: 'Plans changed' });
+  const reasons = (s: Awaited<ReturnType<typeof setup>>) =>
+    s.rows().map((row) => row.find('[data-testid="reservation-list-reason"]'));
+  const shown = (s: Awaited<ReturnType<typeof setup>>) => reasons(s).map((found) => (found.exists() ? found.text().trim() : null));
+
+  it('says what was typed, as typed, and the book’s release translated, next to «Cancelled»; nothing else', async () => {
     const s = await setup();
-    expect(s.prop('filterable')).toBe(true);
+    await s.show([BY_STAFF, RELEASED, SILENT, STALE]);
+    expect(shown(s)).toEqual([
+      en.reservation.list.cancelReason.replace('{reason}', 'Plans changed'),
+      en.reservation.list.unconfirmed,
+      null,
+      null,
+    ]);
+    // In the Status cell, after the pill: the reason belongs to «Cancelled».
+    const status = s.rows()[0].findAll('[role="cell"]')[6];
+    expect(status.find('.status-pill').text()).toBe('Cancelled');
+    expect(status.find('[data-testid="reservation-list-reason"]').exists()).toBe(true);
   });
 
-  it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
+  it('says it in the card too, inside its Status', async () => {
     const s = await setup();
-    expect(listFillProblems(s.wrapper)).toEqual([]);
+    await s.show([BY_STAFF, RELEASED, SILENT]);
+    await ionValue(s.wrapper.find('[data-testid="reservation-list-view"]').element, 'cards');
+    const statuses = s.wrapper
+      .findAll('.data-table__field')
+      .filter((field) => field.find('.data-table__field-label').text() === 'Status')
+      .map((field) => field.find('.data-table__field-value'));
+    expect(statuses.map((value) => value.find('.status-pill').text())).toEqual(['Cancelled', 'Cancelled', 'Cancelled']);
+    expect(statuses.map((value) => value.find('[data-testid="reservation-list-reason"]')).map((r) => (r.exists() ? r.text().trim() : null))).toEqual([
+      en.reservation.list.cancelReason.replace('{reason}', 'Plans changed'),
+      en.reservation.list.unconfirmed,
+      null,
+    ]);
   });
+
+  it('a long reason is shortened at a word, ending in «…», and kept whole in its title (the panel shows it whole)', async () => {
+    const long = 'The guest called to say she is ill and will book again next week for six people on the terrace';
+    const s = await setup();
+    await s.show([reservationRow({ id: 'r8', status: 'cancelled', cancellation_reason: long })]);
+    const [reason] = reasons(s);
+    const said = en.reservation.list.cancelReason.replace('{reason}', long);
+    expect(reason.attributes('title')).toBe(said);
+    const shown = reason.text().trim();
+    expect(shown.endsWith('…')).toBe(true);
+    expect(shown.length).toBeLessThanOrEqual(60);
+    expect(said.startsWith(shown.slice(0, -1))).toBe(true);
+    expect(said.charAt(shown.length - 1)).toBe(' ');
+  });
+
+  it('speaks Spanish: the typed reason stays as typed', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show([BY_STAFF, RELEASED]);
+    // The Spanish words themselves, not the catalogue read back: a message left in English would pass that.
+    expect(shown(s)).toEqual(['Motivo: Plans changed', 'Liberada: nunca se confirmó']);
+  });
+});
+
+describe('ReservationsPage: the list fills the page', () => {
+  itFillsThePage(setup);
 });

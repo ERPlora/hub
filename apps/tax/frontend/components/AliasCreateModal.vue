@@ -8,6 +8,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { categoryCombo } from '../lib/pickers';
 import type { AliasSource } from '../operations';
 
@@ -54,11 +56,14 @@ async function save(): Promise<void> {
 function cancel(): void {
   reset();
 }
+
+const canDismiss = useUnsavedFormOnOpen('tax-alias-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-alias-form"
     :title="$t('tax.aliases.form.title')"
     :submit-label="$t('tax.add')"
@@ -72,6 +77,7 @@ function cancel(): void {
       <div class="tax-form">
         <ion-input
           data-testid="tax-alias-form-alias"
+          name="alias"
           :value="form.alias"
           :label="$t('tax.aliases.columns.alias')"
           :placeholder="$t('tax.aliases.form.aliasPlaceholder')"
@@ -85,6 +91,7 @@ function cancel(): void {
         />
         <Combo
           testid="tax-alias-form-category"
+          name="tax_category_key"
           :model-value="category"
           :search="searchCategories"
           :label="$t('tax.aliases.columns.category')"
@@ -94,6 +101,7 @@ function cancel(): void {
         />
         <ion-select
           data-testid="tax-alias-form-source"
+          name="source"
           :value="form.source"
           :label="$t('tax.aliases.columns.source')"
           label-placement="floating"

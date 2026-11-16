@@ -9,7 +9,14 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
+import { unsavedChangesIn } from '../../../../base/frontend/lib/system-back';
+import { ionModalStubOf } from '../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
 import {
   business,
   category,
@@ -317,6 +324,15 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-cost')?.label).toBe('Cost (PLN)');
     });
 
+    // hub#924: the cost is judged in the business's money, like the price: a euro one is no złoty amount in Poland.
+    it('in Poland a cost «13,50 €» says it is not an amount, and nothing is saved', async () => {
+      const s = await setup({}, { business: business(POLISH) });
+      await s.fillRequired();
+      await s.type('inventory-product-cost', '13,50 €');
+      await s.submit();
+      expect([s.el('inventory-product-cost')?.errorText, s.calls('/api/inventory/products')]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
+    });
+
     it('while the business is not read, «Cost» without a currency, never the euro', async () => {
       const s = await setup({}, { business: null });
       expect(s.el('inventory-product-cost')?.label).toBe('Cost');
@@ -324,7 +340,8 @@ describe('ProductFormModal: editing', () => {
   });
 
   describe('the business answers after the form opened (flow INVENTORY-F02)', () => {
-    const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 12.50.';
+    /** What the money field says in yen, with its example in yen. */
+    const NOT_AMOUNT_IN_YEN = 'This is not an amount. Type a figure, for example 12.';
 
     it('a new product: the name and SKU typed before keep, and «Save» lights up once its tax category is chosen', async () => {
       const s = await setup({}, { business: null });
@@ -374,9 +391,17 @@ describe('ProductFormModal: editing', () => {
     it('a new price typed before is kept as typed and read in the yen; the untouched cost is still rewritten', async () => {
       const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
       await s.type('inventory-product-price', '300');
-      await s.answer(JAPANESE);
-      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
+      // hub#918: until the yen arrives «Save changes» waits in grey and nothing reads the price (never 300 as 30000).
       s.net.onApi(() => ok(product({ price: 300 })));
+      const window = {
+        wrapper: s.wrapper,
+        save: () => s.el('inventory-product-form-submit'),
+        amount: () => s.el('inventory-product-price'),
+        sent: () => s.calls('/api/inventory/products/update'),
+        settle: flush,
+      };
+      await expectSaveWaitsForMoney(window, () => s.answer(JAPANESE));
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
       await s.submit();
       expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', price: 300 });
     });
@@ -388,8 +413,32 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-price')?.value).toBe('1,75');
       await s.submit();
       expect(s.calls('/api/inventory/products/update')).toHaveLength(0);
-      expect(s.el('inventory-product-price')?.errorText).toBe(NOT_AMOUNT);
+      expect(s.el('inventory-product-price')?.errorText).toBe(NOT_AMOUNT_IN_YEN);
     });
+
+    // hub#945 (INVENTORY-F01): a price or a cost typed with its currency's sign and left before the business answers is
+    // neither rewritten nor called «not an amount»; once it answers, it is read in its money.
+    it.each([
+      ['price', '¥1500', JAPANESE, 1500],
+      ['cost', '12,50 zł', POLISH, 1250],
+    ] as const)('the %s «%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (name, typed, money, cents) => {
+      const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+      await expectAmountLeftWaitsForMoney({ amount: () => s.el(`inventory-product-${name}`), settle: flush }, typed, () => s.answer(money));
+      s.net.onApi(() => ok(product({ [name]: cents })));
+      await s.submit();
+      expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', [name]: cents });
+    });
+  });
+
+  // INVENTORY-F01, hub#924: a price is never negative, and the field says that, not that «-2» is no amount.
+  it('a negative price says it cannot be negative, and nothing is sent', async () => {
+    const s = await setup();
+    await s.fillRequired();
+    await s.type('inventory-product-price', '-2');
+    s.el('inventory-product-price')!.dispatchEvent(new CustomEvent('ionBlur'));
+    await flush();
+    await s.submit();
+    expect([s.el('inventory-product-price')?.errorText, s.calls('/api/inventory/products')]).toEqual(['This amount cannot be negative.', []]);
   });
 });
 
@@ -529,5 +578,207 @@ describe('ProductFormModal: photo', () => {
     await flush();
     expect(s.el('inventory-product-image-preview')?.querySelector('img')).toBeNull();
     expect(s.el('inventory-product-image-preview')?.textContent?.trim()).toBe('GT');
+  });
+});
+
+// hub#938 (INVENTORY-F01, F02): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('ProductFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save changes» lights up (opened after the failure: %s)', async (late) => {
+    const props = { open: !late, product: product(), units: UNITS.rows };
+    const m = await mountInventory(ProductFormModal, { props, attach: true, business: null, api: searches(CATEGORIES) });
+    await m.live();
+    const inDoc = (testid: string) => document.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable({ ...m, inDoc }, 'inventory-product-form-submit', () => m.calls('/api/inventory/products/update'), opens);
+  });
+});
+
+// hub#1015 (INVENTORY-F01, F02; BASE-F05): on the installed app Android's Back closed «New product» and threw away what
+// had been typed, without a word. The window signs up with the system Back (`useUnsavedChanges`): while something typed
+// is not saved, Back on it asks «Discard changes?» («Keep editing» / «Discard changes») instead of closing it; as it
+// opened (nothing typed, or put back as it was), Back closes it as before. What Back does with that is pinned in
+// base/frontend/lib/system-back.test.ts and on the real app in tests/e2e/inventory-unsaved-changes.spec.ts.
+describe('ProductFormModal: Back with something typed asks first (hub#1015)', () => {
+  /** The window that holds Back in this dialog, if any: what the system Back asks before closing it. */
+  const holding = (s: { el: (id: string) => HTMLElement | null }) => unsavedChangesIn(s.el('inventory-product-form')!);
+
+  it('a new product as it opened holds nothing: Back closes it as before', async () => {
+    const s = await setup();
+    expect(holding(s)).toBeUndefined();
+  });
+
+  it.each([
+    ['inventory-product-name', 'Coffee'],
+    ['inventory-product-sku', 'CAF-1'],
+    ['inventory-product-price', '2,20'],
+    ['inventory-product-cost', '0,80'],
+    ['inventory-product-initial-stock', '5'],
+    ['inventory-product-threshold', '3'],
+    ['inventory-product-ean13', '4006381333931'],
+    ['inventory-product-description', 'Hot'],
+  ])('something typed in %s holds Back', async (id, value) => {
+    const s = await setup();
+    await s.type(id, value);
+    expect(holding(s)).toBeDefined();
+  });
+
+  it.each<[string, (s: Awaited<ReturnType<typeof setup>>) => Promise<void>]>([
+    ['the type', (s) => s.pick('inventory-product-type', 'service')],
+    ['the unit', (s) => s.pick('inventory-product-unit', 'kg')],
+    ['the tax category', (s) => s.choose('inventory-product-tax', 'product.generic')],
+    ['a category', (s) => s.choose('inventory-product-categories', 'c2')],
+    ['«Track stock for this item»', (s) => s.check('inventory-product-track-stock', !s.el('inventory-product-track-stock')!.checked)],
+  ])('%s chosen holds Back', async (_what, change) => {
+    const s = await setup();
+    await change(s);
+    expect(holding(s)).toBeDefined();
+  });
+
+  it('typed and put back as it was holds nothing', async () => {
+    const s = await setup();
+    await s.type('inventory-product-name', 'Coffee');
+    await s.type('inventory-product-name', '');
+    expect(holding(s)).toBeUndefined();
+  });
+
+  it('editing: as saved it holds nothing, also once the business answers and the price is rewritten in its currency', async () => {
+    const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+    expect(holding(s)).toBeUndefined();
+    await s.answer(JAPANESE);
+    expect(s.el('inventory-product-price')?.value).toBe('220');
+    expect(holding(s)).toBeUndefined();
+    await s.type('inventory-product-name', 'Cola');
+    expect(holding(s)).toBeDefined();
+  });
+
+  it('editing: the photo removed holds Back', async () => {
+    const s = await setup({ product: product({ image: 'catalog:hospitality/americano', image_url: '/p/catalog/hospitality/americano.webp' }) });
+    expect(holding(s)).toBeUndefined();
+    s.el('inventory-product-image-remove')!.click();
+    await flush();
+    expect(holding(s)).toBeDefined();
+  });
+
+  it('asks «Discard changes?» with «Keep editing» and «Discard changes», in the window’s language', async () => {
+    const s = await setup({}, { locale: 'es' });
+    await s.type('inventory-product-name', 'Café');
+    const answer = holding(s)!.confirmDiscard();
+    await flush();
+    const asked = document.querySelector<HTMLElement>('[data-stub="ion-modal"][aria-label="¿Descartar los cambios?"]');
+    expect(asked?.querySelector('.ep-form-modal__cancel')?.textContent?.trim()).toBe('Seguir editando');
+    expect(asked?.querySelector('.ep-form-modal__submit')?.textContent?.trim()).toBe('Descartar cambios');
+    asked!.querySelector<HTMLElement>('.ep-form-modal__cancel')!.click();
+    await expect(answer).resolves.toBe(false);
+    expect(s.el('inventory-product-name')?.value).toBe('Café');
+  });
+
+  it('saved and closed, it holds nothing; opened again, nothing either', async () => {
+    const s = await setup({}, { api: (call) => ((call.init.method ?? 'GET') === 'GET' ? searches(CATEGORIES)(call) : ok(product(), 201)) });
+    await s.fillRequired();
+    await s.submit();
+    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
+    await s.wrapper.setProps({ open: false });
+    expect(holding(s)).toBeUndefined();
+    await s.wrapper.setProps({ open: true });
+    await flush();
+    expect(holding(s)).toBeUndefined();
+  });
+});
+
+// hub#1023 (INVENTORY-F01, F02): «Cancel» («Cancel editing»), the window's «×», Escape and a tap outside closed «New product»
+// and «Editing product» and threw away what had been typed, without a word, though Android's Back on it already asked
+// (hub#1015). Now every way out asks the same «Discard changes?» (`useUnsavedChanges` gives its FormModal the question as
+// `canDismiss`): «Keep editing» leaves the window as it was, «Discard changes» closes it; as it opened, they close it at
+// once. On the real app: tests/e2e/inventory-unsaved-changes.spec.ts.
+describe('ProductFormModal: Cancel, ×, Escape and a tap outside ask first with something typed (hub#1023)', () => {
+  const QUESTION = '[data-stub="ion-modal"][aria-label="Discard changes?"]';
+  const asked = () => document.querySelector<HTMLElement>(QUESTION);
+  const answer = async (part: 'cancel' | 'submit') => {
+    asked()!.querySelector<HTMLElement>(`.ep-form-modal__${part}`)!.click();
+    await flush();
+  };
+  const form = () => document.querySelector<HTMLElement>('[data-stub="ion-modal"][data-testid="inventory-product-form"]')!;
+  type Setup = Awaited<ReturnType<typeof setup>>;
+  const ways: [string, (s: Setup) => Promise<void>][] = [
+    ['«Cancel»', async (s) => {
+      s.el('inventory-product-form-cancel')!.click();
+      await flush();
+    }],
+    ['the «×»', async (s) => {
+      s.el('inventory-product-form-close')!.click();
+      await flush();
+    }],
+    ['Escape', async (s) => {
+      s.el('inventory-product-name')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await flush();
+    }],
+    // Not awaited: with a question up, the tap settles only once it is answered.
+    ['a tap outside', async () => {
+      void ionModalStubOf(form()).tapBackdrop();
+      await flush();
+    }],
+  ];
+
+  it.each(ways)('%s on «New product» as it opened closes it at once, without asking', async (_way, leave) => {
+    const s = await setup();
+    await leave(s);
+    expect(asked()).toBeNull();
+    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
+  });
+
+  it.each(ways)('%s with something typed asks «Discard changes?»; «Keep editing» keeps the window and what was typed', async (_way, leave) => {
+    const s = await setup();
+    await s.type('inventory-product-name', 'Coffee');
+    await leave(s);
+    expect(asked()).not.toBeNull();
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+    await answer('cancel');
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+    expect(s.el('inventory-product-name')?.value).toBe('Coffee');
+  });
+
+  it.each(ways)('%s with something typed, then «Discard changes», closes it and saves nothing', async (_way, leave) => {
+    const s = await setup();
+    await s.type('inventory-product-name', 'Coffee');
+    await leave(s);
+    await answer('submit');
+    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
+    expect(s.calls('/api/inventory/products').filter((c) => (c.init.method ?? 'GET') !== 'GET')).toHaveLength(0);
+  });
+
+  it('«Cancel editing» on «Editing product»: as saved it closes at once; with a change it asks, in Spanish too', async () => {
+    const s = await setup({ product: product({ price: 220 }) }, { locale: 'es' });
+    s.el('inventory-product-form-cancel')!.click();
+    await flush();
+    expect(document.querySelector('[data-stub="ion-modal"][aria-label="¿Descartar los cambios?"]')).toBeNull();
+    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
+
+    const t = await setup({ product: product({ price: 220 }) }, { locale: 'es' });
+    await t.type('inventory-product-name', 'Cola');
+    t.el('inventory-product-form-cancel')!.click();
+    await flush();
+    const question = [...document.querySelectorAll<HTMLElement>('[data-stub="ion-modal"][aria-label="¿Descartar los cambios?"]')].at(-1);
+    expect(question?.querySelector('.ep-form-modal__cancel')?.textContent?.trim()).toBe('Seguir editando');
+    expect(question?.querySelector('.ep-form-modal__submit')?.textContent?.trim()).toBe('Descartar cambios');
+    expect(t.wrapper.emitted('update:open')).toBeUndefined();
+  });
+
+  it('the photo chosen and not saved asks too', async () => {
+    const s = await setup({ product: product({ image: 'catalog:hospitality/americano', image_url: '/p/catalog/hospitality/americano.webp' }) });
+    s.el('inventory-product-image-remove')!.click();
+    await flush();
+    s.el('inventory-product-form-cancel')!.click();
+    await flush();
+    expect(asked()).not.toBeNull();
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+
+  it('saved, it closes without asking', async () => {
+    const s = await setup({}, { api: (call) => ((call.init.method ?? 'GET') === 'GET' ? searches(CATEGORIES)(call) : ok(product(), 201)) });
+    await s.fillRequired();
+    await s.submit();
+    expect(asked()).toBeNull();
+    expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
   });
 });

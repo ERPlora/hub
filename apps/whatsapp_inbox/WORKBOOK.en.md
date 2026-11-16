@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dbb74e718190308da2a5fee253e6318ff1a4713ae3e67fd2720b88bddcba1ad6 -->
+<!-- generated from WORKBOOK.md sha256:364e7398f7b82b43e44f6b14dfd72c6c623f9ab572e7a799616cdcc04334000a -->
 
 ## What it is for and who it is for
 
@@ -43,11 +43,11 @@ conversation as a message from the business (Meta's coexistence).
 **Wins:** an inbox you answer from (Square, Shopify, Fresha, Vagaro, Odoo), with three statuses (open, pending,
 closed) where a new message from the customer reopens the conversation (Zendesk), assignment to whoever can read the
 inbox with "Assign to me" that never overrides someone else (Shopify, Chakra), internal notes in the thread (Fresha,
-Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI,
-Respond.io and the current product).
-**Why not the others:** answering only from the phone (the current product) forces you to pick up the phone and
+Intercom, Front), Meta's 24-hour rule enforced on the server and the templates managed in the app itself (Odoo, WATI
+and Respond.io).
+**Why not the others:** answering only from the phone forces you to pick up the phone and
 leaves the inbox read-only; two statuses (Shopify) do not tell "waiting for the customer" from "it is done";
-assigning by typing an identifier (the current product) is used by nobody; sending the owner to WhatsApp Manager to
+assigning by typing an identifier is used by nobody; sending the owner to WhatsApp Manager to
 create the templates takes them out of the app for something they do every day.
 
 ## Before you start
@@ -134,6 +134,12 @@ touched ("Meta only lets you change the category of a template it rejected.").
 | Conversation panel | "Loading…" | "No messages yet." | "Could not load the conversation" | — |
 | Settings | indicator | "No templates." | the reason + **Retry** | same as the inbox |
 | Template (sheet) | the final button busy while it saves | — | the reason under its field, or at the top the one the Hub gives | only the owner and the administrator open it |
+
+## Unsaved changes on Android
+
+In "New template", "Edit template" and "Send a template", the phone's Back button asks "Discard changes?" when
+something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window
+without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
@@ -255,12 +261,15 @@ Steps:
 3. The number is compared as a number: written with spaces, with the country prefix or with "00" in front it is the
    same person in a business in Spain, and a foreign number that keeps its zero (a landline in Italy) too; the same
    digits with another country's prefix are another person.
+4. When ERPlora's staff recover from the separate copy a card the business deleted (the same card comes back,
+   CUSTOMER-F33), the conversations of its number that are still without a card are linked to it again within a
+   few seconds, without waiting for the customer to write again.
 In: the conversation's number and the cards with that number.
 Out: the conversation knows which card it belongs to. It only fills an empty link: the one a person set is
 respected. A deleted card counts as empty: its conversation is left without a card and another live card with the
-same number claims it.
+same number claims it; if the card comes back from the separate copy and no other claimed it, it is hers again.
 If it fails: if two cards have the same number, it is linked to neither and the message stays saved.
-Involved: Customers
+Involved: Customers, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Read a conversation
 Status: done
@@ -888,7 +897,7 @@ the month's cap…), the bubble says "Not delivered" and its reason; if erplora.
 connected, the Hub says so in its own words ("WhatsApp is not connected: connect the number in Settings to send."),
 never as Meta's reason. If erplora.com does not answer, does not confirm or asks to go slower, the bubble says "Not
 sent" with **Retry**, which hands it over again with the same key: it never goes out twice. It always goes out
-through the number of the business that sent it, even if someone else retries it from the shared inbox of phase 1.
+through the business's number, whoever retries it.
 Involved: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Send a template
@@ -911,8 +920,9 @@ number"): its conversation is created. An automation does not use this send but 
 creates a conversation: it only writes to the one that already exists with the exact international number (FLOW-F31,
 F23). A number written by hand belongs to the business's country unless it carries its prefix.
 In: the template (name and language), its variables, its header's file (if it carries a photo, a video or a document:
-its own or the chosen one), a message key and the conversation or the number. An automation only sends the ones that
-ask for nothing but their variables: those with a file in the header, with their own.
+its own or the chosen one), a message key and the conversation or the number. An automation sends the same ones the
+inbox knows how to fill in: one with a file in the header goes with the one its step **Send a message** chose
+(FLOW-F32) or, if it chose none, with its own; with neither, it does not go.
 Out: the message saved and handed over as in F32; notice `whatsapp_inbox.message.sent`.
 If it fails: a **Marketing** template is only sent to a customer with a card and with the marketing consent by
 WhatsApp given in Customers ("This customer has not agreed to receive marketing by WhatsApp."); a template not
@@ -1017,6 +1027,8 @@ Involved: erplora.com; Appointments and Reservations, when they notify by WhatsA
 | `whatsapp_inbox.note.list` | A conversation's internal notes |
 | `whatsapp_inbox.template.list` | The templates (filters by status, category, language, name and whether they can be sent), with their way to Meta |
 | `whatsapp_inbox.template_sample.detail` | A header's file by its id, as it was returned when saved (name, photo, video or document and size); only the asking business's |
+| `whatsapp_inbox.note.get` | An internal note by its id, with its text: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API |
+| `whatsapp_inbox.template.get` | A template of the business by its id with its name and its language ("recordatorio (es)"), also one deleted here that Meta still has: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API |
 | `whatsapp_inbox.channel.get` | The number's status and the month's usage |
 | `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to |
 
@@ -1070,7 +1082,8 @@ They carry identifiers, never a number, a name or a text of the conversation.
 - **Customers** (required): `customer.customer.created` and `customer.customer.updated` link the conversations with no
   card of that number (F04); `customer.customer.merged` moves them to the card that stays (F12);
   `customer.customer.deleted` leaves them without a card and another live card of the number claims them;
-  `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
+  `customer.customer.restored` (the deleted card coming back from the separate copy, CUSTOMER-F33) links them again,
+  as a new card does (F04); `customer.customer.erased` erases them (F11). It reads the cards by number and the marketing consent by WhatsApp; it
   creates cards only with `customer.customer.create`.
 
 ### Who uses it
@@ -1081,7 +1094,15 @@ They carry identifiers, never a number, a name or a text of the conversation.
   `message.received` (F38). The automatic answer "WhatsApp → table booked" (F24) starts on `message.received`, reads
   the message with `message.get` and marks the conversation with `conversation.flag` (F20).
 - The **assistant**: every operation, with human references ("answer Ana", "assign Ana's conversation to Luis", "send
-  the reminder template to the number I dictate", "create a reminder template").
+  the reminder template to the number I dictate", "create a reminder template"), except the two reads of its card
+  (`note.get`, `template.get`). Before changing anything it asks to confirm with its card (BASE-F97), which names each
+  record as the screens name it, never by its id: the conversation as the inbox calls it ("Conversation: Ana López"),
+  the card joined to it, the message retried and the note deleted by their text, and the template by its name and its
+  language ("Template: recordatorio (es)"). What the person asking cannot see is left out. Each tool knows how a
+  person asks for it, in English and in Spanish: "open Ana's last message", "retry the template that did not reach
+  Meta" or "which people can take this WhatsApp conversation?" reach their operation (before, opening one message, retrying a
+  message or a template, sending, changing a template and seeing who a conversation can be assigned to did not reach
+  it and it said it could not). For the assistant, a "template" and a "message" are this inbox's.
 
 ### Who can do what
 

@@ -1,7 +1,7 @@
-// flow: sale-e2e-wait — FIX of the Sales specs' wait (FIX-HUB-SALE-E2E-WAIT-BLIND-TO-SHADOW-ROOTS)
+// flow: sale-e2e-wait — the Sales specs' wait
 // Before a capture or a measurement, the Sales specs (sale-*.spec.ts) wait for the screen to stop moving with the
-// harness's one wait, `untilStill` (helpers.ts). Their own wait asked the document alone for its animations, which
-// leaves shadow roots out, and Ionic animates its overlays (`ion-toast`, `ion-modal`, the till's sheets) in theirs: a
+// harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves shadow
+// roots out, and Ionic animates its overlays (`ion-toast`, `ion-modal`, the till's sheets) in theirs: a
 // capture could come out with a notice still sliding in and pass for good. Here the till's «… is sold out.» toast
 // (SALE-F07: a tap on a sold-out article says why) enters at a fifth of its speed (Chrome's own control), and once
 // the Sales specs' wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`,

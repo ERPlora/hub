@@ -1,4 +1,4 @@
-"""Resume a run from the step that failed (WORKBOOK FLOW-F24; old hub HUB-F103, hub#952).
+"""Resume a run from the step that failed (WORKBOOK FLOW-F24).
 
 A run that stopped by an error keeps what its steps left for seven days; within them, once the cause is
 fixed, ``flow.run.retry`` takes it up again at the step that failed, without repeating the steps that
@@ -17,9 +17,9 @@ from apps.customer.models import Activity, Customer
 from apps.flow import queries
 from apps.flow.models import FlowRun
 
-from .conftest import ctx_for, make_flow, make_run, run
+from .conftest import HUB_DB, ctx_for, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

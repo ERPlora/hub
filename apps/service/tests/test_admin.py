@@ -1,4 +1,4 @@
-"""Django admin of the service app: full CRUD for support (round 12, PLAN §17).
+"""Django admin of the service app: full CRUD for support.
 
 A second write path, for the staff only on hubs.erplora.com: it adds, changes and deletes every table,
 so that support can repair; it does not go through the operations' rules, so it warns rather than
@@ -34,13 +34,7 @@ from apps.service.models import (
 )
 
 from .conftest import (
-    make_customer,
-    make_grant,
-    make_member,
-    make_package,
-    make_redemption,
-    make_service,
-    make_tax,
+    HUB_DB, make_customer, make_grant, make_member, make_package, make_redemption, make_service, make_tax,
 )
 
 MODELS = {
@@ -83,6 +77,7 @@ def test_every_model_is_registered_and_the_children_are_inlines():
     ) == (PackageItem, GrantAdjustment, Redemption)
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -108,8 +103,8 @@ def test_ids_and_timestamps_are_read_only():
     assert {"id", "updated_at"} <= set(ServiceSettingsAdmin.readonly_fields)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff):
     tax = make_tax()
     cut = make_service("Haircut", tax=tax)
     package = make_package("Bono 5", [cut], max_uses=5)
@@ -118,7 +113,6 @@ def test_changelists_and_change_pages_render(client, superuser):
     Assignment.objects.create(service=cut, member=make_member("Ana"))
     Category.objects.create(name="Hair")
     ServiceSettings.objects.create()
-    client.force_login(superuser)
     for path, text in (
         ("/admin/service/service/", b"Haircut"),
         (f"/admin/service/service/{cut.pk}/change/", b"Haircut"),
@@ -132,14 +126,31 @@ def test_changelists_and_change_pages_render(client, superuser):
         ("/admin/service/service/add/", b"tax_category"),
         ("/admin/service/grant/add/", b"customer"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_support_can_repair_a_category_through_the_admin(client, superuser):
+@HUB_DB
+def test_a_voucher_sold_reads_services_own_spanish_in_the_admin(hub_staff):
+    """Support reading a voucher sold in Spanish sees who voided it as «Anulado por», the voucher being masculine, and
+    its sessions as «Sesiones del bono», as Servicios says them; not Ventas' «Anulada por» nor «Sesiones de bono»."""
+    cut = make_service("Haircut", tax=make_tax())
+    grant = make_grant(make_package("Bono 5", [cut], max_uses=5), make_customer("Lucía"))
+    make_redemption(grant, cut)
+    response = hub_staff.get(
+        f"/admin/service/grant/{grant.pk}/change/",
+        HTTP_HOST="hubs.localhost",
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    page = response.content.decode()
+    assert response.status_code == 200
+    assert ("Anulado por:" in page, "Sesiones del bono" in page) == (True, True)
+    assert ("Anulada por" in page, "Sesiones de bono" in page) == (False, False)
+
+
+@HUB_DB
+def test_support_can_repair_a_category_through_the_admin(hub_staff):
     category = Category.objects.create(name="Hiar")
-    client.force_login(superuser)
     data = {
         "name": "Hair",
         "description": "",
@@ -149,7 +160,7 @@ def test_support_can_repair_a_category_through_the_admin(client, superuser):
         "created_by": "",
         "updated_by": "",
     }
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/service/category/{category.pk}/change/",
         data,
         HTTP_HOST="hubs.localhost",
@@ -159,13 +170,12 @@ def test_support_can_repair_a_category_through_the_admin(client, superuser):
     assert category.name == "Hair"
 
 
-@pytest.mark.django_db
-def test_the_admin_refuses_a_parent_that_closes_a_loop(client, superuser):
+@HUB_DB
+def test_the_admin_refuses_a_parent_that_closes_a_loop(hub_staff):
     hair = Category.objects.create(name="Hair")
     colour = Category.objects.create(name="Colour", parent=hair)
-    client.force_login(superuser)
     data = {"name": "Hair", "description": "", "parent": str(colour.pk), "icon": "", "color": "", "sort_order": "0", "created_by": "", "updated_by": ""}
-    response = client.post(f"/admin/service/category/{hair.pk}/change/", data, HTTP_HOST="hubs.localhost")
+    response = hub_staff.post(f"/admin/service/category/{hair.pk}/change/", data, HTTP_HOST="hubs.localhost")
     assert response.status_code == 200
     assert b"A category cannot hang from itself or from one of its subcategories." in response.content
     hair.refresh_from_db()

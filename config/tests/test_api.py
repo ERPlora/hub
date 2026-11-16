@@ -17,6 +17,8 @@ from live.ninja import ensure_api_parity, operation_ids
 from live.operations import registry
 from ninja import Router
 
+from base.tenancy.tests.business import HOST, on_hub_a
+from base.tests.routes import published_routes
 from config.api import api, build_api
 
 probe_router = Router()
@@ -50,15 +52,15 @@ def test_every_route_is_bound_to_its_operation():
     assert "base.session.me" in operation_ids(api)
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
+@on_hub_a  # the host gate reads the business's row (base.middleware)
 def test_openapi_is_served_with_operation_names_as_ids(client):
-    response = client.get("/api/openapi.json", HTTP_HOST="a.localhost")
+    response = client.get("/api/openapi.json", HTTP_HOST=HOST)
     assert response.status_code == 200
     schema = response.json()
     assert (schema["info"]["title"], schema["info"]["version"]) == ("ERPlora Hub API", "1")
-    assert schema["paths"]["/api/me"]["get"]["operationId"] == "base.session.me"
-    ids = [op["operationId"] for methods in schema["paths"].values() for op in methods.values()]
-    assert ids and all(op_id in registry for op_id in ids)
+    routes = published_routes(client, "", HOST)
+    assert ("GET", "/me", "base.session.me") in routes
+    assert routes and all(op_id in registry for _method, _path, op_id in routes)
 
 
 def test_docs_follow_debug(settings):
@@ -71,36 +73,36 @@ def test_docs_follow_debug(settings):
 # --- Session auth and CSRF -----------------------------------------------------------------------
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_anonymous_write_is_401_envelope(probe_urls, client):
-    response = client.post("/probe/echo", HTTP_HOST="a.localhost")
+    response = client.post("/probe/echo", HTTP_HOST=HOST)
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_session_write_without_csrf_token_is_refused(probe_urls):
     client = Client(enforce_csrf_checks=True)
     client.force_login(get_user_model().objects.create_user("ana", password="pw"))
-    response = client.post("/probe/echo", HTTP_HOST="a.localhost")
+    response = client.post("/probe/echo", HTTP_HOST=HOST)
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_session_write_with_csrf_token_passes(probe_urls, settings):
     client = Client(enforce_csrf_checks=True)
     client.force_login(get_user_model().objects.create_user("ana", password="pw"))
     token = _get_new_csrf_string()
     client.cookies[settings.CSRF_COOKIE_NAME] = token
-    response = client.post("/probe/echo", HTTP_HOST="a.localhost", HTTP_X_CSRFTOKEN=token)
+    response = client.post("/probe/echo", HTTP_HOST=HOST, HTTP_X_CSRFTOKEN=token)
     assert response.status_code == 200
     assert response.json() == {"user": "ana"}
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_route_without_auth_is_open(probe_urls, client):
-    assert client.get("/probe/open", HTTP_HOST="a.localhost").json() == {"ok": True}
+    assert client.get("/probe/open", HTTP_HOST=HOST).json() == {"ok": True}
 
 
 # --- Swagger -------------------------------------------------------------------------------------
@@ -144,9 +146,9 @@ def assert_swagger_is_self_hosted_with_nonce(response) -> None:
     assert "cdn" not in html.replace(nonce, "").replace(csrf_token, "").lower()
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_swagger_scripts_carry_the_csp_nonce(probe_urls, client):
-    response = client.get("/probe/docs", HTTP_HOST="a.localhost")
+    response = client.get("/probe/docs", HTTP_HOST=HOST)
     assert response.status_code == 200
     assert_swagger_is_self_hosted_with_nonce(response)
 
@@ -156,20 +158,20 @@ CDN_NONCE = "cdnCDNcdn".ljust(22, "0")
 CDN_CSRF_TOKEN = "swcdnuv".ljust(64, "0")
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_swagger_check_holds_when_the_nonce_and_csrf_token_spell_cdn(probe_urls, client, monkeypatch):
     monkeypatch.setattr("django.utils.csp.generate_nonce", lambda: CDN_NONCE)
     monkeypatch.setattr("django.template.context_processors.get_token", lambda request: CDN_CSRF_TOKEN)
-    response = client.get("/probe/docs", HTTP_HOST="a.localhost")
+    response = client.get("/probe/docs", HTTP_HOST=HOST)
     assert response.status_code == 200
     assert CDN_CSRF_TOKEN in response.content.decode()
     assert f"'nonce-{CDN_NONCE}'" in response["Content-Security-Policy"]
     assert_swagger_is_self_hosted_with_nonce(response)
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_swagger_check_catches_a_script_or_stylesheet_from_a_cdn(probe_urls, client):
-    html = client.get("/probe/docs", HTTP_HOST="a.localhost").content.decode()
+    html = client.get("/probe/docs", HTTP_HOST=HOST).content.decode()
     bundle = AssetTags(html).scripts()[1]["src"]
     cdn_script = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
     cdn_style = "//cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css"

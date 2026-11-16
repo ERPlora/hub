@@ -9,7 +9,7 @@ editor can offer, of every installed module and not only the ones a test hub tur
 
 - what each action and read of the catalog asks for and leaves (``action_fields``, ``action_outputs``);
 - what each event brings (the «What brought it» data of «Which data?»): the keys of every payload a
-  module's ``services.py`` gives ``record_event``, read from its source, since an event declares no
+  module's ``services`` (a file or a package) gives ``record_event``, read from its source, since an event declares no
   schema. A payload the reader cannot follow fails too, so a new way of building one is taught here
   instead of slipping by.
 
@@ -21,11 +21,16 @@ import ast
 import json
 from collections import defaultdict
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from django.apps import apps
 
 from apps.flow import queries
+
+from .conftest import A, HUB_DB
+
+pytestmark = HUB_DB
 
 LOCALE = Path(apps.get_app_config("flow").path) / "frontend" / "locale"
 
@@ -52,7 +57,7 @@ def without_words(names: dict[str, set[str]]) -> dict[str, list[str]]:
 def catalog_names() -> dict[str, set[str]]:
     """Everything the editor offers, the cancellations only «Ask me first» may use included (``ask_first_catalog``)."""
     names: dict[str, set[str]] = defaultdict(set)
-    for name, op in queries.ask_first_catalog().items():
+    for name, op in queries.ask_first_catalog(A).items():
         for field in queries.action_fields(op):
             names[field["name"]].add(f"{name} asks for it")
         for output in queries.action_outputs(op):
@@ -61,7 +66,7 @@ def catalog_names() -> dict[str, set[str]]:
 
 
 def test_the_catalog_reaches_every_module_with_actions():
-    covered = {op.app_label for op in queries.catalog_operations().values()}
+    covered = {op.app_label for op in queries.catalog_operations(A).values()}
     assert {"appointment", "reservation", "sale", "task", "inventory"} <= covered
     names = catalog_names()
     assert "appointment.appointment.get leaves it" in names["start_date_label"]
@@ -74,11 +79,33 @@ def test_every_field_an_action_asks_for_or_leaves_has_its_words():
 
 
 @pytest.mark.parametrize("language", ["en", "es"])
-@pytest.mark.parametrize("action", ["sale__record__get", "combo__option__get", "staff__role__detail", "staff__time_off__get"])
+@pytest.mark.parametrize(
+    "action",
+    [
+        "sale__record__get",
+        "combo__option__get",
+        "staff__role__detail",
+        "staff__time_off__get",
+        "customer__group__detail",
+        "customer__tag__detail",
+        "customer__field__detail",
+        "customer__order__get",
+        "whatsapp_inbox__note__get",
+        "whatsapp_inbox__template__get",
+        "schedule__special_day__get",
+        "schedule__override__get",
+        "inventory__category__get",
+        "combo__group__get",
+        "kitchen__station__get",
+        "kitchen__item__get",
+        "tax__rule__get",
+        "appointment__blocked_time__get",
+    ],
+)
 def test_a_read_that_names_a_record_on_the_assistants_card_has_a_name_of_its_own(action, language):
     """The catalog offers every operation with a declared permission, these reads too: without a name of their own the
     editor composes one from their id («Get · Sales & POS (Record)»)."""
-    assert queries.catalog_operations()[action.replace("__", ".")]
+    assert queries.catalog_operations(A)[action.replace("__", ".")]
     actions = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]["actions"]
     assert actions.get(action, "").strip()
 
@@ -129,6 +156,33 @@ def test_a_sales_department_goes_by_the_word_sales_gives_it(language):
         "department_id": one.capitalize(),
     }
     assert [key for key, text in flow_texts(flow).items() if "department" in text.lower() or "departament" in text.lower()] == []
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_schedule_override_goes_by_the_word_schedule_gives_it(language):
+    """Schedule shows a ``schedule.override`` as a temporary change (its «Temporary changes» list, «New temporary change»),
+    never as an exception, so whoever builds an automation has to recognize it by that same word. It is read from the
+    Schedule catalog: if Schedule changes its word, these texts follow. The keys stay, they are the operations' and events'
+    names, and an action or event of an override added later has to say it too."""
+    schedule = json.loads(
+        (Path(apps.get_app_config("schedule").path) / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8")
+    )
+    one, many = (schedule["schedule"]["overrides"]["entity"][size] for size in ("one", "many"))
+    flow = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]
+    prefix = "schedule__override__"
+    actions = {key.removeprefix(prefix): text for key, text in flow["actions"].items() if key.startswith(prefix)}
+    events = {key.removeprefix(prefix): text for key, text in flow["events"].items() if key.startswith(prefix)}
+
+    assert {"create", "list", "get", "update"} <= actions.keys()
+    assert {"created", "updated", "deleted"} <= events.keys()
+    assert {action: text.count(many if action == "list" else one) for action, text in actions.items()} == dict.fromkeys(actions, 1)
+    assert {event: text.count(one) for event, text in events.items()} == dict.fromkeys(events, 1)
+    assert flow["fields"]["override"] == one.capitalize()
+    assert [
+        key
+        for key, text in flow_texts(flow).items()
+        if "override" in key and ("excepci" in text.lower() or "exception" in text.lower())
+    ] == []
 
 
 # --- What the events bring ------------------------------------------------------------------------
@@ -193,7 +247,7 @@ class PayloadReader:
         self.unread.append(f"{site}: {ast.unparse(expr)[:80]}")
         return set()
 
-    def read(self, expr: ast.expr | None, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:
+    def read(self, expr: ast.expr | None, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:  # noqa: C901, PLR0911, PLR0912
         if expr is None or (isinstance(expr, ast.Constant) and expr.value is None):
             return set()
         if isinstance(expr, ast.Dict):
@@ -287,7 +341,7 @@ class PayloadReader:
         found = [node.value for node in ast.walk(function) if isinstance(node, ast.Return) and node.value]
         return set().union(*(self.read(value, function, site, seen | {function.name}) for value in found))
 
-    def _name(self, name: str, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:
+    def _name(self, name: str, scope: ast.AST, site: str, seen: frozenset[str]) -> set[str]:  # noqa: C901, PLR0912
         keys: set[str] = set()
         assigned = False
         for node in ast.walk(scope):
@@ -394,15 +448,25 @@ class PayloadReader:
         return None
 
 
+def services_source(folder: Path) -> tuple[str, str]:
+    """``(source, its name)`` of a module's writes: its ``services.py``, or the modules of its ``services/`` package one
+    after another, so a payload a module builds with a helper of another reads as it did before the split (a line is
+    then counted over the joined modules); ``("", …)`` when it has neither."""
+    if (folder / "services.py").is_file():
+        return (folder / "services.py").read_text(encoding="utf-8"), "services.py"
+    modules = sorted((folder / "services").glob("*.py"))
+    return "\n".join(module.read_text(encoding="utf-8") for module in modules), "services/"
+
+
 def event_names() -> tuple[dict[str, set[str]], list[str]]:
     """``({key: where it is sent}, unread payloads)`` of the events of every installed module."""
     names: dict[str, set[str]] = defaultdict(set)
     unread: list[str] = []
-    for label, config in sorted(queries.active_apps().items()):
-        services = Path(config.path) / "services.py"
-        if not services.exists():
+    for label, config in sorted(queries.active_apps(A).items()):
+        source, name = services_source(Path(config.path))
+        if not source:
             continue
-        reader = PayloadReader(services.read_text(encoding="utf-8"), f"apps/{label}/services.py")
+        reader = PayloadReader(source, f"apps/{label}/{name}")
         for key, where in reader.keys.items():
             names[key] |= where
         unread += reader.unread
@@ -457,6 +521,19 @@ def test_the_reader_follows_every_way_a_module_builds_a_payload():
         "person", "person.deep", "flag", "who", "who.deep", "by",
     }  # fmt: skip
     assert reader.unread == ["sample.py:37: payload_from_elsewhere()"]
+
+
+def test_the_payloads_of_a_module_whose_services_is_a_package_are_read_from_every_module_of_it(tmp_path, monkeypatch):
+    services = tmp_path / "services"
+    services.mkdir()
+    (services / "__init__.py").write_text("from . import order, stock\n")
+    (services / "order.py").write_text('def create(ctx, item):\n    record_event(ctx, "shop.order.created", _row(item))\n')
+    (services / "stock.py").write_text('def _row(item):\n    return {"number": item.number}\n')
+    monkeypatch.setattr(queries, "active_apps", lambda scope: {"shop": SimpleNamespace(path=str(tmp_path))})
+
+    names, unread = event_names()
+
+    assert (set(names), unread) == ({"number"}, [])
 
 
 def test_the_reader_reads_every_payload_of_the_modules():

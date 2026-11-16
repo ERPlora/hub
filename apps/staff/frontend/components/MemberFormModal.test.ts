@@ -11,6 +11,8 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { MemberOut, RoleOut } from '../operations';
 import {
   BUSINESS,
@@ -73,12 +75,12 @@ const ROUTES = {
 
 async function setup(
   member: MemberOut | null = null,
-  options: MountOptions & { routes?: Record<string, [number, unknown]>; business?: Parameters<typeof business>[0] } = {},
+  options: MountOptions & { routes?: Record<string, [number, unknown]>; business?: Parameters<typeof business>[0] | null } = {},
 ) {
   const m = await mountStaff(MemberFormModal, { props: { open: false, member }, ...options });
   m.answerBy({ ...ROUTES, ...options.routes });
-  // The business answered before the dialog opens (`options.business`).
-  if (options.business) {
+  // The business answered before the dialog opens: in Spain unless `options.business` says another; `null`, not yet.
+  if (options.business !== null) {
     await m.live();
     await m.result(BUSINESS, business(options.business));
   }
@@ -301,7 +303,7 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     ]);
   });
 
-  // gh:staff#70: closing the panel while the record loads drops that read: a late answer never fills the
+  // Closing the panel while the record loads drops that read: a late answer never fills the
   // form opened next.
   it('a record that answers after the panel closed never fills the next form', async () => {
     let release!: () => void;
@@ -327,6 +329,108 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     expect(m.inDoc('staff-member-form')?.getAttribute('aria-label')).toBe('New');
     expect([field('first_name').value, field('email').value, field('bio').value]).toEqual(['', '', '']);
     expect(m.inDoc('staff-member-form-loading')).toBeNull();
+  });
+
+  // hub#1347: the row is painted at once and the fields take what is typed; the record, when it arrives, fills only
+  // what the person has not touched (React Hook Form's keepDirtyValues, Salesforce's lightning-input-field), so what
+  // was typed is never lost and Save sends it.
+  describe('typed before the record arrives (hub#1347)', () => {
+    async function openHoldingTheRecord(routes: Record<string, [number, unknown]> = {}) {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const m = await mountStaff(MemberFormModal, { props: { open: false, member: ROW } });
+      const answers = { ...ROUTES, ...routes };
+      m.net.onApi(async ({ url }) => {
+        const path = new URL(url, 'http://a.localhost').pathname;
+        if (path === '/api/staff/members/detail') await held;
+        const [status, body] = answers[path] ?? [404, { error: { code: 'not_found', message: 'Not found' } }];
+        return Response.json(body, { status });
+      });
+      await m.live();
+      await m.result(BUSINESS, business());
+      await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+      await m.wrapper.setProps({ open: true });
+      await settle();
+      expect(m.inDoc('staff-member-form-loading')).not.toBeNull();
+      const field = (name: string) => m.inDoc(`staff-member-form-${name}`) as Control;
+      const combo = (name: string) => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === `staff-member-form-${name}`)!;
+      async function arrive() {
+        release();
+        await settle();
+        await settle();
+        expect(m.inDoc('staff-member-form-loading')).toBeNull();
+      }
+      const posts = () => m.sent().filter((c) => c.method === 'POST');
+      return { ...m, field, combo, arrive, posts };
+    }
+
+    it('a field typed meanwhile keeps what was typed; the untouched ones take the record; Save sends the typed one', async () => {
+      const s = await openHoldingTheRecord();
+      await ionValue(s.field('email'), 'ana.changed@example.com', 'ionInput');
+      await s.arrive();
+      expect([s.field('email').value, s.field('phone').value, s.field('bio').value, s.field('hourly_rate').value]).toEqual([
+        'ana.changed@example.com',
+        '600',
+        'Ten years.',
+        '12.50',
+      ]);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts()).toEqual([
+        { method: 'POST', path: '/api/staff/members/update', query: {}, body: { id: 'm1', email: 'ana.changed@example.com' } },
+      ]);
+    });
+
+    it('a role and a Hub user chosen meanwhile stay chosen, by their names, and are sent', async () => {
+      const s = await openHoldingTheRecord();
+      s.combo('role_id').vm.$emit('update:modelValue', { id: 'r1', label: 'Stylist' });
+      s.combo('user_id').vm.$emit('update:modelValue', { id: '9', label: 'Bea Ruiz' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Stylist', 'Bea Ruiz']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', role_id: 'r1', user_id: '9' }]);
+    });
+
+    // Each name follows its own field: choosing one of the two never decides the other's name.
+    it('a role chosen alone meanwhile keeps its name; the Hub user, untouched, is named from the record', async () => {
+      const s = await openHoldingTheRecord();
+      s.combo('role_id').vm.$emit('update:modelValue', { id: 'r1', label: 'Stylist' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Stylist', 'Ana López']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', role_id: 'r1' }]);
+    });
+
+    it('a Hub user chosen alone meanwhile keeps its name; the role, untouched, takes its name from the record', async () => {
+      const newer = { ...DETAIL, role_id: 'r2', role_name: 'Receptionist' };
+      const s = await openHoldingTheRecord({ '/api/staff/members/detail': [200, newer] });
+      s.combo('user_id').vm.$emit('update:modelValue', { id: '9', label: 'Bea Ruiz' });
+      await settle();
+      await s.arrive();
+      expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Receptionist', 'Bea Ruiz']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', user_id: '9' }]);
+    });
+
+    it('what was not touched takes the record even where the row was behind it (role by its name), and sends nothing', async () => {
+      const newer = { ...DETAIL, phone: '611', role_id: 'r1', role_name: 'Stylist' };
+      const s = await openHoldingTheRecord({ '/api/staff/members/detail': [200, newer] });
+      await ionValue(s.field('email'), 'ana.changed@example.com', 'ionInput');
+      await s.arrive();
+      expect([s.field('phone').value, s.field('role_id').value, s.field('user_id').value]).toEqual(['611', 'Stylist', 'Ana López']);
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', email: 'ana.changed@example.com' }]);
+    });
+
+    it('a rate typed meanwhile stays as typed and is sent', async () => {
+      const s = await openHoldingTheRecord();
+      await ionValue(s.field('hourly_rate'), '15', 'ionInput');
+      await s.arrive();
+      expect(s.field('hourly_rate').value).toBe('15');
+      await click(s.inDoc('staff-member-form-submit'));
+      expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', hourly_rate: 1500 }]);
+    });
   });
 
   it('a linked account that no longer has access to this business says so, instead of an id', async () => {
@@ -398,7 +502,7 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   }
 
   it('a business in Poland types the rate in złoty: «zł» at the end of the field, never «€»', async () => {
-    const s = await setup(ROW, { locale: 'es' });
+    const s = await setup(ROW, { locale: 'es', business: null });
     await answer(s, POLISH);
     expect(symbol(s)).toBe('zł');
     expect(s.field('hourly_rate').value).toBe('12,50');
@@ -408,19 +512,19 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 
   it('a business in Spain still types it in euros', async () => {
-    const s = await setup(null);
+    const s = await setup(null, { business: null });
     await answer(s, {});
     expect(symbol(s)).toBe('€');
   });
 
   it('until the business answers, the field shows no symbol, never «€»', async () => {
-    const s = await setup(null);
+    const s = await setup(null, { business: null });
     expect(symbol(s)).toBeNull();
   });
 
-  // gh:staff#64: in yen what is typed is yen: «1500» is 1500, not 150000.
+  // In yen what is typed is yen: «1500» is 1500, not 150000.
   it('a business in Japan types whole yen: «1500» goes as 1500', async () => {
-    const s = await setup(null);
+    const s = await setup(null, { business: null });
     await answer(s, JAPANESE);
     expect(symbol(s)).toBe('¥');
     await ionValue(s.field('first_name'), 'Bea', 'ionInput');
@@ -431,7 +535,7 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 
   it('a rate read before the business answers is rewritten in its decimals when it does, and saving it unchanged sends nothing', async () => {
-    const s = await setup(ROW, { routes: YEN_PAY });
+    const s = await setup(ROW, { routes: YEN_PAY, business: null });
     expect(s.field('hourly_rate').value).toBe('15.00');
     await answer(s, JAPANESE);
     expect(s.field('hourly_rate').value).toBe('1500');
@@ -447,12 +551,23 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 
   it('a rate typed before the business answers stays as typed and is read in its currency when saving', async () => {
-    const s = await setup(ROW, { routes: YEN_PAY });
+    const s = await setup(ROW, { routes: YEN_PAY, business: null });
     await ionValue(s.field('hourly_rate'), '1600', 'ionInput');
     await answer(s, JAPANESE);
     expect(s.field('hourly_rate').value).toBe('1600');
     await click(s.save());
     expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', hourly_rate: 1600 }]);
+  });
+
+  it('a rate typed in a new record before the business answers is never read without it: Save waits in grey, then «1500» is 1500 yen (hub#921)', async () => {
+    const s = await setup(null, { business: null });
+    await ionValue(s.field('first_name'), 'Bea', 'ionInput');
+    await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
+    await ionValue(s.field('hourly_rate'), '1500', 'ionInput');
+    await expectSaveWaitsForMoney({ ...s, sent: s.posts, amount: () => s.field('hourly_rate'), settle }, () => answer(s, JAPANESE));
+    expect(s.field('hourly_rate').value).toBe('1500');
+    await click(s.save());
+    expect(s.posts().map((c) => (c.body as { hourly_rate: number }).hourly_rate)).toEqual([1500]);
   });
 });
 
@@ -460,5 +575,43 @@ describe('MemberFormModal: who may open it', () => {
   it('an employee never gets here (no «+», no row to open), and reads no account', async () => {
     const s = await setup(null, { session: EMPLOYEE });
     expect(s.sent().some((c) => c.path === '/api/staff/accounts')).toBe(false);
+  });
+});
+
+describe('MemberFormModal: fields refused with the same words (hub#888)', () => {
+  // A new record's fields, each refused under its own key; Role and Hub user are Combos, named by the key of their id.
+  const KEYS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'role_id', 'user_id', 'booking_buffer', 'hire_date', 'color', 'specialties', 'bio', 'hourly_rate', 'commission_rate', 'notes'];
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setup(null, { locale, routes: { '/api/staff/members': [422, refusal] } });
+    const send = async () => {
+      await ionValue(s.field('first_name'), 'Bea', 'ionInput');
+      await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
+      await click(s.save());
+    };
+    return { field: s.field, send, settle };
+  }, 'last_name');
+});
+
+// hub#938 (STAFF-F02): if the business's money cannot be read, the record says so with «Retry» instead of waiting in grey
+// without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('MemberFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountStaff(MemberFormModal, { props: { open: !late, member: ROW }, answers: ROUTES });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    const posts = () => m.sent().filter((call) => call.method === 'POST');
+    await expectWindowSaysMoneyUnreadable(m, 'staff-member-form-submit', posts, opens);
+  });
+});
+
+describe('MemberFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('staff-member-form'),
+      change: () => ionValue(s.field('first_name'), 'Ana', 'ionInput'),
+      restore: () => ionValue(s.field('first_name'), '', 'ionInput'),
+    });
   });
 });

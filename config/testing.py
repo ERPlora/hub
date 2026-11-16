@@ -1,5 +1,7 @@
 """What the fixtures of ``conftest.py`` check on the test databases: connections left with a session setting changed,
-and a database kept by ``--reuse-db`` that lost its factory data (``lost_its_factory_data``).
+connections left with their own ``ensure_connection`` (``database_block_left_as_found``), a database kept by
+``--reuse-db`` that lost its factory data (``lost_its_factory_data``) and a pool made before the session had its test
+database (``close_pools_made_before_the_test_database``).
 
 The control database's pool (``DATABASES["default"]["OPTIONS"]["pool"]``) hands a connection out again
 as its last user left it, so a session ``SET`` (a lock or statement timeout, a time zone, a role…) made
@@ -55,6 +57,27 @@ def _changed(conn, time_zone: str) -> list[tuple[int, str, str]]:
     return [(pid, name, value) for name, value in rows]
 
 
+def existing_pool(wrapper):
+    """The pool of ``wrapper``'s alias if one was made, else ``None``: never makes one.
+
+    Django makes it the first time ``wrapper.pool`` is read, on the database's name of that moment, and keeps it when
+    ``create_test_db`` renames the alias to the test database. Read after the first test of an xdist worker that had no
+    database, that name was the developer's, and the whole worker, its ``migrate`` included, read and wrote the
+    developer's database (hub#1332)."""
+    return type(wrapper)._connection_pools.get(wrapper.alias)
+
+
+def close_pools_made_before_the_test_database() -> None:
+    """Close every pool made before the session had its test database, with this thread's connection, as Django closes
+    them before it clones or drops a test database (``create_test_db`` does not): whatever read ``connection.pool``
+    before then made it on the developer's database, and the next connection would be taken from it."""
+    for alias in connections:
+        wrapper = connections[alias]
+        if existing_pool(wrapper) is not None:
+            wrapper.close()
+            wrapper.close_pool()
+
+
 def discard_changed_sessions() -> list[tuple[int, str, str]]:
     """The session settings left changed, as ``(backend pid, name, value)``, on this thread's connection
     and on the free connections of the control pool: what the next test to take one would inherit. Each
@@ -68,7 +91,7 @@ def discard_changed_sessions() -> list[tuple[int, str, str]]:
             found += changed
             own.close()
             wrapper.close()  # hands the closed connection back: the pool discards it
-    pool = wrapper.pool
+    pool = existing_pool(wrapper)
     if pool is not None and not pool.closed:
         # The pool hands out the oldest free connection and takes a returned one at the back: as many
         # turns as free connections see each of them once.
@@ -86,7 +109,7 @@ def discard_changed_sessions() -> list[tuple[int, str, str]]:
 def session_settings_left_as_found():
     """The autouse fixture of ``conftest.py``: fails the test that leaves a database connection with a
     session setting changed, which the pool would hand to the next test as it is (a 300 ms
-    ``lock_timeout`` left by flow failed inventory's lock waits, FIX-FLOW-DETAIL-RACE). The connection
+    ``lock_timeout`` left by a test of ``apps/flow`` fails inventory's lock waits). The connection
     is discarded, so the next test starts clean."""
     yield
     if left := discard_changed_sessions():
@@ -97,3 +120,45 @@ def session_settings_left_as_found():
             "it back before the connection is handed back.",
             pytrace=False,
         )
+
+
+#: The method pytest-django blocks for a test without the database, on the connections' class
+#: (``BaseDatabaseWrapper.ensure_connection``), as Django's ``SimpleTestCase`` does.
+BLOCKED = "ensure_connection"
+
+
+def discard_hidden_blocks() -> list[str]:
+    """The aliases of this thread's connections that keep their own ``ensure_connection``, over their class's: what
+    ``monkeypatch.setattr(connection, "ensure_connection", …)`` leaves when it is undone, the real method it read while
+    the test had the database. Each one is removed, so the connection answers with its class's again, blocked or not as
+    pytest-django says.
+
+    Only that method: Django's ``SimpleTestCase`` puts back ``connect``, ``cursor``… on the connections a test does not
+    use, on the connection itself, and those still go through ``ensure_connection``."""
+    found: list[str] = []
+    for wrapper in connections.all(initialized_only=True):
+        if BLOCKED in vars(wrapper):
+            found.append(wrapper.alias)
+            delattr(wrapper, BLOCKED)
+    return sorted(found)
+
+
+@pytest.hookimpl(wrapper=True)
+def database_block_left_as_found(item, nextitem):
+    """The ``pytest_runtest_teardown`` of ``conftest.py``: once every fixture of the test is torn down, ``monkeypatch``
+    included, fails the test that left a connection with its own ``ensure_connection`` (hub#822).
+
+    A test that patches it on the connection itself gets back, at the undo, the real method it read while it had the
+    database, now on the connection: it hides pytest-django's block, and a later test of the same process without the
+    database queries instead of failing (it passes on one machine and fails in another worker of ``-n 4``). The
+    method is removed, so the next test starts clean."""
+    try:
+        return (yield)
+    finally:
+        if left := discard_hidden_blocks():
+            pytest.fail(
+                f"left its own {BLOCKED} on the database connection {', '.join(left)}: patching the connection leaves "
+                "the real method on it at the undo, which hides pytest-django's block from every later test without "
+                "the database in the process. Patch its class instead, type(connections[alias]).",
+                pytrace=False,
+            )

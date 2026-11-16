@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d0f1d9db8fc9a749296c44e98fdfd696a61280b7dca502c6c64e367044a97ce6 -->
+<!-- generated from WORKBOOK.md sha256:ad24a182c25f96f53562b0d72aee74657553b9ace4bcc644ecf87d8e6d75e53c -->
 
 ## What it is for and who it is for
 
@@ -41,22 +41,21 @@ assistant, with nobody in front of it: **Ask the assistant** (FLOW-F37 to F39).
 | Zapier (consulting forum) | A Zap made with the account of someone who left keeps running with their credentials | https://alltomate.com/blogs/is-zapier-safe/ |
 | Business Central | Queued tasks run with the session of whoever set them ready and need their permissions | https://learn.microsoft.com/en-us/dynamics365/release-plan/2023wave1/smb/dynamics365-business-central/delegated-admins-job-queue-entries-are-run-user |
 | Odoo | Automated actions run with elevated access (`sudo`); it is advised not to hide missing permissions with it | https://deploymonkey.com/blog/odoo-sudo-superuser-security |
-| Current product (ERPlora) | "An automation acts with its own permissions, never with those of whoever created it"; they are granted one by one; the hub refuses to run a paused one | `modules/flows/WORKFLOW.md`, "Rules that are never broken" and FLOWS-F22 |
 
-**Winner:** the tools **inside the product** (Salesforce, HubSpot, Odoo and the current product) make the
+**Winner:** the tools **inside the product** (Salesforce, HubSpot, Odoo) make the
 automation run **as the business**, not as the person who created it; the integration ones (Zapier, Power
 Automate, Business Central) use the owner's account, and their forums tell what happens when that person
 leaves. Our user is a small business whose staff changes, so the automation acts **as the business**, but
-**only with the actions the owner has allowed it one by one** (like the current product): without a granted
+**only with the actions the owner has allowed it one by one**: without a granted
 permission, the step is refused and the history says so. And **running by hand requires it to be on**
-(HubSpot, Power Automate and the current product): to see what it would do while off there is **Try it**,
+(HubSpot and Power Automate): to see what it would do while off there is **Try it**,
 which runs nothing.
 **Why not the others:** with the permissions of whoever created it, the automation stops working the day
 that person leaves or changes role, which is the repeated complaint in the forums; with all the system's
 permissions and no list, a badly written automation could do anything.
 
-From the current product we keep, already checked there against Zapier, Make, Power Automate, Shopify
-Flow, Odoo and Business Central (`qa-hub-flows`, ADR-0461): **one column** of steps from top to bottom and
+Against Zapier, Make, Power Automate, Shopify Flow, Odoo and Business Central, it keeps **one column**
+of steps from top to bottom and
 not a canvas of nodes (on the counter's tablet a column is used with a finger); **no branches**: an "Only
 continue if…" that is not met ends the automation (that is working, not failing), and two outcomes are two
 automations; **starting from a template** of the gallery; and what the assistant writes is born a
@@ -137,10 +136,10 @@ know whether it worked" and "What it cannot do yet". **Back to the automations**
 
 | State | What is seen |
 |---|---|
-| Loading | The list with its indicator; the editor, "Loading…" |
+| Loading | "Loading…" above the gallery until the questions, the drafts and the list arrive; the list, with its indicator; the editor, "Loading…"; "Which data?", "Loading…" until the actions of the apps arrive, and then the data of the previous steps, without closing it |
 | Empty | With no automations, only the gallery; with no steps, "No steps yet…"; with no runs, "It has not run yet." |
 | No results | "Nothing here matches that." and **Show them all again** |
-| Error | The message in red above, with **Retry** in the list; a failure to save, turn on, copy or delete says what does not fit and changes nothing; if what automations can use (notices and actions) cannot be read, "What automations can use here could not be read." with **Retry** |
+| Error | The message in red above, with **Retry** in the list; a failure to save, turn on, copy or delete says what does not fit and changes nothing; if what automations can use (notices and actions) cannot be read, "What automations can use here could not be read." with **Retry**, also inside "Which data?" |
 | Reconnecting | "Reconnecting…" while the live feed comes back; what is painted stays |
 | No permission | "You do not have permission" instead of the screen |
 | App inactive | "This app is not active in this business" |
@@ -195,7 +194,8 @@ Actor: owner, administrator
 Screen: Automations
 Steps:
 1. Open **Automations** in the menu.
-2. The assistant's drafts (if any), your automations (if any) and the gallery show up.
+2. The assistant's drafts (if any), your automations (if any) and the gallery show up. While they are
+   read, "Loading…" above the gallery, never the gallery alone as if there were none.
 In: the session.
 Out: nothing saved.
 If it fails: without permission, "You do not have permission"; with the app off, "This app is not active in
@@ -232,7 +232,7 @@ Steps:
 3. Turning on one that lacks permissions warns: "On, but it still lacks the permissions it asks for: it will
    do nothing until you allow them in its Permissions tab."
 In: the automation (by voice, by its name: "turn on the welcome automation"). Before turning it on or
-pausing it, the assistant's card names it by its name ("Welcome"), never by its code.
+pausing it, the assistant's card names it "Automation: Welcome", by its name and never by its code.
 Out: on or paused (`flow.flow.enabled`, `flow.flow.paused`). When paused it stops starting; a run that is
 waiting is cancelled when it wakes up if it is still paused (if it is turned on again before, it carries
 on). A schedule that is turned on counts from that moment: it does not make up for what happened while it
@@ -299,8 +299,8 @@ Steps:
 1. In the row, press **Make a copy**.
 2. "Copy of …" (or "Copy of … (2)") appears in the list, paused, and the notice "Copied, and the copy is
    paused. It has none of the original's permissions: allow what it needs before turning it on.".
-In: the automation being copied (by voice, by its name; the assistant's card names it by its name, never by
-its code).
+In: the automation being copied (by voice, by its name; the assistant's card names it "Automation: …", by
+its name and never by its code).
 Out: a new automation with the same steps, paused, without permissions and without history
 (`flow.flow.created`).
 If it fails: the message in red at the top; nothing is created.
@@ -314,7 +314,7 @@ Steps:
 1. In the row, press **Delete**.
 2. Confirm: "Delete "…"? This cannot be undone. Its history stays." with **Yes, delete it** or **Leave it**.
 In: the automation being deleted (by voice, by its name, and always with the confirmation: the assistant's
-card names it by its name, never by its code).
+card names it "Automation: …", by its name and never by its code).
 Out: the automation stops starting at once and leaves the list; what was waiting is cancelled at once; its
 history is kept (`flow.flow.deleted`).
 If it fails: the message in red at the top; the row stays.
@@ -362,8 +362,9 @@ Screen: Automation editor
 Steps:
 1. Tap the "When this happens…" card and choose:
    - **Something happens**: in "Choose what happens", the notices of the business's active apps, said in
-     words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…) and
-     with a search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
+     words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
+     the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
+     search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
      10000"); without them it starts with every notice, on its own (FLOW-F21).
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
@@ -375,7 +376,11 @@ In: the notices of the active apps.
 Out: the trigger, on **Save**.
 If it fails: a notice that does not exist in the business, a schedule without a time or a past date are
 refused by the server on saving, next to the field. The date is only looked at if it changes: a "Once"
-automation that already fired can be renamed or paused.
+automation that already fired can be renamed or paused. If the app of an already saved notice is turned off
+afterwards, the automation is kept as it was; while it is off, no new notices from that app start it. Once
+the app is on again, its notices can start it again. Meanwhile, the editor says so next to the notice ("Its app,
+Tasks, is off in this business: turn it on in Apps, or choose another event.") and saving from it is refused with
+that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
@@ -401,22 +406,44 @@ Steps:
    - **Wait**: "How long" and the unit (minutes, hours or days), counted from the previous step; from one
      minute to 30 days.
 3. In each value, **Insert data** opens "Which data?", with the notice's data and a real example from the
-   business beside it (the last notice of that kind), and the data the previous steps leave; it is chosen,
-   not typed. A chosen piece of data shows as a pill; the rest of the value is text. In what a person reads
+   business beside it (the last notice of that kind), and the data the previous steps leave: the first-level
+   ones and also those a step leaves inside another piece of data, right below that piece of data and with its
+   name in front ("1. Add something to a cart › Item › Unit price", "… › Cart › Total amount", the number and
+   the total of a sale's invoice), never those inside a list; it is chosen, not typed. A chosen piece of data shows as a pill; the
+   rest of the value is text. In what a person reads
    —the question of "Ask someone first" (FLOW-F28) and the message to a customer (FLOW-F31)— each piece of
    data comes out in words, in the language of whoever saved the automation: a yes or a no as "Yes" or
    "No", a date and a time as they are written in that language and at the business's time ("2 Nov 2026,
-   10:00"), and an amount a previous step leaves in the business's currency ("120,50 €"); a number the
-   notice brings comes out as it is, because the notice does not say whether it is money. What goes to
-   another action, to another system or to an "Only continue if…" carries each piece of data as it is.
+   10:00"), and an amount a previous step leaves (that of a payment it has just recorded, the total of a sale
+   or of an invoice, the price of a service or of a combo, the provisional total of a check, the amount of a
+   voucher, a cash movement, the price and the total of a cart's line, a price of a price list, the fixed
+   discount of a price-list rule), also one the step leaves inside another piece of data (the price and the
+   total of the line just added to a cart and the cart's total after adding it, the total of a sale's invoice a
+   query reads, the figures of a till session), in the currency that step gives it in: a payment in dollars, in
+   dollars ("12,50 US$"); a cart's line, in its cart's; an amount inside another piece of data, in the one that
+   same piece of data gives (the line, the cart, the invoice: a line in dollars of a business that charges in
+   yen comes out in dollars) and, if it gives none, in the step's; a price of a price list, in its list's; the
+   fixed discount of a rule, which belongs to no price list, in the business's; the cash payment limit or the
+   ticket limit of a charge preview, in euros, the currency the law sets them in, also in a business that charges
+   in another one ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
+   is, because the notice does not say whether it is money. What goes to another action, to another system or
+   to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
 steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
-app they belong to ("Section", as in Sales & POS), never with their internal name.
+app they belong to ("Section", as in Sales & POS; "Override", as in Schedule), never with their internal name;
+so are the actions and the queries ("Create an opening hours override", never an "exception").
 Out: the steps, on **Save**. Each action or query that is named starts asking for its permission
 (FLOW-F12).
 If it fails: the server refuses on saving an action or a query that does not exist in the business, data of
-a step that does not come before, an empty condition or a wait out of range, next to the step.
-Involved: FLOW-F12, FLOW-F13, FLOW-F16
+a step that does not come before, an empty condition or a wait out of range, next to the step. If "Which data?"
+opens before the actions of the apps arrive (right after entering the editor), it says "Loading…" and, as soon as
+they arrive, shows the data of the previous steps without closing it; never "There is no data to insert here yet"
+with a step before it. If they cannot be read, it says so inside, in red, with **Retry**. If a run reaches
+an action or query whose app was turned off after the automation was saved, it stops and History says that
+the action is no longer available; the automation and what the previous steps did are kept. While it is off,
+the editor says so next to the step ("Its app, Tasks, is off in this business: turn it on in Apps, or choose
+another action.") and saving from it is refused with that same reason. After turning the app on again, **Resume from the step that failed** carries it on from there (FLOW-F24).
+Involved: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Grant and withdraw the permissions
 Status: done (server and screen)
@@ -428,8 +455,8 @@ Steps:
    shows as "Waiting for your permission"; what is granted, "Allowed" with **Withdraw**. With unsaved
    changes it warns: "Save it first: what you allow is what is saved.".
 3. Press **Allow everything it needs**: "Permissions updated." appears.
-In: the saved steps and the permissions it has (by voice, the assistant's card names the automation by its
-name, never by its code).
+In: the saved steps and the permissions it has (by voice, the assistant's card names the automation
+"Automation: …", by its name and never by its code).
 Out: the automation's full list of permissions (`flow.flow.granted`). Before the first save there is
 nothing to allow: the tab says so and asks to save.
 If it fails: if the list names something that does not exist in the business, or something that needs a
@@ -502,8 +529,8 @@ Steps:
 2. Confirm: "Run it now? It will really do what its steps say." with **Yes, run it** or **Cancel**.
 3. "Run. See it in History." appears; if it stopped by an error, "It ran and stopped by an error: …" in
    red; if it was left waiting, "It ran and is waiting…".
-In: the automation (by voice: "run the weekly review now"; the assistant's card names it by its name,
-never by its code).
+In: the automation (by voice: "run the weekly review now"; the assistant's card names it "Automation: …",
+by its name and never by its code).
 Out: a real run, with all its effects (`flow.run.started`, `flow.run.finished`). Without the data of a
 notice, what it reads from the notice comes out empty.
 If it fails: paused, "This automation is paused: turn it on to run it."; unsaved, the button does not show;
@@ -529,11 +556,17 @@ Steps:
 In: that automation's runs of the last 90 days, and all those still waiting.
 Out: nothing. The history keeps each finished run **90 days** and then forgets it; one that is waiting or
 under way is never deleted. What its steps read (a customer's card) is not kept when it ends: only the ids
-and the amounts of the notice that started it; one stopped by an error keeps it 7 days, so that it can be
-resumed (FLOW-F24).
+and the amounts of the notice that started it and the ids of what they read, never their data; one stopped by an
+error keeps it 7 days, so that it can be resumed (FLOW-F24). If a customer's personal data are erased
+(CUSTOMER-F16), every run that names her card (what started it or what its steps read, also one started by hand or
+by a schedule or whose assistant read the card), also one that has already ended, forgets right then the free texts of its
+history that may carry her name: an answer's note, what the assistant or the app that did the action answered
+(also about each field, and its technical text) and the title of the question in a "no" or a silence. Each one says "[erased with the
+customer's personal data]"; what happened stays (how it ended, who answered and what). The other customers' runs
+do not change.
 If it fails: if the history cannot be read, the message in red with **Retry**; with no runs, "It has not
 run yet.".
-Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
+Involved: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23, CUSTOMER-F16
 
 ### FLOW-F17 Ask the assistant for an automation
 Status: done
@@ -611,14 +644,19 @@ Steps:
    longer be read…", visible in History, and the other automations of that notice carry on.
 In: the notice of another app, with its data (ids, amounts and states; never names or texts), which the
 platform hands to it a few seconds after it happens, outside the request that left it. A paused automation
-does not receive what happened while it was paused.
+does not receive what happened while it was paused. What ERPlora's staff recovers from a separate copy of the
+business (BASE-F114) starts none: its notices ("customer created", "customer recovered", "appointment created"…) say
+the recovery made them, and what comes back is nothing new to the business, so nobody is welcomed again or told of a
+booking they already had; nor does what another app does with it (the WhatsApp Inbox linking her conversation to the
+card again). What the business creates afterwards starts them as always.
 Out: a run (`flow.run.started`, `flow.run.finished` or `flow.run.parked` if it waits), in the business
 where the notice happened. The same notice delivered twice starts **a single** run per automation.
 If it fails: each step that fails stops the run with its reason, visible in History; the previous steps
-stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"). An
-"Only continue if…" that can no longer be read stops the run with "This "Only continue if…" can no longer be
-read…".
-Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16
+stay done. An automation that would set itself off in a chain is stopped (see "Para quien lo mantiene"), also
+when the chain goes through another app: the WhatsApp Inbox linking the conversation of her number to the card an
+automation made does not make the next one start over. An "Only continue if…" that can no longer be read stops the
+run with "This "Only continue if…" can no longer be read…".
+Involved: FLOW-F10, FLOW-F11, FLOW-F15, FLOW-F16, BASE-F114, WHATSAPP_INBOX-F04
 
 ### FLOW-F22 When the time comes, the automation starts
 Status: done
@@ -647,8 +685,13 @@ In: the runs that are waiting and the time they wake up.
 Out: the run carries on (`flow.run.resumed`) and finishes or waits again. A pass with nothing to do leaves
 no notice.
 If it fails: if the automation is paused when it wakes up, the run is cancelled ("Cancelled: the automation
-was paused while it waited."); if it is deleted, too ("Cancelled: the automation was deleted.").
-Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16
+was paused while it waited."); if it is deleted, too ("Cancelled: the automation was deleted."). If, while it
+waits, the personal data of a customer it keeps something of are erased (CUSTOMER-F16: what started it or what
+its steps read names her card), it is cancelled right then, without waiting to wake up, and forgets what its
+steps read and the free texts of its history (FLOW-F16): "Cancelled: the customer's personal data were erased.". It sends her nothing and creates nothing for
+her; the same for one calling another system or asking someone (its question is closed and left without its
+texts). The other customers' runs carry on.
+Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
 Status: done
@@ -664,8 +707,8 @@ Steps:
    by an error again: …" next to the run, which can be resumed again. Its steps keep "Resumed here, from the
    step that had failed".
 In: the run stopped by an error (by voice, by its reference: "resume the welcome one that failed"). The
-assistant's card names it as History does, with its automation in front: "Welcome · 15 Oct 2026, 21:00",
-never by its code.
+assistant's card names it "Automation run: Welcome · 15 Oct 2026, 21:00", as History does and with its
+automation in front, never by its code.
 Out: the same run carries on at the step that failed, without repeating those that already took effect and
 with the steps it started with, even if the automation changed afterwards (`flow.run.resumed`,
 `flow.run.finished`). A run stopped by an error keeps what its steps left **7 days** so that it can be
@@ -675,8 +718,12 @@ automation does not exist in this business."; one that stopped before doing any 
 unreadable "Only when…"), at something that needs a person in front or at a call to a private or badly
 written address (the same steps would fail again), "This run cannot be resumed…: run it again whole"; after
 7 days, "…can no longer be resumed…"; one already resumed, "Only a run that stopped by an error at one of its
-steps can be resumed…": it is never resumed twice. None resumes by itself.
-Involved: FLOW-F12, FLOW-F15, FLOW-F16
+steps can be resumed…": it is never resumed twice. None resumes by itself. If the personal data of a customer it
+keeps something of are erased (CUSTOMER-F16), one that could still be resumed is cancelled ("Cancelled: the
+customer's personal data were erased."), forgets what its steps read and is no longer resumed; its steps still
+show the one that had failed. One that could no longer be resumed only forgets what its steps read. Both forget
+the free texts of their history (FLOW-F16).
+Involved: FLOW-F12, FLOW-F15, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F25 "Only if…" and "If it fails, it carries on" on each step
 Status: done
@@ -821,7 +868,7 @@ Steps:
 3. Press **Approve** or **No**. "Approved: the automation carries on." or "Answered no." appears and the card
    leaves the tray.
 In: the decision and the note (by voice: "approve Ana's refund"), with who answers from their session. The
-assistant's card names the question by what it asks, never by its code.
+assistant's card names the question "Question: …", by what it asks and never by its code.
 Out: the answer with who, when and the note (`flow.question.answered`). A yes carries on with the next steps,
 which can read "Approved", "Note" and "Answered by"; a no does what the step says: it stops the run
 ("Cancelled: Marta answered no to "…"."; in a change by the assistant, "…" is its action, "Cancel a
@@ -1073,7 +1120,10 @@ Steps:
    and go into each query or action that carries them, over whatever the assistant sends for them or even if
    it sends nothing. That way, the WhatsApp reply only cancels or changes the reservation of whoever writes,
    even if it is asked for another person's. In an automation another app brings, also those its app fixed
-   after it was set up (FLOW-F36).
+   after it was set up (FLOW-F36). Here the assistant does not search the web, even though it can in the chat:
+   what it answers is kept in the run and in the history, and the search engine's terms do not allow keeping
+   its results, not even in part (FLOW-F39). It does have today's date and time and the exchange rate between
+   currencies, as in the chat.
 3. What the assistant looks up is done on the spot and nobody is asked; the history says "The assistant used
    "…".".
 4. What it wants to change:
@@ -1105,8 +1155,10 @@ Out: what it answered in the end, after the changes, for the steps after it and 
 first", also the person's last answer. What it looks up or changes notifies as if the automation did it.
 If it fails: what you have not granted it is not offered to it and, if it asks for it, it is not done; what
 the action refuses ("The assistant tried "…", which did not take it.") is told to the assistant so that it
-tells it. If a fixed piece of data is left empty in that run (the card was not found), that query or action
-is not done nor waits for a yes: the assistant knows, to tell it, and the history says "The assistant tried
+tells it. If it asks to search the web, nothing is searched: it is told that it cannot in an automation, so
+that it says so and answers without it (FLOW-F39). If a fixed piece of data is left empty in that run (the
+card was not found), that query or action is not done nor waits for a yes: the assistant knows, to tell it,
+and the history says "The assistant tried
 "…", but "…", fixed by this step, was empty: it was not done.". If it reaches the limit of turns without
 finishing, it stops: "The assistant took its … turns without finishing, so it stopped.". If erplora.com does
 not answer or fails, it tries three times in total (after one second and after three seconds) without
@@ -1127,7 +1179,9 @@ Screen: none
 Steps:
 1. Each time the step needs the assistant, the Hub calls erplora.com with the business's key, with no person
    in front, just like a chat turn that is not painted (on erplora.com, ASSISTANT-F13): there is no separate
-   door.
+   door. It only differs from the chat in that it does not search the web: the Hub keeps what it answers (in
+   the run and in the history, FLOW-F38) and the search engine's terms do not allow keeping its results, not
+   even in part, so erplora.com neither offers it to the assistant nor tells it about it.
 2. erplora.com spends the same messages of the month as the chat: the first turn of each step, one; the turns
    that bring back what it looked up or did within the next 15 minutes, none (after that time, for example
    after waiting for a person's yes, the turn counts one).
@@ -1138,7 +1192,9 @@ Out: the answer for the Hub and the business's spending of the month (`assistant
 erplora.com's side).
 If it fails: it says whether it is worth repeating: the provider down or an internal failure, yes; the
 month's messages used up, a business that does not work or a request that does not fit, no. Automations and
-the chat share the same allowance of the month.
+the chat share the same allowance of the month. If the assistant asks to search the web even though it is not
+offered, nothing is searched: it gets the reason back, to say it, without the Hub seeing anything and without
+spending anything of the business's searches.
 Involved: FLOW-F37, FLOW-F38
 
 ## Services: what goes in and what comes out
@@ -1165,7 +1221,7 @@ question asked of another role) does not show on the card.
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
 | The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for | see | F10, F11 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object) | see | F10, F11 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |
@@ -1188,6 +1244,7 @@ question asked of another role) does not show on the card.
 | Leaves an assistant's draft | manage | F17 | `flow.draft.propose` |
 | Discards a draft | manage | F19 | `flow.draft.dismiss` |
 | Starts the automations of a notice | only the platform | F21 | `flow.run.react` |
+| When a customer's data are erased, cancels the runs that could still go on with hers and makes every run that names her card, also one that has ended, forget what it read and the free texts of its history (CUSTOMER-F16) | only the platform | F16, F23, F24 | `flow.customer.erase` |
 | Starts the scheduled or dated ones that are due | only the platform | F22 | `flow.schedule.fire_due` |
 | Carries on the runs whose wait is over | only the platform | F23 | `flow.run.resume_due` |
 | Resumes a run stopped by an error at the step that failed | manage | F24 | `flow.run.retry` |
@@ -1245,6 +1302,13 @@ Notices carry ids, never names or contents.
   business.
 - **To its own `flow.run.parked`**: when a run waits for "Call another system", the worker makes the call
   (`flow.run.call`, FLOW-F27); never the request that left it waiting.
+- **To the erasure of a customer's data** (`customer.customer.erased`, CUSTOMER-F16): before starting what waits
+  for that notice, and in the same delivery, it cancels the runs that wait, call, ask or can be resumed and whose
+  kept data name that card (`flow.customer.erase`, FLOW-F23 and F24); what their steps read and their questions'
+  texts are emptied. In the same pass, every run that names the card, also one that has already ended, forgets the
+  free texts of its history (FLOW-F16). It looks for them by the card's id (in what started them, in what their
+  steps read or among the ids of what they read and have forgotten), never by a name or a phone. Repeating the
+  notice changes nothing.
 - From the platform: the business's time zone (the schedules) and the outbox's notices (the last one of a
   kind, for Try it and the examples).
 

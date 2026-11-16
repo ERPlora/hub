@@ -4,6 +4,7 @@
 // taken) shows in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { station } from '../__tests__/kitchen';
 import { click, ionChecked, ionValue, mountKitchen, settle } from '../__tests__/mount-kitchen';
 import type { StationOut } from '../operations';
@@ -80,5 +81,26 @@ describe('StationFormModal', () => {
     expect(f.field('name').placeholder).toBe('p. ej. Plancha');
     const destinations = [...f.field('destination').querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
     expect(destinations).toEqual(['Pantalla y papel', 'Solo pantalla', 'Solo papel']);
+  });
+});
+
+describe('StationFormModal: fields refused with the same words (hub#888)', () => {
+  itTellsTheCorrectedFieldApart(['name', 'printer_name'], async (locale, refusal) => {
+    const f = await form(null, { '/api/kitchen/stations': [422, refusal] }, locale);
+    await ionValue(f.field('name'), 'Grill', 'ionInput');
+    await ionValue(f.field('printer_name'), 'Grill printer', 'ionInput');
+    return { field: f.field, send: () => click(f.field('submit')), settle };
+  }, 'printer_name');
+});
+
+describe('StationFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const f = await form(null);
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => f.inDoc('kitchen-station-form'),
+      change: () => ionValue(f.field('name'), 'Bar', 'ionInput'),
+      restore: () => ionValue(f.field('name'), '', 'ionInput'),
+    });
   });
 });

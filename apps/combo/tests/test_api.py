@@ -1,19 +1,20 @@
 """The combo app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction. A pick travels in the query string of ``resolve`` as a JSON object per ``choices``.
 """
 
 import json
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.combo.api import router
+from apps.flow.tests.test_api import get, post
+from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import FOOD, make_combo, make_group, make_option, make_product
+from .conftest import FOOD, HOST, HUB_DB, A, make_combo, make_group, make_option, make_product
 from .test_combo_image import IMAGE_ROUTES
 
 ROUTES = {
@@ -36,25 +37,15 @@ ROUTES = {
 } | IMAGE_ROUTES
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("bea", host="a", role="hub_employee"))
+    client.force_login(make_user("bea", host=A.key, role="hub_employee"))
     return client
 
 
@@ -75,9 +66,9 @@ def test_the_api_keeps_parity():
     assert [problem for problem in ensure_api_parity(api) if "combo." in problem] == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_openapi_describes_the_combo_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -88,22 +79,13 @@ def test_the_openapi_describes_the_combo_routes(client):
 
 
 def test_the_spas_route_map_names_every_combo_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("combo.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("combo.") == ROUTES
 
 
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/combo/combos"),
@@ -113,7 +95,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_and_prices_menus_but_does_not_build_them(employee_client):
     combo = make_combo("Menu of the day")
     make_option(make_group(combo, "Starters"), make_product("Lentils"))
@@ -143,7 +125,7 @@ def test_an_employee_reads_and_prices_menus_but_does_not_build_them(employee_cli
 # Flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_menu_from_creation_to_the_till(admin_client):
     make_product("Lentils", sku="LEN", price=700)
     make_product("Hake", sku="HAK", price=1400)
@@ -258,7 +240,7 @@ def test_a_menu_from_creation_to_the_till(admin_client):
 # Errors
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_on_a_field_is_a_422_with_its_field(admin_client):
     response = post(
         admin_client, "/combo/combos", {"name": "Menu of the day", "price": 1350}
@@ -269,7 +251,7 @@ def test_a_refusal_on_a_field_is_a_422_with_its_field(admin_client):
     assert response.status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_vat_category_is_refused_in_spanish_with_the_name_of_its_field(admin_client):
     """The menu form's field is «Tipo de IVA» and COMBO-F02 says so: Sale's «categoría fiscal», an earlier app's
     Spanish of the same English, does not speak for it (hub#664)."""
@@ -277,7 +259,7 @@ def test_an_unknown_vat_category_is_refused_in_spanish_with_the_name_of_its_fiel
         "/api/combo/combos",
         json.dumps({"name": "x", "tax_category_key": "nope.nope"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 422
@@ -286,7 +268,7 @@ def test_an_unknown_vat_category_is_refused_in_spanish_with_the_name_of_its_fiel
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_domain_refusal_is_a_409_with_its_code(admin_client):
     combo = make_combo()
     make_group(combo, "Starters")
@@ -297,7 +279,7 @@ def test_a_domain_refusal_is_a_409_with_its_code(admin_client):
     assert response.json()["error"]["code"] == "combo.group_exists"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_menu_is_a_404(admin_client):
     response = get(admin_client, "/combo/combos/detail", combo="brunch")
     assert response.status_code == 404

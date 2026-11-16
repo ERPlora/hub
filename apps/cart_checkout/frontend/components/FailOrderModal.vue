@@ -7,6 +7,7 @@ import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
 import type { OrderOut } from '../operations';
@@ -42,11 +43,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cart-checkout-fail"
     size="sm"
     role="alertdialog"
@@ -62,6 +66,7 @@ async function save(): Promise<void> {
     <template #default="{ fieldErrors }">
       <ion-textarea
         data-testid="cart-checkout-fail-reason"
+        name="reason"
         :value="reason"
         :label="$t('cart_checkout.orders.failForm.reason')"
         label-placement="floating"

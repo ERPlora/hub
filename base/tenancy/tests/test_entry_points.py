@@ -1,8 +1,8 @@
-"""Every way into the Hub opens its database context itself (plan 2026-10-22-fase-2-tenencia §3 S1 and §4, step 8).
+"""Every way into the Hub opens its database context itself.
 
 Without the suite's fallback (``no_test_fallback``), as in production: a request on a hub's host runs in
 ``use_hub(request.hub)``; on the platform host, in the hub chosen for the admin or, with none, on control (a hub's page
-there asks to choose one); a business without its own database (phase 1's, before its cut: S5) answers 503 and runs
+there asks to choose one); a business without its own database (before its cut) answers 503 and runs
 nothing; a live re-execution enters its stream's hub in the executor's thread; the registry's operations run on
 control and their outbox lands there; ``/internal``'s calls for a business enter it; the worker and the commands open
 theirs (``manage.py shell``: ``base/tests/test_shell.py``). A hub with a database of its own (``hub_a``) gets its rows there and nowhere else.
@@ -44,7 +44,8 @@ def api_post(client, host, path, data):
 
 
 def items_in(hub=None) -> list[str]:
-    """The demo items of ``hub``'s database (``None``: what phase 1 left in control's tables), read as the code would."""
+    """The demo items of ``hub``'s database (``None``: what the old shared stage left in control's tables), read as the
+    code would."""
     entered = use_legacy() if hub is None else context.use_hub(hub)
     with entered:
         return sorted(Item.objects.values_list("name", flat=True))
@@ -56,7 +57,7 @@ def items_in(hub=None) -> list[str]:
 @pytest.mark.django_db
 @pytest.mark.parametrize("slug", ["a", "b"])
 def test_a_request_on_a_business_without_its_own_database_answers_503_and_runs_nothing(client, slug):
-    # S5: phase 1's shared database is gone; until its cut, a business still on control's is not served.
+    # The old shared database is gone: until its cut, a business still on control's is not served.
     client.force_login(member(slug))
 
     created = api_post(client, f"{slug}.localhost", "/demo/items", {"name": "Shared"})
@@ -220,7 +221,7 @@ def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
 def test_the_registrys_operations_run_on_control_and_their_events_land_there(client, settings):
     from base.registry import REGISTRY_SCOPE
     from base.schemas import HubSeedLocalIn
-    from base.services import hub_seed_local
+    from base.services.hub_registry import hub_seed_local
     from live.context import system_context
 
     answer = hub_seed_local(system_context(REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c"]))
@@ -246,6 +247,7 @@ def test_a_hubs_operation_never_runs_inside_another_hub(hub_a, hub_b):
 @HUB_DB
 def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
     from base import internal
+    from base.services import photo
 
     seen = []
 
@@ -254,7 +256,7 @@ def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
-    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({internal.WHATSAPP_APP}))
+    monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({photo.WHATSAPP_APP}))
     request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
     internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
@@ -379,7 +381,7 @@ async def asgi_post(async_client, host: str, path: str, data: dict):
 @pytest.mark.parametrize("own_database", [False, True], ids=["without", "own"])
 async def test_an_asgi_request_runs_in_its_hub_too(async_client, hub_a, own_database):
     """Daphne runs the middleware asynchronously (``HubDatabaseMiddleware.__acall__``): the same context, and the same
-    503 for a business without its own database (S5)."""
+    503 for a business without its own database."""
     from asgiref.sync import sync_to_async
 
     slug = hub_a.slug if own_database else "a"

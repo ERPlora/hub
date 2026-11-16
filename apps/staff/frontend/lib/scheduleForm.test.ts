@@ -3,18 +3,20 @@
 // working day (Staff › Settings, STAFF-F22), its break in the middle of the day. Only the
 // working days travel, in weekday order (a weekday not sent is a day off); a break is sent with both
 // ends or not at all. The server's 422 names a day by its position in what was sent
-// (`days.<i>.<field>`): it is turned back into the weekday it belongs to, so the message sits under
-// that day's row.
+// (`days.<i>.<field>`): the window says one line per day, under one key per day (`days.<i>`) that
+// a change to that day takes away.
+import { ApiError } from '@erplora/ui/sdk';
 import { describe, expect, it } from 'vitest';
 
 import type { ScheduleOut } from '../operations';
 import {
   blankScheduleForm,
-  dayErrors,
+  dayKey,
   daysPayload,
   DEFAULT_WORKDAY,
   defaultWeek,
   proposedBreak,
+  refusalByDay,
   scheduleFormFromRecord,
   type Workday,
   workdayFromSettings,
@@ -150,20 +152,39 @@ describe('scheduleFormFromRecord (Edit · {name})', () => {
   });
 });
 
-describe('dayErrors', () => {
-  it('names the weekday of each `days.<i>.<field>` error, by the position in what was sent', () => {
-    const sent = [
-      { weekday: 0, start_time: '09:00', end_time: '18:00', break_start: null, break_end: null },
-      { weekday: 3, start_time: '18:00', end_time: '09:00', break_start: null, break_end: null },
-    ];
-    expect(dayErrors({ 'days.1.end_time': 'The start time must be before the end time.', name: 'x' }, sent)).toEqual({
-      3: 'The start time must be before the end time.',
+describe('refusalByDay', () => {
+  const ORDER = 'The start time must be before the end time.';
+  const PAIR = 'A break needs both a start and an end (or neither).';
+
+  it('puts each day’s problems under one key per day (`days.<i>`), with the first one’s words, and leaves the rest as they came', () => {
+    const refused = new ApiError(422, 'invalid_payload', 'Check the fields.', {
+      'days.0.break_end': PAIR,
+      'days.0.end_time': ORDER,
+      'days.3.end_time': ORDER,
+      days: 'A schedule needs at least one working day with hours.',
+      name: 'Too long.',
+    });
+    expect(refusalByDay(refused)).toEqual({
+      status: 422,
+      code: 'invalid_payload',
+      message: 'Check the fields.',
+      fields: { 'days.0': PAIR, 'days.3': ORDER, days: 'A schedule needs at least one working day with hours.', name: 'Too long.' },
     });
   });
 
-  it('a day with two problems keeps the first; nothing sent, nothing named', () => {
-    const sent = [{ weekday: 2, start_time: '09:00', end_time: '18:00', break_start: '13:00', break_end: null }];
-    expect(dayErrors({ 'days.0.break_end': 'A', 'days.0.end_time': 'B' }, sent)).toEqual({ 2: 'A' });
-    expect(dayErrors({ 'days.4.end_time': 'C' }, sent)).toEqual({});
+  it('keeps a refusal without fields, and nothing stays nothing', () => {
+    expect(refusalByDay(new ApiError(409, 'conflict', 'Taken.'))).toEqual({ status: 409, code: 'conflict', message: 'Taken.' });
+    expect(refusalByDay(null)).toBeNull();
   });
 });
+
+describe('dayKey', () => {
+  it('names a weekday by its position among the days sent, and a day not sent by nothing', () => {
+    const sent = [
+      { weekday: 1, start_time: '09:00', end_time: '18:00', break_start: null, break_end: null },
+      { weekday: 3, start_time: '18:00', end_time: '09:00', break_start: null, break_end: null },
+    ];
+    expect([0, 1, 3].map((weekday) => dayKey(weekday, sent))).toEqual([undefined, 'days.0', 'days.1']);
+  });
+});
+

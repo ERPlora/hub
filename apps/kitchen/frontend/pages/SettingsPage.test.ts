@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SETTINGS } from '../__tests__/kitchen';
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen } from '../__tests__/mount-kitchen';
 import SettingsPage from './SettingsPage.vue';
 
@@ -55,6 +56,10 @@ describe('SettingsPage', () => {
       { method: 'POST', path: '/api/kitchen/settings', query: {}, body: { print_pass: true, warning_minutes: 10, sound_tone: 'buzzer' } },
     ]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('critical_minutes'), '40', 'ionInput');
+    await pressEnter(s.inDoc('kitchen-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ critical_minutes: 40 });
   });
 
   it('a refusal goes under its field', async () => {
@@ -65,7 +70,38 @@ describe('SettingsPage', () => {
     await ionValue(s.field('warning_minutes'), '40', 'ionInput');
     await click(s.field('save'));
     expect(s.field('warning_minutes').errorText).toBe(message);
+    expect(s.field('save-error')?.textContent).toContain('Could not save the settings.');
     expect(s.field('save-error')?.textContent).toContain(message);
+  });
+
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
+    const AMBER_FIRST = 'The amber warning has to come before the red one.';
+    const REFUSAL = { error: { code: 'invalid_field', message: AMBER_FIRST, fields: { warning_minutes: AMBER_FIRST, critical_minutes: AMBER_FIRST } } };
+
+    /** Saves an amber after the red, both typed, and the server refuses both fields. */
+    async function refused() {
+      const s = await setup();
+      await s.show(SETTINGS);
+      s.answer(422, REFUSAL);
+      await ionValue(s.field('warning_minutes'), '40', 'ionInput');
+      await ionValue(s.field('critical_minutes'), '20', 'ionInput');
+      await click(s.field('save'));
+      /** Whether the red notice is on screen. */
+      const notice = () => s.field('save-error') !== null;
+      const says = (name: string) => s.field(name).errorText ?? '';
+      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
+      return { ...s, notice, says, marked };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('warning_minutes'), s.says('critical_minutes')]).toEqual([AMBER_FIRST, AMBER_FIRST]);
+      await ionValue(s.field('critical_minutes'), '60', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('critical_minutes'), s.marked('critical_minutes')]).toEqual(['', false]);
+      expect([s.says('warning_minutes'), s.marked('warning_minutes')]).toEqual([AMBER_FIRST, true]);
+    });
   });
 
   it('plays the tone chosen at the volume chosen', async () => {
@@ -84,7 +120,7 @@ describe('SettingsPage', () => {
     expect(s.field('load-error')?.textContent).toContain('Could not load the settings.');
     expect(s.field('loading')).toBeNull();
     expect(s.field('retry')).not.toBeNull();
-    // kitchen#12: a full-size touch target (44 px), never the small button.
+    // A full-size touch target (44 px), never the small button.
     expect((s.field('retry') as HTMLElement & { size?: string }).size).toBeUndefined();
   });
 
@@ -99,7 +135,7 @@ describe('SettingsPage', () => {
     await s.show(SETTINGS);
     expect([s.field('warning_minutes').label, s.field('save').textContent?.trim()]).toEqual(['Aviso ámbar (minutos)', 'Guardar']);
     expect(s.field('works_from_screen').textContent?.trim()).toBe('La cocina trabaja con la pantalla');
-    // hub#1427, kitchen#159: the tone and the type are chosen by their words, never «chime» or «dine_in».
+    // The tone and the type are chosen by their words, never «chime» or «dine_in».
     const words = (name: string) => [...s.field(name).querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim());
     expect(words('sound_tone')).toEqual(['Campanilla', 'Timbre', 'Zumbador']);
     expect(words('default_order_type')).toEqual(['En sala', 'Para llevar', 'A domicilio']);

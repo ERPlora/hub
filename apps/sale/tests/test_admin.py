@@ -1,13 +1,15 @@
-"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com, PLAN §17–§18).
+"""Django admin of the sale app, for the platform's staff only (hubs.erplora.com).
 
-The open tables (payment methods, settings, departments, quick notes, open checks and their lines) keep
-full CRUD. What was charged is a fiscal document (PLAN-HUB §3.2, round 2026-10-20): sales, their lines and
-payments, the day's counter that numbers them, and refunds with their lines and payments are shown whole
-and never added nor deleted; only the notes of a sale and of a refund can change. A charge is corrected by
-its void or its refunds, as at the till. Ids and timestamps are shown, never typed.
+The open tables (payment methods, settings, departments, quick notes, open checks and their lines) keep full CRUD. What
+was charged is a fiscal document: sales, their lines and payments, the day's counter that numbers them, refunds with
+their lines and payments, and the voucher sessions done outside the till that count in a production are shown whole and
+never added nor deleted; only the notes of a sale and of a refund can change. A charge is corrected by its void or its
+refunds, as at the till. Ids and timestamps are shown, never typed.
 """
 
+import re
 from html.parser import HTMLParser
+from uuid import uuid7
 
 import pytest
 from django.contrib import admin
@@ -29,11 +31,14 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
 )
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HUB_DB, A, run
+
+pytestmark = HUB_DB
 
 OPEN = [PaymentMethod, Settings, Department, QuickNote, Order, OrderLine]
-CHARGED = [Sale, SaleLine, SalePayment, SaleCounter, Refund, RefundPayment, RefundLine]
+CHARGED = [Sale, SaleLine, SalePayment, SaleCounter, Refund, RefundPayment, RefundLine, VoucherSession]
 MODELS = OPEN + CHARGED
 
 HOST = {"HTTP_HOST": "hubs.localhost", "HTTP_ACCEPT_LANGUAGE": "en"}
@@ -48,8 +53,10 @@ def superuser(db):
 
 @pytest.fixture
 def staff(client, superuser):
-    """The platform staff, signed in to the Hub admin."""
+    """The platform staff, signed in to the Hub admin with the business ``A`` chosen, as «Open in the Hub admin» of
+    erplora.com's admin leaves them: its pages read and write that business's own database."""
     client.force_login(superuser)
+    assert client.get(f"/admin/hub/{A.key}/", **HOST).status_code == 302
     return client
 
 
@@ -72,8 +79,8 @@ def charge(key: str, quantity: str = "1"):
 
 @pytest.fixture
 def charged(product):
-    """A coffee charged and two more charged with one of them refunded: a row in every table of what was
-    charged."""
+    """A coffee charged and two more charged with one of them refunded, and a voucher's session done outside the till:
+    a row in every table of what was charged."""
     product()
     charge("admin-plain-0001")
     refunded = charge("admin-refunded-0001", quantity="2")
@@ -86,6 +93,7 @@ def charged(product):
             "lines": [{"line_id": str(refunded.lines[0].id), "quantity": "1"}],
         },
     )
+    run("sale.voucher_session.record", {"session_id": str(uuid7()), "staff_id": str(uuid7()), "value": 3333})
 
 
 def a_row(model):
@@ -391,3 +399,42 @@ def test_the_hub_admin_changes_the_notes_of_a_charge_and_nothing_fiscal(
     assert fiscal(after) == before
     assert [fiscal(line) for line in after.lines.all()] == lines
     assert [fiscal(payment) for payment in after.payments.all()] == payments
+
+
+def test_the_admin_in_spanish_says_ventas_own_words(staff, product):
+    """The open checks' list filters and shows the «Abierta» ones (an open check is a «cuenta»), a line names what it
+    carries of Modifiers its «Suplementos» (SALE-F11) and a sale says when it was «Anulada el»: Ventas' words, not
+    the «Abierto», «Opciones» and «Anulado el» of Demo and Clientes, loaded before it with the same English. The
+    product data a line freezes reads as in Inventory."""
+    product()
+    check = run("sale.order.open", {"lines": [{"product": "COF"}]})
+    sold = charge("admin-es-0001")
+    spanish = {**HOST, "HTTP_ACCEPT_LANGUAGE": "es"}
+
+    def page(path: str) -> str:
+        response = staff.get(path, **spanish)
+        assert response.status_code == 200, path
+        return response.content.decode()
+
+    checks = page(changelist(Order))
+    assert '<details data-filter-title="estado"' in checks  # the page is in Spanish
+    assert re.search(r'status__exact=open"[^>]*>\s*Abierta\s*</a>', checks)  # the status's filter
+    assert '<td class="field-status">Abierta</td>' in checks
+    assert "Abierto<" not in checks
+
+    line = page(url(OrderLine.objects.get(order_id=check.id), "change"))
+    assert re.search(r'<label[^>]* for="id_modifiers"[^>]*>Suplementos:</label>', line)
+    for field, label in (
+        ("category_id", "Categoría del producto"),
+        ("price_quantity", "Cantidad de precio"),
+        ("pricing_unit", "Unidad de precio"),
+    ):
+        assert re.search(rf'<label[^>]* for="id_{field}"[^>]*>{label}:</label>', line), label  # «required» or not
+
+    sale = page(url(Sale.objects.get(pk=sold.id), "change"))
+    assert "<label>Anulada el:</label>" in sale  # read only
+    assert "<label>Anulado el:</label>" not in sale
+
+    charged_line = page(url(SaleLine.objects.get(sale_id=sold.id), "change"))
+    assert "<label>Suplementos:</label>" in charged_line
+    assert "<label>Opciones:</label>" not in charged_line

@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { PaymentOut } from '../operations';
 
@@ -21,6 +23,7 @@ const open = defineModel<boolean>('open', { default: false });
 const t = useT();
 const cancel = useCommand('payment.payment.cancel');
 const reason = ref('');
+const canDismiss = useUnsavedFormOnOpen('payment-cancel', reason, open);
 const title = computed(() => t('payment.payments.cancelForm.title', { reference: props.payment?.reference ?? '' }));
 
 watch(
@@ -47,6 +50,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-cancel"
     size="sm"
     role="alertdialog"
@@ -62,6 +66,7 @@ async function save(): Promise<void> {
     <template #default="{ fieldErrors }">
       <ion-textarea
         data-testid="payment-cancel-reason"
+        name="reason"
         :value="reason"
         :label="$t('payment.payments.cancelForm.reason')"
         label-placement="floating"

@@ -1,8 +1,7 @@
 """The tools a turn offers for what the owner asks (``live.assistant.relevant`` over the Hub's real catalogue).
 
-The QA battery of the assistant with the real model (2026-10-31, docs/plans/2026-10-31-qa-asistente.md of
-erplora-next, block B) found the model answering «I do not have the tool…» for B28, B30 and B32: the owner holds
-those operations, but the turn never offered them, because the words asked («empleado», «vendí», «activa la app»)
+The assistant's QA with the real model found it answering «I do not have the tool…» to the questions below: the owner
+holds those operations, but the turn never offered them, because the words asked («empleado», «vendí», «activa la app»)
 shared none with the tool's own. Business ``a`` has every module on (``base.activation.every_on``): the largest
 catalogue an owner can have, a restaurant's (sale, staff, customer, inventory, cash register, tables, reservations…)
 included, so a tool found here is found in any business with fewer apps on.
@@ -10,13 +9,14 @@ included, so a tool found here is found in any business with fewer apps on.
 
 import pytest
 from live import assistant as shared
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
 
 
 @pytest.fixture
@@ -30,33 +30,33 @@ def owner(make_user):
 
 
 def offered(ctx: OperationContext, *asked: str) -> list[str]:
-    return [op.name for op in assistant.relevant(assistant.catalog(ctx), list(asked), ctx.language)]
+    return [op.name for op in assistant.relevance.relevant(assistant.tools.catalog(ctx), list(asked), ctx.language)]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     ("language", "asked", "expected"),
     [
-        # B30: «No tengo la herramienta para crear empleados desde aquí».
+        # It answered «No tengo la herramienta para crear empleados desde aquí».
         ("es", "Da de alta al empleado «Luis QA» como cajero", "staff.member.create"),
         ("en", "Add the employee «Luis QA» as a cashier", "staff.member.create"),
-        # B32: «No tengo acceso a los datos de ventas desde aquí».
+        # It answered «No tengo acceso a los datos de ventas desde aquí».
         ("es", "¿Qué vendí hoy?", "sale.sale.today"),
         ("en", "What did I sell today?", "sale.sale.today"),
-        # B28: «Desde aquí no puedo activar apps directamente».
+        # It answered «Desde aquí no puedo activar apps directamente».
         ("es", "Activa la app de clientes", "base.app.enable"),
         ("en", "Turn on the customers app", "base.app.enable"),
     ],
 )
 def test_the_tool_that_does_what_the_owner_asks_is_offered(owner, language, asked, expected):
     ctx = owner(language)
-    assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in assistant.tools.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)
 
 
-#: What the review of live#18 asked besides the battery: each question with the tool that obviously does it. The Hub
-#: has no tool that invites someone (that is done on erplora.com): «invita a…» gets the people of the business, which
-#: says how each one gets in, and the documentation search.
+#: Everyday questions, each with the tool that obviously does it. The Hub has no tool that invites someone (that is done
+#: on erplora.com): «invita a…» gets the people of the business, which says how each one gets in, and the documentation
+#: search.
 EVERYDAY = [
     ("es", "cobra la mesa 4", {"sale.sale.complete"}),
     ("es", "¿cuántos clientes tengo?", {"customer.customer.list", "customer.customer.stats"}),
@@ -74,21 +74,21 @@ EVERYDAY = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "asked", "expected"), EVERYDAY)
 def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, asked, expected):
     ctx = owner(language)
-    assert expected <= set(assistant.catalog(ctx))  # the owner holds them: only the selection can leave one out
+    assert expected <= set(assistant.tools.catalog(ctx))  # the owner holds them: only the selection can leave one out
     got = offered(ctx, asked)
     assert not expected - set(got), expected - set(got)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_the_people_of_a_reservation_never_bring_the_staffs_tools(owner):
-    """«personas» is not «Personal» (the staff app in Spanish): before live#18's review, «reserva una mesa para 4
-    personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
+    """«personas» is not «Personal» (the staff app in Spanish): before live offered the tool of what is asked,
+    «reserva una mesa para 4 personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
     got = offered(owner("es"), "reserva una mesa para 4 personas")
-    assert got.index("reservation.reservation.create") == len(assistant.ALWAYS)  # first after what is always at hand
+    assert got.index("reservation.reservation.create") == len(assistant.relevance.ALWAYS)  # first after what is always at hand
     assert sum(name.startswith("staff.") for name in got) <= 1, [name for name in got if name.startswith("staff.")]
 
 
@@ -112,11 +112,11 @@ BLOCK_B = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("index", "asked", "expected"), [(i, q, e) for i, (q, e) in enumerate(BLOCK_B)])
 def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, asked, expected):
     ctx = owner("es")
-    assert expected <= set(assistant.catalog(ctx))  # the owner holds them: only the selection can leave one out
+    assert expected <= set(assistant.tools.catalog(ctx))  # the owner holds them: only the selection can leave one out
     # A turn ranks by the last two questions of the person (``base.assistant.turn``): the battery asks them in order.
     before = BLOCK_B[index - 1][0] if index else None
     for texts in ([asked], [before, asked] if before else [asked]):
@@ -124,7 +124,7 @@ def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, aske
         assert not missing, (texts, missing)
 
 
-#: The Hub's own words (``base.assistant.SYNONYMS``), in phrases no tool says as its asks: a «cuenta», a check or a
+#: Sales' own words (its ``assistant_synonyms``), in phrases no tool says as its asks: a «cuenta», a check or a
 #: tab is a table's open check (``sale.order``), never the person's account; a ticket or a receipt is a sale's.
 HUB_WORDS = [
     ("es", "¿qué hay en la cuenta de la mesa 6?", "sale.order.get"),
@@ -136,23 +136,46 @@ HUB_WORDS = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "asked", "expected"), HUB_WORDS)
 def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
     """Before the Hub said what its words mean, these came at 11 to 31, or not at all: «cuenta» shared no word with an
-    order and «ticket» brought the kitchen's tickets (live#22 leaves those meanings to each project)."""
+    order and «ticket» brought the kitchen's tickets (live leaves those meanings to each project)."""
     ctx = owner(language)
-    assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in assistant.tools.catalog(ctx)  # the owner holds it: only the selection can leave it out
     assert expected in offered(ctx, asked)[:10]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+#: «retira» and «anota» are the verbs they are, in phrases no tool says as its asks: «retira» takes
+#: something out (deletes, removes, retires or withdraws it, as the thing named says) and «anota» writes in what exists
+#: or adds to it. None is a probe of layer 2 of its tool with other names: each shares two stems at most with one
+#: (``live.assistant.stems``), so this test and the probes' do not fix the same sentence twice.
+RETIRA_AND_ANOTA = [
+    ("es", "retira el bono de diez sesiones, que nadie más lo compre", "service.package.delete"),
+    ("es", "retira el permiso de Marta para recibir publicidad", "customer.consent.withdraw"),
+    ("es", "anota en la cita de Rosa del viernes que trae su propio tinte", "appointment.appointment.update"),
+    ("es", "anota en la reserva de Carmen que vienen con un perro", "reservation.reservation.update"),
+]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "asked", "expected"), RETIRA_AND_ANOTA)
+def test_retira_and_anota_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
+    """Before the Hub read live with «anota» and «retira» among its verbs, they asked for no action and the tool came
+    only by the thing named: these came 14th to 23rd. A pointer of ``packages/live`` back to before live read «anota»
+    and «retira» as editing and removing fails here."""
+    ctx = owner(language)
+    assert expected in assistant.tools.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in offered(ctx, asked)[:10]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     ("language", "asked"), [("es", "¿cómo invito a alguien a mi negocio?"), ("en", "how do I split a check?")]
 )
 def test_a_how_to_question_ranks_the_documentation_first_by_being_one(owner, language, asked):
     """The documentation search is always offered (``ALWAYS``), and a how-to question also ranks it first by itself
     (``HOWTO``): ranked without what is always at hand, it still leads."""
-    tools = assistant.catalog(owner(language))
-    ranking = {**assistant.RANKING, "always": ()}
-    assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.DOCS_SEARCH
+    tools = assistant.tools.catalog(owner(language))
+    ranking = {**assistant.relevance.ranking(tools), "always": ()}
+    assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.relevance.DOCS_SEARCH

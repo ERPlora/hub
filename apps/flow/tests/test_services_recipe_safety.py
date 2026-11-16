@@ -1,11 +1,7 @@
 """A factory recipe's safety fix reaches the automations already built from it, without waiting for the owner
-(FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE; WORKBOOK FLOW-F36, FLOW-F37, FLOW-F38, FLOW-F29).
+(WORKBOOK FLOW-F36, FLOW-F37, FLOW-F38, FLOW-F29).
 
-The premise: the WhatsApp table answer turned on before its app fixed whose card its assistant acts for (hub#447,
-``pinned``) was «New version», and nothing else: its assistant still chose ``on_behalf_of``, and after the yes another
-guest's reservation was cancelled, until the owner pressed «Restore the factory one».
-
-Now the data an app fixes on the «Ask the assistant» step of its recipe (``pinned``) are fixed on that step of every
+The data an app fixes on the «Ask the assistant» step of its recipe (``pinned``) are fixed on that step of every
 automation built from it, whenever it was built: when the assistant is asked, when a change it proposed gets its yes
 (also one proposed before the fix), when the automation is read (the editor shows them under «Fixed data») and when
 it is copied. What the owner fixed themselves on that step stays (the assistant does not choose it either), and what
@@ -13,7 +9,7 @@ they changed of the rest of it is never touched. A recipe whose new version only
 
 The market does the same with a safety fix that fits what the user changed: WordPress's automatic security releases,
 Salesforce's enforced release updates, Zapier's automatic migration to a new app version, and Chrome and Android
-applying a narrower permission without asking (a wider one waits for consent). The table is in the PR.
+applying a narrower permission without asking (a wider one waits for consent).
 """
 
 import copy
@@ -29,11 +25,10 @@ from apps.flow import queries
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
 
-from .conftest import A, ctx_for, run
+from .conftest import A, CHAT, HUB_DB, ctx_for, run
 from .test_recipes import declaration, declared  # noqa: F401 - the fixture
 from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     CANCEL,
-    CHAT,
     MAY_CANCEL,
     UPDATE,
     gateway,
@@ -43,10 +38,9 @@ from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     status_of,
     told,
     wants,
-    worker,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 REF = "reservation/table"
 #: What today's version fixes: whose card a change or a cancellation is, the one the run says.
@@ -415,7 +409,7 @@ def test_the_table_answer_turned_on_before_its_app_left_out_old_messages_never_a
 
 
 def app_name(label: str) -> str:
-    return str(queries.active_apps()[label].verbose_name)
+    return str(queries.active_apps(A)[label].verbose_name)
 
 
 def refused(flow_id: str, change: dict) -> InvalidPayload:

@@ -19,6 +19,11 @@ On the business's own domain (HUBS-F17, ``request.custom_domain``) only the page
 asks nothing of the API (``data-ep-static``), so its catalog is read when it is painted and it is kept what the API keeps
 that catalog, a minute, and it names no address for its reports. With nothing to show it is not found: there is no
 sign-in to send a visitor to.
+
+On both addresses the page tells search engines which one is its main address (``rel="canonical"``, hub#818): the
+business's own domain while the door opens its website there, else its address on erplora.com. There is no redirect:
+the erplora.com address is still the team's way in. A page is kept with the main address it names, and one kept before
+the domain changed is painted again, so it never names the address of before.
 """
 
 from django.core.cache import cache
@@ -32,6 +37,7 @@ from apps.website import queries, services
 from apps.website.csp import own_domain_policy, public_policy
 from apps.website.qr import public_url
 from apps.website.render import local_day, render_site
+from base import custom_domains
 from base.business import currency_of
 
 #: What the browser may keep the page for: a minute, then it asks again (and the Hub answers from its cache).
@@ -57,7 +63,8 @@ def respond(request: HttpRequest) -> HttpResponse:
     language, today = visitor_language(request), local_day(request.hub.timezone)
     currency = currency_of(request.hub.country)
     version = queries.live_version(scope)
-    html = cache.get(queries.page_cache_key(slug, version, language, today, currency, own_domain=own_domain))
+    main = main_address(request.hub)
+    html = _kept(queries.page_cache_key(slug, version, language, today, currency, own_domain=own_domain), main)
     if html is None:
         page = queries.published_page(scope)
         if page is None:
@@ -77,10 +84,11 @@ def respond(request: HttpRequest) -> HttpResponse:
             today=today,
             reviews=queries.shown_reviews(slug, page["content"], page.get("reviews_snapshot")),
             hub_address=public_url(slug) if own_domain else "",
+            canonical=main,
         )
         cache.set(
             queries.page_cache_key(slug, page["version"], language, today, currency, own_domain=own_domain),
-            html,
+            {"main": main, "html": html},
             queries.CATALOG_TTL if own_domain else queries.PAGE_TTL,
         )
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
@@ -88,6 +96,19 @@ def respond(request: HttpRequest) -> HttpResponse:
     patch_vary_headers(response, ["Accept-Language", "Cookie"])
     response._csp_config = own_domain_policy() if own_domain else public_policy()
     return response
+
+
+def main_address(hub) -> str:
+    """The address ``hub``'s page tells search engines is its main one: its own domain while the door opens its website
+    there (``base.custom_domains.served_on``), else its address on erplora.com."""
+    domain = custom_domains.served_on(hub)
+    return f"https://{domain}/" if domain else public_url(hub.slug)
+
+
+def _kept(key: str, main: str) -> str | None:
+    """The page kept under ``key`` if it names ``main`` as its main address: never one kept before a domain change."""
+    kept = cache.get(key)
+    return kept["html"] if kept is not None and kept["main"] == main else None
 
 
 def visitor_language(request: HttpRequest) -> str:

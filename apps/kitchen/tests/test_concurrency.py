@@ -16,12 +16,13 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.admin import site
-from django.db import connection, transaction
+from django.db import connections
 from django.test import RequestFactory
 from django.utils import timezone
 from live.context import system_context
 from live.errors import NotFound, OperationError
 from live.models import OutboxEvent
+from live.operations import atomic
 
 from apps.inventory.models import Category, Product
 from apps.kitchen.models import (
@@ -33,57 +34,16 @@ from apps.kitchen.models import (
     TicketItem,
 )
 from apps.kitchen.queries import STATION_NOT_FOUND, TICKET_NOT_FOUND
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, in_a_thread, meanwhile
 
-from .conftest import A, add_line, ctx_for, fire, make_station, open_check, route_product, run
+from .conftest import HUB_DB_COMMITTED, A, add_line, ctx_for, fire, make_station, open_check, route_product, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Real sessions in threads commit what they write, in a business whose plan lets several sessions in at once, with
+#: Taxes' and Sales' factory data planted again in it.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("factory_data", "plan_with_room")]
 
 COOK = "hub_employee"
-
-
-@pytest.fixture(autouse=True)
-def factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and Sales' payment
-    methods are planted again, as their migrations do (idempotent)."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    with connection.schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except (
-            Exception
-        ) as error:  # an unexpected failure (a deadlock, an IntegrityError) is reported
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def failures(results) -> list:
@@ -170,14 +130,14 @@ def test_two_sends_of_the_same_check_make_one_round(product):
     assert Ticket.objects.count() == 1
 
 
-# A product, a category or a station deleted while a write names it (FIX-KITCHEN-ROUTE-PRODUCT-RACE). A route
-# read its product or category unheld: a deletion committed between that read and the write either left a route
-# to a deleted product (Inventory's «Delete»: the row stays, marked deleted) or made the database refuse the
-# write at its COMMIT (the Hub admin's: the row goes), a 500. The same for a station the Hub admin deleted while
-# a route, a round or a ticket by hand named it. The Hub admin's «Delete» (Django's collector) takes the rows
-# that point at the row first and the row last, so a write that held the row and then locked those rows made a
-# circle (a deadlock, review of hub#61): a route locks the route it replaces before it holds its product or
-# category, and the Hub admin's «Delete» of a station goes in line with the kitchen's writes.
+# A product, a category or a station deleted while a write names it. A route read its product or category unheld: a
+# deletion committed between that read and the write either left a route to a deleted product (Inventory's «Delete»: the
+# row stays, marked deleted) or made the database refuse the write at its COMMIT (the Hub admin's: the row goes), a 500.
+# The same for a station the Hub admin deleted while a route, a round or a ticket by hand named it. The Hub admin's
+# «Delete» (Django's collector) takes the rows that point at the row first and the row last, so a write that held the
+# row and then locked those rows made a circle (a deadlock, review of hub#61): a route locks the route it replaces
+# before it holds its product or category, and the Hub admin's «Delete» of a station goes in line with the kitchen's
+# writes.
 
 #: The business's «Delete» (its own app's operation) and the Hub admin's, by the registered ModelAdmin as its
 #: delete page (``delete_model``) or its bulk action (``delete_queryset``) does.
@@ -189,8 +149,6 @@ LOCK_TIMEOUT = "300ms"
 LOCK_NOT_AVAILABLE = "55P03"
 #: How long a deletion under way keeps what it took before it commits.
 IN_FLIGHT = 0.5
-#: How long a write lets the Hub admin's «Delete» run until it ends or waits for the write.
-ADMIN_REACHES_ITS_WAIT = 0.7
 #: The business's «Delete» of each kind of row: its own app's operation and the field that names it.
 DELETE_OPERATIONS = {
     Product: ("inventory.product.delete", "id"),
@@ -223,8 +181,8 @@ def delete(target, how: str) -> None:
     """Deletes ``target`` in this session (in a transaction, as the admin's delete page), giving up after
     LOCK_TIMEOUT on a row another session holds. The lock timeout is the transaction's (SET LOCAL): a
     session-level one would go back with the connection and reach the tests after this one."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
         remove(target, how)
 
@@ -243,7 +201,7 @@ def deleted_just_before(statement: str | Callable[[str], bool], target, how: str
             deletions.extend(at_once(lambda: delete(target, how)))
         return execute(sql, params, many, context)
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -258,7 +216,7 @@ def deleted_in_flight(target, how: str, when: str | None = None):
 
     def deletion():
         try:
-            with transaction.atomic():
+            with atomic():
                 remove(target, how)
                 under_way.set()
                 time.sleep(IN_FLIGHT)
@@ -267,9 +225,8 @@ def deleted_in_flight(target, how: str, when: str | None = None):
             deletions.append(repr(error))
         finally:
             under_way.set()
-            connection.close()
 
-    thread = threading.Thread(target=deletion)
+    thread = in_a_thread(deletion, [None])
 
     def wrapper(execute, sql, params, many, context):
         if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
@@ -278,7 +235,7 @@ def deleted_in_flight(target, how: str, when: str | None = None):
         return execute(sql, params, many, context)
 
     try:
-        with connection.execute_wrapper(wrapper):
+        with connections[current_alias()].execute_wrapper(wrapper):
             yield deletions
     finally:
         if thread.ident is not None:
@@ -289,42 +246,16 @@ def deleted_in_flight(target, how: str, when: str | None = None):
 def admin_deletes_around(statement, target, moment: str, how: str = "admin"):
     """The Hub admin deletes ``target`` (as its delete page, or ``how="admin_bulk"`` as «Delete selected»; no lock
     timeout: a deadlock is what Postgres reports) in another session, started right ``before`` or ``after`` the
-    first statement of this one that ``statement`` accepts, and given ADMIN_REACHES_ITS_WAIT to end or to wait
-    for this one."""
-    deletions: list = []
+    first statement of this one that ``statement`` accepts; this one goes on once the deletion has ended or waits
+    for it. Yields ``["ok"]``, or the error the deletion ended with."""
 
     def deletion():
-        try:
-            with transaction.atomic():
-                remove(target, how)
-            deletions.append("ok")
-        except Exception as error:  # a deadlock, reported to the test
-            deletions.append(repr(error))
-        finally:
-            connection.close()
+        with atomic():
+            remove(target, how)
+        return "ok"
 
-    thread = threading.Thread(target=deletion)
-
-    def start():
-        thread.start()
-        time.sleep(ADMIN_REACHES_ITS_WAIT)
-
-    def wrapper(execute, sql, params, many, context):
-        first = thread.ident is None and statement(sql)
-        if first and moment == "before":
-            start()
-        result = execute(sql, params, many, context)
-        if first and moment == "after":
-            start()
-        return result
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-        assert thread.ident is not None, "the write never reached the statement the deletion waits for"
+    with meanwhile(statement, deletion, first=moment == "before") as outcome:
+        yield outcome
 
 
 def sqlstate(error) -> str | None:
@@ -574,12 +505,12 @@ def test_a_station_being_deleted_when_a_dish_goes_to_it_leaves_the_dish_with_no_
     assert landed() is None
 
 
-# A station or a ticket deleted while a command finds it (FIX-KITCHEN-STATION-DELETE-RACE). A command found its
-# station or its ticket and then locked it again by its id: one gone between the two reads (the Hub admin's
-# «Delete» of a ticket did not go in line with the kitchen's writes) raised DoesNotExist, a 500, and one marked
-# deleted meanwhile (the Hub admin's change page) was changed, printed or deleted again as if it were live. Locked,
-# a row deleted since it was found is not found, as one deleted before. The kitchen's own «Delete» and the Hub
-# admin's «Delete» of a station or a ticket go in line with every write of the kitchen: they wait for it instead.
+# A station or a ticket deleted while a command finds it. A command found its station or its ticket and then locked it
+# again by its id: one gone between the two reads (the Hub admin's «Delete» of a ticket did not go in line with the
+# kitchen's writes) raised DoesNotExist, a 500, and one marked deleted meanwhile (the Hub admin's change page) was
+# changed, printed or deleted again as if it were live. Locked, a row deleted since it was found is not found, as one
+# deleted before. The kitchen's own «Delete» and the Hub admin's «Delete» of a station or a ticket go in line with every
+# write of the kitchen: they wait for it instead.
 
 #: Who takes a station or a ticket away while a command finds it: the ones that go in line with the kitchen's
 #: writes (``locked_settings``) wait for it; the Hub admin's change page comes between its two reads.
@@ -786,12 +717,12 @@ def test_a_ticket_deleted_while_its_round_is_received_is_not_received(world, how
     left_as_the_admin_left_it(ticket.pk, before)
 
 
-# The Hub admin's «Delete» of a ticket a cook is working on (FIX-KITCHEN-STATION-DELETE-RACE). Django's collector
-# takes a ticket's History and dishes first and the ticket last, while a cook's command holds the ticket and then
-# its dishes and writes its History: out of line, the two waited for each other in a circle (a deadlock, 40P01) or
-# the ticket went while the cook's new History line named it (the FK refused the deletion at its end). In line
-# with the kitchen's writes (``locked_settings`` → ticket, as the operations take them), the «Delete» waits for the
-# cook and then takes what the cook added; started first, the cook waits for it and hears the ticket is gone.
+# The Hub admin's «Delete» of a ticket a cook is working on. Django's collector takes a ticket's History and dishes
+# first and the ticket last, while a cook's command holds the ticket and then its dishes and writes its History: out of
+# line, the two waited for each other in a circle (a deadlock, 40P01) or the ticket went while the cook's new History
+# line named it (the FK refused the deletion at its end). In line with the kitchen's writes (``locked_settings`` →
+# ticket, as the operations take them), the «Delete» waits for the cook and then takes what the cook added; started
+# first, the cook waits for it and hears the ticket is gone.
 
 
 def locks_the_dishes(sql: str) -> bool:

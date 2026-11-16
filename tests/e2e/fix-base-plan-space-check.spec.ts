@@ -1,5 +1,4 @@
-// The plan's space is one check of base (FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS): Files and the website's
-// images refused past it each with a copy of its code and its sentence; now both refuse through the same one. In
+// The plan's space is one check of base: Files and the website's images refuse past it through the same one. In
 // Spanish, as the owner of hub `a` with a plan of 1 MB: Files refuses a second file of 600 KB with «No queda espacio…»
 // in its notice and keeps nothing, and with the space then exactly full, Files' upload and the website's image upload
 // answer the same 409 `base.file_no_space` with that very sentence. A capture of the notice per viewport.

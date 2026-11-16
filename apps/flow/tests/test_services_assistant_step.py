@@ -1,60 +1,35 @@
-"""The «Ask the assistant» step (WORKBOOK FLOW-F37, F38, F39; old hub HUB-F95, HUB-F279, old SaaS SAAS_ASSISTANT-F04).
+"""The «Ask the assistant» step (WORKBOOK FLOW-F37, F38, F39).
 
-The gateway is erplora.com's assistant door that answers a turn at once (``POST /internal/assistant/chat``), served
-on 127.0.0.1 by ``base.tests.fake_gateway``: the Hub calls it with its real network code, signed. The request that
-reaches the step parks the run and answers at once; the worker asks the assistant after that COMMIT, outside any
-transaction, with nobody in front: only the reads and actions the step names AND the automation was granted are
-offered; a read runs at once and asks nobody (gh:hub#1595); a change waits in «Waiting for your answer» («Ask me
-first») or runs by its own operation as the automation («On its own»). What it answers is the step's ``text``.
+The gateway is erplora.com's assistant door that answers a turn at once (``POST /internal/assistant/chat``), served on
+127.0.0.1 by ``base.tests.fake_gateway``: the Hub calls it with its real network code, signed. The request that reaches
+the step parks the run and answers at once; the worker asks the assistant after that COMMIT, outside any transaction,
+with nobody in front: only the reads and actions the step names AND the automation was granted are offered; a read runs
+at once and asks nobody; a change waits in «Waiting for your answer» («Ask me first») or runs by its own operation as
+the automation («On its own»). What it answers is the step's ``text``.
 """
 
 import datetime as dt
 import json
-from zoneinfo import ZoneInfo
 
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone, translation
+from django.utils import translation
 from live.context import system_context
 
 from apps.flow import gateway as flow_gateway
 from apps.flow import queries, services
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
-from base import relay
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 
-from .conftest import A, ctx_for, make_flow, run
+from .conftest import A, CHAT, HUB_DB, NOON, QUOTA, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
-
-MADRID = ZoneInfo("Europe/Madrid")
-NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-CHAT = "/internal/assistant/chat"
-QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
+pytestmark = HUB_DB
 
 
 @pytest.fixture(autouse=True)
 def no_pauses(monkeypatch):
     """A retried call waits 1 s and 3 s in production; here, nothing."""
     monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
-
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 def said(text: str, **more) -> dict:
@@ -128,8 +103,8 @@ def test_a_tool_it_was_not_offered_never_runs(gateway, clock, worker):
     assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
 
 
-def test_hub_1595_a_read_runs_at_once_and_asks_nobody(gateway, clock, worker):
-    # gh:hub#1595: an automation that only looks something up never asks a person to approve a question.
+def test_a_read_runs_at_once_and_asks_nobody(gateway, clock, worker):
+    # An automation that only looks something up never asks a person to approve a question.
     clock(NOON)
     Task.objects.create(title="Water the plants")
     flow = manual([step()])
@@ -572,7 +547,7 @@ def test_a_turn_another_process_holds_is_left_alone(gateway, clock, worker):
     assert gateway.sent(CHAT) == []
 
 
-# ── Booking by the guest's phone (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED) ───────────────────────────
+# ── Booking by the guest's phone ──────────────────────────────────────────────────────────────────────────────
 
 
 BOOKING = {"guest_name": "Ana García", "guest_phone": "600 111 222", "date": "2026-10-16", "time": "21:00", "party_size": 2}

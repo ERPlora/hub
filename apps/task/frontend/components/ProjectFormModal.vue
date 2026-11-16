@@ -6,6 +6,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 const open = defineModel<boolean>('open', { default: false });
 
 const creation = useCommand('task.project.create');
@@ -29,11 +31,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('task-project-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="task-project-form"
     :title="$t('task.projects.form.titleNew')"
     :submit-label="$t('task.projects.form.create')"
@@ -46,6 +51,7 @@ async function save(): Promise<void> {
       <div class="task-project-form">
         <ion-input
           data-testid="task-project-form-code"
+          name="code"
           :value="form.code"
           :label="$t('task.projects.form.code')"
           :placeholder="$t('task.projects.form.codePlaceholder')"
@@ -59,6 +65,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="task-project-form-name"
+          name="name"
           :value="form.name"
           :label="$t('task.projects.form.name')"
           label-placement="floating"
@@ -71,6 +78,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="task-project-form-color"
+          name="color"
           :value="form.color"
           :label="$t('task.projects.form.color')"
           :placeholder="$t('task.projects.form.colorPlaceholder')"

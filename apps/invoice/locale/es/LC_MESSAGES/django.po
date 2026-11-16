@@ -575,6 +575,14 @@ msgstr ""
 "{seq:01d}…{seq:09d}), y cabe en una línea de 60 caracteres sin tildes ni "
 "símbolos como º o ª."
 
+#: schemas.py:67
+msgid ""
+"Use only letters without accents, digits, hyphens (-) and underscores (_), "
+"starting with a letter or a digit."
+msgstr ""
+"Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), "
+"empezando por una letra o un número."
+
 #: schemas.py:63
 msgid ""
 "The prefix is written without accents or symbols such as º or ª (letters, "
@@ -770,9 +778,12 @@ msgstr "No hay ninguna categoría fiscal «%(category)s»."
 
 #: services.py:142
 #, python-format
-msgid "No tax rule applies today to the tax category «%(category)s»."
+msgid ""
+"No tax rule applies today to the tax category «%(category)s». Create its "
+"rule in Taxes › Rules."
 msgstr ""
-"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s»."
+"Ninguna regla fiscal se aplica hoy a la categoría fiscal «%(category)s». "
+"Crea su regla en Impuestos › Reglas."
 
 #: services.py:144
 #, python-format
@@ -919,6 +930,14 @@ msgstr "El hub de plataforma no tiene emisor: ejecuta create_platform_hub."
 #: queries.py
 msgid "VeriFactu does not answer in the platform hub."
 msgstr "VeriFactu no responde en el hub de plataforma."
+
+#: queries.py
+msgid ""
+"Real filing with the AEAT is closed on this server: ERPlora's invoices would "
+"not reach it."
+msgstr ""
+"El envío real a la AEAT está cerrado en este servidor: las facturas de "
+"ERPlora no le llegarían."
 
 msgid "Sale"
 msgstr "Venta"

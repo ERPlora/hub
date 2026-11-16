@@ -4,18 +4,27 @@ import gettext
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
-from live.operations import registry
 
 from apps.tax import admin as tax_admin
 from apps.tax import queries, schemas, services
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, WHOLE_COUNTRY, TaxAlias, TaxCategory, TaxRule, TaxSettings
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    operation_titles,
+    untranslated,
+)
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("tax").path) / "locale" / "es" / "LC_MESSAGES"
+SCREENS = Path(apps.get_app_config("tax").path) / "frontend" / "locale" / "es.json"
 
 
 MESSAGES = [
@@ -47,58 +56,32 @@ def visible_texts() -> set[str]:
     its schemas."""
     config = apps.get_app_config("tax")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        # The Home's step (FIX-TAX-SETUP-HOOKS).
+        *config_texts(config),
+        # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
         *MESSAGES,
         *(v.message for v in TaxCategory._meta.get_field("key").validators if isinstance(v, RegexValidator)),
     ]
     for label in SYSTEM_CATEGORY_LABELS.values():
         lazies += [text for text in label if str(text)]
-    for model in (TaxCategory, TaxRule, TaxAlias, TaxSettings):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        # The primary key comes from live.models.UUIDModel: its name is Django's, not a text of this app.
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts((TaxCategory, TaxRule, TaxAlias, TaxSettings))
     lazies += [*TaxRule.TaxType.labels, *TaxRule.OperationClass.labels, *TaxAlias.Source.labels]
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles tax's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones tax wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "tax"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("tax")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Impuestos by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=75, with_context=2) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_taxs_own_spanish():
@@ -107,7 +90,7 @@ def test_the_card_says_each_title_with_taxs_own_spanish():
     on the order of the apps."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("tax")
     assert "Category" in titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
@@ -125,14 +108,37 @@ def test_spanish_texts():
         assert str(apps.get_app_config("tax").verbose_name) == "Impuestos"
 
 
-@pytest.mark.django_db
+def test_each_model_says_active_and_when_in_its_own_gender():
+    """A tax category and a tax rule are feminine — «activa», «creada el», «actualizada el» —, an alias masculine
+    — «activo», «creado el», «actualizado el» —, as the screens' columns say them; not auth's «activo» for all
+    three, which comes first in ``INSTALLED_APPS`` (hub#667)."""
+    screens = json.loads(SCREENS.read_text(encoding="utf-8"))["tax"]
+    with translation.override("es"):
+        said = {
+            model: [str(model._meta.get_field(name).verbose_name) for name in ("is_active", "created_at", "updated_at")]
+            for model in (TaxCategory, TaxRule, TaxAlias)
+        }
+    assert said == {
+        TaxCategory: ["activa", "creada el", "actualizada el"],
+        TaxRule: ["activa", "creada el", "actualizada el"],
+        TaxAlias: ["activo", "creado el", "actualizado el"],
+    }
+    columns = {screen: screens[screen]["columns"]["active"] for screen in ("categories", "rules", "aliases")}
+    assert columns == {
+        "categories": said[TaxCategory][0].capitalize(),
+        "rules": said[TaxRule][0].capitalize(),
+        "aliases": said[TaxAlias][0].capitalize(),
+    }
+
+
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/tax/categories",
         json.dumps({"key": "restaurant.food", "name": "x"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409

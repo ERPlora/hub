@@ -132,12 +132,12 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     const view = shown(page);
     await expect(view.locator('[data-testid=kitchen-display-views]')).toBeVisible();
     await expect(view.locator('[data-testid=kitchen-display-loading]')).toHaveCount(0);
-    // kitchen#116: the views are tabs with their names, the one open selected.
+    // The views are tabs with their names, the one open selected.
     const views = view.getByRole('tablist', { name: 'Views of the display' });
     await expect(views.getByRole('tab', { name: 'Tickets' })).toHaveAttribute('aria-selected', 'true');
     await expect(views.getByRole('tab', { name: 'Ready' })).toHaveAttribute('aria-selected', 'false');
     await expect(views.getByRole('tab', { name: 'All-Day' })).toBeVisible();
-    // kitchen#60: «Full screen» puts the display alone on the screen and a second tap gives the shell back.
+    // «Full screen» puts the display alone on the screen and a second tap gives the shell back.
     await view.locator('[data-testid=kitchen-display-fullscreen]').click();
     await expect(view.locator('[data-testid=kitchen-display]')).toHaveClass(/kds--fullscreen/);
     expect(await page.evaluate(() => document.fullscreenElement?.getAttribute('data-testid'))).toBe('kitchen-display');
@@ -145,7 +145,7 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     await expect(view.locator('[data-testid=kitchen-display]')).not.toHaveClass(/kds--fullscreen/);
     // F16: opening the display does not ring for what was already there.
     expect(await rings(page)).toBe(0);
-    // kitchen#164: the display opens without an error, nor a CSP refusal.
+    // The display opens without an error, nor a CSP refusal.
     const opened = await problems();
     expect([opened.page, opened.console, opened.csp]).toEqual([[], [], []]);
 
@@ -178,7 +178,7 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
     // ...and «Recall» on the card brings back the struck ones.
     await dish(page, saladLine).click();
     await expect(dish(page, saladLine)).toHaveAttribute('data-status', 'ready');
-    // kitchen#156, kitchen#12: half done, the card offers «Ready», «Mark rush» and «Recall»; on a tablet upright or
+    // Half done, the card offers «Ready», «Mark rush» and «Recall»; on a tablet upright or
     // on its side none is cut ("Recal…") or spills out of the card, and each is a 44 px touch target.
     for (const size of [{ width: 834, height: 1112 }, { width: 1112, height: 834 }, { width: 820, height: 1180 }]) {
       await page.setViewportSize(size);

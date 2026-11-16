@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // «New drawer» / «Rename drawer» (CASH_REGISTER-F02): the drawer's «Name», required. «Save» creates it (or
-// renames it) and says so; a name another drawer already has — whatever its case — is said at the field.
+// renames it) and says so; a name another drawer already has — whatever its case — is said at the field until the
+// person types another one.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
+
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
@@ -32,10 +35,14 @@ watch(
   },
   { immediate: true },
 );
+watch(name, () => {
+  missing.value = false;
+});
 
 const pending = computed(() => create.pending.value || update.pending.value);
 const error = computed<FormModalError | null>(() => refusal(create.error.value ?? update.error.value, t('cash_register.registers.modal.failed')));
-const nameError = computed(() => (missing.value ? t('cash_register.registers.modal.required') : (error.value?.fields?.name ?? null)));
+const nameError = (fieldErrors: Readonly<Record<string, string>>): string | undefined =>
+  missing.value ? t('cash_register.registers.modal.required') : fieldErrors.name;
 
 async function confirm(): Promise<void> {
   const text = name.value.trim();
@@ -50,11 +57,14 @@ async function confirm(): Promise<void> {
   void toastSuccess(t(props.register ? 'cash_register.registers.modal.renamed' : 'cash_register.registers.modal.created'));
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('cash-register-register', name, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     size="sm"
     testid="cash-register-register"
     :title="register ? $t('cash_register.registers.modal.rename') : $t('cash_register.registers.modal.create')"
@@ -64,17 +74,20 @@ async function confirm(): Promise<void> {
     :error="error"
     @submit="confirm"
   >
-    <ion-input
-      data-testid="cash-register-register-name"
-      :label="$t('cash_register.registers.modal.name')"
-      label-placement="stacked"
-      fill="outline"
-      mode="md"
-      :maxlength="100"
-      :value="name"
-      :error-text="nameError ?? undefined"
-      :class="{ 'ion-invalid': !!nameError, 'ion-touched': !!nameError }"
-      @ion-input="name = String($event.detail.value ?? '')"
-    />
+    <template #default="{ fieldErrors }">
+      <ion-input
+        data-testid="cash-register-register-name"
+        name="name"
+        :label="$t('cash_register.registers.modal.name')"
+        label-placement="stacked"
+        fill="outline"
+        mode="md"
+        :maxlength="100"
+        :value="name"
+        :error-text="nameError(fieldErrors)"
+        :class="{ 'ion-invalid': !!nameError(fieldErrors), 'ion-touched': !!nameError(fieldErrors) }"
+        @ion-input="name = String($event.detail.value ?? '')"
+      />
+    </template>
   </FormModal>
 </template>

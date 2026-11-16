@@ -9,13 +9,14 @@ from apps.customer import events, services
 
 E = events
 SERVICES_SOURCE = Path(services.__file__).read_text()
-CARD_GONE = [E.CUSTOMER_DELETED, E.CUSTOMER_MERGED, E.CUSTOMER_ERASED]
+#: A card that leaves the lists (deleted, merged into another or erased) or comes back to them (restored, CUSTOMER-F33).
+CARD_IN_OR_OUT = [E.CUSTOMER_DELETED, E.CUSTOMER_MERGED, E.CUSTOMER_ERASED, E.CUSTOMER_RESTORED]
 
 EXPECTED = {
     "customer.customer.list": [
         E.CUSTOMER_CREATED,
         E.CUSTOMER_UPDATED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
         E.PURCHASE_RECORDED,
         E.PURCHASE_VOIDED,
         E.PURCHASE_REFUNDED,
@@ -24,7 +25,7 @@ EXPECTED = {
         E.CUSTOMER_UPDATED,
         E.CUSTOMER_GROUPS_CHANGED,
         E.CUSTOMER_TAGS_CHANGED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
         E.CONSENT_GRANTED,
         E.CONSENT_WITHDRAWN,
         E.PURCHASE_RECORDED,
@@ -39,7 +40,7 @@ EXPECTED = {
     "customer.customer.stats": [
         E.CUSTOMER_CREATED,
         E.CUSTOMER_UPDATED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
         E.PURCHASE_RECORDED,
         E.PURCHASE_VOIDED,
         E.PURCHASE_REFUNDED,
@@ -49,14 +50,14 @@ EXPECTED = {
         E.GROUP_UPDATED,
         E.GROUP_DELETED,
         E.CUSTOMER_GROUPS_CHANGED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
     "customer.tag.list": [
         E.TAG_CREATED,
         E.TAG_UPDATED,
         E.TAG_DELETED,
         E.CUSTOMER_TAGS_CHANGED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
     "customer.field.list": [E.FIELD_CREATED, E.FIELD_UPDATED, E.FIELD_DELETED],
     "customer.activity.list": [
@@ -70,36 +71,36 @@ EXPECTED = {
         E.HEALTH_CONSENT_GRANTED,
         E.HEALTH_CONSENT_WITHDRAWN,
         E.HEALTH_UPDATED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
-    "customer.purchase.list": [E.PURCHASE_RECORDED, E.PURCHASE_VOIDED, E.PURCHASE_REFUNDED, *CARD_GONE],
+    "customer.purchase.list": [E.PURCHASE_RECORDED, E.PURCHASE_VOIDED, E.PURCHASE_REFUNDED, *CARD_IN_OR_OUT],
     "customer.purchase.divergences": [
         E.PURCHASE_RECORDED,
         E.PURCHASE_VOIDED,
         E.PURCHASE_REFUNDED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
     "customer.consent.state": [
         E.CONSENT_GRANTED,
         E.CONSENT_WITHDRAWN,
         E.HEALTH_CONSENT_GRANTED,
         E.HEALTH_CONSENT_WITHDRAWN,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
     "customer.consent.history": [
         E.CONSENT_GRANTED,
         E.CONSENT_WITHDRAWN,
         E.HEALTH_CONSENT_GRANTED,
         E.HEALTH_CONSENT_WITHDRAWN,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
-    "customer.order.customer": [E.ORDER_LINKED, E.ORDER_UNLINKED, *CARD_GONE],
-    "customer.order.list": [E.ORDER_LINKED, E.ORDER_UNLINKED, *CARD_GONE],
+    "customer.order.customer": [E.ORDER_LINKED, E.ORDER_UNLINKED, *CARD_IN_OR_OUT],
+    "customer.order.list": [E.ORDER_LINKED, E.ORDER_UNLINKED, *CARD_IN_OR_OUT],
     "customer.health.detail": [
         E.HEALTH_CONSENT_GRANTED,
         E.HEALTH_CONSENT_WITHDRAWN,
         E.HEALTH_UPDATED,
-        *CARD_GONE,
+        *CARD_IN_OR_OUT,
     ],
 }
 

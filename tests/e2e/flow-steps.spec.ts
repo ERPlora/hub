@@ -1,6 +1,6 @@
 // flow: FLOW-F24 FLOW-F25 FLOW-F26 FLOW-F27 FLOW-F28 FLOW-F29
-// The steps of part 2 of Automations (apps/flow/WORKBOOK.md), end to end in each of the three sizes, against
-// the real Tasks app, with one screenshot per flow and size (`APP-FLOW-2-<flow>-<width>`). A run stopped by a
+// The steps of Automations FLOW-F24 to F29 (apps/flow/WORKBOOK.md), end to end in each of the three sizes,
+// against the real Tasks app, with one screenshot per flow and size. A run stopped by a
 // permission is resumed from the step that failed once allowed (F24); a step that fails carries on and the
 // next one runs only if it failed (F25); a secret is saved in «Call another system» and never comes back
 // (F26); the call is built, tried, allowed and run: «Run now» answers with the run «calling», the worker's

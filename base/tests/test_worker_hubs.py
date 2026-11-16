@@ -1,11 +1,11 @@
-"""The worker relays the outbox and runs the scheduled tasks of every hub with its own database (review of hub#471, C1).
+"""The worker relays the outbox and runs the scheduled tasks of every hub with its own database.
 
 A hub with its own database records its events (``live.OutboxEvent``) and keeps its schedule (``base.TaskSchedule``) in
-that database: the pass over phase 1's shared database never sees them. Every tick, after that pass, the worker enters
+that database: the pass over the control database never sees them. Every tick, after that pass, the worker enters
 each ready hub with its own database (``use_hub``), relays its outbox, writes its apps' schedule once per process and
 runs the tasks due in it, as the system on that hub's own scope (``host``, its slug: their live notices go on its
-channel, not the platform's; ``FIX-SCHEDULED-TASK-LIVE-NOTICE-WRONG-CHANNEL``), within a time budget per tick and one
-hub's connection at a time. A hub still being prepared is never entered.
+channel, not the platform's), within a time budget per tick and one hub's connection at a time. A hub still being
+prepared is never entered.
 
 Real databases: the session's two hubs (``hub_a``, ``hub_b``; ``base/tenancy/tests/hubs.py``), committed
 (``transaction=True``: the relay releases its connections between steps).
@@ -164,9 +164,9 @@ def test_a_hub_that_fails_midway_leaves_no_connection_open_either(hub_a, monkeyp
 
 @pytest.mark.parametrize("status", [Hub.Status.CANCELLED, Hub.Status.ARCHIVING])
 def test_a_business_that_left_still_sends_what_it_owes_the_aeat(hub_a, monkeypatch, status):
-    """Re-review of hub#471: a business cancelled (or being archived) with records still to send keeps its outbox
-    relayed and its tasks run, VeriFactu's queue first: every ticket with a QR reaches the AEAT (working rules §15). The
-    pass over the shared database never looked at a hub's status either."""
+    """A business cancelled (or being archived) with records still to send keeps its outbox relayed and its tasks
+    run, VeriFactu's queue first: every ticket with a QR reaches the AEAT. The pass over the control database does not
+    look at a hub's status either."""
     ran = []
     monkeypatch.setattr(scheduler, "_execute", lambda name, scope=None: ran.append((name, scope.key)))
     Hub.objects.filter(pk=hub_a.pk).update(status=status)
@@ -198,6 +198,22 @@ def test_a_demo_whose_time_is_up_is_never_entered(hub_a, monkeypatch):
     served = []
     monkeypatch.setattr(worker, "_serve_hub", lambda hub, now, **sweep: served.append(hub.slug))
     Hub.objects.filter(pk=hub_a.pk).update(is_demo=True, expires_at=timezone.now() - dt.timedelta(minutes=1))
+
+    with use_control():
+        worker._hubs(timezone.now())
+
+    assert served == []
+
+
+def test_a_hub_being_restored_is_never_entered(hub_a, monkeypatch):
+    # Its database is being put back as it was at a moment (base.tenancy.restore): nothing is relayed nor run in it.
+    from control.models import Cluster
+
+    served = []
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    Hub.objects.filter(pk=hub_a.pk).update(
+        restoring_from=Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False)
+    )
 
     with use_control():
         worker._hubs(timezone.now())

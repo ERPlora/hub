@@ -9,6 +9,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { computed, ref, useTemplateRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { blankCustomer, createInput, ESSENTIAL_FIELDS, MORE_FIELDS } from '../lib/customerForm';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
@@ -16,6 +18,7 @@ import type { CustomerDetailOut } from '../operations';
 import CustomerForm from './CustomerForm.vue';
 
 const open = defineModel<boolean>('open', { default: false });
+
 const emit = defineEmits<{ created: [customer: CustomerDetailOut] }>();
 
 const { t } = useCustomerI18n();
@@ -50,11 +53,14 @@ async function save(): Promise<void> {
   emit('created', customer);
   void toastSuccess(t('customer.create.created', { name: customer.name }));
 }
+
+const canDismiss = useUnsavedFormOnOpen('customer-create', () => form.value, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="customer-create"
     :title="$t('customer.create.title')"
     :pending="pending"

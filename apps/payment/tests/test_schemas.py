@@ -106,7 +106,7 @@ def test_the_method_is_said_by_its_id_or_its_name():
 def test_the_currency_is_an_iso_code_uppercased():
     assert payment_in(currency="usd").currency == "USD"
     assert payment_in(currency=" jpy ").currency == "JPY"
-    # Blank counts as absent: the business's currency (the old payments#38).
+    # Blank counts as absent: the business's currency.
     assert payment_in(currency="  ").currency is None
     with pytest.raises(ValidationError) as caught:
         payment_in(currency="XYZ")
@@ -130,7 +130,7 @@ def test_an_invalid_iban_is_refused_with_its_reason(iban):
 
 
 def test_the_attempt_key_is_a_uuid_and_optional():
-    # payments#8: a caller that may send twice (a retry, a double tap) says which attempt it is.
+    # A caller that may send twice (a retry, a double tap) says which attempt it is.
     key = "0192f0a4-6f43-7b4e-9a8e-2f1c3d4b5a69"
     assert str(payment_in(idempotency_key=key).idempotency_key) == key
     assert payment_in().idempotency_key is None

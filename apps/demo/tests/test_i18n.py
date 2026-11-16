@@ -1,17 +1,17 @@
 """Every visible text of the demo app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 import uuid
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
-from apps.demo import queries, services
+from apps.demo import queries, schemas, services
 from apps.demo.models import Item, ItemLine
-from base.tests.po import po_entries
+from base.tests.po import compiled_differences, config_texts, missing_from_catalogue, model_texts, untranslated
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("demo").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -20,43 +20,32 @@ def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, admin, choices, error messages)."""
     config = apps.get_app_config("demo")
     lazies = [
-        config.verbose_name,
         # The public store's texts (round 16): register_apps writes them in en and es.
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         queries.ITEM_NOT_FOUND,
+        queries.NO_ITEM_CALLED,
+        queries.SEVERAL_ITEMS,
+        schemas.NO_ITEM,
         services.ITEM_DONE,
     ]
-    for model in (Item, ItemLine):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        # The primary key comes from live.models.UUIDModel: its name is Django's default, not a text of this app.
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts((Item, ItemLine))
     lazies += list(Item.Status.labels)
     with translation.override("en"):
         return {str(text) for text in lazies}
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Demo by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=15, with_context=0) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts():
@@ -64,17 +53,35 @@ def test_spanish_texts():
         assert str(Item.Status.DONE.label) == "Hecho"
         assert str(services.ITEM_DONE) == "Este elemento está cerrado: ábrelo para añadir líneas."
         assert str(queries.ITEM_NOT_FOUND) == "Este elemento ya no existe."
+        assert str(schemas.NO_ITEM) == "Di qué elemento: su id o su nombre."
+        assert str(queries.NO_ITEM_CALLED) % {"said": "Ensayo"} == "Ningún elemento se llama «Ensayo»."
+        assert str(queries.SEVERAL_ITEMS) % {"said": "Ensayo", "names": "Ensayo 1, Ensayo 2"} == (
+            "Hay varios elementos que se llaman «Ensayo»: Ensayo 1, Ensayo 2. Di cuál."
+        )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/demo/items/update",
         json.dumps({"id": str(uuid.uuid7()), "name": "x"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404
     assert response.json()["error"]["message"] == "Este elemento ya no existe."
+
+
+@HUB_DB
+def test_a_name_that_fits_several_items_or_none_is_told_in_the_language_of_the_request(client, make_user):
+    """hub#1162: the 409 names the items, and the 404 the name nobody has, in the person's language."""
+    client.force_login(make_user("boss", role="hub_admin"))
+    for _ in range(2):
+        Item.objects.create(name="Ensayo")
+    response = client.get("/api/demo/items/detail", {"called": "ensayo"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
+    assert response.status_code == 409
+    assert response.json()["error"]["message"] == "Hay varios elementos que se llaman «ensayo»: Ensayo, Ensayo. Di cuál."
+    none = client.get("/api/demo/items/detail", {"called": "Otoño"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
+    assert (none.status_code, none.json()["error"]["message"]) == (404, "Ningún elemento se llama «Otoño».")

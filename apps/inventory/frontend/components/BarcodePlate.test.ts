@@ -1,5 +1,5 @@
 // INVENTORY-F25 (WORKBOOK «Ficha del producto»): the SKU's barcode on a white plate with the SKU under it,
-// black on white in every theme so a scanner reads it (inventory#45).
+// black on white in every theme so a scanner reads it.
 import { describe, expect, it } from 'vitest';
 
 import { flush, mountInventory } from '../__tests__/mount-inventory';

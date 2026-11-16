@@ -120,7 +120,7 @@ async function chargeAtTheTill(page: Page): Promise<void> {
   await expect(page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt]')).toBeVisible();
 }
 
-test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close, with a cash sale of the till', async ({ page }) => {
+test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close, with a cash sale of the till @smoke', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/cash_register/sessions');
   await sessionsReady(page);
@@ -244,8 +244,8 @@ async function closedSession(context: BrowserContext, float: number): Promise<st
   return opened.data.id;
 }
 
-// flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
-test('FIX-DATATABLE-HUB-FILTERS-2B: Sessions filter by Opening (euros) behind the funnel, with its count, the panel open at every width; a wrong amount is said under it', async ({
+// flow: none — the column filters sit behind the table's funnel, as in the old hub.
+test('Sessions filter by Opening (euros) behind the funnel, with its count, the panel open at every width; a wrong amount is said under it', async ({
   page,
   context,
 }) => {
@@ -264,7 +264,7 @@ test('FIX-DATATABLE-HUB-FILTERS-2B: Sessions filter by Opening (euros) behind th
     await expect(rowOf(page, other)).toBeVisible();
     await toggle.click();
     await expect(panel).toBeVisible();
-    // «43,21» as typed: euros, sent as 4321 cents (cash_register#103, hub#2271).
+    // «43,21» as typed: euros, sent as 4321 cents.
     await box('opening_min').fill('43,21');
     await box('opening_max').fill('43,21');
     await panel.locator('[data-testid=cash-register-sessions-filters-apply]').click();

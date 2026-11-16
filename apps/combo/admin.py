@@ -1,9 +1,8 @@
 """Django admin of the combo app: full CRUD on every model, for the platform's staff.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables. A raw admin write records no event and checks no business rule beyond the database's (a menu
-eaten in with its tax category, a course's ceiling, a product once per course): the screens and the
-assistant go through services.py.
+The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
+beyond the database's (a menu eaten in with its tax category, a course's ceiling, a product once per course): the
+screens and the assistant go through services.py.
 """
 
 from django.contrib import admin

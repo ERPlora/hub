@@ -2,7 +2,7 @@
 
 The helpers that freeze a line (``freeze_product_line``, ``freeze_open_line``, ``freeze_service_line``)
 read Inventory's product and units, and Services' service, through those apps' own operations, with
-the caller's session: neither is a requirement of the sale app (PLAN §20.5), so their tables are never
+the caller's session: neither is a requirement of the sale app, so their tables are never
 read here. ``call_app`` is the one door to an app sale does not require (Inventory's catalog, Services' catalog and
 voucher sessions, Invoicing's documents, Cash register's drawer, Appointments' bookings), by the name of its operation:
 the platform's ``base.operations.call``, with this app's own 409 when that app is not in the business. ``valuate`` is the one
@@ -48,6 +48,7 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
 )
 from apps.sale.schemas import (
     BusinessDayOut,
@@ -70,7 +71,6 @@ from apps.sale.schemas import (
     ProductLineIn,
     QuickNoteListIn,
     QuickNotePage,
-    RecordOut,
     RecordRefIn,
     RefundByKeyIn,
     RefundByKeyOut,
@@ -105,6 +105,7 @@ from base.business import currency_decimals
 from base.models import Approval
 from base.operations import call
 from base.ordering import list_order
+from base.schemas import RecordNameOut
 
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"
@@ -149,6 +150,10 @@ APPOINTMENT_UNAVAILABLE = _("Appointments is not active in this business.")
 STAFF_UNAVAILABLE = _("Staff is not active in this business.")
 LINE_NOT_FOUND = _("That line does not exist.")
 TENDER_NOT_FOUND = _("That tender does not exist.")
+REFUND_NOT_FOUND = _("That refund does not exist.")
+#: How a refund is said where something names it (the card of Services' write that gives back the sessions a refund
+#: returns): it has no number of its own, «Sales» lists it under its sale.
+REFUND_OF_SALE = _("Refund of sale %(number)s")
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
     "customer's, it did not book this service or it booked it cheaper."
@@ -249,7 +254,7 @@ def authoriser(ctx: OperationContext) -> str:
             ),
             "es": (
                 "¿a qué día estamos para el negocio?",
-                "¿en qué fecha va la caja ahora mismo?",
+                "¿qué día de negocio es hoy?",
             ),
         },
     ),
@@ -350,7 +355,7 @@ def get_pos_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     return settings_row(current_settings())
 
 
-# ── The business on paper (SALE-F21, SALE-F29; hub#458) ──────────────────────────────────────────────
+# ── The business on paper (SALE-F21, SALE-F29) ───────────────────────────────────────────────────────
 
 #: What the papers read of other apps, by name: Invoicing is no ``requires`` of Sales.
 ISSUER = "invoice.issuer.get"
@@ -536,18 +541,21 @@ def held_methods(ids: Iterable[UUID]) -> set[UUID]:
     output=PaymentMethodPage,
     expose_api=True,
     ai=AI(
-        description="List the active payment methods in the order of the charge sheet, with their type (cash, card, "
-        "transfer, other) and whether the till settings let them charge today.",
+        description="List the active payment methods customers can pay with, in the order of the charge sheet, with "
+        "their type (cash, card, transfer, other) and whether the till settings let them charge today.",
         asks={
             "en": (
                 "which payment methods do we take?",
                 "do we accept Bizum?",
                 "what can they pay with here?",
+                "which ways of settling up do we offer?",
             ),
             "es": (
                 "¿qué formas de pago aceptamos?",
                 "¿se puede pagar con Bizum?",
                 "¿con qué me pueden pagar?",
+                "¿de cuántas maneras distintas se puede pagar aquí?",
+                "¿con qué medios de pago abonan los clientes aquí?",
             ),
         },
     ),
@@ -589,7 +597,7 @@ def department_rates(departments: list[Department]) -> dict:
     return current_rates(categories, *business_jurisdiction(), business_today())
 
 
-def _find_named(
+def _find_named(  # noqa: PLR0913
     rows, item_id, said, field: str, *, missing, ambiguous, code: str, lock: bool
 ):
     rows = rows.filter(is_deleted=False)
@@ -799,7 +807,7 @@ def call_services(ctx: OperationContext, name: str, data: dict):
 
 def money_text(cents: int | None, currency: str = LIMITS_CURRENCY) -> str:
     """``cents`` (minor units of ``currency``, with its decimals: none in JPY) as the reader writes money in a sentence,
-    thousands always grouped as every screen paints them («1.234,56 €», «€1,234.56», «PLN 1,234.56»; hub#1090);
+    thousands always grouped as every screen paints them («1.234,56 €», «€1,234.56», «PLN 1,234.56»);
     nothing is «—». Without a currency it is one of Spain's legal limits, which the law writes in euros (Invoicing says
     its ticket limit so too); any other amount passes its own, the sale's or the business's."""
     return "—" if cents is None else business.money_text(cents, currency)
@@ -1329,6 +1337,14 @@ def _tender_name(ctx: OperationContext, payment_id: UUID) -> str:
     return method_display_name(tender.method_name)
 
 
+def _refund_name(ctx: OperationContext, refund_id: UUID) -> str:
+    refund = Refund.objects.select_related("sale").filter(pk=refund_id).first()
+    if refund is None:
+        raise NotFound(str(REFUND_NOT_FOUND), code="sale.refund_not_found")
+    with translation.override(ctx.language):
+        return str(REFUND_OF_SALE) % {"number": refund.sale.number}
+
+
 def _named_by(read: str, unavailable_code: str, name: str = "name"):
     """The name an app Sales does not require gives its record, by its own read and as whoever asks."""
     return lambda ctx, record_id: getattr(call_app(ctx, read, {"id": record_id}, unavailable_code), name)
@@ -1343,6 +1359,7 @@ RECORD_NAMES = {
     "line_id": _check_line_name,
     "sale_line_id": _sale_line_name,
     "payment_id": _tender_name,
+    "refund_id": _refund_name,
     "product_id": _named_by("inventory.product.get", "sale.catalog_unavailable"),
     "service_id": _named_by("service.service.get", "sale.services_unavailable"),
     "combo_id": _named_by("combo.combo.get", "sale.combo_unavailable"),
@@ -1359,7 +1376,7 @@ RECORD_NAMES = {
     kind="query",
     permission="sale.view_sale",
     input=RecordRefIn,
-    output=RecordOut,
+    output=RecordNameOut,
     ai=INTERNAL,
 )
 def get_record(ctx: OperationContext, data: RecordRefIn) -> dict:
@@ -1573,7 +1590,16 @@ def valuate(
         close=pricing.tax_closer(on),
         ticket_percent=discount_percent,
         ticket_amount=discount_amount,
+        category_name=tax_category_name,
     )
+
+
+def tax_category_name(key: str) -> str:
+    """The name Taxes shows for the tax category ``key``, in the active language (a factory category's
+    translated, one of the business's as typed); the key itself once no category has it (deleted in the Hub
+    admin after the line was added). Read only when a line is refused for want of a rule."""
+    category = TaxCategory.objects.filter(key=key).first()
+    return category.display_name if category else key
 
 
 def breakdown_rows(breakdown: list[dict]) -> list[dict]:
@@ -1617,7 +1643,7 @@ def operation_total(order: Order | None, closes: bool, valuation: pricing.Valuat
     return charged + rest.total
 
 
-def loose_lines(
+def loose_lines(  # noqa: PLR0913
     ctx: OperationContext,
     lines: list,
     open_lines: list,
@@ -1735,6 +1761,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "operation_total": operation_total(order, closes, valuation),
         "cash_limit": CASH_LIMIT.get(country),
         "ticket_limit": TICKET_LIMIT.get(country),
+        "limits_currency": LIMITS_CURRENCY,
     }
 
 
@@ -2256,11 +2283,19 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
         )
     )
     refunded, voucher_sold_back = _refunded_by_staff(params)
+    # The sessions spent outside the till (SERVICE-F21) are on no line: they count apart, each once.
+    off_till = dict(
+        _period(VoucherSession.objects.order_by(), params)
+        .values("staff_id")
+        .annotate(worth=Sum("value"))
+        .values_list("staff_id", "worth")
+    )
     totals = []
     for row in rows:
         given_back = refunded.get(row["served_by"], 0)
         revenue = row["gross"] - given_back
         voucher_sold = row["voucher_sold"] - voucher_sold_back.get(row["served_by"], 0)
+        sessions = row["sessions"] + off_till.pop(row["served_by"], 0)
         totals.append(
             {
                 "staff_id": row["served_by"],
@@ -2271,12 +2306,26 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
                 "refunded_total": given_back,
                 "total_revenue": revenue,
                 "voucher_sold_total": voucher_sold,
-                "voucher_total": row["sessions"],
-                "production_total": revenue - voucher_sold + row["sessions"],
+                "voucher_total": sessions,
+                "production_total": revenue - voucher_sold + sessions,
             }
         )
+    for staff_id, sessions in off_till.items():
+        totals.append({"staff_id": staff_id, **NO_MONEY, "voucher_total": sessions, "production_total": sessions})
     totals.sort(key=lambda total: (-total["production_total"], total["staff_id"]))
     return {"rows": totals}
+
+
+#: The money figures of a professional who only did sessions outside the till: no line of the period is hers.
+NO_MONEY = {
+    "sales_count": 0,
+    "gross_total": 0,
+    "net_total": 0,
+    "tax_total": 0,
+    "refunded_total": 0,
+    "total_revenue": 0,
+    "voucher_sold_total": 0,
+}
 
 
 def _refunded_by_staff(params: PeriodIn) -> tuple[dict[UUID, int], dict[UUID, int]]:
@@ -2377,8 +2426,10 @@ def tender_options(sale: Sale) -> list[dict]:
     output=RefundOptionsOut,
     expose_api=True,
     ai=AI(
-        description="What a sale can still give back: for each tender, what it charged, what it already returned, what is "
-        "left and whether it can go back through its own method; for each line, the units already returned and left.",
+        description="Refund options: what a sale can still give back, for each tender and each line. For each tender, "
+        "what it charged, what it already returned, what is left and whether it can go back through its own method; "
+        "for each line, the units already returned and left. Use this read before sale.sale.refund. If no sale number "
+        "was given, find the sale with sale.sale.list; never ask the person for its internal id.",
         asks={
             "en": (
                 "how much can I still give back on that sale?",
@@ -2446,7 +2497,9 @@ def refund_row(refund: Refund) -> dict:
     output=RefundListOut,
     expose_api=True,
     ai=AI(
-        description="List the refunds of a sale, newest first, with their amount, reason and who made them.",
+        description="List the refunds of a sale, newest first, with their amount, reason and who made them. If no sale "
+        "number was given, find the sale with sale.sale.list rather than looking through open checks; never ask the "
+        "person for its internal id.",
         asks={
             "en": (
                 "what refunds did that sale have?",

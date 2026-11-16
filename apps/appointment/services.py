@@ -49,11 +49,13 @@ from apps.appointment.models import (
 from apps.appointment.queries import (
     ADD_OWN,
     APPOINTMENT_NOT_FOUND,
+    BLOCK_NOT_FOUND,
     BUSY,
     CHANGE_ALL,
     CHANGE_OWN,
     CUSTOMER_SOURCES,
     MOVABLE,
+    RECURRING_NOT_FOUND,
     SERIES_DEFAULT_WINDOW,
     blocked_out,
     by_person,
@@ -80,6 +82,7 @@ from apps.appointment.queries import (
 from apps.appointment.schemas import (
     END_BEFORE_START,
     AppointmentCreateIn,
+    AppointmentIdIn,
     AppointmentOut,
     AppointmentRefIn,
     AppointmentsOut,
@@ -108,6 +111,7 @@ from apps.appointment.schemas import (
     OrderVoidedIn,
     SaleFromAppointmentIn,
     SaleVoidedIn,
+    ServiceRefIn,
     SettingsIn,
     SettingsOut,
     UpdateIn,
@@ -181,6 +185,7 @@ RECURRING_NO_STAFF = _(
     "This repeating appointment has no professional: edit it and choose who does it."
 )
 CALENDAR_UPSIDE_DOWN = _("The calendar has to end after it starts.")
+OCCURRENCE_BOOKED = _("Its repeating appointment has booked that date again since.")
 BATCH_AT = _("%(time)s: %(reason)s")
 
 
@@ -228,7 +233,7 @@ def _event(ctx: OperationContext, name: str, appointment: Appointment, **extra) 
     )
 
 
-def _history(
+def _history(  # noqa: PLR0913
     ctx: OperationContext,
     appointment: Appointment,
     action: str,
@@ -261,11 +266,22 @@ def _lock_members(*members: Member | None) -> None:
         )
 
 
-def _locked_card(data):
+def _locked_card(ctx: OperationContext, data):
     """The customer's card a booking or a series is for, locked as Customers' writes and the Hub admin's
     «Delete» of a card take it: a deletion under way is waited for and the card is gone (404), and one that
     comes after waits for the booking and finds the row that protects the card."""
-    return find_customer(data.customer_id, data.customer, lock=True)
+    return find_customer(ctx, data.customer_id, data.customer, lock=True)
+
+
+def _booking_basis(ctx: OperationContext, data) -> tuple:
+    """What a booking and a batch of bookings start from: the customer's card (locked, ``_locked_card``), the
+    professional who performs the services, their lines and the minutes (the ones sent, else the services')."""
+    customer = _locked_card(ctx, data)
+    services = resolve_services(data.services)
+    member = _member_for_booking(ctx, data.staff_id, data.staff, services)
+    lines = lines_for(member, services)
+    minutes = data.duration_minutes or sum(line["duration_minutes"] for line in lines)
+    return customer, member, lines, minutes
 
 
 def lock_appointments(ids) -> list[UUID]:
@@ -307,7 +323,7 @@ def _refuse(code: str) -> None:
     )
 
 
-def _judge(
+def _judge(  # noqa: PLR0913
     ctx: OperationContext,
     member: Member | None,
     start: dt.datetime,
@@ -363,7 +379,7 @@ def _save_lines(appointment: Appointment, lines: list[dict]) -> None:
     )
 
 
-def _create(
+def _create(  # noqa: PLR0913
     ctx: OperationContext,
     *,
     customer,
@@ -446,6 +462,16 @@ def _member_for_booking(
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "make an appointment for Lucía on Friday at 5 pm with Inés for a colour",
+                "put Julia down for an appointment tomorrow at 10",
+            ),
+            "es": (
+                "dale cita a Lucía el viernes a las 17:00 para un tinte con Inés",
+                "crea una cita para Julia mañana a las 10:00",
+            ),
+        },
         "description": "Book an appointment: a customer (by name, phone or email), one or more services (by name) and a "
         "professional (by name) at a wall-clock time of the business (e.g. tomorrow at 10:00 with Ana for a haircut). "
         "Names, prices and lengths are frozen from the catalog. It is refused with its reason when the business is "
@@ -456,11 +482,7 @@ def _member_for_booking(
     },
 )
 def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict:
-    customer = _locked_card(data)
-    services = resolve_services(data.services)
-    member = _member_for_booking(ctx, data.staff_id, data.staff, services)
-    lines = lines_for(member, services)
-    minutes = data.duration_minutes or sum(line["duration_minutes"] for line in lines)
+    customer, member, lines, minutes = _booking_basis(ctx, data)
     start = read_moment(data.start, "start")
     by_customer = data.source in CUSTOMER_SOURCES
     _judge(
@@ -494,6 +516,16 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
     output=AppointmentsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "book Carmen's five sessions every Monday at 4 pm in one go",
+                "make three appointments for Julia at once, all or none",
+            ),
+            "es": (
+                "dale de golpe a Carmen sus cinco sesiones, los lunes a las 16:00",
+                "mete tres citas a Julia a la vez, todas o ninguna",
+            ),
+        },
         "description": "Book several times at once (1 to 50) for the same customer, services and professional (a "
         "voucher's sessions, a course). All or none: the first time that does not fit refuses the whole batch with "
         "its reason.",
@@ -501,11 +533,7 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
     },
 )
 def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
-    customer = _locked_card(data)
-    services = resolve_services(data.services)
-    member = _member_for_booking(ctx, data.staff_id, data.staff, services)
-    lines = lines_for(member, services)
-    minutes = data.duration_minutes or sum(line["duration_minutes"] for line in lines)
+    customer, member, lines, minutes = _booking_basis(ctx, data)
     starts = sorted(read_moment(value, "starts") for value in data.starts)
     zone = business_zone()
     agenda = load_agenda(
@@ -567,7 +595,7 @@ def _acting_for_customer(ctx: OperationContext, appointment: Appointment, data) 
     way whoever writes it down may change it (acting for her never widens their own permissions)."""
     by_customer = bool(data.on_behalf_of_customer)
     if by_customer:
-        asking = find_customer(data.customer_id, data.customer)
+        asking = find_customer(ctx, data.customer_id, data.customer)
         if asking.id != appointment.customer_id:
             raise NotFound(
                 str(APPOINTMENT_NOT_FOUND), code="appointment.appointment_not_found"
@@ -577,7 +605,7 @@ def _acting_for_customer(ctx: OperationContext, appointment: Appointment, data) 
     return by_customer
 
 
-def _move(
+def _move(  # noqa: C901, PLR0913
     ctx: OperationContext,
     appointment: Appointment,
     *,
@@ -701,11 +729,22 @@ def _move(
 @operation(
     "appointment.appointment.reschedule",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RescheduleIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "move Sara's appointment to Thursday at 11",
+                "push Clara's 5 pm appointment back an hour",
+            ),
+            "es": (
+                "pasa la cita de Sara al jueves a las 11:00",
+                "retrasa una hora la cita de las 17:00 de Clara",
+            ),
+        },
         "description": "Move an appointment (by its number or id) to another wall-clock time, change its length, hand "
         "it to another professional (by name) or change its services; only pending or confirmed, uncharged ones move. "
         "Judged like a new booking. on_behalf_of_customer=true (with the customer) when she asks herself: it must be "
@@ -734,11 +773,22 @@ def reschedule(ctx: OperationContext, data: RescheduleIn) -> dict:
 @operation(
     "appointment.appointment.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=UpdateIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add to Lucía's appointment that she is allergic to ammonia",
+                "fix the phone number on Julia's appointment",
+            ),
+            "es": (
+                "cambia las notas de la cita de Lucía: es alérgica al amoniaco",
+                "corrige el teléfono de la cita de Julia",
+            ),
+        },
         "description": "Edit an appointment: only what is sent changes — its notes (the visit's notes, e.g. the colour "
         "formula, in any state), the customer's phone (saved as +34…) or email on it, and, judged like a move, its "
         "time, length, professional or services.",
@@ -796,7 +846,7 @@ def update_appointment(ctx: OperationContext, data: UpdateIn) -> dict:
 # ── States (F03, F05, F07, F08, F09) ─────────────────────────────────────────────────────────
 
 
-def _transition(
+def _transition(  # noqa: PLR0913
     ctx: OperationContext,
     data: AppointmentRefIn,
     *,
@@ -822,11 +872,22 @@ def _transition(
 @operation(
     "appointment.appointment.confirm",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "confirm Teresa's pending appointment",
+                "accept the appointment Paula is waiting on",
+            ),
+            "es": (
+                "da por buena la cita pendiente de Teresa",
+                "acepta la cita que tiene pendiente Paula",
+            ),
+        },
         "description": "Confirm a pending appointment (a booking the customer made, waiting for review).",
         "risk": "normal",
     },
@@ -846,11 +907,22 @@ def confirm(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.start",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Clara is here, start her appointment",
+                "Sara just walked in for her 10 o'clock",
+            ),
+            "es": (
+                "ya está aquí Clara, empieza su cita",
+                "ha llegado Sara a su cita de las 10:00, ponla en curso",
+            ),
+        },
         "description": "The customer arrived: start the service of a pending or confirmed appointment.",
         "risk": "normal",
     },
@@ -870,11 +942,23 @@ def start(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Julia's appointment is finished",
+                "mark Pilar's appointment as completed",
+            ),
+            "es": (
+                "ya hemos acabado con la cita de Julia",
+                "da por completada la cita de Pilar",
+                "ya está prestado el tinte de Clara, da su cita por acabada",
+            ),
+        },
         "description": "Complete an appointment in progress (or confirmed). Charging it also completes it.",
         "risk": "normal",
     },
@@ -894,13 +978,25 @@ def complete(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.mark_no_show",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=AppointmentRefIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Inés never showed up for her appointment",
+                "mark Carmen's appointment as a no-show",
+            ),
+            "es": (
+                "Inés no vino a su cita",
+                "apunta que Carmen faltó a la cita de ayer",
+                "Beatriz no se ha presentado a su cita de las 12:00",
+            ),
+        },
         "description": "Record that the customer did not show up, once the appointment's time has passed (pending or "
-        "confirmed, not charged). Ask the person before doing it.",
+        "confirmed, not charged).",
         "risk": "high",
     },
 )
@@ -928,14 +1024,25 @@ def mark_no_show(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=CancelIn,
     output=AppointmentOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel Beatriz's appointment on Friday",
+                "Sara can't make it, call off her appointment",
+            ),
+            "es": (
+                "anula la cita del viernes de Beatriz",
+                "a Sara le ha surgido algo, cancela su cita del jueves",
+            ),
+        },
         "description": "Cancel an appointment (pending, confirmed or no-show; not a charged one), with an optional "
         "reason; its time becomes free. on_behalf_of_customer=true (with the customer) when she cancels herself: it "
-        "must be hers and the business's cancellation policy applies. Ask the person before doing it.",
+        "must be hers and the business's cancellation policy applies.",
         "risk": "high",
         # An automation cancels anybody's (``is_own``), so a yes to it is only of someone who may too (FLOW-F28).
         "yes_permission": CHANGE_ALL,
@@ -993,13 +1100,24 @@ def _delete(ctx: OperationContext, appointment: Appointment) -> None:
 @operation(
     "appointment.appointment.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=DELETE,
     input=AppointmentRefIn,
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete Lucía's appointment from the agenda",
+                "erase that test appointment of Friday",
+            ),
+            "es": (
+                "borra de la agenda la cita de Lucía",
+                "quita del todo la cita de prueba del viernes",
+            ),
+        },
         "description": "Delete an appointment from the agenda (it is archived, not destroyed): pending, confirmed, "
-        "cancelled or no-show and not charged. Cancelling keeps the record and is usually what is wanted; ask first.",
+        "cancelled or no-show and not charged. Cancelling keeps the record and is usually what is wanted.",
         "risk": "high",
     },
 )
@@ -1012,12 +1130,23 @@ def delete_appointment(ctx: OperationContext, data: AppointmentRefIn) -> dict:
 @operation(
     "appointment.appointment.bulk_delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=DELETE,
     input=BulkDeleteIn,
     output=BulkDeletedOut,
     expose_api=True,
     ai={
-        "description": "Delete several appointments at once (all or none). Ask first.",
+        "asks": {
+            "en": (
+                "delete these three appointments at once",
+                "remove all of Clara's appointments next week in one go",
+            ),
+            "es": (
+                "borra de una vez las tres citas de Clara",
+                "elimina juntas todas las citas de prueba del lunes",
+            ),
+        },
+        "description": "Delete several appointments at once (all or none).",
         "risk": "high",
     },
 )
@@ -1032,6 +1161,58 @@ def bulk_delete(ctx: OperationContext, data: BulkDeleteIn) -> dict:
     return {"deleted": deleted}
 
 
+@operation(
+    "appointment.appointment.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=AppointmentIdIn,
+    output=AppointmentOut,
+    ai={
+        "description": "Bring a deleted appointment back to the agenda, the same one with its number, its history and "
+        "its series (run by the platform when ERPlora's staff recovers the business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def restore_appointment(ctx: OperationContext, data: AppointmentIdIn) -> dict:
+    """A deleted appointment back on the agenda as it was (deleting keeps it, APPOINTMENT-F11), with a line in its
+    history. One already on the agenda is answered as it is."""
+    # Its series first, as every write takes them: a run of the series cannot book its date meanwhile.
+    lock_series(Appointment.objects.filter(pk=data.id).values("recurring_id"))
+    appointment = Appointment.objects.select_for_update(of=("self",)).filter(pk=data.id).first()
+    if appointment is None:
+        raise NotFound(str(APPOINTMENT_NOT_FOUND), code="appointment.appointment_not_found")
+    if appointment.deleted_at is not None:
+        _refuse_unless_restorable(ctx, appointment)
+        appointment.deleted_at = None
+        appointment.updated_by = _actor(ctx)
+        appointment.save(update_fields=["deleted_at", "updated_by", "updated_at"])
+        _history(ctx, appointment, A.RESTORED)
+        _event(ctx, events.APPOINTMENT_RESTORED, appointment)
+    return load_detail(ctx, appointment.id)
+
+
+def _refuse_unless_restorable(ctx: OperationContext, appointment: Appointment) -> None:
+    """A deleted appointment comes back only as the agenda would book it now: for a live card, never on a date its
+    series booked again and, while it is still booked, with its services and its professional bookable at a time
+    that fits (judged by the customer's rules, as the platform always is)."""
+    find_customer(ctx, appointment.customer_id, None)
+    if (
+        appointment.recurring_id
+        and Appointment.objects.filter(
+            recurring_id=appointment.recurring_id,
+            occurrence_date=appointment.occurrence_date,
+            deleted_at__isnull=True,
+        ).exists()
+    ):
+        raise Conflict(str(OCCURRENCE_BOOKED), code="appointment.occurrence_booked")
+    if appointment.status not in MOVABLE:
+        return
+    services = resolve_services([ServiceRefIn(service_id=line.service_id) for line in appointment.lines.all()])
+    member = _member_for_booking(ctx, appointment.staff_id, None, services) if appointment.staff_id else None
+    _judge(ctx, member, appointment.start, appointment.end, customer=True, confirm_overlap=False)
+
+
 # ── Charging (F17) ───────────────────────────────────────────────────────────────────────────
 
 
@@ -1043,10 +1224,20 @@ def bulk_delete(ctx: OperationContext, data: BulkDeleteIn) -> dict:
     output=ChargeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "charge Julia's appointment",
+                "send Paula's appointment to the checkout",
+            ),
+            "es": (
+                "cobra la cita de Julia",
+                "hazle la cuenta a la cita de Paula",
+            ),
+        },
         "description": "Charge an appointment at the till: opens a check in Sales linked to it, titled with the customer "
         "and the appointment's number, with a line per service at the price booked and the professional who did it, "
         "so a voucher of the customer can pay one. While that check is open, charging again goes back to it. "
-        "Charging the check then marks the appointment charged and completed. Ask first.",
+        "Charging the check then marks the appointment charged and completed.",
         "risk": "high",
     },
 )
@@ -1143,11 +1334,22 @@ def _charge_out(appointment: Appointment, order) -> dict:
 @operation(
     "appointment.blocked_time.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SCHEDULE,
     input=BlockedTimeCreateIn,
     output=BlockedTimeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "block the agenda on Christmas Eve",
+                "block Inés's Friday afternoon for a training",
+            ),
+            "es": (
+                "bloquea la agenda el día de Nochebuena",
+                "bloquea la tarde del viernes de Inés por una formación",
+            ),
+        },
         "description": "Block a period of the agenda (a holiday, a training, a professional's break): for the whole "
         "business or one professional (by name), between two wall-clock times or whole days (all_day). Nobody books it.",
         "risk": "normal",
@@ -1190,22 +1392,31 @@ def create_blocked_time(ctx: OperationContext, data: BlockedTimeCreateIn) -> dic
 @operation(
     "appointment.blocked_time.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SCHEDULE,
     input=BlockedTimeRefIn,
     output=DeletedOut,
     expose_api=True,
     ai={
-        "description": "Remove a blocked period: its time can be booked again. Ask first.",
+        "asks": {
+            "en": (
+                "remove the block on Friday afternoon",
+                "unblock the agenda on Christmas Eve",
+            ),
+            "es": (
+                "quita el bloqueo del viernes por la tarde",
+                "desbloquea la agenda de Nochebuena",
+            ),
+        },
+        "description": "Remove a blocked period: its time can be booked again. One the person names by its title or "
+        "its day is found with appointment.blocked_time.list, from today on when no day is said.",
         "risk": "high",
     },
 )
 def delete_blocked_time(ctx: OperationContext, data: BlockedTimeRefIn) -> dict:
     block = BlockedTime.objects.select_for_update().filter(pk=data.id).first()
     if block is None:
-        raise NotFound(
-            str(_("That blocked period does not exist in this business.")),
-            code="appointment.blocked_time_not_found",
-        )
+        raise NotFound(str(BLOCK_NOT_FOUND), code="appointment.blocked_time_not_found")
     block.delete()
     record_event(ctx, events.BLOCKED_TIME_DELETED, {"id": str(data.id)})
     return {"id": data.id}
@@ -1332,6 +1543,16 @@ def _materialize_out(series: Recurring, report: dict) -> dict:
     output=MaterializeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "book Teresa every Tuesday at 6 pm from next week",
+                "book Carmen in every other Thursday at noon",
+            ),
+            "es": (
+                "cita fija para Teresa todos los martes a las 18:00",
+                "crea una cita que se repita los jueves para Carmen",
+            ),
+        },
         "description": "Create a repeating appointment (every day, week, two weeks or month) for a customer, services "
         "and a professional (all by name) at a wall-clock time, from a date, optionally until a date or for a number "
         "of appointments; it books the dates of the booking window at once and lists the dates that did not fit with "
@@ -1340,7 +1561,7 @@ def _materialize_out(series: Recurring, report: dict) -> dict:
     },
 )
 def create_series(ctx: OperationContext, data: RecurringCreateIn) -> dict:
-    customer = _locked_card(data)
+    customer = _locked_card(ctx, data)
     services = resolve_services(data.services)
     member = _member_for_booking(ctx, data.staff_id, data.staff, services)
     minutes = data.duration_minutes or sum(
@@ -1387,6 +1608,16 @@ def create_series(ctx: OperationContext, data: RecurringCreateIn) -> dict:
     output=MaterializeOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "fill in the dates still missing in Teresa's weekly appointment",
+                "generate the next appointments of every repeating one",
+            ),
+            "es": (
+                "reserva las fechas que faltan de la cita fija de Teresa",
+                "rellena las próximas fechas de las citas que se repiten",
+            ),
+        },
         "description": "Book the dates of a repeating appointment's window not booked yet (at most 50 a run; run it "
         "again from next_from until there is none). A date that does not fit is skipped and listed with its reason; a "
         "date cancelled by hand is never booked again.",
@@ -1417,6 +1648,16 @@ def materialize(ctx: OperationContext, data: MaterializeIn) -> dict:
     output=RecurringUpdatedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "from next week, move Teresa's repeating appointment to Wednesdays",
+                "change Carmen's weekly appointment to 11 am from now on",
+            ),
+            "es": (
+                "desde la semana que viene, la cita fija de Teresa pasa a los miércoles",
+                "cambia la cita fija de Carmen a las 11:00 de aquí en adelante",
+            ),
+        },
         "description": "Edit a repeating appointment from one of its dates on (this and all following): its time, "
         "length, repetition, weekday, professional (by name) or services. Before that date nothing changes (the series "
         "is split); appointments already charged, in progress or completed are left alone; the booked ones that still "
@@ -1424,7 +1665,7 @@ def materialize(ctx: OperationContext, data: MaterializeIn) -> dict:
         "risk": "normal",
     },
 )
-def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:
+def update_series(ctx: OperationContext, data: RecurringUpdateIn) -> dict:  # noqa: C901, PLR0912, PLR0915
     series = find_series(ctx, data.id, lock=True)
     if not may_change(ctx, series.staff_id):
         raise PermissionDenied(str(CHANGE_OWN_ONLY))
@@ -1608,11 +1849,22 @@ def _set_active(ctx: OperationContext, series_id: UUID, active: bool) -> dict:
 @operation(
     "appointment.recurring.deactivate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringRefIn,
     output=RecurringOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "pause Teresa's repeating appointment",
+                "stop Carmen's weekly appointment for the summer",
+            ),
+            "es": (
+                "deja en pausa la cita fija de Teresa",
+                "desactiva la cita semanal de Carmen en verano",
+            ),
+        },
         "description": "Pause a repeating appointment: it stops booking dates; the ones booked are kept.",
         "risk": "normal",
     },
@@ -1624,11 +1876,22 @@ def deactivate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
 @operation(
     "appointment.recurring.activate",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringRefIn,
     output=RecurringOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "resume Teresa's paused repeating appointment",
+                "reactivate Carmen's weekly appointment",
+            ),
+            "es": (
+                "reanuda la cita fija de Teresa",
+                "retoma la cita semanal de Carmen que estaba parada",
+            ),
+        },
         "description": "Reactivate a paused repeating appointment (it books nothing by itself: materialize does).",
         "risk": "normal",
     },
@@ -1640,12 +1903,23 @@ def activate_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
 @operation(
     "appointment.recurring.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE_OWN,
     input=RecurringRefIn,
     output=RecurringDeletedOut,
     expose_api=True,
     ai={
-        "description": "Delete a repeating appointment; the appointments already booked are kept. Ask first.",
+        "asks": {
+            "en": (
+                "delete Teresa's repeating appointment but keep the ones booked",
+                "remove Carmen's weekly appointment for good",
+            ),
+            "es": (
+                "borra la cita fija de Teresa y deja las que ya tiene",
+                "quita la serie de Carmen sin tocar sus citas",
+            ),
+        },
+        "description": "Delete a repeating appointment; the appointments already booked are kept.",
         "risk": "high",
     },
 )
@@ -1660,17 +1934,63 @@ def delete_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
     return {"id": series.id}
 
 
+@operation(
+    "appointment.recurring.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=RecurringRefIn,
+    output=RecurringOut,
+    ai={
+        "description": "Bring a deleted repeating appointment back to Repeating, the same one with the appointments it "
+        "had booked, active and booking nothing by itself (run by the platform when ERPlora's staff recovers the "
+        "business from a separate copy).",
+        "risk": "normal",
+    },
+)
+def restore_series(ctx: OperationContext, data: RecurringRefIn) -> dict:
+    """A deleted series back in Repeating (deleting keeps it and its appointments, APPOINTMENT-F15), active, only as
+    Repeating would create it now: for a live card, with its services and its professional bookable. It books nothing:
+    its next dates wait for «Book» (APPOINTMENT-F13), which skips those it has booked. One already in Repeating is
+    answered as it is."""
+    series = Recurring.objects.select_for_update(of=("self",)).filter(pk=data.id).first()
+    if series is None:
+        raise NotFound(str(RECURRING_NOT_FOUND), code="appointment.recurring_not_found")
+    if series.deleted_at is not None:
+        find_customer(ctx, series.customer_id, None)
+        if series.staff_id is None:
+            raise Conflict(str(RECURRING_NO_STAFF), code="appointment.recurring_no_staff")
+        services = resolve_services([ServiceRefIn(service_id=line.service_id) for line in series.lines.all()])
+        _member_for_booking(ctx, series.staff_id, None, services)
+        series.deleted_at = None
+        series.is_active = True
+        series.save(update_fields=["deleted_at", "is_active", "updated_at"])
+        record_event(ctx, events.RECURRING_RESTORED, {"id": str(series.id), "customer_id": str(series.customer_id)})
+    return load_series(series.id)
+
+
 # ── Settings (F19) ───────────────────────────────────────────────────────────────────────────
 
 
 @operation(
     "appointment.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=SettingsIn,
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "require two hours' notice to book an appointment",
+                "stop auto-confirming the appointments customers book",
+            ),
+            "es": (
+                "pide al menos un día de antelación para las citas",
+                "que las citas de las clientas no se confirmen solas",
+            ),
+        },
         "description": "Change the booking rules; only what is sent changes (e.g. turn off auto-confirming the "
         "customer's own bookings, or set the minimum notice).",
         "risk": "normal",

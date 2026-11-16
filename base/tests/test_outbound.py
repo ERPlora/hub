@@ -1,7 +1,7 @@
-"""Slow I/O after the COMMIT, off the loop that committed (``base.outbound``; FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS).
+"""Slow I/O after the COMMIT, off the loop that committed (``base.outbound``).
 
 The worker relays the outbox of every hub in one loop, and Django runs what a transaction leaves for after its COMMIT
-right there: a reaction that called another system held every other delivery until it answered. ``after_commit``
+right there: a reaction that calls another system would hold every other delivery until it answered. ``after_commit``
 hands that I/O to a few threads of the worker's own, after the COMMIT and never after a rollback, in the database of
 the hub that asked; the loop goes on at once. These tests drive real threads on the real database: a job waits until
 the test lets it (``WAIT`` at most, so a broken pool fails instead of hanging), and the order says who waited for whom.
@@ -204,7 +204,7 @@ def for_its_business(seen: list):
 def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, monkeypatch):
     """A hub's database holds only its own rows. A job it says is for another hub stays in its database, sees only its
     rows and the other's operation is refused; one for the platform runs on control. No job ever reaches another hub's
-    database (since S5 there is no shared database to hand it to)."""
+    database (there is no shared database to hand it to)."""
     monkeypatch.setattr(context, "_test_fallback", None)
     monkeypatch.setattr(outbound, "_pool", pool(threads=1))
     seen: list = []
@@ -212,11 +212,11 @@ def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, mo
     tenant_a, tenant_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
 
     def ask(ctx, data):
-        outbound.after_commit(job, tenant_b, scope=tenant_b)
+        outbound.after_commit(job, tenant_b)
         return {"count": 1}
 
     def ask_the_platform(ctx, data):
-        outbound.after_commit(job, PLATFORM, scope=PLATFORM)
+        outbound.after_commit(job, PLATFORM)
         return {"count": 1}
 
     with context.use_hub(hub_a):
@@ -234,7 +234,7 @@ def test_whom_a_job_is_for_is_kept_from_when_it_is_asked():
     """The context a job runs in is chosen when it is asked and never changes after: nobody hands it another hub's."""
     a = SimpleNamespace(slug="a", db_name="")
     with context.use_hub(a):
-        job = outbound.Job(print, (), context.current_for(B))
+        job = outbound.Job(print, (), context.current())
     with pytest.raises(FrozenInstanceError):
         job.database = context.CONTROL_DATABASE  # type: ignore[misc]
     assert job.database.hub is a

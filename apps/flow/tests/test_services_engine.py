@@ -9,7 +9,6 @@ import datetime as dt
 import uuid
 from zoneinfo import ZoneInfo
 
-import pytest
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -17,10 +16,12 @@ from apps.customer.models import Customer
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
+from base.recovery import actor_of
+from base.tenancy.context import current_alias
 
-from .conftest import A, TASK_STEP, make_flow, make_run, run
+from .conftest import A, HUB_DB, TASK_STEP, due_daily_flow, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -296,18 +297,65 @@ def test_an_action_that_says_no_stops_the_run_with_its_own_words():
     assert "project" in run_.log[0]["error"]["fields"]
 
 
-def test_an_action_whose_app_is_gone_is_unavailable(monkeypatch):
-    from apps.flow import queries
+def test_an_event_of_an_app_that_is_off_starts_nothing():
+    make_flow(trigger_event="task.task.created")
+    run("base.app.disable", {"app": "task"})
 
+    result = deliver("task.task.created")
+
+    assert (result.started, result.skipped) == (0, 1)
+    assert FlowRun.objects.count() == 0
+
+
+def test_an_event_a_recovery_from_a_separate_copy_recorded_starts_nothing_and_counts_as_skipped():
+    """hub#1307 (FLOW-F21): the reaction says what it left alone, as with an app that is off; the same event of the
+    business starts its automation."""
     make_flow()
-    active = {
-        label: config
-        for label, config in queries.active_apps().items()
-        if label != "task"
-    }
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    make_flow("Paused", enabled=False)
+
+    result = deliver(actor=actor_of(uuid.uuid7()))
+
+    assert (result.started, result.skipped) == (0, 1)
+    assert FlowRun.objects.count() == 0
+    assert (deliver().started, FlowRun.objects.count()) == (1, 1)
+
+
+def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_callbacks):
+    make_flow()
+    run("base.app.disable", {"app": "task"})
     deliver()
-    assert FlowRun.objects.get().error_code == "flow.action_unavailable"
+    stopped = FlowRun.objects.get()
+    assert (stopped.status, stopped.error_code) == (
+        FlowRun.Status.FAILED,
+        "flow.action_unavailable",
+    )
+    assert Task.objects.count() == 0
+
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
+        run("base.app.enable", {"app": "task"})
+    resumed = run("flow.run.retry", {"id": str(stopped.id)})
+    assert (resumed.status, resumed.error_code, resumed.error_message) == (
+        FlowRun.Status.SUCCEEDED,
+        "",
+        "",
+    )
+    assert Task.objects.count() == 1
+
+
+def test_a_scheduled_run_on_the_worker_s_pass_stops_at_an_action_whose_app_is_off(monkeypatch, django_capture_on_commit_callbacks):
+    """The worker runs a hub's due schedules on that hub's own scope (``base.worker._serve_hub``): there, Tasks is off,
+    so the step stops as unavailable and nothing is created; on the platform's scope nothing would be off."""
+    from live.context import system_context
+
+    flow = due_daily_flow(monkeypatch)
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
+        run("base.app.disable", {"app": "task"})
+
+    assert run("flow.schedule.fire_due", {}, system_context(A)).count == 1
+
+    stopped = FlowRun.objects.get(flow=flow)
+    assert (stopped.status, stopped.error_code) == (FlowRun.Status.FAILED, "flow.action_unavailable")
+    assert Task.objects.count() == 0
 
 
 def test_an_unexpected_failure_of_a_step_is_kept_and_visible(monkeypatch, caplog):
@@ -509,7 +557,7 @@ def _admin():
 
 
 def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
-    # Review 2026-10-15, item 6: a read leaves a customer's card in the run; only a waiting run needs it.
+    # A read leaves a customer's card in the run; only a waiting run needs it.
     clock(NOON)
     make_flow(
         steps=[
@@ -530,8 +578,8 @@ def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
     assert Task.objects.get().title == "Call Ana López"
 
 
-# The worker's minute (FLOW-F22, FLOW-F23), through the scheduler it calls every tick, with the tasks flow declares and
-# no scope: `WORKER_SCOPE_SLUG`'s, here `a`'s. In production each business runs on its own (`test_worker_parked_runs.py`).
+# The worker's minute (FLOW-F22, FLOW-F23), through the scheduler it calls every tick, with the tasks flow declares, on
+# business A's own scope as the worker's pass over the businesses runs them (`test_worker_parked_runs.py`).
 
 
 def _flow_tasks():
@@ -540,12 +588,11 @@ def _flow_tasks():
     return [task for task in scheduler.tasks() if task.app_label == "flow"]
 
 
-def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, settings, monkeypatch):
+def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, monkeypatch):
     from base import scheduler
 
     # The worker releases its connection after each task; the test's transaction must stay open.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
-    settings.WORKER_SCOPE_SLUG = "a"
     clock(NOON - dt.timedelta(minutes=1))
     scheduler.sync(NOON - dt.timedelta(minutes=1), declared=_flow_tasks())
     daily = make_flow(
@@ -563,13 +610,13 @@ def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, setting
     assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
 
     clock(NOON)
-    assert sorted(scheduler.run_due(NOON)) == ["flow.expire_questions", "flow.fire_due", "flow.resume_due"]
+    assert sorted(scheduler.run_due(NOON, scope=A)) == ["flow.expire_questions", "flow.fire_due", "flow.resume_due"]
     fired = FlowRun.objects.get(flow=daily)
     assert (fired.trigger_kind, fired.status) == ("schedule", FlowRun.Status.SUCCEEDED)
     assert FlowRun.objects.get(flow=waits).status == FlowRun.Status.WAITING
 
     clock(NOON + dt.timedelta(minutes=1))
-    assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1))) == [
+    assert sorted(scheduler.run_due(NOON + dt.timedelta(minutes=1), scope=A)) == [
         "flow.expire_questions",
         "flow.fire_due",
         "flow.resume_due",
@@ -580,7 +627,7 @@ def test_the_workers_tick_fires_a_due_schedule_and_resumes_a_wait(clock, setting
 
 
 def test_a_tick_with_nothing_due_records_and_announces_nothing(clock):
-    # hub#2612: a scheduled task that finds nothing to do leaves no event, so no live list re-runs.
+    # A scheduled task that finds nothing to do leaves no event, so no live list re-runs.
     flow = make_flow(
         trigger_kind=Flow.Trigger.SCHEDULE,
         trigger_event="",
@@ -595,7 +642,7 @@ def test_a_tick_with_nothing_due_records_and_announces_nothing(clock):
     assert OutboxEvent.objects.count() == before
 
 
-# A document the engine can no longer read (hub#1766: written raw from the admin, or by an older
+# A document the engine can no longer read (written raw from the admin, or by an older
 # version): it fails visibly in its own history, and the other automations still run.
 
 
@@ -627,7 +674,7 @@ def test_a_condition_it_cannot_read_stops_the_run_with_its_reason(clock):
     assert Task.objects.count() == 0
 
 
-# The history keeps 90 days (FLOW-F16, hub#699; the old Hub's `retention.rs`, Ioan 2026-08-10): a
+# The history keeps 90 days (FLOW-F16; the old Hub's `retention.rs`): a
 # finished run older than that is deleted, in bounded passes, counted; live work is never touched.
 
 
@@ -674,7 +721,7 @@ def test_the_prune_goes_in_bounded_passes(clock, monkeypatch):
 
 
 def test_a_condition_compares_two_data_of_the_run(clock):
-    # hub#1712: saved well and then never matching is what the old engine did with a datum as the value.
+    # Saved well and then never matching is what the old engine did with a datum as the value.
     clock(NOON)
     make_flow(
         steps=[

@@ -37,12 +37,12 @@ llega por `/internal` (el contrato está en «Para quien lo mantiene» del WORKB
 | `requires` | `customer` |
 | La usan | Automatizaciones (sus recetas de fábrica: `recipes.py`, y el paso «Mandar un mensaje», FLOW-F31), Citas y Reservas (sus avisos de confirmación), Clientes (la ficha que borra, une o crea), `base` (las puertas `/internal/whatsapp/*` de erplora.com, el Inicio y la campana) |
 | Pantallas | `/whatsapp_inbox/inbox` (la bandeja, con la conversación en `?conversation=<id>`) y `/whatsapp_inbox/settings` (el número, el consumo, las respuestas automáticas y las plantillas) |
-| Operaciones | 13 consultas (`queries.py`) y 35 acciones (`services.py`), todas con `ai=`; las que llama erplora.com o el sistema, con `ai=INTERNAL` |
+| Operaciones | 15 consultas (`queries.py`) y 35 acciones (`services.py`), todas con `ai=`; las que llama erplora.com o el sistema, con `ai=INTERNAL` |
 | Permisos | `view`, `reply`, `assign`, `configure` y `erase` (`whatsapp_inbox.*`); el empleado lee y contesta |
 | Hooks del Inicio | `bell` «Clientes de WhatsApp esperando respuesta» y `notices` (un aviso del dispositivo por cliente sin contestar), con `conversation.count_awaiting_reply` y `conversation.notices` |
 | Tarea programada | `whatsapp_inbox.delivery.resume`, cada 5 minutos: vuelve a dar a erplora.com los mensajes, borrados, plantillas y borrados de plantillas cuya entrega tras el COMMIT no terminó |
 | Eventos | 18, `whatsapp_inbox.<entidad>.<hecho>` (`events.py`), solo con identificadores |
-| Migraciones | `0001_initial` … `0010_hub_users` |
+| Migraciones | `0001_initial` … `0012_no_business_hosts` |
 | Admin | Django admin de conversaciones, mensajes, notas, plantillas y canal en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (el contrato con erplora.com, las puertas, el modelo, la retención y las respuestas
@@ -69,6 +69,7 @@ pnpm e2e tests/e2e/whatsapp-inbox.spec.ts tests/e2e/whatsapp-inbox-erplora.spec.
 
 ## Qué queda fuera
 
-- Los textos de hub#569, hub#570 y hub#571, los servicios por su nombre en la tarjeta de una cita (hub#835) y los iconos y el
-  hilo de chat pedidos a `@erplora/ui`: «Lo que queda fuera» del WORKBOOK y [`UI-REQUESTS.md`](UI-REQUESTS.md).
+- Los iconos y el hilo de chat pedidos a `@erplora/ui`: «Lo que queda fuera» del WORKBOOK y
+  [`UI-REQUESTS.md`](UI-REQUESTS.md). Ya no están fuera: los textos de hub#569, hub#570 y hub#571 y los servicios por
+  su nombre en la tarjeta de una cita (hub#835), cerradas entre el 2026-11-04 y el 2026-11-06.
 - Relacionada, de otras apps: el Inicio no dice de un vistazo si WhatsApp funciona (hub#573, BASE-F02).

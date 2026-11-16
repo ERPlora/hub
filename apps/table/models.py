@@ -5,8 +5,7 @@ A table's status is NOT stored: it is computed when read (queries.py) from its l
 ``blocked`` flag and its live holds, so nothing has to «free a table when no other check is left».
 The check of a table points at its open check of Sales by ``order_id``: an opaque reference, no
 foreign key between apps. Zones, tables and checks are deleted logically: the history keeps pointing
-at them. Phase 1 has no tenancy: every scope shares these tables; phase 2 moves them to each hub's
-database.
+at them.
 """
 
 from django.db import models

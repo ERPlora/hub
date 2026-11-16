@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, psql, settled, shot, shown, untilStill } from './helpers';
+import { A, api, capture, HUB_DIR, psql, scrolledTo, settled, shot, shown, untilStill } from './helpers';
 import { liveStreamsSettled, watchLiveStreams } from './live-streams';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
 
@@ -28,7 +28,7 @@ const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-/** The business's wall clock (Madrid in phase 1), `now + minutes`, rounded up to 5 minutes. */
+/** The business's wall clock (Madrid, hub `a`'s zone), `now + minutes`, rounded up to 5 minutes. */
 function madrid(minutes = 0): { date: string; time: string; weekday: number } {
   const at = new Date(Date.now() + minutes * 60_000);
   const parts = Object.fromEntries(
@@ -97,12 +97,12 @@ function cleanUp(): void {
   );
 }
 
-/** Screenshots of the page in the three viewports, each once `ready` says it painted: `APP-RESERVATION-<flow>-<width>`. */
+/** Captures of the page in the three viewports (`capture`), each once `ready` says it painted: `APP-RESERVATION-<flow>-<width>`. */
 async function shots(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await ready();
-    await page.screenshot({ path: shot(`APP-RESERVATION-${flow}-${viewport.label}`), fullPage: true });
+    await capture(page, `APP-RESERVATION-${flow}-${viewport.label}`, { fullPage: true });
   }
   await page.setViewportSize({ width: 1280, height: 860 });
 }
@@ -137,6 +137,25 @@ async function openTheBook(context: BrowserContext): Promise<void> {
   const table = await post<{ id: string }>(context, '/table/tables', { zone_id: zone.id, number: '51', capacity: 4 });
   zoneId = zone.id;
   tableId = table.id;
+}
+
+/** A cancelled reservation says why next to «Cancelled» (hub#862), at every size: in its row — its card on a phone —
+ *  (`<flow>-<width>`) and on top of its panel, opened from the book (`<flow>-form-<width>`). The book paints its card
+ *  as a row (and back) a frame or more after the resize, so the reason is scrolled to as the new size paints it
+ *  (`scrolledTo`, hub#1303). */
+async function saysWhy(page: Page, id: string, flow: string, why: string): Promise<void> {
+  const reason = shown(page).locator(`[data-testid=reservation-list-row][data-id="${id}"] [data-testid=reservation-list-reason]`);
+  await shots(page, flow, async () => {
+    await expect(reason).toHaveText(why);
+    await scrolledTo(reason);
+  });
+  const form = page.locator('[data-testid=reservation-form]');
+  await rowAction(page, 'reservation-list', id, 'edit');
+  await shots(page, `${flow}-form`, async () => {
+    await expect(form.locator('[data-testid=reservation-form-notes-only]')).toContainText(why);
+  });
+  await form.locator('[data-testid=reservation-form-cancel]').click();
+  await expect(form).toBeHidden();
 }
 
 const book = (page: Page) => shown(page).locator('[data-testid=reservation-list-row]', { hasText: GUEST });
@@ -407,9 +426,7 @@ test('Edit a reservation, cancel one with a reason, mark a no-show and delete on
     await expect(rowOf(cancelled.id)).toContainText('Cancelled');
     const detail = await api<{ cancellation_reason: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${cancelled.id}`);
     expect(detail.data.cancellation_reason).toBe('Plans changed');
-    await shots(page, 'RESERVATION-F09', async () => {
-      await expect(rowOf(cancelled.id)).toBeVisible();
-    });
+    await saysWhy(page, cancelled.id, 'RESERVATION-F09', 'Reason: Plans changed');
 
     // No-show (F10).
     await rowAction(page, 'reservation-list', absent.id, 'no_show');
@@ -485,10 +502,9 @@ test('A pending reservation nobody confirmed turns Cancelled on the open book th
     expect(detail.data).toMatchObject({ status: 'cancelled', cancellation_reason: 'unconfirmed' });
     await shots(page, 'RESERVATION-F13', async () => {
       // On a phone the book is cards, painted again on the resize: the status, at the card's foot, is brought into view
-      // once they stand still.
+      // as the new size paints it (`scrolledTo`, hub#1303).
       await expect(row).toContainText('Cancelled');
-      await untilStill(page);
-      await row.getByText('Cancelled').scrollIntoViewIfNeeded();
+      await scrolledTo(row.getByText('Cancelled'));
     });
   } finally {
     await context.close();
@@ -649,6 +665,29 @@ test('A phone typed without prefix for a chosen card is kept international; one 
     await form.locator('[data-testid=reservation-form-submit]').click();
     await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toContainText(refusal);
     expect(psql(`select guest_phone from reservation_reservation where id = '${id}'`)).toBe(`+34${typed}`);
+  } finally {
+    await context.close();
+  }
+});
+
+// flow: RESERVATION-F13
+// hub#862: a pending reservation the book released because nobody confirmed it says so next to «Cancelled», in the row,
+// in the card and on top of its panel. The release is run by hand (`release_unconfirmed`, safe so: the worker's pass in
+// `a` is hub#551's test); its time moved an hour back first, as a pending one nobody confirmed is when its day comes.
+test('A reservation the book released says «Released: never confirmed» next to «Cancelled»', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/reservation/reservations');
+  try {
+    const stale = await bookByApi(context, `${TAG} Iris`, SOON_TIME);
+    const past = madrid(-60);
+    psql(`update reservation_reservation set date = '${past.date}', time = '${past.time}' where id = '${stale.id}'`);
+    const released = await post<{ released: number }>(context, '/reservation/reservations/release_unconfirmed', {}, 200);
+    expect(released.released).toBeGreaterThanOrEqual(1);
+    const detail = await api<{ status: string; cancellation_reason: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${stale.id}`);
+    expect(detail.data).toMatchObject({ status: 'cancelled', cancellation_reason: 'unconfirmed' });
+
+    await page.reload();
+    if (past.date !== TODAY.date) await shown(page).locator('[data-testid=reservation-day-prev]').click();
+    await saysWhy(page, stale.id, 'RESERVATION-F13-reason', 'Released: never confirmed');
   } finally {
     await context.close();
   }

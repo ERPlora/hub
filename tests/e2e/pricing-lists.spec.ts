@@ -7,6 +7,8 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Price';
 const CODE = 'E2EPR';
@@ -78,19 +80,6 @@ async function pick(page: Page, testid: string, query: string, text: string): Pr
   await option.click();
 }
 
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
-}
-
 const ready = (page: Page, table: string) =>
   shown(page).locator(`[data-testid=${table}-empty], [data-testid=${table}-row]`).first().waitFor({ state: 'visible' });
 
@@ -138,7 +127,9 @@ test('A VIP list with an Inventory product, a rule, and the price of a VIP custo
       'A price list with that code already exists. Pick a different code.',
     );
     await page.screenshot({ path: shot('pricing-list-duplicate') });
+    // «Cancel» asks before losing the refused list (BASE-F05): the person discards it.
     await page.locator('[data-testid=pricing-list-form-cancel]').click();
+    await discardChanges(page);
     expect(psql(`select count(*) from pricing_pricelist where lower(code) = lower('${listCode}')`)).toBe('1');
 
     // The list's detail: the price of the Inventory product from one unit (PRICING-F06, F07).

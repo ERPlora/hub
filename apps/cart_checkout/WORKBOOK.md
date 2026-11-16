@@ -5,10 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `cart_checkout`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
-> (servidor y páginas). Parte del `WORKFLOW.md` del módulo Carrito y pago del producto actual
-> (`modules-workspace/modules/cart_checkout`, `origin/main` `571c2cc`, v1.0.26), de sus `docs/`, de su
-> manejador y de sus tests. Los números de flujo se conservan. Lo que cambia frente al producto actual
-> lo dice «Cambios frente al producto actual», al final.
+> (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -38,8 +35,7 @@ Quién la usa:
 El modelo de carrito y pedido de una tienda en línea (Shopify Checkout, WooCommerce, Odoo eCommerce):
 carrito con código de sesión, pedido con número correlativo y estados iniciado → pagado o fallido →
 completado. Se adopta **solo el modelo de estados**: la tienda pública, la pasarela de pago, los
-impuestos, el envío y el stock de esas referencias **no existen aquí**. Sin investigación nueva: es el
-mismo alcance que el producto actual.
+impuestos, el envío y el stock de esas referencias **no existen aquí**.
 
 ## Antes de empezar
 
@@ -64,12 +60,15 @@ por un trozo del texto, el estado por lista, los ítems y el total «desde / has
 página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito
 (uno creado en euros sigue en euros aunque el negocio cambie de país); el filtro de Total se escribe en
 la moneda del negocio («12» son 12,00 zł en un negocio de Polonia y 12 ¥ en uno de Japón, donde no hay
-céntimos) y compara el importe tal cual, sin convertir monedas. Se puede pegar con sus puntos de miles
-(«1.250,50») o con el símbolo o el código de esa moneda («12,50 zł», «PLN 12,50»); un importe que no se
-entiende («1.250», que puede ser mil doscientos cincuenta o uno con veinticinco, o uno con el símbolo de
-otra moneda) se avisa debajo de su caja, «Escribe un importe, como 12,50» (con los decimales de la moneda
-del negocio: «como 12» en yenes), y no filtra. Mientras el negocio no ha contestado, un importe se lee
-con dos decimales y, cuando contesta, el filtro se vuelve a leer en su moneda desde la primera página.
+céntimos) y compara el importe tal cual, sin convertir monedas. Se lee como en cualquier campo de importe
+del Hub y como en las demás listas (hub#1196): se puede pegar con sus puntos de miles («1.250,50»,
+«1,250.50», «2 500») o con el símbolo o el código de esa moneda («12,50 zł», «PLN 12,50»); uno que no se
+puede leer no filtra y lo dice debajo de su caja con las palabras del campo de importe: «1.250», que puede
+ser mil doscientos cincuenta o uno con veinticinco, «Este importe se puede leer de dos maneras…»; uno con el
+símbolo de otra moneda o con letras, «Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»; uno
+negativo, «Este importe no puede ser negativo.». Mientras el negocio no ha contestado, un importe se lee
+con dos decimales y no se avisa de nada; cuando contesta, el filtro se vuelve a leer en su moneda desde la
+primera página.
 
 El botón **Nuevo carrito** abre el formulario «Nuevo carrito»: **Sesión** (obligatoria; «Guardar» no se
 activa sin ella), **Email** y **Nombre**. Cada fila ofrece **Abandonar** (solo un carrito activo) y
@@ -94,13 +93,19 @@ del flujo CART_CHECKOUT-F08.
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado. |
 | Vacío | «Sin carritos.» o «Sin pedidos.»; con búsqueda o filtro, «Sin resultados». |
-| Error | El aviso de la tabla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo debajo de su campo, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
+| Error | El aviso de la tabla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo debajo de su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); el de una acción de fila, encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
 Importes con el formato del idioma de quien mira y en la moneda de cada fila, con los decimales de esa
 moneda (el yen no tiene céntimos); cantidades sin ceros de adorno («2», «0,5»).
+
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
 
 ## Flujos
 
@@ -122,7 +127,6 @@ moneda (el yen no tiene céntimos); cantidades sin ceros de adorno («2», «0,5
 | CART_CHECKOUT-F14 | Borrar los datos personales de un cliente | hecho |
 
 ### CART_CHECKOUT-F01 Crear un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-create old:cart_checkout/WORKFLOW.md#cart_checkout-f01 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
@@ -142,7 +146,6 @@ existe; una caducidad que ya pasó. Lo tecleado se conserva. Sin permiso, se rec
 Implicados: ninguno
 
 ### CART_CHECKOUT-F02 Añadir una línea a un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-items-add-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f02 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -166,7 +169,6 @@ No se guarda nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F03 Cambiar la cantidad de una línea o quitarla
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-items-remove fi:modules/cart_checkout#command-cart_checkout-items-update-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f03 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -186,7 +188,6 @@ total por encima de lo que cabe en un carrito, debajo de la cantidad. No cambia 
 Implicados: ninguno
 
 ### CART_CHECKOUT-F04 Vaciar un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-clear-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f04 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -202,7 +203,6 @@ Si falla: carrito que no existe o que no está activo. No cambia nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F05 Abandonar un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-mark_abandoned old:cart_checkout/WORKFLOW.md#cart_checkout-f05 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
@@ -217,7 +217,6 @@ la tabla, y no cambia nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F06 Borrar un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-delete old:cart_checkout/WORKFLOW.md#cart_checkout-f06 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Carritos
@@ -233,7 +232,6 @@ Si falla: un carrito que no existe (o ya borrado) se rechaza; no cambia nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F07 Caducar los carritos vencidos
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-carts-cleanup_expired-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f07 -->
 Estado: hecho
 Actor: sistema (tarea programada), administrador, asistente
 Pantalla: Carritos (el estado)
@@ -253,7 +251,6 @@ al día en ese momento.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F08 Iniciar el pedido desde un carrito
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-checkout-initiate-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f08 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
@@ -274,7 +271,6 @@ que no es un email. No se crea pedido, **no se gasta número** y no avisa.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F09 Marcar un pedido como pagado
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-mark_paid old:cart_checkout/WORKFLOW.md#cart_checkout-f09 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
@@ -291,7 +287,6 @@ empleado no puede.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F10 Registrar que el pago falló
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-fail old:cart_checkout/WORKFLOW.md#cart_checkout-f10 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
@@ -302,14 +297,13 @@ Pasos:
 3. El pedido pasa a **Fallido** y enseña su motivo entero debajo del estado.
 Entra: el pedido y el motivo (hasta 500 caracteres).
 Sale: estado Fallido, el motivo y la hora (`cart_checkout.order.failed`). Un pedido ya Pagado también
-puede fallar, como hoy: **no deja rastro de devolución** (no hay devoluciones en esta app). El carrito
+puede fallar: **no deja rastro de devolución** (no hay devoluciones en esta app). El carrito
 sigue como estaba. El asistente pide confirmación reforzada y dice el pedido por su número.
 Si falla: un pedido Completado o ya Fallido se rechaza; un motivo vacío, debajo de su campo, sin perder
 lo escrito.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F11 Completar un pedido
-<!-- origen: fi:modules/cart_checkout#command-cart_checkout-orders-complete-handler-wasm old:cart_checkout/WORKFLOW.md#cart_checkout-f11 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pedidos
@@ -323,7 +317,6 @@ Si falla: solo se completa un pedido Pagado; en otro estado se rechaza diciendo 
 Implicados: ninguno
 
 ### CART_CHECKOUT-F12 Consultar carritos, líneas y pedidos
-<!-- origen: fi:modules/cart_checkout#navigation fi:modules/cart_checkout#query-cart_checkout-carts-get fi:modules/cart_checkout#query-cart_checkout-carts-list fi:modules/cart_checkout#query-cart_checkout-items-list fi:modules/cart_checkout#query-cart_checkout-orders-get fi:modules/cart_checkout#query-cart_checkout-orders-list old:cart_checkout/WORKFLOW.md#cart_checkout-f12 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Carritos, Pedidos
@@ -331,7 +324,7 @@ Pasos:
 1. Abre **Carritos** o **Pedidos**.
 2. Busca por sesión, email o nombre (carritos) o por número de pedido o email (pedidos) y ordena. Para
    filtrar por columna, toca el embudo de la barra: abre «Filtros» con una caja por columna (el Total,
-   como se escribe o se pega: «12», «12,50», «1.250,50»); **Aplicar** filtra y lo cierra, y el embudo
+   como se escribe o se pega: «12», «12,50», «1.250,50», «2 500»); **Aplicar** filtra y lo cierra, y el embudo
    cuenta los filtros en uso.
 3. Las líneas de un carrito y el detalle de un pedido (direcciones, métodos, fechas, notas) se leen con
    el asistente o la API: un carrito por su sesión o por el email o el nombre de su cliente, un pedido
@@ -340,11 +333,11 @@ Entra: permiso «ver carritos» (el empleado lo tiene).
 Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en la unidad
 menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales.
 Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso»; un importe de Total que no
-se entiende, «Escribe un importe, como 12,50» debajo de su caja, sin filtrar.
+se puede leer, lo que diría el campo de importe («Esto no es un importe. Escribe una cifra, por ejemplo
+12,50.», o las dos lecturas de «1.250») debajo de su caja, sin filtrar.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F13 Avisar a otras apps de lo que ocurre
-<!-- origen: fi:modules/cart_checkout#events-emitidos-catalogo old:cart_checkout/WORKFLOW.md#cart_checkout-f13 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -352,16 +345,15 @@ Pasos:
 1. Cada cambio de los flujos anteriores deja un aviso en el outbox del Hub en su misma transacción.
 2. Las dos pantallas se actualizan solas con lo que cambió.
 Entra: el cambio que lo provoca.
-Sale: trece avisos: los doce del producto actual (`cart.created`, `cart.abandoned`, `cart.deleted`,
-`cart.cleared`, `cart.expired`, `item.added`, `item.updated`, `item.removed`, `checkout.initiated`,
-`order.paid`, `order.failed`, `order.completed`) y `customer.erased`, con el prefijo `cart_checkout.`.
+Sale: trece avisos (`cart.created`, `cart.abandoned`, `cart.deleted`, `cart.cleared`, `cart.expired`,
+`item.added`, `item.updated`, `item.removed`, `checkout.initiated`, `order.paid`, `order.failed`,
+`order.completed` y `customer.erased`), con el prefijo `cart_checkout.`.
 Solo los escucha Automatizaciones, que puede arrancar una automatización con cualquiera de ellos; ninguna
 otra app del Hub los escucha.
 Si falla: un cambio rechazado no deja ni el cambio ni el aviso.
 Implicados: FLOW-F21 (Automatizaciones arranca con cualquier aviso del negocio)
 
 ### CART_CHECKOUT-F14 Borrar los datos personales de un cliente
-<!-- origen: nuevo (el borrado de datos personales de Shopify y WooCommerce, «erase personal data»: el derecho de supresión del RGPD) -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente; el personal de la plataforma desde el admin
 Pantalla: asistente; admin del Hub (acción «Borrar los datos personales de sus clientes»)
@@ -429,44 +421,33 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 
 ## Para quien lo mantiene
 
-### Decisión: una libreta interna, fuera de las plantillas (2026-10-15)
+### Decisión: una libreta interna, fuera de las plantillas
 
-- El catálogo actual la tiene fuera del MVP y su `WORKFLOW.md` la describe como libreta interna sin
-  tienda. Se porta **igual, sin ampliar**: `verticals = []` (ninguna plantilla la trae al darse de alta)
-  y `listed = True` (en la tienda, desde donde la enciende quien la quiera), como `payment`.
-- `requires = []`: el producto actual guarda producto, SKU y precio como **texto libre** (`product_ref`,
-  `product_name`, `sku`, sin `product_id`) y al cliente como **email y nombre** (sin `customer_id`). Se
-  mantiene: no hay FK hacia `inventory` ni hacia `customer`, y por eso tampoco reacciona a
+- Es una libreta interna sin tienda, fuera del MVP: `verticals = []` (ninguna plantilla la trae al darse
+  de alta) y `listed = True` (en la tienda, desde donde la enciende quien la quiera), como `payment`.
+- `requires = []`: guarda producto, SKU y precio como **texto libre** (`product_ref`, `product_name`,
+  `sku`, sin `product_id`) y al cliente como **email y nombre** (sin `customer_id`): no hay FK hacia
+  `inventory` ni hacia `customer`, y por eso tampoco reacciona a
   `customer.customer.merged/erased`. Enlazar el carrito con una ficha o las líneas con el catálogo es
   ampliar el alcance: queda fuera.
-- La descripción del asistente dice expresamente que **no es el TPV** y que no cobra: el producto
-  actual se describía como «mark payments» y podía elegirse ante «registra el cobro» en vez de Ventas.
+- La descripción del asistente dice expresamente que **no es el TPV** y que no cobra, para que nunca la
+  elija ante «registra el cobro» en vez de Ventas.
 
-### Decisiones al cerrar la app (2026-10-21)
+### Decisiones de alcance
 
-- **Varios pedidos por carrito, a propósito** (cart_checkout#10 pedía uno solo): mientras el carrito
+- **Varios pedidos por carrito, a propósito**: mientras el carrito
   está activo se puede iniciar otro pedido, con el número siguiente y el total de ese momento
   (CART_CHECKOUT-F08). Completar uno convierte el carrito (F11) y, desde entonces, ya no inicia más.
-- **El canal online hacia Ventas sigue aplazado** (cart_checkout#12, el paraguas «el pedido desemboca
+- **El canal online hacia Ventas está aplazado** (cart_checkout#12, el paraguas «el pedido desemboca
   en una venta»): sin tienda, sin pasarela y sin venta ni factura (ver «Lo que NO hace»). Si vuelve,
   es una ampliación con su propio flujo, no un arreglo de esta app.
-- **Contradicción señalada con ADR-0380**: el producto actual **retiró** la app de su catálogo
-  (`retired`: cerrada la oferta, no el suministro) porque «Pagado» es una marca a mano que deja el
-  pedido fuera de la cadena fiscal y porque su backlog se había quedado en el paraguas de
-  cart_checkout#12. Aquí sigue `listed = True`, en la Tienda. No se cambia al cerrar: queda escrita en la
-  ronda 2026-10-21 (CLOSE-CART_CHECKOUT) de `PLAN-HUB.md` para decidirla aparte.
-- **ADR del producto actual**: vigentes 0123 (dinero en céntimos enteros, validado en la entrada) y
-  0125 (los filtros de texto buscan por un trozo); sustituidas 0147 en la escala (cantidades `Decimal`
-  con tres decimales, no enteros con escala 10⁶), 0034 (fechas `timestamptz`, no milisegundos) y 0101
-  (migraciones de Django y el migrador del Hub, no el manifiesto); 0141 no aplica (el pedido de esta app
-  no es la cuenta de Ventas).
+- **En la Tienda** (`listed = True`), aunque «Pagado» es una marca a mano que deja el pedido fuera de la
+  cadena fiscal: si debe seguir en ella está señalado en `PLAN-HUB.md`, para decidirlo aparte.
 
 ### Cómo está hecho
 
-- Modelos (`models.py`, PK UUIDv7): `Cart`, `CartItem`, `Order` (la «sesión de checkout» del producto
-  actual) y `OrderCounter` (último número por día). Importes en céntimos (`BigIntegerField`);
-  cantidades `Decimal` con tres decimales, como `sale` e `inventory` (el producto actual usaba enteros
-  con escala 10⁶).
+- Modelos (`models.py`, PK UUIDv7): `Cart`, `CartItem`, `Order` y `OrderCounter` (último número por
+  día). Importes en céntimos (`BigIntegerField`); cantidades `Decimal` con tres decimales, como `sale` e `inventory`.
 - **Borrar un carrito es lógico** (`deleted_at`): sus pedidos siguen apuntándole. La sesión es única
   solo entre carritos no borrados (restricción parcial de la base). Las líneas quitadas se borran de
   verdad.
@@ -497,12 +478,31 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   mayor desbordaba el `bigint` de la base (un 500).
 - Asistente: toda operación declara `ai` con `description` y `risk` (`high` en marcar pagado, fallar,
   borrar y borrar los datos de un cliente) y todo campo de entrada su `description`. `expose_api=True` en
-  todas.
+  todas. Declaran también sus `asks`, lo que una persona escribe para pedir cada una, en `en` y `es`
+  (hub#1100): `cart_checkout` está en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py`
+  exige que cada frase traiga su herramienta entre las diez primeras, por rol. Sin ellos, vaciar un
+  carrito (F04) y añadir una línea (F02) quedaban fuera de las 40 herramientas que se ofrecen en un turno,
+  y cambiar la cantidad de una línea (F03) salía por detrás de `inventory.product.update`, que fue lo que
+  el modelo cambió. Sus palabras propias (`assistant_synonyms`, en `apps.py`) suman dos grupos: «cesta» y «carrito» son el carrito
+  (`cart_checkout.cart`), y «unidades» o «cantidad» la cantidad que toma una línea (`quantity`; «cantidad»
+  nunca es una unidad de medida de Inventario). «Línea» no lleva sinónimo hacia las líneas del carrito
+  (`item`): es la de las cuentas del TPV (`sale.order.*_line`) y les robaría el puesto. Los asks en inglés
+  de los pedidos no dicen «order», que el Hub lee como la cuenta del TPV («cuenta»), ni los de leer y
+  quitar líneas «total»: empujaban asks de Ventas y Mesas fuera de las diez primeras. Tampoco nombran a
+  las personas de las sondas de la QA («Ana», «Marta»): con ellas, cualquier frase de otra app sobre
+  «Ana QA» subía las herramientas del carrito y una de Citas salía de las 40. Y la lectura de un pedido no
+  dice «pedido» en español, que es también lo que «han pedido» en una mesa (`sale.order.get`). El Hub no
+  conoce el verbo «vaciar»: vaciar llega por sus `asks` y por «cesta».
+  `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+  (`tests/e2e/qa/probes/owner-es-cart_checkout-2026-11-08.json`), nunca con los propios `asks`: cada una
+  ofrece su herramienta, la de cambiar la cantidad antes que la ficha de producto, la de vaciar una cesta
+  que sigue activa antes que borrarla o quitarle una línea y, con las que cambian o quitan una línea, una
+  lectura del carrito que da su id; el empleado solo recibe las seis lecturas.
 - Datos personales (CART_CHECKOUT-F14): `cart_checkout.customer.erase` vacía email, nombre, notas y
   motivo de abandono de los carritos con ese email (también los borrados) y email, direcciones, notas y
   motivo de fallo de sus pedidos, en una transacción con las filas bloqueadas; su aviso lleva los números,
   nunca el email. El email de un pedido admite quedar vacío (migración 0002).
-- El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
+- El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (PLAN §17); una
   escritura del admin no pasa por las reglas ni deja aviso. Su acción «Borrar los datos personales de sus
   clientes» (carritos y pedidos) sí es la operación, sobre el hub elegido en el admin.
 
@@ -512,21 +512,21 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `payment`),
   formularios en `FormModal` (`CartFormModal`, `FailOrderModal`), confirmación de borrar con
   `useConfirm`, importes y cantidades con `lib/format.ts`.
-- La barra de arriba lleva el nombre de la app (`cart_checkout.title`), como el hub viejo; la pestaña la
+- La barra de arriba lleva el nombre de la app (`cart_checkout.title`); la pestaña la
   añade el shell.
 - Los importes agrupan los millares también con cuatro cifras (`useGrouping: 'always'`: el CLDR del
-  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }`: `toMinor`
-  lee lo que se pega («1.250,50», «12,50 zł», «PLN 12,50»; lo ambiguo, «1.250», no se adivina; el símbolo de
-  otra moneda tampoco) y `unreadableTotals` da los `filterErrors` (pm#521).
+  español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }` y se lee con el
+  lector común de las listas (hub#1196): `filterCents` y `amountFilterErrors` de `base/frontend/lib/money.ts`
+  (sobre `parseMoney` de `@erplora/ui`) sobre `TOTAL_BOUNDS`; las dos páginas corren la tabla de textos de
+  `base/frontend/__tests__/amount-filter.ts` (pm#521).
 - Moneda (flujo `cart-checkout-business-currency`, BASE-F50): `queries.business_currency(ctx)` es
   `base.operations.business_currency(ctx.scope)` (la del país del negocio; en el hub propio de ERPlora, la del
   país de su emisor) y solo la usa el alta de un carrito sin `currency`; el modelo no tiene valor por defecto
   (migración 0003, solo de estado). Cada fila de carrito y de pedido lleva `currency_decimals`
   (`base.business.currency_decimals`, CLDR: 2 en HUF, que `Intl` da sin decimales) y la pantalla la pinta con
   `formatMoney(…, recordMoney(row))`. El filtro de Total se lee con `useBusinessMoney()` de
-  `base/frontend/lib/money` (sin símbolo y con dos decimales mientras no contesta); un `watch` de su moneda
-  y sus decimales vuelve a leer un Total ya tecleado desde la primera página, y el ejemplo del aviso sale de
-  `amountExample` con los decimales de esa moneda.
+  `base/frontend/lib/money` («—» mientras no contesta); un `watch` de su moneda
+  y sus decimales vuelve a leer un Total ya tecleado desde la primera página.
 - La columna del número de pedido tiene ancho mínimo (`minmax(10.5rem, 1fr)`) y el motivo de un pedido
   fallido parte en líneas dentro de su celda: cortados, dos pedidos del día se leían iguales.
 - Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos y piezas copiadas).
@@ -534,58 +534,11 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   flujos sin pantalla, por la API real) y `-employee.spec.ts` (el empleado solo mira), con
   `cart-checkout-helpers.ts`.
 
-### Tablas de paridad con el producto actual
-
-Operaciones:
-
-| Producto actual | Ahora | Nota |
-|---|---|---|
-| `cart_checkout.carts.list` | `cart_checkout.cart.list` | busca también por sesión; filtros declarados |
-| `cart_checkout.carts.get` | `cart_checkout.cart.get` | por id, sesión o cliente; trae sus líneas |
-| `cart_checkout.items.list` | `cart_checkout.item.list` | el carrito por id o sesión |
-| `cart_checkout.items.get` | `cart_checkout.item.get` | ahora también del asistente |
-| `cart_checkout.orders.list` | `cart_checkout.order.list` | con la moneda del pedido |
-| `cart_checkout.orders.get` | `cart_checkout.order.get` | también por número |
-| `cart_checkout.carts.create` | `cart_checkout.cart.create` | 409 con campo si la sesión está usada |
-| `cart_checkout.carts.mark_abandoned` | `cart_checkout.cart.mark_abandoned` | 409 en vez de no-op mudo; motivo en su campo |
-| `cart_checkout.carts.delete` | `cart_checkout.cart.delete` | 404 si no existe; confirmación |
-| `cart_checkout.carts.clear` (WASM) | `cart_checkout.cart.clear` | 409 si no está activo |
-| `cart_checkout.carts.cleanup_expired` (WASM) | `cart_checkout.cart.cleanup_expired` | dice cuántos; tarea declarada |
-| `cart_checkout.items.add` (WASM) | `cart_checkout.item.add` | 404/409 en vez de no-op mudo |
-| `cart_checkout.items.update` (WASM) | `cart_checkout.item.update` | precio de la línea, nunca de quien llama |
-| `cart_checkout.items.remove` | `cart_checkout.item.remove` | 404/409 |
-| `cart_checkout.checkout.initiate` (WASM) | `cart_checkout.checkout.initiate` | sin huecos; email del carrito por defecto |
-| `cart_checkout.orders.mark_paid` | `cart_checkout.order.mark_paid` | 409 en vez de no-op mudo |
-| `cart_checkout.orders.fail` | `cart_checkout.order.fail` | 409 si completado o ya fallido; motivo en su campo |
-| `cart_checkout.orders.complete` (WASM) | `cart_checkout.order.complete` | 409 si no está pagado |
-| `_insert_item`, `_recalc_totals_by_token`, `_recalc_totals_by_item` | dentro de `item.add/update/remove` y `cart.clear` | intenciones internas del WASM |
-| `_update_item_qty`, `_soft_delete_item`, `_soft_delete_cart_items` | dentro de `item.update/remove` y `cart.clear` | |
-| `_expire_carts` | dentro de `cart.cleanup_expired` | |
-| `_bump_counter`, `_insert_checkout` | dentro de `checkout.initiate` | |
-| `_complete_checkout`, `_convert_cart` | dentro de `order.complete` | |
-| — | `cart_checkout.customer.erase` | nueva: borrar los datos personales de un cliente (F14) |
-
-Avisos: los doce del producto actual con el mismo hecho; solo cambia `carts.expired` →
-`cart.expired` (entidad en singular). Nuevo: `cart_checkout.customer.erased` (CART_CHECKOUT-F14).
-
-Tests:
-
-| Producto actual | Ahora |
-|---|---|
-| `cart_currency.hub` / `.postgres` | `tests/test_services.py` (moneda del negocio, explícita, nula, inválida), `tests/test_business_currency.py` (la del país del negocio, cada hub la suya, decimales del servidor) |
-| `handler` (Rust): cantidad × precio, HALF_UP, precio de la fila al cambiar cantidad | `tests/test_services.py` |
-| `erp-cart-checkout-carts.test.ts` (alta dentro de la tabla, estado con lista, moneda del carrito) | `frontend/pages/CartsPage.test.ts`, `components/CartFormModal.test.ts` |
-| `erp-cart-checkout-orders.test.ts` (total en céntimos con formato) | `frontend/pages/OrdersPage.test.ts` |
-| `range-filters.test.ts`, `total-amount-filter.test.ts` | `frontend/pages/CartsPage.test.ts`, `OrdersPage.test.ts` (rangos en la unidad que se ve) |
-| `form-error-in-panel.test.ts` | `components/CartFormModal.test.ts` (rechazo dentro del formulario) |
-| `list-load-error.test.ts` | `frontend/pages/*.test.ts` (error de carga con Reintentar) |
-| `lib/quantity.test.ts`, `money-display-guard.test.ts` | `frontend/lib/format.test.ts` |
-
 ## Lo que queda fuera
 
-- **Iconos propios** (`ion:bag-check-outline` y `ion:checkmark-done-outline` del producto actual) y las
+- **Iconos propios** (`ion:bag-check-outline` y `ion:checkmark-done-outline`) y las
   **piezas compartidas** que la app lleva copiadas (tabla de servidor viva, lector de importes): pedidos
-  en `UI-REQUESTS.md`, sin llegar a `@erplora/ui` al cerrar la app.
+  en `UI-REQUESTS.md`, sin llegar a `@erplora/ui`.
 
 ## Lo que NO hace, a propósito
 
@@ -599,35 +552,3 @@ Tests:
 - No borra solo los datos personales al borrar un carrito (el borrado es lógico): para eso está
   CART_CHECKOUT-F14, que los vacía en carritos (también borrados) y pedidos cuando el cliente lo pide.
   El código de sesión, el número, los importes y las líneas (producto y precio) se quedan.
-
-## Cambios frente al producto actual
-
-- **Los rechazos ya no son mudos**: abandonar, vaciar, añadir o cambiar líneas en un carrito que no
-  está activo, iniciar un pedido de un carrito inexistente, inactivo o vacío, marcar pagado o completar
-  en el estado equivocado, o fallar uno completado, contesta con su motivo y no cambia nada ni avisa.
-  Antes contestaba bien y emitía el aviso igualmente.
-- **La numeración de pedidos no tiene huecos**: un pedido rechazado no gasta número (antes subía el
-  contador igual). El día del número es el del negocio, no el del reloj UTC del servidor.
-- **Un carrito vencido se lee como Expirado** aunque nadie haya lanzado la caducidad, y la caducidad
-  está declarada como tarea programada (antes no la ejecutaba nadie).
-- **Borrar pide confirmación** y **Fallar pide el motivo** en un formulario (antes, «Cancelled by
-  operator» fijo, en inglés); el motivo de fallo y el de abandono van en su campo, no pegados a las
-  notas. Fallar un pedido ya fallido se rechaza (antes repetía la nota).
-- **Cada fila ofrece solo la acción que le toca** (Abandonar solo en un carrito activo; Marcar pagado,
-  Completar y Fallar según el estado del pedido), y solo a quien puede.
-- **El buscador de Carritos encuentra por sesión** (antes solo por email y nombre, aunque lo decía).
-- **El pedido guarda su moneda** (la del carrito) y su total se pinta en ella (antes, en la del
-  negocio).
-- **La moneda del negocio es la de su país** (la de **Ajustes › Negocio**), la de un carrito nuevo y la
-  del filtro de Total; antes, la que guardaba el hub en sus ajustes.
-- **Borrar un carrito deja libre su sesión** para otro carrito (antes la sesión de un carrito borrado
-  no se podía volver a usar).
-- **Cantidades con tres decimales** (`0,5`), como el resto del Hub; antes, enteros con escala 10⁶.
-- **Email validado** en el carrito y en el pedido; iniciar el pedido sin email usa el del carrito.
-- **Las líneas quitadas se borran** (antes quedaban con borrado lógico, sin forma de leerlas).
-- **Fuera de las plantillas** (como `payment`): `verticals = []`, en la tienda.
-- **Borrar los datos personales de un cliente** (CART_CHECKOUT-F14, nuevo): el producto actual no tenía
-  forma de hacerlo; se adopta lo de Shopify y WooCommerce («erase personal data») y lo que ya hacen
-  `service`, `reservation`, `appointment` y `table` con sus textos libres.
-- **Topes de cantidad y de importe**: una línea de más de 1 000 000 unidades o un total por encima de
-  99 999 999 999,99 (con dos decimales) se rechazan en su campo (antes, error genérico).

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cfd3183450073e8104568c9560aeab8dd475ee3b4c8d149d50e9f7ae66257760 -->
+<!-- generated from WORKBOOK.md sha256:e041a30afbb6768130cd241db4f20535fcb99b9f64f2430c76feb67efca48378 -->
 
 ## What it is for and who it is for
 
@@ -18,6 +18,11 @@ Who uses it:
 - The **owner** and the **administrator**: besides, they delete them and set up the booking page.
 - The **assistant** (by voice or by text, with the session of the person speaking) does the same: "confirm
   Ana's booking for tomorrow", "which online bookings are pending?", "cancel booking APT-20261016-0003".
+  Before an action it asks to confirm with its card (BASE-F97), which names each record as the diary names
+  it, never by its identifier: the booking by its customer, its day, its time and its professional
+  ("Booking: Lucía Pérez · Tuesday, March 5, 2030 · 10:00 · Ana López"), as the inbox does in "Cancel …'s
+  booking?"; the services and the professional of a booking from the page, by their names. What the person
+  asking cannot see, or what no longer exists, is left out.
 
 ## Reference adopted
 
@@ -47,7 +52,7 @@ the app refuses it even if they try through the API or the assistant.
 
 ### Bookings (inbox)
 A table of 50 rows per page with a search box ("Search no., customer, phone, service…") and filters by
-column behind the filter button of the bar, as in the current product: No., Customer, Service,
+column behind the filter button of the bar: No., Customer, Service,
 Professional, Date (one day) and Status. Columns: **No.** (`APT-…`), **Customer** (with her
 phone), **Service**, **Professional**, **Date**, **Time**, **Status** and **Booked** (when she asked for it).
 Most recent first; sorted by column. List or cards.
@@ -112,7 +117,7 @@ Dates and times show on the business's clock and in the format of the language o
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
 Status: done (operations and preview; the public page is `base`'s)
-Actor: customer (no session)
+Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: public booking page (`base`); in development, the preview
 Steps:
 1. She opens the business's page: title, welcome message, logo and colour from the Settings.
@@ -137,7 +142,8 @@ the customer's card **linked by her phone** or created if it does not exist (`cu
 origin "web"), and the notice `online_booking.booking.created`. If the card has no email, the one she wrote
 stays as the appointment's contact (the card is not touched). With "No preference", the appointment goes to
 the first professional (by name order) who has that time free. Nothing the page answers tells the name
-of the card of that mobile. Whoever opens the preview from inside (owner or administrator) books with
+of the card of that mobile. Whoever books from inside (owner or administrator), with the preview or by
+asking the assistant ("book her online, as the customer would…": its card is the confirmation), books with
 the same rules as the customer: never with the front desk's exceptions.
 If it fails: nothing is written. The page switched off ("This business does not take online bookings right now."); a
 service that is not booked online; picking a professional when the business does not allow it; the time is no longer
@@ -147,7 +153,10 @@ from the same device ("…Try again later, or call the business.") or more than 
 business ("…Try again in a few minutes."), or more
 upcoming online bookings with the same mobile than the Settings allow (3 out of the box: "This mobile already
 has upcoming bookings…", without saying how many). Two customers who book the same time of the same
-professional at once: one gets in and the other gets "That time is no longer free".
+professional at once: one gets in and the other gets "That time is no longer free". In the preview, as in the
+form windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
+corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
+try (hub#854).
 Involved: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirm a booking
@@ -205,10 +214,11 @@ Involved: APPOINTMENT-F05
 
 ### ONLINE_BOOKING-F06 Delete a booking
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Bookings
 Steps:
-1. Press **Delete** and confirm "Delete booking APT-…? It is better to cancel it, which keeps its history.".
+1. Press **Delete** and confirm "Delete booking APT-…? It is better to cancel it, which keeps its history."
+   (or ask the assistant for it: its card is the confirmation).
 2. The booking disappears from the inbox and from the diary (soft delete: the data is not lost).
 In: an online booking that is not in progress, completed or charged.
 Out: `appointment.appointment.deleted`.
@@ -217,11 +227,12 @@ Involved: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Set up the booking page
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Settings
 Steps:
 1. Change the fields of **Public page** and of **Booking rules** and press **Save**: "Settings
    saved.". Only what changes is saved, all together or nothing.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 2. In **Services booked online**, touch a service's switch: it is saved at once in
    Services.
 In: the saved settings (or the out-of-the-box ones: page off, email not required, 3 upcoming bookings per
@@ -229,7 +240,9 @@ mobile, choosing a professional and notes allowed) and the rules of Appointments
 Out: `online_booking.settings.updated` (if something of the page changes) and `appointment.settings.updated` (if
 a rule changes); a service's switch, `service.service.updated`.
 If it fails: a colour that is not `#RRGGBB`, a URL that is not `http(s)://…`, a number out of range or a text
-too long, under its field; nothing is saved.
+too long, under its field; nothing is saved. As in the form windows, the notice goes as soon as something is
+changed and a field's reason as soon as that field is corrected; both come back if the next try is refused
+too. A refusal that names no field stays until the next try (hub#854).
 Involved: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 See and search the bookings
@@ -308,7 +321,8 @@ Involved: APPOINTMENT-F24, CUSTOMER-F16
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of the person speaking) and the
 API, with the same rules and permissions. A booking is named by its id, its number (`APT-…`) or **the way a
 person says it**: the customer (name, phone or email) and the day ("Ana's for tomorrow"); with no day, her next
-online booking. If it fits several, they are listed and the number is asked for.
+online booking. If it fits several, they are listed and the number is asked for. By voice, the page's ones are
+asked for as "Olga's internet booking" or "what I have in the inbox".
 
 ### What it offers: queries
 
@@ -331,7 +345,8 @@ online booking. If it fits several, they are listed and the number is asked for.
 | Saves the settings (and the rules of Appointments) | settings (+ Appointments settings for the rules) | F07 | `online_booking.settings.update` |
 | Books and cancels from the page (public) | `online_booking.public` | F01, F11 | `online_booking.public.book`, `.cancel` |
 
-No-show, cancel and delete are **high risk** for the assistant: it asks for confirmation first. The actions of
+No-show, cancel and delete are **high risk** for the assistant: its card asks for confirmation before doing
+it, without asking first in the chat (BASE-F97). The actions of
 the inbox are done by Appointments with the permission of whoever acts: it takes this app's **and** Appointments'.
 
 ### What it announces

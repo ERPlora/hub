@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import type { MemberOut, TerminateIn } from '../operations';
 
 const props = defineProps<{
@@ -16,6 +18,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+const canDismiss = useUnsavedFormOnOpen('staff-member-terminate', () => ({ lastDay: lastDay.value, reason: reason.value }), open);
 
 const lastDay = ref('');
 const reason = ref('');
@@ -48,6 +52,7 @@ async function terminate(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-member-terminate"
     size="sm"
     role="alertdialog"
@@ -60,7 +65,9 @@ async function terminate(): Promise<void> {
     @submit="terminate"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-terminate">
+      <div
+        class="staff-terminate"
+      >
         <p
           class="staff-terminate__message"
           data-testid="staff-member-terminate-message"
@@ -69,6 +76,7 @@ async function terminate(): Promise<void> {
         </p>
         <ion-input
           data-testid="staff-member-terminate-termination_date"
+          name="termination_date"
           type="date"
           :value="lastDay"
           :label="$t('staff.members.terminate.date')"
@@ -81,6 +89,7 @@ async function terminate(): Promise<void> {
         />
         <ion-textarea
           data-testid="staff-member-terminate-reason"
+          name="reason"
           :value="reason"
           :label="$t('staff.members.terminate.reason')"
           label-placement="floating"

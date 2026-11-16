@@ -2,10 +2,24 @@
 // quantities and percentages as decimal strings). One place turns them into text in the page's
 // language with `Intl.NumberFormat`, and the amounts a person types into cents: no page formats by hand.
 // Money is in the business's currency (flow business-currency), or a charged sale's own: the one the screen
-// passes, with the decimals the server counts; until it is known, a figure without a symbol, never the euro.
+// passes, with the decimals the server counts; until it is known, a dash: never the euro, nor a figure with two
+// decimals it may not have (hub#936: 1,500 yen painted «15.00»).
 import { describe, expect, it } from 'vitest';
 
-import { centsFromAmount, currencySign, formatDay, formatMoney, formatPercent, formatQuantity, moneyOf, plain } from './format';
+import { itGroupsThousandsAndDashesAMissingAmount } from '../../../../base/frontend/__tests__/money-format';
+import {
+  centsFromAmount,
+  currencySign,
+  formatDay,
+  formatMoney,
+  formatPercent,
+  formatQuantity,
+  keypadCents,
+  moneyOf,
+  plain,
+  quantityWithUnit,
+  signedMoney,
+} from './format';
 
 // The money as `base.business.get` (or a sale) says it: the currency and the decimals the server counts it in.
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -23,21 +37,7 @@ describe('formatMoney', () => {
     expect(formatMoney(-350, 'en', EUR)).toBe('-€3.50');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
-    // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
-    // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
-    expect(spaced(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
-    expect(spaced(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
-    expect(spaced(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
-    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-    expect(formatMoney(1234567, 'en', EUR)).toBe('€12,345.67');
-  });
-
-  it('a missing amount is a dash, never «NaN», and a broken language falls back to English', () => {
-    expect(formatMoney(null, 'en', EUR)).toBe('—');
-    expect(formatMoney(undefined, 'es', EUR)).toBe('—');
-    expect(formatMoney(100, 'not a tag!', EUR)).toBe('€1.00');
-  });
+  itGroupsThousandsAndDashesAMissingAmount(formatMoney, plain);
 });
 
 describe('money of the business (flow business-currency)', () => {
@@ -54,21 +54,28 @@ describe('money of the business (flow business-currency)', () => {
     expect(spaced(formatMoney(123450, 'en', HUF))).toBe('Ft 1,234.50');
   });
 
-  it('until the money is known an amount is a figure without a sign, never the euro', () => {
-    expect(spaced(formatMoney(123456, 'es'))).toBe('1.234,56');
-    expect(formatMoney(15050, 'en')).toBe('150.50');
+  // hub#936: two decimals supposed painted 1,500 yen as «15.00» until the business answered.
+  it('until the money is known an amount is a dash, never a figure with decimals the currency may not have', () => {
+    expect(formatMoney(1500, 'es')).toBe('—');
+    expect(formatMoney(15050, 'en')).toBe('—');
     expect(formatMoney(null, 'en')).toBe('—');
+  });
+
+  it('an amount taken off or added carries its sign; until the money is known, the dash alone', () => {
+    expect(signedMoney('−', 500, 'en', JPY)).toBe('−¥500');
+    expect(spaced(signedMoney('+', 150, 'es', EUR))).toBe('+1,50 €');
+    expect(signedMoney('−', 500, 'en')).toBe('—');
   });
 
   it('a charged sale is painted with its own currency and decimals, as the server sent them', () => {
     expect(moneyOf({ currency: 'PLN', currency_decimals: 2 })).toEqual(PLN);
     expect(moneyOf({ currency: 'JPY', currency_decimals: 0 })).toEqual(JPY);
-    // A server that does not send it yet (a deploy half way): a figure without a sign, never a broken screen.
+    // A server that does not send it yet (a deploy half way): a dash, never a broken screen nor a guessed figure.
     expect(moneyOf({} as { currency: string; currency_decimals: number })).toBeUndefined();
-    expect(formatMoney(150, 'en', moneyOf({} as { currency: string; currency_decimals: number }))).toBe('1.50');
+    expect(formatMoney(150, 'en', moneyOf({} as { currency: string; currency_decimals: number }))).toBe('—');
   });
 
-  it('the sign of the money alone, for the button that switches a discount to an amount (gh:sales#380)', () => {
+  it('the sign of the money alone, for the button that switches a discount to an amount', () => {
     expect(currencySign('es', EUR)).toBe('€');
     expect(currencySign('es', PLN)).toBe('zł');
     expect(currencySign('en', JPY)).toBe('¥');
@@ -86,10 +93,25 @@ describe('formatPercent', () => {
 });
 
 describe('formatQuantity', () => {
+  // hub#974: the till wrote «12.500» but «1500», the stock «12500»; every screen now writes it the platform's way.
+  it('writes a quantity with only the decimals it has, its thousands grouped from four digits on', () => {
+    expect(formatQuantity('2.000', 'en')).toBe('2');
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+    expect(formatQuantity('12500.000', 'es')).toBe('12.500');
+  });
+});
+
+describe('quantityWithUnit', () => {
   it('paints a quantity with only the decimals it has, and its unit unless it is units', () => {
-    expect(formatQuantity('2.000', 'ud', 'en')).toBe('2');
-    expect(formatQuantity('0.532', 'kg', 'es')).toBe('0,532 kg');
-    expect(formatQuantity('1.500', 'h', 'en')).toBe('1.5 h');
+    expect(quantityWithUnit('2.000', 'ud', 'en')).toBe('2');
+    expect(quantityWithUnit('0.532', 'kg', 'es')).toBe('0,532 kg');
+    expect(quantityWithUnit('1.500', 'h', 'en')).toBe('1.5 h');
+    expect(quantityWithUnit('2', '', 'en')).toBe('2');
+  });
+
+  it('groups a quantity of four digits as every screen does, with or without its unit', () => {
+    expect(quantityWithUnit('1500.000', 'ud', 'es')).toBe('1.500');
+    expect(quantityWithUnit('1250.500', 'kg', 'es')).toBe('1.250,5 kg');
   });
 });
 
@@ -122,5 +144,21 @@ describe('formatDay', () => {
     expect(formatDay('2026-11-14T10:00:00Z', 'es')).toBe('14/11/2026');
     expect(formatDay('2026-11-14T10:00:00Z', 'en')).toBe('11/14/2026');
     expect(formatDay(null, 'es')).toBe('—');
+  });
+});
+
+// hub#921: what the till's keypad typed is handed up only in the business's money, which its type asks for (never
+// «1500» yen read with two decimals as 150000 because the business had not answered yet).
+describe('keypadCents', () => {
+  it('reads what the keypad typed in the money’s decimals, a dot still being typed included', () => {
+    expect(keypadCents('1500', JPY)).toBe(1500);
+    expect(keypadCents('1500', EUR)).toBe(150000);
+    expect(keypadCents('12.5', EUR)).toBe(1250);
+    expect(keypadCents('12.', EUR)).toBe(1200);
+  });
+
+  it('nothing typed, or more decimals than the money has, is 0', () => {
+    expect(keypadCents('', EUR)).toBe(0);
+    expect(keypadCents('15.50', JPY)).toBe(0);
   });
 });

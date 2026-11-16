@@ -1,9 +1,8 @@
 // Types of the payment app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/payment/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py (tests/test_queries.py compares the list inputs)
-// and `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
-// parameters, an id travels in the input. On the wire: money in whole minor units of its currency,
-// days `YYYY-MM-DD`, moments ISO 8601.
+// apps/payment/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py (tests/test_queries.py compares the list inputs) and
+// `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters, an id travels in
+// the input. On the wire: money in whole minor units of its currency, days `YYYY-MM-DD`, moments ISO 8601.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type MethodType = 'cash' | 'transfer' | 'card' | 'sepa' | 'check' | 'other';

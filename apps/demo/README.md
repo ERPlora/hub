@@ -72,6 +72,6 @@ pnpm e2e tests/e2e/demo-flows.spec.ts tests/e2e/two-tabs-live.spec.ts tests/e2e/
 
 ## Qué queda fuera
 
-- Borrar o reordenar líneas, precios e impuestos, y separar los datos de `a` y `b` (llega con la
-  tenencia de la fase 2): «Lo que NO hace, a propósito» del WORKBOOK.
-- El asistente del Hub que llama a las operaciones por su `ai=` (fase 2): Demo ya las declara.
+- Borrar o reordenar líneas, precios e impuestos: «Lo que NO hace, a propósito» del WORKBOOK.
+- Ya no están fuera: los datos de `a` y `b` van separados, cada negocio en su base de datos (tenencia, S5), y el
+  asistente del Hub llama a las operaciones de Demo por su `ai=` (BASE-F92 … F106).

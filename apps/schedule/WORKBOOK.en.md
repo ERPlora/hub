@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8476716e2d188d1e068b5715b6b277ccb4aea9b0773436ebc636ca062eb76865 -->
+<!-- generated from WORKBOOK.md sha256:6af11c4d4142afa4185f1517ac078cbfc8f61bb1251edc32ffa9d1868f602811 -->
 
 ## What it is for and who it is for
 
@@ -53,10 +53,9 @@ does.
 
 That is why, of what the brief asked to look at, **everything "per person" is covered by Staff**: each
 professional's weekly hours (STAFF-F13 to F15), their time off (STAFF-F17 to F20, F24) and their
-availability (`staff.availability.for_member`, STAFF-F16). The old Schedules module did not have it
-either. Schedules knows nobody in the team and does not depend on Staff.
+availability (`staff.availability.for_member`, STAFF-F16). Schedules knows nobody in the team and does not depend on Staff.
 
-From the current product these are kept (their market comparison was already done and recorded in its code):
+Adopted from the market:
 
 - **Google Business Profile**: several intervals a day, "open 24 hours" as 00:00–00:00 and special hours
   by date.
@@ -70,8 +69,7 @@ And this is decided here (same comparison):
 - **An interval belongs to the day it opens** (Google Business Profile): a Saturday 22:00–02:00 is still
   open on Sunday at 01:00, whether it comes from the week, a special day or a temporary change, even if
   Sunday is a closed day.
-- **A special day and a temporary change can be corrected** (Google, Fresha, Square edit them); there is no
-  longer any need to delete them and create them again.
+- **A special day and a temporary change can be corrected** (Google, Fresha, Square edit them).
 
 ## Before you start
 
@@ -134,10 +132,17 @@ able to change it and without **Save**.
 |---|---|
 | Loading | "Loading…" while the first result arrives; the week is not painted until the settings are there too (otherwise it would be sorted wrong). |
 | Empty | "No special days." or "No overrides."; with a search or a filter, "No results". The week always has seven rows. |
-| Error | The table's notice with "Retry", which says which one did not load ("The opening hours could not be loaded.", "The special days could not be loaded.", "The overrides could not be loaded." or "The settings could not be loaded.") and then the cause. A form's refusal shows inside the form, without losing what was typed; a row action's (delete, confirm the week, save the settings), above the table or the form. With the settings unread, **Week starts** is not shown, so as not to save a value that has not been read. |
+| Error | The table's notice with "Retry", which says which one did not load ("The opening hours could not be loaded.", "The special days could not be loaded.", "The overrides could not be loaded." or "The settings could not be loaded.") and then the cause. A form's refusal shows inside the form, without losing what was typed, and each refused field (date, name, reason, notes) says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888); a row action's (delete, confirm the week, save the settings), above the table or the form. With the settings unread, **Week starts** is not shown, so as not to save a value that has not been read. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In "Edit hours" of a day, "New special day", "New override" and their correction ("Edit · …"), the phone's Back
+button asks "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and
+"Discard changes" closes the window without saving. With the window as it opened, Back closes it without asking
+(BASE-F05).
 
 ## Flows
 
@@ -149,10 +154,10 @@ able to change it and without **Save**.
 | SCHEDULE-F04 | Add a special day | done (server and screen) |
 | SCHEDULE-F05 | Add a temporary change | done (server and screen) |
 | SCHEDULE-F06 | Delete a special day or a temporary change | done (server and screen) |
-| SCHEDULE-F07 | Load several special days at once | done (assistant and API, like the current product) |
+| SCHEDULE-F07 | Load several special days at once | done (assistant and API) |
 | SCHEDULE-F08 | Choose which day the week starts on | done (server and screen) |
 | SCHEDULE-F09 | See the time zone the schedule is read with | done (server and screen) |
-| SCHEDULE-F10 | Ask whether the business is open at a moment | done (assistant and API, like the current product) |
+| SCHEDULE-F10 | Ask whether the business is open at a moment | done (assistant and API) |
 | SCHEDULE-F11 | Give Appointments the hours of some days | done (Appointments and Reservations read it) |
 | SCHEDULE-F12 | Start from a default week when turned on | done (when the tables are created) |
 | SCHEDULE-F13 | Correct a special day or a temporary change | done (server and screen) |
@@ -282,7 +287,7 @@ date it covers." (422).
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F07 Load several special days at once
-Status: done (assistant and API, like the current product)
+Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
@@ -328,7 +333,7 @@ If it fails: nothing to fail; the zone always comes from the server.
 Involved: none
 
 ### SCHEDULE-F10 Ask whether the business is open at a moment
-Status: done (assistant and API, like the current product)
+Status: done (assistant and API)
 Actor: assistant, API
 Screen: none
 Steps:
@@ -406,9 +411,12 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 whoever speaks) and the API, with the same rules and the same permissions. A weekday is named by its number
 (0 = Monday) or by its name ("lunes", "monday"); a special day, by its id, its name or its date; a temporary
 change, by its id, its reason or a date it covers. If a name fits several, it says which ones and asks to
-choose (`schedule.ambiguous_reference`).
+choose (`schedule.ambiguous_reference`). Before correcting or deleting a special day or a temporary change, the
+assistant asks for confirmation with its card (BASE-F97), which names the record as the screens name it, never by its
+id: the special day by its name ("Special day: Christmas") and the temporary change by its reason ("Override: Summer
+hours"). What the person asking cannot see is left out.
 
-### What it offers: queries (they read and change nothing; all of them can be followed live)
+### What it offers: queries (they read and change nothing; all of them, except the assistant card's two, can be followed live)
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -418,6 +426,8 @@ choose (`schedule.ambiguous_reference`).
 | The settings and the business's time zone, and whether the week is confirmed (the "Confirm your opening hours" step of the Home) | view | F03, F08, F09 | `schedule.settings.get` |
 | Is it open at a moment? | view | F10 | `schedule.business.is_open` |
 | The hours of each day of a range | view | F11 | `schedule.hours.for_range` |
+| A special day by its id, with its intervals: what the assistant's card reads to name it (BASE-F97); not an assistant tool and no route in the API | view | F06, F13 | `schedule.special_day.get` |
+| A temporary change by its id, with its intervals: what the assistant's card reads to name it (BASE-F97); not an assistant tool and no route in the API | view | F06, F13 | `schedule.override.get` |
 
 ### What it offers: actions (they change data)
 

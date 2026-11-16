@@ -1,9 +1,11 @@
-"""Django admin of the reservation app: full CRUD for support (round 12, PLAN §17).
+"""Django admin of the reservation app: full CRUD, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it adds, changes and deletes every table of
 the app so support can repair; it does not go through the operations' rules and leaves no event. What the
 database fills in (ids and timestamps) is shown, not edited.
 """
+
+import re
 
 import pytest
 from django.contrib import admin
@@ -25,7 +27,7 @@ from apps.reservation.models import (
     WaitlistEntry,
 )
 
-from .conftest import make_blocked, make_entry, make_reservation, make_slot, set_rules
+from .conftest import HUB_DB, make_blocked, make_entry, make_reservation, make_slot, set_rules
 
 MODELS = {
     Settings: SettingsAdmin,
@@ -59,6 +61,7 @@ def test_every_model_is_registered():
         assert isinstance(admin.site._registry[model], model_admin), model
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -82,14 +85,13 @@ def test_ids_and_timestamps_are_read_only():
     assert {"id", "updated_at"} <= set(SettingsAdmin.readonly_fields)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff):
     reservation = make_reservation(guest_name="Ana Admin")
     make_entry(guest_name="Luis Admin")
     make_slot(max_covers=44)
     make_blocked(reason="Holiday Admin")
     set_rules(max_party_size=17)
-    client.force_login(superuser)
     for path, text in (
         ("/admin/reservation/reservation/", b"Ana Admin"),
         (f"/admin/reservation/reservation/{reservation.pk}/change/", b"internal_notes"),
@@ -99,14 +101,13 @@ def test_changelists_and_change_pages_render(client, superuser):
         ("/admin/reservation/settings/", b"17"),
         ("/admin/reservation/reservation/add/", b"party_size"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_support_can_repair_a_reservation_through_the_admin(client, superuser):
+@HUB_DB
+def test_support_can_repair_a_reservation_through_the_admin(hub_staff):
     reservation = make_reservation()
-    client.force_login(superuser)
     data = {
         "guest_name": "Ana García",
         "guest_phone": "",
@@ -123,7 +124,7 @@ def test_support_can_repair_a_reservation_through_the_admin(client, superuser):
         "created_by": "",
         "updated_by": "",
     }
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/reservation/reservation/{reservation.pk}/change/",
         data,
         HTTP_HOST="hubs.localhost",
@@ -135,3 +136,35 @@ def test_support_can_repair_a_reservation_through_the_admin(client, superuser):
         reservation.status,
         f"{reservation.time:%H:%M}",
     ) == (5, "confirmed", "21:30")
+
+
+@HUB_DB
+def test_the_reservations_list_in_spanish_says_where_a_reservation_came_from_as_reservas_does(hub_staff):
+    """The column and the filter of a reservation's source read «Origen», as Reservas' own screens and WORKBOOK say
+    it, next to the «Estado» of the status; not Citas' «reservada por» of the same English (hub#548)."""
+    make_reservation()
+    response = hub_staff.get(
+        "/admin/reservation/reservation/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    )
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert '<details data-filter-title="estado"' in page  # the page is in Spanish: the status' filter
+    assert '<details data-filter-title="origen"' in page  # the source's filter
+    header = re.search(r'class="sortable column-source">\s*<div class="text"><a [^>]*>([^<]*)</a>', page)
+    assert header and header.group(1) == "Origen"  # the source's column
+    assert "eservada por" not in page
+
+
+@HUB_DB
+def test_the_settings_in_spanish_say_email_required_as_reservas_does(hub_staff):
+    """The setting that asks each reservation for an email reads «Correo obligatorio», as Reservas' settings screen
+    and WORKBOOK say it, under its «Teléfono obligatorio»; not Reservas online's «email obligatorio» (hub#548)."""
+    rules = set_rules(require_email=True)
+    response = hub_staff.get(
+        f"/admin/reservation/settings/{rules.pk}/change/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    )
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert 'for="id_require_phone">Teléfono obligatorio</label>' in page  # the page is in Spanish
+    assert 'for="id_require_email">Correo obligatorio</label>' in page
+    assert "mail obligatorio" not in page

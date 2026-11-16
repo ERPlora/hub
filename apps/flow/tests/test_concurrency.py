@@ -11,43 +11,25 @@ from contextlib import contextmanager
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from live.context import system_context
 from live.errors import NotFound
 from live.models import OutboxEvent
+from live.operations import atomic
 from psycopg.errors import LockNotAvailable
 
 from apps.flow import events
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once
 
-from .conftest import A, TASK_STEP, make_flow, run
+from .conftest import A, HUB_DB_COMMITTED, TASK_STEP, due_daily_flow, make_flow, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 MADRID = ZoneInfo("Europe/Madrid")
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported to the test, which fails on it
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def test_the_same_event_delivered_twice_at_once_runs_once():
@@ -66,16 +48,7 @@ def test_the_same_event_delivered_twice_at_once_runs_once():
 
 
 def test_two_workers_fire_a_due_schedule_once(monkeypatch):
-    from django.utils import timezone
-
-    now = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-    monkeypatch.setattr(timezone, "now", lambda: now)
-    flow = make_flow(
-        trigger_kind=Flow.Trigger.SCHEDULE,
-        trigger_event="",
-        schedule={"every": "day", "time": "09:00"},
-        next_fire_at=dt.datetime(2026, 10, 15, 9, 0, tzinfo=MADRID),
-    )
+    flow = due_daily_flow(monkeypatch)
     fire = lambda: run("flow.schedule.fire_due", {}, system_context(A))  # noqa: E731
     results = at_once(fire, fire)
     assert not [result for result in results if isinstance(result, Exception)], results
@@ -84,7 +57,7 @@ def test_two_workers_fire_a_due_schedule_once(monkeypatch):
 
 
 def test_two_workers_resume_each_waiting_run_once(monkeypatch):
-    # Review 2026-10-15, item 8: `resume_due` claims its runs with SKIP LOCKED.
+    # `resume_due` claims its runs with SKIP LOCKED.
     from django.utils import timezone
 
     start = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -102,10 +75,10 @@ def test_two_workers_resume_each_waiting_run_once(monkeypatch):
     assert Task.objects.filter(title="After").count() == 3
 
 
-# An automation deleted while it is being looked up (FIX-FLOW-DETAIL-RACE): the lookup found it and then
-# loaded it again by its id, so a deletion committed between the two either raised DoesNotExist (a 500)
-# or handed back the automation that was just deleted. Each case lands the deletion there, both the
-# business's «Delete» (the row stays, marked deleted) and the Hub admin's (the row goes).
+# An automation deleted while it is being looked up: the lookup found it and then loaded it again by its id, so a
+# deletion committed between the two either raised DoesNotExist (a 500) or handed back the automation that was just
+# deleted. Each case lands the deletion there, both the business's «Delete» (the row stays, marked deleted) and the Hub
+# admin's (the row goes).
 
 DELETIONS = ["operation", "row"]
 
@@ -114,8 +87,8 @@ def delete(flow, how: str) -> None:
     """Deletes ``flow`` in this session, giving up at once on a row another session has locked. The lock
     timeout is the transaction's (SET LOCAL): a session-level one would go back to the pool with the
     connection and reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("SET LOCAL lock_timeout = '300ms'")
         if how == "operation":
             run("flow.flow.delete", {"id": str(flow.id)})
@@ -137,7 +110,7 @@ def deleted_after_the_first_read_of(flow, how: str):
             deletions.extend(at_once(lambda: delete(flow, how)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -230,7 +203,7 @@ def test_a_command_by_id_locks_its_automation_in_the_read_that_finds_it(how):
     assert [(f.name, f.deleted_at is None) for f in Flow.objects.all()] == [("Renamed", True)]
 
 
-# «Ask someone first» (FLOW-F29, FLOW-F30; hub#2502): whatever decides it at once, it is decided once.
+# «Ask someone first» (FLOW-F29, FLOW-F30): whatever decides it at once, it is decided once.
 
 
 def _asking(hours=1):
@@ -286,8 +259,8 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
 
     def sweep():
         clock.now = start + dt.timedelta(hours=1, minutes=1)
-        with transaction.atomic():
-            with connection.cursor() as cursor:
+        with atomic():
+            with connections[current_alias()].cursor() as cursor:
                 cursor.execute("SET LOCAL lock_timeout = '300ms'")
             return run("flow.question.expire_due", {}, system_context(A))
 
@@ -303,7 +276,7 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
                     sweeps.extend(at_once(sweep))
             return result
 
-        with connection.execute_wrapper(wrapper):
+        with connections[current_alias()].execute_wrapper(wrapper):
             return run("flow.question.answer", {"id": str(question.id), "approve": True})
 
     before = OutboxEvent.objects.count()
@@ -318,7 +291,7 @@ def test_an_answer_given_in_time_is_not_closed_by_the_sweep_that_lands_in_the_mi
 
 
 def test_two_people_turning_the_same_recipe_on_at_once_build_one_automation():
-    # FLOW-F33: the old Hub could build two (HUB-F105 «parcial»); here one wins and the other finds it.
+    # FLOW-F33: one of them builds the automation and the others find it.
     turn_on = lambda: run("flow.recipe.enable", {"recipe": "appointment/customer_cancelled"})  # noqa: E731
     results = at_once(turn_on, turn_on, turn_on)
     assert not [result for result in results if isinstance(result, Exception)], results

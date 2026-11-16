@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.sale.department.list","app":"sale","tool":"sale.department.list","role":"employee","language":"es","phrase":"¿en qué apartados puedo apuntar un importe suelto cuando estoy en el TPV?","expect":"read"},
+    {"id":"qa20261108.employee.es.sale.refund.options","app":"sale","tool":"sale.refund.options","role":"employee","language":"es","phrase":"antes de hablar con la encargada, ¿qué se podría devolver de la venta de la Cuenta QA?","expect":"read","lookups":["sale.sale.list"]},
+    {"id":"qa20261108.employee.es.sale.order.update_line","app":"sale","tool":"sale.order.update_line","role":"employee","language":"es","phrase":"en la Cuenta QA aparte pon dos cruasanes en vez de uno y apunta que sean integrales","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.sale.department.delete","app":"sale","tool":"sale.department.delete","role":"employee","language":"es","phrase":"borra el apartado Chuches QA del TPV, que sobra","expect":"refused"},
+    {"id":"qa20261108.employee.es.sale.settings.get","app":"sale","tool":"sale.settings.get","role":"employee","language":"es","phrase":"enséñame la configuración administrativa completa del TPV, incluidos los límites y los textos internos","expect":"refused"},
+    {"id":"qa20261108.employee.es.sale.settings.update","app":"sale","tool":"sale.settings.update","role":"employee","language":"es","phrase":"cambia el tope de descuentos al 40 % y quita el mensaje del pie de los tickets","expect":"refused"}
+  ]
+}

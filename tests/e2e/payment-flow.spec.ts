@@ -6,7 +6,9 @@
 // app's pytest and Vitest suites. Everything created here is named «E2E Pay …» and removed before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Pay';
 const VIEWPORTS = [
@@ -59,18 +61,6 @@ async function threeShots(page: Page, key: string, target: () => Locator): Promi
 /** A row (or, on a phone, a card) of a payment list by its id. */
 const rowOf = (page: Page, table: string, id: string): Locator =>
   shown(page).locator(`[data-testid=${table}-row][data-id="${id}"]`).first();
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  await expect(rowOf(page, table, id)).toBeVisible();
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`).first();
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await shown(page).locator(`[data-testid=${table}-row-${id}-menu]`).first().click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
-}
 
 /** Picks `text` in the ion-select `testid` (a popover). */
 async function choose(page: Page, testid: string, text: string): Promise<void> {
@@ -141,7 +131,7 @@ async function step(context: BrowserContext, id: string, ...steps: Array<'approv
   }
 }
 
-// flow: PAYMENT-F01 · gh:payments#6 — methods are created from the screen; a twin name is refused under Name
+// flow: PAYMENT-F01 — methods are created from the screen; a twin name is refused under Name
 test('PAYMENT-F01: «New method» creates an Active method that «New payment» offers; a twin name is refused under Name', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/payment/methods');
   try {
@@ -170,7 +160,9 @@ test('PAYMENT-F01: «New method» creates an Active method that «New payment» 
     await expect(name).toContainText('There is already a payment method with that name. Pick another name.');
     await expect(page.locator('[data-testid=payment-method-form-name] input')).toHaveValue(bank.toUpperCase());
     await threeShots(page, 'PAYMENT-F01', () => name);
+    // «Cancel» asks before losing the refused method (BASE-F05): the person discards it.
     await page.locator('[data-testid=payment-method-form-cancel]').click();
+    await discardChanges(page);
     expect(psql(`select count(*) from payment_paymentmethod where lower(name) = lower('${bank}')`)).toBe('1');
 
     // From now on «New payment» offers it.
@@ -184,7 +176,7 @@ test('PAYMENT-F01: «New method» creates an Active method that «New payment» 
   }
 });
 
-// flow: PAYMENT-F02 · gh:payments#8, gh:pm#513, gh:pm#521 — the amount as typed, refusals under their field, one payment per attempt
+// flow: PAYMENT-F02 — the amount as typed, refusals under their field, one payment per attempt
 test('PAYMENT-F02: «New payment» records a Draft with its reference; a bad IBAN is refused under its field; the same attempt records one payment', async ({
   browser,
 }) => {
@@ -316,7 +308,7 @@ test('PAYMENT-F05: «Cancel payment» asks the reason and the row shows it under
   }
 });
 
-// flow: PAYMENT-F06 · gh:payments#21, gh:payments#29 — a piece of the reference finds it; the date filters from / to
+// flow: PAYMENT-F06 — a piece of the reference finds it; the date filters from / to
 test('PAYMENT-F06: the search finds a payment by a piece of its reference and the Date filters from one day to another', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/payment/payments');
   try {
@@ -369,7 +361,7 @@ test('PAYMENT-F06: an employee sees the payments and the methods, with no New pa
   }
 });
 
-// flow: PAYMENT-F08 · gh:pm#155 — the row opens «Editing method — {name}»; deactivated, it leaves «New payment»
+// flow: PAYMENT-F08 — the row opens «Editing method — {name}»; deactivated, it leaves «New payment»
 test('PAYMENT-F08: a row opens «Editing method — {name}» with the whole account; a rename shows on its payments; Deactivate and Activate', async ({
   browser,
 }) => {
@@ -379,13 +371,29 @@ test('PAYMENT-F08: a row opens «Editing method — {name}» with the whole acco
     const paid = await payment(context, bank.id);
     await page.reload();
     await waitForList(page, 'payment-methods');
+    // What is typed before the whole method arrives stays and is saved: the method is held until the name is typed.
+    let arrive!: () => void;
+    const held = new Promise<void>((resolve) => (arrive = resolve));
+    const isDetail = (url: URL) => url.pathname === '/api/payment/methods/detail';
+    await page.route(isDetail, async (route) => {
+      await held;
+      await route.continue();
+    });
+    const name = page.locator('[data-testid=payment-method-form-name] input');
+    const account = page.locator('[data-testid=payment-method-form-account] input');
     await rowOf(page, 'payment-methods', bank.id).click();
     const form = page.locator('ion-modal[data-testid=payment-method-form]');
     await expect(form.locator('ion-title')).toHaveText(`Editing method — ${bank.name}`);
-    await expect(page.locator('[data-testid=payment-method-form-account] input')).toHaveValue('ES9121000418450200051332');
-    await threeShots(page, 'PAYMENT-F08', () => page.locator('[data-testid=payment-method-form-account]'));
+    await expect(account).toBeDisabled();
+    await expect(page.locator('[data-testid=payment-method-form-submit]')).toHaveAttribute('aria-disabled', 'true');
     const renamed = named('Renamed');
-    await page.locator('[data-testid=payment-method-form-name] input').fill(renamed);
+    await name.fill(renamed);
+    await capture(page, 'payment-methods-edit-before-whole');
+    arrive();
+    await expect(account).toHaveValue('ES9121000418450200051332');
+    await expect(name).toHaveValue(renamed);
+    await page.unroute(isDetail);
+    await threeShots(page, 'PAYMENT-F08', () => page.locator('[data-testid=payment-method-form-account]'));
     await page.locator('[data-testid=payment-method-form-submit]').click();
     await expect(form).toBeHidden();
     await expect(rowOf(page, 'payment-methods', bank.id)).toContainText(renamed);

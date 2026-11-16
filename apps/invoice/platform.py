@@ -1,14 +1,14 @@
-"""ERPlora's own invoices, as the SaaS posts them to its platform hub (PLAN-SAAS §4; ``platform_payload()`` of
-saas-next/billing/services.py): the body → the fields of an ``Invoice`` and its lines. Pure: it reads and writes
-nothing (``services.issue_platform`` writes, ``base.internal`` is the door).
+"""ERPlora's own invoices, as the SaaS posts them to its platform hub (``platform_payload()`` of the SaaS's
+billing/services.py): the body → the fields of an ``Invoice`` and its lines. Pure: it reads and writes nothing
+(``services.issue_platform`` writes, ``base.internal`` is the door).
 
 - The number is the SaaS's own (``ERP-2026-00123``, ``ERPR-…`` for a credit note): its series, its year (of the issue
   date) and its sequence (the number's last digits). No series of the Hub is ever counted for it.
 - The type: F1 with a recipient tax ID; without one, a simplified F2 up to 400 € (RD 1619/2012 art. 4), refused
   above (the old SaaS's ``fiscal/invoice_type.py``). A credit note is a rectifying invoice by differences with the
   SaaS's type (R1–R4), or R5 when it rectifies a simplified invoice.
-- The breakdown: one entry per fiscal key, as the old SaaS declared it to the AEAT (``fiscal/desglose.py``,
-  ADR-0183): a domestic sale is subject (S1) at its rate; OSS (regime 17), reverse charge and not subject are not
+- The breakdown: one entry per fiscal key, as the old SaaS declared it to the AEAT (``fiscal/desglose.py``):
+  a domestic sale is subject (S1) at its rate; OSS (regime 17), reverse charge and not subject are not
   subject by location (N2) and exempt is E1, all without rate nor quota, the whole amount of the line as its base
   (AEAT error 1237). The header is the sum of the breakdown, as every document of Invoicing.
 - The notes: the tax notice the old invoice printed (reverse charge, OSS, not subject), in the document's language.
@@ -24,6 +24,7 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from apps.invoice import fiscal
+from apps.tax.queries import round_half_up
 
 KINDS = ("invoice", "credit_note")
 #: A rectifying invoice by differences (``Invoice.RectificationKind.DIFFERENCES``): the credit note's negative amounts.
@@ -47,6 +48,7 @@ TAX_ID_MAX_LENGTH = 20
 DESCRIPTION_MAX_LENGTH = 500
 _SEQUENCE = re.compile(r"(\d+)$")
 _TWO_PLACES = Decimal("0.01")
+_HUNDRED = Decimal(100)
 
 REVERSE_CHARGE_NOTICE = _(
     "This is a B2B transaction. VAT is payable by the customer under the reverse charge mechanism."
@@ -158,19 +160,23 @@ def _line(item: dict, treatment: str) -> tuple[fiscal.FiscalKey, dict]:
         int(item["tax_cents"]),
         int(item["total_cents"]),
     )
+    discount = int(item.get("discount_cents") or 0)
     if key.cls == fiscal.SUBJECT:
         base, quota = net, tax
     else:
-        # No Spanish VAT is charged here: the whole amount of the line is its base, without quota.
+        # No Spanish VAT is charged here: the whole amount of the line is its base, without quota. Another state's
+        # VAT (OSS) is part of it, so the SaaS's discount, without VAT, takes it too.
         base, quota = total, 0
+        discount = round_half_up(discount * (_HUNDRED + rate) / _HUNDRED)
     quantity = Decimal(int(item.get("quantity") or 1))
-    # Invoicing keeps the sign of a line in its quantity, never in its price.
-    signed = -quantity if base < 0 else quantity
-    unit_price = (Decimal(abs(base)) / quantity).quantize(_TWO_PLACES)
+    # Invoicing keeps the sign of a line in its quantity, never in its price; its discount follows that sign.
+    sign = -1 if base < 0 else 1
+    unit_price = ((Decimal(abs(base)) + discount) / quantity).quantize(_TWO_PLACES)
     return key, {
         "description": (item.get("description") or "").strip()[:255],
-        "quantity": signed,
+        "quantity": sign * quantity,
         "unit_price": unit_price,
+        "discount_amount": sign * discount,
         "tax_rate": key.rate,
         "tax_category_key": (item.get("tax_category") or "")[:80],
         "base_amount": base,

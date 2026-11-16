@@ -8,8 +8,11 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, errorFrame, flush, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
+import { itReadsAmountsAsTheHub, itReadsWhatWasLeftOnceTheMoneyArrives } from '../__tests__/money-field';
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
+import type { Business } from '../../../../base/frontend/operations';
 import CloseSessionForm from './CloseSessionForm.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
@@ -45,19 +48,45 @@ const queue = (usages: ReturnType<typeof usage>[] = []) => ({
   failed: usages.reduce((sum, row) => sum + row.failed, 0),
 });
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountCash(CloseSessionForm, { props: { session: SESSION }, locale });
+/** What the hub answers once the session is closed with its expected cash counted. */
+const CLOSED = { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 };
+
+async function setup(locale: 'en' | 'es' = 'en', options: { business?: Business | null } = {}) {
+  const m = await mountCash(CloseSessionForm, { props: { session: SESSION }, locale, ...options });
   await m.live();
   const counted = () => m.inDoc('cash-register-close-counted');
   const submit = () => click(m.inDoc('cash-register-close-submit'));
-  const ready = async (expected: number | null = 10150, countRows: unknown[] = [], checkRows: unknown[] = []) => {
+  /** The session, its counts and the open checks answered; the kitchen and the print queue not yet. */
+  const answerTheSession = async (expected: number | null = 10150, countRows: unknown[] = [], checkRows: unknown[] = []) => {
     await m.result(DETAIL, detail(expected));
     await m.result(COUNTS, counts(countRows));
     await m.result(CHECKS, checks(checkRows));
+  };
+  const ready = async (expected: number | null = 10150, countRows: unknown[] = [], checkRows: unknown[] = []) => {
+    await answerTheSession(expected, countRows, checkRows);
     await m.result(KITCHEN, board());
     await m.result(PRINTS, queue());
   };
-  return { ...m, counted, submit, ready };
+  /** Counts the expected cash and presses «Close» once. */
+  const closeCountingTheExpected = async () => {
+    await ionValue(counted(), '101,50', 'ionInput');
+    m.answer(200, CLOSED);
+    await submit();
+  };
+  return { ...m, counted, submit, answerTheSession, ready, closeCountingTheExpected };
+}
+
+/** Counts the expected cash and presses «Close» twice: the first press only warns, its button now «Close anyway»; the
+ *  second closes. */
+async function expectClosesOnTheSecondPress(s: Awaited<ReturnType<typeof setup>>): Promise<void> {
+  await ionValue(s.counted(), '101,50', 'ionInput');
+  await s.submit();
+  expect(s.sent()).toEqual([]);
+  expect(s.find('cash-register-review-confirm').exists()).toBe(true);
+  expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Close anyway');
+  s.answer(200, CLOSED);
+  await s.submit();
+  expect(s.sent()).toHaveLength(1);
 }
 
 describe('CloseSessionForm', () => {
@@ -123,21 +152,12 @@ describe('CloseSessionForm', () => {
     const s = await setup();
     await s.ready(10150, [], [{ id: 'o1', label: 'Table 4' }]);
     expect(s.find('cash-register-review').text()).toContain('Table 4');
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    await s.submit();
-    expect(s.sent()).toEqual([]);
-    expect(s.find('cash-register-review-confirm').exists()).toBe(true);
-    expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Close anyway');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
-    expect(s.sent()).toHaveLength(1);
+    await expectClosesOnTheSecondPress(s);
   });
 
-  it('warns of the kitchen tickets not served and the prints that did not come out (cash_register#68)', async () => {
+  it('warns of the kitchen tickets not served and the prints that did not come out', async () => {
     const s = await setup();
-    await s.result(DETAIL, detail(10150));
-    await s.result(COUNTS, counts([]));
-    await s.result(CHECKS, checks([]));
+    await s.answerTheSession();
     await s.result(KITCHEN, board([{ label: 'Table 4', short_number: '12', number: 'K-12' }], [{ label: '', short_number: '13', number: 'K-13' }]));
     await s.result(PRINTS, queue([usage('receipt', 1), usage('kitchen', 0, 1), usage('bar')]));
     const review = s.find('cash-register-review').text();
@@ -146,29 +166,19 @@ describe('CloseSessionForm', () => {
     expect(review).toContain('Prints not out yet: 2');
     expect(review).toContain('Receipts · Kitchen');
     expect(review).not.toContain('Open checks');
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    await s.submit();
-    expect(s.sent()).toEqual([]);
-    expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Close anyway');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
-    expect(s.sent()).toHaveLength(1);
+    await expectClosesOnTheSecondPress(s);
   });
 
   it('Kitchen or Printing off in this hub leaves nothing pending, not an incomplete review', async () => {
     const s = await setup();
-    await s.result(DETAIL, detail(10150));
-    await s.result(COUNTS, counts([]));
-    await s.result(CHECKS, checks([]));
+    await s.answerTheSession();
     s.net.lastStream().push(errorFrame(s.subId(KITCHEN), 'app_inactive'));
     s.net.lastStream().push(errorFrame(s.subId(PRINTS), 'app_inactive'));
     await flush();
     expect(s.find('cash-register-review-checking').exists()).toBe(false);
     expect(s.find('cash-register-review').exists()).toBe(false);
     expect(s.find('cash-register-review-unavailable').exists()).toBe(false);
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
+    await s.closeCountingTheExpected();
     expect(s.sent()).toHaveLength(1);
   });
 
@@ -200,9 +210,7 @@ describe('CloseSessionForm', () => {
     s.net.lastStream().push(errorFrame(s.subId(CHECKS), 'permission_denied'));
     await flush();
     expect(s.find('cash-register-review-unavailable').exists()).toBe(true);
-    await ionValue(s.counted(), '101,50', 'ionInput');
-    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 10150, closing_balance: 10150, difference: 0 });
-    await s.submit();
+    await s.closeCountingTheExpected();
     expect(s.sent()).toHaveLength(1);
   });
 
@@ -223,4 +231,60 @@ describe('CloseSessionForm', () => {
     expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Cerrar sesión');
     expect(plain(s.find('cash-register-close-expected').text())).toContain('101,50 €');
   });
+});
+
+describe('CloseSessionForm: before the business answers its money (hub#921)', () => {
+  it('the last closing count is written in the business’s money, not before it answers: «1500» yen, never «15.00»', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, [{ id: 'c1', type: 'closing', total: 1500 }]);
+    expect(prop(s.counted(), 'value')).toBe('');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(prop(s.counted(), 'value')).toBe('1500');
+    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 1500, closing_balance: 1500, difference: 0 });
+    await s.submit();
+    expect(s.sent().map((call) => call.body)).toEqual([{ session_id: 's1', closing_balance: 1500, closing_notes: '' }]);
+  });
+
+  it('what the person typed before the business answered stays as typed', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1400', 'ionInput');
+    await s.result(COUNTS, counts([{ id: 'c1', type: 'closing', total: 1500 }]), {}, 2);
+    await s.result('base.business.get', business(JAPANESE));
+    expect(prop(s.counted(), 'value')).toBe('1400');
+  });
+
+  it('the difference says nothing while the count cannot be read in the business’s money: «—», then «-¥100», never 138500', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1400', 'ionInput');
+    const difference = () => plain(s.find('cash-register-close-expected').findAll('dd')[1].text());
+    expect(difference()).toBe('—');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(difference()).toBe('-¥100');
+  });
+});
+
+describe('CloseSessionForm: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Close session» lights up', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1500', 'ionInput');
+    await expectWindowSaysMoneyUnreadable(s, 'cash-register-close-submit', s.sent);
+  });
+});
+
+describe('CloseSessionForm: the counted cash, read as every amount of the Hub', () => {
+  const window = {
+    open: async (business?: Business | null) => {
+      const s = await setup('en', { business });
+      await s.ready();
+      return s;
+    },
+    field: 'cash-register-close-counted',
+    submit: 'cash-register-close-submit',
+    amount: (body: Record<string, unknown>) => body.closing_balance,
+  };
+  itReadsAmountsAsTheHub(window);
+  itReadsWhatWasLeftOnceTheMoneyArrives(window);
 });

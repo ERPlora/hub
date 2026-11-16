@@ -103,7 +103,6 @@ describe('TimeOffPage: the live list', () => {
   });
 
   it('filters behind the table funnel: member (searched), type and status on their columns, then full day as a yes/no and dates', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop('filterable')).toBe(true);
@@ -236,7 +235,7 @@ describe('TimeOffPage: «+» and «My time off» (STAFF-F08, F17, F24)', () => {
   });
 });
 
-describe('TimeOffPage: today’s time off (STAFF-G05, STAFF-F20)', () => {
+describe('TimeOffPage: today’s time off (STAFF-F20)', () => {
   it('lists who is away today above the list, also for an employee', async () => {
     const s = await setup({ session: EMPLOYEE });
     expect(s.params('staff.time_off.today')).toEqual([{ limit: 100 }]);
@@ -253,7 +252,7 @@ describe('TimeOffPage: today’s time off (STAFF-G05, STAFF-F20)', () => {
   });
 });
 
-describe('TimeOffPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('TimeOffPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

@@ -1,4 +1,4 @@
-"""The business's files (APP-BASE-8; the old hub's Files, ``media.rs`` and the SaaS's S3 media manager, ADR-0047).
+"""The business's files.
 
 What the Files screen keeps lives in the hub file store (``storages["hub_files"]``, ``base.storage``: S3 in AWS, the
 disk locally) under the hub's prefix, in a folder of its own: ``hub-<hex>/files/<path>``. The modules keep theirs
@@ -8,7 +8,7 @@ session and the permission of who asks.
 
 A *name* is one segment (no ``/``, ``\\``, control character, lone dot, or the folder marker) of 255 UTF-8 bytes at
 most; a *path* is a chain of names, ``""`` being the root. Both are checked before the store sees them, so no key
-ever leaves its hub's folder (an S3 key folds ``..``: saas#972). Object stores have no folders: an empty one is kept
+ever leaves its hub's folder (an S3 key folds ``..``). Object stores have no folders: an empty one is kept
 by its marker (``<folder>/.keep``), and renaming or moving copies every key and then deletes the old ones. Writing
 never overwrites in silence: an upload takes «name (1).ext» when «name.ext» is taken (Google Drive, Dropbox), and a
 new folder, a rename or a move onto a taken name is refused. Programs (Gmail's blocked list) are never kept.
@@ -19,8 +19,9 @@ uploads and the listings after each walk the files once. What the apps keep is c
 stays exact for the plan's limit.
 
 These functions take the store and the hub's id, and raise ``live`` errors in the language that is active: the
-operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space. One does not:
-:func:`delete_hub_files`, which empties the whole prefix of a hub that is gone, for the worker that purges it.
+operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space. Two do not:
+:func:`delete_hub_files`, which empties the whole prefix of a hub that is gone, for the worker that purges it, and
+:func:`hubs_in_store`, the hubs whose prefix holds anything, for ``manage.py delete_leftover_hub_files``.
 """
 
 import datetime as dt
@@ -28,6 +29,7 @@ import itertools
 import logging
 import os
 import posixpath
+import re
 import unicodedata
 import uuid
 from collections.abc import Iterator
@@ -83,11 +85,13 @@ STORE_ERRORS = (OSError, BotoCoreError, ClientError)
 NOT_A_FOLDER = (FileNotFoundError, NotADirectoryError, FileExistsError)
 #: The keys one ``DeleteObjects`` takes at most.
 S3_DELETE_BATCH = 1000
+#: A top folder of the store that is a hub's prefix, as :func:`base.storage.hub_prefix` names it: its id's 32 hex.
+HUB_PREFIX = re.compile(r"hub-([0-9a-f]{32})")
 
 Preview = Literal["image", "pdf", "text", "table", "json", "audio", "video", ""]
 #: The type a file is served with and how the screen shows it, by extension. Our own table, not ``mimetypes``: the
 #: slim image of production has no ``/etc/mime.types``. Markup and scripts are served as their source, as plain text
-#: (a browser never runs them, saas#968); an SVG may carry script and is never shown; what is not here is bytes.
+#: (a browser never runs them); an SVG may carry script and is never shown; what is not here is bytes.
 SERVED: dict[str, tuple[str, Preview]] = {
     **{ext: (f"image/{kind}", "image") for ext, kind in (
         ("jpg", "jpeg"), ("jpeg", "jpeg"), ("png", "png"), ("gif", "gif"), ("webp", "webp"), ("bmp", "bmp"),
@@ -293,7 +297,7 @@ def _refuse_program(name: str) -> None:
         raise InvalidPayload(message, code="base.file_type_refused", fields={"name": message})
 
 
-# ── Listing (BASE-G82) ───────────────────────────────────────────────────────────────────────────────────────
+# ── Listing ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def listing(store: Storage, hub: uuid.UUID, folder: str) -> dict:
@@ -471,10 +475,10 @@ def _tree(folders: set[str], parent: str) -> list[dict]:
     return [{"path": path, "name": posixpath.basename(path), "children": _tree(folders, path)} for path in children]
 
 
-# ── Upload and new folder (BASE-G83) ─────────────────────────────────────────────────────────────────────────
+# ── Upload and new folder ────────────────────────────────────────────────────────────────────────────────────
 
 
-def upload(
+def upload(  # noqa: PLR0913
     store: Storage, hub: uuid.UUID, folder: str, name: str, content: bytes, *, limit_bytes: int | None = None
 ) -> dict:
     """Keep ``content`` as ``name`` in ``folder``, numbered («name (1).ext») when the name is taken."""
@@ -569,7 +573,7 @@ def create_folder(store: Storage, hub: uuid.UUID, parent: str, name: str) -> dic
     return {"path": path, "name": name}
 
 
-# ── Read (BASE-G84) ──────────────────────────────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def describe(store: Storage, hub: uuid.UUID, path: str) -> dict:
@@ -605,7 +609,7 @@ def file_response(store: Storage, hub: uuid.UUID, described: dict, *, inline: bo
     return response
 
 
-# ── Rename and move (BASE-G85) ───────────────────────────────────────────────────────────────────────────────
+# ── Rename and move ──────────────────────────────────────────────────────────────────────────────────────────
 
 
 def rename(store: Storage, hub: uuid.UUID, path: str, name: str) -> dict:
@@ -698,7 +702,7 @@ def _prune(store: Storage, key: str) -> None:
     store.delete(key)
 
 
-# ── Delete (BASE-G86) ────────────────────────────────────────────────────────────────────────────────────────
+# ── Delete ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
 def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:
@@ -719,7 +723,7 @@ def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:
     return {"path": path, "folder": kind == "folder"}
 
 
-# ── A hub that is gone (PLAN-DB §6 «Baja», step 4) ───────────────────────────────────────────────────────────────
+# ── A hub that is gone ───────────────────────────────────────────────────────────────────────────────────────────
 
 
 class HubFilesNotDeleted(Exception):
@@ -728,8 +732,8 @@ class HubFilesNotDeleted(Exception):
 
 def delete_hub_files(store: Storage, hub: uuid.UUID) -> None:
     """Delete everything under ``hub``'s prefix, its Files and what its apps keep beside them, and no key of any other
-    hub: only its database's end calls this (``base.services.purge_demo_data``, ``base.tenancy.offboarding``), the hub
-    never comes back. Safe to run again: nothing left is no failure.
+    hub: only its database's end calls this (``base.services.demos.purge_demo_data``, ``base.tenancy.offboarding``), the
+    hub never comes back. Safe to run again: nothing left is no failure.
 
     In a versioned bucket a key leaves a delete marker, and its old version goes with the bucket's lifecycle rule."""
     prefix = hub_prefix(hub)
@@ -744,6 +748,19 @@ def delete_hub_files(store: Storage, hub: uuid.UUID) -> None:
     except (*STORE_ERRORS, OperationError) as error:
         cause = error.__cause__ or error
         raise HubFilesNotDeleted(f"{prefix}: {type(cause).__name__}: {cause}") from error
+
+
+def hubs_in_store(store: Storage) -> list[uuid.UUID]:
+    """The hubs whose prefix holds anything in the store, by id: its top folders named as a hub's prefix
+    (:data:`HUB_PREFIX`). Anything else at the top, as ``shared/`` (the blueprints' catalog) or ``_inventory/`` (S3's
+    inventory), is no hub's and is left out; a disk where nothing was kept yet holds none. What the store could not do
+    is 503 ``base.file_store_unavailable``, never «no hub»."""
+    with _store():
+        try:
+            folders, _names = store.listdir("")
+        except NOT_A_FOLDER:
+            return []
+    return sorted(uuid.UUID(found[1]) for folder in folders if (found := HUB_PREFIX.fullmatch(folder)))
 
 
 def _delete_s3_keys(store: S3Storage, prefix: str, keys: list[str]) -> None:

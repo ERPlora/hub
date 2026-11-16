@@ -1,4 +1,4 @@
-// TASK-F13 and F14 in the project's sheet (tasks#43): its name with its colour, Active or Inactive and
+// TASK-F13 and F14 in the project's sheet: its name with its colour, Active or Inactive and
 // its code; Name and Color editable with Save (only what changed); Deactivate / Activate, which keeps
 // the saved name and colour; Delete, asked first; the 50 most recent tasks of the project with «Showing
 // {shown} of {total}. Find the rest in Tasks.», and «Add task», which creates it inside the project.
@@ -6,7 +6,7 @@
 import { ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
+import { click, EMPLOYEE, errorFrame, expectSheetDiscardsOnClose, ionValue, mountTask, OWNER, page, settle } from '../__tests__/mount-task';
 import { project } from '../__tests__/project';
 import { task } from '../__tests__/task';
 import ProjectSheet from './ProjectSheet.vue';
@@ -159,5 +159,39 @@ describe('ProjectSheet', () => {
     const s = await setup({ locale: 'es' });
     expect(s.text('task-project-sheet-tasks-heading')).toBe('Tareas de este proyecto (2)');
     expect(s.text('task-project-sheet-toggle')).toBe('Desactivar');
+  });
+});
+
+
+describe('ProjectSheet: unsaved changes ask before closing (hub#1046, hub#1233, BASE-F05)', () => {
+  it('a changed name: Back, «Close», Escape and a tap outside ask «Discard changes?»; «Keep editing» keeps it', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('task-project-sheet'),
+      change: () => ionValue(s.el('task-project-sheet-name'), 'Grand opening', 'ionInput'),
+      restore: () => ionValue(s.el('task-project-sheet-name'), 'Opening', 'ionInput'),
+    });
+  });
+
+  it('a half-written new task asks on «Close» too; «Discard changes» closes it', async () => {
+    await expectSheetDiscardsOnClose(await setup(), 'task-project-sheet', 'task-project-sheet-new-task', 'Hang the sign');
+  });
+
+  it('as opened, «Close», Escape and a tap outside close it without asking', async () => {
+    const { expectUntouchedWindowClosesAtOnce } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUntouchedWindowClosesAtOnce(await setup(), 'task-project-sheet');
+  });
+
+  it('closing after discarding clears the edited fields and the half-written new task', async () => {
+    const s = await setup();
+    await ionValue(s.el('task-project-sheet-name'), 'Grand opening', 'ionInput');
+    await ionValue(s.el('task-project-sheet-new-task'), 'Hang the sign', 'ionInput');
+    await s.wrapper.setProps({ open: false });
+    await settle();
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.el('task-project-sheet-name').value).toBe('Opening');
+    expect(s.el('task-project-sheet-new-task').value).toBe('');
   });
 });

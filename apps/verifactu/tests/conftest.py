@@ -1,10 +1,14 @@
 """Fixtures of the verifactu tests: contexts per role, the real apps a record is born from (Invoicing's issuer and
 its documents, made through Invoicing's own operations, never by hand) and the outbox's delivery to VeriFactu's
-reaction, as the relay will in phase 2.
+reaction, in place of the relay.
 
 The only stand-in is the SaaS's gateway (``gateway_answers``): its transport is replaced and it answers with the
 AEAT's **real** answers kept in ``fixtures/`` (accepted, accepted with errors, duplicate, fault), rewritten only
 to name the invoices of the test. Nothing the AEAT says is invented.
+
+Every test that uses the database works as production does: inside the business ``A``'s own database
+(``in_business_a``), never on control's. A test of two businesses also enters the business ``B``'s
+(``in_business_b``).
 """
 
 import base64
@@ -24,9 +28,19 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
 from apps.verifactu import gateway
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import (
+    HOST,
+    HUB_DB,
+    HUB_DB_COMMITTED,
+    A,
+    B,
+    factory_data,
+    factory_data_b,
+    in_business_a,
+)
+from base.tenancy.tests.concurrency import plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
 FIXTURES = Path(__file__).parent / "fixtures"
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
@@ -93,7 +107,7 @@ def manual(lines=None, **more):
     return run("invoice.invoice.create", data)
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     from base.models import Hub  # the models are not loaded yet when this module is
 
@@ -108,6 +122,13 @@ def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
     return Scope("host", hub_a.slug), Scope("host", hub_b.slug)
 
 
+@pytest.fixture
+def in_business_b(hub_b):
+    """``in_business_b()``: the business ``B`` (``hub_b``) entered until the block ends."""
+    assert hub_b.slug == B.key, f"hub_b is {hub_b.slug!r}, not the scope B of these tests"
+    return lambda: use_hub(hub_b)
+
+
 @pytest.fixture(autouse=True)
 def english():
     with translation.override("en"):
@@ -116,7 +137,7 @@ def english():
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = "hub_admin"):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = "hub_admin"):
         from django.contrib.auth import get_user_model
 
         from base.models import Membership
@@ -177,27 +198,22 @@ def at_emission(monkeypatch):
 
 
 @pytest.fixture
-def committed_factory_data(transactional_db):
-    """A transactional test starts from a flushed database: tax's factory catalogue and the factory payment
-    methods are planted again, as their migrations do (idempotent); then the issuer."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-    from django.db import connection
-
-    with connection.schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(registry, editor)
+def committed_factory_data(factory_data):
+    """A transactional test starts from flushed businesses: the business ``A``'s factory data and issuer."""
     run("invoice.issuer.update", ISSUER)
 
 
 @pytest.fixture
+def committed_factory_data_b(factory_data_b, in_business_b):
+    """The business ``B``'s factory data and issuer, for a transactional test that works in it too."""
+    with in_business_b():
+        run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
+
+
+@pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, for raw psycopg sessions: every business's live notices are sent there, each on
+    its scope's channel (``live.outbox.notify``)."""
     from django.db import connections
     from psycopg.conninfo import make_conninfo
 
@@ -246,7 +262,8 @@ def aeat_answer(name: str, records: list[tuple[str, str]] | None = None) -> str:
 
 
 def paged(body: str, last: tuple[str, str, str]) -> str:
-    """A real query answer as the AEAT gives it when more follow (RespuestaConsultaLR.xsd, §6.4.3):
+    """A real query answer as the AEAT gives it when more follow (RespuestaConsultaLR.xsd; the AEAT's web service
+    description, section 6.4.3):
     ``IndicadorPaginacion`` S and ``ClavePaginacion`` naming its last record (nif, number, dd-mm-yyyy).
     The preproduction never paginated for us (it takes over 10,000 records), so only these two fields change."""
     nif, number, day = last

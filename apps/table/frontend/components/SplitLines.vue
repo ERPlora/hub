@@ -8,7 +8,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { formatQuantity } from '../../../sale/frontend/lib/format';
+import { quantityWithUnit } from '../../../sale/frontend/lib/format';
 import { useLocale } from '../composables/useT';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 
@@ -60,7 +60,7 @@ const lines = computed(() => data.value?.lines ?? []);
           justify="start"
           @ion-change="emit('toggle', line.id)"
         >
-          {{ formatQuantity(line.quantity, line.unit, locale) }} × {{ line.name }} · {{ formatMoney(line.line_total, locale, money) }}
+          {{ quantityWithUnit(line.quantity, line.unit, locale) }} × {{ line.name }} · {{ formatMoney(line.line_total, locale, money) }}
         </ion-checkbox>
       </li>
     </ul>

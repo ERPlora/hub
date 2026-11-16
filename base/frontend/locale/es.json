@@ -146,6 +146,7 @@
       "open": "Abrir",
       "buy": "Mejorar plan",
       "buyWhere": "Se contrata en erplora.com, desde tu cuenta de ERPlora.",
+      "mandatory": "Obligatoria en {country}",
       "entity": {
         "one": "app",
         "many": "apps"
@@ -192,8 +193,8 @@
         "body": "Has llegado al límite de {max} app de tu plan. Mejora el plan o desactiva una. | Has llegado al límite de {max} apps de tu plan. Mejora el plan o desactiva una."
       },
       "counter": {
-        "limited": "{enabled} de {max} apps activadas",
-        "unlimited": "1 app activada · Sin límite | {enabled} apps activadas · Sin límite"
+        "limited": "1 app activada · {chosen} de {max} de tu plan | {on} apps activadas · {chosen} de {max} de tu plan",
+        "unlimited": "1 app activada · Sin límite | {on} apps activadas · Sin límite"
       }
     },
     "appBlocked": {
@@ -709,7 +710,9 @@
         "languageHelp": "Se guarda para ti. Si no eliges uno, se usa el idioma del negocio.",
         "businessLanguage": "Usar el idioma del negocio",
         "appearance": "Apariencia",
-        "appearanceHelp": "Elige el modo y la paleta que prefieras.",
+        "appearanceHelp": "Elige el modo, la paleta y el tamaño de interfaz que prefieras.",
+        "scale": "Tamaño de la interfaz",
+        "scaleHelp": "Escala toda la interfaz del 80% al 120%. Tu elección se guarda y se aplica en todos tus dispositivos.",
         "palette": "Paleta de tema",
         "palettes": {
           "erplora": "ERPlora",
@@ -1171,7 +1174,28 @@
         },
         "pdfPages": "Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.",
         "textCut": "Mostrando el principio del archivo. Descárgalo para leerlo entero.",
-        "tableCut": "Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas."
+        "tableCut": "Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.",
+        "damaged": {
+          "heading": "No se pudo leer el archivo",
+          "body": "Puede que esté dañado o guardado en otro formato. Descárgalo para abrirlo con una aplicación de tu dispositivo."
+        },
+        "tooLarge": {
+          "heading": "Demasiado grande para la vista previa",
+          "body": "La vista previa abre archivos de hasta {size}. Descárgalo para abrirlo con una aplicación de tu dispositivo."
+        },
+        "sheets": "Hojas",
+        "sheetEmpty": "Esta hoja está vacía.",
+        "documentEmpty": "Este documento no tiene texto.",
+        "yes": "VERDADERO",
+        "no": "FALSO",
+        "json": {
+          "oneItem": "1 elemento",
+          "items": "{count} elementos",
+          "oneField": "1 campo",
+          "fields": "{count} campos",
+          "more": "{count} más. Descarga el archivo para verlos todos.",
+          "broken": "Este archivo no es un JSON válido: se muestra tal cual."
+        }
       },
       "refusal": {
         "invalidName": "Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.",
@@ -1465,6 +1489,15 @@
       "notSaved": "No se pudo guardar la foto. Inténtalo de nuevo.",
       "retry": "Reintentar"
     },
+    "download": {
+      "savedTo": "Guardado en {path}",
+      "refusal": {
+        "unreachable": "Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.",
+        "unlinked": "No se ha podido guardar el archivo: esta app está vinculada a otro negocio.",
+        "outdated": "Esta versión de la app de ERPlora no puede guardar archivos. Actualízala para descargar.",
+        "failed": "No se ha podido descargar el archivo."
+      }
+    },
     "print": {
       "refusal": {
         "refused": "el documento está vacío o es demasiado grande para imprimirlo",
@@ -1472,6 +1505,21 @@
         "unlinked": "esta app está vinculada a otro negocio",
         "outdated": "esta versión de la app de ERPlora no puede imprimir; actualízala"
       }
+    },
+    "money": {
+      "unreadable": "No se ha podido leer la moneda del negocio",
+      "retry": "Reintentar",
+      "filter": {
+        "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo {amount}.",
+        "negative": "Este importe no puede ser negativo.",
+        "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
+      }
+    },
+    "unsavedChanges": {
+      "title": "¿Descartar los cambios?",
+      "message": "Lo que has escrito en esta ventana no se ha guardado.",
+      "keep": "Seguir editando",
+      "discard": "Descartar cambios"
     }
   }
 }

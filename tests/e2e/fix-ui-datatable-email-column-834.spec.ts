@@ -1,10 +1,9 @@
-// flow: UI DataTable anchos de columna — FIX-UI-DATATABLE-EMAIL-COLUMN-834 (seen by the reviewer of APP-CART_CHECKOUT,
-// hub#110): at 834×1112, in Cart & Checkout › Orders, the Email column cut «ana@example.c…» while the row had room to
-// spare (Payment almost empty, a gap before Total). Every column without its own width took the same share of the row
-// (`minmax(5.5rem, 1fr)`), whatever it holds: a long email got what «—» got. As in the market (Shopify, Odoo, Square)
+// flow: UI DataTable column widths — at 834×1112, in Cart & Checkout › Orders, the Email column must not cut
+// «ana@example.c…» while the row has room to spare (hub#110), as it does when every column without its own width
+// takes the same share of the row (`minmax(5.5rem, 1fr)`) whatever it holds. As in the market (Shopify, Odoo, Square)
 // a column fits its content and only a table really out of room cuts with «…»: the widest text gives up first, the
-// short columns keep theirs, and the ladder of W-19 (low columns out, actions folded, cards) is the one of before
-// (erplora-old/hub#2717 was the same cut in Staff, at 820px). The header still lines up with its cells.
+// short columns keep theirs, and the narrowing steps (low columns out, actions folded, cards) do not change. The
+// header still lines up with its cells.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, code, orderFrom, signedIn, VIEWPORTS } from './cart-checkout-helpers';
@@ -88,7 +87,7 @@ async function steady(table: Locator): Promise<Painted> {
   return seen!;
 }
 
-/** The orders list once it shows every seeded email and its ladder (W-19) stands still. */
+/** The orders list once it shows every seeded email and what it gives up to fit stands still. */
 async function listWith(page: Page, emails: string[]): Promise<Locator> {
   await page.goto(`/cart_checkout/orders`);
   const view = shown(page);
@@ -142,7 +141,7 @@ test('UI DataTable anchos de columna at 834: out of room, the longest email give
       expect(column.cut, `«${column.label}» keeps its text`).toEqual([]);
       expect(column.drift, `«${column.label}» lines up with its cells`).toBeLessThanOrEqual(1);
     }
-    // The ladder of W-19 is untouched: still the list, its row actions out, nothing hidden sideways.
+    // Nothing else is given up to fit: still the list, its row actions out, nothing hidden sideways.
     await expect(table.locator('.data-table__row--data').first()).toBeVisible();
     await expect(table.locator('.data-table__card')).toHaveCount(0);
     expect(seen.overflow).toBeLessThanOrEqual(0);

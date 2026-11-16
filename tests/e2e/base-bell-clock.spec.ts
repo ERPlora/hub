@@ -1,9 +1,9 @@
-// The bell by the clock (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): a counter whose figure moves as time
+// The bell by the clock: a counter whose figure moves as time
 // passes, with no event, asks the bell to read it again (`bell_refresh_every` of its module); one that does not —
 // the demo's «Open demo items» here — moves with its events, as before. Printing asks, for «Nobody is printing …»
-// (PRINTING-F01, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF, whose spec watches its row move by the clock): the
+// (PRINTING-F01; fix-hub-printing-bell-silent-with-device-off.spec.ts watches its row move by the clock): the
 // owner sees Printing, so the bell reads its rows again by itself. The clock itself is HubBell.test.ts's. Each viewport
-// leaves `FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE-<width>`.
+// leaves a capture.
 // flow: PRINTING-F01 BASE-F10
 import { expect, test } from '@playwright/test';
 

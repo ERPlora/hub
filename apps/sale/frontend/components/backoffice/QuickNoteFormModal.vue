@@ -8,9 +8,12 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../../composables/useT';
 import type { QuickNoteOut } from '../../operations';
 import { refusal } from '../../lib/refusal';
+import PositionField from './PositionField.vue';
 
 const props = defineProps<{
   /** The note to edit; `null` adds a new one. */
@@ -18,6 +21,7 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
 
 const t = useT();
 const create = useCommand('sale.quick_note.create');
@@ -66,11 +70,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('sale-quick-note-form', () => ({ text: text.value, order: order.value }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="sale-quick-note-form"
     :title="editing ? $t('sale.quickNotes.form.editTitle') : $t('sale.quickNotes.form.createTitle')"
     :submit-label="editing ? $t('sale.quickNotes.form.save') : $t('sale.quickNotes.form.add')"
@@ -80,7 +87,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="sale-backoffice-form">
+      <div
+        class="sale-backoffice-form"
+      >
         <ion-input
           data-testid="sale-quick-note-form-text"
           :value="text"
@@ -89,24 +98,17 @@ async function save(): Promise<void> {
           fill="outline"
           mode="md"
           :maxlength="80"
+          name="text"
           :error-text="fieldErrors.text"
           :class="invalid(fieldErrors.text)"
           @ion-input="text = String($event.detail.value ?? '')"
         />
-        <ion-input
+        <PositionField
+          v-model="order"
           data-testid="sale-quick-note-form-order"
-          :value="order"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          step="1"
+          name="sort_order"
           :label="$t('sale.quickNotes.columns.sortOrder')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           :error-text="fieldErrors.sort_order"
-          :class="invalid(fieldErrors.sort_order)"
-          @ion-input="order = String($event.detail.value ?? '')"
         />
       </div>
     </template>

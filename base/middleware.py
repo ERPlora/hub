@@ -1,30 +1,30 @@
 """The Hub's request gates: ``CustomDomainMiddleware``, ``HubHostRequiredMiddleware``, ``PlatformHostMiddleware`` and
 ``SaasLoginRequiredMiddleware``.
 
-``CustomDomainMiddleware`` (HUBS-F17, PLAN-SAAS §37 point 2): a host outside ``ALLOWED_HOSTS``, which stays as it was. A
+``CustomDomainMiddleware``: a host outside ``ALLOWED_HOSTS``, which stays as it was. A
 host the Hub does not know (``base.custom_domains``, at no read per request: the ALB's last rule lets the scanners
 through) goes on to ``CommonMiddleware``, whose 400 it always was. One it knows, a business's own domain, is answered
 here and never goes further down this chain, so no gate below has to know of it and nothing of the app can be reached by
 it: its ``/``, the business's published website (``base.public_home``), its images (``/p/media/<its id>/``, the public
 ones: no session is ever read here) and the activation's probe (:data:`PROBE_PATH`), and for any other path or a site
-that is not there, 404 (``/api`` with its envelope), before any read. The session's cookie does not reach another domain
-(PLAN-SAAS §1.1), and one sent by hand is not read. A business that left, or suspended, is 404: a visitor of its domain
+that is not there, 404 (``/api`` with its envelope), before any read. The session's cookie does not reach another domain,
+and one sent by hand is not read. A business that left, or suspended, is 404: a visitor of its domain
 has nothing to do with its invoices; one being prepared or moved says to come back (503). The page and its images read
 the business's row again, as every other host does, and it has to name the domain still.
 
 ``HubHostRequiredMiddleware``: a host that is no hub (``HostScopeResolver`` with ``live.slugs``: a reserved name
 such as ``hub`` or ``www``, an invalid label, the bare host, an IP) answers 404 on every hub path (the SPA,
 ``/api``, ``/auth``…), before ninja's session auth, so an anonymous API call gets the 404 envelope and not a 401.
-Then the registry decides (``base.registry``, plan 2026-10-17, §1.2): a slug without a row is 404 too; a hub that is
+Then the registry decides (``base.registry``): a slug without a row is 404 too; a hub that is
 gone (cancelled, purged, or a demo past its ``expires_at``) is 410, a page with the way back to ERPlora (the SaaS's
 ``/demo/?state=expired``, or its ``/launch``), save a demo's ``/auth/login``, whose jump is how the SaaS's
-``/demo/`` learns that it ended (plan 2026-10-17, §1.7); one still being prepared is 503 with ``Retry-After``, a
+``/demo/`` learns that it ended; one still being prepared is 503 with ``Retry-After``, a
 page that refreshes itself. The API, and any call that does not ask for a page (``Accept`` without ``text/html``),
 gets the envelope instead (``base.hub_gone``, ``base.hub_preparing``). A hub that answers is left on
 ``request.hub``; one the SaaS's photo says is suspended for an unpaid invoice is 402 (``base.hub_suspended``), with
 a session or without and its login included, until the photo says it is paid. The platform host ``hubs.<domain>`` (``settings.PLATFORM_HOST_LABEL``) is no hub either: it is
-marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The Hub admin lives only there (PLAN
-§18.1.3): on any other host, a hub's or not, ``/admin/`` answers 404, never the admin's own login. Static files, CSP
+marked ``request.platform_host`` and left to ``PlatformHostMiddleware``. The Hub admin lives only there: on any other
+host, a hub's or not, ``/admin/`` answers 404, never the admin's own login. Static files, CSP
 reports and ``/readyz`` (Route 53 and the deploy probe it on the platform host and on the private name) and
 ``/internal/`` (the SaaS's calls, signed: ``base.internal``) are left alone on every host.
 
@@ -32,8 +32,7 @@ Every gate looks at ``request.path_info``, the path Django resolves: ``request.p
 script prefix, which behind Daphne comes from the client's own ``Daphne-Root-Path`` header, so a made-up
 prefix would walk past a check made on it.
 
-``PlatformHostMiddleware``: the platform host is only the Hub admin for the staff (round 13, PLAN
-§18.1). Without a session, the staff go to the SaaS admin's Hubs page, where the jump with a
+``PlatformHostMiddleware``: the platform host is only the Hub admin for the staff. Without a session, the staff go to the SaaS admin's Hubs page, where the jump with a
 ``hub-admin`` code starts (no login of its own); with a session but no staff, 403, never the login
 (it would loop through the SaaS); staff outside ``/admin/`` go to ``/admin/``. ``/auth/*`` (the
 callback and the logout), static files, CSP reports, ``/internal/`` (signed), ``/readyz`` (exactly that path) and
@@ -42,27 +41,28 @@ callback and the logout), static files, CSP reports, ``/internal/`` (signed), ``
 ``SaasLoginRequiredMiddleware``: the Hub has no login of its own; the login is the SaaS's.
 
 A browser without a session that loads a SPA route jumps to the SaaS's ``/hub-login/`` for this hub
-(PLAN-SAAS §3.1 step 4) with a fresh ``state`` in its cookie (``base.auth.login_redirect``), and the
+with a fresh ``state`` in its cookie (``base.auth.login_redirect``), and the
 SaaS comes back with a one-time code and that ``state`` to ``/auth/callback``. It jumps through a page of its own
-(``base.auth_views.jump_page``, BASE-G52) whose script sends to ``/auth/login`` with the link's fragment in ``next``
+(``base.auth_views.jump_page``) whose script sends to ``/auth/login`` with the link's fragment in ``next``
 (``/settings#data``): the browser never sends the fragment to the server, and the way back through erplora.com
 would lose it. Only page loads of the
 SPA are redirected: anything with a URL of its own in Django (``/api`` answers 401, ``/auth``,
 ``/healthz``, static files…) never reaches the SPA view, nor does a path that names a file (``/robots.txt``: a plain
 404 with no cookie, ``base.spa.NOT_A_FILE``). A request that does not ask for HTML gets
 the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
-SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
-``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21). Which way in
-is ``base.auth_views.way_in``'s (APP-BASE-3): a shared device of the hub with the PIN pad, or a browser whose session
+SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``): there is no account to log in to.
+``/`` of a hub with a published website is that website instead (``base.public_home``). Which way in
+is ``base.auth_views.way_in``'s: a shared device of the hub with the PIN pad, or a browser whose session
 ended, goes to the hub's own Access page (``/login``, which this gate leaves alone) instead of the SaaS's.
 
-``HubDatabaseMiddleware`` (phase 2, S1; plan 2026-10-22): right after the host gate, the rest of the request runs in
+``HubDatabaseMiddleware``: right after the host gate, the rest of the request runs in
 its database context: ``use_hub(request.hub)`` on a hub's host; on the platform host, the hub the admin chose
 (``/admin/hub/<slug>/``) or, with none, control (a page of a hub's model there goes back to the index, asking to
 choose a business); nothing for ``/internal`` and the open paths, whose code opens its own. A hub's database that says
 it is another hub (``base.tenancy.identity``) answers 503 (``base.hub_unavailable``), serves nothing and raises an
-alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning; a business without its
-own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_maintenance``, as one being moved. A hub
+alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning, after waiting for it when
+it is a cut of the database (``live.database_cut``: marked, so the request runs again); a business without its
+own database yet (one that shared a database, before its cut) answers 503 ``base.hub_maintenance``, as one being moved. A hub
 whose every place in this process is taken (its plan's transactions at once, ``base.tenancy.limits``) answers 503
 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its database, in
 ``SaasLoginRequiredMiddleware`` (the website, a till's device) or in the view (the API's routes answer it themselves,
@@ -70,7 +70,7 @@ with the same envelope): the envelope, or for a page (the admin, the website) it
 a module whose tables the business does not have yet (``AppNotCreated``, ``base.tenancy.router``) answers its 404
 ``app_inactive`` the same way; the admin's page goes back to its index, saying so.
 
-``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
+``SessionHostMiddleware``: a session is a session of the host it was opened on (the login notes it);
 on another hub's host, or on the platform host, it is anonymous (401).
 """
 
@@ -93,6 +93,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
 from django.views.defaults import page_not_found
 from live.api_errors import DEFAULT_API_PREFIX
+from live.database_cut import cut_of, marked
 from live.errors import NotFound
 
 from base import custom_domains, meter, public_home, registry
@@ -226,7 +227,7 @@ def _not_found(request: HttpRequest) -> HttpResponse:
 def _refuse(request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
     """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
     suspended)."""
-    if _wants_envelope(request):
+    if wants_envelope(request):
         response = _envelope(refusal.status, refusal.code, refusal.message)
     elif refusal.code == registry.HUB_GONE:
         back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
@@ -249,7 +250,7 @@ def _is_api(request: HttpRequest) -> bool:
     return request.path_info.startswith(api_prefix)
 
 
-def _wants_envelope(request: HttpRequest) -> bool:
+def wants_envelope(request: HttpRequest) -> bool:
     """The API, and any call that does not ask for a page, gets the JSON envelope; a browser gets the page."""
     return _is_api(request) or "text/html" not in request.headers.get("Accept", "")
 
@@ -307,7 +308,7 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         from base.auth_views import ACCESS_PAGE, access_page_url, jump_page
 
         if request.path_info == ACCESS_PAGE:
-            # The hub's Access page (APP-BASE-3) is the SPA's own way in: it never jumps anywhere by itself.
+            # The hub's Access page is the SPA's own way in: it never jumps anywhere by itself.
             return None
         access_page = access_page_url(request, request.get_full_path())
         if access_page is not None:
@@ -362,7 +363,7 @@ class HubDatabaseMiddleware:
 
     def _resolve(self, request: HttpRequest):
         """The hub the request works on, ``_CONTROL`` or ``None``; a hub's own database is registered and checked. A
-        business without one (phase 1's, before its cut) is ``HubWithoutDatabase``: its host's gate answered 503
+        business without one (one that shared a database, before its cut) is ``HubWithoutDatabase``: its host's gate answered 503
         already, the admin that chose it gets 503 here."""
         hub = getattr(request, "hub", None)
         if hub is None and getattr(request, "platform_host", False):
@@ -410,7 +411,7 @@ class HubDatabaseMiddleware:
     def _not_created(request: HttpRequest, refused: tenancy_context.AppNotCreated) -> HttpResponse:
         """404 ``app_inactive``: the envelope; the admin's page, its index with what it says; another page, the index
         itself included (going back to it would be a loop), its message."""
-        if _wants_envelope(request):
+        if wants_envelope(request):
             return _envelope(refused.status, refused.code, refused.message)
         if getattr(request, "platform_host", False) and request.path_info != _route("admin:index"):
             from django.contrib import messages
@@ -424,7 +425,7 @@ class HubDatabaseMiddleware:
         """503 ``base.hub_busy``: the envelope, or the message for a page; come back in a moment (``Retry-After``). It has
         reached a client, so it counts (``HubBusy.reached_client``)."""
         busy.reached_client()
-        if _wants_envelope(request):
+        if wants_envelope(request):
             response = _envelope(busy.status, busy.code, busy.message)
         else:
             response = HttpResponse(busy.message, status=busy.status, content_type="text/plain; charset=utf-8")
@@ -433,8 +434,8 @@ class HubDatabaseMiddleware:
 
     @staticmethod
     def _unavailable(request: HttpRequest, error: Exception) -> HttpResponse:
-        """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes), or a business
-        without its own yet (its cut is to come)."""
+        """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes; a cut of the database
+        is waited for first), or a business without its own yet (its cut is to come)."""
         hub = getattr(request, "hub", None)
         if isinstance(error, tenancy_context.HubWithoutDatabase):
             logger.warning("base.hub_without_database: %s; nothing is served until its cut.", error)
@@ -453,15 +454,20 @@ class HubDatabaseMiddleware:
         refusal = registry.unavailable()
         response = _envelope(refusal.status, refusal.code, refusal.message)
         response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
-        return response
+        # A cut of the database (live.database_cut, BASE-F111) is the same 503, marked: nothing ran yet, so the request
+        # waits for it and runs again while its limit lasts.
+        cut = cut_of(error, request)
+        return response if cut is None else marked(response, cut)
 
 
 def _count_the_request(request: HttpRequest) -> None:
     """One more request of the business whose host it came to (``base.meter``, BASE-F40): the platform's host, ``/internal``
     and the open paths have no ``request.hub``, and ``HealthCheckMiddleware`` and WhiteNoise answered before; a demo is not
-    measured."""
+    measured. Once per request: a cut of the database runs the same request again (``live.database_cut``, BASE-F111), and
+    its tries are not more requests of the business."""
     hub = getattr(request, "hub", None)
-    if hub is not None and not hub.is_demo:
+    if hub is not None and not hub.is_demo and not getattr(request, "_counted_by_meter", False):
+        request._counted_by_meter = True
         meter.count_request(hub.pk)
 
 
@@ -480,7 +486,7 @@ def _admin_hub(request: HttpRequest):
     return registry.hub_by_slug(slug) if slug else None
 
 
-# ── A session is its host's (phase 2, S1; PLAN-DB §14.2; plan 2026-10-22, §2.3) ──────────────────────────────────
+# ── A session is its host's ──────────────────────────────────────────────────────────────────────────────────────
 
 #: Where the login noted the host a session was opened on: a hub's slug, or :data:`PLATFORM_SESSION_HOST`.
 SESSION_HOST_KEY = "hub_host"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// TASK-F13 «Abrir y cambiar un proyecto» and TASK-F14 «Borrar un proyecto» (tasks#43): the project's
+// TASK-F13 «Abrir y cambiar un proyecto» and TASK-F14 «Borrar un proyecto»: the project's
 // name with its colour, Active or Inactive and its code; for whoever manages projects, Name and Color
 // editable with Save (only what this person changed, so another person's save meanwhile is never
 // overwritten; an untouched field follows the live project), Deactivate / Activate (which never sends
@@ -11,6 +11,8 @@ import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonInput, IonModal, IonTitle, IonToolbar } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
+
+import { useSheetWaysOut, useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
 import { STATUS_TONE } from '../lib/format';
@@ -42,6 +44,15 @@ const editColor = ref('');
 /** The name and colour the inputs started from: what Save compares with. */
 const base = ref({ name: '', color: '' });
 const newTask = ref('');
+/** «Close», Escape and a tap outside ask «Discard changes?» while a change or a new task is not saved (hub#1233). */
+const { canDismiss, close } = useSheetWaysOut(
+  useUnsavedForm(
+    'task-project-sheet',
+    () => ({ name: editName.value, color: editColor.value, newTask: newTask.value }),
+    () => ({ ...base.value, newTask: '' }),
+  ),
+  open,
+);
 const sheetError = ref<ApiError | null>(null);
 const deleteOpen = ref(false);
 
@@ -67,6 +78,12 @@ watch(
     base.value = { name, color };
   },
 );
+watch(open, (isOpen) => {
+  if (isOpen) return;
+  editName.value = base.value.name;
+  editColor.value = base.value.color;
+  newTask.value = '';
+});
 
 async function send(changes: Omit<ProjectPatchIn, 'id' | 'project'>): Promise<void> {
   if (!project.value || busy.value) return;
@@ -127,6 +144,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
 <template>
   <ion-modal
     :is-open="open"
+    :can-dismiss="canDismiss"
     data-testid="task-project-sheet"
     @did-dismiss="open = false"
   >
@@ -145,7 +163,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
         <ion-buttons slot="end">
           <ion-button
             data-testid="task-project-sheet-close"
-            @click="open = false"
+            @click="close"
           >
             {{ t('task.actions.close') }}
           </ion-button>

@@ -40,11 +40,9 @@ el «registro que ya no existe» de Odoo.
 
 - Hace falta entrar con una cuenta que tenga papel en ese negocio. Demo no tiene entrada propia: sin
   sesión, lleva a la entrada de ERPlora, que vuelve al negocio ya con su papel.
-- En la fase 1 el negocio es la **primera parte de la dirección** (el negocio `a` y el negocio `b`). En
-  la fase 2 cada negocio tendrá sus propios datos.
-- ⚠️ En la fase 1 los dos negocios **comparten los elementos**. Lo que sí se separa ya es el **aviso
-  en vivo**: guardar en `a` solo refresca las pantallas abiertas en `a`. Las de `b` ven el cambio al
-  recargar o con el siguiente aviso de `b`.
+- El negocio es la **primera parte de la dirección** (el negocio `a` y el negocio `b`), y cada negocio
+  tiene sus propios datos: los elementos de `a` no salen en `b`, y guardar en `a` solo refresca las
+  pantallas abiertas en `a`.
 
 ## Pantallas
 
@@ -98,7 +96,6 @@ del formulario.
 | DEMO-F06 | Intentarlo sin permiso | hecho |
 
 ### DEMO-F01 Crear un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Elementos
@@ -114,7 +111,6 @@ guarda nada.
 Implicados: ninguno
 
 ### DEMO-F02 Editar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -133,7 +129,6 @@ borró): «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F03 Borrar un elemento
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -148,7 +143,6 @@ Si falla: «Este elemento ya no existe» si otra persona lo borró antes.
 Implicados: ninguno
 
 ### DEMO-F04 Añadir una línea al instante (optimista e idempotente)
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: administrador, responsable
 Pantalla: Ficha del elemento
@@ -170,7 +164,6 @@ Si el elemento ya no existe: «Este elemento ya no existe».
 Implicados: ninguno
 
 ### DEMO-F05 Ver el cambio en otra tableta en menos de un segundo
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: cualquiera con permiso de ver
 Pantalla: Elementos y Ficha del elemento
@@ -186,7 +179,6 @@ completos. Lo hecho en `a` no avisa a las pantallas de `b` (ni al revés).
 Implicados: ninguno
 
 ### DEMO-F06 Intentarlo sin permiso
-<!-- origen: nuevo (app de referencia de la fase 1, PLAN §16; sin módulo viejo) -->
 Estado: hecho
 Actor: empleado
 Pantalla: Elementos y Ficha del elemento
@@ -208,8 +200,22 @@ Implicados: ninguno
 
 ## Servicios: lo que entra y lo que sale
 
-Todo se puede pedir por las pantallas, el asistente (fase 2) y la API, con las mismas reglas y los
-mismos permisos.
+Todo se puede pedir por las pantallas, el asistente y la API, con las mismas reglas y los
+mismos permisos. Antes de cambiar o borrar un elemento o de añadirle una línea, el asistente pide confirmar con su
+tarjeta (BASE-F97), que nombra el elemento como lo nombran las pantallas, nunca por su id: por su nombre
+(«Elemento: Mesa 4»), y el estado con su palabra («Abierto», «Hecho»). Lo que quien pregunta no puede ver no sale.
+El asistente llega a cada una por lo que la persona dice («¿cuántos elementos abiertos hay en Demo?», «borra Ensayo
+2») y, si nombra un elemento como «el elemento …», le ofrece también la lista con la que lo busca por su nombre.
+La ficha y las acciones sobre un elemento (cambiarlo, borrarlo, añadirle una línea) lo toman por su id o por su
+nombre, como lo dice la persona: el mismo nombre, sin distinguir mayúsculas, antes que uno que lo contenga
+(«borra otoño» encuentra «Ensayo de otoño» si es el único que lo lleva), y la tarjeta enseña el elemento que se va a
+tocar, con su nombre entero. Si lo dicho encaja con varios elementos, no sale ninguna tarjeta: el asistente oye
+«Hay varios elementos que se llaman «Ensayo»: Ensayo 1, Ensayo 2. Di cuál.» y pregunta cuál; si no encaja con
+ninguno, «Ningún elemento se llama «Ensayo»». El «sí» vale solo para el elemento que enseñó la tarjeta (BASE-F97): si
+antes de confirmar alguien crea uno que encaja mejor con lo dicho («Mesa» cuando la tarjeta decía «Mesa 4») o el
+elemento cambia de nombre, no se toca nada y sale la tarjeta nueva; si lo han borrado, el asistente lo cuenta. Si el
+elemento llega por su id junto al nombre de otro, la tarjeta no lee ni enseña ese nombre, que la acción no usa: dice
+solo el elemento del id (hub#1272).
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -218,6 +224,7 @@ mismos permisos.
 | Los elementos, con búsqueda por nombre, filtro de estado y páginas (hasta 100 por página) | ver | F01–F05 | `demo.item.list` |
 | La ficha de un elemento con sus líneas | ver | F02–F05 | `demo.item.detail` |
 | Las cifras: total, abiertos, hechos y líneas | gestionar | F05 | `demo.item.stats` |
+| Cuántos elementos siguen abiertos (el contador de la campana) | ver | F05 | `demo.item.open_count` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -256,7 +263,7 @@ papel en ningún negocio.
 
 ## Para quien lo mantiene
 
-- Ejemplo de los ganchos del Inicio (PLAN-HUB, ronda 2026-10-21), el que copian los módulos: `DemoConfig`
+- Ejemplo de los ganchos del Inicio, el que copian los módulos: `DemoConfig`
   declara un paso (`setup`: «Crea tu primer elemento», hecho con `total` de `demo.item.stats`), un panel
   (`widgets`: «Elementos abiertos», `kpi` sobre `demo.item.stats`) y un contador de la campana (`bell`:
   «Elementos de demo abiertos», sobre `demo.item.open_count`). Demo no está en la tienda (`listed = False`):
@@ -268,19 +275,51 @@ papel en ningún negocio.
   POST), porque cada ruta toma **un** parámetro igual a la entrada de su operación.
 - La línea es idempotente por `(elemento, client_line_id)` (restricción `demo_line_client_id_unique`);
   `add_line` bloquea la fila del elemento, así que dos líneas a la vez no comparten posición.
-- Errores: 422 `invalid_payload` con `fields` por campo (mensaje en el idioma de la petición); 404
-  `not_found` («Este elemento ya no existe»); 409 `demo.item_done` (línea en un elemento hecho); 403
+- Errores: 422 `invalid_payload` con `fields` por campo (mensaje en el idioma de la petición; sin `id` ni nombre,
+  en `called`: «Di qué elemento: su id o su nombre»); 404 `not_found` («Este elemento ya no existe»; por un nombre
+  que no tiene nadie, «Ningún elemento se llama «…»»); 409 `demo.item_done` (línea en un elemento hecho); 409
+  `demo.item_ambiguous` (un nombre que encaja con varios elementos, con ellos, hasta cinco); 403
   `permission_denied`; 401 `unauthorized`; 404 `app_inactive`. En la ficha, un error de la consulta
   viva que dice que el elemento ya no es de quien mira (`not_found`, `permission_denied`,
   `unauthorized`, `app_inactive`, `app_entitlement_blocked`) deja de pintarlo con sus acciones
   (`ItemDetailPage.vue`, `GONE`); un fallo pasajero (`internal_error`) lo deja a la vista bajo el
   aviso. `permission_denied` se titula «No tienes permiso».
-- Cada operación es una herramienta del asistente: `ai=` con su descripción y, en las acciones, su
-  `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace).
+- Cada operación es una herramienta del asistente: `ai=` con su descripción, sus `asks` (las frases en `en` y `es`
+  con que una persona la pide; `live.E020`: Demo está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1095) y, en las
+  acciones, su `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace). Los
+  `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
+  tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
+  (`tests/test_assistant_asks.py`), y las que nombran el elemento solo por su nombre («elimina Ejemplo QA…») llegan a
+  una herramienta que lo toma por ese nombre (hub#1162).
+- Un elemento por su id o por su nombre (hub#1162): `ItemRefIn` (`id` o `called`; el id gana), del que heredan
+  `ItemPatchIn` y `LineIn`, y `queries.find_item`, que lo busca (el mismo nombre sin distinguir mayúsculas, después
+  uno que lo contenga; el primero que encaja decide; los cambiados más recientemente primero) y lo bloquea en las
+  escrituras. Es el patrón de los menús (`combo.find_combo`) y las tareas (`task.resolve_task`). El nombre viaja como
+  `called` y no como `item`: el turno sube 1 punto a cada herramienta que toma un dato que la frase nombra
+  (`live.assistant.relevant`), e «item»/«elemento» nombran también las cosas de Carrito y Tarifas; con `item`, tres
+  `asks` de `inventory.product.bulk_create` bajaban del 4.º al 8.º, y con `called` no se mueve ningún `ask` ni sonda
+  del Hub. Las tres escrituras declaran `check: demo.item.detail` (`base.assistant.cards.checked`): antes de dibujar la
+  tarjeta, el turno busca el elemento como lo hará la escritura, y un nombre que encaja con varios o con ninguno
+  vuelve al modelo en lugar de una tarjeta que fallaría tras el sí.
+- La tarjeta de confirmación del asistente (BASE-F97, hub#670) nombra el elemento que una escritura señala por su id
+  con la marca `refers` de `schemas.py` (`AN_ITEM`, en el `id` de `ItemRefIn`, `ItemPatchIn` y `LineIn`), leída como
+  quien pregunta con `demo.item.detail`: el elemento por su `name`, como la lista y el diálogo «Eliminar». Dicho por
+  su nombre, `called` lleva la misma marca leída por ese nombre (`AN_ITEM_BY_NAME`), así que la tarjeta dice el
+  elemento que la escritura va a encontrar, no solo lo dicho; junto al `id`, que `find_item` usa sin mirar el nombre,
+  lo deja sin leer (`unless_given(AN_ITEM_BY_NAME, "id")`, hub#1272; `UNLESS` de
+  `tests/test_assistant_card_records.py`). Con eso y su `check`, la huella de la tarjeta lleva el id
+  del elemento encontrado y el «sí» vale solo para él (hub#1208, `base/tests/test_assistant_yes_for_its_card.py` y
+  `test_the_yes_deletes_only_the_item_its_card_showed_although_another_fits_the_name_better_meanwhile`). Ese `id`
+  lleva el título de su pantalla (`T_ITEM`: «Elemento», «Item»), nunca «Registro». Sin persona detrás, sin `demo.view`,
+  con un id de otro negocio o de algo que ya no está, el elemento queda fuera, nunca su id
+  (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. El estado, la única lista cerrada de
+  sus escrituras, sale con las etiquetas de `Item.Status` en cada idioma.
 - La lista nunca pide más de 100 filas (`PAGE_MAX`, el `le=100` de `ItemListIn`): «Cargar más» crece
   hasta ese tope y, con más elementos, el `DataTable` pagina también en el móvil (`maxWindow`).
 - El administrador de Django tiene CRUD sobre los elementos y sus líneas (en línea), como el de las
-  demás apps (PLAN §17, ronda 12, y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
+  demás apps (PLAN §17 y PLAN-HUB §3.2): es la vía de soporte para reparar una fila, por el
   ORM, sin aviso ni las reglas de `services.py` (ni elemento cerrado ni posición siguiente); las
   pantallas, la API y el asistente escriben por las operaciones. Vive solo en `http://hubs.localhost:8000/admin/`
   (en `a.localhost:8000/admin/`, 404) y entra el staff desde la página «Hubs» del admin del SaaS
@@ -295,9 +334,10 @@ papel en ningún negocio.
   papeles de plataforma (superusuario y grupo `support`) solo llegan al Hub por la audiencia
   `hub-admin` (el admin del Hub en `hubs`), sobre una copia local propia del staff, `saas-staff:<id>`,
   separada de la copia de cliente `saas:<id>` y sin papel en ningún hub.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b` (una sola
-  base de datos, sin tenencia); la fase 2 cambia solo `base/operations.py` (ámbito = hub, una BD por
-  hub).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): `base` entra en la del hub (`use_hub`) y esta app no hace nada propio para separarlos. Solo los
+  tests escritos antes de la tenencia guardan `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`,
+  hasta hub#611); `two-orgs-isolated` mide la separación de verdad.
 - Pruebas por flujo: `tests/e2e/demo-flows.spec.ts` recorre DEMO-F01 a F06 en 390, 834 y 1440 (capturas
   `APP-DEMO-<flujo>-<ancho>`) y la lista con más de 100 elementos (`APP-DEMO-CLOSE-DEMO-*`); las medidas finas siguen en `two-tabs-live`, `optimistic-add-line`,
   `two-orgs-isolated`, `reconnect`, `delete-item`, `create-edit-pages`, `edit-keeps-text`,
@@ -308,4 +348,3 @@ papel en ningún negocio.
 
 - No tiene precios, impuestos ni nada fiscal: no es una app de negocio.
 - No borra ni reordena líneas: con añadir basta para enseñar el patrón optimista.
-- No separa los datos de `a` y `b` en la fase 1 (llega con la tenencia de la fase 2).

@@ -8,6 +8,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { CategoryRowOut, RuleOut } from '../operations';
 import { click, ionValue, mountTax, settle } from '../__tests__/mount-tax';
 import RuleCreateModal from './RuleCreateModal.vue';
@@ -313,5 +314,46 @@ describe('RuleCreateModal speaks Spanish', () => {
     expect(s.options('tax_type')[1][1]).toBe('IGIC (Canarias)');
     expect(s.options('tax_type')[4][1]).toBe('Impuesto sobre las ventas');
     expect(s.add().textContent?.trim()).toBe('Añadir');
+  });
+});
+
+describe('RuleCreateModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('tax-rule-form'),
+      change: () => s.type('component_label', 'Recargo'),
+      restore: () => s.type('component_label', ''),
+    });
+  });
+});
+
+describe('RuleCreateModal: fields refused with the same words (hub#888)', () => {
+  // Every field of a rule subject to tax paints a refusal under its own key: the two Combos, the root rule
+  // (ParentRuleSelect) and the two dates side by side among them.
+  const SUBJECT = ['country_code', 'region_code', 'tax_category_key', 'rate_pct', 'tax_type', 'operation_class', 'regime_key', 'valid_from', 'valid_to', 'parent_id', 'component_label'];
+  itTellsTheCorrectedFieldApart(
+    SUBJECT,
+    async (locale, refusal) => {
+      const s = await setup(locale);
+      await s.fillBasics();
+      s.answer(422, refusal);
+      return { field: s.field, send: () => click(s.add()), settle };
+    },
+    'valid_from',
+  );
+
+  describe('an exempt rule', () => {
+    // The exemption reason only shows for an exempt rule; it and the regime are both short codes.
+    itTellsTheCorrectedFieldApart(['exempt_reason', 'regime_key'], async (locale, refusal) => {
+      const s = await setup(locale);
+      await s.fillBasics();
+      await s.pick('operation_class', 'exempt');
+      await s.type('exempt_reason', 'E1');
+      await s.type('regime_key', '01');
+      s.answer(422, refusal);
+      return { field: s.field, send: () => click(s.add()), settle };
+    });
   });
 });

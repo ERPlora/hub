@@ -1,11 +1,11 @@
-"""The blueprints' rules (``base.blueprint``; PLAN-HUB round 2026-10-21, «Blueprints»): the ``.blueprint.zip``, the
-catalogue of seeds by vertical and what travels of each app.
+"""The blueprints' rules (``base.blueprint``): the ``.blueprint.zip``, the catalogue of seeds by vertical and what
+travels of each app.
 
-Flows BASE-G101–G109. What travels of an app goes through that app's own operations, never its tables (hub#426): a
-dataset reads its rows with the app's list and writes them with its create, so the app's rules (a SKU never twice, a
-category's tax key resolved by Taxes) hold for an import too. Rows name each other by their natural key (a product's
-categories by name, a table's zone by name), never by an id of the business that made the file (hub#2626). People,
-PINs and fiscal data never travel: there is no dataset for them, and a file that brings one has it discarded.
+What travels of an app goes through that app's own operations, never its tables: a dataset reads its rows with the
+app's list and writes them with its create, so the app's rules (a SKU never twice, a category's tax key resolved by
+Taxes) hold for an import too. Rows name each other by their natural key (a product's categories by name, a table's
+zone by name), never by an id of the business that made the file. People, PINs and fiscal data never travel: there is
+no dataset for them, and a file that brings one has it discarded.
 
 Every test here runs against the real apps (inventory, service, table, customer), never a stand-in.
 """
@@ -78,7 +78,7 @@ def a_file(data=None, **fields) -> bytes:
     return zipped(files)
 
 
-# ── The file: a .blueprint.zip (BASE-G101, BASE-G104) ──────────────────────────────────────────────────────────────
+# ── The file: a .blueprint.zip ─────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_written_file_reads_back_as_the_same_blueprint():
@@ -219,7 +219,7 @@ def test_what_no_dataset_carries_is_left_out_of_the_blueprint():
     assert read.dropped == ["base.membership", "verifactu.record"]
 
 
-# ── The catalogue: the seeds by vertical (BASE-G103) ───────────────────────────────────────────────────────────────
+# ── The catalogue: the seeds by vertical ───────────────────────────────────────────────────────────────────────────
 
 
 def test_the_catalogue_has_a_seed_of_every_vertical_in_spanish_and_in_english():
@@ -232,7 +232,7 @@ def test_the_catalogue_has_a_seed_of_every_vertical_in_spanish_and_in_english():
         assert template.key == f"{template.vertical}.{template.language}"
         assert template.name and template.description and template.version
         assert template.country == "ES"
-        # What a seed turns on is its vertical's: every app that lists it, closed by requires (PLAN §15.2).
+        # What a seed turns on is its vertical's: every app that lists it, closed by requires.
         assert template.bundle.manifest["apps"] == catalog.template_apps(template.vertical)
         assert blueprint.template(template.key) == template
 
@@ -270,7 +270,7 @@ def test_every_seed_loads_whole_into_an_empty_business(ctx, key):
     }
 
 
-# ── Loading: each app by its own operations (BASE-G105) ────────────────────────────────────────────────────────────
+# ── Loading: each app by its own operations ────────────────────────────────────────────────────────────────────────
 
 
 def restaurant_bundle(**data):
@@ -346,7 +346,6 @@ def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
 
 
 def test_a_refused_row_is_named_as_the_person_knows_it_by_its_name_and_by_its_code_only_without_one(ctx):
-    """hub#1891: the report speaks of a product by its name; its code (SKU) only when it has no name."""
     bundle = restaurant_bundle(
         **{
             "inventory.product": [
@@ -434,7 +433,7 @@ def test_a_backup_brings_the_customers_back(ctx):
     assert result.created["customer.customer"] == [str(row.id)]
 
 
-# ── Exporting: the same datasets, read by each app's list (BASE-G101, BASE-G102) ──────────────────────────────────
+# ── Exporting: the same datasets, read by each app's list ─────────────────────────────────────────────────────────
 
 
 def test_what_an_export_reads_loads_into_another_business_as_it_was(ctx):
@@ -471,7 +470,7 @@ def test_the_counts_of_every_dataset_of_the_apps_on(ctx):
     assert counts["customer.customer"] == 0
 
 
-# ── Undoing: exactly the rows a load created (BASE-G108) ───────────────────────────────────────────────────────────
+# ── Undoing: exactly the rows a load created ───────────────────────────────────────────────────────────────────────
 
 
 def test_undoing_removes_exactly_what_the_load_created_and_keeps_what_came_after(ctx):
@@ -496,7 +495,7 @@ def test_undoing_what_is_already_gone_counts_it_as_gone(ctx):
     assert (table["removed"], table["failed"]) == (2, 0)
 
 
-# ── Resetting: every row of the sections chosen (BASE-G109) ────────────────────────────────────────────────────────
+# ── Resetting: every row of the sections chosen ────────────────────────────────────────────────────────────────────
 
 
 def test_the_reset_plan_says_how_many_rows_each_app_would_lose(ctx):

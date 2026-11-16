@@ -24,6 +24,9 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
+from base.recovery import RecoveredOut
+from base.relay import by_platform
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -49,6 +52,29 @@ GROUP = gettext_noop("Group")
 TAG = gettext_noop("Tag")
 GROUP_COLOR = gettext_noop("Group color")
 TAG_COLOR = gettext_noop("Tag color")
+CUSTOMER = gettext_noop("Customer")
+CUSTOM_FIELD = gettext_noop("Custom field")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
+# asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
+# for its name, and without Sales the card leaves it out. A card said by its name beside its own card's id is neither
+# read nor shown: the write takes the card by the id and never looks at the name (``unless_given``, hub#1272).
+A_CUSTOMER = names("customer.customer.detail")
+A_CUSTOMER_REFERENCE = names("customer.customer.detail", by="customer")
+A_GROUP = names("customer.group.detail")
+A_TAG = names("customer.tag.detail")
+A_FIELD = names("customer.field.detail")
+A_ORDER = names("customer.order.get", by="order_id")
+# A card, a group, a tag or a custom field said in words in every other write: read as the write finds it, and said as
+# said when the words fit none or several, as the merge does not (hub#1280). Beside its own record's id the write never
+# looks at the words, and the card neither reads nor shows them (``unless_given``).
+A_CUSTOMER_SAID = names("customer.customer.detail", by="customer", as_said=True)
+A_GROUP_SAID = names("customer.group.detail", by="group", as_said=True)
+A_TAG_SAID = names("customer.tag.detail", by="tag", as_said=True)
+A_FIELD_SAID = names("customer.field.detail", by="field", as_said=True)
+#: A group or a tag of the card by its id, each named on the card.
+GroupId = Annotated[UUID, Field(json_schema_extra=A_GROUP)]
+TagId = Annotated[UUID, Field(json_schema_extra=A_TAG)]
 
 
 def _email(value: str) -> str:
@@ -166,8 +192,13 @@ CUSTOMER_REFERENCE = "The customer's exact name, phone or email, when the id is 
 class CustomerRefIn(Schema):
     """A card by its ``id`` or by its exact name, phone or email (``customer``); the id wins."""
 
-    id: UUID | None = Field(None, description="The customer's id.")
-    customer: Reference | None = Field(None, validate_default=True, description=CUSTOMER_REFERENCE)
+    id: UUID | None = Field(None, title=CUSTOMER, description="The customer's id.", json_schema_extra=A_CUSTOMER)
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description=CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "id"),
+    )
 
     _named = field_validator("customer")(_named_unless("id", CUSTOMER_REF_MISSING))
 
@@ -175,34 +206,50 @@ class CustomerRefIn(Schema):
 class CustomerOfIn(Schema):
     """The card something belongs to: ``customer_id``, or its exact name, phone or email."""
 
-    customer_id: UUID | None = Field(None, description="The customer's id.")
-    customer: Reference | None = Field(None, validate_default=True, description=CUSTOMER_REFERENCE)
+    customer_id: UUID | None = Field(None, description="The customer's id.", json_schema_extra=A_CUSTOMER)
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description=CUSTOMER_REFERENCE,
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
+    )
 
     _named = field_validator("customer")(_named_unless("customer_id", CUSTOMER_REF_MISSING))
 
 
 class GroupRefIn(Schema):
-    id: UUID | None = Field(None, description="The group's id.")
+    id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Reference | None = Field(
-        None, validate_default=True, title=GROUP, description="The group's current name, when the id is not known."
+        None,
+        validate_default=True,
+        title=GROUP,
+        description="The group's current name, when the id is not known.",
+        json_schema_extra=unless_given(A_GROUP_SAID, "id"),
     )
 
     _named = field_validator("group")(_named_unless("id", GROUP_REF_MISSING))
 
 
 class TagRefIn(Schema):
-    id: UUID | None = Field(None, description="The tag's id.")
+    id: UUID | None = Field(None, title=TAG, description="The tag's id.", json_schema_extra=A_TAG)
     tag: Reference | None = Field(
-        None, validate_default=True, title=TAG, description="The tag's current name, when the id is not known."
+        None,
+        validate_default=True,
+        title=TAG,
+        description="The tag's current name, when the id is not known.",
+        json_schema_extra=unless_given(A_TAG_SAID, "id"),
     )
 
     _named = field_validator("tag")(_named_unless("id", TAG_REF_MISSING))
 
 
 class FieldRefIn(Schema):
-    id: UUID | None = Field(None, description="The custom field's id.")
+    id: UUID | None = Field(None, title=CUSTOM_FIELD, description="The custom field's id.", json_schema_extra=A_FIELD)
     field: Reference | None = Field(
-        None, validate_default=True, description="The custom field's current name, when the id is not known."
+        None,
+        validate_default=True,
+        description="The custom field's current name, when the id is not known.",
+        json_schema_extra=unless_given(A_FIELD_SAID, "id"),
     )
 
     _named = field_validator("field")(_named_unless("id", FIELD_REF_MISSING))
@@ -336,7 +383,7 @@ class CustomerIn(Schema):
 
 
 class FieldValueIn(Schema):
-    field_id: UUID = Field(description="The custom field's id.")
+    field_id: UUID = Field(title=CUSTOM_FIELD, description="The custom field's id.", json_schema_extra=A_FIELD)
     value: _text(10000) = Field(
         description="The value as text: a number, a date YYYY-MM-DD, true/false, one of a select's options, "
         "or empty to clear it."
@@ -422,7 +469,7 @@ class ImportIn(Schema):
 
 
 class SetGroupsIn(CustomerRefIn):
-    group_ids: list[UUID] = Field(
+    group_ids: list[GroupId] = Field(
         [], max_length=200, title=GROUPS, description="The ids of the groups the customer is in."
     )
     groups: list[Reference] = Field(
@@ -431,7 +478,7 @@ class SetGroupsIn(CustomerRefIn):
 
 
 class SetTagsIn(CustomerRefIn):
-    tag_ids: list[UUID] = Field(
+    tag_ids: list[TagId] = Field(
         [], max_length=200, title=TAGS, description="The ids of the tags the customer has."
     )
     tags: list[Reference] = Field(
@@ -442,14 +489,30 @@ class SetTagsIn(CustomerRefIn):
 class MergeIn(CustomerRefIn):
     """``id``/``customer`` is the card that stays; ``absorbed_id``/``absorbed`` the duplicate."""
 
+    id: UUID | None = Field(
+        None,
+        title=CUSTOMER,
+        description="The id of the card that stays.",
+        json_schema_extra=A_CUSTOMER,
+    )
+    customer: Reference | None = Field(
+        None,
+        validate_default=True,
+        description="The card that stays: its exact name, phone or email, when its id is not known.",
+        json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "id"),
+    )
     absorbed_id: UUID | None = Field(
-        None, title=DUPLICATE_CUSTOMER, description="The duplicate's id: it is merged into the other card."
+        None,
+        title=DUPLICATE_CUSTOMER,
+        description="The duplicate's id: it is merged into the card that stays.",
+        json_schema_extra=A_CUSTOMER,
     )
     absorbed: Reference | None = Field(
         None,
         validate_default=True,
         title=DUPLICATE_CUSTOMER,
-        description="The duplicate's exact name, phone or email.",
+        description="The duplicate's exact name, phone or email, when its id is not known.",
+        json_schema_extra=unless_given(A_CUSTOMER_REFERENCE, "absorbed_id"),
     )
 
     _absorbed_named = field_validator("absorbed")(_named_unless("absorbed_id", ABSORBED_REF_MISSING))
@@ -568,12 +631,16 @@ class ConsentHistoryIn(CustomerOfIn, PageIn):
 
 
 class OrderLinkIn(Schema):
-    order_id: UUID = Field(title=gettext_noop("Open order"), description="The open order's id in the sale app.")
+    order_id: UUID = Field(
+        title=gettext_noop("Open order"), description="The open order's id in the sale app.", json_schema_extra=A_ORDER
+    )
     customer_id: UUID | None = Field(
-        None, description="The customer's id; without a customer the link is removed."
+        None, description="The customer's id; without a customer the link is removed.", json_schema_extra=A_CUSTOMER
     )
     customer: Reference | None = Field(
-        None, description="The customer's exact name, phone or email."
+        None,
+        description="The customer's exact name, phone or email.",
+        json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
     )
 
 
@@ -804,6 +871,54 @@ class FieldPatchIn(FieldRefIn):
         return list(dict.fromkeys(option.strip() for option in value if option.strip()))
 
 
+# ── A card of a separate copy, as its recovery takes it (BASE-F114, hub#1285, hub#1356) ───────────
+
+
+class GroupOfCopyIn(GroupIn):
+    """A group of a card of the copy, as the copy held it: its id there, what the Groups screen's create takes, and
+    whether it was offered on the cards."""
+
+    id: UUID | None = Field(None, description="The group's id in the copy.")
+    is_active: bool = Field(True, description="Whether the group was offered on the cards.")
+
+
+class TagOfCopyIn(TagIn):
+    """A tag of a card of the copy, as the copy held it: its id there, what the Tags screen's create takes, and whether
+    it was offered on the cards."""
+
+    id: UUID | None = Field(None, description="The tag's id in the copy.")
+    is_active: bool = Field(True, description="Whether the tag was offered on the cards.")
+
+
+class FieldValueOfCopyIn(FieldIn):
+    """A card's value of an active custom field of the copy: the field's id there, the field as the Fields screen's
+    create takes it, and the value."""
+
+    id: UUID | None = Field(None, description="The field's id in the copy.")
+    value: _text(10000) = Field(description="The card's value, as text.")
+
+
+class HungInCopyIn(Schema):
+    """What hung from a card in the copy, each named as the copy named it: the business makes its own ids, and the
+    copy's tell what it still has."""
+
+    groups: list[GroupOfCopyIn] = Field([], max_length=200, description="The card's groups in the copy.")
+    tags: list[TagOfCopyIn] = Field([], max_length=200, description="The card's tags in the copy.")
+    field_values: list[FieldValueOfCopyIn] = Field(
+        [], max_length=200, description="The card's values of the copy's active custom fields."
+    )
+
+
+class CustomerRecoverIn(CustomerIn, HungInCopyIn):
+    """A card of a separate copy the business no longer has: what ``customer.customer.create`` takes and what hung from
+    it there."""
+
+
+class CustomerRestoreIn(CustomerRefIn, HungInCopyIn):
+    """A deleted card the business still holds, by its id, and what hung from it in a separate copy: what the business
+    deleted since comes back with it."""
+
+
 # ── Outputs ─────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -818,7 +933,7 @@ class CustomerRow(Schema):
     source: Source = Field(description=SOURCE)
     is_active: bool = Field(description="Whether the customer counts as active.")
     total_purchases: int = Field(description="How many purchases they made.")
-    total_spent: int = Field(description="How much they spent, in cents.")
+    total_spent: int = Field(description="How much they spent, in cents.", json_schema_extra={"money": True})
     last_purchase_at: datetime | None = Field(description="When they last bought.")
 
 
@@ -879,11 +994,15 @@ class CustomerDetailOut(CustomerRow):
     )
 
 
+class CustomerRecoveredOut(CustomerDetailOut, RecoveredOut):
+    """A card back from a separate copy, and the values of its custom fields it came back without, each with why."""
+
+
 class CustomerStatsOut(Schema):
     total: int = Field(description="How many customers there are.")
     active: int = Field(description="How many of them are active.")
     vip: int = Field(description="How many are at the vip stage.")
-    total_revenue: int = Field(description="What they spent altogether, in cents.")
+    total_revenue: int = Field(description="What they spent altogether, in cents.", json_schema_extra={"money": True})
 
 
 class PhoneMatch(Schema):
@@ -956,12 +1075,17 @@ class ActivityRow(Schema):
     )
     related_id: str = Field(description="The id of what it is about.")
     related_type: str = Field(description="The type of what it is about.")
-    actor: str = Field(description="Who did it.")
+    actor: str = Field(description="Who did it: a person's name, an API key's or the platform's own mark.")
+    by_platform: bool = Field(description="No person did it: the platform (the system, an automation, a recovery).")
     created_at: datetime = Field(description="When.")
 
     @staticmethod
     def resolve_currency_decimals(entry: Activity) -> int | None:
         return _decimals((entry.data or {}).get("currency"))
+
+    @staticmethod
+    def resolve_by_platform(entry: Activity) -> bool:
+        return by_platform(entry.actor)
 
 
 ActivityPage = Page[ActivityRow]
@@ -996,6 +1120,11 @@ class ConsentStateOut(Schema):
     )
 
 
+class OrderNamedOut(Schema):
+    order_id: UUID = Field(description="The order's id.")
+    name: str = Field(description="The order as Sales names it: its title or, with none, its amount.")
+
+
 class OrderCustomerOut(Schema):
     order_id: UUID = Field(description="The order's id.")
     customer_id: UUID | None = Field(
@@ -1016,7 +1145,10 @@ class PurchaseRow(Schema):
     id: UUID = Field(description="The entry's id.")
     customer_id: UUID = Field(description="The customer's id.")
     sale_id: UUID | None = Field(description="The sale's id; empty for a manual entry.")
-    amount: int = Field(description="The amount, in cents; negative on a refund line.")
+    amount: int = Field(
+        description="The amount, in cents; negative on a refund line.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="The currency.")
     currency_decimals: int | None = Field(
         description="The decimals of its currency as the server counts them (0 in JPY); empty without a currency."
@@ -1040,9 +1172,9 @@ class DivergenceRow(Schema):
     id: UUID = Field(description="The customer's id.")
     name: str = Field(description="Name.")
     total_purchases: int = Field(description="Purchases on the card.")
-    total_spent: int = Field(description="Spent on the card, in cents.")
+    total_spent: int = Field(description="Spent on the card, in cents.", json_schema_extra={"money": True})
     ledger_purchases: int = Field(description="Paid purchases in its history.")
-    ledger_spent: int = Field(description="Paid amount in its history, in cents.")
+    ledger_spent: int = Field(description="Paid amount in its history, in cents.", json_schema_extra={"money": True})
 
 
 DivergencePage = Page[DivergenceRow]

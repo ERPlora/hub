@@ -1,6 +1,6 @@
-"""Django admin of the website app, read-mostly (round 12, PLAN §17): the staff on hubs.erplora.com see the site and
-its images and can only take a site offline (``is_live``); its content goes through the editor's operations, which
-validate it and write its images' URLs."""
+"""Django admin of the website app, read-mostly: the staff on hubs.erplora.com see the site and its images and can only
+take a site offline (``is_live``); its content goes through the editor's operations, which validate it and write its
+images' URLs."""
 
 import uuid
 
@@ -11,6 +11,8 @@ from django.test import RequestFactory
 
 from apps.website.admin import ImageAdmin, SiteAdmin
 from apps.website.models import Image, Site
+from apps.website.tests.conftest import HUB_DB
+from base.tenancy.tests.concurrency import PLATFORM_HOST
 
 MODELS = {Site: SiteAdmin, Image: ImageAdmin}
 
@@ -36,6 +38,7 @@ def test_every_model_is_registered():
         assert isinstance(admin.site._registry[model], model_admin), model
 
 
+@HUB_DB
 def test_nothing_is_added_or_deleted_from_the_admin(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -45,7 +48,7 @@ def test_nothing_is_added_or_deleted_from_the_admin(superuser):
         assert not model_admin.has_delete_permission(request), model
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_only_whether_the_site_is_live_can_change(superuser):
     site = Site.objects.create(hub_id=uuid.uuid7())
     request = request_by(superuser)
@@ -58,7 +61,28 @@ def test_only_whether_the_site_is_live_can_change(superuser):
 
 
 def test_the_staff_see_whose_hub_each_row_is():
-    # Phase 1: every hub's rows share the tables, so the list says which hub each one belongs to.
+    # The list says which hub each row belongs to.
     for model in MODELS:
         model_admin = admin.site._registry[model]
         assert "hub_id" in model_admin.list_display and "hub_id" in model_admin.fields, model
+
+
+@HUB_DB
+def test_the_admin_in_spanish_says_the_websites_own_words(hub_staff):
+    """The staff read the site and its images in Página web's words: the site is «Página web» and feminine
+    («Actualizada el», «Actualizada por», like its «Publicada el»), an image «Creada el»; not Clientes' «Web» nor Demo's
+    and Clientes' masculine."""
+    site = Site.objects.create(hub_id=uuid.uuid7(), updated_by="ana")
+    Image.objects.create(
+        hub_id=site.hub_id, key="a/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
+    )
+    spanish = {"HTTP_HOST": PLATFORM_HOST, "HTTP_ACCEPT_LANGUAGE": "es"}
+    change = hub_staff.get(f"/admin/website/site/{site.pk}/change/", **spanish)
+    images = hub_staff.get("/admin/website/image/", **spanish)
+    assert (change.status_code, images.status_code) == (200, 200)
+    page, listing = change.content.decode(), images.content.decode()
+    assert "<label>Publicada el:</label>" in page  # the page is in Spanish: a label the site already says alone
+    assert "<label>Actualizada el:</label>" in page and "<label>Actualizada por:</label>" in page
+    assert '<li aria-current="page">Página web</li>' in page and "<h2>Página web</h2>" in page  # the site's name
+    assert ">Creada el</a>" in listing  # the images' column
+    assert "Actualizado" not in page and "<h2>Web</h2>" not in page and "Creado el" not in listing

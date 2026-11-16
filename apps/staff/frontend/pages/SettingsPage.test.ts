@@ -1,12 +1,12 @@
 // Staff → Settings (WORKBOOK «Pantallas · Ajustes de Personal»; STAFF-F22): the default working day,
 // only for whoever may save it — Working day starts/ends (HH:MM) and Break duration, which a new
-// schedule proposes (STAFF-F13). The old module's other eight settings changed nothing and are gone
-// (FIX-STAFF-SETTINGS-ORPHANS). «Save» sends only what changed (`staff.settings.update`). The values come
+// schedule proposes (STAFF-F13). «Save» sends only what changed (`staff.settings.update`). The values come
 // live (`staff.settings.get`: the proposed ones until the business saves); a value the server refuses is
 // said under its field and nothing is saved.
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { between, pressEnter, refusalMarks } from '../../../../base/frontend/__tests__/settings-form';
 import type { SettingsOut } from '../operations';
 import { click, EMPLOYEE, errorFrame, flush, ionValue, type MountOptions, mountStaff, settle } from '../__tests__/mount-staff';
 import SettingsPage from './SettingsPage.vue';
@@ -58,7 +58,9 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.save().disabled).toBe(true);
   });
 
-  it('«Save» sends only what changed and says it is saved', async () => {
+  // As every settings page and FormModal (hub#897): what a save says is said where the person tapped «Save»; and Enter in
+  // a field submits the form (Ionic puts a hidden submit button in it), the same save.
+  it('«Save» sends only what changed and says it is saved right above it; Enter in a field saves too', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
     s.answer(200, { ...PROPOSED, default_work_end: '20:00', default_break_duration: 30 });
@@ -70,9 +72,28 @@ describe('SettingsPage (STAFF-F22)', () => {
       { method: 'POST', path: '/api/staff/settings', query: {}, body: { default_work_end: '20:00', default_break_duration: 30 } },
     ]);
     expect(s.find('staff-settings-saved').text()).toContain('Settings saved');
+    expect(between(s.field('default_break_duration'), s.find('staff-settings-saved').element, s.save())).toBe(true);
+    await ionValue(s.field('default_work_start'), '08:00', 'ionInput');
+    await pressEnter(s.find('staff-settings-form').element);
+    expect(s.sent().at(-1)?.body).toEqual({ default_work_start: '08:00' });
   });
 
-  it('a value the server refuses is said under its field and the typed values stay', async () => {
+  it('while saving, «Save» spins and is off; once saved, it stops', async () => {
+    const s = await setup();
+    await s.result('staff.settings.get', PROPOSED);
+    let answer!: (response: Response) => void;
+    s.net.onApi(() => new Promise<Response>((resolve) => (answer = resolve)));
+    await ionValue(s.field('default_break_duration'), '30', 'ionInput');
+    await click(s.save());
+    const spins = () => !!s.save().querySelector('ion-spinner');
+    expect([s.save().disabled, spins()]).toEqual([true, true]);
+    answer(Response.json({ ...PROPOSED, default_break_duration: 30 }));
+    await flush();
+    await flush();
+    expect([spins(), s.find('staff-settings-saved').exists()]).toEqual([false, true]);
+  });
+
+  it('a value the server refuses is said under its field, the typed values stay and the notice sits right above «Save»', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
     s.answer(422, {
@@ -82,7 +103,45 @@ describe('SettingsPage (STAFF-F22)', () => {
     await click(s.save());
     expect(s.field('default_work_end').errorText).toBe('The start time must be before the end time.');
     expect(s.field('default_work_end').value).toBe('06:00');
-    expect(s.find('staff-settings-error').text()).toContain('The start time must be before the end time.');
+    expect(s.find('staff-settings-save-error').text()).toContain('The start time must be before the end time.');
+    expect(between(s.field('default_break_duration'), s.find('staff-settings-save-error').element, s.save())).toBe(true);
+  });
+
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
+    const REFUSAL = {
+      error: {
+        code: 'invalid_payload',
+        message: 'The start time must be before the end time.',
+        fields: {
+          default_work_end: 'The start time must be before the end time.',
+          default_break_duration: 'Ensure this value is less than or equal to 480.',
+        },
+      },
+    };
+
+    /** Saves a day that ends before it starts and a 10-hour break, and the server refuses both fields. */
+    async function refused() {
+      const s = await setup();
+      await s.result('staff.settings.get', PROPOSED);
+      s.answer(422, REFUSAL);
+      await ionValue(s.field('default_work_end'), '06:00', 'ionInput');
+      await ionValue(s.field('default_break_duration'), '600', 'ionInput');
+      await click(s.save());
+      return { ...s, ...refusalMarks(s.field, () => s.find('staff-settings-save-error').exists()) };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('default_work_end'), s.says('default_break_duration')]).toEqual([
+        'The start time must be before the end time.',
+        'Ensure this value is less than or equal to 480.',
+      ]);
+      await ionValue(s.field('default_work_end'), '19:00', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('default_work_end'), s.marked('default_work_end')]).toEqual(['', false]);
+      expect([s.says('default_break_duration'), s.marked('default_break_duration')]).toEqual(['Ensure this value is less than or equal to 480.', true]);
+    });
   });
 
   it('a change saved elsewhere repaints the form while nothing is being typed', async () => {
@@ -113,7 +172,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.save().disabled).toBe(true);
   });
 
-  // gh:hub#2541: a read that failed never passes for the business's settings (no proposed values to save).
+  // A read that failed never passes for the business's settings (no proposed values to save).
   it('a read that fails says so with «Retry» instead of «Loading…», with no form; «Retry» asks again', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId('staff.settings.get'), 'boom'));

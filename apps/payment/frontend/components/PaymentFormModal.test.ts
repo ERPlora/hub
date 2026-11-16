@@ -1,14 +1,16 @@
 // PAYMENT-F02 «Registrar un pago»: «New payment» asks for the old panel's Method (only the active ones),
 // Date (today), Amount (as a person writes it), Beneficiary and Concept, plus the Beneficiary IBAN and
 // the Supplier invoice the old screen left to the API, with «Record payment». The three states of the
-// methods read are told apart (the old payments#24): still loading, could not be read (Retry), none
+// methods read are told apart: still loading, could not be read (Retry), none
 // yet (go to Methods). An amount that is not one, or is 0, is refused under the field without asking
-// the server; the server's refusals go under their field (the old pm#513: inside the form). The amount is typed
+// the server; the server's refusals go under their field (inside the form). The amount is typed
 // in the business's currency, with its decimals, and the field says which («Amount (PLN)»); the payment is
-// recorded in it by the server (the old payments#35), never in a euro fixed in the screen.
+// recorded in it by the server, never in a euro fixed in the screen.
 import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { expectAmountLeftWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
@@ -37,10 +39,11 @@ const CASH = method('m2', 'Cash drawer');
 const CREATED = { id: 'p1', reference: 'PAY-20261014-0001' } as PaymentOut;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function setup(locale: 'en' | 'es' = 'en', shop: Business | null = business()) {
+/** «New payment» on its page, opened unless `opened` is false (the page mounts it closed), its stream live. */
+async function setup(locale: 'en' | 'es' = 'en', shop: Business | null = business(), opened = true) {
   const m = await mountPayment(PaymentFormModal, { props: { open: false }, locale, session: RECORDER, business: shop });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
+  if (opened) await m.wrapper.setProps({ open: true });
   await settle();
   await m.live();
   const field = (name: string) => m.inDoc(`payment-form-${name}`) as Control;
@@ -109,7 +112,7 @@ describe('PaymentFormModal', () => {
     expect(s.wrapper.emitted('created')).toEqual([[CREATED]]);
   });
 
-  it('the same form sent again carries the same attempt key; the next «New payment» makes a new one (payments#8)', async () => {
+  it('the same form sent again carries the same attempt key; the next «New payment» makes a new one', async () => {
     const s = await setup();
     await s.result(METHODS, page([BANK]));
     s.answer(503, { error: { code: 'unavailable', message: 'Try again in a moment.' } });
@@ -196,7 +199,7 @@ describe('PaymentFormModal', () => {
     expect(s.save().textContent).toContain('Registrar pago');
   });
 
-  describe('in the business’s currency (the old payments#35)', () => {
+  describe('in the business’s currency', () => {
     it('a business in Poland: «Amount (PLN)», «12,50 zł» is 1250 grosze and the server records it in złoty', async () => {
       const s = await setup('en', business(POLISH));
       await s.result(METHODS, page([BANK]));
@@ -243,6 +246,77 @@ describe('PaymentFormModal', () => {
       s.answer(201, CREATED);
       await click(s.save());
       expect((s.sent()[0].body as { amount: number }).amount).toBe(150);
+    });
+
+    // hub#945 (PAYMENT-F02): an amount typed with its currency's sign and left before the business answers is neither
+    // rewritten nor called «not an amount»; once it answers, it is read in its money.
+    it.each([
+      ['¥1500', JAPANESE, 1500],
+      ['12,50 zł', POLISH, 1250],
+    ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, amount) => {
+      const s = await setup('en', null);
+      await s.result(METHODS, page([BANK]));
+      await s.fill(typed);
+      await expectAmountLeftWaitsForMoney({ amount: () => s.field('amount'), settle }, typed, () => s.result('base.business.get', business(money)));
+      s.answer(201, CREATED);
+      await click(s.save());
+      expect((s.sent()[0].body as { amount: number }).amount).toBe(amount);
+    });
+  });
+});
+
+describe('PaymentFormModal: fields refused with the same words (hub#888)', () => {
+  /** Each field of the window by the key the server refuses it under. */
+  const TESTID: Record<string, string> = {
+    method_id: 'method',
+    payment_date: 'date',
+    amount: 'amount',
+    beneficiary_name: 'beneficiary',
+    concept: 'concept',
+    beneficiary_iban: 'iban',
+    supplier_invoice_ref: 'invoice',
+  };
+  itTellsTheCorrectedFieldApart(
+    Object.keys(TESTID),
+    async (locale, refusal) => {
+      const s = await setup(locale);
+      await s.result(METHODS, page([BANK, CASH]));
+      await s.fill();
+      s.answer(422, refusal);
+      return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
+    },
+    'amount',
+  );
+});
+
+// hub#938 (PAYMENT-F02): if the business's money cannot be read, «New payment» says so with «Retry» instead of waiting
+// in grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('PaymentFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Record payment» lights up (opened after the failure: %s)', async (late) => {
+    const s = await setup('en', null, !late);
+    // Each opening starts from a blank form: it is filled once open.
+    async function fill() {
+      await s.result(METHODS, page([BANK]));
+      await s.fill('1500');
+    }
+    async function opens() {
+      await s.wrapper.setProps({ open: true });
+      await settle();
+      await fill();
+    }
+    if (!late) await fill();
+    await expectWindowSaysMoneyUnreadable(s, 'payment-form-submit', s.sent, late ? opens : undefined);
+  });
+});
+
+describe('PaymentFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('payment-form'),
+      change: () => ionValue(s.field('beneficiary'), 'Proveedor Norte SL', 'ionInput'),
+      restore: () => ionValue(s.field('beneficiary'), '', 'ionInput'),
     });
   });
 });

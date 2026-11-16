@@ -1,21 +1,18 @@
-"""Events of the appointment app and its reactions to the events of Customers, Staff and Sales.
-
-The reactions are handed the real payloads, read back from the outbox where each app's own operation
-recorded them (as the relay of phase 2 will), and run as the system; repeating one changes nothing.
+"""The reactions are handed the real payloads, read back from the outbox where each app's own operation
+recorded them (as the relay does), and run as the system; repeating one changes nothing.
 """
 
 import datetime as dt
 import uuid
 
-import pytest
 from live.models import OutboxEvent
 
 from apps.appointment import events
 from apps.appointment.models import Appointment, History, Recurring, RecurringService
 
-from .conftest import A, MONDAY, at, make_appointment, run
+from .conftest import A, HUB_DB, MONDAY, at, make_appointment, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def relay(name: str):

@@ -1,15 +1,15 @@
 """What the inbox hands to erplora.com after a COMMIT never holds the worker.
 
-FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY. One worker relays the outbox of every hub and runs the scheduled tasks in one loop, and Django ran what a transaction
-left for after its COMMIT right there: the message an automation of hub A sends (door 5), the number an erased card
+One worker relays the outbox of every hub and runs the scheduled tasks in one loop, and Django runs what a transaction
+leaves for after its COMMIT right there: the message an automation of hub A sends (door 5), the number an erased card
 asks erplora.com to forget (door 6), and what the tick hands over again (messages, erasures, templates and their
-deletions, doors 5, 6, 8 and 9) held every other delivery, of every hub, and the scheduled tasks while erplora.com did
-not answer (up to 20 s a call). They go through ``base.outbound``: a thread of the worker's own makes the call, with
-no database connection held while it waits, and each still goes out once, with its own key.
+deletions, doors 5, 6, 8 and 9) would hold every other delivery, of every hub, and the scheduled tasks while erplora.com
+does not answer (up to 20 s a call). So they go through ``base.outbound``: a thread of the worker's own makes the call,
+with no database connection held while it waits, and each still goes out once, with its own key.
 
 erplora.com answers here only once the test lets it (5 s at most: a worker that waits for it fails the test instead of
-hanging), and every delivery of hub B lets it, so the order says who waited for whom. The real pool runs the calls
-(``outbound_threads``), on committed data.
+hanging), and every delivery of hub B lets it, so the order says who waited for whom. Each hub is in its own database
+and the worker's real pass serves A before B. The real pool runs the calls (``outbound_threads``), on committed data.
 """
 
 import datetime as dt
@@ -24,22 +24,22 @@ from types import SimpleNamespace
 import httpx
 import pytest
 import respx
-from django.db import connection
+from django.db import connections
 from django.utils import timezone
 
+from apps.flow.tests.test_relay import heard_by_hub_b
 from apps.whatsapp_inbox import gateway
 from apps.whatsapp_inbox.models import Conversation, Message, Template
-from apps.whatsapp_inbox.tests.conftest import NOW, B, card, connect, ctx_for, receive, run, system, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, B, card, connect, ctx_for, receive, run, system, template
 from apps.whatsapp_inbox.tests.test_relay_notify import confirm, salon
-from base import catalog, outbound, relay, scheduler, worker
-from base.catalog import RegisterResult
+from base import outbound, relay, scheduler
+from base.tenancy.context import use_hub
 
 SAAS = "http://saas.test"
 SEND = f"{SAAS}/internal/whatsapp/send"
 ERASE = f"{SAAS}/internal/whatsapp/erase"
 REGISTER = f"{SAAS}/internal/whatsapp/templates"
 DELETE = f"{SAAS}/internal/whatsapp/templates/delete"
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 #: The most a test waits for what the worker's thread hands over.
 WAIT_SECONDS = 10
 #: erplora.com did not answer: what was on its way stays so, for the tick to hand over again.
@@ -58,7 +58,7 @@ def answering_late(monkeypatch, name: str) -> SimpleNamespace:
     def late(*args, **kwargs):
         if not armed.is_set():
             return real(*args, **kwargs)
-        held.append(connection.connection is not None)
+        held.append(any(database.connection is not None for database in connections.all(initialized_only=True)))
         answer.wait(timeout=5)
         reply = real(*args, **kwargs)
         timeline.append("answered")
@@ -68,23 +68,10 @@ def answering_late(monkeypatch, name: str) -> SimpleNamespace:
     return SimpleNamespace(timeline=timeline, held=held, answer=answer, armed=armed)
 
 
-def heard_by_hub_b(monkeypatch, late: SimpleNamespace) -> None:
-    """Every delivery of hub B goes on the timeline, and the first one lets erplora.com answer."""
-    real = relay.deliver
-
-    def deliver(app_label, event):
-        done = real(app_label, event)
-        if event.scope_key == B.key:
-            late.timeline.append(f"{app_label} got {event.name} in b")
-            late.answer.set()
-        return done
-
-    monkeypatch.setattr(relay, "deliver", deliver)
-
-
-def hub_b_writes() -> None:
-    """Hub B makes a card meanwhile: its event waits in the same outbox."""
-    system("customer.customer.create", {"name": "Bea Ruiz"}, B)
+def hub_b_writes(hub_b) -> None:
+    """Hub B makes a card meanwhile: its event waits in its outbox, for the same pass of the worker."""
+    with use_hub(hub_b):
+        system("customer.customer.create", {"name": "Bea Ruiz"}, B)
 
 
 def settled(done: Callable[[], bool]) -> None:
@@ -106,8 +93,8 @@ def waited_for_nobody(late: SimpleNamespace) -> None:
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_a_late_send_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch):
+@HUB_DB_COMMITTED
+def test_a_late_send_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch, tick, hub_b):
     """WHATSAPP_INBOX-F37: confirming an appointment tells the customer through erplora.com; the relay goes on."""
     with respx.mock(assert_all_called=False) as saas:
         door = saas.post(SEND).mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
@@ -115,11 +102,11 @@ def test_a_late_send_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch):
         relay.run(timezone.now())  # the salon's own events: nothing is sent
         late = answering_late(monkeypatch, "send")
         late.armed.set()
-        confirm(appointment)  # its event is older than hub B's: the relay hands it over first
-        hub_b_writes()
+        confirm(appointment)  # hub A is served first: its relay hands it over before hub B's
+        hub_b_writes(hub_b)
         heard_by_hub_b(monkeypatch, late)
 
-        relay.run(timezone.now())
+        tick()
 
         settled(lambda: Message.objects.filter(direction="outbound", status=Message.Status.SENT).exists())
     waited_for_nobody(late)
@@ -128,8 +115,8 @@ def test_a_late_send_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch):
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_a_late_erasure_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch):
+@HUB_DB_COMMITTED
+def test_a_late_erasure_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch, tick, hub_b):
     """WHATSAPP_INBOX-F11: erasing a card asks erplora.com to forget her number; the relay goes on."""
     with respx.mock(assert_all_called=False) as saas:
         door = saas.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
@@ -139,10 +126,10 @@ def test_a_late_erasure_of_hub_a_never_holds_the_deliveries_of_hub_b(monkeypatch
         late = answering_late(monkeypatch, "erase")
         late.armed.set()
         run("customer.customer.erase", {"id": str(ana.id), "reason": "Lo pidió por WhatsApp"}, ctx_for("hub_owner"))
-        hub_b_writes()
+        hub_b_writes(hub_b)
         heard_by_hub_b(monkeypatch, late)
 
-        relay.run(timezone.now())
+        tick()
 
         settled(lambda: Conversation.objects.get().erase_status == Conversation.EraseStatus.DONE)
     waited_for_nobody(late)
@@ -238,10 +225,9 @@ STUCK = [
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize("stuck", STUCK)
-def test_what_the_tick_hands_over_again_never_holds_the_relay(stuck, fixed_clock, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+def test_what_the_tick_hands_over_again_never_holds_the_relay(stuck, fixed_clock, monkeypatch, tick, hub_b):
     late = answering_late(monkeypatch, stuck.door)
     with respx.mock(assert_all_called=False) as saas:
         door = saas.post(stuck.url).mock(return_value=UNANSWERED)
@@ -250,15 +236,14 @@ def test_what_the_tick_hands_over_again_never_holds_the_relay(stuck, fixed_clock
         assert not done()
         door.mock(return_value=httpx.Response(200, json=stuck.answer))
         monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))  # past its 2 minutes
-        hub_b_writes()
+        hub_b_writes(hub_b)
         heard_by_hub_b(monkeypatch, late)
         late.armed.set()
-        now = timezone.now()
-        scheduler.sync(now - dt.timedelta(minutes=6))  # whatsapp_inbox.resume_deliveries (every 5 min) is due
+        scheduler.sync(timezone.now() - dt.timedelta(minutes=6))  # whatsapp_inbox.resume_deliveries (every 5 min) is due
 
-        # One tick of the worker's real loop: the scheduled tasks (the inbox's hands it over again), then the relay.
-        stop = threading.Event()
-        assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
+        # One tick of the worker's real loop: in hub A the relay, then the scheduled tasks (the inbox's hands it over
+        # again); then hub B.
+        tick()
 
         settled(done)
     waited_for_nobody(late)

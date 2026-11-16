@@ -156,26 +156,41 @@ msgstr "termina el"
 msgid "number of appointments"
 msgstr "número de citas"
 
+msgctxt "appointment"
 msgid "active"
 msgstr "activa"
 
 msgid "split from"
 msgstr "continúa la serie"
 
+msgctxt "appointment"
 msgid "deleted at"
 msgstr "borrada el"
 
+msgctxt "appointment"
 msgid "created at"
 msgstr "creada el"
 
+msgctxt "appointment"
+msgid "updated at"
+msgstr "actualizada el"
+
+msgctxt "appointment"
 msgid "created by"
 msgstr "creada por"
+
+msgctxt "appointment"
+msgid "updated by"
+msgstr "actualizada por"
 
 msgid "repeating appointment"
 msgstr "cita periódica"
 
 msgid "repeating appointments"
 msgstr "citas periódicas"
+
+msgid "Repeating appointments"
+msgstr "Citas periódicas"
 
 msgid "series"
 msgstr "serie"
@@ -330,12 +345,17 @@ msgstr "Venta anulada"
 msgid "Deleted"
 msgstr "Borrada"
 
+msgctxt "appointment history"
+msgid "Restored"
+msgstr "Recuperada"
+
 msgid "action"
 msgstr "acción"
 
 msgid "at"
 msgstr "cuándo"
 
+msgctxt "appointment"
 msgid "by"
 msgstr "quién"
 
@@ -381,6 +401,12 @@ msgstr "tipo"
 
 msgid "all day"
 msgstr "todo el día"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "created by"
+msgstr "creado por"
 
 msgid "blocked time"
 msgstr "bloqueo"
@@ -446,10 +472,10 @@ msgid "Say which customer: her id, or her name, phone or email."
 msgstr "Di qué cliente: su id, o su nombre, teléfono o email."
 
 msgid "Say which professional: their id, or their name."
-msgstr "Di qué profesional: su id, o su nombre."
+msgstr "Di qué profesional: su id o su nombre."
 
 msgid "Say which service: its id, or its name."
-msgstr "Di qué servicio: su id, o su nombre."
+msgstr "Di qué servicio: su id o su nombre."
 
 msgid "Say which appointment: its id, or its number."
 msgstr "Di qué cita: su id, o su número."
@@ -475,6 +501,9 @@ msgstr "Pide como mucho 62 días de una vez."
 
 msgid "The calendar has to end after it starts."
 msgstr "El calendario tiene que terminar después de empezar."
+
+msgid "Its repeating appointment has booked that date again since."
+msgstr "Su cita periódica ya ha vuelto a reservar esa fecha."
 
 msgid ""
 "This appointment can no longer be confirmed: it is not pending any more."
@@ -590,3 +619,30 @@ msgstr "Te deja la tarea, para que te acuerdes de ofrecer ese hueco."
 
 msgid "Appointment"
 msgstr "Cita"
+
+msgid "Book even if it overlaps"
+msgstr "Reservar aunque se solape"
+
+msgid "Dates and times"
+msgstr "Fechas y horas"
+
+msgid "Asked by the customer"
+msgstr "Lo pide la clienta"
+
+msgid "Applies from"
+msgstr "Se aplica desde"
+
+msgid "Book from"
+msgstr "Reservar desde"
+
+msgid "Book up to"
+msgstr "Reservar hasta"
+
+msgid "Duplicate customer"
+msgstr "Ficha duplicada"
+
+msgid "Repeating appointment"
+msgstr "Cita periódica"
+
+msgid "Blocked period"
+msgstr "Bloqueo"

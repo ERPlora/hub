@@ -4,6 +4,7 @@ and the aliases the CSV importer of inventory recognises (WORKBOOK.md)."""
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
 
+from apps.tax.choices import CHOICES
 from apps.tax.events import RULE_IN_FORCE_EVENTS
 
 
@@ -15,7 +16,7 @@ class TaxConfig(LiveAppConfig):
     icon = "ion:calculator-outline"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Tax categories and the VAT rate of each one, by country, region and date."
     )
@@ -26,10 +27,17 @@ class TaxConfig(LiveAppConfig):
         "ready, lets you schedule a rate change ahead, never lets two rates apply on the same day, "
         "and is what the till and the invoices use to charge and declare each line."
     )
-    # Every hair salon and every restaurant turns it on at sign-up: no sale is priced without it.
+    # Both sectors' templates carry it (base.catalog.template_apps); every business is born with it on anyway (below).
     verticals = ["hair_salon", "restaurant"]
+    # Mandatory wherever the business is: no sale is priced without it. The Home asks whoever runs a business to turn it
+    # on while it is off (base.home.mandatory_steps), and the platform turns it on by itself at sign-up
+    # (base.activation.born_on, base.services.hub_registry.turn_on_born_apps): it binds the business to no authority.
+    mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["tax.view", "tax.manage"]
+    # The countries a rule is set for, by their names: no field of the models labels them, so the
+    # assistant's card would say their ISO codes.
+    choices = CHOICES
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Viewing
     # includes calculating; the old cashier role is an employee.
     role_permissions = {
@@ -48,10 +56,9 @@ class TaxConfig(LiveAppConfig):
         # The business's tax region (TAX-F11).
         Nav("settings", _("Settings"), "ion:settings-outline", "/tax/settings"),
     ]
-    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your taxes» (module.json `setup`,
-    # taxes#19), order 20 and important, done once one active root rule of any country applies today (TAX-F17: the
-    # query and the words of the notice of the tax screens), for whoever manages taxes, leading to the rules.
-    # Refreshed on what changes the rules in force. The old module declared no panel and no bell row.
+    # The Home's step «Your taxes», order 20 and important, done once one active root rule of any country applies today
+    # (TAX-F17: the query and the words of the notice of the tax screens), for whoever manages taxes, leading to the
+    # rules. Refreshed on what changes the rules in force. The old module declared no panel and no bell row.
     setup = [
         SetupStep(
             key="rules",

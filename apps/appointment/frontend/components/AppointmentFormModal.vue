@@ -5,15 +5,19 @@
 // read through Services and Staff), the Day and the Time (with the «Free times»), the Min. (the services'
 // sum unless typed) and the notes. The Min. and the Total are the professional's own for each service
 // (Services · «Who does it»), the catalog's where she has none — what the server books; the Total is in the
-// business's money (BASE-F50: «65,00 zł» in Poland, the figure alone until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
+// business's money (BASE-F50: «65,00 zł» in Poland, a dash until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
 // only what changed (`appointment.appointment.update`) and shows the history below; a series occurrence
 // first asks «This appointment only» / «This and all following» (the latter edits the series from its
 // date). An overlap asks first (409 `appointment.overlap_needs_confirmation`: «Book anyway» sends it again
 // confirmed); any other refusal goes on top, a bad field under it, and what was typed stays.
-import { Combo, type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
+
+import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLocale, useT } from '../composables/useT';
@@ -25,6 +29,7 @@ import type { AppointmentOut, RecurringUpdateIn, UpdateIn } from '../operations'
 import AppointmentHistory from './AppointmentHistory.vue';
 import FreeSlots from './FreeSlots.vue';
 import ServicesField from './ServicesField.vue';
+import StaffField from './StaffField.vue';
 
 /** What a tapped slot of the grid brings. */
 export interface BookingPreset {
@@ -50,6 +55,8 @@ const props = withDefaults(
 const emit = defineEmits<{ saved: [appointment: AppointmentOut]; outcome: [text: string] }>();
 const open = defineModel<boolean>('open', { default: false });
 
+const canDismiss = useUnsavedFormOnOpen('appointment-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, day: day.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, notes: notes.value, internalNotes: internalNotes.value }), open);
+
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
@@ -61,12 +68,20 @@ const own = shallowRef(new Map<string, Terms>());
 const termsOf = (id: string): Terms | undefined => own.value.get(id) ?? facts.get(id);
 
 const customer = ref<CustomerSnapshot | null>(null);
+/** The customer is chosen in a window of her search, where no field of the form is typed in: choosing another one
+ *  takes the customer's refusal away. */
+const customerChanged = useGroupChange('customerGroup');
+function chooseCustomer(chosen: CustomerSnapshot | null): void {
+  customer.value = chosen;
+  customerChanged();
+}
 const services = ref<ComboOption[]>([]);
 const staff = ref<ComboOption | null>(null);
 const day = ref('');
 const time = ref('');
 const minutes = ref('');
 const minutesTouched = ref(false);
+const openedMinutes = ref('');
 const notes = ref('');
 const internalNotes = ref('');
 const staffWarning = ref(false);
@@ -89,7 +104,6 @@ const past = computed(() => !!day.value && !!time.value && wallInput(day.value, 
 const ready = computed(
   () => (editing.value || !!customer.value) && services.value.length > 0 && !!staff.value && !!day.value && !!time.value,
 );
-const searchStaff = (query: string) => eligibleStaff(client, serviceIds.value, query);
 
 function sumMinutes(): string {
   const sum = services.value.reduce((acc, option) => acc + (termsOf(option.id)?.minutes ?? 0), 0);
@@ -112,6 +126,7 @@ function reset(): void {
     day.value = dayOf(booked.start);
     time.value = timeOf(booked.start);
     minutes.value = String(booked.duration_minutes);
+    openedMinutes.value = minutes.value;
     notes.value = booked.notes;
     internalNotes.value = booked.internal_notes;
     return;
@@ -127,6 +142,7 @@ function reset(): void {
   day.value = preset?.day ?? props.businessNow.slice(0, 10);
   time.value = preset?.time ?? '';
   minutes.value = '';
+  openedMinutes.value = '';
   notes.value = '';
   internalNotes.value = '';
 }
@@ -308,6 +324,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="appointment-form"
     :title="title"
     :submit-label="editing ? $t('appointment.form.save') : $t('appointment.form.create')"
@@ -317,7 +334,9 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save()"
   >
     <template #default="{ fieldErrors }">
-      <div class="appointment-form">
+      <div
+        class="appointment-form"
+      >
         <p
           v-if="editing"
           class="appointment-form__hint"
@@ -332,23 +351,28 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           {{ $t('appointment.form.charged') }}
         </InlineFeedback>
-        <div
+        <FieldGroup
           v-if="!editing"
-          class="appointment-form__customer"
+          ref="customerGroup"
+          name="customer"
           data-testid="appointment-form-customer"
         >
           <span class="appointment-form__label">{{ $t('appointment.form.customer') }}</span>
-          <CustomerSearch v-model="customer" />
+          <CustomerSearch
+            :model-value="customer"
+            @update:model-value="chooseCustomer"
+          />
           <small
             v-if="fieldErrors.customer"
             class="appointment-form__error"
           >{{ fieldErrors.customer }}</small>
-        </div>
+        </FieldGroup>
         <div class="appointment-form__services">
           <ServicesField
             v-model="services"
             :facts="facts"
             testid="appointment-form"
+            name="services"
             :error-text="fieldErrors.services"
             :disabled="charged"
           />
@@ -358,16 +382,14 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             data-testid="appointment-form-total"
           >{{ $t('appointment.form.total') }}: {{ formatMoney(total, locale, money) }}</small>
         </div>
-        <Combo
-          testid="appointment-form-staff"
+        <StaffField
           :model-value="staff"
-          :search="searchStaff"
-          :label="t('appointment.form.staff')"
-          :placeholder="t('appointment.form.pickStaff')"
-          :empty-label="t('appointment.form.staffNone')"
+          :service-ids="serviceIds"
+          testid="appointment-form"
+          name="staff"
           :error-text="fieldErrors.staff"
-          :clearable="!ownStaff"
-          :disabled="!!ownStaff || charged"
+          :own="!!ownStaff"
+          :disabled="charged"
           @update:model-value="pickStaff"
         />
         <small
@@ -403,6 +425,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="charged"
+            name="start"
             :error-text="fieldErrors.start"
             :class="invalid(fieldErrors.start)"
             @ion-input="time = text($event.detail.value)"
@@ -418,6 +441,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="charged"
+            name="minutes"
             :error-text="fieldErrors.minutes"
             :class="invalid(fieldErrors.minutes)"
             @ion-input="typeMinutes(text($event.detail.value))"
@@ -449,6 +473,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :auto-grow="true"
           :maxlength="2000"
+          name="notes"
           :error-text="fieldErrors.notes"
           @ion-input="notes = text($event.detail.value)"
         />
@@ -461,6 +486,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :auto-grow="true"
           :maxlength="2000"
+          name="internal_notes"
           :error-text="fieldErrors.internal_notes"
           @ion-input="internalNotes = text($event.detail.value)"
         />

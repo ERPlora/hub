@@ -1,4 +1,4 @@
-// PoC §8.13, second pass: icons come from npm (`ionicons/icons` through `addIcons`, other sets baked
+// Icons come from npm (`ionicons/icons` through `addIcons`, other sets baked
 // by `unplugin-icons`), so every visible `ion-icon` of the shell and the demo pages — shadow roots
 // included (ion-select, the topbar buttons…) — paints an inner SVG of non-zero size, with no request to
 // any Iconify host, no icon fetched as a URL from our server and no failed request at all.

@@ -1,6 +1,6 @@
 """Input and output schemas of the schedule app: what the API, the live stream and the assistant accept.
 
-The rules of a set of intervals are the old handler's (schedules#8, #23, #28): one code, one meaning,
+The rules of a set of intervals are the old handler's: one code, one meaning,
 whichever form sends them. Each refusal lands under its field (the 422's ``fields``).
 """
 
@@ -334,7 +334,7 @@ def test_is_open_takes_the_moment_and_nothing_else():
     assert (
         IsOpenIn.model_validate({"when": "2026-08-18T10:00"}).when == "2026-08-18T10:00"
     )
-    # The rules are read from the server, never from the caller (schedules#1).
+    # The rules are read from the server, never from the caller.
     assert "business_hours" in errors(IsOpenIn, business_hours=[])
 
 
@@ -350,7 +350,7 @@ def test_the_hours_of_a_range_take_up_to_366_days_and_one_day_alone():
     }
 
 
-# ── The ends of the calendar: a 422 under the field, never a 500 (review of 2026-10-14) ────────
+# ── The ends of the calendar: a 422 under the field, never a 500 ─────────────────────────────────
 
 
 @pytest.mark.parametrize(

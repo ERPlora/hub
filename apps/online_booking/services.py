@@ -134,11 +134,22 @@ def _diary(ctx: OperationContext, name: str, appointment: Appointment, **extra):
 @operation(
     "online_booking.booking.confirm",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CONFIRM,
     input=BookingRefIn,
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "accept Nerea's self-booking for Wednesday",
+                "approve the booking that came in from my link",
+            ),
+            "es": (
+                "acepta la reserva de internet de Nerea del miércoles",
+                "da el visto bueno a la reserva de Nerea que tengo en la bandeja",
+            ),
+        },
         "description": "Confirm a booking a customer made online that is waiting (pending), named by its number or "
         "as a person says it: the customer and the day (e.g. confirm Ana's booking of tomorrow).",
         "risk": "normal",
@@ -153,11 +164,22 @@ def confirm_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.booking.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE,
     input=BookingRefIn,
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Nerea's self-booking from earlier today is done",
+                "close off the booking APT-20261120-0004 from my link as finished",
+            ),
+            "es": (
+                "lo que reservó Nerea por internet, dalo por hecho",
+                "da por acabada la reserva de la bandeja APT-20261120-0004",
+            ),
+        },
         "description": "Mark an online booking (confirmed or in progress) as completed, named by its number or by the "
         "customer and the day. It does not charge it: that is the till.",
         "risk": "normal",
@@ -172,13 +194,24 @@ def complete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.booking.no_show",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE,
     input=BookingRefIn,
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "Olga never turned up for her self-booking yesterday",
+                "Olga missed her booking made through my link",
+            ),
+            "es": (
+                "Olga no se ha presentado a lo que reservó por internet ayer",
+                "Olga faltó a su reserva de la web: déjalo anotado",
+            ),
+        },
         "description": "Record that the customer of an online booking did not show up (only once its time has "
-        "passed), named by its number or by the customer and the day. Ask the person before doing it.",
+        "passed), named by its number or by the customer and the day.",
         "risk": "high",
     },
 )
@@ -191,13 +224,24 @@ def no_show_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.booking.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=CHANGE,
     input=CancelIn,
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel Olga's self-booking on Saturday, something came up",
+                "decline the booking that came in through my link for Thursday",
+            ),
+            "es": (
+                "anula la reserva de internet de Olga del sábado, no puede venir",
+                "rechaza la reserva de la bandeja que tengo para el jueves",
+            ),
+        },
         "description": "Cancel (or decline) an online booking, named by its number or by the customer and the day, "
-        "with an optional reason; its time becomes free. Ask the person before doing it.",
+        "with an optional reason; its time becomes free.",
         "risk": "high",
     },
 )
@@ -210,14 +254,24 @@ def cancel_booking(ctx: OperationContext, data: CancelIn) -> dict:
 @operation(
     "online_booking.booking.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=DELETE,
     input=BookingRefIn,
     output=DeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "remove Olga's duplicate self-booking completely",
+                "get rid of the fake booking that came in through my link for good",
+            ),
+            "es": (
+                "borra la reserva de internet repetida de Olga",
+                "quita para siempre de la bandeja la reserva falsa",
+            ),
+        },
         "description": "Delete an online booking from the inbox and the diary (archived, not destroyed), named by "
-        "its number or by the customer and the day. Cancelling keeps its history and is usually what is wanted; "
-        "ask the person first.",
+        "its number or by the customer and the day. Cancelling keeps its history and is usually what is wanted.",
         "risk": "high",
     },
 )
@@ -233,11 +287,22 @@ def delete_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
 @operation(
     "online_booking.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE,
     input=SettingsIn,
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "ask for an email when customers book by themselves",
+                "change the welcome text customers see when they book",
+            ),
+            "es": (
+                "pide el email a quien reserve por internet",
+                "cambia el texto de bienvenida de la web de reservas",
+            ),
+        },
         "description": "Change the booking page's settings and the diary's booking rules it uses; only what is sent "
         "changes, all of it or nothing (e.g. switch the page on, ask for the email, or set the minimum notice).",
         "risk": "normal",
@@ -275,9 +340,9 @@ def _refuse_field(message, code: str, field: str) -> None:
     raise InvalidPayload(str(message), code=code, fields={field: str(message)})
 
 
-def _mobile(raw: str) -> str:
+def _mobile(ctx: OperationContext, raw: str) -> str:
     try:
-        return to_e164(raw, business_country())
+        return to_e164(raw, business_country(ctx))
     except InvalidPhone:
         _refuse_field(PHONE_INVALID, "online_booking.phone_invalid", "phone")
 
@@ -309,7 +374,7 @@ def _card_for(ctx: OperationContext, name: str, phone: str, email: str) -> Custo
         cards[0] if cards else None,
     )
     if card is not None:
-        return find_customer(card.id, None, lock=True)
+        return find_customer(ctx, card.id, None, lock=True)
     create = get("customer.customer.create")
     created = create(
         ctx, CustomerIn(name=name, phone=phone, email=email, source="website")
@@ -374,8 +439,19 @@ def _book(
     input=PublicBookIn,
     output=BookedOut,
     ai={
-        "description": "Book from the public booking page as the customer: services, a professional or anyone, a "
-        "free time, her name and mobile. Hands back the appointment number and her personal link token.",
+        "asks": {
+            "en": (
+                "book Maite in by herself for a cut on Thursday at 5 pm, mobile 622 000 111",
+                "make a self-booking as the customer would, anyone free is fine",
+            ),
+            "es": (
+                "resérvale a Maite por internet un tinte el jueves a las 17:00, móvil 622 000 111",
+                "reserva por internet como lo haría la clienta, con cualquiera que esté libre",
+            ),
+        },
+        "description": "Book from the public booking page as the customer: services (their ids, from "
+        "online_booking.public.services), a professional or anyone, a free time (one of online_booking.public.slots), "
+        "her name and mobile. Hands back the appointment number and her personal link token.",
         "risk": "normal",
     },
 )
@@ -386,7 +462,7 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
     services = services_to_book(data.service_ids)
     member = chosen_member(own, data.staff_id, services)
     _check_form(own, data)
-    phone = _mobile(data.phone)
+    phone = _mobile(ctx, data.phone)
     visitor = visitor_key(ctx)
     _check_limits(visitor)
     card = _card_for(acting, data.name, phone, data.email)
@@ -431,12 +507,23 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
 @operation(
     "online_booking.public.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=PUBLIC,
     input=PublicCancelIn,
     output=PublicBookingOut,
     ai={
+        "asks": {
+            "en": (
+                "cancel through Leire's own link on her behalf",
+                "with the customer's link, call off her booking for her",
+            ),
+            "es": (
+                "anula lo que Leire reservó en la web, con su enlace y por ella",
+                "con el enlace de Leire, anúlale lo del jueves por ella",
+            ),
+        },
         "description": "Cancel the booking behind a customer's personal link, as the customer: the business's "
-        "cancellation policy applies. Ask the person before doing it.",
+        "cancellation policy applies.",
         "risk": "high",
     },
 )

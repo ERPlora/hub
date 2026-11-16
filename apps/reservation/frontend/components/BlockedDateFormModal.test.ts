@@ -2,6 +2,7 @@
 // «Block date». A date already blocked at that time goes on top.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionChecked, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { blockedRow } from '../__tests__/rows';
 import BlockedDateFormModal from './BlockedDateFormModal.vue';
@@ -52,5 +53,29 @@ describe('BlockedDateFormModal', () => {
     s.answer(409, { error: { code: 'reservation.blocked_date_exists', message, fields: { date: message } } });
     await click(s.submit());
     expect(s.inDoc('reservation-blocked-form-error')?.textContent).toContain(message);
+  });
+});
+
+describe('BlockedDateFormModal: fields refused with the same words (hub#888)', () => {
+  // Some hours of a day: the date and both hours paint a refusal, each under its own key.
+  itTellsTheCorrectedFieldApart(['date', 'blocked_from', 'blocked_until'], async (locale, refusal) => {
+    const s = await setup(locale);
+    await ionChecked(s.field('is_full_day'), false);
+    await ionValue(s.field('blocked_from'), '20:00', 'ionInput');
+    await ionValue(s.field('blocked_until'), '22:00', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.submit()), settle };
+  }, 'blocked_until');
+});
+
+describe('BlockedDateFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('reservation-blocked-form'),
+      change: () => ionValue(s.field('reason'), 'Christmas', 'ionInput'),
+      restore: () => ionValue(s.field('reason'), '', 'ionInput'),
+    });
   });
 });

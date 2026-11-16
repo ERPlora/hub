@@ -5,8 +5,9 @@ comes with its own (``Template.header_sample``), which may be changed; one made 
 file is one of the business's kept files (``whatsapp_inbox.template_sample.upload``), of the header's kind; the message
 names it (``Message.header_sample``) and its hand-over to erplora.com (door 5, after the COMMIT, the file read from the
 store with no connection held) carries it in base64, so erplora.com uploads it to the number and sends the template
-with it. A retry carries the same file with the same key. An automation sends what it can fill alone: a template with
-its own file, never one that asks for it. Meta not answering is said as Meta's (gh:hub#2731).
+with it. A retry carries the same file with the same key. An automation (``message.notify``) sends the same templates
+the inbox fills: one with a file header goes with the file its step «Send a message» chose (FLOW-F32), else with its
+own, and with neither it does not leave. Meta not answering is said as Meta's.
 """
 
 import base64
@@ -16,16 +17,18 @@ import json
 import httpx
 import pytest
 import respx
+from live.context import Scope
 from live.errors import InvalidPayload
 
 from apps.whatsapp_inbox.models import Message, Template, TemplateSample
-from apps.whatsapp_inbox.tests.conftest import NOW, B, connect, ctx_for, receive, run, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, ctx_for, receive, run, system, template
 from apps.whatsapp_inbox.tests.test_services import SEND, conv, send, stored
 from apps.whatsapp_inbox.tests.test_services import delivered  # noqa: F401 - fixture
 from apps.whatsapp_inbox.tests.test_template_header_file import JPEG, MP4, OTHER_JPEG, approved_with_photo, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
+from base.tenancy.context import use_hub
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("hub_files")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_files")]
 
 MANAGER_PHOTO = "promo_foto"
 
@@ -51,10 +54,19 @@ def with_photo(delivered) -> Template:
     return row
 
 
-def from_manager():
+def from_manager(scope=None):
     """A photo template made in WhatsApp Manager (no file of its own here), and a conversation."""
-    connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
-    return a_conversation()
+    if scope is None:
+        connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
+        return a_conversation()
+    system(
+        "whatsapp_inbox.channel.sync",
+        {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150,
+         "templates": [template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)]},
+        scope,
+    )
+    receive("wamid.IN", sent_at=(NOW - dt.timedelta(days=3)).isoformat(), scope=scope)
+    return conv()
 
 
 def sending(row: Template, **fields) -> dict:
@@ -117,7 +129,7 @@ def test_a_photo_template_from_whatsapp_manager_is_offered_to_send_asking_for_it
 
     [row] = run("whatsapp_inbox.template.list", {"fillable": True}).rows
     assert (row.name, row.editable, row.header_format, row.header_sample) == (MANAGER_PHOTO, False, "IMAGE", None)
-    assert run("whatsapp_inbox.template.list", {"sendable": True}).rows == [], "an automation cannot choose its file"
+    assert run("whatsapp_inbox.template.list", {"sendable": True}).rows == [], "it asks for its file: never as it is"
 
 
 @respx.mock
@@ -146,16 +158,20 @@ def test_without_its_file_it_does_not_leave():
     assert not Message.objects.filter(direction=Message.Direction.OUTBOUND).exists()
 
 
+@HUB_DB
+@pytest.mark.usefixtures("no_test_fallback")
 @pytest.mark.parametrize("sample", ["another_kind", "another_business"])
-def test_the_file_is_of_its_kind_and_of_its_business(sample):
-    c = from_manager()
-    chosen = {
-        "another_kind": lambda: upload(MP4, "VIDEO", name="visita.mp4"),
-        "another_business": lambda: upload(ctx=ctx_for(scope=B)),
-    }[sample]()
+def test_the_file_is_of_its_kind_and_of_its_business(hub_a, hub_b, sample):
+    with use_hub(hub_a):
+        c = from_manager(Scope("host", hub_a.slug))
+        if sample == "another_kind":
+            chosen = upload(MP4, "VIDEO", name="visita.mp4", ctx=ctx_for(scope=Scope("host", hub_a.slug)))
+        else:
+            with use_hub(hub_b):
+                chosen = upload(ctx=ctx_for(scope=Scope("host", hub_b.slug)))
 
-    with pytest.raises(InvalidPayload) as refused:
-        send({"id": str(c.id), "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}})
+        with pytest.raises(InvalidPayload) as refused:
+            send({"id": str(c.id), "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}}, ctx_for(scope=Scope("host", hub_a.slug)))
 
     assert "file" in refused.value.fields["header_sample"]
 
@@ -216,24 +232,6 @@ def test_meta_not_taking_the_file_is_said_as_metas_never_erploras(delivered):
     assert "Meta" in listed.error_message and "erplora" not in listed.error_message.lower()
 
 
-@respx.mock
-def test_a_message_never_carries_another_business_file(delivered):
-    """Phase 1 shares the tables: a message of ``a`` naming ``b``'s file (never written by the operations) is not
-    handed over with it."""
-    row = with_photo(delivered)
-    route = respx.post(SEND).mock(side_effect=httpx.ConnectError("down"))
-    out = delivered(lambda: send({"id": str(conv().id), "template": sending(row)}))
-    foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
-    Message.objects.filter(pk=out.id).update(header_sample_id=foreign.id)
-    calls = route.call_count
-
-    route.mock(side_effect=None, return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
-    delivered(lambda: run("whatsapp_inbox.message.retry", {"id": str(out.id)}))
-
-    assert route.call_count == calls
-    assert stored(out).error_code == "whatsapp_inbox.header_sample_missing"
-
-
 # ── An automation (notify) ──────────────────────────────────────────────────────────────────────
 
 
@@ -249,7 +247,26 @@ def test_an_automation_sends_a_template_made_here_with_its_own_photo(delivered):
     assert base64.b64decode(door_5(route)["template"]["header_sample"]["content_base64"]) == JPEG
 
 
-def test_an_automation_cannot_send_one_that_asks_for_its_file():
+@respx.mock
+def test_an_automation_sends_one_from_whatsapp_manager_with_the_file_its_step_chose(delivered):
+    """FLOW-F32: the step «Send a message» offers the fillable templates and keeps the file chosen in the editor."""
+    c = from_manager()
+    chosen = upload(OTHER_JPEG, name="carta-otono.jpg")
+    route = answering()
+
+    out = delivered(
+        lambda: run(
+            "whatsapp_inbox.message.notify",
+            {"phone": c.phone, "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}},
+        )
+    )
+
+    sent = door_5(route)["template"]["header_sample"]
+    assert (sent["name"], base64.b64decode(sent["content_base64"])) == ("carta-otono.jpg", OTHER_JPEG)
+    assert stored(out).header_sample_id == chosen.id
+
+
+def test_an_automation_cannot_send_one_that_asks_for_its_file_when_its_step_chose_none():
     c = from_manager()
 
     with pytest.raises(InvalidPayload) as refused:

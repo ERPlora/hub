@@ -53,4 +53,10 @@ const label = computed(() =>
 .pos-table-trigger--assigned {
   --color: var(--ion-color-primary, #0091ce);
 }
+@media (pointer: coarse) {
+  .pos-table-trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
 </style>

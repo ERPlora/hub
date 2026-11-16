@@ -1,7 +1,7 @@
-"""HMAC-SHA256 + timestamp of the internal calls (PLAN-SAAS §2), ported from the SaaS's ``accounts/tests/test_signing.py``.
+"""HMAC-SHA256 + timestamp of the internal calls between the SaaS and the Hub.
 
-The Hub signs and verifies exactly as the SaaS does (docs/plans/2026-10-17-demo-hubs-fase-1.md, §1.4): the same
-functions, headers, window and secrets, so one side never refuses what the other signs.
+The Hub signs and verifies exactly as the SaaS does (its ``accounts/tests/test_signing.py``): the same functions,
+headers, window and secrets, so one side never refuses what the other signs.
 """
 
 import hashlib
@@ -73,7 +73,7 @@ def test_non_ascii_headers_are_refused_without_raising(timestamp, signature):
     assert verify(BODY, timestamp, signature, secret=SECRET, now=NOW) is False
 
 
-# --- Two live secrets and the signature that covers method and path (PLAN-SAAS §2.1; L1-A2) ------
+# --- Two live secrets and the signature that covers method and path ------------------------------
 
 from base.signing import (  # noqa: E402
     SIGNATURE_HEADER,
@@ -159,7 +159,7 @@ class TestTheSignatureV2:
 
 
 class TestTwoLiveSecrets:
-    """Rotation (PLAN-SAAS §2): both projects accept the current and the previous secret, and sign with the current."""
+    """Rotation: both projects accept the current and the previous secret, and sign with the current."""
 
     @pytest.mark.parametrize("version", ["v1", "v2"])
     def test_a_call_signed_with_the_previous_secret_verifies_during_the_rotation(self, version):
@@ -221,7 +221,7 @@ class TestVerifyRequest:
         assert verify_request(self._request(rf, headers), now=NOW) is False
 
 
-# --- A timestamp no clock writes, and the headers alone (T7b) ---------------------------------------
+# --- A timestamp no clock writes, and the headers alone ---------------------------------------------
 
 from base.signing import may_be_signed  # noqa: E402
 

@@ -1,7 +1,7 @@
-"""Services on the Home (PLAN-HUB round 2026-10-21; FIX-SERVICE-SETUP-HOOKS): base's own query brings the old module's
-item «Your service catalogue» (module.json `setup`, services#26), important, pending until one offered service can be
-charged (its tax category alive), to whoever adds services, leading to the list of services. Every change of it records
-an event it is refreshed on, and a change in hub B re-runs B's Home only; with Services off the Home does not ask.
+"""Services on the Home: base's own query brings «Your service catalogue», important, pending until one offered service
+can be charged (its tax category alive), to whoever adds services, leading to the list of services. Every change of it
+records an event it is refreshed on, and a change in hub B re-runs B's Home only; with Services off the Home does not
+ask.
 
 base and service run for real: the step comes from ServiceConfig through base's own query, as the person.
 """
@@ -18,8 +18,9 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.service.models import Service
-from apps.service.tests.conftest import A, B, make_service, make_tax
+from apps.service.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, make_service, make_tax
 from base.schemas import SetupStatusIn
+from base.tenancy.context import use_hub
 
 STEP = "service.catalog"
 TAX = "test.service"
@@ -54,7 +55,7 @@ def tax(db):
     return make_tax(TAX)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_without_services_has_your_service_catalogue_pending_and_it_leads_to_the_services():
     item = step()
     assert {name: item[name] for name in ("key", "state", "level", "required", "actionable", "route", "order", "icon")} == {
@@ -73,7 +74,7 @@ def test_a_hub_without_services_has_your_service_catalogue_pending_and_it_leads_
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_old_words():
     item = step(person(language="es"))
     assert (item["title"], item["description"]) == (
@@ -82,13 +83,13 @@ def test_in_spanish_it_says_the_old_words():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_service_that_can_be_charged_ticks_it(tax):
     make_service("Haircut", tax=tax)
     assert step()["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_archived_service_or_one_whose_tax_category_is_gone_cannot_be_charged(tax):
     # The old module's `sellable_services`: offered (not archived) and with a live tax category, or the till refuses it.
     gone = make_tax("test.gone", "Gone", is_active=False)
@@ -97,7 +98,7 @@ def test_an_archived_service_or_one_whose_tax_category_is_gone_cannot_be_charged
     assert step()["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_every_service_archived_puts_it_back_to_pending(tax):
     haircut = make_service("Haircut", tax=tax)
     assert step()["state"] == "done"
@@ -105,7 +106,7 @@ def test_every_service_archived_puts_it_back_to_pending(tax):
     assert step()["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_adds_services_is_told_and_who_only_reads_them_is_not():
     # Important, never ⛔: who cannot add a service is not told (base's rule). The employee adds services (the old
     # module gave it to the cashier too), so the employee is told.
@@ -115,14 +116,15 @@ def test_whoever_adds_services_is_told_and_who_only_reads_them_is_not():
     assert step(person(permissions=reader)) is None
 
 
-@pytest.mark.django_db
-def test_with_services_off_the_home_does_not_ask_for_its_catalogue():
+@HUB_DB
+def test_with_services_off_the_home_does_not_ask_for_its_catalogue(hub_b):
     # base brings only the steps of the modules on in the scope: Services off (after the apps that need it), no step.
     administrator = OperationContext(scope=A, actor="ana", permissions=frozenset({"*"}))
     for app in ("online_booking", "appointment", "service"):
         run("base.app.disable", {"app": app}, administrator)
     assert step() is None
-    assert step(person(scope=B))["state"] == "pending"
+    with use_hub(hub_b):
+        assert step(person(scope=B))["state"] == "pending"
 
 
 def add_one(tax, service):
@@ -167,7 +169,7 @@ def start_from(change, tax):
     return make_service("Haircut", tax=make_tax("test.gone", "Gone", is_active=False))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "event,change,state",
     [(event, change, state) for event, cases in CHANGES.items() for change, state in cases],
@@ -220,11 +222,13 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_service_added_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen):
-    make_tax(TAX)
+@HUB_DB_COMMITTED
+def test_a_service_added_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, hub_b):
+    with use_hub(hub_b):
+        make_tax(TAX)
     on_a, on_b = listen(A), listen(B)
-    run("service.service.create", {"name": "Haircut", "tax_category_key": TAX, "price": 1500}, person("hub_admin", B))
+    with use_hub(hub_b):
+        run("service.service.create", {"name": "Haircut", "tax_category_key": TAX, "price": 1500}, person("hub_admin", B))
 
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}

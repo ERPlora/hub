@@ -1,11 +1,10 @@
-// The manual invoice of a business with a tax territory (INVOICE-F03 with TAX-F11;
-// FIX-INVOICE-MANUAL-TAX-LABEL-REGION): the rate of a typed line is named by the tax of the business's
-// territory and starts at its general rate. In the Canary Islands, with an IGIC 7 % rule on the generic
-// goods, «New manual invoice» says «IGIC %» and proposes 7; the invoice is declared IGIC 7 % and its card
-// names the column «IGIC %». On the peninsula it still says «VAT %» and proposes 21. The dialog is seen at
-// 390×844, 834×1112 and 1440×900 (`FIX-INVOICE-MANUAL-TAX-LABEL-REGION-<width>.png`). What the run makes is
-// deleted after it, and the business goes back to the whole country.
-// flow: ninguno — FIX de INVOICE-F03 (factura manual): en Canarias, Ceuta o Melilla la columna del tipo dice «IVA %» y propone 21
+// The manual invoice of a business with a tax territory (INVOICE-F03 with TAX-F11): the rate of a typed line is named
+// by the tax of the business's territory and starts at its general rate. In the Canary Islands, with an IGIC 7 % rule
+// on the generic goods, «New manual invoice» says «IGIC %» and proposes 7; the invoice is declared IGIC 7 % and its
+// card names the column «IGIC %». On the peninsula it still says «VAT %» and proposes 21. The dialog is seen at
+// 390×844, 834×1112 and 1440×900. What the run makes is deleted after it, and the business goes back to the whole
+// country.
+// flow: INVOICE-F03 — the manual invoice in the Canary Islands, Ceuta or Melilla
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';

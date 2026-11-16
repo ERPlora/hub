@@ -1,4 +1,4 @@
-"""Where the meter hears a business during the day (BASE-F40; PLAN-HUB §66): every request that reaches a hub counts, and
+"""Where the meter hears a business during the day (BASE-F40): every request that reaches a hub counts, and
 every person with a session there has activity. Static files, health probes, ``/internal``, the platform's host and the
 demos are not measured; a visitor of the public web and an API key are no people; and nothing of it adds a statement to
 the request, sync or async.

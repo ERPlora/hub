@@ -1,16 +1,16 @@
 """The printing app's routes: each bound to its operation, named in the SPA's route map, and the main
-flows over HTTP. Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees
-the test's transaction."""
+flows over HTTP. Requests go to business A's host (``HOST``, its own database) with Django's sync test client,
+which sees the test's transaction."""
 
 import json
 
 import pytest
-from django.conf import settings
 from django.test import Client
 from live.ninja import ensure_api_parity
 
 from apps.printing.api import router
-from apps.printing.tests.conftest import RECEIPT
+from apps.printing.tests.conftest import HOST, HUB_DB, RECEIPT, A
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -42,25 +42,25 @@ ROUTES = {
 DEVICE = "3f1c9a52-6b0e-4c1d-9a77-0d2b5f8e4c11"
 
 
-def get(client, path, host="a.localhost", device=None, **params):
+def get(client, path, host=HOST, device=None, **params):
     headers = {"HTTP_X_DEVICE_ID": device} if device else {}
     return client.get(f"/api{path}", params, HTTP_HOST=host, **headers)
 
 
-def post(client, path, data, host="a.localhost", device=None):
+def post(client, path, data, host=HOST, device=None):
     headers = {"HTTP_X_DEVICE_ID": device} if device else {}
     return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host, **headers)
 
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -95,13 +95,10 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
 
 
 def test_the_spas_route_map_names_every_printing_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op.startswith("printing.")}
-    assert mine == ROUTES
+    assert spa_routes("printing.") == ROUTES
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_owner_adds_a_printer_tests_it_and_a_device_prints_it(admin_client):
     created = post(admin_client, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"})
     assert created.status_code == 201
@@ -118,7 +115,7 @@ def test_the_owner_adds_a_printer_tests_it_and_a_device_prints_it(admin_client):
     assert get(admin_client, "/printing/jobs", status="done").json()["total"] == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_employee_prints_and_reads_but_does_not_set_up_or_cancel(employee_client):
     queued = post(employee_client, "/printing/jobs", {"document_type": "receipt", "document": RECEIPT, "job_key": "sale-1"})
     assert queued.status_code == 201
@@ -133,7 +130,7 @@ def test_the_employee_prints_and_reads_but_does_not_set_up_or_cancel(employee_cl
     assert refused.status_code == 403
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_employee_reads_one_job_and_one_device_by_their_id(employee_client):
     """The two reads the assistant's card names a job and a device by, over HTTP (an id in the query, never the device's
     own one)."""
@@ -148,14 +145,14 @@ def test_the_employee_reads_one_job_and_one_device_by_their_id(employee_client):
     assert get(employee_client, "/printing/devices/detail", device_id=job["id"]).status_code == 404
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_wrong_address_is_a_422_at_its_field(admin_client):
     response = post(admin_client, "/printing/printers", {"name": "Till", "kind": "bluetooth", "address": "nope", "usage": "receipt"})
     assert response.status_code == 422
     assert response.json()["error"]["fields"] == {"address": "Type the MAC as AA:BB:CC:DD:EE:FF."}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_job_that_cannot_be_cancelled_is_a_409(admin_client):
     post(admin_client, "/printing/jobs", {"document_type": "receipt", "document": RECEIPT})
     job = get(admin_client, "/printing/jobs").json()["rows"][0]
@@ -165,7 +162,7 @@ def test_a_job_that_cannot_be_cancelled_is_a_409(admin_client):
     assert response.json()["error"]["code"] == "printing.job_not_cancellable"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_document_type_is_a_422(admin_client):
     response = post(admin_client, "/printing/jobs", {"document_type": "kitchn", "document": {}})
     assert response.status_code == 422
@@ -174,14 +171,13 @@ def test_an_unknown_document_type_is_a_422(admin_client):
 
 def session_of(make_user, username, role):
     client = Client()
-    client.force_login(make_user(username, host="a", role=role))
+    client.force_login(make_user(username, host=A.key, role=role))
     return client
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_takes_no_job_until_a_manager_sets_up_the_device(make_user):
-    # FIX-PRINTING-JOBS-CLAIMED-BY-ANY-DEVICE: POST /api/printing/jobs/claim with an employee's session handed
-    # the job of any printer it named.
+    # POST /api/printing/jobs/claim with an employee's session never hands over the job of whatever printer it names.
     manager = session_of(make_user, "mar", "hub_manager")
     employee = session_of(make_user, "ana", "hub_employee")
     till = post(manager, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}).json()
@@ -209,7 +205,7 @@ def test_an_employee_takes_no_job_until_a_manager_sets_up_the_device(make_user):
     assert DEVICE not in json.dumps(mine)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_setting_up_a_device_needs_its_own_id(admin_client):
     till = post(admin_client, "/printing/printers", {"name": "Till", "kind": "system", "usage": "receipt"}).json()
     response = post(admin_client, "/printing/devices", {"name": "Till", "printers": [till["id"]]})
@@ -217,7 +213,7 @@ def test_setting_up_a_device_needs_its_own_id(admin_client):
     assert response.json()["error"]["code"] == "printing.device_required"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_manager_retires_a_device_and_it_takes_nothing_more(make_user):
     manager = session_of(make_user, "mar", "hub_manager")
     till = post(manager, "/printing/printers", {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"}).json()

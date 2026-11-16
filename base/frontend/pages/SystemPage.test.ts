@@ -1,5 +1,4 @@
-// System's page (BASE-F39, BASE-G87): its four tabs, each in the address, what each opens for who runs the business and
-// what anyone else is told, with no useless «Retry». What «Usage and plan» says is SystemUsage.test.ts's.
+// What «Usage and plan» says is tested in SystemUsage.test.ts.
 import { AppPage, type ShellTab } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
@@ -7,15 +6,17 @@ import { EMPLOYEE, flush, mountBase } from '../__tests__/mount-base';
 import FailedEvents from '../components/FailedEvents.vue';
 import SystemLog from '../components/SystemLog.vue';
 import SystemRelease from '../components/SystemRelease.vue';
+import SystemAppCards from '../components/SystemAppCards.vue';
 import SystemUsage from '../components/SystemUsage.vue';
 import SystemPage from './SystemPage.vue';
 
-// ── The tabs (APP-BASE-7) ───────────────────────────────────────────────────────────────────────────────────
+// ── The tabs ────────────────────────────────────────────────────────────────────────────────────────────────
 
 async function at(path: string, options: Parameters<typeof mountBase>[1] = {}) {
   const m = await mountBase(SystemPage, { path, routes: ['/system', '/settings'], ...options });
-  // Anyone else asks nothing live here: no stream opens for them.
-  if (options.session !== EMPLOYEE) await m.live();
+  // «Usage and plan» follows the cards of the apps on for anyone (hub#683); anyone else asks nothing else live here.
+  const isUsage = !/#(updates|events)$/.test(path);
+  if (options.session !== EMPLOYEE || isUsage) await m.live();
   await flush();
   return m;
 }
@@ -23,7 +24,7 @@ async function at(path: string, options: Parameters<typeof mountBase>[1] = {}) {
 const tabIds = (m: Awaited<ReturnType<typeof at>>) =>
   (m.wrapper.getComponent(AppPage).props('tabs') as ShellTab[]).map((tab) => [`tab-${tab.id}`, tab.label]);
 
-describe('SystemPage › its tabs (BASE-G87)', () => {
+describe('SystemPage › its tabs', () => {
   it('who runs the business has four tabs, in their order', async () => {
     const m = await at('/system');
     expect(tabIds(m)).toEqual([
@@ -45,6 +46,17 @@ describe('SystemPage › its tabs (BASE-G87)', () => {
     expect(m.wrapper.findComponent(SystemUsage).exists()).toBe(true);
     expect(m.wrapper.findComponent(FailedEvents).exists()).toBe(false);
     expect(m.wrapper.findComponent(SystemLog).exists()).toBe(false);
+  });
+
+  it('«Usage and plan» has, below, the cards of the apps on, for anyone (hub#683)', async () => {
+    const owner = await at('/system');
+    expect(owner.wrapper.findComponent(SystemAppCards).exists()).toBe(true);
+    expect(owner.client.stream.subscriptions('base.system.cards')).toHaveLength(1);
+    const employee = await at('/system', { session: EMPLOYEE });
+    expect(employee.wrapper.find('[data-testid="system-usage-denied"]').exists()).toBe(true);
+    expect(employee.wrapper.findComponent(SystemAppCards).exists()).toBe(true);
+    expect(employee.client.stream.subscriptions('base.system.cards')).toHaveLength(1);
+    expect((await at('/system#events')).wrapper.findComponent(SystemAppCards).exists()).toBe(false);
   });
 
   it.each(['#resources', '#plan'])('the old address %s opens «Usage and plan»', async (hash) => {

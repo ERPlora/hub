@@ -9,6 +9,7 @@
 import { Combo, ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { AppointmentOut } from '../operations';
 import { business, click, ionValue, mountAppointment, page, POLISH, settle } from '../__tests__/mount-appointment';
@@ -210,11 +211,11 @@ describe('AppointmentFormModal: New appointment', () => {
     }
   });
 
-  it('the total is in the business’s currency: złoty in a business in Poland, a figure alone until it answers (hub#577)', async () => {
+  it('the total is in the business’s currency: złoty in a business in Poland, a dash until it answers (hub#577, hub#947)', async () => {
     const s = await setup({}, 'es');
     await s.addService('cut', 'Haircut');
     await s.addService('colour', 'Colour');
-    expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: 65,00$/);
+    expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: —$/);
     await s.businessIn(POLISH);
     expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: 65,00\u00a0zł$/);
     expect(s.inDoc('appointment-form-total')?.textContent).not.toContain('€');
@@ -261,7 +262,31 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.field('time').value).toBe('10:00');
   });
 
-  // appointments#204, #239, #240, #241: the day and the time are the device's own date and time pickers (never a
+  // The customer is chosen in Customers' own search, in a window of its own: no field of the form is typed in, and its
+  // refusal is a line under the chooser. Choosing another customer takes that line away at once, and only it (hub#1448).
+  it('a refused customer’s line goes when another customer is chosen, before booking again; another field’s stays', async () => {
+    const s = await setup();
+    await fillNew(s);
+    const gone = 'That customer is no longer in the business.';
+    const time = 'That time does not exist.';
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { customer_id: gone, start: time } } });
+    await click(s.submit());
+    const said = () => s.field('customer').textContent ?? '';
+    expect(said()).toContain(gone);
+    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', {
+      customer_id: 'c2',
+      customer_name: 'Marta Gil',
+      customer_tax_id: '',
+      customer_address: '',
+      customer_country: '',
+    });
+    await settle();
+    expect(said()).not.toContain(gone);
+    expect(s.field('time').errorText).toBe(time);
+    expect(s.sent().filter((call) => call.path === '/api/appointment/appointments')).toHaveLength(1);
+  });
+
+  // The day and the time are the device's own date and time pickers (never a
   // numeric keypad without «:» or «/»), and a time typed with the keyboard counts at once.
   it('the day and the time are the device’s pickers, and a typed time counts at once', async () => {
     const s = await setup();
@@ -277,7 +302,7 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.submit().disabled).toBe(false);
   });
 
-  // appointments#319, #333: services or professionals that cannot load are never an empty list nor only the
+  // Services or professionals that cannot load are never an empty list nor only the
   // appointment's own: their search fails, and the picker says so with «Retry» (Combo's error state).
   it('services and professionals that cannot load fail their search, new and edited alike', async () => {
     const broken: Record<string, [number, unknown]> = {
@@ -358,6 +383,13 @@ describe('AppointmentFormModal: Edit appointment', () => {
     ]);
   });
 
+  it('a charged appointment keeps its services and professional: both pickers are locked', async () => {
+    const s = await setup({ appointment: { ...BOOKED, sale_id: 'sale1' } });
+    expect([s.servicePicker().props('disabled'), s.staffPicker().props('disabled')]).toEqual([true, true]);
+    const open = await setup({ appointment: BOOKED });
+    expect([open.servicePicker().props('disabled'), open.staffPicker().props('disabled')]).toEqual([false, false]);
+  });
+
   it('a series occurrence asks the scope; «This and all following» edits the series from its date', async () => {
     const s = await setup({ appointment: { ...BOOKED, recurring_id: 'r1', occurrence_date: '2026-10-19' } });
     await ionValue(s.field('time'), '12:00', 'ionInput');
@@ -374,7 +406,7 @@ describe('AppointmentFormModal: Edit appointment', () => {
         body: { id: 'r1', from_date: '2026-10-19', time: '12:00' },
       },
     ]);
-    // appointments#293: only what happened, never «0 cancelled».
+    // Only what happened, never «0 cancelled».
     expect(s.wrapper.emitted('outcome')?.[0]).toEqual(['3 appointments moved · 1 left alone because they are already charged']);
   });
 });
@@ -474,5 +506,29 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
     expect(s.inDoc('customer-search-trigger')?.textContent?.trim()).toBe('Marta Ruiz');
     expectChoicesKept(s);
     expect(s.submit().disabled).toBe(false);
+  });
+});
+
+describe('AppointmentFormModal: fields refused with the same words (hub#888)', () => {
+  // A new appointment's fields, each refused under its own key; the time says the refusal of `start`, and the search
+  // that adds a service (ServicesField's Combo) the refusal of `services`.
+  const FIELD_OF: Record<string, string> = { start: 'time', services: 'service-add' };
+  itTellsTheCorrectedFieldApart(['services', 'staff', 'start', 'minutes', 'notes', 'internal_notes'], async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await fillNew(s);
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
+  }, 'minutes');
+});
+
+describe('AppointmentFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('appointment-form'),
+      change: () => ionValue(s.field('time'), '10:00', 'ionInput'),
+      restore: () => ionValue(s.field('time'), '', 'ionInput'),
+    });
   });
 });

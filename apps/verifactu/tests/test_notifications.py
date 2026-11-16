@@ -1,6 +1,7 @@
 """What a write of the verifactu app tells the live streams, after the COMMIT and only on its own hub's channel
-(the guardrail «writing in hub B does not notify A», CLAUDE.md): sealing and sending in B notify B's channel
-with VeriFactu's events, never A's; a refused write notifies nobody. Pattern of ``apps/table``."""
+(the guardrail «writing in hub B does not notify A»): sealing and sending in B, inside B's own database, notify B's
+channel with VeriFactu's events, never A's; a refused write notifies nobody. The notices are heard as a live stream
+hears them: ``LISTEN`` on the scope's channel, in control."""
 
 import json
 
@@ -10,9 +11,9 @@ from live.errors import Conflict
 from live.outbox import channel_for
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import A, B, answering, ctx_for, run
+from apps.verifactu.tests.conftest import HUB_DB_COMMITTED, A, B, answering, ctx_for, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+pytestmark = HUB_DB_COMMITTED
 
 WAIT = 1.0
 QUIET = 0.3
@@ -20,8 +21,8 @@ CUT = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "
 
 
 @pytest.fixture(autouse=True)
-def _committed(committed_factory_data):
-    """Committed factory data and the issuer (``conftest``)."""
+def _committed(committed_factory_data, committed_factory_data_b):
+    """Committed factory data and the issuer of both businesses (``conftest``)."""
 
 
 @pytest.fixture
@@ -63,9 +64,10 @@ def received_until(session, expected: set[str], timeout=WAIT):
     return notes
 
 
-def test_sealing_in_hub_b_notifies_the_channel_of_b_only(listen):
+def test_sealing_in_hub_b_notifies_the_channel_of_b_only(listen, in_business_b):
     on_a, on_b = listen(A), listen(B)
-    invoice = run("invoice.invoice.create", {"series_code": "TICKET", "lines": CUT}, ctx_for(scope=B))
+    with in_business_b():
+        invoice = run("invoice.invoice.create", {"series_code": "TICKET", "lines": CUT}, ctx_for(scope=B))
     assert invoice.verifactu_status == "sealed"
     notes = received_until(on_b, {"invoice.invoice.issued", "verifactu.record.created"})
     assert {channel for channel, _ in notes} == {channel_for(B)}
@@ -73,11 +75,13 @@ def test_sealing_in_hub_b_notifies_the_channel_of_b_only(listen):
     assert received(on_a, timeout=QUIET) == []
 
 
-def test_sending_in_hub_b_notifies_the_channel_of_b_only(listen, gateway_answers):
-    run("invoice.invoice.create", {"series_code": "TICKET", "lines": CUT}, ctx_for(scope=B))
+def test_sending_in_hub_b_notifies_the_channel_of_b_only(listen, gateway_answers, in_business_b):
+    with in_business_b():
+        run("invoice.invoice.create", {"series_code": "TICKET", "lines": CUT}, ctx_for(scope=B))
     gateway_answers.set(answering())
     on_a, on_b = listen(A), listen(B)
-    result = run("verifactu.contingency.process", {}, ctx_for(scope=B))
+    with in_business_b():
+        result = run("verifactu.contingency.process", {}, ctx_for(scope=B))
     assert (result.sent, result.accepted) == (1, 1)
     notes = received_until(on_b, {"verifactu.record.transmitted", "verifactu.contingency.processed"})
     assert {channel for channel, _ in notes} == {channel_for(B)}

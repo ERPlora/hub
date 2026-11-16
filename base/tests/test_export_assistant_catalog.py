@@ -1,6 +1,5 @@
-"""``manage.py export_assistant_catalog``: the catalogue layer 2 of the assistant's QA reads (docs plan 2026-10-31, the
-assistant's knowledge and QA, §1.5) — a role's real tools, in a language, as ``live.assistant_qa.export_catalog``
-gives them, as JSON on the standard output.
+"""``manage.py export_assistant_catalog``: the catalogue layer 2 of the assistant's QA reads — a role's real tools, in
+a language, as ``live.assistant_qa.export_catalog`` gives them, as JSON on the standard output.
 
 The export names no business: it is the catalogue of a business with every app on (``--apps`` narrows it), which is
 what the e2e business ``a`` has, so it needs no database.
@@ -12,15 +11,16 @@ from io import StringIO
 import pytest
 from django.core.management import CommandError, call_command
 from live.assistant import asks_of
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.meta import all_live_app_configs
 from live.operations import registry
 
 from base import assistant
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
 ROLES = {
     "owner": Membership.Role.OWNER,
     "admin": Membership.Role.ADMIN,
@@ -41,7 +41,7 @@ def names(exported: list[dict]) -> list[str]:
 
 def test_the_owner_s_export_is_every_tool_of_every_app_by_name_with_its_asks_in_the_language():
     exported = export("--role", "owner", "--language", "es")
-    assert names(exported) == sorted(name for name, op in registry.items() if assistant.is_tool(op))
+    assert names(exported) == sorted(name for name, op in registry.items() if assistant.tools.is_tool(op))
     assert {tool["app_label"] for tool in exported} >= {"base", "sale", "staff"}  # every app, not only the platform
     enable = next(tool for tool in exported if tool["name"] == "base.app.enable")
     assert enable["tool_name"] == "base__app__enable"
@@ -55,12 +55,12 @@ def test_the_asks_come_in_the_language_asked():
     assert english["asks"] == list(asks_of(registry["base.app.enable"])["en"]) != []
 
 
-@pytest.mark.django_db  # the catalogue of a member of business a, which has every app on
+@HUB_DB  # the catalogue of a member of business A, which has every app on
 @pytest.mark.parametrize("role", sorted(ROLES))
 def test_each_role_exports_exactly_the_catalogue_a_member_with_it_has_in_a_turn(make_user, role):
     user = make_user(f"qa-{role}", host=A.key, role=ROLES[role])
     ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="en")
-    assert names(export("--role", role, "--language", "en")) == list(assistant.catalog(ctx))
+    assert names(export("--role", role, "--language", "en")) == list(assistant.tools.catalog(ctx))
 
 
 def test_a_role_without_the_permission_does_not_get_the_tool():

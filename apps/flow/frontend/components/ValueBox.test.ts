@@ -3,15 +3,11 @@
 // the editor's one picker and adds what it answers.
 import { describe, expect, it } from 'vitest';
 
-import type { CatalogOut, Step } from '../operations';
-import { click, mountFlow, settle } from '../__tests__/mount-flow';
+import { click, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
 import ValueBox from './ValueBox.vue';
 
-const CATALOG = { events: [], actions: [{ name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: ['number'] }] } as unknown as CatalogOut;
-const STEPS: Step[] = [{ id: 's1', kind: 'command', operation: 'task.task.create', params: {} }];
-
 async function setup(modelValue: unknown, pick: () => Promise<string | null> = async () => 'input.customer_name') {
-  const m = await mountFlow(ValueBox, { props: { modelValue, label: 'Title', testid: 'vb', steps: STEPS, catalog: CATALOG, pick } });
+  const m = await mountFlow(ValueBox, { props: { modelValue, label: 'Title', testid: 'vb', steps: TASK_STEPS, catalog: TASK_CATALOG, pick } });
   const emitted = () => (m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value);
   const texts = () => m.wrapper.findAll('[data-testid^="vb-text-"]').map((input) => (input.element as HTMLInputElement).value);
   const pills = () => m.wrapper.findAll('[data-testid^="vb-pill-"]').map((pill) => pill.text());

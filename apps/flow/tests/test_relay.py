@@ -1,10 +1,12 @@
 """«When something happens in the business, the automation starts» (WORKBOOK FLOW-F21), end to end through the
-worker's real outbox relay (``base.relay``, PLAN-HUB round 2026-10-20; ``base/tests/test_relay.py`` is the
-pattern): the real Customers operation writes its event, one tick of the worker's real loop hands it to flow,
-the automation runs and its task is in Tasks — once, a second tick changing nothing. An event of hub B starts
-its run in B, and its notices are heard in B only (phase 1 shares the tables; the frontier is the scope). A call to
-another system that answers late (FLOW-F27) holds neither the relay's other deliveries nor the scheduled tasks: the
-worker makes it in a thread of its own (``base.outbound``), and it is still made once.
+worker's real outbox relay (``base.relay``; ``base/tests/test_relay.py`` is the pattern): the real Customers
+operation writes its event, one tick of the worker's real loop hands it to flow, the automation runs and its task
+is in Tasks — once, a second tick changing nothing. An event of hub B starts its run in B, and its notices are
+heard in B only. A call to another system that answers late (FLOW-F27) holds neither the relay's other deliveries
+nor the scheduled tasks: the worker makes it in a thread of its own (``base.outbound``), and it is still made once.
+
+The worker's real loop serves each business in its own database and releases its connections once it has served it:
+what these tests write is committed.
 """
 
 import datetime as dt
@@ -15,8 +17,7 @@ from types import SimpleNamespace
 
 import psycopg
 import pytest
-from django.db import connection
-from django.db.backends.base.base import BaseDatabaseWrapper
+from django.db import connections
 from django.utils import timezone
 from live.context import system_context
 from live.models import OutboxEvent
@@ -29,9 +30,10 @@ from apps.task.models import Task
 from base import catalog, relay, scheduler, worker
 from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import A, B, make_flow, run
+from .conftest import A, B, HUB_DB_COMMITTED, ctx_for, make_flow, run
 from .local_https import Handler
 
 REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
@@ -44,31 +46,33 @@ WELCOME = {
 }
 
 
-def automation(document: dict = WELCOME) -> str:
+def automation(document: dict = WELCOME, ctx=None) -> str:
     """An automation as the owner makes it: created, granted and turned on through its operations."""
-    created = run("flow.flow.create", document)
-    run("flow.flow.grant", {"id": str(created.id), "operations": ["task.task.create"]})
-    run("flow.flow.set_enabled", {"id": str(created.id), "enabled": True})
+    created = run("flow.flow.create", document, ctx)
+    run("flow.flow.grant", {"id": str(created.id), "operations": ["task.task.create"]}, ctx)
+    run("flow.flow.set_enabled", {"id": str(created.id), "enabled": True}, ctx)
     return str(created.id)
 
 
-def tick() -> None:
-    """One tick of the worker's real loop (relay included)."""
+def tick(now: dt.datetime | None = None) -> None:
+    """One tick of the worker's real loop at ``now`` (relay included), over every business in its own database."""
     stop = threading.Event()
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
+    at = now or timezone.now()
+    assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: at) == 0
 
 
 @pytest.fixture
 def worker_loop(monkeypatch):
-    """The worker without the SaaS (``register_apps``) and, inside a test's transaction, without releasing the
-    connections (that would close the test's own)."""
+    """The worker without the SaaS (``register_apps``), as a fresh process (no business served yet, A first), in a pass
+    that serves every business however slow the machine."""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
+    monkeypatch.setattr(worker, "_synced", set())
+    monkeypatch.setattr(worker, "_next_hub", None)
+    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
     return tick
 
 
-@pytest.mark.django_db
+@HUB_DB_COMMITTED
 def test_a_new_customer_starts_the_automation_through_the_workers_relay_once(worker_loop):
     flow_id = automation()
     ana = run("customer.customer.create", {"name": "Ana López"}, system_context(A))
@@ -90,7 +94,7 @@ def test_a_new_customer_starts_the_automation_through_the_workers_relay_once(wor
     assert (FlowRun.objects.count(), Task.objects.count()) == (1, 1)
 
 
-@pytest.mark.django_db
+@HUB_DB_COMMITTED
 def test_a_paused_automation_or_another_event_starts_nothing(worker_loop):
     flow_id = automation()
     run("flow.flow.set_enabled", {"id": flow_id, "enabled": False})
@@ -122,32 +126,35 @@ def heard(session, timeout: float = 0.5) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-@pytest.mark.django_db(transaction=True)
-def test_an_event_of_hub_b_starts_its_run_in_b_and_is_heard_in_b_only(listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+@HUB_DB_COMMITTED
+def test_an_event_of_hub_b_starts_its_run_in_b_and_is_heard_in_b_only(listen, worker_loop, hub_b):
     automation()
     on_a, on_b = listen(A), listen(B)
-    run("customer.customer.create", {"name": "Bea Ruiz"}, system_context(B))
-    heard(on_b)  # the card's own notice
+    with use_hub(hub_b):
+        automation(ctx=ctx_for(scope=B))
+        run("customer.customer.create", {"name": "Bea Ruiz"}, system_context(B))
+    heard(on_b)  # the automation's and the card's own notices
 
-    tick()
+    worker_loop()
 
     assert {"flow.run.started", "flow.run.finished", "task.task.created"} <= heard(on_b)
     assert heard(on_a, timeout=0.3) == set()
-    started = OutboxEvent.objects.get(name="flow.run.started")
+    with use_hub(hub_b):
+        started = OutboxEvent.objects.get(name="flow.run.started")
     assert (started.scope_kind, started.scope_key) == (B.kind, B.key)
+    assert not FlowRun.objects.exists()
     # The positive control: a card of A is heard in A.
     run("customer.customer.create", {"name": "Ana López"}, system_context(A))
     heard(on_a)
-    tick()
+    worker_loop()
     assert "flow.run.started" in heard(on_a)
 
 
-# ── A late answer of another system holds nothing else (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS) ──────────
-# One relay serves every hub of phase 1, and Django runs what a reaction leaves for after its COMMIT right there, in
-# the relay's loop: a «Call another system» step of hub A that took its 30 s held every delivery of every hub, and a
-# call the tick sent again held the scheduled tasks. The other system here answers only once the test lets it (5 s at
-# most: a worker that waits for it fails the test instead of hanging), so the order says who waited for whom.
+# ── A late answer of another system holds nothing else ────────────────────────────────────────────────────────────
+# One relay serves many hubs, and Django runs what a reaction leaves for after its COMMIT right there, in the relay's
+# loop: a «Call another system» step of hub A that took its 30 s held every delivery of every hub, and a call the tick
+# sent again held the scheduled tasks. The other system here answers only once the test lets it (5 s at most: a worker
+# that waits for it fails the test instead of hanging), so the order says who waited for whom.
 
 #: The most a test waits for the call made in the worker's thread.
 CALL_WAIT_SECONDS = 10
@@ -163,7 +170,7 @@ def answering_late(monkeypatch, module, name: str) -> SimpleNamespace:
     real = getattr(module, name)
 
     def late(*args, **kwargs):
-        held.append(connection.connection is not None)
+        held.append(any(opened.connection is not None for opened in connections.all(initialized_only=True)))
         answer.wait(timeout=5)
         reply = real(*args, **kwargs)
         timeline.append("answered")
@@ -189,6 +196,11 @@ def parked_on_a_call(origin: str) -> FlowRun:
     ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
     assert ran.status == FlowRun.Status.CALLING
     return FlowRun.objects.get(pk=ran.id)
+
+
+def card_in_b(hub_b) -> None:
+    with use_hub(hub_b):
+        run("customer.customer.create", {"name": "Bea Ruiz"}, system_context(B))
 
 
 def heard_by_hub_b(monkeypatch, late) -> None:
@@ -220,13 +232,13 @@ def made_once(parked: FlowRun) -> None:
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_a_late_call_of_hub_a_never_holds_the_deliveries_of_hub_b(trusted, late_answer, monkeypatch):
-    parked = parked_on_a_call(trusted)  # its flow.run.parked is the oldest event: the relay hands it over first
-    run("customer.customer.create", {"name": "Bea Ruiz"}, system_context(B))
+@HUB_DB_COMMITTED
+def test_a_late_call_of_hub_a_never_holds_the_deliveries_of_hub_b(trusted, late_answer, monkeypatch, worker_loop, hub_b):
+    parked = parked_on_a_call(trusted)  # business A is served first: its flow.run.parked is handed over first
+    card_in_b(hub_b)
     heard_by_hub_b(monkeypatch, late_answer)
 
-    relay.run(timezone.now())
+    worker_loop()
 
     made_once(parked)
     assert late_answer.timeline[0] == "flow got customer.customer.created in b"
@@ -237,20 +249,19 @@ def test_a_late_call_of_hub_a_never_holds_the_deliveries_of_hub_b(trusted, late_
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_a_call_sent_again_by_the_tick_never_holds_the_relay(trusted, late_answer, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+@HUB_DB_COMMITTED
+def test_a_call_sent_again_by_the_tick_never_holds_the_relay(trusted, late_answer, monkeypatch, worker_loop, hub_b):
     parked = parked_on_a_call(trusted)
     # The worker that took its flow.run.parked died before the call: the event is delivered, the call never went out.
     OutboxEvent.objects.filter(name="flow.run.parked").update(delivered_at=timezone.now())
-    run("customer.customer.create", {"name": "Bea Ruiz"}, system_context(B))
+    card_in_b(hub_b)
     heard_by_hub_b(monkeypatch, late_answer)
     now = timezone.now() + dt.timedelta(minutes=1)
-    scheduler.sync(now - dt.timedelta(minutes=2))  # flow.resume_due is due at the tick
+    scheduler.sync(now - dt.timedelta(minutes=2))  # business A's flow.resume_due is due at the tick
 
-    # One tick of the worker's real loop: the scheduled tasks (resume_due sends the call again), then the relay.
-    stop = threading.Event()
-    assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: now) == 0
+    # One tick of the worker's real loop: business A's scheduled tasks (resume_due sends the call again), then
+    # business B's relay.
+    worker_loop(now)
 
     made_once(parked)
     assert late_answer.timeline[0] == "flow got customer.customer.created in b"
@@ -258,8 +269,8 @@ def test_a_call_sent_again_by_the_tick_never_holds_the_relay(trusted, late_answe
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-def test_a_slow_assistant_of_hub_a_never_holds_the_deliveries_of_hub_b(gateway, monkeypatch):  # noqa: F811
+@HUB_DB_COMMITTED
+def test_a_slow_assistant_of_hub_a_never_holds_the_deliveries_of_hub_b(gateway, monkeypatch, worker_loop, hub_b):  # noqa: F811
     # «Ask the assistant» (FLOW-F37): up to a minute a turn, a few turns a step.
     monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
     late = answering_late(monkeypatch, flow_gateway, "turn")
@@ -275,10 +286,10 @@ def test_a_slow_assistant_of_hub_a_never_holds_the_deliveries_of_hub_b(gateway, 
     )
     ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
     assert ran.status == FlowRun.Status.CALLING
-    run("customer.customer.create", {"name": "Bea Ruiz"}, system_context(B))
+    card_in_b(hub_b)
     heard_by_hub_b(monkeypatch, late)
 
-    relay.run(timezone.now())
+    worker_loop()
 
     went_on(FlowRun.objects.get(pk=ran.id))
     assert late.timeline[0] == "flow got customer.customer.created in b"

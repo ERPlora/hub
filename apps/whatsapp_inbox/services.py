@@ -51,6 +51,8 @@ from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Tem
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.queries import (
     MESSAGE_NOT_FOUND,
+    NOTE_NOT_FOUND,
+    TEMPLATE_GONE,
     CAP_REACHED,
     HEADER_SAMPLE_MISSING_CODE,
     META_RATE_LIMITED,
@@ -76,7 +78,6 @@ from apps.whatsapp_inbox.queries import (
     team,
     template_out,
     templates_of,
-    templates_of_every_business,
 )
 from apps.whatsapp_inbox.schemas import (
     AssignIn,
@@ -133,7 +134,7 @@ from base.files import STORE_ERRORS
 from base.operations import hub_id
 from base.models import HubUser
 from base.queries import refuse_past_the_plans_space
-from base.services import acting_hub_user
+from base.services.sessions import acting_hub_user
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,7 @@ WINDOW_CLOSED = _(
 SAAS_UNCONFIGURED = _(
     "This server cannot reach erplora.com, so nothing can be sent from it."
 )
-#: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
+#: A plan that includes no WhatsApp messages (0): no month brings any, so not «until next month».
 NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
 NOT_RETRYABLE = _("This message cannot be sent again: write a new one.")
 TEMPLATE_NOT_FOUND = _("There is no template called “%(name)s”.")
@@ -167,7 +168,6 @@ TEMPLATE_NOT_SENDABLE = _(
 )
 MARKETING_CONSENT = _("This customer has not agreed to receive marketing by WhatsApp.")
 TEMPLATE_EXISTS = _("There is already a template “%(name)s” in that language.")
-TEMPLATE_GONE = _("That template no longer exists.")
 TEMPLATE_READ_ONLY = _("This template is changed in WhatsApp Manager: the Hub cannot change it.")
 TEMPLATE_IN_REVIEW = _("Meta is reviewing this template: wait for its verdict to change it.")
 TEMPLATE_SUBMITTING = _("This template is on its way to Meta: wait a moment.")
@@ -190,7 +190,6 @@ NOBODY_CALLED = _("Nobody in this business is called “%(reference)s”.")
 SEVERAL_CALLED = _("Several people match “%(reference)s”: choose one from the list.")
 NOT_IN_BUSINESS = _("That person does not work in this business.")
 NOT_A_PERSON = _("Only a person can be assigned a conversation.")
-NOTE_NOT_FOUND = _("That note no longer exists.")
 NOT_INTERNATIONAL = _(
     "“%(phone)s” is not a number in international format (+34600111222): nothing was sent, so that it never "
     "reaches the wrong person."
@@ -219,7 +218,7 @@ _REFUSALS = {
     HEADER_SAMPLE_MISSING_CODE: HEADER_SAMPLE_MISSING_CODE,
 }
 #: erplora.com's 409 codes for a template the Hub says in its own words when read (never blaming ERPlora for
-#: Meta: gh:hub#2731); any other is Meta's refusal, with Meta's reason as it came.
+#: Meta); any other is Meta's refusal, with Meta's reason as it came.
 _TEMPLATE_REFUSALS = {
     "whatsapp.meta_unreachable": "whatsapp_inbox.meta_unreachable",
     "whatsapp.meta_rate_limited": "whatsapp_inbox.meta_rate_limited",
@@ -245,15 +244,6 @@ def _after_commit(ctx: OperationContext, job, *args) -> None:
     request, the worker's relay or its tick that committed never waits for erplora.com. A job lost on the way (the
     process stopped) is found again by ``delivery.resume``: each one claims its row first."""
     outbound.after_commit(job, ctx.scope, *args)
-
-
-def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
-    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as, and where that
-    business's operations run: phase 1's shared database when it is another business of phase 1 (the shared inbox's
-    «Retry», erasing again, the sweep), at once; never another hub's database (``base.outbound``, ``scope=``). A row
-    made before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
-    scope = Scope(ctx.scope.kind, host) if host else ctx.scope
-    outbound.after_commit(job, scope, *args, scope=scope)
 
 
 def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
@@ -420,7 +410,7 @@ def _redelivered(ctx: OperationContext, message: Message, data: ReceiveIn) -> di
         "risk": "normal",
     },
 )
-def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
+def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:  # noqa: C901
     try:
         phone = e164(data.from_, ctx, from_whatsapp=True)
     except InvalidPhone:
@@ -608,12 +598,12 @@ def sync_channel(ctx: OperationContext, data: ChannelSyncIn) -> dict:
 def _locked_channel(ctx: OperationContext) -> Channel:
     """The row of the business of ``ctx``, locked; born the first time erplora.com speaks of it (two at once: one
     creates it, the other finds it)."""
-    rows = Channel.objects.select_for_update().filter(host=ctx.scope.key)
+    rows = Channel.objects.select_for_update()
     row = rows.first()
     if row is None:
         try:
             with atomic():
-                row = Channel.objects.create(host=ctx.scope.key)
+                row = Channel.objects.create()
         except IntegrityError:
             row = rows.get()
     return row
@@ -634,7 +624,7 @@ def _sync_templates(ctx: OperationContext, items, now) -> None:
             deleted = templates_of(ctx.scope).filter(name=item.name, language=item.language, deleted_at__isnull=False)
             if deleted.filter(Q(delete_state=Template.DeleteState.PENDING) | Q(meta_id=item.meta_id)).exists():
                 continue
-            row = Template(host=ctx.scope.key, name=item.name, language=item.language)
+            row = Template(name=item.name, language=item.language)
         elif row.status == Template.Status.DRAFT and row.submit_state:
             kept.append(row.pk)
             continue
@@ -760,6 +750,18 @@ def _return_page(value) -> str:
     input=ChannelPrepareIn,
     output=ChannelPrepareOut,
     ai={
+        "asks": {
+            "en": (
+                "can I connect WhatsApp yet?",
+                "what's missing to connect our WhatsApp number?",
+                "is WhatsApp ready to connect from Settings?",
+            ),
+            "es": (
+                "¿se puede preparar ya la conexión de WhatsApp?",
+                "¿qué me falta para conectar el número de WhatsApp?",
+                "¿está todo preparado para conectar WhatsApp en Ajustes?",
+            ),
+        },
         "description": "Whether the business's WhatsApp number can be connected from Settings now (Meta's window "
         "opens there, and only a person in it connects a number), and why not: WhatsApp not set up on erplora.com "
         "yet, or the window not available yet.",
@@ -793,6 +795,18 @@ def prepare_connect(ctx: OperationContext, data: ChannelPrepareIn) -> dict:
     input=ChannelConnectIn,
     output=ChannelConnectOut,
     ai={
+        "asks": {
+            "en": (
+                "connect our WhatsApp number with the code from Meta",
+                "finish connecting WhatsApp, here is the code",
+                "link the business's WhatsApp with this one-time code",
+            ),
+            "es": (
+                "quiero conectar el WhatsApp del negocio: aquí tienes el código",
+                "termina de conectar el número con este código de Meta",
+                "enlaza nuestro WhatsApp con el código de un solo uso",
+            ),
+        },
         "description": "Connect the business's WhatsApp number chosen in Meta's window, with the one-time code that "
         "window returned (it lasts 30 seconds). Only Meta's window in Settings gives that code: to connect a "
         "number, ask the person to press «Connect WhatsApp» in Settings.",
@@ -835,6 +849,18 @@ def _connected(answer: dict) -> ChannelConnectOut | None:
     input=ChannelDisconnectIn,
     output=ChannelDisconnectOut,
     ai={
+        "asks": {
+            "en": (
+                "disconnect our WhatsApp number",
+                "stop using WhatsApp in the Hub for now",
+                "unlink the business's WhatsApp but keep the chats",
+            ),
+            "es": (
+                "desconecta el WhatsApp del negocio",
+                "deja de usar nuestro número de WhatsApp por ahora",
+                "quita la conexión de WhatsApp sin perder los chats",
+            ),
+        },
         "description": "Disconnect the business's WhatsApp number (erplora.com stops using it): the inbox no longer "
         "receives nor sends until it is connected again from Settings; the conversations kept stay.",
         "risk": "high",
@@ -923,7 +949,7 @@ def _rendered(body: str, variables: list[str]) -> str:
 def _target(ctx: OperationContext, data: SendIn) -> tuple[Conversation | None, str]:
     """The conversation the message goes to (locked) and its number; ``None`` for a number never written to."""
     if data.id is not None or data.conversation:
-        conversation = find_conversation(data.id, data.conversation, lock=True)
+        conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
         return conversation, conversation.phone
     try:
         phone = e164(data.to or "", ctx)
@@ -948,6 +974,19 @@ def _sent_message(key: UUID) -> Message | None:
     output=MessageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "reply to Nuria: see you tomorrow at 10",
+                "send the reminder template to +34 600 111 222",
+                "write to Jorge on WhatsApp that we open at 9",
+            ),
+            "es": (
+                "responde a Nuria: nos vemos mañana a las 10",
+                "envía la plantilla de recordatorio al +34 600 111 222",
+                "escríbele a Jorge por WhatsApp que abrimos a las 9",
+                "responde por WhatsApp a Nuria que su cita sigue en pie",
+            ),
+        },
         "description": "Sends a WhatsApp message to a customer («reply to Ana», «send the reminder template to "
         "+34 600 111 222»): free text only within 24 hours of the customer's last message, otherwise an approved "
         "template with its variables; marketing templates only to customers who consented. Give a new "
@@ -997,7 +1036,7 @@ def _file_to_send(ctx: OperationContext, template: Template, chosen: UUID | None
         return None
     wanted = chosen or template.header_sample_id
     sample = (
-        TemplateSample.objects.filter(pk=wanted, host=ctx.scope.key, header_format=template.header_format).first()
+        TemplateSample.objects.filter(pk=wanted, header_format=template.header_format).first()
         if wanted
         else None
     )
@@ -1006,7 +1045,7 @@ def _file_to_send(ctx: OperationContext, template: Template, chosen: UUID | None
     return sample
 
 
-def _queue_message(
+def _queue_message(  # noqa: PLR0913, PLR0917
     ctx: OperationContext,
     conversation: Conversation,
     text: str | None,
@@ -1038,7 +1077,6 @@ def _queue_message(
                 client_message_id=key,
                 sent_by=acting_hub_user(ctx),
                 sent_at=now,
-                host=ctx.scope.key,
             )
     except IntegrityError:
         # The same key at the same time: the other one kept it and hands it over.
@@ -1066,6 +1104,18 @@ def _queue_message(
     output=MessageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retry the WhatsApp message that didn't go out",
+                "resend the failed message to Nuria",
+                "that message got stuck, try it again",
+            ),
+            "es": (
+                "reintenta el WhatsApp que no se envió",
+                "vuelve a mandar el mensaje fallido a Nuria",
+                "ese mensaje se quedó atascado, pruébalo otra vez",
+            ),
+        },
         "description": "Hands a message that has not left (erplora.com did not answer or did not confirm it) to "
         "erplora.com again, with the same key: it is never sent twice.",
         "risk": "high",
@@ -1084,13 +1134,13 @@ def retry_message(ctx: OperationContext, data: MessageRefIn) -> dict:
         raise Conflict(str(NOT_RETRYABLE), code="whatsapp_inbox.not_retryable")
     message.error_code = message.error_message = ""
     message.save(update_fields=["error_code", "error_message"])
-    _after_commit_as(message.host, ctx, deliver, message.id)
+    _after_commit(ctx, deliver, message.id)
     return message_out(message)
 
 
 def _exact_number(raw: str, ctx: OperationContext) -> str:
     """``raw`` when it is a number written exactly in international format; ``InvalidPayload`` otherwise (a
-    national or half-typed number is never guessed: it could be somebody else's, gh:whatsapp_inbox#279)."""
+    national or half-typed number is never guessed: it could be somebody else's)."""
     text = (raw or "").strip()
     message = str(NOT_INTERNATIONAL % {"phone": text})
     if not _INTERNATIONAL.fullmatch(text):
@@ -1121,6 +1171,18 @@ def _in_language(ctx: OperationContext, data: NotifyIn) -> NotifyIn:
     output=MessageOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "let Nuria know on WhatsApp that her order is ready",
+                "notify +34 600 111 222 on WhatsApp that the table is booked",
+                "tell Jorge on WhatsApp his appointment moved to Friday",
+            ),
+            "es": (
+                "manda un aviso por WhatsApp a Nuria: ya puede recoger su pedido",
+                "notifica al +34 600 111 222 por WhatsApp que tiene la mesa reservada",
+                "dile a Jorge por WhatsApp que su cita pasa al viernes",
+            ),
+        },
         "description": "Tells a customer something by WhatsApp (an appointment or a reservation confirmed…), only in "
         "the live conversation of exactly that international number (+34600111222): never a new conversation, "
         "never a number written any other way. Free text within 24 hours of the customer's last message, "
@@ -1235,7 +1297,7 @@ def claim_delivery(ctx: OperationContext, data: MessageRefIn) -> dict:
     )
     if template is not None and message.header_sample_id is not None:
         # Read after the claim's COMMIT, with no connection held (``deliver``): only a file of its own business.
-        sample = TemplateSample.objects.filter(pk=message.header_sample_id, host=message.host).first()
+        sample = TemplateSample.objects.filter(pk=message.header_sample_id).first()
         if sample is not None:
             template.update(header_format=sample.header_format, sample_key=sample.key, sample_name=sample.name)
         else:
@@ -1281,7 +1343,7 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     else:
         message.status = Message.Status.SENDING
         if data.code == "whatsapp.meta_unreachable":
-            message.error_code = "whatsapp_inbox.meta_unreachable"  # Meta's silence, never ERPlora's (gh:hub#2731)
+            message.error_code = "whatsapp_inbox.meta_unreachable"  # Meta's silence, never ERPlora's
         else:
             message.error_code = SEND_UNKNOWN_CODE if data.kind == gateway.UNKNOWN else SAAS_UNREACHABLE_CODE
         message.error_message = ""
@@ -1320,42 +1382,40 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
     },
 )
 def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
-    """Hand erplora.com again what was left: every business's, each for its own (phase 1's worker runs on one fixed
-    scope). A message or an erasure made before its business was recorded (0007) goes as ``ctx``'s, as it did."""
+    """Hand erplora.com again what was left in this hub's database, as this business."""
     cutoff = clock.now() - STUCK_AFTER
     messages = list(
         Message.objects.select_for_update(skip_locked=True)
         .filter(origin=Message.Origin.HUB, status__in=_ON_ITS_WAY, status_at__lt=cutoff)
         .order_by("status_at", "id")
-        .values_list("id", "host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
     erasures = list(
         Conversation.objects.select_for_update(skip_locked=True)
         .filter(erase_status=Conversation.EraseStatus.PENDING, erased_at__lt=cutoff)
         .order_by("erased_at", "id")
-        .values_list("id", "erase_host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
-    # Every business's, each handed over as its own (phase 1's worker runs on one fixed scope).
     templates = list(
-        templates_of_every_business().select_for_update(skip_locked=True)
+        Template.objects.select_for_update(skip_locked=True)
         .filter(submit_state__in=_TEMPLATE_ON_ITS_WAY, submit_at__lt=cutoff, deleted_at__isnull=True)
         .order_by("submit_at", "id")
-        .values_list("id", "host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
     deletions = list(
-        templates_of_every_business().select_for_update(skip_locked=True)
+        Template.objects.select_for_update(skip_locked=True)
         .filter(delete_state=Template.DeleteState.PENDING, deleted_at__lt=cutoff)
         .order_by("deleted_at", "id")
-        .values_list("id", "host")[:RESUME_BATCH]
+        .values_list("id", flat=True)[:RESUME_BATCH]
     )
-    for message_id, host in messages:
-        _after_commit_as(host, ctx, deliver, message_id)
-    for conversation_id, host in erasures:
-        _after_commit_as(host, ctx, forget, conversation_id)
-    for template_id, host in templates:
-        _after_commit_as(host, ctx, submit_template, template_id)
-    for template_id, host in deletions:
-        _after_commit_as(host, ctx, remove_template, template_id)
+    for message_id in messages:
+        _after_commit(ctx, deliver, message_id)
+    for conversation_id in erasures:
+        _after_commit(ctx, forget, conversation_id)
+    for template_id in templates:
+        _after_commit(ctx, submit_template, template_id)
+    for template_id in deletions:
+        _after_commit(ctx, remove_template, template_id)
     return {
         "messages": len(messages),
         "erasures": len(erasures),
@@ -1370,17 +1430,30 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.mark_read",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.view",
     input=ConversationRefIn,
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "mark Nuria's chat as read",
+                "clear the unread count of Jorge's conversation",
+                "I've seen Elena's WhatsApp, mark it read",
+            ),
+            "es": (
+                "da por leído el chat de Nuria",
+                "pon a cero los no leídos de la conversación de Jorge",
+                "ya he visto el WhatsApp de Elena, quítale el sin leer",
+            ),
+        },
         "description": "Marks a WhatsApp conversation as read: its unread counter goes back to zero.",
         "risk": "normal",
     },
 )
 def mark_read(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if conversation.unread_count:
         conversation.unread_count = 0
         _save(conversation, "unread_count")
@@ -1402,7 +1475,7 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
         return person
     reference = (data.assignee or "").strip()
     if reference.lower() == "me":
-        # Whoever takes it is a person of the business's database: made if their session came before it (W10).
+        # Whoever takes it is a person of the business's database: made if their session came before it.
         me = acting_hub_user(ctx)
         if me is None:
             raise InvalidPayload(
@@ -1436,11 +1509,24 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
 @operation(
     "whatsapp_inbox.conversation.assign",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=AssignIn,
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "assign Nuria's conversation to Jorge",
+                "I'll take the conversation with Elena",
+                "unassign Raúl's WhatsApp",
+            ),
+            "es": (
+                "asigna la conversación de Nuria a Jorge",
+                "me quedo yo con la conversación de Elena",
+                "quita la asignación del WhatsApp de Raúl",
+            ),
+        },
         "description": "Assigns a WhatsApp conversation to a person of the team («assign Ana's conversation to "
         "Luis», «take it»: assignee me), or to nobody. Only managers assign somebody else or take it from "
         "somebody; «only if unassigned» never takes it from anybody.",
@@ -1448,7 +1534,7 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
     },
 )
 def assign(ctx: OperationContext, data: AssignIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     person = _assignee(ctx, data)
     me = actor_id(ctx)
     target = person.pk if person is not None else None
@@ -1484,18 +1570,31 @@ def assign(ctx: OperationContext, data: AssignIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.set_status",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=SetStatusIn,
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the status of Nuria's conversation to closed",
+                "set Jorge's chat to pending",
+                "reopen the WhatsApp conversation with Elena",
+            ),
+            "es": (
+                "cambia a cerrada la conversación de Nuria",
+                "deja pendiente el chat de Jorge",
+                "vuelve a abrir la conversación de Elena",
+            ),
+        },
         "description": "Marks a WhatsApp conversation open, pending (waiting for the customer) or closed (done); "
         "a new message from the customer opens it again.",
         "risk": "high",
     },
 )
 def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if conversation.status != data.status:
         conversation.status = data.status
         conversation.needs_attention = False
@@ -1511,11 +1610,24 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.flag",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=ConversationRefIn,
     output=FlaggedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "flag Nuria's chat as needing attention",
+                "the bot didn't understand Jorge: flag the conversation",
+                "a person needs to look at Elena's WhatsApp",
+            ),
+            "es": (
+                "pon en atención la conversación de Jorge",
+                "la respuesta automática no entendió a Nuria, que la mire una persona",
+                "señala el chat de Elena: necesita a alguien del negocio",
+            ),
+        },
         "description": "Marks an open WhatsApp conversation «Needs attention»: an automatic answer could not answer "
         "the customer, so she waits for a person even after its apology; somebody of the business answering, or "
         "changing its status, takes it away. A pending or closed conversation is left as it is.",
@@ -1523,7 +1635,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
     },
 )
 def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if conversation.status != Conversation.Status.OPEN:
         return {"id": conversation.id, "flagged": False}
     if not conversation.needs_attention:
@@ -1536,11 +1648,24 @@ def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
 @operation(
     "whatsapp_inbox.conversation.link_customer",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=LinkCustomerIn,
     output=ConversationOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "link Nuria's WhatsApp to her customer card",
+                "put Elena's WhatsApp chat on her customer card",
+                "unlink the customer from Jorge's conversation",
+            ),
+            "es": (
+                "une el WhatsApp de Nuria a su ficha de cliente",
+                "haz la ficha de cliente desde esta conversación",
+                "quita la ficha de cliente de la conversación de Jorge",
+            ),
+        },
         "description": "Joins a WhatsApp conversation to a customer card (by id or by the card's exact name, phone "
         "or email), creates the card from the WhatsApp name and number, or takes the card off.",
         "risk": "normal",
@@ -1550,8 +1675,8 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
     # The card chosen before the conversation (``_locked_cards_of``): one the Hub admin deletes is waited for and gone.
     chosen = None
     if not (data.unlink or data.create):
-        chosen = find_customer(data.customer_id, data.customer, lock=True)
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+        chosen = find_customer(ctx, data.customer_id, data.customer, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if data.unlink:
         card = None
     elif data.create:
@@ -1585,8 +1710,7 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
 
 def _erase(ctx: OperationContext, conversation: Conversation) -> None:
     """Empty every personal datum of ``conversation`` once, and ask erplora.com to forget its number
-    after the COMMIT until it confirms; again changes nothing here and asks erplora.com again, for the business
-    that erased it (``erase_host``), whoever asks from the shared inbox."""
+    after the COMMIT until it confirms; again changes nothing here and asks erplora.com again."""
     if conversation.erased_at is None:
         conversation.messages.update(
             body="",
@@ -1603,7 +1727,6 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
         conversation.notes.all().delete()
         conversation.erase_phone = conversation.phone
         conversation.erase_status = Conversation.EraseStatus.PENDING
-        conversation.erase_host = ctx.scope.key
         conversation.phone = ""
         conversation.contact_name = ""
         conversation.last_message_preview = ""
@@ -1615,7 +1738,7 @@ def _erase(ctx: OperationContext, conversation: Conversation) -> None:
         conversation.save()
         record_event(ctx, events.ERASED, {"id": str(conversation.id)})
     if conversation.erase_status == Conversation.EraseStatus.PENDING:
-        _after_commit_as(conversation.erase_host, ctx, forget, conversation.id)
+        _after_commit(ctx, forget, conversation.id)
 
 
 def forget(scope: Scope, conversation_id: UUID) -> None:
@@ -1695,6 +1818,18 @@ def record_erasure(ctx: OperationContext, data: RecordErasureIn) -> dict:
     input=ConversationRefIn,
     output=ErasedOut,
     ai={
+        "asks": {
+            "en": (
+                "erase all of Nuria's WhatsApp data, she asked us to",
+                "delete this number's chat under GDPR",
+                "wipe the messages and notes of +34 600 111 222",
+            ),
+            "es": (
+                "borra todos sus datos de WhatsApp a Nuria, nos lo ha pedido",
+                "elimina el chat de este número por protección de datos",
+                "borra los datos del +34 600 111 222 en WhatsApp",
+            ),
+        },
         "description": "Erases a number's WhatsApp data at the person's request (GDPR): the number, the name, "
         "every text, attachment and note of the conversation, here and at erplora.com. Irreversible; if they "
         "write again, a new conversation starts.",
@@ -1703,7 +1838,7 @@ def record_erasure(ctx: OperationContext, data: RecordErasureIn) -> dict:
 )
 def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
     conversation = find_conversation(
-        data.id, data.conversation, lock=True, live=data.id is None
+        ctx, data.id, data.conversation, lock=True, live=data.id is None
     )
     _erase(ctx, conversation)
     return {"id": conversation.id}
@@ -1715,17 +1850,30 @@ def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
 @operation(
     "whatsapp_inbox.note.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=NoteAddIn,
     output=NoteOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a note to Nuria's chat: call her back after five",
+                "leave an internal note on Jorge's conversation",
+                "write down on Elena's WhatsApp that she prefers Tuesdays",
+            ),
+            "es": (
+                "añade una nota al chat de Nuria: llamarla después de las cinco",
+                "apunta en el WhatsApp de Elena que prefiere los martes",
+                "escribe una nota interna en la conversación de Jorge",
+            ),
+        },
         "description": "Leaves an internal note on a WhatsApp conversation for the team; the customer never sees it.",
         "risk": "normal",
     },
 )
 def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation)
+    conversation = find_conversation(ctx, data.id, data.conversation)
     author = acting_hub_user(ctx)
     note = Note.objects.create(
         conversation=conversation,
@@ -1745,11 +1893,24 @@ def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
 @operation(
     "whatsapp_inbox.note.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="whatsapp_inbox.reply",
     input=NoteRefIn,
     output=NoteDeletedOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete my note on Nuria's chat",
+                "remove the internal note about the deposit",
+                "take off the note I left on Jorge's conversation",
+            ),
+            "es": (
+                "borra la nota del chat de Nuria",
+                "elimina la nota interna sobre la señal",
+                "quita la nota que dejé en la conversación de Jorge",
+            ),
+        },
         "description": "Deletes an internal note of a WhatsApp conversation: one's own, or anybody's for a manager.",
         "risk": "high",
     },
@@ -1807,7 +1968,7 @@ def _header_file(ctx: OperationContext, data: TemplateWriteIn) -> None:
     if data.header_format not in samples.FILE_HEADERS:
         return
     kept = data.header_sample is not None and TemplateSample.objects.filter(
-        pk=data.header_sample, host=ctx.scope.key, header_format=data.header_format
+        pk=data.header_sample, header_format=data.header_format
     ).exists()
     if not kept:
         message = str(HEADER_FILE_MISSING)
@@ -1858,6 +2019,18 @@ def _sample_bytes(data: TemplateSampleUploadIn) -> tuple[bytes, str]:
     output=TemplateSampleOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "use this photo as a WhatsApp template header",
+                "upload this PDF for the template's header",
+                "keep this video for the header of the template",
+            ),
+            "es": (
+                "esta foto es para la cabecera de la plantilla de WhatsApp",
+                "sube este PDF para la cabecera de la plantilla",
+                "quiero este vídeo arriba en la plantilla de WhatsApp",
+            ),
+        },
         "description": "Keeps the file of a WhatsApp template's header the person attached (a JPEG or PNG photo up "
         "to 5 MB, an MP4 video up to 16 MB or a PDF up to 25 MB) and answers its id, to give as header_sample when "
         "creating or changing the template: Meta reviews the template with it.",
@@ -1878,7 +2051,6 @@ def upload_sample(ctx: OperationContext, data: TemplateSampleUploadIn) -> dict:
     except STORE_ERRORS as exc:
         raise OperationError(str(SAMPLE_NOT_KEPT), code="whatsapp_inbox.sample_not_kept", status=503) from exc
     row = TemplateSample.objects.create(
-        host=ctx.scope.key,
         header_format=data.header_format,
         key=key,
         sha256=sha,
@@ -1898,6 +2070,18 @@ def upload_sample(ctx: OperationContext, data: TemplateSampleUploadIn) -> dict:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "create a WhatsApp template to remind appointments",
+                "make a marketing template with a 10% offer",
+                "add a template that says your order is ready",
+            ),
+            "es": (
+                "crea una plantilla de WhatsApp para recordar citas",
+                "haz una plantilla de marketing con una oferta del 10 %",
+                "añade una plantilla con el texto: gracias por tu visita",
+            ),
+        },
         "description": "Creates a WhatsApp message template (name, language, utility or marketing, header, text with "
         "{{1}}… and an example of each, footer, buttons) and sends it to Meta for review. Give a new submit_key per "
         "save (the same one if you retry it): it is registered once.",
@@ -1913,7 +2097,7 @@ def create_template(ctx: OperationContext, data: TemplateCreateIn) -> dict:
     exists = Conflict(str(TEMPLATE_EXISTS % {"name": data.name}), code="whatsapp_inbox.template_exists")
     if live_templates(ctx.scope).filter(name=data.name, language=data.language).exists():
         raise exists
-    row = Template(host=ctx.scope.key, name=data.name, language=data.language, status=Template.Status.DRAFT)
+    row = Template(name=data.name, language=data.language, status=Template.Status.DRAFT)
     _apply(row, _content(data))
     try:
         with atomic():
@@ -1950,6 +2134,18 @@ def _changeable(row: Template, content: dict) -> None:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the text of the reminder template",
+                "edit the welcome template and send it for review again",
+                "update the promo template's footer",
+            ),
+            "es": (
+                "cambia el texto de la plantilla de recordatorio",
+                "edita la plantilla de bienvenida y mándala otra vez a revisión",
+                "actualiza el pie de la plantilla de la promoción",
+            ),
+        },
         "description": "Changes a WhatsApp template (not its name or language) and sends it to Meta for review "
         "again; until Meta takes the change, the approved one keeps being the one sent. Not while Meta reviews it.",
         "risk": "high",
@@ -1986,6 +2182,18 @@ def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retry sending the template to Meta",
+                "the reminder template never reached Meta, try again",
+                "send Meta again the template deletion it did not confirm",
+            ),
+            "es": (
+                "vuelve a mandar la plantilla a Meta",
+                "la plantilla de recordatorio no llegó a Meta, reinténtalo",
+                "reintenta en Meta el borrado de la plantilla que no confirmó",
+            ),
+        },
         "description": "Hands a template that did not reach Meta (or a deletion Meta has not confirmed) to "
         "erplora.com again: never registered twice.",
         "risk": "normal",
@@ -2018,6 +2226,18 @@ def retry_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
     output=TemplateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "delete the welcome template",
+                "remove the old promo template from WhatsApp",
+                "get rid of the English reminder template",
+            ),
+            "es": (
+                "ya no queremos la plantilla de bienvenida, bórrala",
+                "elimina la plantilla vieja de la promoción",
+                "quita la plantilla de recordatorio en inglés",
+            ),
+        },
         "description": "Deletes a WhatsApp template here and at Meta (that language only). Irreversible: an approved "
         "template takes days to be approved again.",
         "risk": "high",
@@ -2147,7 +2367,7 @@ def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
     template = {"name": row.name, "language": row.language, **content, "meta_id": row.meta_id}
     if header_format in samples.FILE_HEADERS:
         # Read after the claim's COMMIT, with no connection held (``submit_template``): the key, not the bytes.
-        sample = TemplateSample.objects.filter(pk=sample_id, host=row.host).first() if sample_id else None
+        sample = TemplateSample.objects.filter(pk=sample_id).first() if sample_id else None
         template.update(header_format=header_format)
         if sample is not None:
             template.update(sample_key=sample.key, sample_name=sample.name)
@@ -2259,8 +2479,8 @@ def record_delete(ctx: OperationContext, data: RecordTemplateDeletionIn) -> dict
     input=CustomerEventIn,
     output=ReactionOut,
     ai={
-        "description": "System only (customer.customer.created/updated): joins the conversations of the card's "
-        "number that have no live card to it, when no other live card has that number.",
+        "description": "System only (customer.customer.created/updated/restored): joins the conversations of "
+        "the card's number that have no live card to it, when no other live card has that number.",
         "risk": "normal",
     },
 )

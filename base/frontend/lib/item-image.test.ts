@@ -1,5 +1,4 @@
-// The image of a product, a service or a set menu (round 2026-10-30; INVENTORY-F30 to F32, SERVICE-F34/F35,
-// COMBO-F14): the initials over the name's colour that stand in for a missing photo, what a form keeps while the person
+// The image of a product, a service or a set menu: the initials over the name's colour that stand in for a missing photo, what a form keeps while the person
 // chooses (a library image, a photo of their own read on the device, or none), the one step it sends once the record is
 // saved, and that step's failure kept for «Retry» (the record saved, the photo not).
 import { ApiError } from '@erplora/ui/sdk';

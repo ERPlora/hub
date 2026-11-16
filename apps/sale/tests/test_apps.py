@@ -44,8 +44,8 @@ def test_sale_is_an_installed_live_app():
 
 def test_it_requires_tax_and_customer_but_not_inventory():
     # Every line is priced with tax's rules and a sale keeps its customer's card (a foreign key).
-    # Inventory is optional (PLAN §20.5): the till sells services and open prices without it, a
-    # line keeps a copy of its product, and inventory moves the stock by reacting to the sale.
+    # Inventory is optional: the till sells services and open prices without it, a line keeps a copy of its product, and
+    # inventory moves the stock by reacting to the sale.
     assert sale().requires == ["tax", "customer"]
 
 
@@ -114,8 +114,9 @@ def test_navigation_is_the_old_four_tabs_and_the_settings():
 def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
     # operation but the reactions only the system runs and the steps of Services' grant of a voucher
-    # (asked directly, a line would pay for a voucher nobody granted), and a write says how risky it
-    # is (high: money moves or a sale is corrected); a read never asks to confirm.
+    # and of a session spent outside the till (asked directly, a line would pay for a voucher nobody
+    # granted, a professional would count a session nobody spent), and a write says how risky it is
+    # (high: money moves or a sale is corrected); a read never asks to confirm.
     from live.operations import AI, INTERNAL, registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("sale.")}
@@ -127,6 +128,7 @@ def test_every_operation_is_described_for_the_assistant():
         "sale.sale.record_invoice",
         "sale.sale.voucher_sold",
         "sale.sale.voucher_unsold",
+        "sale.voucher_session.record",
     }
     for name, op in ops.items():
         if name in internal:
@@ -162,7 +164,7 @@ def test_the_money_and_fiscal_writes_are_high_risk():
     } <= high
 
 
-# ── The Home's hooks (PLAN-HUB round 2026-10-21) ────────────────────────────────────────────────────
+# ── The Home's hooks ────────────────────────────────────────────────────────────────────────────────
 
 FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"]
 SALES = [*FIGURES, "sale.sale.reassigned", "sale.sale.invoiced"]
@@ -249,7 +251,7 @@ def test_the_panels_are_titled_in_english_and_in_spanish_as_the_old_ones():
     ]
     assert spanish == [
         "Ventas hoy",
-        "Tickets hoy",
+        "Tiques hoy",
         "Ventas últimos 7 días",
         "Actividad reciente",
     ]

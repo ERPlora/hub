@@ -1,4 +1,4 @@
-"""The «Call another system» step (WORKBOOK FLOW-F27; old hub HUB-F94, module flows-f16; hub#2659, hub#2675).
+"""The «Call another system» step (WORKBOOK FLOW-F27).
 
 The other system is a real local HTTPS server (``local_https``). A step calls only an address whose origin
 the owner granted (``http:https://host``); the request that parks the run answers at once, and the worker
@@ -16,21 +16,19 @@ from zoneinfo import ZoneInfo
 import pydantic
 import pytest
 from cryptography.fernet import Fernet
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.context import system_context
 from live.errors import InvalidPayload
 
 from apps.flow import events, services, vault
 from apps.flow.models import Flow, FlowRun, Question, Secret
 from apps.task.models import Task
-from base import relay
 from base.models import EventDelivery
+from base.tenancy.context import current_alias
 
-from .conftest import A, TASK_STEP, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
 from .local_https import Handler
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -66,24 +64,6 @@ def _manual(origin: str, steps, grants=None):
         grants=list(grants if grants is not None else [_grant(origin), "task.task.create"]),
     )
 
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay): what it hands over runs,
-    and a call it schedules goes out after its COMMIT. Inside a test's transaction it keeps the connection."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        """Runs the operation ``name`` as a web request does, its COMMIT included: what it answers."""
-        with django_capture_on_commit_callbacks(execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 def test_run_now_answers_at_once_and_the_worker_makes_the_call(trusted, clock, worker):
@@ -303,14 +283,14 @@ def test_without_the_servers_key_a_call_without_secrets_is_saved_tried_and_goes_
 def test_a_call_left_half_way_is_sent_again_with_the_same_key(trusted, clock, django_capture_on_commit_callbacks):
     clock(NOON)
     flow = _manual(trusted, [_call(trusted)])
-    with django_capture_on_commit_callbacks(execute=False):  # the process dies before the call
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=False):  # the process dies before the call
         ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
     system = ctx_for(permissions={"flow.system"})
     claimed = run("flow.run.claim_call", {"id": str(ran.id)}, system)
     assert claimed.claimed is True  # …and dies again during the call
     assert run("flow.run.claim_call", {"id": str(ran.id)}, system).claimed is False  # someone else holds it
     clock(NOON + dt.timedelta(minutes=services.CALL_LEASE_MINUTES, seconds=1))
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("flow.run.resume_due", {}, system)
     done = FlowRun.objects.get(pk=ran.id)
     assert done.status == FlowRun.Status.SUCCEEDED
@@ -321,7 +301,7 @@ def test_a_call_left_half_way_is_sent_again_with_the_same_key(trusted, clock, dj
 def test_an_answer_that_comes_late_changes_nothing(trusted, clock, django_capture_on_commit_callbacks):
     clock(NOON)
     flow = _manual(trusted, [_call(trusted)])
-    with django_capture_on_commit_callbacks(execute=False):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=False):
         ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
     run("flow.flow.delete", {"id": str(flow.id)})
     cancelled = FlowRun.objects.get(pk=ran.id)
@@ -409,7 +389,7 @@ def test_a_call_from_a_scheduled_run_goes_out_too(trusted, clock, worker, django
     flow.run_at = NOON
     flow.next_fire_at = NOON
     flow.save()
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("flow.schedule.fire_due", {}, system_context(A))
     assert Handler.seen == []  # the task parks it; the relay, in the same tick of the worker, makes it
     worker()

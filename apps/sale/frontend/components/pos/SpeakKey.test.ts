@@ -1,10 +1,9 @@
-// The till's «Speak» key (WORKBOOK «Vender»; PLAN §30 point 4, PLAN-HUB §8 round 2026-10-22b): open the assistant by
-// dictating. Only to whoever may use the assistant (`base.view_home`) on a device that can record; offline it stays,
-// greyed, and a tap says why. A first tap records («Listening…», the key turns «Stop»), a second one stops; the words
-// are transcribed by erplora.com, land in the assistant's box after what was written and the panel opens: the person
-// sees what was understood and sends it. Nothing is sent by itself. A refusal, an empty or too long dictation and a
-// failure are a toast. The dictation is the shared assistant's (`useDictation`, PLAN-HUB §18): the key only says each
-// reason its way and keeps its own offline guard.
+// The till's «Speak» key (WORKBOOK «Vender»): open the assistant by dictating. Only to whoever may use the assistant
+// (`base.view_home`) on a device that can record; offline it stays, greyed, and a tap says why. A first tap records
+// («Listening…», the key turns «Stop»), a second one stops; the words are transcribed by erplora.com, land in the
+// assistant's box after what was written and the panel opens: the person sees what was understood and sends it. Nothing
+// is sent by itself. A refusal, an empty or too long dictation and a failure are a toast. The dictation is the shared
+// assistant's (`useDictation`): the key only says each reason its way and keeps its own offline guard.
 import {
   ASSISTANT_ICONS,
   type Assistant,
@@ -152,6 +151,7 @@ describe('SpeakKey: who sees it', () => {
   it('shows «Hablar» with the microphone to whoever may use the assistant on a device that records', async () => {
     const k = await key();
     expect(k.button().exists()).toBe(true);
+    expect(k.button().element.tagName.toLowerCase()).toBe('ion-button');
     expect(k.button().text()).toBe('Hablar');
     expect(k.button().attributes('aria-pressed')).toBe('false');
     // The assistant composer's own microphone.
@@ -206,11 +206,11 @@ describe('SpeakKey: dictating into the assistant', () => {
     await k.press();
     await k.press();
     expect(k.find('pos-speak-status').text()).toBe('Transcribiendo…');
-    expect(k.button().attributes('disabled')).toBeDefined();
+    expect((k.button().element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
     finish(Response.json({ text: 'dos cafés', language: 'es' }));
     await settle();
     expect(assistant.state.draft).toBe('dos cafés');
-    expect(k.button().attributes('disabled')).toBeUndefined();
+    expect((k.button().element as HTMLElement & { disabled?: boolean }).disabled).toBe(false);
   });
 
   it('an empty dictation is a toast: the box and the panel stay as they were', async () => {
@@ -344,7 +344,7 @@ describe('SpeakKey: without connection', () => {
   });
 });
 
-// PLAN-HUB §18: the dictation lives once, in base; the key only says each reason its way and keeps its offline guard.
+// The dictation lives once, in base; the key only says each reason its way and keeps its offline guard.
 describe("SpeakKey: base's dictation", () => {
   it("is base's useDictation, on the key's microphone: a tap is its toggle", async () => {
     const dictation = fakeDictation();

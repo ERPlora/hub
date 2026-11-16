@@ -7,10 +7,14 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import type { BlockedDateIn } from '../operations';
 
 const props = defineProps<{ day: string }>();
 const open = defineModel<boolean>('open', { default: false });
+
+const canDismiss = useUnsavedFormOnOpen('reservation-blocked-form', () => ({ date: date.value, reason: reason.value, wholeDay: wholeDay.value, from: from.value, until: until.value }), open);
 
 const create = useCommand('reservation.blocked_date.create');
 const date = ref('');
@@ -58,6 +62,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="reservation-blocked-form"
     size="sm"
     :title="$t('reservation.availability.blockedForm.title')"
@@ -68,9 +73,12 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="reservation-blocked-form">
+      <div
+        class="reservation-blocked-form"
+      >
         <ion-input
           data-testid="reservation-blocked-form-date"
+          name="date"
           type="date"
           :value="date"
           :label="$t('reservation.availability.blockedForm.date')"
@@ -106,6 +114,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           <ion-input
             data-testid="reservation-blocked-form-blocked_from"
+            name="blocked_from"
             type="time"
             :value="from"
             :label="$t('reservation.availability.blockedForm.from')"
@@ -118,6 +127,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           />
           <ion-input
             data-testid="reservation-blocked-form-blocked_until"
+            name="blocked_until"
             type="time"
             :value="until"
             :label="$t('reservation.availability.blockedForm.to')"

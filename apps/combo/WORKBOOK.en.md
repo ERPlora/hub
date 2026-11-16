@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6f0407f2fa7fa1a7cffd6b39272648b9805961ed263392e949a92b5e5e4f0157 -->
+<!-- generated from WORKBOOK.md sha256:9d4be4c881631363156ee7d3ca6c61bd6d7ca276289634a0e8867aa6de7084cb -->
 
 ## What it is for and who it is for
 
@@ -23,8 +23,7 @@ station. It is not a discount nor a variant, nor the extras of a dish (that is M
 
 ## Reference adopted
 
-The market sweep of the current product (`architecture/modules/combos.md`, 24/08/2026: 10
-references and their forums) is still valid and is adopted, nothing more:
+What the market does is adopted:
 
 - [Square — combos](https://squareup.com/help/us/en/article/8558-create-and-sell-combos): the combo is
   an item of the catalogue, with "required choices" per group and a charge per option; a sold-out item
@@ -102,7 +101,8 @@ category to take away"; per row, the handle, move up, move down, "Sold out / Ava
 remove. Below, the search box "Search a product…" (each product with its SKU and its price), "Supplement
 (<currency>)", "Add choice" and "Add several"
 (window with a search box and checkboxes, and the "Category" field with "Tick all of “{category}”
-(N)": "Add N selected"; what is already in the course comes ticked "Already in this course").
+(N)": "Add N selected" ("Add 1 selected" with one); what is already in the course comes ticked "Already
+in this course").
 At the end, the "Add a course" form (Course name, "Minimum picks", "Maximum picks", the checkbox "The
 same option may be picked more than once" and "Save"), which becomes "Course · {name}" when editing
 one.
@@ -118,6 +118,12 @@ one.
 | No longer exists | If the menu is withdrawn while its builder is open (here or on another device), the builder empties and says "This menu no longer exists" ("It has been withdrawn, perhaps from another device."), with "All menus" to go back. |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); a price rewritten by itself in the business's currency is no change.
 
 ## Flows
 
@@ -137,6 +143,7 @@ one.
 | COMBO-F12 | Mark a choice as sold out | done |
 | COMBO-F13 | When a product leaves the catalogue | done |
 | COMBO-F14 | The menu's photo | done |
+| COMBO-F15 | Recover the menus, their courses and their choices from a separate copy | done |
 
 ### COMBO-F01 Look up and search the menus
 Status: done
@@ -175,11 +182,15 @@ Steps:
 In: name, kitchen name, price, way of selling, VAT category, order and "On sale"; it reads the VAT
 categories from Taxes.
 Out: the menu (announces: new menu).
-If it fails: next to the field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
-without it, it cannot be billed.", "A menu price cannot be below zero. To make a choice cheaper, give it
-a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." (also with
+If it fails: "Save" is grey while the name is missing and while the business has not yet said its
+currency, because the price is read in it (without it, "1500" yen would be saved as 150,000); until then, leaving the price
+keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). Next to the
+field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
+without it, it cannot be billed.", "This amount cannot be
+negative." (to make a choice cheaper, it gets a negative supplement: COMBO-F06), "This is not an amount. Type a figure, for example 12.50." (also with
 another currency's sign: "€13.50" in a business in Poland) and the one about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that
-does not exist in Taxes: "That tax category does not exist in Taxes.". Without the right to manage
+does not exist in Taxes: "That tax category does not exist in Taxes.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Without the right to manage
 there is no + button.
 Involved: TAX-F01
 
@@ -216,8 +227,10 @@ In: the chosen menu (by id or by name).
 Out: the menu, its courses and its choices deleted in a single operation (announces: menu withdrawn,
 with its name). The tickets issued carry their copy and can still be read.
 If it fails: the dialog says why and stays open; a menu that no longer exists, "That menu does not
-exist in this business.". An open check that already had it charges it as it was ordered (COMBO-F08).
-Involved: SALE-F12
+exist in this business.". An open check that already had it charges it as it was ordered (COMBO-F08). Through the
+assistant, a name that fits several menus or none brings up no card, and if before the "yes" another menu fits better
+what was said, nothing is withdrawn and the new card comes up (BASE-F97).
+Involved: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Set up the courses of a menu
 Status: done
@@ -239,8 +252,12 @@ Out: the course (announces: course new, changed, reordered or withdrawn).
 If it fails: next to the field: "The course needs a name.", "The maximum ({max}) is below the
 minimum ({min}): nobody could ever satisfy this course." and "That menu already has a course “{name}”.".
 A minimum or a maximum above 50 is refused, and so are more than 20 courses in a menu ("A menu
-holds 20 courses at most."). If the server refuses, the form says so and does not lose what was written.
-Involved: none
+holds 20 courses at most."). If the server refuses, the form says so and does not lose what was written. Through the
+assistant, when changing or withdrawing a course said by its name, a name that fits several courses or none brings up
+no card, and if before the "yes" another course or another menu fits better what was said, nothing is touched and the
+new card comes up (BASE-F97). When adding or reordering courses of a menu said by its name, the "yes" counts only for
+the menu the card showed.
+Involved: COMBO-F15
 
 ### COMBO-F06 Choose the products of each course and their supplement
 Status: done
@@ -250,9 +267,11 @@ Steps:
 1. On the course's card, type in "Search a product…" and choose the product from Inventory's
    catalogue (it searches by name and by SKU).
 2. Type the "Supplement (<currency>)", in the business's currency, if substituting costs more (or less,
-   with a minus sign) than the closed price; empty is no supplement.
+   with a minus sign: "-" or the "±" button at the end of the field, because a phone's decimal keyboard has no
+   minus) than the closed price; empty is no supplement.
 3. Tap "Add choice": it goes in last. For several at once, "Add several": tick the boxes
-   and tap "Add N selected" (all go in without a supplement and in the order they were ticked). For
+   and tap "Add N selected" ("Add 1 selected" with one; all go in without a supplement and in the order
+   they were ticked). For
    a whole category, choose it in "Category": the list shows its products and "Tick all of
    “{category}” (N)" ticks the ones the course does not offer yet.
 4. To change the product or the supplement of a choice, tap its pencil: the form says
@@ -266,10 +285,19 @@ If it fails: "Pick a catalogue product first.", "This course already offers that
 be picked twice, switch on «the same option may be picked more than once».", "“{product}” is
 deactivated in Inventory: activate it before putting it in a menu.", "Only a product sold and priced
 by the unit can be a menu choice; “{product}” is sold by {unit}.", "A course holds
-40 choices at most." and the amount warnings. "Add several" with nothing ticked: "Tick at least one
+40 choices at most." and the amount warnings ("This is not an amount. Type a figure, for example 1.50, or -0.50 for a
+discount." and the one about the two readings of "1.250"). "Add choice" (and "Save" when editing) is off while the
+business has not yet said its currency: the supplement is read in it, and without it "1500" yen would be
+saved as 150,000; until then, leaving the supplement keeps it as typed, without inventing decimals for it or judging it: "¥150" or "-0,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the builder says so once, above the courses ("The
+business's currency could not be read", with the reason), and offers "Retry", which asks for it again; as
+soon as it arrives, the button lights up (hub#946). "Add several" with nothing ticked: "Tick at least one
 product first."; a search or a category with no products: "No products match.". If the
 catalogue does not load, the search box says so with "Retry". A product that does not exist yet is
-created first in Inventory: the search box finds it as soon as it is saved.
+created first in Inventory: the search box finds it as soon as it is saved. Through the assistant, when changing or
+removing a choice said by its product, a name that fits several choices or none brings up no card, and if before the
+"yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up
+(BASE-F97). When adding or reordering choices, the "yes" counts only for the menu, the course and the product the card
+showed.
 Involved: INVENTORY-F27
 
 ### COMBO-F07 Choose a menu when selling
@@ -429,8 +457,9 @@ Steps:
    "Deactivated in Inventory", and the till does not offer them until it is reactivated.
 2. Someone deletes a product in Inventory: in a few seconds its choices leave on their own all the
    menus that offered it, and the open builder shows it at once. Meanwhile they come marked
-   "No longer in the catalogue" and the till neither offers them nor can they be charged (it is final: a
-   deleted product does not come back).
+   "No longer in the catalogue" and the till neither offers them nor can they be charged (from its screens a
+   deleted product does not come back; if ERPlora's staff recover it from a separate copy, its choices come back
+   with it, COMBO-F15).
 3. Look at the notice at the top of the builder: if a compulsory course has been left without enough
    choices, it says why the menu is no longer on the till; add another choice to that course (COMBO-F06).
 In: the product deactivated or deleted in Inventory.
@@ -440,7 +469,7 @@ is deleted in one business does not touch the menus of another.
 If it fails: if a compulsory course is left without enough choices to offer, the menu stops being
 on the till and the builder's notice says why. If removing the choices fails, Menus retries
 on its own; meanwhile, they stay marked and nobody sells them.
-Involved: INVENTORY-F04, COMBO-F06
+Involved: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 The menu's photo
 Status: done
@@ -467,13 +496,89 @@ one.", "There is no space left for that file: your plan includes <space>." or "T
 saved. Try again.". A menu without a photo, or whose photo does not load, shows its initials.
 Involved: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
+### COMBO-F15 Recover the menus, their courses and their choices from a separate copy
+Status: done
+Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
+Screen: none of Menus: in the Hubs admin, Separate copies › "Recover into the business…", with **Menus, Menu courses,
+Menu choices of products** ticked (it is, like everything that can be brought back)
+Steps:
+1. The staff recovers from a separate copy with **Menus, Menu courses, Menu choices of products** ticked. Menus always
+   goes after Inventory, whatever order it is asked in: a deleted product that comes back is already live when its
+   choices are given back.
+2. First, each menu the copy has and the business no longer does (it withdrew it with its courses and choices,
+   COMBO-F04) comes back as a new one, created as the Menus screen creates it (COMBO-F02): with its name, its kitchen
+   name, its closed price, how it is sold (eaten in or to take away), its tax category, its order and on sale or not,
+   as it was, and with the library image it had (COMBO-F14). Its own photo does not come back: it was deleted when the
+   menu was withdrawn, and the copy is of the database, not of the files.
+3. Then, each course the copy has and its menu no longer does (the menu has just come back, or the business removed
+   the course, COMBO-F05) is added to its menu again as the builder adds it: with its name, its minimum and maximum
+   picks and whether the same choice may be picked again, at the end of the menu and in the order it had in the copy.
+4. Last, each choice that in the copy offered a product live there and that the business no longer has is added again
+   to its course, the same one or the one that has just come back for it, as the menu builder adds it (COMBO-F06):
+   with its supplement and, if it was sold out in the copy, sold out (COMBO-F12). It goes at the end of the course, in
+   the order it had in the copy. A product the business no longer had at all comes back as a new one, with another id
+   (INVENTORY-F01): its choices are added to that one, the one the recovery made with its SKU.
+5. Recoveries counts it apart: "Menus: 1 created; Menu courses: 2 created; Menu choices of products: 3 created".
+In: the separate copy and what the business has today.
+Out: a menu for each one that was missing, with its new-menu event (`combo.combo.created`, and the changed-menu one,
+`combo.combo.updated`, if it comes back with its image), a course for each one that was missing, with its new-course
+event (`combo.group.created`), and a choice for each one that was missing, with its new-choice event
+(`combo.option.created`), all made by the recovery, so no automation starts (FLOW-F21); nothing else. The menu and the
+course that come back remember which of the copy's they were made for. The open menu builder and the till's menu
+catalogue see what comes back at once, and the till offers the menu again as soon as it has something to offer
+(COMBO-F07).
+If it fails: what the business still has stays as it is: a menu or a course it keeps, even if it renamed it, and a
+choice it still has, even if it changed its product afterwards. A menu the business made again by hand with its name
+(the case and the spaces aside; two menus may share a name, so each one made by hand stands for one of the copy's) is
+not repeated, nor a course with its name in its menu (the case aside), nor a choice whose product the business already
+offered again in that course: the business's own stay, as it left them. What comes back is recognised afterwards even
+if renamed, so asking again adds nothing twice. What hung in the copy from a menu or a course the business made again
+by hand is not added to it, and Recoveries says why, by its id in the copy ("not_found: That menu does not exist in this
+business.", "not_found: That course does not exist in this menu."). A choice the business removed by hand after the
+copy also comes back, like everything the business no longer has (BASE-F114). What the Menus screen or the builder
+does not accept today does not come back and Recoveries says why: a menu whose tax category is no longer active in
+Taxes ("invalid_field: …"; its courses and choices, "not_found: …"), a menu that already has 20 courses
+(`combo.too_many_groups`), a product still deleted or that the business no longer has (Products was not recovered, or
+the business already made another one by hand with its SKU, which keeps the choices it gave it) ("invalid_field: …"),
+switched off or no longer sold by units (`combo.product_inactive`, `combo.product_not_by_unit`) or a full course
+(`combo.too_many_options`). The product a recovery made is recognised by its SKU, whether this recovery made it or an
+earlier one: asked again from an earlier copy, it offers it again in its courses the choices the business removed from
+it since, like everything it no longer has.
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, COMBO-F02, COMBO-F04, COMBO-F05, COMBO-F06, COMBO-F12, COMBO-F13, COMBO-F14
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and permissions. A menu is named by its id or by its name; a
 course by its id or by its name within the menu; a product by its id, its SKU or its name. If a name
 fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `combo.group_ambiguous`,
-`combo.option_ambiguous`, `inventory.product_ambiguous`).
+`combo.option_ambiguous`, `inventory.product_ambiguous`). Before an action, the assistant asks for confirmation with
+its card (BASE-F97), which names each record as the screens name it, never by its identifier: the menu by its name
+("Menu: Menu of the day"), the course by its name ("Course: Starters"), the choice by its product's name ("Choice:
+Lentils"), the product by its name ("New product: Soup") and, when reordering courses or choices or adding several
+products, each one by its name and in the order sent ("Courses: Mains, Starters"). What the person asking cannot see,
+or what no longer exists, is left out; what was said in words and cannot be read comes up as it was said. A menu said
+by its name when changing it, withdrawing it, giving it a photo or
+reordering its courses is looked up as the action will look it up (the same name before one that contains it), and the
+card shows the menu that will be touched, with its full name ("Menu: Vegan menu" when "vegan" was said). If what was
+said fits several menus or none, no card comes up: the assistant hears "There are several menus called "vegan": Vegan
+menu, Gluten-free vegan menu. Say which one." and asks which one, or "That menu does not exist in this business.". The
+"yes" counts only for the menu the card showed: if, before confirming, someone creates one that fits better what was
+said ("Menu" when the card said "Vegan menu"), nothing is touched and the new card comes up. A course or a choice said
+by its name when changing or withdrawing it is looked up the same way, inside its menu: if what was said fits several or
+none, or its menu fits several, no card comes up and the assistant asks which one; the card shows the menu they belong
+to with its full name, and the "yes" counts only for the course or the choice it found: if, before confirming, someone
+adds one that fits better what was said ("Desserts" when "Homemade desserts" was found) or a menu that fits better,
+nothing is touched and the new card comes up (hub#1231). The card shows the course and the choice it found ("Course:
+Homemade desserts" when "desserts" was said, "Choice: House flan" when "flan" was said). When adding or reordering
+courses and choices, and with an Inventory product said by its name, the card also shows the menu, the course and the
+product it found, and the "yes" counts only for them: if, before confirming, someone creates one that fits better what
+was said, nothing is touched and the new card comes up; if what was said fits several, the card shows it as it was said
+and the action asks which one (hub#1245). If the menu, the course or the choice comes by its identifier beside a name
+the action does not use (another menu's, another course's or another product's), the card neither reads nor shows that
+name: it says the record of the identifier, as when it comes alone (hub#1250). The same with the identifier of another
+menu or another course that comes beside the course's or the choice's, or beside that of the course a choice is added
+to, reordered in or looked for in: the action does not use it and the card does not show it (hub#1278).
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -481,7 +586,8 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 |---|---|---|---|
 | The menus, with search, filters and order, in pages of up to 100 (live) | view | F01 | `combo.combo.list` |
 | A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
-| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20) | view | F07 | `combo.option.get` |
+| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06, F07 | `combo.option.get` |
+| A course of a menu with its choices, by its id or by its name within the menu: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view | F05, F06 | `combo.group.get` |
 | The till's menu catalogue: the ones that can be sold, with their courses and their available choices (live) | view | F07 | `combo.combo.for_sale` |
 | The line of a menu with what was chosen: amount, components and tax split | view | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |
@@ -497,7 +603,7 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 | Changes a course (only what is sent) | manage | F05 | `combo.group.update` |
 | Withdraws a course with its choices | manage | F05 | `combo.group.delete` |
 | Orders the courses of a menu, all at once | manage | F05 | `combo.group.reorder` |
-| Adds a choice (at the end) | manage | F06 | `combo.option.create` |
+| Adds a choice (at the end) | manage | F06, F15 | `combo.option.create` |
 | Adds several choices at once | manage | F06 | `combo.option.bulk_create` |
 | Changes a choice: product, supplement or available (only what is sent) | manage | F06, F12 | `combo.option.update` |
 | Removes a choice | manage | F06 | `combo.option.delete` |
@@ -510,12 +616,12 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
-| New menu | Creating a menu | `id`, `name` | `combo.combo.created` |
+| New menu | Creating a menu (or recovering it from a separate copy) | `id`, `name` | `combo.combo.created` |
 | Menu changed | Saving with some change | `id`, `name` | `combo.combo.updated` |
 | Menu withdrawn | Withdrawing | `id`, `name` | `combo.combo.deleted` |
-| Course new, changed or withdrawn | Creating, saving with changes or withdrawing a course | `id`, `combo_id` | `combo.group.created`, `.updated`, `.deleted` |
+| Course new, changed or withdrawn | Creating (or recovering it from a separate copy), saving with changes or withdrawing a course | `id`, `combo_id` | `combo.group.created`, `.updated`, `.deleted` |
 | Courses reordered | Changing the order | `combo_id` | `combo.group.reordered` |
-| Choice new, changed or removed | Adding (one or several), saving with changes, marking sold out or removing; removing because the product was deleted carries `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
+| Choice new, changed or removed | Adding (one or several, or recovering it from a separate copy), saving with changes, marking sold out or removing; removing because the product was deleted carries `reason: "product_deleted"` | `id`, `group_id`, `combo_id`, `product_id` | `combo.option.created`, `.updated`, `.deleted` |
 | Choices reordered | Changing the order | `group_id`, `combo_id` | `combo.option.reordered` |
 
 ### What it reacts to
@@ -524,9 +630,10 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 |---|---|---|---|
 | Inventory: product deleted | Removes its choices from all the menus, in a few seconds (the worker's handing out of notices; repeating it changes nothing) | F13 | `inventory.product.deleted` → `combo.option.drop_product` |
 
-Besides, Inventory's product changes (`inventory.product.updated`, `.deleted`) re-read live
-the builder and the till's catalogue: the name, the price, whether it is active and whether it is
-sold out belong to Inventory.
+Besides, Inventory's product changes (`inventory.product.updated`, `.deleted`, and `.restored`
+when ERPlora's staff recover it from a separate copy) re-read live the builder and the till's
+catalogue: the name, the price, whether it is active and whether it is sold out belong to Inventory.
+To a recovered product it does not react: its choices come back from the copy (F15).
 
 ### What it needs from other apps
 
@@ -535,6 +642,7 @@ sold out belong to Inventory.
 | Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | model `inventory.Product`; the screen's search box uses `inventory.product.list` with `is_active` and `include_sold_out` (the active ones, sold out or not) |
 | Taxes (`requires`) | The tax categories of the selector and that of the menu "eaten in" | F02, F03, F09 | model `tax.TaxCategory`; the selector uses `tax.category.list` |
 | Platform | The image library: searching it and naming by its title the image set on a menu | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
+| Platform | The recovery from a separate copy (BASE-F114), to which Menus says which menus, courses and choices it gives back | F15 | `recoverable_from_copy` in `apps.py` |
 
 ### Contract with Sales
 

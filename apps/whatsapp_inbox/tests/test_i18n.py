@@ -4,56 +4,42 @@ import gettext
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils.functional import Promise
 from django.utils.translation import gettext as gettext_
 from django.utils.translation import override
-from live.operations import registry
 
 from apps.whatsapp_inbox import queries, schemas, services
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
-from apps.whatsapp_inbox.tests.conftest import receive
-from base.tests.po import po_entries
+from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, receive
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 LOCALE = (
     Path(apps.get_app_config("whatsapp_inbox").path) / "locale" / "es" / "LC_MESSAGES"
 )
 
 
-def msgids(path: Path) -> set[str]:
-    """The English sources of the catalog, without their contexts."""
-    return {key.split("\x04", 1)[-1] for key in po_entries(path)}
-
-
-def module_texts(module) -> list:
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
-
-
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, errors)."""
+    """The catalogue key of every lazy text the app shows (menu, store, admin, choices, errors) — its English, with
+    its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("whatsapp_inbox")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         # The Home's bell and the device's notices (WHATSAPP_INBOX-F09).
         *(counter.label for counter in config.bell),
         *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
-        *module_texts(schemas),
-        *module_texts(queries),
-        *module_texts(services),
+        *module_texts(schemas, queries, services),
     ]
-    for model in (Channel, Conversation, Message, Note, Template):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += model_texts((Channel, Conversation, Message, Note, Template))
     for choices in (
         Channel.Status,
         Conversation.Status,
@@ -69,41 +55,21 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles the inbox's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones whatsapp_inbox wrote: pydantic leaves ``title``
-    empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "whatsapp_inbox"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("whatsapp_inbox")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - msgids(LOCALE / "django.po") == set()
+    """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
+    context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#639)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=200, with_context=37) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_whatsapp_inboxs_own_spanish():
@@ -111,7 +77,7 @@ def test_the_card_says_each_title_with_whatsapp_inboxs_own_spanish():
     Spanish, so the inbox's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("whatsapp_inbox")
     assert {"Assigned to", "Template", "WhatsApp Business account"} <= titles
     with override("es"):
         assert {title: gettext_(title) for title in titles} == {title: own.gettext(title) for title in titles}
@@ -133,15 +99,39 @@ def test_spanish_texts():
         assert str(queries.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
 
 
-@pytest.mark.django_db
+def test_spanish_says_the_inboxs_own_words_not_an_earlier_apps():
+    """The labels the inbox shares in English with an app loaded before it come out in Spanish with its own words
+    (hub#570): where a message came from (live or its history) is its «procedencia», since «origen» already names who
+    sent it, not Clientes' «origen»; a template is «borrada el» and «sincronizada el» like it is «entregada el», not
+    Clientes' «eliminado el» nor Facturación's «recibido el»; the channel is «sincronizado el»."""
+    labels = {
+        "Message.origin": Message._meta.get_field("origin").verbose_name,
+        "Message.source": Message._meta.get_field("source").verbose_name,
+        "Template.submit_at": Template._meta.get_field("submit_at").verbose_name,
+        "Template.deleted_at": Template._meta.get_field("deleted_at").verbose_name,
+        "Template.synced_at": Template._meta.get_field("synced_at").verbose_name,
+        "Channel.synced_at": Channel._meta.get_field("synced_at").verbose_name,
+    }
+    with override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "Message.origin": "origen",
+            "Message.source": "procedencia",
+            "Template.submit_at": "entregada el",
+            "Template.deleted_at": "borrada el",
+            "Template.synced_at": "sincronizada el",
+            "Channel.synced_at": "sincronizado el",
+        }
+
+
+@HUB_DB
 def test_an_error_follows_the_language_of_the_request(client, make_user):
     receive("wamid.1")
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/whatsapp_inbox/messages/send",
         json.dumps({"conversation": "Zoe", "text": "Hola", "client_message_id": "0199e000-0000-7000-8000-0000000000be"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

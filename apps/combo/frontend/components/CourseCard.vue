@@ -6,9 +6,10 @@
 // deleted in Inventory); per row the handle, up and down (the whole order saved at once), «Sold out» /
 // «Available», edit (keeps its place) and remove (after its confirmation). Below, the product picker,
 // «Supplement (PLN)» (it may be negative), «Add choice» and «Add several». A refusal is said in the course. Every
-// amount is in the business's currency, its country's, with its decimals; a bare figure (and just «Supplement»)
-// until the business answers, never a euro.
-import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
+// amount is in the business's currency, its country's, with its decimals; a dash (and just «Supplement»)
+// until the business answers, never a euro. «Add choice» / «Save» wait in grey until then: the supplement is read in
+// that currency (hub#946); the builder's page says it, with «Retry», if the business's money cannot be read.
+import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, MoneyInput, moneyFieldText, parseMoney, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonReorder, IonReorderGroup } from '@ionic/vue';
@@ -16,12 +17,10 @@ import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatDelta, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchProducts } from '../lib/pickers';
 import { courseRule } from '../lib/rules';
 import type { GroupOut, OptionOut, OptionPatchIn, OptionStatus } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
-import MoneyInput from './MoneyInput.vue';
 
 /** Sold out, here or in Inventory (INVENTORY-F29): it comes back, a warning; the rest needs fixing. */
 const SOLD_OUT: ReadonlySet<OptionStatus> = new Set(['sold_out', 'product_sold_out']);
@@ -159,6 +158,11 @@ const courseError = computed(() => {
 });
 
 async function save(): Promise<void> {
+  // No supplement is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#946). Nor judged: the attempt counts only once the money is known, or the
+  // field would call «¥1500» not an amount while the course waits.
+  const currency = money.value;
+  if (!currency) return;
   tried.value = true;
   reason.value = '';
   if (!article.value) {
@@ -170,7 +174,7 @@ async function save(): Promise<void> {
     reason.value = t('combo.choices.duplicate');
     return;
   }
-  const read = parseMoney(delta.value, { signed: true, money: money.value });
+  const read = parseMoney(delta.value, { signed: true, money: currency });
   if (!read.ok) return;
   const price = read.cents ?? 0;
   try {
@@ -393,6 +397,7 @@ async function save(): Promise<void> {
           v-model="delta"
           signed
           :testid="`${prefix}-delta`"
+          :money="money"
           :label="money ? t('combo.choices.deltaIn', { currency: money.currency }) : t('combo.choices.delta')"
           :error-text="fields.price_delta"
           :show-error="tried"
@@ -401,7 +406,7 @@ async function save(): Promise<void> {
           <ion-button
             size="small"
             :data-testid="`${prefix}-save`"
-            :disabled="create.pending.value || update.pending.value"
+            :disabled="!money || create.pending.value || update.pending.value"
             @click="save"
           >
             {{ editing ? $t('combo.save') : $t('combo.choices.add') }}
@@ -575,7 +580,7 @@ async function save(): Promise<void> {
   font-size: 0.85rem;
   color: var(--ion-color-danger, #c5000f);
 }
-/* combos#4: on a phone or a tablet each button (not only its icon) reaches 44×44, as the tables' actions. */
+/* On a phone or a tablet each button (not only its icon) reaches 44×44, as the tables' actions. */
 @media (pointer: coarse), (max-width: 834px) {
   .combo-course__actions ion-button,
   .combo-course__row-actions ion-button {

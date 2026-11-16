@@ -123,7 +123,7 @@ async function exportFile(): Promise<void> {
   try {
     const { search, sort } = table.params.value;
     const file = await client.api.call('inventory.category.export', { search, sort });
-    saveTextFile(file.filename, file.content, file.content_type);
+    await saveTextFile(file.filename, file.content, file.content_type, t);
   } catch (failure) {
     pageError.value = failure instanceof Error ? failure.message : String(failure);
   } finally {

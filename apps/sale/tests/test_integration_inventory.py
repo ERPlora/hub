@@ -1,7 +1,7 @@
 """Sale and Inventory together, no mocks: the catalog that prices a line and the stock a sale moves.
 
 The sale's real event (``sale.sale.completed`` / ``voided``, as recorded in the outbox) is handed to
-Inventory's real reaction (``apps.inventory.events.react``), as the outbox relay will in phase 2.
+Inventory's real reaction (``apps.inventory.events.react``), as the worker's outbox relay does.
 """
 
 from decimal import Decimal
@@ -15,9 +15,9 @@ from live.models import OutboxEvent
 from apps.inventory import events as inventory_events
 from apps.inventory.models import Product, StockMovement
 from apps.sale.models import Order, OrderLine, Sale
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def deliver(name: str):

@@ -14,16 +14,11 @@ from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.reservation.models import (
-    BlockedDate,
-    Reservation,
-    Settings,
-    TimeSlot,
-    WaitlistEntry,
-)
+from apps.reservation.models import BlockedDate, Reservation, Settings, TimeSlot, WaitlistEntry
 
 from .conftest import (
     A,
+    HUB_DB,
     NOW,
     THURSDAY,
     TOMORROW,
@@ -40,7 +35,7 @@ from .conftest import (
     set_rules,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 MANAGER = "hub_manager"
@@ -904,7 +899,7 @@ def test_the_reactions_are_the_platforms_only():
     assert run("reservation.customer.erase", {}, system_context(A)).changed == 0
 
 
-# ── Review of 2026-10-21: who changes a guest's own booking (F08) and the WhatsApp door (F17, F18) ─────────
+# ── Who changes a guest's own booking (F08) and the WhatsApp door (F17, F18) ─────────────────────
 
 
 def test_the_staff_change_a_booking_the_guest_made_herself_without_her_rules(week):

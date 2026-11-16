@@ -1,4 +1,4 @@
-"""What the worker's metrics read of the registry (hub#488; PLAN-AWS §8, PLAN-DB §6 and §8): one aggregate of control.
+"""What the worker's metrics read of the registry: one aggregate of control.
 
 ``registry_health(now)`` answers, in one query: since when the oldest hub still being prepared waits (requested,
 creating, migrating, seeding, or failed and retried), how many hubs failed, and since when the oldest demo that ended
@@ -41,7 +41,7 @@ def test_a_hub_still_being_prepared_waits_since_its_last_change(status):
 
 
 def test_a_business_restored_into_its_preparation_waits_since_it_was_restored_not_since_it_was_born():
-    """Review of hub#598: ``base.hub.restore`` brings a business that left back to ``requested`` when its preparation
+    """``base.hub.restore`` brings a business that left back to ``requested`` when its preparation
     never ended; born months ago, it would page at once if its age counted from its birth."""
     now = timezone.now()
     make("acme", "requested", created=now - dt.timedelta(days=90), changed=now - dt.timedelta(minutes=2))

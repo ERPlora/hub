@@ -37,4 +37,26 @@ export default [
     files: ['frontend/**/*.{ts,vue}', 'base/frontend/**/*.{ts,vue}', 'apps/*/frontend/**/*.{ts,vue}'],
     rules: { 'no-restricted-globals': ['error', ...restricted] },
   },
+  {
+    // Functions small enough for a person to follow. What already broke a limit when it came in is in
+    // eslint-suppressions.json, and `eslint` fails when one of those suppressions is no longer needed.
+    rules: {
+      complexity: ['error', 15],
+      'max-depth': ['error', 4],
+      'max-params': ['error', 3],
+      'max-lines-per-function': ['error', { max: 50, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    // A Vue page is measured by blocks: the function limits see neither its template nor its style. Every physical
+    // line counts, blank ones too, and the blocks over their cap today are frozen in eslint-suppressions.json.
+    files: ['**/*.vue'],
+    rules: { 'vue/max-lines-per-block': ['error', { template: 250, script: 300, style: 150 }] },
+  },
+  {
+    // In tests each describe is a function, and a test's helpers take what they need.
+    // The extensions are spelled out: a pattern such as `**/*.test.*` would make ESLint lint the shell scripts too.
+    files: ['**/tests/**', '**/e2e/**', '**/*.{test,spec}.{ts,tsx,js,mjs,cjs,vue}'],
+    rules: { 'max-params': 'off', 'max-lines-per-function': 'off' },
+  },
 ];

@@ -5,21 +5,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WeekDayOut } from '../operations';
-import { click, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
+import { click, ionChecked, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import DayHoursModal from './DayHoursModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
-
-/** Ticks or unticks an `ion-checkbox` as Ionic does (`ionChange` with `checked`). */
-async function toggle(el: Element | null, checked: boolean): Promise<void> {
-  if (!el) throw new Error('no checkbox');
-  (el as HTMLElement & { checked?: boolean }).checked = checked;
-  el.dispatchEvent(new CustomEvent('ionChange', { detail: { checked, value: 'on' }, bubbles: true }));
-  await settle();
-}
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; errorText?: string };
 
@@ -101,13 +93,13 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
   it('Closed sends no interval; Open 24 hours sends 00:00–00:00', async () => {
     const s = await setup();
     s.answer(200, { week_starts_on: 1, confirmed: true, timezone: 'Europe/Madrid', days: [] });
-    await toggle(s.control('open24h'), true);
+    await ionChecked(s.control('open24h'), true);
     expect(s.inDoc('schedule-day-form-intervals-open-0')).toBeNull();
     await click(s.submit());
     expect(s.sent().at(-1)?.body).toEqual({ weekday: 0, is_closed: false, intervals: [{ open_time: '00:00', close_time: '00:00' }] });
     await s.wrapper.setProps({ open: true });
     await settle();
-    await toggle(s.control('closed'), true);
+    await ionChecked(s.control('closed'), true);
     await click(s.submit());
     expect(s.sent().at(-1)?.body).toEqual({ weekday: 0, is_closed: true, intervals: [] });
   });
@@ -135,5 +127,17 @@ describe('DayHoursModal (SCHEDULE-F02)', () => {
     const s = await setup(MONDAY, 'es');
     expect(s.inDoc('schedule-day-form')?.getAttribute('aria-label')).toBe('Editar horario — Lunes');
     expect([s.control('weekday').label, s.submit().textContent?.trim()]).toEqual(['Día', 'Guardar día']);
+  });
+});
+
+describe('DayHoursModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('the day as loaded closes; a change asks; restored as loaded closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('schedule-day-form'),
+      change: () => ionChecked(s.control('closed'), true),
+      restore: () => ionChecked(s.control('closed'), false),
+    });
   });
 });

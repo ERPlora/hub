@@ -5,25 +5,32 @@
 // business signs itself; a company names its legal representative), the data-protection essentials BEFORE any identity
 // document is asked, and the two to four PDFs to upload («Send for review»). A refusal is said by its code. The
 // taxpayer is Invoicing's issuer, read and never asked here. Only who configures VeriFactu sends it.
-import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toastError, toastSuccess } from '@erplora/ui/shell';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type BrowserDownload, browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { click, EMPLOYEE, ionValue, mountVerifactu, settle } from '../__tests__/mount-verifactu';
-import { saveBase64File } from '../lib/files';
 import type { ConfigOut, RepresentationOut } from '../operations';
 import RepresentationGrant from './RepresentationGrant.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastSuccess: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(() => Promise.resolve()),
 }));
-vi.mock('../lib/files', async (importOriginal) => ({
-  ...((await importOriginal()) as object),
-  saveBase64File: vi.fn(),
-}));
+
+/** The files the page handed the browser through a link. */
+let downloads: BrowserDownload[];
+
 beforeEach(() => {
   vi.mocked(toastSuccess).mockClear();
-  vi.mocked(saveBase64File).mockClear();
+  vi.mocked(toastError).mockClear();
+  downloads = browserDownloads();
+});
+
+afterEach(() => {
+  outOfTheApp();
+  vi.restoreAllMocks();
 });
 
 const NONE: RepresentationOut = {
@@ -255,14 +262,44 @@ describe('a refusal says why, by its code', () => {
 });
 
 describe('the blank model', () => {
+  const MODEL = { filename: 'anexo-i.pdf', content_type: 'application/pdf', content_base64: 'JVBERi0xLjQ=' };
+
   it('is downloaded from ERPlora and handed to the browser', async () => {
     const s = await setup();
-    s.answer(200, { filename: 'anexo-i.pdf', content_type: 'application/pdf', content_base64: 'JVBERi0xLjQ=' });
+    s.answer(200, MODEL);
     await click(s.find('verifactu-grant-download').element);
     await settle();
     expect(s.sent()).toEqual([{ method: 'GET', path: '/api/verifactu/representation/model', query: {}, body: undefined }]);
-    expect(saveBase64File).toHaveBeenCalledWith('anexo-i.pdf', 'application/pdf', 'JVBERi0xLjQ=');
+    expect(downloads.map((file) => file.name)).toEqual(['anexo-i.pdf']);
+    expect(downloads[0].blob.type).toBe('application/pdf');
+    expect(new Uint8Array(await downloads[0].blob.arrayBuffer())).toEqual(new TextEncoder().encode('%PDF-1.4'));
     expect(s.find('verifactu-grant-downloaded').text()).toBe('Model downloaded. Sign it and upload it below.');
+  });
+
+  it('inside the installed app it is saved in Downloads by the app, which says where (hub#1041)', async () => {
+    const invoke = insideTheAppSaving({ path: 'Download/anexo-i.pdf' });
+    const s = await setup();
+    s.answer(200, MODEL);
+    await click(s.find('verifactu-grant-download').element);
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('save_download', { name: 'anexo-i.pdf', dataBase64: 'JVBERi0xLjQ=' });
+    expect(downloads).toEqual([]);
+    expect(toastSuccess).toHaveBeenCalledWith('Saved to Download/anexo-i.pdf');
+    expect(s.find('verifactu-grant-downloaded').text()).toBe('Model downloaded. Sign it and upload it below.');
+  });
+
+  it('inside the installed app a refusal is said, never «downloaded»', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    insideTheAppSaving('downloads_unreachable');
+    const s = await setup({}, { locale: 'es' });
+    s.answer(200, MODEL);
+    await click(s.find('verifactu-grant-download').element);
+    await settle();
+    expect(toastError).toHaveBeenCalledWith(
+      'Esta app no puede guardar archivos en un móvil o una tablet. Abre tu negocio en un navegador para descargarlo.',
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(s.wrapper.find('[data-testid="verifactu-grant-downloaded"]').exists()).toBe(false);
   });
 
   it('without ERPlora it says why', async () => {
@@ -270,7 +307,7 @@ describe('the blank model', () => {
     s.answer(503, { error: { code: 'verifactu.saas_unreachable', message: 'x' } });
     await click(s.find('verifactu-grant-download').element);
     await settle();
-    expect(saveBase64File).not.toHaveBeenCalled();
+    expect(downloads).toEqual([]);
     expect(s.find('verifactu-grant-error').text()).toBe('ERPlora could not handle this right now. Try again in a few minutes.');
   });
 });

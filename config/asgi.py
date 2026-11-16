@@ -1,14 +1,14 @@
-"""ASGI entry point of hub-next: the ``application`` that Daphne serves.
+"""ASGI entry point of the Hub: the ``application`` that Daphne serves.
 
 ``ignore_root_path`` wraps it because Daphne trusts its client's own ``Daphne-Root-Path`` header:
 it copies it into ``scope["root_path"]``, which Django takes as the script prefix, stripped from the
 path it resolves and put in front of every URL it builds. The project is served at the root of its
-host, so that prefix is always empty and a request is answered for its real path (ERPlora/hub#2).
+host, so that prefix is always empty and a request is answered for its real path.
 
 HTTP goes to Django. Django serves no WebSocket, and the Hub has exactly one, ``/ws/print`` (the print
-host's channel, PLAN-HUB §5): a plain ASGI application of ``base.ws_print``, without Channels (round 11:
-no channel layer, no ``channels`` installed). Any other WebSocket path is refused at the handshake
-(close 4404 before the accept: Daphne answers it 403).
+host's channel): a plain ASGI application of ``base.ws_print``, without Channels (no channel layer, no
+``channels`` installed). Any other WebSocket path is refused at the handshake (close 4404 before the
+accept: Daphne answers it 403).
 
 https://docs.djangoproject.com/en/6.1/howto/deployment/asgi/
 """

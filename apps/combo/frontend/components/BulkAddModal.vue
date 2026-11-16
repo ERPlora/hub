@@ -7,12 +7,14 @@
 // Only portions are offered (sold and priced by the unit); while the catalogue is on its way it says
 // «Loading…», a failure offers «Retry», and an answer older than the last search is dropped. A category
 // of Inventory narrows the list to its products (all of them, the course takes 40 at most) and «Tick all
-// of “category” (N)» ticks the ones the course does not offer yet, in the list's order (combos#12: Square
+// of “category” (N)» ticks the ones the course does not offer yet, in the list's order (as Square
 // and WooCommerce Composite add a whole category at once). Each product's price is in the business's currency.
 import { Combo, type ComboOption, FormModal, InlineFeedback, syncSearchbarInputName } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonItem, IonList, IonNote, IonSearchbar } from '@ionic/vue';
 import { computed, ref, useTemplateRef, watch } from 'vue';
+
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, useBusinessMoney } from '../lib/format';
@@ -37,7 +39,7 @@ interface Article {
 const locale = useLocale();
 const t = useT();
 const client = useLiveClient();
-/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+/** The business's currency (its country's), a dash until it answers: never a euro by default. */
 const money = useBusinessMoney();
 const add = useCommand('combo.option.bulk_create');
 const articles = ref<Article[]>([]);
@@ -131,11 +133,15 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// What is searched or narrowed only filters the list: what would be added is what is ticked.
+const canDismiss = useUnsavedFormOnOpen('combo-bulk', picked, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-bulk"
     :title="$t('combo.bulk.title')"
     :submit-label="$t('combo.bulk.addCount', { n: picked.length })"

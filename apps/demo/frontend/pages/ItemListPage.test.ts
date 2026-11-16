@@ -236,7 +236,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     expect(s.wrapper.findComponent(EmptyState).props('message')).toBeUndefined();
   });
 
-  it('has no OutfitKit tag left in any state (PLAN §16.11)', () => {
+  it('has no OutfitKit tag left in any state', () => {
     expect(source).not.toMatch(/<ok[-]/);
   });
 
@@ -380,7 +380,7 @@ describe('ItemListPage: the figures above the table (managers only)', () => {
   });
 });
 
-// PoC issue E: on a phone «Load more» must ADD the next rows below the ones shown. The page keeps one
+// On a phone «Load more» must ADD the next rows below the ones shown. The page keeps one
 // live window from the first row (a bigger `limit`, `offset` 0), so every row on screen stays live.
 describe('ItemListPage on a phone: «Load more» grows the live window', () => {
   type MediaListener = (e: { matches: boolean }) => void;
@@ -434,9 +434,9 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
     expect(s.wrapper.text()).toContain('Renamed 11');
   });
 
-  // CLOSE-DEMO: one page of `demo.item.list` holds 100 rows at most (`ItemListIn.limit`, le=100). «Load more» never
-  // asks for more (at 50 per page the second one asked for 150 and the 422 left «The items could not be loaded»),
-  // and past 100 rows a phone pages too (`maxWindow`, ERPlora/ui#12), so every row stays in reach.
+  // One page of `demo.item.list` holds 100 rows at most (`ItemListIn.limit`, le=100). «Load more» never asks for
+  // more (at 50 per page the second one asked for 150 and the 422 left «The items could not be loaded»), and past
+  // 100 rows a phone pages too (`maxWindow`), so every row stays in reach.
   it('«Load more» never asks for more than the server’s 100 rows', async () => {
     viewport(true);
     const s = await setup();
@@ -492,7 +492,7 @@ describe('ItemListPage on a phone: «Load more» grows the live window', () => {
   });
 });
 
-describe('ItemListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ItemListPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the bottom of the page', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

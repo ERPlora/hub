@@ -1,16 +1,16 @@
-"""``manage.py translate_workbooks [--app <id>] [--check]``: each app's ``WORKBOOK.en.md`` (spec §4.5).
+"""``manage.py translate_workbooks [--app <id>] [--check]``: each app's ``WORKBOOK.en.md``.
 
 The WORKBOOK is written in Spanish (it is the specification); its English version is the translation
 of its user part (``base.catalog.user_part``), versioned next to it and headed by
 ``<!-- generated from WORKBOOK.md sha256:<hash> -->``. The hash is the user part's, so editing
 «Para quien lo mantiene» never asks for a new translation.
 
-ERPlora uses no ``ANTHROPIC_API_KEY`` (PLAN-MIGRATIONS §24-D): whoever edits a WORKBOOK translates the
+ERPlora uses no ``ANTHROPIC_API_KEY``: whoever edits a WORKBOOK translates the
 change by hand, with the header ``base.catalog.translate_by_hand`` names. ``--check`` is what runs (in
 CI, through the tests): it never reaches the network nor needs the key, and fails listing the apps
 whose ``WORKBOOK.en.md`` exists and is out of date (a missing one is no error), telling to translate
 each by hand, and every Spanish date placeholder (``AAAA``, ``aaaa``) a current one keeps outside its
-fenced code blocks, by file and line: in English the year is ``YYYY`` (hub#225).
+fenced code blocks, by file and line: in English the year is ``YYYY``.
 
 Without ``--check`` it translates through the Claude API, for whoever has a key; no error sends there.
 The ``anthropic`` client is a development dependency, the key lives in the local ``.env`` (or the
@@ -28,7 +28,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from base import catalog
 
-#: The fixed instructions of every translation (spec §4.5).
+#: The fixed instructions of every translation.
 INSTRUCTIONS = """\
 You translate the customer documentation of an app of ERPlora, a point-of-sale and back-office \
 platform for small businesses in Spain, from Spanish into English.

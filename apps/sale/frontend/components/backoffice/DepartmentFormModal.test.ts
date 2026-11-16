@@ -6,6 +6,8 @@
 // does not know under «VAT charged», a department another device deleted on top).
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart, refusedWithTheSameWords, SAME_WORDS } from '../../../../../base/frontend/__tests__/same-words-refusal';
+import { unsavedChangesIn } from '../../../../../base/frontend/lib/system-back';
 import { click, ionValue, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import type { DepartmentOut } from '../../operations';
@@ -209,5 +211,68 @@ describe('DepartmentFormModal: the business territory’s tax', () => {
     await s.type('name', 'Butchery');
     await click(s.submit());
     expect(s.field('tax').errorText).toBe('Choose the IPSI this section charges.');
+  });
+});
+
+describe('DepartmentFormModal: fields refused with the same words (hub#888)', () => {
+  const KEYS = ['name', 'tax_category_key', 'sort_order'];
+  const FIELD_OF: Record<string, string> = { tax_category_key: 'tax', sort_order: 'order' };
+  /** «New section» filled in, «Add» answered with `refusal`. */
+  async function refused(locale: 'en' | 'es', refusal: ReturnType<typeof refusedWithTheSameWords>) {
+    const s = await setup(null, locale);
+    await s.type('name', 'Butchery');
+    await s.chooseTax('general');
+    await s.type('order', '4');
+    s.answer(422, refusal);
+    return { ...s, fieldOf: (key: string) => s.field(FIELD_OF[key] ?? key) };
+  }
+
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await refused(locale, refusal);
+    return { field: s.fieldOf, send: () => click(s.submit()), settle };
+  }, 'tax_category_key');
+
+  // «VAT charged» is not typed in: a person corrects it by choosing another category in its list.
+  it('«VAT charged», chosen again in its list, alone loses the words every field was refused with', async () => {
+    const s = await refused('en', refusedWithTheSameWords(KEYS));
+    await click(s.submit());
+    expect(KEYS.map((key) => s.fieldOf(key).errorText)).toEqual([SAME_WORDS, SAME_WORDS, SAME_WORDS]);
+    await s.chooseTax('food.basic');
+    await settle();
+    expect(KEYS.filter((key) => s.fieldOf(key).errorText)).toEqual(['name', 'sort_order']);
+  });
+});
+
+describe('DepartmentFormModal: Android Back with unsaved changes (hub#1020, SALE-F35, BASE-F05)', () => {
+  const holding = (s: Awaited<ReturnType<typeof setup>>) => unsavedChangesIn(s.inDoc('sale-department-form')!);
+
+  it('as opened closes; a typed change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    expect(holding(s)).toBeUndefined();
+    await s.type('name', 'Butchery');
+    expect(holding(s)).toBeDefined();
+    await s.type('name', '');
+    expect(holding(s)).toBeUndefined();
+  });
+
+  it('editing starts clean and a changed field asks', async () => {
+    const s = await setup(FRUIT);
+    expect(holding(s)).toBeUndefined();
+    await s.type('name', 'Fruit');
+    expect(holding(s)).toBeDefined();
+  });
+});
+
+// hub#1156 (SALE-F35, BASE-F05): «Cancel», the «×», Escape and a tap outside ask «Discard changes?» too while a typed
+// change is there; «Keep editing» leaves «New section» open with it.
+describe('DepartmentFormModal: its own ways out ask with unsaved changes (hub#1156, SALE-F35, BASE-F05)', () => {
+  it('Cancel, ×, Escape and a tap outside ask while a name is typed; as opened nothing holds it', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('sale-department-form'),
+      change: () => s.type('name', 'Fruit'),
+      restore: () => s.type('name', ''),
+    });
   });
 });

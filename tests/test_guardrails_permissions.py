@@ -1,4 +1,4 @@
-"""Guardrail of the permissions (W11, phase 2; ARCHITECTURE.md §4 «Un solo camino»; Ioan, 2026-10-31).
+"""Guardrail of the permissions: no operation of the Hub is open to every employee by omission.
 
 ``live.operations.Operation`` checks ``ctx.has(op.permission)`` before it runs, and ``OperationContext.has(None)`` is
 ``True``: an ``@operation(..., permission=None)`` runs for anyone with a context on the business (any role, and on a
@@ -25,7 +25,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import PermissionDenied
 from live.operations import registry
 
@@ -33,7 +33,9 @@ from base.auth import RedeemedUser
 from base.models import Membership
 from base.permissions import permissions_for
 from base.registry import REGISTRY_SCOPE
-from base.services import open_admin_session_from_saas, open_session_from_saas
+from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import A, HUB_DB, on_hub_a
 from control.models import Hub
 
 # ── Why an operation may have no permission ───────────────────────────────────────────────────────────────────────
@@ -55,7 +57,7 @@ CHECKED_INSIDE = "checked inside"
 OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.access.door": (
         DEVICE_DOOR,
-        "The PIN pad of a trusted shared device, before anyone signs in (BASE-G55): names and initials of who may "
+        "The PIN pad of a trusted shared device, before anyone signs in: names and initials of who may "
         "enter with a PIN there, never an email or an account; anyone else hears it with nobody in it.",
     ),
     "base.demo.code_create": (PLATFORM, "The SaaS asks for the one-time entry code of a demo (/internal)."),
@@ -76,7 +78,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
     "base.app.activation_settle": (
         PLATFORM,
-        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database (S3).",
+        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database.",
     ),
     "base.hub.reset_apply": (
         PLATFORM,
@@ -99,7 +101,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.cut_finish": (
         PLATFORM,
-        "The last step of the cut of S5 (manage.py cut_shared_hubs): a business of phase 1 gets its own database "
+        "The last step of manage.py cut_shared_hubs: a business that shared control's database gets its own "
         "in control's registry; internal_only refuses anyone else.",
     ),
     "base.usage.list": (
@@ -126,6 +128,20 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         PLATFORM,
         "The Hub admin edits a database cluster, for the platform's admins (staff and superuser).",
     ),
+    "control.copy.recover": (
+        PLATFORM,
+        "The Hub admin's «Recover into the business…» on a separate copy, for the platform's admins (staff and "
+        "superuser); the worker creates what the business lacks by each app's own operation.",
+    ),
+    "control.freeze.get": (
+        PLATFORM,
+        "The Hub admin's freeze switch, read by the platform's staff (support only reads): frozen, since when, by whom.",
+    ),
+    "control.freeze.set": (
+        PLATFORM,
+        "The Hub admin freezes or lifts the platform for a database upgrade, for the platform's admins (staff and "
+        "superuser); the worker and migrate_hubs read it.",
+    ),
     "control.hub.move": (
         PLATFORM,
         "The Hub admin's «Move to cluster…», for the platform's admins (staff and superuser); the worker moves it.",
@@ -133,6 +149,16 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "control.hub.move_cancel": (
         PLATFORM,
         "The Hub admin's «Cancel the move», for the platform's admins (staff and superuser); the worker undoes it.",
+    ),
+    "control.hub.restore": (
+        PLATFORM,
+        "The Hub admin puts a hub back as it was at a moment, for the platform's admins (staff and superuser); the "
+        "worker restores it.",
+    ),
+    "control.hub.restore_aside": (
+        PLATFORM,
+        "The Hub admin's «Restore to a separate copy…», for the platform's admins (staff and superuser); the worker "
+        "makes the copy next to the business, which is never closed nor changed.",
     ),
     "staff.account.list": (
         CHECKED_INSIDE,
@@ -199,40 +225,39 @@ def test_an_open_command_is_the_platform_s_alone():
 
 def an_owner_of_a() -> object:
     user = get_user_model().objects.create_user(username="saas:1")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     return user
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", of_kind(PLATFORM))
-def test_the_platform_s_operations_refuse_a_business_s_owner_with_every_permission(name):
+def test_the_platform_s_operations_refuse_a_business_s_owner_with_every_permission(name, hub_a):
     # The worst case on a business's host: its owner, holding every permission there is.
     op = registry[name]
-    ctx = OperationContext(scope=Scope("host", "a"), actor=an_owner_of_a(), permissions=frozenset({"*"}))
-    with pytest.raises(PermissionDenied) as refused:
+    ctx = OperationContext(scope=A, actor=an_owner_of_a(), permissions=frozenset({"*"}))
+    with use_hub(hub_a), pytest.raises(PermissionDenied) as refused:
         op(ctx, op.input.model_construct())
     assert refused.value.code == "base.internal_only"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("name", of_kind(CHECKED_INSIDE))
-def test_what_checks_its_permissions_itself_refuses_without_them(name):
+def test_what_checks_its_permissions_itself_refuses_without_them(name, hub_a):
     # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries.py,
     # test_accounts_for_whoever_adds_or_edits_records).
     op = registry[name]
     employee = get_user_model().objects.create_user(username="saas:2")
-    Membership.objects.create(user=employee, host="a", role=Membership.Role.EMPLOYEE)
-    ctx = OperationContext(scope=Scope("host", "a"), actor=employee, permissions=frozenset())
-    with pytest.raises(PermissionDenied):
+    Membership.objects.create(user=employee, host=A.key, role=Membership.Role.EMPLOYEE)
+    ctx = OperationContext(scope=A, actor=employee, permissions=frozenset())
+    with use_hub(hub_a), pytest.raises(PermissionDenied):
         op(ctx, op.input.model_construct())
 
 
 # ── ERPlora's staff is no customer ────────────────────────────────────────────────────────────────────────────────
 
-HUB_HOST = "a.localhost:8000"
+HUB_HOST = f"{A.key}.localhost:8000"
 PLATFORM_HOST = "hubs.localhost:8000"
-A = Scope("host", "a")
-#: One SaaS account (Ioan's): the platform's admin, and the owner of a business.
+#: One SaaS account that is both the platform's admin and the owner of a business.
 ROOT_AS_STAFF = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="platform_admin")
 ROOT_AS_OWNER = RedeemedUser(user_id="7", email="root@erplora.com", name="Root", locale="en", role="hub_owner")
 
@@ -245,7 +270,7 @@ def door_request(host: str) -> object:
     request.user = AnonymousUser()
     request.platform_host = host == PLATFORM_HOST
     if not request.platform_host:
-        request.hub = Hub.objects.get(slug="a")
+        request.hub = Hub.objects.get(slug=A.key)
     return request
 
 
@@ -263,9 +288,10 @@ def staff_session(client) -> object:
 
 
 def customer_session(client) -> object:
-    """``client`` with the owner's session of business ``a``, opened on its host as the SaaS vouched."""
+    """``client`` with the owner's session of business A, opened on its host as the SaaS vouched."""
     request = door_request(HUB_HOST)
-    user = open_session_from_saas(request, ROOT_AS_OWNER, "a")
+    with use_hub(request.hub):
+        user = open_session_from_saas(request, ROOT_AS_OWNER, A.key)
     with_the_session_of(client, request)
     return user
 
@@ -274,7 +300,7 @@ def me(client, host=HUB_HOST) -> dict:
     return client.get("/api/me", HTTP_HOST=host).json()
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_a_staff_session_on_a_business_s_host_is_anonymous_and_never_holds_everything(client, settings):
     settings.SAAS_URL = "http://localhost:8001"
     staff = staff_session(client)
@@ -293,9 +319,9 @@ def test_on_a_business_s_host_a_superuser_holds_only_what_its_membership_there_g
     assert permissions_for(staff, A) == frozenset()
 
     raised = get_user_model().objects.create_user("saas:7", is_staff=True, is_superuser=True)
-    Membership.objects.create(user=raised, host="a", role=Membership.Role.EMPLOYEE)
+    Membership.objects.create(user=raised, host=A.key, role=Membership.Role.EMPLOYEE)
     plain = get_user_model().objects.create_user("saas:8")
-    Membership.objects.create(user=plain, host="a", role=Membership.Role.EMPLOYEE)
+    Membership.objects.create(user=plain, host=A.key, role=Membership.Role.EMPLOYEE)
     assert permissions_for(raised, A) == permissions_for(plain, A)
     assert "*" not in permissions_for(raised, A)
 
@@ -307,9 +333,9 @@ def test_the_superuser_s_wildcard_is_the_platform_s_alone():
     assert permissions_for(get_user_model().objects.create_user("saas:8"), REGISTRY_SCOPE) == frozenset()
 
 
-@pytest.mark.django_db
+@on_hub_a
 def test_a_staff_session_from_before_the_host_rule_holds_nothing_on_a_business_s_host(client):
-    # A session with no host noted (opened before S1's rule) stays valid where it is used until it expires: on a
+    # A session with no host noted (opened before the host rule) stays valid where it is used until it expires: on a
     # business's host the staff copy is one more user without a Membership there.
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
     client.force_login(staff)
@@ -318,7 +344,7 @@ def test_a_staff_session_from_before_the_host_rule_holds_nothing_on_a_business_s
     assert me(client)["permissions"] == []
 
 
-@pytest.mark.django_db
+@on_hub_a
 @pytest.mark.parametrize("path", ["/admin/", "/admin/base/membership/", "/admin/hub/a/"])
 def test_the_admin_is_not_found_on_a_business_s_host_with_a_customer_s_or_the_staff_s_session(client, path):
     customer_session(client)

@@ -8,15 +8,16 @@ is a calculation, not a list to follow.
 import json
 from pathlib import Path
 
-import psycopg
 import pytest
 from live.errors import InvalidPayload
 from live.live_registry import live_registry
+from live.models import OutboxEvent
 from live.outbox import channel_for
 
 from apps.combo import events, services
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, run
+from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, run
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
 SERVICES_SOURCE = Path(services.__file__).read_text()
@@ -34,6 +35,8 @@ TREE = [
     events.OPTION_REORDERED,
     "inventory.product.updated",
     "inventory.product.deleted",
+    # A product recovered from a separate copy is the same one again (INVENTORY-F34): what showed it gone shows it back.
+    "inventory.product.restored",
 ]
 
 
@@ -87,37 +90,31 @@ def test_a_product_deleted_in_inventory_re_runs_the_builder_and_the_till():
 # A write in hub B reaches B's channel only (real LISTEN sessions, after the COMMIT)
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=1.0, stop_after=None):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_menu_written_in_b_notifies_b_only(listen):
+def noted_for() -> list[tuple[str, str]]:
+    """The business each event of the outbox at hand is noted down for: the channel of a notice is the command's, so
+    only the row tells an event written down for another business."""
+    return list(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
+
+
+@HUB_DB_COMMITTED
+def test_a_menu_written_in_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("combo.combo.create", {"name": "Menu B", "supply_kind": "goods"}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        run("combo.combo.create", {"name": "Menu B", "supply_kind": "goods"}, ctx_for(scope=B))
+        assert noted_for() == [(B.kind, B.key)]
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.COMBO_CREATED]})]
     assert received(on_a, timeout=0.3) == []
     # Positive control: the same listener of A hears a menu written in A.
     run("combo.combo.create", {"name": "Menu A", "supply_kind": "goods"}, ctx_for(scope=A))
     assert received(on_a, stop_after=1) == [(channel_for(A), {"events": [events.COMBO_CREATED]})]
+    assert noted_for() == [(A.kind, A.key)]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_refused_write_notifies_nobody(listen):
     on_a = listen(A)
     with pytest.raises(InvalidPayload):

@@ -73,7 +73,7 @@ describe('PermissionsPanel', () => {
   });
 });
 
-describe('PermissionsPanel: review 2026-10-15, item 12', () => {
+describe('PermissionsPanel: what the saved steps need', () => {
   it('reads what is missing from the saved steps, and asks to save the changes first', async () => {
     const saved = { ...FLOW, steps: [STEPS[1]], grants: [] } as unknown as FlowOut;
     const m = await mountFlow(PermissionsPanel, { props: { flow: saved, dirty: true, catalog: CATALOG } });

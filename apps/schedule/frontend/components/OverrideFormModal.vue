@@ -9,6 +9,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { blankRows, type IntervalRow, payloadOf, rowsOf } from '../lib/intervals';
 import type { OverrideOut } from '../operations';
@@ -73,11 +75,18 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen(
+  'schedule-override-form',
+  () => ({ startDate: startDate.value, endDate: endDate.value, reason: reason.value, closed: closed.value, rows: rows.value }),
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="schedule-override-form"
     :title="title"
     :submit-label="editing ? $t('schedule.save') : $t('schedule.overrides.form.submit')"
@@ -91,6 +100,7 @@ async function save(): Promise<void> {
         <div class="schedule-exception-form__pair">
           <ion-input
             data-testid="schedule-override-form-start_date"
+            name="start_date"
             type="date"
             :value="startDate"
             :label="$t('schedule.overrides.form.from')"
@@ -103,6 +113,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="schedule-override-form-end_date"
+            name="end_date"
             type="date"
             :value="endDate"
             :label="$t('schedule.overrides.form.to')"
@@ -116,6 +127,7 @@ async function save(): Promise<void> {
         </div>
         <ion-input
           data-testid="schedule-override-form-reason"
+          name="reason"
           :value="reason"
           :label="$t('schedule.overrides.form.reason')"
           label-placement="floating"

@@ -11,7 +11,7 @@ import pytest
 from live.ninja import ensure_api_parity
 
 from apps.invoice.api import router
-from apps.invoice.tests.conftest import ISSUER
+from apps.invoice.tests.conftest import A, HUB_DB, ISSUER
 from config.api import api
 
 ROUTES = {
@@ -61,11 +61,11 @@ RECIPIENT = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
+def get(client, path, host=f"{A.key}.localhost", **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data, host="a.localhost", **headers):
+def post(client, path, data, host=f"{A.key}.localhost", **headers):
     return client.post(
         f"/api{path}",
         json.dumps(data),
@@ -77,13 +77,13 @@ def post(client, path, data, host="a.localhost", **headers):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -104,9 +104,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
+@HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_the_openapi_describes_the_invoice_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=f"{A.key}.localhost").json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -119,7 +119,7 @@ def test_the_openapi_describes_the_invoice_routes(client):
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/invoice/invoices"),
@@ -129,7 +129,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_owner_sets_up_the_issuer_and_issues_by_hand(admin_client):
     assert post(admin_client, "/invoice/issuer", ISSUER).status_code == 200
     created = post(admin_client, "/invoice/invoices", {"lines": [LINE], **RECIPIENT})
@@ -158,7 +158,7 @@ def test_the_owner_sets_up_the_issuer_and_issues_by_hand(admin_client):
     assert get(admin_client, "/invoice/invoices/detail", number=body["number"]).json()["status"] == "issued"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_issues_and_pays_but_neither_rectifies_nor_keeps_series(
     employee_client, make_user, client
 ):
@@ -191,7 +191,7 @@ def test_an_employee_reads_issues_and_pays_but_neither_rectifies_nor_keeps_serie
 # The envelope
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_422_says_the_field(admin_client):
     response = post(
         admin_client,
@@ -202,7 +202,7 @@ def test_a_422_says_the_field(admin_client):
     assert set(response.json()["error"]["fields"]) == {"lines.0.tax_rate"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refused_tax_id_says_what_to_do_and_why_in_the_requests_language(admin_client):
     """hub#461 (INVOICE-F05): never «Invalid payload» on top nor «Enter a valid value.» under the NIF."""
     wrong = {
@@ -232,7 +232,26 @@ def test_a_refused_tax_id_says_what_to_do_and_why_in_the_requests_language(admin
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
+def test_a_series_code_of_another_shape_says_what_a_code_takes_in_the_requests_language(admin_client):
+    """hub#872 (INVOICE-F12): «E2E-?» under the Code field says what a code takes, never «Enter a valid value.»."""
+    wrong = {"code": "E2E-?", "name": "Online", "invoice_type": "F1", "year": 2026}
+
+    english = post(admin_client, "/invoice/series", wrong)
+    spanish = post(admin_client, "/invoice/series", wrong, HTTP_ACCEPT_LANGUAGE="es")
+
+    assert (english.status_code, spanish.status_code) == (422, 422)
+    assert english.json()["error"]["fields"] == {
+        "code": "Use only letters without accents, digits, hyphens (-) and underscores (_), starting with a letter or "
+        "a digit."
+    }
+    assert spanish.json()["error"]["fields"] == {
+        "code": "Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), empezando por una letra o un "
+        "número."
+    }
+
+
+@HUB_DB
 def test_a_409_carries_its_domain_code_in_the_requests_language(admin_client):
     response = post(
         admin_client,
@@ -246,7 +265,7 @@ def test_a_409_carries_its_domain_code_in_the_requests_language(admin_client):
     assert error["message"].startswith("Configura el emisor")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_list_asks_for_at_most_a_hundred_rows(admin_client):
     response = get(admin_client, "/invoice/invoices", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -255,7 +274,7 @@ def test_a_list_asks_for_at_most_a_hundred_rows(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_issuer_reads_empty_before_it_is_set_up(employee_client):
     body = get(employee_client, "/invoice/issuer").json()
     assert (body["configured"], body["legal_name"]) == (False, "")

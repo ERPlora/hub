@@ -6,7 +6,7 @@
 // does the service — and «Edit» saves them (`customer.health.update`). «Withdraw permission» asks
 // first, because it erases the data (`customer.health.withdraw`). The block is live
 // (`customer.health.detail`) and never part of the card other apps read.
-import { ConfirmDialog, formatDateTime, InlineFeedback } from '@erplora/ui/components';
+import { ConfirmDialog, formatDateTime, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
@@ -41,7 +41,11 @@ const granted = computed(() => data.value?.consent === 'granted');
 const failure = computed(() =>
   [grant.error.value, update.error.value].map((err) => refusalOutsideFields(err, FIELDS)).find(Boolean) ?? '',
 );
-const fieldErrors = computed(() => refusalFields(update.error.value));
+// The reasons the fields carry (a 422, or a 409 that names its field): each goes once its field is changed.
+const { fieldErrors, changed } = useRefusal(() => {
+  const err = update.error.value;
+  return err && { message: err.message, fields: refusalFields(err) };
+});
 const invalid = (key: string) => ({ 'ion-invalid': !!fieldErrors.value[key], 'ion-touched': !!fieldErrors.value[key] });
 
 /** The permission is being asked and not answered yet. */
@@ -246,6 +250,7 @@ const testLine = computed(() => {
             :maxlength="2000"
             :error-text="fieldErrors.allergies"
             :class="invalid('allergies')"
+            @update:model-value="changed('allergies')"
           />
           <ion-input
             v-model="testOn"
@@ -257,6 +262,7 @@ const testLine = computed(() => {
             mode="md"
             :error-text="fieldErrors.sensitivity_test_on"
             :class="invalid('sensitivity_test_on')"
+            @update:model-value="changed('sensitivity_test_on')"
           />
           <ion-select
             v-model="result"
@@ -267,6 +273,7 @@ const testLine = computed(() => {
             mode="md"
             interface="popover"
             :class="invalid('sensitivity_test_result')"
+            @update:model-value="changed('sensitivity_test_result')"
           >
             <ion-select-option value="">
               {{ $t('customer.health.noResult') }}

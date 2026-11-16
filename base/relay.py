@@ -1,18 +1,20 @@
-"""The outbox relay, run by the worker on every tick (PLAN-HUB «Eventos entre módulos»; round 2026-10-20).
+"""The outbox relay, run by the worker on every tick.
 
-A port of the old Hub's ``crates/runtime/src/outbox.rs``. A command records its events in the outbox in its own
+A command records its events in the outbox in its own
 transaction (``live.outbox.record_event``); the relay hands each one to the reactions of the apps that listen to
 it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other apps):
 
 - **taken**: an event nobody took yet gets one delivery per app that is on and listens to it, and its
-  ``delivered_at``, in one transaction (``base.services.relay_take_events``); an app turned on later never
+  ``delivered_at``, in one transaction (``base.services.relay_runs.relay_take_events``); an app turned on later never
   receives what came before. An app is on unless it is a paid one its business has no right to or one the
   business turned off (``active_apps``: ``base.entitlement`` and ``base.activation``; ``base.session.me`` says the
   same);
 - **delivered**: each delivery runs its app's reaction as the system, in the scope of the hub that recorded the
   event (the reaction's own notice goes to that hub's channel after the COMMIT), and is marked in the same
   transaction, so an app never gets an event twice (``relay_deliver_next``); the events a reaction records are
-  taken in it, one level deeper, and past ``MAX_EVENT_DEPTH`` they are not delivered; what a reaction leaves for
+  taken in it, one level deeper, and past ``MAX_EVENT_DEPTH`` they are not delivered; those it records as the system
+  in answer to an event of an actor that is passed on keep that actor (``carried``: a recovery from a separate copy's,
+  ``base.recovery``, and those an app declares in ``carried_actors``); what a reaction leaves for
   after its COMMIT that waits on the network (a call to another system) goes through ``base.outbound``, in a thread
   of the worker's own, so it never holds the next delivery, of this hub or of another;
 - **failed**: a reaction that raises has its writes undone and waits ``backoff`` (2, 4, 8… s, an hour at most);
@@ -20,10 +22,10 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 
 Both steps claim their rows with ``SKIP LOCKED``: the old worker and the new one overlap on a deploy. Every
 transaction releases its connection, so the worker never idles holding one. The events recorded before the relay
-existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): the backlog
-of phase 1 is never applied. The worker runs it in each hub with its own database, under ``use_hub``
-(``base.worker._hubs``; review of hub#471), and on control for control's own events (``of_hubs=False``: the registry's
-and the demos', which no app hears); since S5 what a business of phase 1 recorded in control before its cut is never
+existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): that old
+backlog is never applied. The worker runs it in each hub with its own database, under ``use_hub``
+(``base.worker._hubs``), and on control for control's own events (``of_hubs=False``: the registry's
+and the demos', which no app hears); what a business that shared a database recorded in control before its cut is never
 taken there (its cut copies its own events into its database, ``base.tenancy.cut``).
 """
 
@@ -33,6 +35,7 @@ from functools import cache
 from importlib import import_module
 from types import ModuleType
 
+from django.core import checks
 from django.db import close_old_connections
 from django.utils.module_loading import module_has_submodule
 from live.context import Scope
@@ -40,7 +43,9 @@ from live.live_registry import ALL_EVENTS
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
-from base import activation, entitlement, services
+from base import activation, entitlement
+from base.services import relay_runs
+from base.recovery import brought_back
 from base.tenancy.context import HUB_SCOPE_KIND
 
 #: How deep a chain of events may go (an event, the event its reaction records, …): the old Hub's.
@@ -52,6 +57,8 @@ BACKOFF_MAX_SECONDS = 3600
 #: At most this many events taken, and deliveries run, a tick: the rest waits for the next one.
 TAKE_PER_TICK = 500
 DELIVER_PER_TICK = 200
+#: The attribute of an app's config that lists the prefixes of its own actors the relay passes on (``carried``).
+CARRIED_ACTORS = "carried_actors"
 
 
 @dataclass(frozen=True)
@@ -108,6 +115,53 @@ def deliver(app_label: str, event: OutboxEvent) -> object:
     return module.react(Scope(event.scope_kind, event.scope_key), event.name, event.payload)
 
 
+def carried(actor: str) -> bool:
+    """Whether what a reaction records as the system in answer to an event of ``actor`` takes that actor: a recovery's
+    (what it records came back too) and those an app declares in ``carried_actors`` (an app that reads the actor back
+    follows a chain through the other apps' reactions). A declaration ``base.E017`` refuses is never used."""
+    return brought_back(actor) or any(
+        actor.startswith(prefix)
+        for config in all_live_app_configs()
+        if not _carried_problems(config)
+        for prefix in getattr(config, CARRIED_ACTORS, ())
+    )
+
+
+def by_platform(actor: str) -> bool:
+    """Whether ``actor``, as an app keeps who did something, is no one but the platform: no one, the system
+    (``live.context.system_context``) or an actor that is passed on (``carried``). A person and an API key are named."""
+    return not actor or actor == "system" or carried(actor)
+
+
+@checks.register("base")
+def check_carried_actors(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E017``: an app declares in ``carried_actors`` a list of prefixes of its own actors: each its label and
+    ``:``, or its label, ``_`` and a name ending in ``:``; never the system's, someone's, another app's nor an empty one,
+    which would pass on what the business does."""
+    return [
+        checks.Error(
+            problem,
+            hint=f'An app passes on only actors of its own: {CARRIED_ACTORS} = ["<label>_<name>:"].',
+            obj=config,
+            id="base.E017",
+        )
+        for config in all_live_app_configs()
+        for problem in _carried_problems(config)
+    ]
+
+
+def _carried_problems(config) -> list[str]:
+    """What is wrong with the actors ``config`` declares in ``carried_actors`` (none declared: nothing)."""
+    declared = getattr(config, CARRIED_ACTORS, ())
+    if not isinstance(declared, list | tuple) or not all(isinstance(prefix, str) for prefix in declared):
+        return [f"{config.label}.{CARRIED_ACTORS} is not a list of actor prefixes."]
+    return [
+        f"{config.label}.{CARRIED_ACTORS} names {prefix!r}, not an actor of its own (<label>: or <label>_<name>:)."
+        for prefix in declared
+        if not prefix.endswith(":") or not (prefix == f"{config.label}:" or prefix.startswith(f"{config.label}_"))
+    ]
+
+
 def backoff(attempts: int) -> dt.timedelta:
     """The wait after the ``attempts``-th failed attempt: 2 s, doubling, an hour at most."""
     return dt.timedelta(seconds=min(2**attempts, BACKOFF_MAX_SECONDS))
@@ -116,16 +170,17 @@ def backoff(attempts: int) -> dt.timedelta:
 def run(now: dt.datetime, *, of_hubs: bool = True) -> RelayPass:
     """Take the new events, then run the deliveries due at ``now``, one transaction each. ``of_hubs=False`` (control's
     outbox): only the events of no hub, never a business's."""
-    taken = services.relay_take_events(
+    taken = relay_runs.relay_take_events(
         now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH, of_hubs=of_hubs
     )
     close_old_connections()
     delivered = failed = 0
     for _ in range(DELIVER_PER_TICK):
-        outcome = services.relay_deliver_next(
+        outcome = relay_runs.relay_deliver_next(
             now,
             deliver=deliver,
             listeners=listeners,
+            carried=carried,
             max_depth=MAX_EVENT_DEPTH,
             max_attempts=MAX_ATTEMPTS,
             backoff=backoff,

@@ -1,9 +1,7 @@
 <script setup lang="ts">
-// «PIN pad» (Settings › General, BASE-G151 and G62; the old hub's PinPolicyCard): whether the business asks who is at
-// the till («Show PIN pad»), when it asks again (after 1, 5, 10, 15 or 30 idle minutes, or «Until signing out»: per
-// shift) and how many digits a PIN has. Each control saves on its own, at once and only its key
-// (`base.access.settings_update`); the card paints what the Hub confirms, never what was asked, and a control the Hub
-// refused goes back to its value. Off and on again is the factory choice (per shift). Only who runs the hub changes it.
+// Settings › General: whether the business asks who is at the till, when it asks again and how many digits a PIN has.
+// Each control saves only its own key, at once; the card paints what the Hub confirms, never what was asked, so a
+// refused change goes back to its value. Turning it off and on again restores the default (per shift).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonLabel, IonSegment, IonSegmentButton, IonToggle } from '@ionic/vue';

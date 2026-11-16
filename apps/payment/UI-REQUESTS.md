@@ -3,9 +3,9 @@
 Lo que las páginas de Pagos necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-**Al cerrar la app** (CLOSE-PAYMENT, 2026-10-23): nada de esto ha llegado a `ERPlora/ui` (`origin/main`
-53db78c); todo tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de
-`MIGRATION.md` como `payment:ui-icons`, `payment:ui-live-server-table` y `payment:ui-money-reader`.
+**Al cerrar la app** (CLOSE-PAYMENT, 2026-10-23): nada de esto ha llegado a `ERPlora/ui` (`origin/main` 53db78c); todo
+tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de `archive/migration/MIGRATION.md` de
+`ERPlora/erplora-next` como `payment:ui-icons`, `payment:ui-live-server-table` y `payment:ui-money-reader`.
 
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
@@ -25,8 +25,8 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
   `customer`, `sale`, `invoice`). Ya están pedidas en `apps/sale/UI-REQUESTS.md` e
   `apps/invoice/UI-REQUESTS.md` («Tabla de servidor viva»; en el registro, `cart_checkout:`, `combo:`,
   `tax:` y `kitchen:ui-live-server-table`).
-- **Dinero**: `frontend/lib/money.ts` (leer lo que se teclea, sin adivinar un «1.250») y
-  `frontend/components/MoneyInput.vue`. Es la misma pieza que piden `cash_register:ui-money-format`,
-  `cart_checkout:ui-money-reader` y `combo:ui-money-reader`.
+- **Dinero**: llegó (hub#924, parte 2): «Nuevo pago» usa el `MoneyInput` de `@erplora/ui/components` y la
+  página y la ventana leen con `parseMoney(text, { money })`; la copia de la app (`frontend/lib/money.ts` y
+  `frontend/components/MoneyInput.vue`) se borró.
 
 Cuando lleguen a `@erplora/ui`, se borran de aquí con sus tests.

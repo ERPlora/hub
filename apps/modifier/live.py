@@ -18,17 +18,20 @@ from apps.modifier.events import (
 
 # Inventory's events that change what a link names, or which groups a product carries.
 PRODUCT_UPDATED = "inventory.product.updated"
+# A product recovered from a separate copy is the same one again (INVENTORY-F34): what showed it gone shows it back.
+PRODUCT_RESTORED = "inventory.product.restored"
 CATEGORY_UPDATED = "inventory.category.updated"
 PRODUCT_CATEGORIZED = "inventory.product.categorized"
 PRODUCT_UNCATEGORIZED = "inventory.product.uncategorized"
-TARGET = [PRODUCT_UPDATED, PRODUCT_DELETED, CATEGORY_UPDATED, CATEGORY_DELETED]
+TARGET = [PRODUCT_UPDATED, PRODUCT_DELETED, PRODUCT_RESTORED, CATEGORY_UPDATED, CATEGORY_DELETED]
 
-# The counts of options and links are columns of the table; a deleted target stops counting.
+# The counts of options and links are columns of the table; a deleted target stops counting, a restored one counts again.
 CATALOG = [
     *GROUP_EVENTS,
     *OPTION_EVENTS,
     *LINK_EVENTS,
     PRODUCT_DELETED,
+    PRODUCT_RESTORED,
     CATEGORY_DELETED,
 ]
 live("modifier.group.list", on=CATALOG)

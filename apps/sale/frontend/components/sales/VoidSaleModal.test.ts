@@ -131,11 +131,15 @@ describe('VoidSaleModal', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('«Cancel» closes and sends nothing; opened again it starts blank', async () => {
+  // hub#1156: with a reason typed, «Cancel» asks «Discard changes?» first (BASE-F05); «Discard changes» closes it.
+  it('«Cancel» with a reason asks first; «Discard changes» closes and sends nothing; opened again it starts blank', async () => {
     const s = await setup();
     await s.submit();
     await s.type('Mistake');
     await click(s.inDoc('sale-void-cancel'));
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+    const { answerUnsavedQuestion } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await answerUnsavedQuestion('discard');
     expect(s.sent()).toEqual([]);
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
     await s.wrapper.setProps({ open: false });
@@ -151,5 +155,17 @@ describe('VoidSaleModal', () => {
     expect([s.inDoc('sale-void-submit')?.textContent?.trim(), s.inDoc('sale-void-cancel')?.textContent?.trim()]).toEqual(['Anular', 'Cancelar']);
     await s.submit();
     expect(s.inDoc('sale-void-error')?.textContent).toContain('Hace falta un motivo para anular una venta');
+  });
+});
+
+describe('VoidSaleModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('sale-void'),
+      change: () => s.type('Mistake'),
+      restore: () => s.type(''),
+    });
   });
 });

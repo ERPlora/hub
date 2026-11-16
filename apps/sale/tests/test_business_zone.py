@@ -8,10 +8,10 @@ import uuid
 
 import pytest
 
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HUB_DB, run
 from apps.tax.models import TaxCategory, TaxRule
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: The day of a sale at night in another zone (``night_elsewhere``): the deployment's, until hub#772.
 SALE_DAY = dt.date(2026, 11, 3)
@@ -44,6 +44,16 @@ def test_the_till_counts_a_sale_on_the_day_it_numbers_it(tapa):
     today = run("sale.sale.today")
     assert (today.day, today.tickets, today.total) == (SALE_DAY, 1, sale.total)
     assert run("sale.sale.last_7_days").rows[-1].total == sale.total
+
+
+def test_a_session_done_outside_the_till_counts_on_the_day_the_till_charges(tapa):
+    # SALE-F28, SERVICE-F21: what a professional produced is on one clock, the till's, which hub#772 moves whole.
+    sale = charge()
+    ana = uuid.uuid7()
+    done = run("sale.voucher_session.record", {"session_id": str(uuid.uuid7()), "staff_id": str(ana), "value": 3333})
+    assert (done.business_day, sale.business_day) == (SALE_DAY, SALE_DAY)
+    [row] = [row for row in run("sale.sale.by_staff", {"date_from": str(SALE_DAY)}).rows if row.staff_id == ana]
+    assert row.voucher_total == 3333
 
 
 def test_the_preview_and_the_charge_tax_on_the_same_day(tapa):

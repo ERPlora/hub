@@ -14,10 +14,8 @@ conversation stays waiting for an answer, marked «Needs attention».
 
 import datetime as dt
 import json
-import threading
 
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 
 from apps.appointment.models import Appointment
@@ -39,18 +37,16 @@ from apps.flow.queries import TURN
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run
-from base import catalog, worker
-from base.catalog import RegisterResult
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, A, connect, ctx_for, receive, run
 from base.models import TaskSchedule
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB_COMMITTED
 
 CHAT = "/internal/assistant/chat"
 SEND = "/internal/whatsapp/send"
 QUOTA = {"used": 1, "limit": 300, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 TABLE_REF = "whatsapp_inbox/reservation_from_whatsapp"
 BOOKING_REF = "whatsapp_inbox/appointment_from_whatsapp"
 LUCIA = "+34600111222"
@@ -58,28 +54,6 @@ THANKS = "Thanks for writing! Let me check the reservations book and I will come
 SORRY = (
     "Sorry, I cannot check the reservations right now. Someone from the team will answer you here as soon as they can."
 )
-
-
-@pytest.fixture
-def tick(monkeypatch, django_capture_on_commit_callbacks):
-    """One turn of the worker's real loop (``test_relay_notify.py``'s): the tasks due and the relay, then what each
-    COMMIT left for after it (the deliveries to erplora.com, the assistant's turns). ``tick(later)`` runs it with its
-    clock ``later`` than now (a second by default)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:
-        stop = threading.Event()
-        now = timezone.now()
-
-        def wait(seconds: float) -> bool:
-            stop.set()
-            return True
-
-        with django_capture_on_commit_callbacks(execute=True):
-            assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now + later) == 0
-
-    return run_once
 
 
 def said(text: str) -> dict:
@@ -106,7 +80,7 @@ def offered(seen) -> list[str]:
 
 def answer_yes(django_capture_on_commit_callbacks) -> Question:
     question = Question.objects.get()
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for("hub_owner"))
     return question
 
@@ -448,7 +422,7 @@ def test_a_guest_cancels_their_table_and_after_the_owner_s_yes_it_is_cancelled(
 def test_the_answer_never_cancels_the_reservation_of_another_number(
     gateway, tick, django_capture_on_commit_callbacks, later  # noqa: F811 - the fixture
 ):
-    """reservations#50: on their behalf, another guest's reservation is refused even after the yes, saying nothing of it;
+    """On their behalf, another guest's reservation is refused even after the yes, saying nothing of it;
     the assistant hears the refusal and what it says then goes to them.
 
     ``past_the_minute``: the tick after the yes lands on another minute than the first one, as in the CI run that got
@@ -476,7 +450,7 @@ def test_the_answer_never_cancels_the_reservation_of_another_number(
     told = [message for message in gateway.sent(CHAT)[-1].body["messages"] if message.get("role") == "tool"]
     assert "reservation.customer_mismatch" in json.dumps(told)
     assert outbound()[-1] == "No encuentro ninguna reserva a tu nombre."
-    assert [seen.body["hub"] for seen in gateway.sent(CHAT)] == ["a", "a"]  # both turns, the business's own
+    assert [seen.body["hub"] for seen in gateway.sent(CHAT)] == [A.key, A.key]  # both turns, the business's own
 
 
 def test_a_tick_past_the_minute_runs_the_minute_s_tasks(tick):

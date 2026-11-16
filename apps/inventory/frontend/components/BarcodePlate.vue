@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // INVENTORY-F25 (WORKBOOK «Ficha del producto»): the SKU's Code 128 on a white plate with the SKU under it.
-// Always black on white, whatever the theme, so a scanner reads it (inventory#45). `svg` is exposed for the
+// Always black on white, whatever the theme, so a scanner reads it. `svg` is exposed for the
 // browser's print dialog (lib/print-label.ts).
 import { computed, ref } from 'vue';
 

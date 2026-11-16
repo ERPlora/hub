@@ -7,6 +7,10 @@ import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
+import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { business, IN_YEN } from '../../../../base/frontend/__tests__/business';
+import { insideTheInstalledApp } from '../__tests__/system-browser';
 import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { RecordRowOut } from '../operations';
@@ -19,12 +23,6 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 
 const OP = 'verifactu.record.list';
-
-type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
-
-afterEach(() => {
-  delete (window as TauriWindow).__TAURI__;
-});
 
 /** The links clicked on the page while `act` runs: what a browser would open, read as they reach the document
  *  (stopped there, so the test's page navigates nowhere). */
@@ -90,6 +88,8 @@ async function setup(options: MountOptions = {}) {
   return { ...m, table, prop, rows, emit, show: (page: unknown) => m.result(OP, page) };
 }
 
+afterEach(outOfTheApp);
+
 describe('RecordsPage', () => {
   it('follows verifactu.record.list, the last sealed first, 50 from the first', async () => {
     const s = await setup();
@@ -150,9 +150,8 @@ describe('RecordsPage', () => {
     open.mockRestore();
   });
 
-  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
-    const invoke = vi.fn(() => Promise.resolve());
-    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser', async () => {
+    const invoke = insideTheInstalledApp();
     const s = await setup();
     await s.show(PAGE);
     const links = await clickedLinks(() => s.emit('action', { actionId: 'verify', row: PAGE.rows[0] }));
@@ -186,8 +185,7 @@ describe('RecordsPage', () => {
   });
 });
 
-describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FILTERS-2B)', () => {
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
+describe('RecordsPage: the filters behind the table funnel', () => {
   type Filter = { type: string; key?: string; keys?: string[]; amount?: boolean; label?: string; options?: Array<{ value: string; label: string }> };
 
   it('Date, Type, Total, Environment and Status filter on their columns, the invoice type after them', async () => {
@@ -263,20 +261,46 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
   });
 
   it('a total that is not an amount, or a day «until» before its «from», is said under it and does not filter', async () => {
-    const s = await setup();
+    const s = await setup({ business: business() });
     await s.show(PAGE);
     expect(s.prop('filterErrors')).toEqual({});
     await s.emit('update:filters', { total_amount_from: '12x', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
     await s.reopen();
     expect(s.prop('filterErrors')).toEqual({
-      total_amount_from: 'Write an amount in euros, such as 12,50.',
+      total_amount_from: 'This is not an amount. Type a figure, for example 12.50.',
       issue_date_to: 'The end date cannot be before the start date.',
     });
     expect(s.params(OP)).toEqual([{ issue_date_from: '2026-10-14', sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
-    const es = await setup({ locale: 'es' });
+    const es = await setup({ locale: 'es', business: business() });
     await es.show(PAGE);
-    await es.emit('update:filters', { issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
-    expect(es.prop('filterErrors')).toEqual({ issue_date_to: 'La fecha final no puede ser anterior a la inicial.' });
+    await es.emit('update:filters', { total_amount_from: '12x', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' });
+    expect(es.prop('filterErrors')).toEqual({
+      total_amount_from: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      issue_date_to: 'La fecha final no puede ser anterior a la inicial.',
+    });
+  });
+
+  itReadsAmountFiltersAsTheHub({
+    ends: ['total_amount_from', 'total_amount_to'],
+    params: ['total_amount_from', 'total_amount_to'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.show(PAGE);
+      return {
+        filter: (values) => s.emit('update:filters', values),
+        query: () => s.params(OP).at(-1),
+        says: () => s.prop('filterErrors'),
+      };
+    },
+  });
+
+  it('a total that is no amount of the business\'s money does not narrow the list: «12,5» in yen', async () => {
+    const s = await setup({ business: business(IN_YEN) });
+    await s.show(EMPTY);
+    await s.emit('update:filters', { total_amount_from: '12,5' });
+    await s.reopen();
+    await s.show(EMPTY);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No records yet. Every invoice you issue is sealed and listed here.');
   });
 
   it('a filter the server refuses (422) goes under its filter; the rows stay and no error replaces them', async () => {
@@ -294,7 +318,7 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
   });
 });
 
-describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, hub#857)', () => {
+describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24)', () => {
   const REJECTIONS = {
     rows: [
       row('TICKET-2026-000004', { sequence: 4, status: 'rejected', correction_status: 'pending' }),
@@ -355,7 +379,7 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
     expect(s.router.currentRoute.value.path).toBe('/verifactu/records/fix-3');
   });
 
-  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row (hub#865)', async () => {
+  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row', async () => {
     const s = await setup();
     await s.show(REJECTIONS);
     const push = vi.spyOn(s.router, 'push');
@@ -395,7 +419,7 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
   });
 });
 
-describe('RecordsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('RecordsPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

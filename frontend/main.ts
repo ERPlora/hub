@@ -1,6 +1,6 @@
 // Entry of the hub SPA (`LIVE["spa"]["entry"]`): app routes and catalogues → shell, live client, session
 // (`base.session.me`, a plain query: embedded by `base/spa.py`, else `GET /api/me`), mount.
-// 🔴 Import order (hub#1060): the shell barrel goes first so its boot hooks wrap `customElements.define`
+// 🔴 Import order: the shell barrel goes first so its boot hooks wrap `customElements.define`
 // before anything loads `@ionic/vue` (the SDK does). Vite hoists eager globs above everything, so an
 // app's `routes.ts` only imports types; its pages load with `() => import(…)`. Guards: main.test.ts.
 import {
@@ -14,12 +14,13 @@ import {
   type ShellSidebar,
   type ShellUserMenu,
   type ShellUserMenuItem,
+  stopNoticeListening,
   type ThemePalette,
   toastSuccess,
 } from '@erplora/ui/shell';
 import { assistantMessages, configureAssistant, forgetAssistant } from '@erplora/ui/components';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
-import { defineAsyncComponent, ref } from 'vue';
+import { defineAsyncComponent, ref, watch } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
@@ -33,11 +34,11 @@ import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 /**
- * The old hub's side menu (PLAN-MIGRATIONS §16): the platform's entries in its two groups — Home (the
- * shell's, first), Employees, Files · My plan, Apps, System, API, Settings — and never a module (they open
- * from «My apps» and Home). The shell paints an entry only once its screen exists in the router, so
- * each appears by itself when `base` brings it; and only for whoever may open it (`visible`: the permission
- * its screen's operation asks, APP-BASE-5), «API» only while the business shows its API's documentation.
+ * The side menu: the platform's entries in two groups — Home (the shell's, first), Employees, Files · My plan, Apps,
+ * System, API, Settings — and never a module (modules open from «My apps» and Home). The shell paints an entry only
+ * once its screen exists in the router, so each appears by itself when `base` brings it; and only for whoever may open
+ * it (`visible`: the permission its screen's operation asks), «API» only while the business shows its API's
+ * documentation.
  * My plan has no screen in the Hub yet: it asks nothing until it has one.
  */
 export const SIDEBAR: ShellSidebar = {
@@ -57,9 +58,9 @@ export const SIDEBAR: ShellSidebar = {
 };
 
 /**
- * base's pieces of the chrome (APP-BASE-1, the old hub's): the assistant's sparkles and the bell at the end of the
+ * base's pieces of the chrome: the assistant's sparkles and the bell at the end of the
  * topbar, «Upgrade plan» and right below it «Manage on erplora.com» in the menu's footer, the blocking strip over every
- * screen and, beside the pane, the device's notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Each in its
+ * screen and, beside the pane, the device's notices and the assistant's panel. Each in its
  * own chunk, which `boot` loads beside the first screen's: the hub mounts once they are here (`chromeLoaded`).
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
@@ -85,7 +86,7 @@ export const CHROME_WAIT_MS = 3000;
  * Loads the chrome's pieces, settled whether they load or not, for at most `CHROME_WAIT_MS`. The bell, the apps followed
  * beside the pane and the blocking strip read live queries: mounted with the screen, they go in its one stream; mounted
  * once their chunk arrived, more than 150 ms after the screen's queries on a slow device (the tab's CPU ×6), they cut it
- * and opened it again (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY). Through each piece's own loader, not another `import()`: a
+ * and opened it again. Through each piece's own loader, not another `import()`: a
  * module already here still resolves in a later task, after the stream opened. A piece that does not load never keeps
  * the hub from mounting: it loads again at render, and Vue hands that failure to base's report (`installErrorReport`);
  * one still loading past the wait paints when its chunk comes.
@@ -106,9 +107,14 @@ export function chromeLoaded(pieces: object = CHROME): Promise<unknown> {
   return Promise.race([loaded.finally(() => clearTimeout(timer)), waited]);
 }
 
-/** The Hub's sign out: the assistant's conversation of the tab is forgotten first (BASE-G120), then the shell's. */
-export function signOut(doc: Document = document): void {
+/**
+ * The Hub's sign out: the assistant's conversation of the tab is forgotten and the installed app stops
+ * listening with the screen off (HUB_APP-F26), waited for because once the form leaves this page is no longer the
+ * linked hub and the app refuses its orders; then the shell's.
+ */
+export async function signOut(doc: Document = document): Promise<void> {
   forgetAssistant();
+  await stopNoticeListening();
   logout(doc);
 }
 
@@ -145,11 +151,11 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
 }
 
 /**
- * The user menu: «Profile» (the person's page in this hub, BASE-G125) and, on a shared till of a business that asks,
- * «Switch user» (BASE-G60), both from `hub-home`'s `access` (APP-BASE-3); then the person's account, erplora.com's
- * page (PLAN-SAAS §1.1), opened from the address `base/spa.py` embeds only in a session opened with the account (a new
- * tab; the system browser in the installed app; gh:hub#2506), and with it «Report a problem», base's own dialog
- * (BASE-F108), since only that session has an account for support to answer to; then the Hub's sign out, a form POST
+ * The user menu: «Profile» (the person's page in this hub) and, on a shared till of a business that asks,
+ * «Switch user», both from `hub-home`'s `access`; then the person's account, erplora.com's
+ * page, opened from the address `base/spa.py` embeds only in a session opened with the account (a new
+ * tab; the system browser in the installed app), and with it «Report a problem», base's own dialog,
+ * since only that session has an account for support to answer to; then the Hub's sign out, a form POST
  * to `/auth/logout` once the assistant's conversation is forgotten (`signOut`). Without `hub-home` (no hub), only the sign out.
  */
 export function userMenu(doc: Document): ShellUserMenu {
@@ -171,7 +177,7 @@ export function userMenu(doc: Document): ShellUserMenu {
 }
 
 /** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. `reload` reads it again
- *  when base says the person changed (their name in «My profile», BASE-G125); a failed reload keeps the session it had. */
+ *  when base says the person changed (their name in «My profile»); a failed reload keeps the session it had. */
 function loadSession(client: LiveClient, doc: Document) {
   const text = doc.getElementById('session-me')?.textContent;
   const me = ref<SessionMe | undefined>(text ? (JSON.parse(text) as SessionMe) : undefined);
@@ -205,9 +211,9 @@ export async function boot(
   doc: Document = document,
 ): Promise<void> {
   const config = readSpaConfig(doc);
-  // The shared assistant's panel (APP-BASE-9) as the Hub's: its routes, base's operations and words, who uses it.
+  // The shared assistant's panel as the Hub's: its routes, base's operations and words, who uses it.
   configureAssistant(hubAssistant(doc));
-  // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
+  // A manager's approval: the pass of the command being repeated travels in `X-Elevation-Token`.
   const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);
   const chrome = chromeLoaded();
@@ -220,16 +226,16 @@ export async function boot(
     // «Home» first in the menu, and the shell's grid of apps as the fallback of `/` (where the login lands
     // without `next`): base's Home (base/frontend/routes.ts) is registered before it and wins `/`.
     home: true,
-    // The old hub's shell (PLAN-MIGRATIONS §16): its side menu, pinned from 992 px and a drawer below,
-    // with the QR in its footer and the rail toggle and «My apps» in the topbar.
+    // The side menu, pinned from 992 px and a drawer below, with the QR in its footer and the rail toggle and
+    // «My apps» in the topbar.
     sidebar: SIDEBAR,
     userMenu: userMenu(doc),
     chrome: CHROME,
   });
   provideLiveClient(client, app);
-  // base's report of the screen's own errors (BASE-G95): what nobody caught goes to the Hub's log by itself.
+  // base's report of the screen's own errors: what nobody caught goes to the Hub's log by itself.
   installErrorReport(app);
-  // base's app gate (BASE-G132, G134): a screen of an app the session gives `off` mounts «why it does not open» in
+  // base's app gate: a screen of an app that is not on mounts «why it does not open» in
   // its address. The page's own after the shell's 404, so only reached by name; the first address is checked once
   // the router is ready, before mounting (the first navigation may have started before the guard was added).
   const appGate = createAppGate(session.session);
@@ -245,16 +251,25 @@ export async function boot(
   if (blocked !== true) await router.replace(blocked);
   await chrome;
   app.mount('#app');
-  // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
+  // base's way in: the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
-    logout: () => signOut(doc),
+    logout: () => void signOut(doc),
     toast: (message) => void toastSuccess(message),
-    paint: (mode, palette) => applyUserThemePreferences(mode, palette as ThemePalette | null),
+    paint: (mode, palette, scale) => applyUserThemePreferences(mode, palette as ThemePalette | null, undefined, scale),
     reset: resetUserThemePreferences,
     label: () => session.session.value?.user?.label,
   });
   onSessionChanged(() => void reload());
+  // The server writes the texts of every live read in the stream's language (BASE-F64, hub#1038): a session back in
+  // another language reopens the tab's one stream, so the checklist, the panels and the bell answer in it at once,
+  // whichever screens are mounted.
+  watch(
+    () => session.session.value?.language,
+    (language, previous) => {
+      if (language && previous && language !== previous) client.stream.reconnect();
+    },
+  );
 }
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;

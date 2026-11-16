@@ -1,20 +1,18 @@
 """Write operations of the printing app: one operation = one transaction, with its events in the outbox.
 
-The queue's state machine is the old hub's (``print_queue.rs``): a job waits ``pending``; a device takes
-it (``claim``: ``sent``, one more hand-out, a 90 s lease) with ``SELECT … FOR UPDATE SKIP LOCKED``, so two
-devices never take the same one; the device confirms it (``done``) or reports its failure (back to
-``pending``, or ``failed`` after 5 hand-outs); a lease that runs out puts it back in the queue at the next
-claim. A person retries a failed (or unanswered) job or cancels it, stamped. A job that ended (printed,
-cancelled or failed) is forgotten 30 days later by the hourly prune, the platform's own (PRINTING-F20).
+The queue's state machine: a job waits ``pending``; a device takes it (``claim``: ``sent``, one more hand-out, a 90 s
+lease) with ``SELECT … FOR UPDATE SKIP LOCKED``, so two devices never take the same one; the device confirms it
+(``done``) or reports its failure (back to ``pending``, or ``failed`` after 5 hand-outs); a lease that runs out puts it
+back in the queue at the next claim. A person retries a failed (or unanswered) job or cancels it, stamped. A job that
+ended (printed, cancelled or failed) is forgotten 30 days later by the hourly prune, the platform's own (PRINTING-F20).
 
 Every app that prints calls ``printing.job.create`` by name inside its own transaction; the job is the
-structured document the app's renderer paints, never bytes (PLAN-HUB §5; hub#501).
+structured document the app's renderer paints, never bytes.
 
-Only a device set up to print takes, confirms and fails jobs, and only those of the printers it reaches (the old
-hub's print hosts, hub#342): a session that prints is not enough, or a waiter's phone would drain the till's
-receipts. Whoever sets up the printers sets the device up — from the device («Print from this device»), or by
-printing from it — and changes or retires it from any device. The device is known by the digest of its own id,
-which no screen shows (hub#2551).
+Only a device set up to print takes, confirms and fails jobs, and only those of the printers it reaches: a
+session that prints is not enough, or a waiter's phone would drain the till's receipts. Whoever sets up the
+printers sets the device up — from the device («Print from this device»), or by printing from it — and changes
+or retires it from any device. The device is known by the digest of its own id, which no screen shows.
 """
 
 import datetime as dt
@@ -157,7 +155,7 @@ def _normalize_mac(mac: str) -> str:
     return ":".join(part.zfill(2) for part in re.split(r"[:-]", mac.upper()))
 
 
-def _connection(kind: str, address: str, port: int | None, usage: str) -> tuple[str, int | None]:
+def _connection(kind: str, address: str, port: int | None, usage: str) -> tuple[str, int | None]:  # noqa: C901
     """The address and port a printer of ``kind`` keeps, normalized; a 422 at the field that is wrong.
 
     The rules are the app's (``discovery::parse_print_target``): a network printer is ``<ip>:<port>``, a
@@ -202,11 +200,24 @@ def _refuse_taken_name() -> Conflict:
 @operation(
     "printing.printer.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_settings",
     input=PrinterIn,
     output=PrinterOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "add a new printer called Kitchen 2 on 192.168.1.50",
+                "add a receipt printer",
+                "connect a bluetooth printer for labels",
+            ),
+            "es": (
+                "añade una impresora nueva llamada Cocina 2 con la IP 192.168.1.50",
+                "da de alta una impresora de tickets para la caja",
+                "conecta una impresora bluetooth para etiquetas",
+            ),
+        },
         "description": "Add a printer of the business: its name (Till, Kitchen), its connection (network with its IP and "
         "port 9100, bluetooth with its MAC, usb with the name of the computer's print queue, or system for the "
         "computer's A4 printer), its paper (80 or 58 mm) and what it prints (receipt, kitchen, bar or label). Two "
@@ -239,11 +250,26 @@ def create_printer(ctx: OperationContext, data: PrinterIn) -> dict:
 @operation(
     "printing.printer.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_settings",
     input=PrinterUpdateIn,
     output=PrinterOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the IP, the paper and the name of the Caja 2 printer",
+                "rename the Till printer to Front desk",
+                "switch the kitchen printer to 58 mm paper",
+                "deactivate the old bar printer",
+            ),
+            "es": (
+                "cambia la IP, el papel y el nombre de la impresora Caja 2",
+                "renombra la impresora de la caja como Recepción",
+                "pon la impresora de cocina con papel de 58 mm",
+                "desactiva la impresora de la barra",
+            ),
+        },
         "description": "Change a printer, named by its name or id: its name, connection, address, port, paper or "
         "function, or deactivate it (it takes no new jobs) and activate it again. A printer is never deleted. A "
         "printer that changes function stops being the chosen one of its old function.",
@@ -332,11 +358,25 @@ def _chosen_printer(field: str, ref: str | None, usage: str) -> Printer | None:
 @operation(
     "printing.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_settings",
     input=SettingsPatchIn,
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print the receipt by itself when I charge",
+                "send the kitchen orders to Kitchen 2",
+                "print two copies of every receipt",
+            ),
+            "es": (
+                "que el ticket se imprima solo al cobrar",
+                "manda los pedidos de cocina a la impresora Cocina 2",
+                "imprime dos copias de cada ticket",
+                "que se abra el cajón al cobrar",
+            ),
+        },
         "description": "Change how the business prints, field by field: print the receipt by itself at checkout, open the "
         "drawer with it, receipt copies (1 to 3), and the printer of each function by its name («the kitchen orders go "
         "to Kitchen 2»; null = the first active one of that function). What is not sent is kept.",
@@ -406,7 +446,7 @@ def _given_printer(ref: str, paper: str) -> Printer:
 def _stamped(ctx: OperationContext, data: JobCreateIn) -> dict:
     """The document with the envelope the paper needs when the caller left it out: its language (the
     caller's) and, but on a generic document (which prints every key), its money scale: the decimals of the
-    caller's currency or, when it does not say, of the business's (hub#1159, #2129)."""
+    caller's currency or, when it does not say, of the business's."""
     document = dict(data.document)
     if data.format != PrintJob.Format.RECEIPT:
         return document
@@ -443,11 +483,24 @@ def _new_job(ctx: OperationContext, **values) -> PrintJob:
 @operation(
     "printing.job.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobCreateIn,
     output=JobCreateOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print this receipt on the Till printer",
+                "print the label of this product",
+                "send this document to the kitchen printer",
+            ),
+            "es": (
+                "imprime este ticket en la impresora de la caja",
+                "imprime la etiqueta de este producto",
+                "manda este documento a la impresora de cocina",
+            ),
+        },
         "description": "Print a document: put it in the print queue, where the device next to its printer prints it. "
         "The document is structured (a receipt: business_name, receipt_id, items [{name, quantity, total}], totals, "
         "payment; a barcode label: product_name, barcode, price) and goes to the printer of its function, or to a "
@@ -514,11 +567,24 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
 @operation(
     "printing.printer.test",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=PrinterRefIn,
     output=JobOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "print a test page on the Caja 2 printer",
+                "test the kitchen printer",
+                "send a test ticket to the Till printer",
+            ),
+            "es": (
+                "saca una página de prueba en la impresora Caja 2",
+                "prueba la impresora de cocina",
+                "manda un ticket de prueba a la impresora de la caja",
+            ),
+        },
         "description": "Print a test page on a printer, named by its name or id («test the kitchen printer»): the device "
         "next to it prints the sheet with the printer's address and the time, or an A4 page on the system printer.",
         "risk": "normal",
@@ -641,11 +707,22 @@ def _copy_of(job: PrintJob) -> dict | None:
 @operation(
     "printing.job.claim",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobClaimIn,
     output=JobClaimOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "take the next print job for this device",
+                "this device is ready to print the oldest job",
+            ),
+            "es": (
+                "este equipo recoge el siguiente trabajo de impresión",
+                "que este puesto coja el trabajo de impresión más antiguo",
+            ),
+        },
         "description": "For the device that prints (base's /ws/print): take the oldest queued job of the printers this "
         "device reaches, or one with no printer of their function. It is marked sent for 90 s; without an answer it "
         "goes back to the queue. Not for a person.",
@@ -704,11 +781,22 @@ def claim_job(ctx: OperationContext, data: JobClaimIn) -> dict:
 @operation(
     "printing.job.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobCompleteIn,
     output=JobAckOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "this device confirms the job came out on paper",
+                "the print job is done on this device",
+            ),
+            "es": (
+                "este equipo confirma que el trabajo salió en papel",
+                "el trabajo de impresión ya está hecho en este equipo",
+            ),
+        },
         "description": "For the device that prints: confirm a job came out on paper, saying which device and which "
         "hand-out. Confirming twice is one confirmation; a late confirmation of the device that took it is taken even "
         "if the job went back to the queue (the paper did come out). Another device: refused. Not for a person.",
@@ -737,11 +825,22 @@ def complete_job(ctx: OperationContext, data: JobCompleteIn) -> dict:
 @operation(
     "printing.job.fail",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=JobFailIn,
     output=JobAckOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "this device reports the print job did not come out",
+                "the printer ran out of paper on this job",
+            ),
+            "es": (
+                "este equipo avisa de que el trabajo no salió impreso",
+                "la impresora se quedó sin papel en este trabajo",
+            ),
+        },
         "description": "For the device that prints: say a job did not come out, with the device's error, the device "
         "and the hand-out it answers. It goes back to the queue, and fails after its fifth hand-out. Another device or "
         "another hand-out: refused. Not for a person.",
@@ -782,11 +881,22 @@ def _reached_printers(ids: list) -> list[Printer]:
 @operation(
     "printing.device.register",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=DeviceRegisterIn,
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "enroll this station as the one that prints",
+                "this counter's station will take the print jobs",
+            ),
+            "es": (
+                "deja este equipo encargado de la impresión de los tickets",
+                "este equipo se encargará de los trabajos de impresión",
+            ),
+        },
         "description": "Set up the device the person is using to print, with its name and the printers it reaches: from "
         "then on it prints their jobs with anybody's session. Only from the device itself (it says which device it is); "
         "setting up a retired device again brings it back.",
@@ -805,7 +915,7 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
                 device = PrintDevice.objects.create(key=key, name=data.name, registered_by=actor(ctx))
         except IntegrityError:
             device = PrintDevice.objects.select_for_update().get(key=key)
-    # Set up from the device in hand: it is there (the old hub's «a re-registration counts as news»).
+    # Set up from the device in hand: it is there (a re-registration counts as news).
     device.name, device.retired_at, device.retired_by, device.last_seen_at = data.name, None, "", timezone.now()
     device.save(update_fields=["name", "retired_at", "retired_by", "last_seen_at"])
     device.printers.set(printers)
@@ -835,11 +945,22 @@ def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
 @operation(
     "printing.device.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=DeviceUpdateIn,
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "change the name and the printers of the Bar 2 station",
+                "make this station reach the kitchen printer too",
+            ),
+            "es": (
+                "cambia el nombre del equipo de impresión Barra 2",
+                "haz que este equipo también llegue a la impresora de cocina",
+            ),
+        },
         "description": "Rename a device that prints, or change the printers it reaches, by its registration id "
         "(printing.device.list). From any device.",
         "risk": "high",
@@ -859,11 +980,22 @@ def update_device(ctx: OperationContext, data: DeviceUpdateIn) -> dict:
 @operation(
     "printing.device.retire",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission=MANAGE_SETTINGS,
     input=DeviceRefIn,
     output=DeviceOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retire the Bar 2 station for good",
+                "that station was lost, take it out of service",
+            ),
+            "es": (
+                "retira el dispositivo Barra 2, ya no está",
+                "el equipo de la barra se ha perdido: retíralo",
+            ),
+        },
         "description": "Retire a device that prints (a till replaced or lost), by its registration id: it takes, confirms "
         "and fails no job any more, and printing from it does not set it up again. Its jobs in hand go back to the "
         "queue when their time to answer runs out.",
@@ -884,11 +1016,24 @@ def retire_device(ctx: OperationContext, data: DeviceRefIn) -> dict:
 @operation(
     "printing.job.retry",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_jobs",
     input=JobRefIn,
     output=JobOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "retry the failed print of ticket T-000123",
+                "print that failed ticket again",
+                "reprint the stuck job",
+            ),
+            "es": (
+                "reintenta la impresión fallida del ticket T-000123",
+                "vuelve a mandar a imprimir ese ticket que falló",
+                "reenvía la impresión atascada a la cola",
+            ),
+        },
         "description": "Send a queued or failed print job (or a sent one with no answer) back to the queue, named by its id or "
         "the number of its document («retry ticket T-000123»): its attempts start again, and if its printer is no "
         "longer active it goes to the printer of its function now.",
@@ -913,11 +1058,24 @@ def retry_job(ctx: OperationContext, data: JobRefIn) -> dict:
 @operation(
     "printing.job.cancel",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.manage_jobs",
     input=JobCancelIn,
     output=JobOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "cancel the print job of ticket T-000123",
+                "do not print that queued document",
+                "drop the stuck print from the queue",
+            ),
+            "es": (
+                "cancela la impresión del ticket T-000123",
+                "no imprimas ese documento que está en cola",
+                "saca de la cola la impresión atascada",
+            ),
+        },
         "description": "Cancel a print job that is queued, failed or sent with no answer, named by its id or the "
         "number of its document, with an optional reason. It is not printed and stays in the queue with who, when "
         "and why. A job a printer is printing or has printed is not cancelled.",

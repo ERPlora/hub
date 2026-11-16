@@ -7,16 +7,18 @@
 // (`attendance.settings.get`: the defaults until the business saves): a change saved elsewhere repaints every
 // field the person has not touched. «Save» sends only what changed (`attendance.settings.update`); what the
 // screen can judge it judges first and the server's 422 goes under each field. Whoever may not save reads them.
-import { InlineFeedback } from '@erplora/ui/components';
+// The form is every settings page's (`useSettingsForm`, hub#867): a refusal says itself as a FormModal does,
+// and the workplace's two coordinates are one value: changing either sends both and lifts both messages.
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, nativeBridge, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { IonButton, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
+import { computed, ref } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
-import type { Radius, SettingsIn, SettingsOut } from '../operations';
+import type { Radius, SettingsOut } from '../operations';
 import { attendanceTabs } from '../tabs';
 
 const RADII: readonly Radius[] = [50, 100, 250, 500, 1000];
@@ -42,16 +44,18 @@ const t = useT();
 const canEdit = computed(() => session.can('attendance.manage_settings'));
 
 const { data, status, error, refresh } = useLive('attendance.settings.get', {});
-const { run, pending, error: saveError } = useCommand('attendance.settings.update');
+/** The form is every settings page's (`useSettingsForm`, hub#867); what is this page's is said below. */
+const settingsForm = useSettingsForm(data, useCommand('attendance.settings.update'), {
+  toForm,
+  numbers: ['geofence_radius_m', 'auto_close_after_hours'],
+  server: { workplace_lat: { value: coordinate }, workplace_lng: { value: coordinate } },
+  together: [['workplace_lat', 'workplace_lng']],
+  judge,
+});
+const { form, fieldErrors } = settingsForm;
 const blocked = computed(() => blockingError(error.value));
 
-const form = ref<Form | null>(null);
-const original = ref<Form | null>(null);
-const touched = ref<ReadonlySet<keyof Form>>(new Set());
-const saved = ref(false);
 const problem = ref('');
-/** What the screen judged wrong before sending, by field (WORKBOOK ATTENDANCE-F04: «se señalan en su campo»). */
-const judged = ref<Partial<Record<keyof Form, string>>>({});
 const accuracy = ref<number | null>(null);
 const locating = ref(false);
 
@@ -67,89 +71,41 @@ function toForm(settings: SettingsOut): Form {
   };
 }
 
-// What the server says repaints every field the person has not touched.
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(
-          (Object.keys(fresh) as (keyof Form)[]).map((key) => [key, touched.value.has(key) ? current[key] : fresh[key]]),
-        ) as unknown as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set<K extends keyof Form>(field: K, value: Form[K]): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-  problem.value = '';
-  // Fixing a field lifts its mark; the coordinates are judged as a pair.
-  const pair: (keyof Form)[] = field === 'workplace_lat' || field === 'workplace_lng' ? ['workplace_lat', 'workplace_lng'] : [field];
-  if (pair.some((key) => key in judged.value)) {
-    judged.value = Object.fromEntries(Object.entries(judged.value).filter(([key]) => !pair.includes(key as keyof Form)));
-  }
+/** A typed coordinate as the server knows it: a number, or none when it is empty. */
+function coordinate(value: string): number | null {
+  return value.trim() ? Number(value.trim()) : null;
 }
 
+/** The first thing the screen can tell is wrong, under its field, before sending (ATTENDANCE-F04 «Si falla»). */
+function judge(now: Form): Partial<Record<keyof Form, string>> | null {
+  const lat = coordinate(now.workplace_lat);
+  const lng = coordinate(now.workplace_lng);
+  const incomplete = t('attendance.settings.coordinatesIncomplete');
+  if (lat === null && lng !== null) return { workplace_lat: incomplete };
+  if (lat !== null && lng === null) return { workplace_lng: incomplete };
+  if (lat !== null && !(Number.isFinite(lat) && Math.abs(lat) <= 90)) return { workplace_lat: t('attendance.settings.invalidLatitude') };
+  if (lng !== null && !(Number.isFinite(lng) && Math.abs(lng) <= 180)) return { workplace_lng: t('attendance.settings.invalidLongitude') };
+  const hours = now.auto_close_after_hours.trim();
+  if (!/^\d+$/.test(hours) || Number(hours) < 1 || Number(hours) > 24) return { auto_close_after_hours: t('attendance.settings.invalidAutoClose') };
+  return null;
+}
+
+/** A change also takes away what «Use my current location» last said. */
+function set<K extends keyof Form>(field: K, value: Form[K]): void {
+  if (!form.value) return;
+  settingsForm.set(field, value);
+  problem.value = '';
+}
+/** The form as its number fields change it: through `set`, so typing in them also takes that message away. */
+const fields = { form, fieldErrors, set };
+
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => ({ ...(saveError.value?.fields ?? {}), ...judged.value }));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 const workplaceMissing = computed(() => !!form.value?.require_location && (!form.value.workplace_lat.trim() || !form.value.workplace_lng.trim()));
 
-/** The changes to send, or the first thing wrong with the form: its field and its message's key. */
-function changes(): { ok: true; value: SettingsIn } | { ok: false; field: keyof Form; key: string } {
-  const now = form.value!;
-  const was = original.value!;
-  const lat = now.workplace_lat.trim();
-  const lng = now.workplace_lng.trim();
-  if (!!lat !== !!lng) return { ok: false, field: lat ? 'workplace_lng' : 'workplace_lat', key: 'attendance.settings.coordinatesIncomplete' };
-  const latN = lat ? Number(lat) : null;
-  const lngN = lng ? Number(lng) : null;
-  if (latN !== null && !(Number.isFinite(latN) && Math.abs(latN) <= 90)) return { ok: false, field: 'workplace_lat', key: 'attendance.settings.invalidLatitude' };
-  if (lngN !== null && !(Number.isFinite(lngN) && Math.abs(lngN) <= 180)) return { ok: false, field: 'workplace_lng', key: 'attendance.settings.invalidLongitude' };
-  const hoursText = now.auto_close_after_hours.trim();
-  const hours = Number(hoursText);
-  if (!/^\d+$/.test(hoursText) || hours < 1 || hours > 24) return { ok: false, field: 'auto_close_after_hours', key: 'attendance.settings.invalidAutoClose' };
-  const out: SettingsIn = {};
-  if (now.require_location !== was.require_location) out.require_location = now.require_location;
-  if (now.geofence_radius_m !== was.geofence_radius_m) out.geofence_radius_m = Number(now.geofence_radius_m) as Radius;
-  if (lat !== was.workplace_lat || lng !== was.workplace_lng) {
-    out.workplace_lat = latN;
-    out.workplace_lng = lngN;
-  }
-  if (hoursText !== was.auto_close_after_hours) out.auto_close_after_hours = hours;
-  return { ok: true, value: out };
-}
-
+/** Only whoever may change them saves (no one else has the button). */
 async function save(): Promise<void> {
-  if (!canEdit.value || !form.value || pending.value) return;
-  saved.value = false;
-  judged.value = {};
-  const next = changes();
-  if (!next.ok) {
-    judged.value = { [next.field]: t(next.key) };
-    return;
-  }
-  if (Object.keys(next.value).length === 0) {
-    saved.value = true;
-    return;
-  }
-  try {
-    const answer = await run(next.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
+  if (canEdit.value) await settingsForm.save();
 }
 
 async function useMyLocation(): Promise<void> {
@@ -211,6 +167,7 @@ async function useMyLocation(): Promise<void> {
         v-else
         class="attendance-settings"
         data-testid="attendance-settings-form"
+        novalidate
         @submit.prevent="save"
       >
         <header>
@@ -226,20 +183,6 @@ async function useMyLocation(): Promise<void> {
           data-testid="attendance-settings-read-only"
         >
           {{ $t('attendance.settings.readOnly') }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saveError"
-          tone="danger"
-          data-testid="attendance-settings-error"
-        >
-          {{ saveError.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="attendance-settings-saved"
-        >
-          {{ $t('attendance.settings.saved') }}
         </InlineFeedback>
         <ion-toggle
           data-testid="attendance-settings-require_location"
@@ -279,39 +222,27 @@ async function useMyLocation(): Promise<void> {
         <section>
           <h3>{{ $t('attendance.settings.workplace') }}</h3>
           <div class="attendance-settings__pair">
-            <ion-input
-              data-testid="attendance-settings-workplace_lat"
-              type="number"
+            <SettingsNumberField
+              :settings="fields"
+              field="workplace_lat"
+              testid="attendance-settings-workplace_lat"
+              :label="$t('attendance.settings.latitude')"
               inputmode="decimal"
               min="-90"
               max="90"
               step="any"
-              mode="md"
-              fill="outline"
-              label-placement="floating"
-              :label="$t('attendance.settings.latitude')"
               :disabled="!canEdit"
-              :value="form.workplace_lat"
-              :error-text="fieldErrors.workplace_lat"
-              :class="invalid(fieldErrors.workplace_lat)"
-              @ion-input="set('workplace_lat', text($event.detail.value))"
             />
-            <ion-input
-              data-testid="attendance-settings-workplace_lng"
-              type="number"
+            <SettingsNumberField
+              :settings="fields"
+              field="workplace_lng"
+              testid="attendance-settings-workplace_lng"
+              :label="$t('attendance.settings.longitude')"
               inputmode="decimal"
               min="-180"
               max="180"
               step="any"
-              mode="md"
-              fill="outline"
-              label-placement="floating"
-              :label="$t('attendance.settings.longitude')"
               :disabled="!canEdit"
-              :value="form.workplace_lng"
-              :error-text="fieldErrors.workplace_lng"
-              :class="invalid(fieldErrors.workplace_lng)"
-              @ion-input="set('workplace_lng', text($event.detail.value))"
             />
           </div>
           <div class="attendance-settings__locate">
@@ -340,7 +271,7 @@ async function useMyLocation(): Promise<void> {
               data-testid="attendance-settings-accuracy"
             >{{ $t('attendance.settings.accuracy', { accuracy }) }}</span>
           </div>
-          <!-- Under the button that read it: on a phone the banner up top is out of sight from here. -->
+          <!-- Under the button that read it: on a phone the save's notices, by «Save», are out of sight from here. -->
           <InlineFeedback
             v-if="problem"
             class="attendance-settings__location-error"
@@ -357,46 +288,27 @@ async function useMyLocation(): Promise<void> {
         >
           {{ $t('attendance.settings.workplaceMissing') }}
         </InlineFeedback>
-        <ion-input
-          data-testid="attendance-settings-auto_close_after_hours"
-          type="number"
-          inputmode="numeric"
+        <SettingsNumberField
+          :settings="fields"
+          field="auto_close_after_hours"
+          testid="attendance-settings-auto_close_after_hours"
+          :label="$t('attendance.settings.autoClose')"
+          :helper-text="$t('attendance.settings.autoCloseHelp')"
           min="1"
           max="24"
           step="1"
-          mode="md"
-          fill="outline"
-          label-placement="floating"
-          :label="$t('attendance.settings.autoClose')"
-          :helper-text="$t('attendance.settings.autoCloseHelp')"
           :disabled="!canEdit"
-          :value="form.auto_close_after_hours"
-          :error-text="fieldErrors.auto_close_after_hours"
-          :class="invalid(fieldErrors.auto_close_after_hours)"
-          @ion-input="set('auto_close_after_hours', text($event.detail.value))"
         />
-        <div
-          v-if="canEdit"
-          class="attendance-settings__actions"
-        >
-          <ion-button
-            data-testid="attendance-settings-save"
-            :disabled="pending"
-            @click="save"
-          >
-            <ion-spinner
-              v-if="pending"
-              slot="start"
-              name="crescent"
-            />
-            <HubIcon
-              v-else
-              slot="start"
-              name="lucide:save"
-            />
-            {{ $t('attendance.settings.save') }}
-          </ion-button>
-        </div>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="attendance-settings"
+          :save-label="$t('attendance.settings.save')"
+          :saved-label="$t('attendance.settings.saved')"
+          :readonly="!canEdit"
+          allow-unchanged
+          spinner
+          save-icon="lucide:save"
+        />
       </form>
     </template>
   </AppPage>
@@ -406,10 +318,6 @@ async function useMyLocation(): Promise<void> {
 .attendance-settings {
   display: grid;
   gap: 1.1rem;
-}
-/* The toggle's long label wraps: on one line it pushed the whole form past a phone's edge. */
-.attendance-settings ion-toggle::part(label) {
-  white-space: normal;
 }
 .attendance-settings header h2 {
   margin: 0;
@@ -439,10 +347,6 @@ async function useMyLocation(): Promise<void> {
 }
 .attendance-settings__location-error {
   margin-top: 12px;
-}
-.attendance-settings__actions {
-  display: flex;
-  justify-content: flex-end;
 }
 .attendance-settings__loading {
   display: flex;

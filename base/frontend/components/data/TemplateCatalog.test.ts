@@ -1,6 +1,3 @@
-// «Choose what to load» (BASE-G103): the hub's templates as cards or a list, with «Search templates», each with its
-// language and country by name, its version, what it brings and «Use template». Loading, empty, no match and a
-// catalogue that could not be read (the file can still be imported) each say so.
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../../__tests__/mount-base';
@@ -35,7 +32,7 @@ describe('TemplateCatalog', () => {
   it('paints each template with its language and country by name, its version and what it brings', async () => {
     const m = await catalog({}, 'es');
     await m.result(m.call, 'base.blueprint.list', { templates: [template('restaurant.es')], empty: true });
-    // Cards first, with the list/cards switch of the old hub's catalogue.
+    // Cards first, with a switch to the list.
     expect(m.wrapper.find('[data-testid="templates-view"]').exists()).toBe(true);
     expect(m.wrapper.find('.data-table__cards, [data-view="cards"]').exists()).toBe(true);
     const row = m.wrapper.get('[data-testid="templates-row"]');

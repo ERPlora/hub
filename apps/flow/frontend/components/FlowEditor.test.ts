@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CatalogOut, DraftOut, FlowOut } from '../operations';
-import { click, ionChecked, ionValue, mountFlow, settle } from '../__tests__/mount-flow';
+import { type Answers, click, ionChecked, ionValue, mountFlow, settle } from '../__tests__/mount-flow';
 import { emptyDocument, fromFlow } from '../lib/document';
 import FieldPicker from './FieldPicker.vue';
 import FlowEditor from './FlowEditor.vue';
@@ -31,6 +31,7 @@ afterEach(() => {
 });
 
 const CATALOG: CatalogOut = {
+  off_apps: [],
   events: [{ name: 'sale.sale.completed', app: 'sale', app_name: 'Sales' }],
   actions: [
     {
@@ -79,12 +80,12 @@ const FLOW: FlowOut = {
   last_run: null,
 };
 
-const BASE_ANSWERS: Record<string, [number, unknown]> = {
+const BASE_ANSWERS: Answers = {
   '/api/flow/catalog': [200, CATALOG],
   '/api/flow/events/sample': [200, { found: true, event: 'sale.sale.completed', at: '2026-10-15T09:00:00+02:00', payload: { total: 12500, customer_name: 'Ana' } }],
 };
 
-async function setup(props: Record<string, unknown>, answers: Record<string, [number, unknown]> = {}) {
+async function setup(props: Record<string, unknown>, answers: Answers = {}) {
   const m = await mountFlow(FlowEditor, { props: { tab: 'steps', draft: null, ...props }, answers: { ...BASE_ANSWERS, ...answers } });
   await settle();
   const sentTo = (path: string) => m.sent().filter((call) => call.path === path);
@@ -115,7 +116,7 @@ describe('FlowEditor: a new automation', () => {
     expect(mine.wrapper.findComponent(TriggerCard).props('fixedByApp')).toBeNull();
   });
 
-  it('«Save» says its word, never an empty button (flows#144)', async () => {
+  it('«Save» says its word, never an empty button', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     expect(s.find('flow-editor-save').text()).toBe('Save');
   });
@@ -180,7 +181,7 @@ describe('FlowEditor: a saved automation', () => {
     expect(s.wrapper.findComponent(StepNode).props('open')).toBe(true);
   });
 
-  it('a save the Hub did not answer says so in words, never the technical text (hub#2320)', async () => {
+  it('a save the Hub did not answer says so in words, never the technical text', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) }, { '/api/flow/flows/update': [502, { detail: 'Bad gateway' }] });
     await click(s.find('flow-editor-save').element);
     await settle();
@@ -244,8 +245,8 @@ describe('FlowEditor: a saved automation', () => {
   });
 });
 
-describe('FlowEditor: review 2026-10-15', () => {
-  it('the switch is saved by «set_enabled», after the document (item 3)', async () => {
+describe('FlowEditor: the switch, a run by hand, the permissions and an unreadable catalog', () => {
+  it('the switch is saved by «set_enabled», after the document', async () => {
     const s = await setup(
       { flow: null, initial: emptyDocument() },
       { '/api/flow/flows': [201, { ...FLOW, id: 'f9' }], '/api/flow/flows/set_enabled': [200, { ...FLOW, id: 'f9', enabled: true }] },
@@ -261,7 +262,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(s.wrapper.emitted('saved')?.at(-1)).toEqual([{ ...FLOW, id: 'f9', enabled: true }]);
   });
 
-  it('a run by hand that stopped by an error says so, never «Run.» (item 11)', async () => {
+  it('a run by hand that stopped by an error says so, never «Run.»', async () => {
     const on = { ...FLOW, enabled: true };
     const s = await setup(
       { flow: on, initial: fromFlow(on) },
@@ -274,7 +275,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('with unsaved changes «Run now» waits for the save: it would run the saved version (item 11)', async () => {
+  it('with unsaved changes «Run now» waits for the save: it would run the saved version', async () => {
     const on = { ...FLOW, enabled: true };
     const s = await setup({ flow: on, initial: fromFlow(on) });
     await ionValue(s.find('flow-editor-name').element, 'Changed', 'ionInput');
@@ -282,7 +283,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(s.find('flow-editor-run-hint').text()).toBe('Save it first: «Run now» runs what is saved.');
   });
 
-  it('the permissions are read from what is saved, and ask to save the changes first (item 12)', async () => {
+  it('the permissions are read from what is saved, and ask to save the changes first', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) });
     await ionValue(s.find('flow-editor-tabs').element, 'permissions');
     expect(s.wrapper.findComponent(PermissionsPanel).props()).toMatchObject({ flow: FLOW, dirty: false });
@@ -290,7 +291,7 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(s.wrapper.findComponent(PermissionsPanel).props('dirty')).toBe(true);
   });
 
-  it('a catalog that could not be read is said, with «Retry» (item 5)', async () => {
+  it('a catalog that could not be read is said, with «Retry»', async () => {
     const s = await setup({ flow: FLOW, initial: fromFlow(FLOW) }, { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] });
     expect(s.find('flow-catalog-error').text()).toContain('What automations can use here could not be read.');
     expect(s.find('flow-catalog-error').text()).not.toContain('Internal error');
@@ -330,7 +331,7 @@ describe('FlowEditor: review 2026-10-15', () => {
   });
 
   // FLOW-F31: without the WhatsApp inbox in the business, «Send a message» is not offered. FLOW-F37: «Ask the
-  // assistant» is (until 2026-10-28 this test proved it was not, while the Hub had no assistant): these are all the
+  // assistant» is offered: these are all the
   // steps there are.
   it('offers exactly the steps the Hub can run', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
@@ -377,5 +378,87 @@ describe('FlowEditor: review 2026-10-15', () => {
     await click(s.find('flow-editor-run').element);
     await settle();
     expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is waiting for an answer in «Waiting for your answer».');
+  });
+});
+
+// hub#969: «Insert data» pressed before the catalog of actions had come in said «There is no data to insert here
+// yet…» with a step before it, and stayed so while open: the picker took a copy of the data when it opened. It
+// follows what the editor knows: «Loading…» until the catalog is in, then the earlier steps' data without closing
+// it; a catalog that could not be read is said inside it, with «Retry» (WORKBOOK FLOW-F11, «Estados de cada pantalla»).
+describe('FlowEditor: «Which data?» while the catalog is being read (hub#969)', () => {
+  const TWO: FlowOut = { ...FLOW, steps: [...FLOW.steps, { id: 's2', kind: 'command', operation: 'task.task.create', params: { title: '' } }] };
+  const FAILED: [number, unknown] = [500, { error: { code: 'internal_error', message: 'Internal error' } }];
+
+  /** A read the test holds and answers when it wants. */
+  function held() {
+    let answer!: (response: Response) => void;
+    const reply = new Promise<Response>((resolve) => (answer = resolve));
+    return { reply: () => reply, answer };
+  }
+
+  async function pickInStep2(s: Awaited<ReturnType<typeof setup>>) {
+    void (s.wrapper.findAllComponents(StepNode)[1].props('pick') as () => Promise<string | null>)();
+    await settle();
+    return s.wrapper.findComponent(FieldPicker);
+  }
+
+  /** The held catalog comes in: the picker, still open, stops loading and offers what step 1 leaves. */
+  async function catalogComesIn(s: Awaited<ReturnType<typeof setup>>, catalog: ReturnType<typeof held>, picker: Awaited<ReturnType<typeof pickInStep2>>) {
+    catalog.answer(Response.json(CATALOG));
+    await settle();
+    expect(picker.props('open')).toBe(true);
+    expect(s.find('flow-picker-loading').exists()).toBe(false);
+    expect(s.find('flow-picker-none').exists()).toBe(false);
+    expect(s.find('flow-picker-steps.s1.number').text()).toContain('1. Create a task › Number');
+  }
+
+  it('says «Loading…», never that there is nothing, and shows what step 1 leaves once the catalog is in, still open', async () => {
+    const catalog = held();
+    const s = await setup({ flow: TWO, initial: fromFlow(TWO) }, { '/api/flow/catalog': catalog.reply });
+    const picker = await pickInStep2(s);
+    expect(picker.props('open')).toBe(true);
+    expect(s.find('flow-picker-loading').text()).toBe('Loading…');
+    // Read out by a screen reader as the page's own «Loading…» is; the dots are decoration.
+    expect(s.find('flow-picker-loading').attributes('role')).toBe('status');
+    expect(s.find('flow-picker-loading').find('ion-spinner').attributes('aria-hidden')).toBe('true');
+    expect(s.find('flow-picker-none').exists()).toBe(false);
+
+    await catalogComesIn(s, catalog, picker);
+    expect(picker.props('choices').map((choice: { path: string }) => choice.path)).toEqual([
+      'input.total',
+      'input.customer_name',
+      'steps.s1.id',
+      'steps.s1.number',
+    ]);
+  });
+
+  it('a catalog that could not be read is said inside the picker, with «Retry», and its data come in', async () => {
+    const s = await setup({ flow: TWO, initial: fromFlow(TWO) }, { '/api/flow/catalog': FAILED });
+    const picker = await pickInStep2(s);
+    expect(s.find('flow-picker-error').text()).toContain('What automations can use here could not be read.');
+    expect(s.find('flow-picker-error').text()).not.toContain('Internal error');
+    expect(s.find('flow-picker-none').exists()).toBe(false);
+    expect(s.find('flow-picker-loading').exists()).toBe(false);
+
+    const catalog = held();
+    s.answerBy({ ...BASE_ANSWERS, '/api/flow/catalog': catalog.reply });
+    await click(s.find('flow-picker-retry').element);
+    expect(s.find('flow-picker-error').exists()).toBe(false);
+    expect(s.find('flow-picker-loading').text()).toBe('Loading…');
+    await catalogComesIn(s, catalog, picker);
+  });
+
+  it('opened on a call, the secrets that come in later are offered too, still open (FLOW-F27)', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    await click(s.find('flow-editor-add-http').element);
+    await settle();
+    await s.live();
+    void (s.wrapper.findAllComponents(StepNode)[0].props('pickCall') as () => Promise<string | null>)();
+    await settle();
+    expect(s.find('flow-picker-secret.STRIPE_KEY').exists()).toBe(false);
+    await s.result('flow.secret.list', { rows: [{ id: 'x1', name: 'STRIPE_KEY', created_at: '', updated_at: '', updated_by: '' }], available: true });
+    await settle();
+    expect(s.wrapper.findComponent(FieldPicker).props('open')).toBe(true);
+    expect(s.find('flow-picker-secret.STRIPE_KEY').exists()).toBe(true);
   });
 });

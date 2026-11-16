@@ -1,10 +1,9 @@
 <script setup lang="ts">
-// «Switch user» (`/switch-user`, BASE-G60; Square's and Toast's «switch user» over the app; the old hub's
-// UserSwitchOverlay): opened from the user menu on a shared till. The faces come live (`base.access.faces`), so a PIN
-// given or taken away shows at once. Whoever takes over types their PIN (or passes their badge); the Hub opens their
-// session over this one and ends this one only then (`/auth/pin`), and the screen that was in use reloads in place as
-// them: nothing that whoever left had read or opened stays mounted, and Back does not return to it (gh:hub#2538,
-// hub#2539). The sale in progress is its app's, kept on the till. A refusal leaves whoever was in, in.
+// Opened from the user menu on a shared till, as Square's and Toast's «switch user». The faces come live
+// (`base.access.faces`), so a PIN given or taken away shows at once. The Hub opens the new session over this one and
+// ends this one only then (`/auth/pin`), so a refusal leaves whoever was in, in. The screen that was in use then
+// reloads in place: nothing that whoever left had read or opened stays mounted, and Back does not return to it. The
+// sale in progress belongs to its app and stays on the till.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useLive } from '@erplora/ui/sdk';
 import { IonContent, IonPage, IonSpinner } from '@ionic/vue';

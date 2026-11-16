@@ -5,7 +5,7 @@
 // and Melilla; «Tax %» while it is not known); «+ Line» adds one at the territory's general rate and the
 // cross removes one (never the last). Each line names its
 // hooks by its own id (`invoice-line-<uid>-…`), so removing the first never renames the others. What the
-// server refused on a line (`lines.<index>.<field>`) is said under its field.
+// server refused on a line (`lines.<index>.<field>`) is said under its field, which carries that key as its name.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput } from '@ionic/vue';
 import { computed } from 'vue';
@@ -48,8 +48,10 @@ function remove(uid: number): void {
   if (lines.value.length > 1) lines.value = lines.value.filter((line) => line.uid !== uid);
 }
 
-const errorOf = (errors: Readonly<Record<string, string>>, index: number, field: Field): string | undefined =>
-  errors[`lines.${index}.${SERVER_FIELD[field]}`];
+/** A field's name: the command's key of its datum (`lines.0.quantity`), the one its refusal comes under, so the
+ *  window tells which field was corrected even when another line's says the same words (hub#888). */
+const keyOf = (index: number, field: Field): string => `lines.${index}.${SERVER_FIELD[field]}`;
+const errorOf = (errors: Readonly<Record<string, string>>, index: number, field: Field): string | undefined => errors[keyOf(index, field)];
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
@@ -67,6 +69,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       <ion-input
         class="invoice-lines-editor__description"
         :data-testid="`invoice-line-${line.uid}-description`"
+        :name="keyOf(index, 'description')"
         :label="$t('invoice.create.line.description')"
         label-placement="floating"
         fill="outline"
@@ -79,6 +82,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       />
       <ion-input
         :data-testid="`invoice-line-${line.uid}-quantity`"
+        :name="keyOf(index, 'quantity')"
         :label="$t('invoice.create.line.qty')"
         label-placement="floating"
         fill="outline"
@@ -91,6 +95,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       />
       <ion-input
         :data-testid="`invoice-line-${line.uid}-price`"
+        :name="keyOf(index, 'price')"
         :label="$t('invoice.create.line.price')"
         label-placement="floating"
         fill="outline"
@@ -103,6 +108,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
       />
       <ion-input
         :data-testid="`invoice-line-${line.uid}-tax-rate`"
+        :name="keyOf(index, 'taxRate')"
         :label="rateLabel"
         label-placement="floating"
         fill="outline"

@@ -6,7 +6,7 @@ transaction, and erplora.com's answer is recorded in another one. ``respx`` is t
 only; Customers and the channel are the app's real operations. Cases of the product's tests: a template
 saved again is never duplicated, an edit of an approved template keeps the approved one usable until Meta
 takes the edit, Meta's verdict never lands on a text changed afterwards, a template deleted here is never
-brought back, and «Meta did not answer» is never blamed on ERPlora (gh:hub#2731).
+brought back, and «Meta did not answer» is never blamed on ERPlora.
 """
 
 import datetime as dt
@@ -22,9 +22,10 @@ from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Template
-from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, run, system, template
+from apps.whatsapp_inbox.tests.conftest import A, HUB_DB, NOW, connect, ctx_for, run, system, template
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 REGISTER = f"{SAAS}/internal/whatsapp/templates"
@@ -67,7 +68,7 @@ def delivered(django_capture_on_commit_callbacks):
     """Run a write and then what it left for after its COMMIT (the call to erplora.com)."""
 
     def run_and_deliver(write):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
             return write()
 
     return run_and_deliver
@@ -108,7 +109,7 @@ def events(name: str) -> list[dict]:
 def test_a_new_template_is_kept_unsent_and_registered_at_meta_only_after_the_commit(django_capture_on_commit_callbacks):
     connect()
     route = registering()
-    with django_capture_on_commit_callbacks(execute=False) as pending:
+    with django_capture_on_commit_callbacks(execute=False, using=current_alias()) as pending:
         out = create()
     row = Template.objects.get(pk=out.id)
     assert (row.status, row.submit_state) == ("DRAFT", "queued")
@@ -118,7 +119,7 @@ def test_a_new_template_is_kept_unsent_and_registered_at_meta_only_after_the_com
     request = route.calls.last.request
     assert request.headers["Idempotency-Key"] == str(row.submit_key)
     assert json.loads(request.content) == {
-        "hub": "a",
+        "hub": A.key,
         "name": "recordatorio_cita",
         "language": "es",
         "category": "UTILITY",
@@ -270,7 +271,7 @@ def test_only_who_configures_makes_changes_or_deletes_templates(role):
 )
 @respx.mock
 def test_a_refusal_keeps_the_template_unsent_with_its_reason_never_blaming_erplora(delivered, code, kept, words):
-    """gh:hub#2731: with Meta down the screen says Meta did not answer, not that ERPlora failed."""
+    """With Meta down the screen says Meta did not answer, not that ERPlora failed."""
     connect()
     registering(409, {"error": {"code": code, "message": "Template name already exists"}})
     out = delivered(create)
@@ -444,7 +445,7 @@ def test_what_only_whatsapp_manager_changes_is_read_only_here(fields, code):
 @respx.mock
 def test_a_template_on_its_way_to_meta_is_not_changed_until_it_lands(django_capture_on_commit_callbacks):
     connect()
-    with django_capture_on_commit_callbacks(execute=False):
+    with django_capture_on_commit_callbacks(execute=False, using=current_alias()):
         out = create()
     with pytest.raises(Conflict) as excinfo:
         update(Template.objects.get(pk=out.id), footer="Otro")
@@ -473,7 +474,7 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
     route = deleting()
     delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}))
     assert json.loads(route.calls.last.request.content) == {
-        "hub": "a",
+        "hub": A.key,
         "name": "recordatorio",
         "language": "es",
         "meta_id": "meta-recordatorio",
@@ -500,7 +501,7 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
             "whatsapp_inbox.reconnect_needed",
             "WhatsApp's permission for your number expired: connect it again.",
         ),
-        # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296); the
+        # erplora.com without the deletion door yet: its 404 is no confirmation; the
         # deletion's own words, not the ones of a template that has not left.
         (
             404,
@@ -561,9 +562,9 @@ def test_a_template_deleted_here_is_never_brought_back_but_a_new_one_of_that_nam
     [
         # A place header (a photo, video or document one is sent with its file: F33).
         {"header_format": "LOCATION", "header": ""},
-        # gh:whatsapp_inbox#226, #230: a variable in the title.
+        # A variable in the title.
         {"header": "Tu cita, {{1}}", "body": "Te esperamos el {{2}}."},
-        # gh:whatsapp_inbox#186: named variables; the Hub fills them by number only.
+        # Named variables; the Hub fills them by number only.
         {"body": "Hola {{nombre}}, te esperamos el {{dia}}."},
     ],
 )
@@ -607,7 +608,7 @@ def test_the_list_says_which_templates_the_hub_cannot_fill_whatever_meta_says_of
     assert (by_name["de_manager"].editable, by_name["de_manager"].sendable) == (False, False)
 
 
-# ── The worker hands again what never ended (phase 1 runs its scheduled task too) ───────────────
+# ── The worker hands again what never ended ───────────────
 
 
 @respx.mock

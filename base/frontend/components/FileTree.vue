@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// Files › the tree of folders (BASE-G82, BASE-G85; the old hub's ok-file-manager tree): the folders of the business,
-// nested, the open one marked (`aria-current`); a tap opens one, and what is dragged from the list (`dragging`, its
-// path) drops on a folder to move there — only where the person may move (`droppable`), never onto itself or inside
-// itself. Content of the page, not a menu: its rows are buttons.
+// What is dragged from the file list drops on a folder to move there, only where the person may move (`droppable`) and
+// never onto or inside itself. The tree is page content, not a menu, so its rows are buttons.
 import { HubIcon } from '@erplora/ui/shell';
 import { ref } from 'vue';
 

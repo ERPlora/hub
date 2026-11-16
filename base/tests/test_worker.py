@@ -1,16 +1,16 @@
-"""The worker's loop (CLAUDE.md «Procesos»; aws-next README, «Contrato app ↔ infra»).
+"""The worker's loop.
 
-It registers the Hub's modules in the SaaS first: without its apps registered there is no release
-(round 16, PLAN §21.1.1), so it does no work before that. A ``shared`` schema the SaaS has not
-migrated yet (the first deploy) is waited for, with a warning and a backoff of 5, 10, 20, 40 and
-then 60 s; any other failure stops the worker with 1. Then it names, as an error, each ready business still without
-its own database (S5: it never serves one) and, on every tick until asked to stop (waking up at once: ECS gives it
-30 s after SIGTERM), takes control's own outbox (``relay.run(of_hubs=False)``, round 2026-10-20) and serves each hub
-with its own database (``_hubs``: its outbox and its tasks, in it; ``test_worker_hubs.py``). A pass that fails is
+It registers the Hub's modules in the SaaS first: without its apps registered there is no release,
+so it does no work before that. A ``shared`` schema the SaaS has not migrated yet (the first deploy)
+is waited for, with a warning and a backoff of 5, 10, 20, 40 and then 60 s; any other failure stops
+the worker with 1. Then it names, as an error, each ready business still without its own database (it
+never serves one) and, on every tick until asked to stop (waking up at once: ECS gives it 30 s after
+SIGTERM), takes control's own outbox (``relay.run(of_hubs=False)``) and serves each hub with its own
+database (``_hubs``: its outbox and its tasks, in it; ``test_worker_hubs.py``). A pass that fails is
 logged and the next tick tries again. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it purges the demos
-that ended (``reap_demos``, plan 2026-10-17 §1.7); a reaper that fails is logged and never stops the worker. Every
-tick it makes the databases of the hubs due in ``hub_due`` and drops the demos that ended (``provision.run_due``,
-round 2026-10-30, S2a), on control; a pass that fails is logged and the next tick tries again. No database here:
+that ended (``reap_demos``); a reaper that fails is logged and never stops the worker. Every tick it
+makes the databases of the hubs due in ``hub_due`` and drops the demos that ended (``provision.run_due``),
+on control; a pass that fails is logged and the next tick tries again. No database here:
 ``register_apps``, the scheduler, the relay, the reaper, the registry and the due pass are replaced; their own tests
 are ``test_register_apps.py``, ``test_scheduler.py``, ``test_relay.py``, ``test_services_demo.py`` and
 ``base/tenancy/tests/test_provision.py``.
@@ -192,12 +192,33 @@ def reaper(monkeypatch) -> FakeReaper:
     return fake
 
 
+class FakeFreeze:
+    """Stands in for ``worker._frozen``, the freeze switch read once a tick (hub#930): one answer per read, in order,
+    the last one kept; counts the reads."""
+
+    def __init__(self) -> None:
+        self.answers: list[bool] = [False]
+        self.reads = 0
+
+    def __call__(self) -> bool:
+        self.reads += 1
+        return self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
+
+@pytest.fixture(autouse=True)
+def freeze_switch(monkeypatch) -> FakeFreeze:
+    """The platform not frozen unless a test says so (``control.freeze.set``; its real read: ``test_the_switch_*``)."""
+    fake = FakeFreeze()
+    monkeypatch.setattr(worker, "_frozen", fake)
+    return fake
+
+
 @pytest.fixture(autouse=True)
 def nobody_without_a_database(monkeypatch) -> list:
     """Stands in for the registry's businesses still on control's database (``services.hubs_on_control``), read once at
     start: none here (``test_it_names_each_ready_business_without_its_own_database``)."""
     waiting: list = []
-    monkeypatch.setattr(worker.services, "hubs_on_control", lambda: waiting)
+    monkeypatch.setattr(worker.services.hub_registry, "hubs_on_control", lambda: waiting)
     return waiting
 
 
@@ -382,7 +403,7 @@ def test_the_real_wait_wakes_up_as_soon_as_it_is_asked_to_stop(monkeypatch):
     "failure",
     [
         CatalogError("The 'shared' database alias is not configured"),
-        # The tables exist but lack a column: a contract gap (spec §3.5), never waited for.
+        # The tables exist but lack a column: a contract gap, never waited for.
         CatalogError("the database has no column shared.app.verticals: migrate the SaaS first"),
         DatabaseError("could not connect to server"),
         RuntimeError("unexpected"),
@@ -424,7 +445,7 @@ def stop_after(stop: threading.Event, ticks: int):
 
 
 def test_the_loop_runs_no_task_of_its_own_each_hub_runs_its_own_in_its_pass(calls, tasks, hubs_pass):
-    """Since S5 there is no shared database to run every hub's tasks on: each hub's run in its own database, in the
+    """There is no shared database to run every hub's tasks on: each hub's run in its own database, in the
     pass over the hubs (``_serve_hub``, ``test_worker_hubs.py``), every tick."""
     stop = threading.Event()
     wait, waits = stop_after(stop, 3)
@@ -490,7 +511,7 @@ def test_stop_ends_the_ticks(calls, hubs_pass):
 def test_it_names_each_ready_business_without_its_own_database_as_an_error_and_goes_on(
     caplog, calls, hubs_pass, nobody_without_a_database, status
 ):
-    """S5: a business still on control's database (phase 1's, not cut) is never served: at start the worker says so,
+    """A business still on control's database is never served: at start the worker says so,
     as an error, for each ready one, and serves the rest; one that left (``cancelled``) is no error, it is made one if
     it comes back."""
     from types import SimpleNamespace
@@ -514,7 +535,7 @@ def test_it_names_each_ready_business_without_its_own_database_as_an_error_and_g
     assert hubs_pass == [ten(0)]
 
 
-# ── The demo reaper (plan 2026-10-17, §1.7) ─────────────────────────────────────────────────────
+# ── The demo reaper ─────────────────────────────────────────────────────────────────────────────
 
 
 def at(*seconds: int):
@@ -574,7 +595,7 @@ def test_a_reaper_that_fails_is_logged_and_never_stops_the_worker(monkeypatch, c
     assert "demo" in record.getMessage() and record.exc_info[1] is failure
 
 
-# ── The outbox relay (round 2026-10-20) ──────────────────────────────────────────────────────────
+# ── The outbox relay ─────────────────────────────────────────────────────────────────────────────
 
 
 def test_takes_control_s_own_outbox_on_every_tick_never_a_business_s(calls, outbox):
@@ -614,22 +635,28 @@ def test_a_relay_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog,
     assert calls.count("close_old_connections") == 6
 
 
-# ── The hubs due: their databases made, the demos that ended dropped (round 2026-10-30, S2a) ───────────────────────
+# ── The hubs due: their databases made, the demos that ended dropped ───────────────────────────────────────────────
 
 
-def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due_on_every_tick(
-    monkeypatch, calls, tasks, due, outbox
-):
-    """Review of hub#471 (I2, C1): the relay first, so a slow pass making databases never holds kitchen, stock or
-    VeriFactu back; then the hubs with their own database, each relayed in it; the hubs due last, on control. A hub
-    made ready in a tick has its outbox relayed from the next one."""
-    order: list[str] = []
+def every_pass(monkeypatch, order: list[str], due: FakeDue, outbox: FakeRelay) -> None:
+    """The passes of the tick note their names in ``order``, in the order they run (the slow ones inline: ``Inline``);
+    the moves and the reaper keep their own fakes (``moves_pass``, ``reaper``)."""
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now, of_hubs=True: order.append("relay") or outbox(now, of_hubs=of_hubs))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
     monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
+
+
+def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due_on_every_tick(
+    monkeypatch, calls, tasks, due, outbox
+):
+    """hub#471: the relay first, so a slow pass making databases never holds kitchen, stock or
+    VeriFactu back; then the hubs with their own database, each relayed in it; the hubs due last, on control. A hub
+    made ready in a tick has its outbox relayed from the next one."""
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
     stop = threading.Event()
     wait, _ = stop_after(stop, 3)
 
@@ -637,9 +664,10 @@ def test_takes_control_s_outbox_then_relays_the_hubs_own_then_makes_the_hubs_due
 
     assert due.passes == [ten(0), ten(1), ten(2)]
     assert due.contexts == [context.CONTROL] * 3
-    # The apps turned on whose tables a hub lacks (S3) right after its own pass, before the hubs due. The slow passes
-    # (the data work, the nightly measurement) are started where the loop is in this order, run inline here (Inline); in the worker they run in threads of their own, so nothing orders them against the hubs due: a
-    # reset's row the provisioning's pass takes first is given back still due (release_hub, test_worker_data.py).
+    # The apps turned on whose tables a hub lacks right after its own pass, before the hubs due. The slow passes (the
+    # data work, the nightly measurement) are started where the loop is in this order, run inline here (Inline); in the
+    # worker they run in threads of their own, so nothing orders them against the hubs due: a reset's row the
+    # provisioning's pass takes first is given back still due (release_hub, test_worker_data.py).
     assert order == ["relay", "hubs", "activations", "data", "usage", "due"] * 3
 
 
@@ -662,7 +690,7 @@ def test_with_databases_only_it_makes_the_hubs_databases_and_apps_tables_and_dro
 
     worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 1), databases_only=True)
 
-    # Every tick makes the tables of the apps turned on (S3: an app turned on in a spec is set up) and the databases
+    # Every tick makes the tables of the apps turned on (an app turned on in a spec is set up) and the databases
     # due; the reaper keeps its own pace; nothing else runs.
     assert [step for step in order if step != "reap"] == ["activations", "due", "activations", "due"]
     assert not {"tasks", "relay", "hubs", "data", "usage"} & set(order)
@@ -692,12 +720,36 @@ def test_a_stop_before_the_first_tick_makes_no_hub(calls, due):
 
 
 def test_the_pass_that_makes_databases_gives_the_next_tick_its_turn():
-    """Re-review of hub#471 (c): the hubs due take at most a few seconds a tick (the rest waits for the next), so the
+    """hub#471: the hubs due take at most a few seconds a tick (the rest waits for the next), so the
     next tick's relay and the hubs' tasks are never held back long."""
     assert provision.DUE_PASS_SECONDS <= worker.TICK_SECONDS
 
 
-# ── The slow passes run off the loop (PLAN-DB round 2026-10-31b, C8) ──────────────────────────────────────────────
+#: A demo is ready in under 5 s from its request. The worker takes a hub due on its next pass, so it never waits longer
+#: than that between passes.
+DEMO_READY_AIM_SECONDS = 5.0
+
+
+@pytest.mark.parametrize("databases_only", [True, False], ids=["e2e-worker", "worker"])
+def test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds(monkeypatch, calls, due, databases_only):
+    """hub#1061: demo.spec.ts gave a demo 15 s (the worker's 5 s tick plus the 5 s a demo aims at, with room for a
+    loaded machine) and dropped that clock: what it held of the tick is this fact, measured on the waits the loop asks
+    for, never on the wall clock. ``run_worker`` passes no tick (``test_run_worker.py``), so this is the tick of
+    production and of the e2e's worker (``--databases-only``): it makes the hubs due on every pass and waits no longer
+    than 5 s between two."""
+    monkeypatch.setattr(worker, "_activations", lambda now: None)
+    monkeypatch.setattr(worker, "_hubs", lambda now: None)
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: None)
+    stop = threading.Event()
+    wait, waits = stop_after(stop, 3)
+
+    assert worker.run(stop, wait=wait, clock=clock(0, 1, 2), databases_only=databases_only) == 0
+
+    assert due.passes == [ten(0), ten(1), ten(2)]
+    assert len(waits) == 3 and max(waits) <= DEMO_READY_AIM_SECONDS
+
+
+# ── The slow passes run off the loop ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_slow_data_pass_never_holds_the_relay_the_tasks_nor_the_hubs_due(monkeypatch, calls, hubs_pass, due, outbox):
@@ -787,7 +839,7 @@ def test_a_slow_pass_that_fails_is_logged_and_the_next_tick_starts_it_again(monk
     assert "the data pass failed" in caplog.text
 
 
-# ── A hub moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; base.tenancy.move) ────────────────────
+# ── A hub moved to another cluster (base.tenancy.move) ──────────────────────────────────────────────────────────────
 
 
 def test_the_moves_run_in_a_thread_of_their_own_every_tick_after_the_data_and_before_the_hubs_due(
@@ -826,7 +878,7 @@ def test_with_databases_only_no_hub_moves(monkeypatch, calls, tasks, due, outbox
 
 
 def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
-    from base.tenancy import move
+    from base.tenancy import move, restore
 
     monkeypatch.undo()
     seen: list[tuple[str, bool]] = []
@@ -839,10 +891,43 @@ def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
         return 1
 
     monkeypatch.setattr(move, "run_due", run_due)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append(("restores", cancelled())) or 0)
 
     worker._moves(ten(0), stop)
 
-    assert seen == [(context.CONTROL, False), (context.CONTROL, True)]
+    assert seen == [(context.CONTROL, False), (context.CONTROL, True), ("restores", True)]
+
+
+def test_the_moves_pass_restores_the_hubs_asked_too_on_control(monkeypatch):
+    # hub#1198: a hub put back as it was at a moment, in the same thread as the moves (both copy a database).
+    from base.tenancy import move, restore
+
+    monkeypatch.undo()
+    seen: list[tuple[str, dt.datetime]] = []
+    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now)) or 1)
+
+    worker._moves(ten(0), threading.Event())
+
+    assert seen == [(context.CONTROL, ten(0))]
+
+
+def test_the_moves_pass_brings_back_what_a_business_lost_from_its_copy_too_on_control(monkeypatch):
+    # hub#1257: a recovery from a separate copy, in the thread of the copies it reads, after they are made.
+    from base.tenancy import move, recovery, restore
+
+    monkeypatch.undo()
+    seen: list[tuple] = []
+    monkeypatch.setattr(move, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_due", lambda now, *, cancelled: 0)
+    monkeypatch.setattr(restore, "run_aside_due", lambda now, *, cancelled: seen.append("asides") or 0)
+    monkeypatch.setattr(
+        recovery, "run_due", lambda now, *, cancelled: seen.append((context.current().kind, now, cancelled())) or 1
+    )
+
+    worker._moves(ten(0), threading.Event())
+
+    assert seen == ["asides", (context.CONTROL, ten(0), False)]
 
 
 def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeypatch, caplog):
@@ -861,3 +946,113 @@ def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeyp
 
     [record] = [r for r in caplog.records if r.name == "base.worker"]
     assert "move" in record.getMessage() and record.exc_info[1] is failure
+
+
+# ── The freeze switch (hub#930) ──────────────────────────────────────────────────────────────────────────────────────
+
+
+def ticks(count: int, **options) -> int:
+    """Run the loop for ``count`` ticks, at 10:00, 10:01…; its exit code."""
+    stop = threading.Event()
+    wait, _ = stop_after(stop, count)
+    return worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(*range(count)), **options)
+
+
+def test_frozen_it_makes_drops_moves_and_sets_up_nothing_while_the_relay_the_tasks_and_the_use_go_on(
+    monkeypatch, calls, tasks, due, outbox, moves_pass, reaper, freeze_switch
+):
+    """While a database upgrade runs nothing may change a schema: no sign-up or demo made, no demo dropped, no app's
+    tables made, no move, no data work (a business past its days is dropped); the relay, every hub's tasks (VeriFactu's
+    queue among them) and the nightly measure go on."""
+    freeze_switch.answers = [True]
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
+
+    assert ticks(2) == 0
+
+    assert order == ["relay", "hubs", "usage"] * 2
+    assert (due.passes, moves_pass, reaper.passes) == ([], [], [])
+
+
+def test_the_switch_is_read_once_a_tick(calls, freeze_switch):
+    ticks(3)
+
+    assert freeze_switch.reads == 3
+
+
+def test_a_stop_before_the_first_tick_reads_no_switch(calls, freeze_switch):
+    worker.run(stopped())
+
+    assert freeze_switch.reads == 0
+
+
+def test_once_lifted_the_next_tick_makes_what_waited_and_reaps_at_once(
+    monkeypatch, calls, tasks, due, outbox, moves_pass, reaper, freeze_switch
+):
+    freeze_switch.answers = [True, True, False]
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
+
+    ticks(3)
+
+    assert order[-6:] == ["relay", "hubs", "activations", "data", "usage", "due"]
+    # The reaper, held while frozen, runs on the first tick after: the demos that ended do not wait another minute.
+    assert (due.passes, moves_pass, reaper.passes) == ([ten(2)], [ten(2)], [ten(2)])
+
+
+def test_frozen_the_e2es_worker_does_nothing(monkeypatch, calls, tasks, due, outbox, reaper, freeze_switch):
+    freeze_switch.answers = [True]
+    order: list[str] = []
+    every_pass(monkeypatch, order, due, outbox)
+
+    ticks(2, databases_only=True)
+
+    assert (order, reaper.passes) == ([], [])
+
+
+def test_it_says_once_when_it_freezes_and_once_when_it_is_lifted(caplog, calls, freeze_switch):
+    freeze_switch.answers = [False, True, True, False, False]
+
+    with caplog.at_level(logging.INFO, logger="base.worker"):
+        ticks(5)
+
+    said = [r.getMessage() for r in caplog.records if r.name == "base.worker" and "freeze" in r.getMessage()]
+    assert len(said) == 2
+    assert "frozen" in said[0] and "control.freeze.set" in said[0]
+    assert "lifted" in said[1]
+
+
+@pytest.mark.django_db
+def test_the_switch_read_says_whether_control_is_frozen(monkeypatch):
+    from control import services as control_services
+    from control.schemas import FreezeIn
+    from live.context import system_context
+
+    from base.registry import REGISTRY_SCOPE
+
+    monkeypatch.undo()
+    platform = system_context(REGISTRY_SCOPE)
+
+    assert worker._frozen() is False
+    control_services.freeze_set(platform, FreezeIn(frozen=True, reason="upgrade"))
+    assert worker._frozen() is True
+    control_services.freeze_set(platform, FreezeIn(frozen=False))
+    assert worker._frozen() is False
+
+
+def test_the_switch_that_cannot_be_read_freezes_the_tick_and_says_why(monkeypatch, caplog):
+    from control import queries as control_queries
+
+    monkeypatch.undo()
+    failure = DatabaseError("server closed the connection unexpectedly")
+
+    def broken():
+        raise failure
+
+    monkeypatch.setattr(control_queries, "active_freeze", broken)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker._frozen() is True
+
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "freeze" in record.getMessage() and record.exc_info[1] is failure

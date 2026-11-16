@@ -277,7 +277,7 @@ async def movement_list(request, params: Query[MovementListIn]):
     return await run_operation(request, queries.list_movements, params)
 
 
-# The service's image (SERVICE-F34, F35; round 2026-10-30, base.images)
+# The service's image (SERVICE-F34, F35; base.images)
 
 
 @bind(router, "service.service.set_image", "/service/services/image")

@@ -1,39 +1,40 @@
-"""Turning a business's apps on and off, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25; FIX-BASE-APP-TURN-
-OFF-VETO): ``base.app.enable`` and ``base.app.disable``, their rows (``base.AppActivation``), what an app that is off
-stops being (its operations, the menu, the relay) and how the Apps screen follows them live.
+"""Turning a business's apps on and off, with the plan's limit (BASE-F18, F19, F23–F25): ``base.app.enable`` and
+``base.app.disable``, their rows (``base.AppActivation``), what an app that is off stops being (its operations, the
+menu, the relay) and how the Apps screen follows them live.
 
 The rules themselves, without the database, are ``base/tests/test_activation.py``.
 """
 
 import json
 import re
-import threading
 
 import psycopg
 import pytest
 from django.apps import apps
-from django.db import IntegrityError, connections, transaction
+from django.db import IntegrityError, connections
 from live.assistant import description, risk
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, Conflict, NotFound, OperationError, PermissionDenied
 from live.live_registry import live_registry
 from live.models import OutboxEvent
-from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
+from live.operations import atomic, get
 
+from apps.flow.tests.test_relay import heard, listen
+from apps.sale.tests.conftest import db_dsn
 from base import activation, events, relay
 from base.activation import OFF, ON, Activation
 from base.entitlement import EntitlementBlocked
 from base.models import AppActivation, Hub
 from base.schemas import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
+from base.tenancy.context import current_alias, use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import at_once, in_a_thread, plan_with_room
+from base.tests.routes import assert_bound
 
-A = Scope("host", "a")
-B = Scope("host", "b")
-#: Businesses a test registers: born with every app off (round 2026-10-27), unlike the suite's ``a`` and ``b``.
-C = Scope("host", "c")
-D = Scope("host", "d")
+#: Business A entered for every test with the database, room for two of its sessions at once, and control's LISTEN.
+__all__ = ["db_dsn", "in_business_a", "listen", "plan_with_room"]
+
 ADMIN = "base.administer_hub"
 HOME = "base.view_home"
 
@@ -66,13 +67,13 @@ def with_limit(slug, max_apps):
     keep(slug, {"plan": {"slug": "free", "max_users": 0, "max_devices": 0, "max_apps": max_apps}})
 
 
-def rows(host="a"):
+def rows(host=A.key):
     return {
         row.app: Activation(row.state, row.chosen) for row in AppActivation.objects.filter(host=host).order_by("app")
     }
 
 
-def set_rows(host="a", **given):
+def set_rows(host=A.key, **given):
     """Write ``host``'s rows: every module off, those given ``on``/``on*`` (chosen)/``off``."""
     AppActivation.objects.filter(host=host).delete()
     graph = activation.module_graph()
@@ -89,6 +90,11 @@ def set_rows(host="a", **given):
 
 def recorded(name):
     return list(OutboxEvent.objects.filter(name=name).values_list("scope_key", "payload"))
+
+
+def born_off(host=A.key):
+    """The business as it is born, every app off: no row of its own (one of before has every app on)."""
+    AppActivation.objects.filter(host=host).delete()
 
 
 def app_list(scope=A, language="en", *permissions):
@@ -109,37 +115,36 @@ def test_an_activation_lives_in_the_hubs_database():
     assert inventory.classify(AppActivation) == inventory.HUB
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_has_one_row_per_app():
     AppActivation.objects.create(host="c", app="task", state=ON, chosen=True)
     AppActivation.objects.create(host="d", app="task", state=OFF, chosen=False)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         AppActivation.objects.create(host="c", app="task", state=OFF, chosen=False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_state_is_on_or_off():
-    with pytest.raises(IntegrityError), transaction.atomic():
-        AppActivation.objects.create(host="a", app="task", state="activating", chosen=False)
+    with pytest.raises(IntegrityError), atomic():  # a host without rows: only the state's check can refuse it
+        AppActivation.objects.create(host="c", app="task", state="activating", chosen=False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_business_that_never_changed_anything_has_every_app_off_and_writes_nothing():
-    """Round 2026-10-27: a hub is born with every app off; reading its apps writes nothing."""
-    Hub.objects.create(slug="c", status="ready")
-    document = app_list(C)
+    born_off()
+    document = app_list()
     assert {app["id"]: (app["state"], app["chosen"]) for app in document["apps"]} == {
         label: ("off", False) for label in activation.module_graph()
     }
     assert (document["max_apps"], document["enabled"]) == (None, 0)
-    assert relay.active_apps(C).isdisjoint(activation.module_graph())
-    assert rows("c") == {}
+    assert relay.active_apps(A).isdisjoint(activation.module_graph())
+    assert rows() == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
-    """What the migration base.0017 wrote for the hubs of before round 2026-10-27 (as the suite's ``a``): every app
-    on, the roots chosen (PLAN §32, point 2)."""
+    """What the migration base.0017 wrote for hubs created before new hubs started with every app off (as the suite's
+    A): every app on, the roots chosen."""
     document = app_list()
     graph = activation.module_graph()
     roots = activation.roots(graph, graph)
@@ -149,29 +154,27 @@ def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
     assert (document["max_apps"], document["enabled"]) == (None, 17)
 
 
-@pytest.mark.django_db
-def test_erploras_own_hub_and_the_workers_scope_have_every_app_on(settings):
-    """Phase 1 runs every app's scheduled tasks on the worker's scope (``WORKER_SCOPE_SLUG``) over the tables every
-    hub shares, and ERPlora's own hub (``PLATFORM_HUB_SLUG``) issues ERPlora's invoices with Invoicing and VeriFactu:
-    neither is a business that chooses its apps, so neither is born with them off (round 2026-10-27)."""
+@HUB_DB
+def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platform(settings):
+    """ERPlora's own hub issues its invoices with Invoicing and VeriFactu; the worker's legacy scope is not it."""
     settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG = "erplora", "worker-scope"
     graph = activation.module_graph()
-    for slug in ("erplora", "worker-scope"):
-        scope = Scope("host", slug)
-        assert activation.off_apps(scope) == frozenset()
-        assert activation.states_of(scope) == activation.every_on(graph)
-        assert {"invoice", "verifactu", "whatsapp_inbox"} <= relay.active_apps(scope)
+    scope = Scope("host", "erplora")
+    assert activation.off_apps(scope) == frozenset()
+    assert activation.states_of(scope) == activation.every_on(graph)
+    assert {"invoice", "verifactu", "whatsapp_inbox"} <= relay.active_apps(scope)
+    assert activation.off_apps(Scope("host", "worker-scope")) == frozenset(graph)
     assert activation.off_apps(Scope("host", "c")) == frozenset(graph)
 
 
-# ── How a hub is born (round 2026-10-27) ──────────────────────────────────────────────────────────────────────
+# ── How a hub is born ─────────────────────────────────────────────────────────────────────────────────────────
 
 
 def modules_on(scope):
     return set(relay.active_apps(scope)) & set(activation.module_graph())
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_business_the_saas_registers_is_born_with_every_app_off():
     from live.context import system_context
 
@@ -184,14 +187,14 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
                       timezone="Europe/Madrid", language="es", vertical="restaurant"),
     )
 
-    # Requested, with its own database to make (round 2026-10-30, S2a): its template carries no app turned on
+    # Requested, with its own database still to make: its template carries no app turned on
     # (base/tenancy/tests/test_provision.py), and nothing turns one on before it is ready.
     assert Hub.objects.get(slug="nuevo").status == "requested"
     assert modules_on(Scope("host", "nuevo")) == set()
     assert rows("nuevo") == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_demo_is_born_with_every_app_off():
     import hashlib
 
@@ -240,8 +243,8 @@ def test_the_assistants_card_names_the_apps_screen():
     from base import assistant
 
     for name in ("base.app.enable", "base.app.disable"):
-        assert assistant.card(get(name), {"app": "task"}, "es")["app_name"] == "Apps"
-        assert assistant.card(get(name), {"app": "task"}, "en")["app_name"] == "Apps"
+        assert assistant.cards.card(get(name), {"app": "task"}, "es")["app_name"] == "Apps"
+        assert assistant.cards.card(get(name), {"app": "task"}, "en")["app_name"] == "Apps"
 
 
 def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
@@ -253,7 +256,7 @@ def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
     assert risk(get("base.app.disable")) == "high"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_turning_one_on_turns_on_what_it_needs_and_records_its_event():
     set_rows(task="on*", staff="on")
 
@@ -272,10 +275,10 @@ def test_turning_one_on_turns_on_what_it_needs_and_records_its_event():
         ("sale", "tax", "customer"), Activation(ON, False)
     )
     assert now["task"] == Activation(ON, True) and now["staff"] == Activation(ON, False)
-    assert recorded(events.APP_ENABLED) == [("a", {"app": "invoice", "along": ["customer", "sale", "tax"]})]
+    assert recorded(events.APP_ENABLED) == [(A.key, {"app": "invoice", "along": ["customer", "sale", "tax"]})]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_what_it_needs_and_was_chosen_stays_chosen():
     set_rows(customer="on*")
     enable("sale")
@@ -283,32 +286,33 @@ def test_what_it_needs_and_was_chosen_stays_chosen():
     assert rows()["tax"] == Activation(ON, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_already_on_and_chosen_changes_nothing_and_records_nothing():
     set_rows(task="on*", staff="on")
     assert enable("task") == {"app": "task", "state": "on", "chosen": True, "along": [], "already": True}
     assert recorded(events.APP_ENABLED) == []
 
 
-@pytest.mark.django_db
-def test_the_first_change_writes_down_every_app_of_the_business():
+@HUB_DB
+def test_the_first_change_writes_down_every_app_of_the_business(hub_b):
     """A business on the baseline (born, every app off) gets its rows the first time it changes something: every app
     as it was, off, and the change; so a second change at the same time has rows to lock (the plan's limit). Another
     business keeps its own baseline."""
-    Hub.objects.create(slug="c", status="ready")
-    Hub.objects.create(slug="d", status="ready")
+    born_off()
+    with use_hub(hub_b):
+        born_off(B.key)
 
-    enable("task", context=ctx(scope=C))
+    enable("task")
 
     expected = {label: Activation(OFF, False) for label in activation.module_graph()}
     expected["task"] = Activation(ON, True)
     expected["staff"] = Activation(ON, False)  # what Tasks needs comes along, not chosen
-    assert rows("c") == expected
-    assert rows("d") == {}
-    assert by_id(app_list(D))["task"]["state"] == "off"
+    assert rows() == expected
+    with use_hub(hub_b):
+        assert (rows(B.key), by_id(app_list(B))["task"]["state"]) == ({}, "off")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_app_or_the_platform_is_not_found():
     before = rows()
     for label in ("nope", "base", "live", "peluquería"):
@@ -328,7 +332,7 @@ def app_get(app, *, language="en", permissions=(HOME,)):
     return op(context, op.input.model_validate({"app": app})).model_dump(mode="json")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_app_the_person_names_goes_on_never_another_whose_name_starts_the_same():
     """«Activa la app de reservas» with Reservas off and Reservas online on turned on Reservas online (hub#539)."""
     set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
@@ -341,7 +345,7 @@ def test_the_app_the_person_names_goes_on_never_another_whose_name_starts_the_sa
     assert [payload["app"] for _, payload in recorded(events.APP_ENABLED)] == ["reservation"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("said", "language", "app"),
     [
@@ -362,7 +366,7 @@ def test_an_app_is_named_by_its_id_or_by_its_name_as_the_person_says_it(said, la
     assert disable(said, context=ctx(language=language))["app"] == app
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_name_that_fits_several_apps_is_refused_naming_them_and_changes_nothing():
     """«reserva» is Reservas and Reservas online: the assistant asks which one, never picks one (hub#539)."""
     set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
@@ -376,7 +380,7 @@ def test_a_name_that_fits_several_apps_is_refused_naming_them_and_changes_nothin
     assert recorded(events.APP_ENABLED) == recorded(events.APP_DISABLED) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_already_on_says_so_also_when_it_had_come_along_with_another():
     """«Activa la app de clientes» with Clientes on (it came with Sales): it was on already, and the answer says so."""
     set_rows(sale="on*", tax="on", customer="on")
@@ -384,7 +388,7 @@ def test_one_already_on_says_so_also_when_it_had_come_along_with_another():
     assert (answer["app"], answer["state"], answer["already"]) == ("customer", "on", True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
     set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
     assert app_get("reservas", language="es") == {"id": "reservation", "name": "Reservas", "state": "off"}
@@ -393,7 +397,7 @@ def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
     with pytest.raises(NotFound):
         app_get("nope")
     monkeypatch.setattr(apps.get_app_config("task"), "premium", True)
-    keep("a", {"modules": []})
+    keep(A.key, {"modules": []})
     assert app_get("task")["state"] == "blocked"
 
 
@@ -403,23 +407,23 @@ def test_the_read_is_for_who_sees_the_home_and_told_to_the_assistant():
     assert description(op)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
-    """B28c (hub#539): the card said «online_booking», and the person confirmed Reservas online asking for Reservas."""
+    """hub#539: the card said «online_booking», and the person confirmed Reservas online asking for Reservas."""
     from base import assistant
 
     set_rows()
     for name in ("base.app.enable", "base.app.disable"):
-        card = assistant.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
+        card = assistant.cards.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
         assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservas online")]
-        card = assistant.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
+        card = assistant.cards.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
         assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservations")]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_paid_app_without_its_right_cannot_be_turned_on(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "premium", True)
-    keep("a", {"modules": []})
+    keep(A.key, {"modules": []})
     set_rows(staff="on*")
 
     with pytest.raises(EntitlementBlocked) as refused:
@@ -429,19 +433,19 @@ def test_a_paid_app_without_its_right_cannot_be_turned_on(monkeypatch):
     assert rows()["task"] == Activation(OFF, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_only_who_runs_the_business_turns_apps_on_or_off():
     for name in ("base.app.enable", "base.app.disable"):
         with pytest.raises(PermissionDenied):
             run(name, "task", context=ctx(HOME))
 
 
-# ── The plan's limit (PLAN §32, points 2 and 3) ─────────────────────────────────────────────────────────────
+# ── The plan's limit ────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_at_the_limit_one_more_is_refused_with_402_and_what_counts():
-    with_limit("a", 2)
+    with_limit(A.key, 2)
     set_rows(task="on*", staff="on", website="on*")
 
     with pytest.raises(OperationError) as refused:
@@ -461,18 +465,18 @@ def test_at_the_limit_one_more_is_refused_with_402_and_what_counts():
     assert recorded(events.APP_ENABLED) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_limit_is_said_in_the_language_of_who_asks():
-    with_limit("a", 2)
+    with_limit(A.key, 2)
     set_rows(task="on*", website="on*")
     with pytest.raises(OperationError) as refused:
         enable("flow", context=ctx(language="es"))
     assert refused.value.message == "Has llegado al límite de 2 apps de tu plan. Mejora el plan o desactiva una."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_what_comes_along_does_not_count():
-    with_limit("a", 2)
+    with_limit(A.key, 2)
     set_rows(invoice="on*", sale="on", tax="on", customer="on")
 
     enable("task")  # 1 chosen (invoice) + task = 2: staff comes along, uncounted
@@ -481,9 +485,9 @@ def test_what_comes_along_does_not_count():
     assert rows()["staff"] == Activation(ON, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_choosing_one_that_came_along_counts():
-    with_limit("a", 1)
+    with_limit(A.key, 1)
     set_rows(invoice="on*", sale="on", tax="on", customer="on")
     with pytest.raises(OperationError) as refused:
         enable("sale")
@@ -491,7 +495,7 @@ def test_choosing_one_that_came_along_counts():
     assert rows()["sale"] == Activation(ON, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "photo",
     [
@@ -501,19 +505,19 @@ def test_choosing_one_that_came_along_counts():
     ],
 )
 def test_no_limit_without_a_positive_max_apps(photo):
-    keep("a", photo)
+    keep(A.key, photo)
     set_rows(task="on*", staff="on", website="on*", flow="on*")
     enable("cart_checkout")
     assert app_list()["max_apps"] is None and app_list()["enabled"] == 4
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lower_plan_turns_nothing_off_and_only_refuses_one_more():
-    with_limit("a", 20)
+    with_limit(A.key, 20)
     graph = activation.module_graph()
     before = by_id(app_list())
 
-    with_limit("a", 5)  # bought down: 17 chosen, 5 allowed
+    with_limit(A.key, 5)  # bought down: 17 chosen, 5 allowed
 
     after = by_id(app_list())
     assert {label: (app["state"], app["chosen"]) for label, app in after.items()} == {
@@ -528,13 +532,14 @@ def test_a_lower_plan_turns_nothing_off_and_only_refuses_one_more():
     assert len(graph) == len(after)
 
 
-@pytest.mark.django_db
-def test_the_limit_is_this_business_own():
-    with_limit("a", 1)
-    keep("b", {})
-    set_rows("a", task="on*", staff="on")
-    set_rows("b", task="on*", staff="on")
-    enable("website", context=ctx(scope=B))
+@HUB_DB
+def test_the_limit_is_this_business_own(hub_b):
+    with_limit(A.key, 1)
+    keep(B.key, {})
+    set_rows(A.key, task="on*", staff="on")
+    with use_hub(hub_b):
+        set_rows(B.key, task="on*", staff="on")
+        enable("website", context=ctx(scope=B))
     with pytest.raises(OperationError):
         enable("website")
 
@@ -542,7 +547,7 @@ def test_the_limit_is_this_business_own():
 # ── Turning one off ─────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_turning_one_off_turns_off_what_came_with_it_and_records_its_event():
     set_rows(invoice="on*", sale="on", tax="on*", customer="on", task="on*", staff="on")
 
@@ -557,13 +562,13 @@ def test_turning_one_off_turns_off_what_came_with_it_and_records_its_event():
     }
     now = rows()
     assert [label for label, row in now.items() if row.on] == ["staff", "task", "tax"]
-    assert recorded(events.APP_DISABLED) == [("a", {"app": "invoice", "along": ["customer", "sale"]})]
+    assert recorded(events.APP_DISABLED) == [(A.key, {"app": "invoice", "along": ["customer", "sale"]})]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_another_app_on_needs_is_refused_with_409_naming_them():
     # Outside Spain, where VeriFactu can go off: turning it off first is something the person can do (hub#619).
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
     set_rows(verifactu="on*", invoice="on", sale="on", tax="on", customer="on", cash_register="on*")
 
     with pytest.raises(Conflict) as refused:
@@ -578,7 +583,7 @@ def test_one_another_app_on_needs_is_refused_with_409_naming_them():
     assert recorded(events.APP_DISABLED) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_409_is_said_in_the_language_of_who_asks():
     set_rows(task="on*", staff="on")
     with pytest.raises(Conflict) as refused:
@@ -586,16 +591,16 @@ def test_the_409_is_said_in_the_language_of_who_asks():
     assert refused.value.message == "Desactiva antes Tareas."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_already_off_changes_nothing_and_records_nothing():
     set_rows(task="on*", staff="on")
     assert disable("flow") == {"app": "flow", "state": "off", "chosen": False, "along": [], "already": True}
     assert recorded(events.APP_DISABLED) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_app_may_veto_going_off_with_its_reason(monkeypatch):
-    """FIX-BASE-APP-TURN-OFF-VETO: the hook an app declares on its config (VeriFactu will, in its own lane)."""
+    """The hook an app declares on its config, told which business asks."""
     seen = []
 
     def veto(ctx):
@@ -610,14 +615,14 @@ def test_an_app_may_veto_going_off_with_its_reason(monkeypatch):
 
     error = refused.value.envelope()["error"]
     assert (refused.value.status, error["code"], error["app"]) == (409, "base.app_vetoed", "task")
-    assert refused.value.message == "Close the open tasks of a first."
+    assert refused.value.message == "Close the open tasks of tenant-a first."
     assert seen == [A]
     assert rows()["task"] == Activation(ON, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_veto_is_said_in_the_language_of_who_asks(monkeypatch):
-    """BASE-F25 (gh:hub#2595: a reason only in English): an app's reason comes in the asker's language, whatever the
+    """BASE-F25: an app's reason comes in the asker's language, whatever the
     language the process runs in (the assistant, an API key), even from a hook that only calls gettext."""
     from django.utils.translation import gettext
 
@@ -636,7 +641,7 @@ def test_a_veto_is_said_in_the_language_of_who_asks(monkeypatch):
     assert refused.value.message == "Desactiva antes Tareas abiertas."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_what_would_go_off_along_may_veto_too(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
     set_rows(task="on*", staff="on")
@@ -646,7 +651,7 @@ def test_what_would_go_off_along_may_veto_too(monkeypatch):
     assert rows()["task"] == Activation(ON, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_needed_by_an_app_that_refuses_says_why_instead_of_asking_the_impossible(monkeypatch):
     """hub#619: «Turn off Tasks first» is an instruction nobody can follow while Tasks refuses to go off."""
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
@@ -663,7 +668,7 @@ def test_one_needed_by_an_app_that_refuses_says_why_instead_of_asking_the_imposs
     assert recorded(events.APP_DISABLED) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_that_sentence_is_said_in_the_language_of_who_asks(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Hay tareas abiertas.", raising=False)
     set_rows(task="on*", staff="on")
@@ -674,7 +679,7 @@ def test_that_sentence_is_said_in_the_language_of_who_asks(monkeypatch):
     assert refused.value.message == "Personal no se puede desactivar: hace falta para Tareas. Hay tareas abiertas."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_one_that_refuses_itself_says_its_own_reason_even_while_another_app_needs_it(monkeypatch):
     """«Turn off Tasks first» would be a dead end: Tasks goes off, and then Staff still refuses."""
     monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
@@ -691,7 +696,7 @@ def test_one_that_refuses_itself_says_its_own_reason_even_while_another_app_need
     assert rows()["staff"] == Activation(ON, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_while_none_of_those_that_need_it_refuses_it_still_says_which_to_turn_off_first(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
     set_rows(task="on*", staff="on")
@@ -703,7 +708,7 @@ def test_while_none_of_those_that_need_it_refuses_it_still_says_which_to_turn_of
     assert refused.value.message == "Turn off Tasks first."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_app_without_a_reason_lets_it_go(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
     set_rows(task="on*", staff="on")
@@ -711,10 +716,132 @@ def test_an_app_without_a_reason_lets_it_go(monkeypatch):
     assert rows()["task"] == Activation(OFF, False)
 
 
+@HUB_DB
+def test_one_that_refuses_itself_says_its_own_reason_before_that_of_an_app_that_needs_it(monkeypatch):
+    """Its own reason is the one that holds: turning the other off would still leave it refusing (hub#997: Taxes, which
+    VeriFactu needs in Spain, says that it is mandatory, not that VeriFactu needs it)."""
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["staff"]["refusal"] == "Staff is busy."
+    with pytest.raises(Conflict) as refused:
+        disable("staff")
+    assert (refused.value.envelope()["error"]["app"], refused.value.message) == ("staff", "Staff is busy.")
+
+
+# ── An app the business must have on in its country (hub#997, BASE-F25) ─────────────────────────────────────────
+# Taxes says it is mandatory everywhere (apps/tax/apps.py) and has no reason of its own to refuse: base's. The local
+# hub ``a`` has no country: it is in Spain.
+
+MANDATORY_HERE = "Taxes is mandatory for businesses in Spain: it can't be turned off."
+
+
+@HUB_DB
+def test_one_the_business_must_have_on_is_refused_with_409_and_stays_on():
+    set_rows(tax="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("tax")
+
+    error = refused.value.envelope()["error"]
+    assert (refused.value.status, error["code"], error["app"]) == (409, "base.app_vetoed", "tax")
+    assert refused.value.message == MANDATORY_HERE
+    assert rows()["tax"] == Activation(ON, True)
+    assert recorded(events.APP_DISABLED) == []
+
+
+@HUB_DB
+def test_its_refusal_names_the_business_country_in_the_language_of_who_asks():
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    set_rows(tax="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("tax", context=ctx(language="es"))
+
+    assert refused.value.message == "Impuestos es obligatoria para los negocios de Polonia: no se puede desactivar."
+    assert by_id(app_list(language="es"))["tax"]["refusal"] == refused.value.message
+
+
+@HUB_DB
+def test_while_an_app_on_needs_it_it_says_it_is_mandatory_not_which_to_turn_off_first():
+    """«Turn off Sales first» would be a dead end: Sales goes off, and Taxes still stays on."""
+    set_rows(sale="on*", tax="on", customer="on")
+
+    with pytest.raises(Conflict) as refused:
+        disable("tax")
+
+    error = refused.value.envelope()["error"]
+    assert (error["code"], error["app"], refused.value.message) == ("base.app_vetoed", "tax", MANDATORY_HERE)
+    assert "required_by" not in error
+    assert rows()["tax"] == Activation(ON, False)
+
+
+@HUB_DB
+def test_turning_off_the_app_it_came_with_leaves_it_on():
+    """The cascade of BASE-F23 skips it: Customers goes off with Sales, Taxes stays on (not chosen: it never counts
+    against the plan's limit)."""
+    set_rows(sale="on*", tax="on", customer="on")
+
+    assert by_id(app_list())["sale"]["refusal"] is None
+    answer = disable("sale")
+
+    assert answer["along"] == [{"id": "customer", "name": "Customers"}]
+    assert rows()["tax"] == Activation(ON, False)
+    assert {label: rows()[label].state for label in ("sale", "customer")} == {"sale": OFF, "customer": OFF}
+    assert recorded(events.APP_DISABLED) == [(A.key, {"app": "sale", "along": ["customer"]})]
+
+
+@HUB_DB
+def test_turning_off_the_app_it_came_with_never_asks_it(monkeypatch):
+    """Only what would go off is asked whether it refuses: Taxes stays on, so its hook is not run."""
+    asked = []
+    monkeypatch.setattr(apps.get_app_config("tax"), "can_disable", lambda ctx: asked.append(ctx.scope), raising=False)
+    set_rows(sale="on*", tax="on", customer="on")
+
+    disable("sale")
+
+    assert asked == []
+    assert rows()["tax"] == Activation(ON, False)
+
+
+@HUB_DB
+def test_one_mandatory_only_in_another_country_goes_off_here(monkeypatch):
+    monkeypatch.setattr(
+        apps.get_app_config("task"), "mandatory", {"countries": ["PL"], "platform_turns_on": False}, raising=False
+    )
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["task"]["refusal"] is None
+    disable("task")
+
+    assert rows()["task"] == Activation(OFF, False)
+
+
+@HUB_DB
+def test_each_hub_keeps_on_what_its_own_business_country_requires(hub_a, hub_b, no_test_fallback, monkeypatch):
+    """Two businesses with their own databases: Tasks, mandatory in Poland only, stays on in A's (Poland) and goes off
+    in B's (Spain); neither reads the other's country."""
+    monkeypatch.setattr(
+        apps.get_app_config("task"), "mandatory", {"countries": ["PL"], "platform_turns_on": False}, raising=False
+    )
+    Hub.objects.filter(slug=hub_a.slug).update(country="PL")
+    Hub.objects.filter(slug=hub_b.slug).update(country="ES")
+    of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
+
+    with use_hub(hub_a), pytest.raises(Conflict) as refused:
+        disable("task", context=ctx(scope=of_a))
+    assert refused.value.message == "Tasks is mandatory for businesses in Poland: it can't be turned off."
+    with use_hub(hub_b):
+        assert disable("task", context=ctx(scope=of_b))["state"] == "off"
+    with use_hub(hub_a):
+        assert activation.states_of(of_a)["task"].on
+
+
 # ── What an app refuses, said beforehand (hub#618, hub#619, hub#694) ─────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_app_may_refuse_to_go_on_with_its_reason(monkeypatch):
     seen = []
 
@@ -730,13 +857,13 @@ def test_an_app_may_refuse_to_go_on_with_its_reason(monkeypatch):
 
     error = refused.value.envelope()["error"]
     assert (refused.value.status, error["code"], error["app"]) == (409, "base.app_vetoed", "task")
-    assert refused.value.message == "Not for a."
+    assert refused.value.message == "Not for tenant-a."
     assert seen == [A]
     assert rows()["task"] == Activation(OFF, False)
     assert recorded(events.APP_ENABLED) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_what_would_come_along_may_refuse_too_and_nothing_goes_on(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("staff"), "can_enable", lambda ctx: "No staff here.", raising=False)
     set_rows(flow="on*")
@@ -749,7 +876,7 @@ def test_what_would_come_along_may_refuse_too_and_nothing_goes_on(monkeypatch):
     assert (rows()["task"], rows()["staff"]) == (Activation(OFF, False), Activation(OFF, False))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_refusal_to_go_on_is_said_in_the_language_of_who_asks(monkeypatch):
     from django.utils.translation import gettext
 
@@ -764,7 +891,7 @@ def test_the_refusal_to_go_on_is_said_in_the_language_of_who_asks(monkeypatch):
     assert refused.value.message == "Desactiva antes X."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_app_already_on_is_never_asked_to_go_on(monkeypatch):
     """Choosing what came along turns nothing on: an app that refuses to go on stays as it is, chosen by the person."""
     monkeypatch.setattr(apps.get_app_config("staff"), "can_enable", lambda ctx: "No staff here.", raising=False)
@@ -775,7 +902,7 @@ def test_an_app_already_on_is_never_asked_to_go_on(monkeypatch):
     assert (answer["state"], answer["chosen"]) == ("on", True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_says_why_an_app_on_cannot_go_off(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
     set_rows(task="on*", staff="on", flow="on*")
@@ -787,7 +914,7 @@ def test_the_list_says_why_an_app_on_cannot_go_off(monkeypatch):
     assert apps_["flow"]["refusal"] is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_says_why_what_would_go_off_along_keeps_an_app_on(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
     set_rows(task="on*", staff="on")
@@ -795,7 +922,7 @@ def test_the_list_says_why_what_would_go_off_along_keeps_an_app_on(monkeypatch):
     assert by_id(app_list())["task"]["refusal"] == "Staff is busy."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_says_why_an_app_off_cannot_go_on(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("staff"), "can_enable", lambda ctx: "No staff here.", raising=False)
     set_rows(flow="on*")
@@ -807,7 +934,7 @@ def test_the_list_says_why_an_app_off_cannot_go_on(monkeypatch):
     assert apps_["flow"]["refusal"] is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_never_asks_the_hook_of_the_other_direction(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
     monkeypatch.setattr(apps.get_app_config("flow"), "can_enable", lambda ctx: "Not here.", raising=False)
@@ -818,7 +945,7 @@ def test_the_list_never_asks_the_hook_of_the_other_direction(monkeypatch):
     assert (apps_["task"]["refusal"], apps_["flow"]["refusal"]) == (None, None)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_asks_each_hook_once(monkeypatch):
     calls = []
 
@@ -834,7 +961,7 @@ def test_the_list_asks_each_hook_once(monkeypatch):
     assert calls == [A]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_says_it_in_the_language_of_who_reads(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Hay tareas abiertas.", raising=False)
     set_rows(task="on*", staff="on")
@@ -844,7 +971,7 @@ def test_the_list_says_it_in_the_language_of_who_reads(monkeypatch):
     assert apps_["staff"]["refusal"] == "Personal no se puede desactivar: hace falta para Tareas. Hay tareas abiertas."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_turning_one_off_and_on_again_keeps_its_data():
     from apps.task.models import Project
 
@@ -859,8 +986,8 @@ def test_turning_one_off_and_on_again_keeps_its_data():
 # ── What an app that is off stops being ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
-def test_an_operation_of_an_app_off_answers_404_app_inactive():
+@HUB_DB
+def test_an_operation_of_an_app_off_answers_404_app_inactive(hub_b):
     set_rows(task="on*", staff="on")
     disable("task")
 
@@ -871,11 +998,12 @@ def test_an_operation_of_an_app_off_answers_404_app_inactive():
     assert (refused.value.status, refused.value.code) == (404, "app_inactive")
     assert refused.value.message == "Tasks is turned off in this business."
     # The same operation runs in another business, and base's never stop.
-    assert task_list(ctx(scope=B), task_list.input()).model_dump()["rows"] == []
+    with use_hub(hub_b):
+        assert task_list(ctx(scope=B), task_list.input()).model_dump()["rows"] == []
     assert get("base.app.list")(ctx(), get("base.app.list").input()).apps
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_404_is_said_in_the_language_of_who_asks():
     set_rows(staff="on*")
     task_list = get("task.task.list")
@@ -884,39 +1012,40 @@ def test_the_404_is_said_in_the_language_of_who_asks():
     assert refused.value.message == "Tareas está desactivada en este negocio."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_paid_app_without_its_right_is_402_before_it_is_off(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "premium", True)
-    keep("a", {"modules": []})
+    keep(A.key, {"modules": []})
     set_rows(staff="on*")
     task_list = get("task.task.list")
     with pytest.raises(EntitlementBlocked):
         task_list(ctx(), task_list.input())
 
 
-@pytest.mark.django_db
-def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off(django_capture_on_commit_callbacks):
+@HUB_DB
+def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off(django_capture_on_commit_callbacks, hub_b):
     from base import assistant
 
     set_rows(task="on*", staff="on")
     assert "task" in relay.active_apps(A)
-    with django_capture_on_commit_callbacks(execute=True):  # its COMMIT forgets the cache
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):  # its COMMIT forgets the cache
         disable("task")
     assert "task" not in relay.active_apps(A) and "staff" not in relay.active_apps(A)
     assert "base" in relay.active_apps(A)
-    assert "task" in relay.active_apps(B)
-    assert "task" not in assistant.active_apps(A)
-    assert not any(op.app_label == "task" for op in assistant.catalog(ctx()).values())
+    with use_hub(hub_b):
+        assert "task" in relay.active_apps(B)
+    assert "task" not in assistant.tools.active_apps(A)
+    assert not any(op.app_label == "task" for op in assistant.tools.catalog(ctx()).values())
 
 
-@pytest.mark.django_db
-def test_the_menu_and_the_session_leave_out_an_app_off(django_capture_on_commit_callbacks):
+@HUB_DB
+def test_the_menu_and_the_session_leave_out_an_app_off(django_capture_on_commit_callbacks, hub_b):
     set_rows(task="on*", staff="on", customer="on*")
     me = get("base.session.me")
     before = me(ctx(), me.input()).model_dump(mode="json")
     assert {"task", "staff", "customer"} <= {group["id"] for group in before["menu"]}
 
-    with django_capture_on_commit_callbacks(execute=True):  # its COMMIT forgets the cache
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):  # its COMMIT forgets the cache
         disable("task")
 
     after = me(ctx(), me.input()).model_dump(mode="json")
@@ -925,16 +1054,17 @@ def test_the_menu_and_the_session_leave_out_an_app_off(django_capture_on_commit_
     states = {app["label"]: app["state"] for app in after["apps"]}
     assert (states["task"], states["staff"], states["customer"]) == ("off", "off", "on")
     # Another business keeps its menu.
-    assert "task" in {group["id"] for group in me(ctx(scope=B), me.input()).model_dump()["menu"]}
+    with use_hub(hub_b):
+        assert "task" in {group["id"] for group in me(ctx(scope=B), me.input()).model_dump()["menu"]}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_api_key_cannot_be_given_an_app_off(django_capture_on_commit_callbacks):
     from base import queries
 
     set_rows(task="on*", staff="on", customer="on*")
     assert "task" in {app["id"] for app in queries.api_apps(ctx())}
-    with django_capture_on_commit_callbacks(execute=True):  # its COMMIT forgets the cache
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):  # its COMMIT forgets the cache
         disable("task")
     assert "task" not in {app["id"] for app in queries.api_apps(ctx())}
 
@@ -942,9 +1072,9 @@ def test_an_api_key_cannot_be_given_an_app_off(django_capture_on_commit_callback
 # ── The Apps screen ─────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_list_says_each_apps_state_whether_chosen_and_which_apps_on_need_it():
-    with_limit("a", 20)
+    with_limit(A.key, 20)
     set_rows(invoice="on*", sale="on", tax="on", customer="on", task="off")
 
     document = app_list()
@@ -956,11 +1086,11 @@ def test_the_list_says_each_apps_state_whether_chosen_and_which_apps_on_need_it(
     assert (apps_["task"]["state"], apps_["task"]["chosen"], apps_["task"]["path"]) == ("off", False, None)
     assert apps_["task"]["required_by"] == []  # nothing on needs it
     assert (document["max_apps"], document["enabled"]) == (20, 1)
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     assert document["plan_url"] == f"http://localhost:8001/dashboard/store/plans?business={hub.id}"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_app_off_is_still_listed_with_its_icon_and_name():
     set_rows()
     document = by_id(app_list())
@@ -968,7 +1098,7 @@ def test_an_app_off_is_still_listed_with_its_icon_and_name():
     assert all(app["state"] == "off" and app["icon"] and app["name"] for app in document.values())
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("state", ["on*", "off"])
 def test_a_paid_app_without_its_right_gives_no_reason_of_its_own_on_or_off(monkeypatch, state):
     """What it lacks is the right: «blocked» sends the person to erplora.com, and no reason of the app's competes."""
@@ -982,15 +1112,31 @@ def test_a_paid_app_without_its_right_gives_no_reason_of_its_own_on_or_off(monke
     assert (row["state"], row["refusal"]) == ("blocked", None)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_paid_app_without_its_right_is_blocked_on_or_off(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "premium", True)
-    keep("a", {"modules": []})
+    keep(A.key, {"modules": []})
     set_rows(staff="on*")
     assert by_id(app_list())["task"]["state"] == "blocked"
 
 
-@pytest.mark.django_db
+@HUB_DB
+def test_an_app_born_on_is_listed_on_and_takes_nothing_of_the_plans_limit():
+    """hub#1286: Taxes, born on (hub#997), is on in «My apps» (the screen's counter counts it as turned on) but not
+    chosen, so the plan's part of the counter, ``enabled``, leaves it out; the app the business chose counts."""
+    with_limit(A.key, 20)
+    born = activation.born(activation.born_on("ES"), activation.module_graph())
+    set_rows(**{label: "on*" if row.chosen else "on" for label, row in born.items() if row.on}, task="on*")
+
+    document = app_list()
+    apps_ = by_id(document)
+
+    assert (apps_["tax"]["state"], apps_["tax"]["chosen"]) == ("on", False)
+    assert (apps_["task"]["state"], apps_["task"]["chosen"]) == ("on", True)
+    assert (document["max_apps"], document["enabled"]) == (20, 1)
+
+
+@HUB_DB
 def test_the_counter_counts_only_the_apps_this_business_shows(settings):
     """The reference app is no app of a customer's hub: it never counts against its limit."""
     settings.SHOW_UNLISTED_MODULES = False
@@ -1016,7 +1162,7 @@ def test_the_list_the_menu_and_the_home_follow_every_change():
     assert "base.session.me" not in affected
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_live_list_runs_with_its_permission_only():
     with pytest.raises(PermissionDenied):
         get("base.app.list")(OperationContext(scope=A, actor="eva", permissions=frozenset(), language="en"), get("base.app.list").input())
@@ -1026,21 +1172,22 @@ def test_the_live_list_runs_with_its_permission_only():
 
 
 @pytest.fixture
-def registered_a(db, settings):
-    """The suite's local hub ``a``, as the SaaS registered it."""
+def registered_a(hub_a, settings):
+    """Business A, as the SaaS registered it."""
     settings.INTERNAL_SHARED_SECRET = "local-internal-shared-secret"
     settings.INTERNAL_SHARED_SECRET_PREVIOUS = ""
-    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "state": {}, "state_version": 0})
+    hub, _ = Hub.objects.update_or_create(slug=A.key, defaults={"status": "ready", "state": {}, "state_version": 0})
     return hub
 
 
 def put_photo(client, hub, version, **blocks):
     from base.tests.test_internal import signed
 
-    body = {"hub_id": str(hub.id), "slug": "a", "version": version, **blocks}
+    body = {"hub_id": str(hub.id), "slug": hub.slug, "version": version, **blocks}
     return signed(client, "put", f"/internal/hubs/{hub.id}/state", body)
 
 
+@HUB_DB
 def test_a_photo_applies_while_verifactu_is_off_and_its_block_waits_until_it_is_on(client, registered_a):
     from apps.verifactu.models import Config
 
@@ -1058,6 +1205,7 @@ def test_a_photo_applies_while_verifactu_is_off_and_its_block_waits_until_it_is_
     assert (config.hub_status, config.representation_status, config.synced_version) == ("active", "approved", 3)
 
 
+@HUB_DB
 def test_a_photo_applies_while_whatsapp_is_off_and_its_block_waits_until_it_is_on(client, registered_a):
     from apps.whatsapp_inbox.models import Channel
     from base.tests.test_internal_whatsapp import channel_state
@@ -1074,6 +1222,7 @@ def test_a_photo_applies_while_whatsapp_is_off_and_its_block_waits_until_it_is_o
     assert Channel.objects.get().version == 7
 
 
+@HUB_DB
 def test_a_whatsapp_block_out_of_contract_while_it_is_off_never_stops_turning_it_on(client, registered_a, caplog):
     """Off, the photo's WhatsApp block is not read (as before the activation): the photo applies. Turned on, a block
     the sync refuses is logged and waits for the next photo; the app turns on all the same."""
@@ -1093,24 +1242,27 @@ def test_a_whatsapp_block_out_of_contract_while_it_is_off_never_stops_turning_it
 # ── The gate's cache: one read per business, forgotten at the COMMIT of a change ───────────────────────────
 
 
-def task_list_as(scope=A):
+def task_list_as(scope=A, hub=None):
+    """``task.task.list`` in ``scope``'s business, entering ``hub``'s database when it is not the one at work."""
     op = get("task.task.list")
-    return op(ctx(scope=scope), op.input())
+    if hub is None:
+        return op(ctx(scope=scope), op.input())
+    with use_hub(hub):
+        return op(ctx(scope=scope), op.input())
 
 
 def activation_reads(captured):
     return [query["sql"] for query in captured.captured_queries if "base_appactivation" in query["sql"]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_with_the_cache_warm_the_operations_read_no_row():
-    from django.db import connection
     from django.test.utils import CaptureQueriesContext
 
     set_rows(task="on*", staff="on")
     task_list_as()  # the first one reads the rows once
 
-    with CaptureQueriesContext(connection) as captured:
+    with CaptureQueriesContext(connections[current_alias()]) as captured:  # the business's own database
         for _ in range(3):
             task_list_as()
             assert "task" in relay.active_apps(A)
@@ -1119,20 +1271,21 @@ def test_with_the_cache_warm_the_operations_read_no_row():
     assert activation_reads(captured) == []
 
 
-@pytest.mark.django_db
-def test_each_business_has_its_own_entry():
+@HUB_DB
+def test_each_business_has_its_own_entry(hub_b):
     from django.core.cache import cache
 
-    set_rows("a", staff="on*")
+    set_rows(A.key, staff="on*")
     with pytest.raises(AppInactive):
         task_list_as(A)
-    task_list_as(B)
+    task_list_as(B, hub_b)
 
-    assert "task" in cache.get(activation.OFF_APPS_CACHE + "a")
-    assert cache.get(activation.OFF_APPS_CACHE + "b") == []
+    assert "task" in cache.get(activation.OFF_APPS_CACHE + A.key)
+    assert cache.get(activation.OFF_APPS_CACHE + B.key) == []
 
 
-def test_turned_off_and_committed_the_next_operation_is_refused_at_once(transactional_db):
+@HUB_DB_COMMITTED
+def test_turned_off_and_committed_the_next_operation_is_refused_at_once():
     task_list_as()  # warm: on
 
     disable("task")
@@ -1143,15 +1296,15 @@ def test_turned_off_and_committed_the_next_operation_is_refused_at_once(transact
     assert task_list_as().model_dump()["rows"] == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_commit_forgets_what_another_process_cached_meanwhile(django_capture_on_commit_callbacks):
     from django.core.cache import cache
 
     set_rows(task="on*", staff="on")
-    with django_capture_on_commit_callbacks() as callbacks:
+    with django_capture_on_commit_callbacks(using=current_alias()) as callbacks:
         disable("task")
     # Before the COMMIT another process read the rows as they were, and kept them.
-    cache.set(activation.OFF_APPS_CACHE + "a", [], 60)
+    cache.set(activation.OFF_APPS_CACHE + A.key, [], 60)
 
     for callback in callbacks:
         callback()
@@ -1160,7 +1313,7 @@ def test_the_commit_forgets_what_another_process_cached_meanwhile(django_capture
         task_list_as()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_inside_a_change_nothing_is_kept_before_its_commit(client, registered_a):
     """What a change reads of its own rows (the photo's block it applies, the gate of that sync) is not committed yet:
     it is never kept, or a rollback would leave the cache saying what never happened."""
@@ -1168,15 +1321,15 @@ def test_inside_a_change_nothing_is_kept_before_its_commit(client, registered_a)
 
     set_rows(staff="on*")
     put_photo(client, registered_a, 3, status="active", verifactu={"representation": {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}})
-    cache.delete(activation.OFF_APPS_CACHE + "a")
+    cache.delete(activation.OFF_APPS_CACHE + A.key)
 
     enable("verifactu")
 
-    assert cache.get(activation.OFF_APPS_CACHE + "a") is None
+    assert cache.get(activation.OFF_APPS_CACHE + A.key) is None
 
 
-@pytest.mark.django_db
-def test_without_the_cache_the_gate_reads_the_rows(monkeypatch, caplog):
+@HUB_DB
+def test_without_the_cache_the_gate_reads_the_rows(monkeypatch, caplog, hub_b):
     class Unreachable:
         def __getattr__(self, name):
             def fail(*args, **kwargs):
@@ -1189,7 +1342,7 @@ def test_without_the_cache_the_gate_reads_the_rows(monkeypatch, caplog):
 
     with pytest.raises(AppInactive):
         task_list_as(A)
-    task_list_as(B)
+    task_list_as(B, hub_b)
     enable("task")
     assert task_list_as(A).model_dump()["rows"] == []
     assert "base.activation.cache_unavailable" in caplog.text
@@ -1199,40 +1352,34 @@ def test_without_the_cache_the_gate_reads_the_rows(monkeypatch, caplog):
 
 
 @pytest.mark.parametrize(("path", "operation"), [("/apps/enable", "base.app.enable"), ("/apps/disable", "base.app.disable")])
-def test_the_routes_are_bound_to_their_commands(path, operation, db):
-    from django.urls import resolve
-
-    from base.api import router
-
-    [route] = router.path_operations[path].operations
-    assert (route.methods, route.operation_id) == (["POST"], operation)
-    assert resolve(f"/api{path}").url_name
+def test_the_routes_are_bound_to_their_commands(path, operation):
+    assert_bound("POST", path, operation)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_which_app_a_name_names_is_read_over_http(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
-    answered = client.get("/api/apps/detail", {"app": "Reservas online"}, HTTP_HOST="a.localhost:8000")
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
+    answered = client.get("/api/apps/detail", {"app": "Reservas online"}, HTTP_HOST=HOST)
     assert (answered.status_code, answered.json()["id"]) == (200, "online_booking")
-    refused = client.get("/api/apps/detail", {"app": "reserva"}, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
+    refused = client.get("/api/apps/detail", {"app": "reserva"}, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert (refused.status_code, refused.json()["error"]["code"]) == (409, "base.app_ambiguous")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_owner_turns_one_off_over_http_and_a_cashier_is_refused(client, make_user):
     body = json.dumps({"app": "task"})
-    client.force_login(make_user("eva", host="a", role="hub_employee"))
-    refused = client.post("/api/apps/disable", body, content_type="application/json", HTTP_HOST="a.localhost:8000")
+    client.force_login(make_user("eva", host=A.key, role="hub_employee"))
+    refused = client.post("/api/apps/disable", body, content_type="application/json", HTTP_HOST=HOST)
     assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")
 
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
-    answered = client.post("/api/apps/disable", body, content_type="application/json", HTTP_HOST="a.localhost:8000")
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
+    answered = client.post("/api/apps/disable", body, content_type="application/json", HTTP_HOST=HOST)
     assert (answered.status_code, answered.json()["state"]) == (200, "off")
-    gone = client.get("/api/task/tasks", HTTP_HOST="a.localhost:8000")
+    gone = client.get("/api/task/tasks", HTTP_HOST=HOST)
     assert (gone.status_code, gone.json()["error"]["code"]) == (404, "app_inactive")
 
-    with_limit("a", 1)
-    over = client.post("/api/apps/enable", body, content_type="application/json", HTTP_HOST="a.localhost:8000")
+    with_limit(A.key, 1)
+    over = client.post("/api/apps/enable", body, content_type="application/json", HTTP_HOST=HOST)
     assert over.status_code == 402
     assert {key: over.json()["error"][key] for key in ("code", "max_apps", "enabled")} == {
         "code": "base.app_limit_reached",
@@ -1244,121 +1391,62 @@ def test_an_owner_turns_one_off_over_http_and_a_cashier_is_refused(client, make_
 # ── After the COMMIT, to its own business only ──────────────────────────────────────────────────────────────
 
 
-def dsn() -> str:
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
-
-
-@pytest.fixture
-def listen():
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(dsn(), autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout=0.5):
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
-
-
-def test_turning_one_off_in_b_is_told_to_b_and_never_to_a(transactional_db, listen):
+@HUB_DB_COMMITTED
+def test_turning_one_off_in_b_is_told_to_b_and_never_to_a(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
+    changes = (events.APP_DISABLED, events.APP_ENABLED)
 
-    disable("task", context=ctx(scope=B))
-    enable("task", context=ctx(scope=B))
+    with use_hub(hub_b):
+        disable("task", context=ctx(scope=B))
+        enable("task", context=ctx(scope=B))
+        written = set(OutboxEvent.objects.filter(name__in=changes).values_list("scope_kind", "scope_key", "name"))
 
-    assert heard(on_b) == {events.APP_DISABLED, events.APP_ENABLED}
+    assert heard(on_b) == set(changes)
     assert heard(on_a, timeout=0.2) == set()
+    assert written == {("host", B.key, name) for name in changes}
+    assert not OutboxEvent.objects.filter(name__in=changes).exists()  # A's outbox
 
 
-def test_two_at_the_limit_at_once_turn_on_only_one(transactional_db):
+@HUB_DB_COMMITTED
+def test_two_at_the_limit_at_once_turn_on_only_one(plan_with_room):
     """The rows of the business are locked while one turns an app on: two people at once cannot both pass the
     limit."""
-    with_limit("a", 2)
+    with_limit(A.key, 2)
     set_rows(task="on*", staff="on")
-    barrier = threading.Barrier(2)
-    outcomes: list[str] = []
 
-    def turn_on(label):
-        try:
-            barrier.wait()
-            enable(label)
-            outcomes.append("on")
-        except OperationError as error:
-            outcomes.append(error.code)
-        finally:
-            connections.close_all()
+    outcomes = at_once(lambda: enable("website"), lambda: enable("flow"))
 
-    threads = [threading.Thread(target=turn_on, args=(label,)) for label in ("website", "flow")]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    assert sorted(outcomes) == ["base.app_limit_reached", "on"]
+    assert sorted(o["state"] if isinstance(o, dict) else o.code for o in outcomes) == ["base.app_limit_reached", "on"]
     assert app_list()["enabled"] == 2
 
 
-def test_a_change_waits_while_another_holds_the_business_rows(transactional_db):
+@HUB_DB_COMMITTED
+def test_a_change_waits_while_another_holds_the_business_rows(plan_with_room):
     """What makes the limit hold with two people at once: a change locks every row of its business, the ones it does
     not touch too (a row held elsewhere, Tasks, holds a change of Website)."""
-    with_limit("a", 20)
+    with_limit(A.key, 20)
     set_rows(task="on*", staff="on")
-    holder = psycopg.connect(dsn())
-    holder.execute("SELECT id FROM base_appactivation WHERE host = 'a' AND app = 'task' FOR UPDATE")
-    done = threading.Event()
-    failures: list[BaseException] = []
-
-    def turn_on():
-        try:
-            enable("website")
-        except BaseException as error:  # noqa: BLE001 - the test reports any of them
-            failures.append(error)
-        finally:
-            connections.close_all()
-            done.set()
-
-    thread = threading.Thread(target=turn_on)
+    holder = psycopg.connect(**connections[current_alias()].get_connection_params())  # in the business's own database
+    holder.execute("SELECT id FROM base_appactivation WHERE host = %s AND app = 'task' FOR UPDATE", [A.key])
+    outcome: list = [None]
+    thread = in_a_thread(lambda: enable("website"), outcome)
     thread.start()
     try:
-        assert not done.wait(0.7), "the change did not wait for the business's rows"
+        thread.join(0.7)
+        assert thread.is_alive(), "the change did not wait for the business's rows"
     finally:
         holder.rollback()
         holder.close()
-    assert done.wait(10) and failures == []
-    thread.join()
+    thread.join(10)
+    assert not thread.is_alive() and outcome[0]["state"] == "on"
     assert rows()["website"] == Activation(ON, True)
 
 
-def test_two_first_changes_at_once_write_the_business_down_once(transactional_db):
-    barrier = threading.Barrier(2)
-    failures: list[BaseException] = []
+@HUB_DB_COMMITTED
+def test_two_first_changes_at_once_write_the_business_down_once(plan_with_room):
+    outcomes = at_once(lambda: disable("website"), lambda: disable("flow"))
 
-    def turn_off(label):
-        try:
-            barrier.wait()
-            disable(label)
-        except BaseException as error:  # noqa: BLE001 - the test reports any of them
-            failures.append(error)
-        finally:
-            connections.close_all()
-
-    threads = [threading.Thread(target=turn_off, args=(label,)) for label in ("website", "flow")]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    assert failures == []
+    assert [outcome["state"] for outcome in outcomes] == ["off", "off"]
     now = rows()
     assert len(now) == len(activation.module_graph())
     assert now["website"] == Activation(OFF, False) and now["flow"] == Activation(OFF, False)

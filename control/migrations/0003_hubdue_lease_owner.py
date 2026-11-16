@@ -1,4 +1,4 @@
-# The lease of a hub's hub_due row is its worker process's (review of hub#471, I2): only its holder renews it or gives it
+# The lease of a hub's hub_due row is its worker process's (hub#471): only its holder renews it or gives it
 # back. Expand: the column has its default in the database, so the code of before inserts and updates without it.
 
 from django.db import migrations, models

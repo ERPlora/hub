@@ -1,8 +1,8 @@
-"""The Home's rules (PLAN-HUB round 2026-10-21): what base does with the modules' steps, panels and counters.
+"""The Home's rules: what base does with the modules' steps, panels and counters.
 
 Every module declares in its ``LiveAppConfig`` its steps of «Finish setting up your business» (``setup``), its
 panels of the dashboard (``widgets``) and its counters of the bell (``bell``), each naming a query of its own
-``queries.py``. Base aggregates them in three live queries of ``base/queries.py`` (``base.setup.status``,
+``queries.py``. Base aggregates them in three live queries of ``base/queries/`` (``base.setup.status``,
 ``base.widget.list``, ``base.bell.counters``) with the old hub's rules (``crates/runtime/src/setup_status.rs``):
 
 - only the modules on in the scope bring anything, and a module kept out of the store (``listed = False``, the
@@ -14,15 +14,26 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
   row says the hub files in production, for the ones of ``LEGAL_IN_PRODUCTION``; else ``required`` gives functional
   and its absence recommended;
 - whoever lacks a step's permission is not told about it, except a pending ⛔ (``actionable: false``): it is what
-  will stop their invoice, whoever clears it (hub#435).
+  will stop their invoice, whoever clears it.
 
 A counter whose figure moves as time passes, with no event (a job waiting a minute with no device alive to print
 it), names in ``bell_refresh_every`` of its module's ``LiveAppConfig`` (counter key → seconds) how often the bell reads
-it again besides its ``refresh_on`` (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): the bell is told the shortest
+it again besides its ``refresh_on``: the bell is told the shortest
 period among the counters the person may see (:func:`bell_refresh_every`), and ``base.E007`` checks the declarations
 at start (:func:`bell_refresh_errors`).
 
-The device's notices (PLAN-HUB round 2026-10-23, ``notices``; ``base.notice.list``) run the same way: every row of
+The cards of System › «Usage and plan» are a hook of base, not of
+``live.meta``: a module names in ``system_cards`` the Vue components of its own ``frontend/components/`` that paint them
+(:func:`system_cards`), base lists those of the modules on that the person may see (``base.system.cards``) and the SPA
+mounts each one, as a panel with a ``component`` of its own; ``base.E015`` checks the declarations at start
+(:func:`system_card_errors`). What a card says is its app's: base never learns what is in it.
+
+An app also says where a business must have it on: ``mandatory`` on its
+``LiveAppConfig``, the countries (or ``"all"``) and whether the platform turns it on by itself. While it is off in a
+business of one of them, the list carries a step of the platform that asks to turn it on (:func:`mandatory_steps`);
+``base.E016`` checks the declarations at start (:func:`mandatory_errors`). Base names no app: each says it.
+
+The device's notices (``notices``; ``base.notice.list``) run the same way: every row of
 a notice's query that passes its ``when`` is told, with the texts filled in from the row in the person's language
 (:func:`device_notices`); the shell tells each one once on the device, with the installed app's system notice.
 
@@ -35,34 +46,36 @@ import logging
 import re
 import string
 from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 from django.conf import settings
 from django.core import checks
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.functional import Promise
+from django.utils.translation import gettext
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
-from base.business import business_zone
+from base.business import business_zone, country_name, country_or_market
 
 logger = logging.getLogger(__name__)
 
 STATE_DONE = "done"
 STATE_PENDING = "pending"
-#: Ours, not the person's task: nothing could be turned on (the old hub's empty catalogue, hub#371).
+#: Ours, not the person's task: nothing could be turned on (the old hub's empty catalogue).
 STATE_UNAVAILABLE = "unavailable"
 LEVEL_LEGAL = "legal"
 LEVEL_FUNCTIONAL = "functional"
 LEVEL_RECOMMENDED = "recommended"
 #: The ⛔ list base fixes: the steps whose absence stops the invoice (the old hub's ``BLOCKING_KEYS``).
 LEGAL_STEPS = frozenset({"invoice.business_identity"})
-#: The ⛔ steps only where the hub files in production, each with what the first row of its own query says there
-#: (PLAN-HUB round 2026-10-21): VeriFactu's way to the AEAT, without which every sale in production is refused; in
-#: testing the till sells without it (gh:hub#1726), so there it keeps the level its ``required`` gives.
+#: The ⛔ steps only where the hub files in production, each with what the first row of its own query says there:
+#: VeriFactu's way to the AEAT, without which every sale in production is refused; in testing the till sells without
+#: it, so there it keeps the level its ``required`` gives.
 LEGAL_IN_PRODUCTION = {
     "verifactu.sending_route": (SetupCheck(field="environment", equals="production"),),
 }
@@ -73,9 +86,27 @@ DEFAULT_STEP_ICON = "ion:settings-outline"
 BELL_REFRESH_ATTRIBUTE = "bell_refresh_every"
 #: Where an app declares what its plan includes and has spent (:func:`plan_meters`).
 PLAN_METER_ATTRIBUTE = "plan_meter"
+#: Where an app declares its cards of System › «Usage and plan» (:func:`system_cards`).
+SYSTEM_CARDS_ATTRIBUTE = "system_cards"
+#: What a card declares: its ``key`` and its ``component``, and the ``permission`` it needs, if any.
+SYSTEM_CARD_FIELDS = frozenset({"key", "component", "permission"})
+#: A component's name: a Vue file of the app's ``frontend/components/``, never a path.
+COMPONENT_NAME = re.compile(r"[A-Z][A-Za-z0-9]*")
 #: The shortest of those periods: the old hub's bell asked every 30 s, and a shorter one would make every open screen
 #: of the business a poller of its hub.
 MIN_BELL_REFRESH_SECONDS = 30
+#: Where an app declares the countries where a business must have it on (:func:`mandatory_steps`, hub#997): its
+#: ``countries`` (:data:`EVERY_COUNTRY`, or the ISO 3166-1 alpha-2 codes) and whether the platform turns it on by itself
+#: at sign-up (``platform_turns_on``: never one that binds the business to a tax authority).
+MANDATORY_ATTRIBUTE = "mandatory"
+MANDATORY_FIELDS = frozenset({"countries", "platform_turns_on"})
+#: The ``countries`` of an app mandatory wherever the business is.
+EVERY_COUNTRY = "all"
+COUNTRY_CODE = re.compile(r"[A-Z]{2}")
+#: Where the step that asks to turn a mandatory app on goes: right after «Your apps» (10), before any app's own step.
+MANDATORY_ORDER = 15
+#: Apps, on «Add apps»: the tab where an app off is (the default one lists the business's own).
+CATALOGUE_ROUTE = "/apps#all"
 
 
 def shown_modules(*, demo_hub: bool = False) -> list[LiveAppConfig]:
@@ -145,9 +176,13 @@ def is_configured(row: Mapping[str, Any] | None, checks: Sequence[SetupCheck]) -
 
 
 def applies_to_country(countries: Sequence[str], hub_country: str) -> bool:
+    """Whether a step for ``countries`` (none: every one) is for a hub of ``hub_country``. A hub without a country (a
+    demo, ERPlora's own) is in ERPlora's market, Spain (``base.business.country_or_market``, hub#682): it is told the
+    Spanish steps, as VeriFactu counts it, and no other country's."""
     if not countries:
         return True
-    return bool(hub_country) and any(country.strip().upper() == hub_country.upper() for country in countries)
+    country = country_or_market(hub_country)
+    return any(declared.strip().upper() == country for declared in countries)
 
 
 def may_be_legal(key: str) -> bool:
@@ -213,7 +248,21 @@ def plan_meters(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> list
     return meters
 
 
-def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:
+def system_cards(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> list[dict]:
+    """The cards the apps of ``configs`` put in System › «Usage and plan» that the person of ``ctx`` may see, in the order
+    each app declares them: ``{key, app, component}``, the component of the app's ``frontend/components/`` that paints
+    the card and reads what it says through the app's own queries. An app declares them on its ``LiveAppConfig`` as
+    :data:`SYSTEM_CARDS_ATTRIBUTE`: a list of ``{"key", "component"}`` and, for a card not everybody sees, its
+    ``"permission"``."""
+    cards = []
+    for config in configs:
+        for card in getattr(config, SYSTEM_CARDS_ATTRIBUTE, None) or ():
+            if ctx.has(card.get("permission")):
+                cards.append({"key": f"{config.label}.{card['key']}", "app": config.label, "component": card["component"]})
+    return cards
+
+
+def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:  # noqa: C901
     """The modules' steps of the list, as the person of ``ctx`` may be told about them."""
     items = []
     for config in configs:
@@ -268,6 +317,47 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
                 )
             )
     return items
+
+
+def shell_icon(config: LiveAppConfig) -> str:
+    """The icon the shell paints for a module: its first menu entry's, as the launcher and «My apps»; without a menu,
+    the shell's own for an app. The module's ``icon`` is the store's, baked apart (``base.catalog``): HubIcon refuses
+    a name the shell has not registered."""
+    return config.navigation[0].icon if config.navigation else "ion:apps-outline"
+
+
+def mandatory_in(config: LiveAppConfig, hub_country: str) -> bool:
+    """Whether a business of ``hub_country`` must have ``config``'s app on, as the app declares it in
+    :data:`MANDATORY_ATTRIBUTE`; a business without a country is in ERPlora's market, Spain (:func:`applies_to_country`)."""
+    declared = getattr(config, MANDATORY_ATTRIBUTE, None)
+    if not isinstance(declared, Mapping):
+        return False
+    countries = declared.get("countries")
+    return countries == EVERY_COUNTRY or bool(countries) and applies_to_country(countries, hub_country)
+
+
+def mandatory_steps(configs: Iterable[LiveAppConfig], on: frozenset[str], hub_country: str) -> list[dict]:
+    """A step of the platform for each app of ``configs`` a business of ``hub_country`` must have on and does not (hub#997):
+    important, it leads to Apps and goes once the app is on, when the app's own steps follow. Base names no app: each
+    one says where it is mandatory (:data:`MANDATORY_ATTRIBUTE`). The texts in the language active now."""
+    country = country_name(country_or_market(hub_country), translation.get_language())
+    return [
+        item(
+            f"base.mandatory.{config.label}",
+            "base",
+            state=STATE_PENDING,
+            required=True,
+            level=level_of(f"base.mandatory.{config.label}", True),
+            actionable=True,
+            title=gettext("Turn on %(app)s") % {"app": config.verbose_name},
+            description=gettext("It is mandatory for businesses in %(country)s.") % {"country": country},
+            icon=shell_icon(config),
+            route=CATALOGUE_ROUTE,
+            order=MANDATORY_ORDER,
+        )
+        for config in configs
+        if config.label not in on and mandatory_in(config, hub_country)
+    ]
 
 
 def item(key: str, app: str, **fields: Any) -> dict:
@@ -404,7 +494,7 @@ def check_bell_refresh(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     return bell_refresh_errors(all_live_app_configs())
 
 
-# --- The device's notices (PLAN-HUB round 2026-10-23) ------------------------------------------------------------
+# --- The device's notices ----------------------------------------------------------------------------------------
 
 #: What joins the parts of a notice's body (the old shell's «service · day at hour · professional»).
 BODY_JOINER = " · "
@@ -564,3 +654,100 @@ def plan_meter_errors(configs: Iterable[LiveAppConfig]) -> list[checks.CheckMess
 @checks.register("base")
 def check_plan_meters(app_configs: Any, **kwargs: Any) -> list[checks.CheckMessage]:
     return plan_meter_errors(all_live_app_configs())
+
+
+def system_card_problems(config: LiveAppConfig, card: Any, seen: set[str]) -> list[str]:
+    """What is wrong with one card of ``config``'s ``system_cards`` (``seen``: the keys of the cards before it)."""
+    if not isinstance(card, Mapping):
+        return [f"has {card!r}, not a mapping"]
+    problems = [f"has a card with {field!r}, which a card does not take" for field in sorted(set(card) - SYSTEM_CARD_FIELDS)]
+    key, component, permission = card.get("key"), card.get("component"), card.get("permission")
+    if not key or not isinstance(key, str):
+        problems.append("has a card without a key")
+    elif key in seen:
+        problems.append(f"has two cards {key!r}")
+    else:
+        seen.add(key)
+    if not isinstance(component, str) or not COMPONENT_NAME.fullmatch(component):
+        problems.append(f"has a card whose component {component!r} is no component's name")
+    elif not (Path(config.path) / "frontend" / "components" / f"{component}.vue").is_file():
+        problems.append(f"names {component!r}, which is no file of its frontend/components/")
+    if permission is not None and permission not in config.permissions:
+        problems.append(f"has a card needing {permission!r}, which is no permission of the app")
+    return problems
+
+
+def system_card_errors(configs: Iterable[LiveAppConfig]) -> list[checks.CheckMessage]:
+    """``base.E015``: ``system_cards`` is a list of cards, each with a key of its own, the name of a component the app
+    has and, if any, a permission of the app: a card that names no file would never mount, and nobody would know."""
+    hint = (
+        f'Declare {SYSTEM_CARDS_ATTRIBUTE} = [{{"key": "<card>", "component": "<Vue component of frontend/components/>"}}] '
+        'on the LiveAppConfig of the module, with "permission": "<app>.<action>" for a card not everybody sees.'
+    )
+    errors = []
+    for config in configs:
+        declared = getattr(config, SYSTEM_CARDS_ATTRIBUTE, None)
+        if declared is None:
+            continue
+        if not isinstance(declared, list | tuple):
+            problems = [f"is {declared!r}, not a list of cards"]
+        else:
+            seen: set[str] = set()
+            problems = [problem for card in declared for problem in system_card_problems(config, card, seen)]
+        errors += [
+            checks.Error(f"{config.label}'s {SYSTEM_CARDS_ATTRIBUTE} {problem}.", hint=hint, obj=config, id="base.E015")
+            for problem in problems
+        ]
+    return errors
+
+
+@checks.register("base")
+def check_system_cards(app_configs: Any, **kwargs: Any) -> list[checks.CheckMessage]:
+    return system_card_errors(all_live_app_configs())
+
+
+def mandatory_problems(declared: Any) -> list[str]:
+    """What is wrong with an app's :data:`MANDATORY_ATTRIBUTE`."""
+    if not isinstance(declared, Mapping):
+        return [f"is {declared!r}, not a mapping"]
+    problems = [f"has {field!r}, which it does not take" for field in sorted(set(declared) - MANDATORY_FIELDS)]
+    countries = declared.get("countries")
+    if countries != EVERY_COUNTRY:
+        if not isinstance(countries, list | tuple) or not countries:
+            problems.append(f"says countries {countries!r}, neither {EVERY_COUNTRY!r} nor a list of country codes")
+        else:
+            problems += [
+                f"names {code!r}, which is no upper-case ISO 3166-1 alpha-2 code"
+                for code in countries
+                if not isinstance(code, str) or not COUNTRY_CODE.fullmatch(code)
+            ]
+            if len(set(countries)) != len(countries):
+                problems.append(f"names a country twice in {countries!r}")
+    if not isinstance(declared.get("platform_turns_on"), bool):
+        problems.append("does not say whether the platform turns it on by itself (platform_turns_on: True or False)")
+    return problems
+
+
+def mandatory_errors(configs: Iterable[LiveAppConfig]) -> list[checks.CheckMessage]:
+    """``base.E016``: ``mandatory`` says the countries (``"all"`` or their codes, never an empty list, which would read as
+    «nowhere» or «everywhere») and whether the platform turns the app on by itself: a slip would ask every business for
+    an app, or none."""
+    hint = (
+        f'Declare {MANDATORY_ATTRIBUTE} = {{"countries": "{EVERY_COUNTRY}" or ["ES", …], "platform_turns_on": True or '
+        "False} on the LiveAppConfig of the module."
+    )
+    errors = []
+    for config in configs:
+        declared = getattr(config, MANDATORY_ATTRIBUTE, None)
+        if declared is None:
+            continue
+        errors += [
+            checks.Error(f"{config.label}'s {MANDATORY_ATTRIBUTE} {problem}.", hint=hint, obj=config, id="base.E016")
+            for problem in mandatory_problems(declared)
+        ]
+    return errors
+
+
+@checks.register("base")
+def check_mandatory_apps(app_configs: Any, **kwargs: Any) -> list[checks.CheckMessage]:
+    return mandatory_errors(all_live_app_configs())

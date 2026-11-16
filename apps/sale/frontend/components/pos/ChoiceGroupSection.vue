@@ -19,7 +19,7 @@ export interface SectionGroup extends ChoiceGroup {
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, useBusinessMoney } from '../../lib/format';
+import { signedMoney, useBusinessMoney } from '../../lib/format';
 import { type Choice, countOf, ruleOf } from '../../lib/modifierChoice';
 
 const props = defineProps<{ kind: 'options' | 'menu'; group: SectionGroup; choice: Choice; attention: string | null }>();
@@ -39,7 +39,7 @@ const rule = computed(() => ruleOf(props.group));
 
 function supplement(cents: number): string {
   if (!cents) return '';
-  return `${cents > 0 ? '+' : '−'}${formatMoney(Math.abs(cents), locale.value, business.value)}`;
+  return signedMoney(cents > 0 ? '+' : '−', Math.abs(cents), locale.value, business.value);
 }
 </script>
 

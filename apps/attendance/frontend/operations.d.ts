@@ -1,8 +1,8 @@
 // Types of the attendance app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/attendance/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: instants ISO 8601 with their offset, business dates `YYYY-MM-DD`, durations in seconds.
+// apps/attendance/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// no path parameters, an id travels in the input. On the wire: instants ISO 8601 with their offset, business dates
+// `YYYY-MM-DD`, durations in seconds.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type RecordStatus = 'open' | 'closed' | 'needs_review';

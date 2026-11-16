@@ -1,7 +1,7 @@
 """The chain's bricks (VERIFACTU-F13, F18, F26): the AEAT formats, the SHA-256 fingerprint and the QR link.
 
 The official vectors are the three cases of «Detalle de las especificaciones técnicas para generación de la
-huella o hash de los registros de facturación» v0.1.2 (27/08/2024, §6): an alta, the next one chained to it
+huella o hash de los registros de facturación» v0.1.2 (27/08/2024, section 6): an alta, the next one chained to it
 and an anulación chained to the second, published input → published hash. The derived anchors and the QR
 cases are the current engine's (hub ``crates/plugins/verifactu/tests/aeat_compliance.rs``), recomputed here
 with an independent oracle. The 19 real submissions the AEAT's preproduction accepted are checked in
@@ -81,7 +81,7 @@ def test_parse_date_reads_the_aeat_and_the_iso_forms():
     assert chain.parse_date("2026-08-01") == dt.date(2026, 8, 1)
 
 
-# The official AEAT vectors (§6, cases 1–3: one chain)
+# The official AEAT vectors (section 6 of that document, cases 1–3: one chain)
 
 
 def test_the_official_case_1_and_case_2_altas():

@@ -1,9 +1,9 @@
 """Django admin of the demo app: full CRUD on items and their lines, for the platform's staff.
 
-Round 12 (PLAN §17, PLAN-HUB §3.2, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of
-a hub's tables but the fiscal ones. A raw admin write records no event and checks no rule of
-services.py (no closed item, no next position): it is support's way to repair a row, as in every
-other app's admin; the screens, the API and the assistant write through the operations.
+The Hub admin has full CRUD over all of a hub's tables but the fiscal ones. A raw admin write records
+no event and checks no rule of services.py (no closed item, no next position): it is support's way to
+repair a row, as in every other app's admin; the screens, the API and the assistant write through the
+operations.
 """
 
 from django.contrib import admin

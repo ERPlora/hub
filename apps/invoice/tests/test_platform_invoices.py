@@ -1,7 +1,7 @@
-"""ERPlora's invoices issued by its platform hub (PLAN-SAAS §4; contract point 4): ``invoice.invoice.issue_platform``
-writes the invoice and its VeriFactu record in one transaction, idempotent by the SaaS's id (``platform_ref``);
-``invoice.invoice.platform_status`` answers how it stands, ``invoice.invoice.platform_document`` its A4 and
-``invoice.invoice.platform_health`` whether the platform hub can issue now. Real VeriFactu, no mocks.
+"""ERPlora's invoices issued by its platform hub: ``invoice.invoice.issue_platform`` writes the invoice and its
+VeriFactu record in one transaction, idempotent by the SaaS's id (``platform_ref``); ``invoice.invoice.platform_status``
+answers how it stands, ``invoice.invoice.platform_document`` its A4 and ``invoice.invoice.platform_health`` whether the
+platform hub can issue now. Real VeriFactu, no mocks.
 
 The case lists come from the old SaaS's own engine (billing/tests/test_hub_invoices.py, test_invoice_dedup.py,
 test_invoice_environment.py; hubs/main/tests/test_platform.py): one invoice per Stripe invoice whatever the
@@ -9,19 +9,21 @@ deliveries, the environment by deployment, the QR only from a record.
 """
 
 import copy
-import threading
 
 import pytest
-from django.db import connection
-from live.context import Scope, system_context
+from live.context import system_context
 from live.errors import OperationError
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import run
-from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, line
+from apps.invoice.tests.conftest import A, HUB_DB, HUB_DB_COMMITTED, run
+from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, free_month, line
 from apps.verifactu.models import Config, Record
+from base.tenancy.tests.concurrency import at_once
 
-PLATFORM = Scope("host", "erplora")
+pytestmark = HUB_DB
+
+#: ERPlora's own hub is a business with its own database, as every other: here, business A.
+PLATFORM = A
 #: ERPlora's identity with a test tax ID (never the real seal's NIF in a test).
 PLATFORM_ISSUER = {
     "legal_name": "ERPLORA CLOUD SL",
@@ -115,6 +117,52 @@ def test_a_second_delivery_answers_what_the_first_issued(platform_hub):
     assert (second.status, second.qr, second.error) == (first.status, first.qr, None)
     assert Invoice.objects.count() == 1
     assert Record.objects.count() == 1
+
+
+FREE_ID = "019a0000-0000-7000-8000-000000000003"
+
+
+def test_a_free_month_is_issued_with_the_plans_price_its_discount_and_a_record_of_zero(platform_hub):
+    answer = issue(free_month())
+
+    invoice = Invoice.objects.get(platform_ref=BODY["id"])
+    [only] = invoice.lines.all()
+    record = Record.objects.get(invoice=invoice)
+    assert (answer.status, answer.qr) == ("issued", record.qr_url)
+    assert (only.unit_price, only.discount_amount, only.base_amount, only.total_amount) == (2999, 2999, 0, 0)
+    assert (invoice.invoice_type, invoice.total_amount, record.total_amount) == ("F1", 0, 0)
+    assert "&importe=0.00" in record.qr_url
+    assert "<sum1:CuotaTotal>0.00</sum1:CuotaTotal>" in record.xml
+    assert "<sum1:ImporteTotal>0.00</sum1:ImporteTotal>" in record.xml
+    assert "<sum1:BaseImponibleOimporteNoSujeto>0.00</sum1:BaseImponibleOimporteNoSujeto>" in record.xml
+
+
+def test_the_document_of_a_free_month_shows_the_plans_price_its_discount_and_zero(platform_hub):
+    issue(free_month())
+
+    document = run("invoice.invoice.platform_document", {"id": BODY["id"]}, system())
+
+    assert "<th class=\"num\">Descuento</th>" in document.html
+    assert document.html.count("29,99\xa0€") == 2
+    assert "0,00\xa0€" in document.html
+
+
+def test_a_free_month_is_kept_and_read_through_every_door_as_a_paid_invoice(platform_hub):
+    free = free_month(id=FREE_ID, number="ERP-2026-00124")
+    paid = copy.deepcopy(BODY)
+    first = {body["id"]: issue(body) for body in (paid, free)}
+
+    for body in (paid, free):
+        again = issue(copy.deepcopy(body))
+        assert (again.already, again.status, again.qr) == (True, "issued", first[body["id"]].qr)
+        assert status(body["id"]).qr == first[body["id"]].qr
+        document = run("invoice.invoice.platform_document", {"id": body["id"]}, system())
+        assert document.number == body["number"]
+        got = run("invoice.invoice.get", {"number": body["number"]}, system())
+        assert got.total_amount == body["total_cents"]
+    listed = run("invoice.invoice.list", {}, system())
+    assert sorted(row.number for row in listed.rows) == ["ERP-2026-00123", "ERP-2026-00124"]
+    assert Record.objects.count() == 2
 
 
 def test_a_number_another_invoice_holds_is_refused(platform_hub):
@@ -216,7 +264,7 @@ def test_in_prod_the_record_files_in_production_whatever_the_configuration_says(
 def test_in_prod_while_erplora_has_not_opened_real_filing_it_files_in_testing(
     platform_hub, settings
 ):
-    # Working-rules §15: ERPlora's own invoices skip no lock.
+    # ERPlora's own invoices skip no lock.
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = False
 
@@ -303,6 +351,7 @@ def test_the_document_of_an_invoice_it_never_issued_is_404(platform_hub):
 
 def test_it_is_healthy_only_with_its_issuer(db, settings):
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
+    settings.ERPLORA_ENVIRONMENT = "pre"
 
     unconfigured = run("invoice.invoice.platform_health", {}, system())
     run("invoice.issuer.update", PLATFORM_ISSUER, system())
@@ -313,41 +362,42 @@ def test_it_is_healthy_only_with_its_issuer(db, settings):
     assert configured.detail == ""
 
 
+def test_in_prod_it_is_not_ready_while_real_filing_is_closed(platform_hub, settings):
+    # The SaaS charges live only while this answers ready: a real charge with filing closed would carry an invoice
+    # the AEAT never registers for real.
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+    health = run("invoice.invoice.platform_health", {}, system())
+
+    assert (health.ready, "AEAT" in health.detail) == (False, True)
+
+
+@pytest.mark.parametrize(
+    ("where", "opened"), [("prod", True), ("pre", False), ("pre", True)]
+)
+def test_it_is_ready_in_prod_with_real_filing_open_and_in_pre_whatever_the_server_says(
+    platform_hub, settings, where, opened
+):
+    settings.ERPLORA_ENVIRONMENT = where
+    settings.VERIFACTU_PRODUCTION_ENABLED = opened
+
+    health = run("invoice.invoice.platform_health", {}, system())
+
+    assert (health.ready, health.detail) == (True, "")
+
+
 # ── Two deliveries at once (Review Focus 4: the reconcile of the SaaS posting again) ────────────────
 
 
 @pytest.fixture
-def committed_platform_hub(transactional_db, settings):
+def committed_platform_hub(factory_data, plan_with_room, settings):
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
     settings.ERPLORA_ENVIRONMENT = "pre"
     run("invoice.issuer.update", PLATFORM_ISSUER, system())
 
 
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
-
-
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_the_same_invoice_delivered_twice_at_once_is_one_invoice_and_one_record(
     committed_platform_hub,
 ):

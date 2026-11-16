@@ -7,10 +7,10 @@ goes to the station of ITS product (else of its category: KITCHEN-F04), never to
 quantity times the menus ordered and under the menu's header (its kitchen name, else its name), on the
 card and on paper; the menu's note on each of its dishes; the menu's amount counted once.
 
-Traps of the old product: sales#522 and pm#94 (the kitchen got «Menu of the day» without the dishes chosen),
-kitchen#57 (each dish to ITS station, grouped under the menu, as a list and never a paragraph: TouchBistro
-sends the salad to the grill), hub#1156 (the paper lost the menu's header), sales#535 (a menu short of a
-course never reaches the kitchen: Sales refuses it, ``apps/sale/tests/test_integration_combo.py``).
+Traps of the old product: the kitchen got «Menu of the day» without the dishes chosen; each dish goes to ITS
+station, grouped under the menu, as a list and never a paragraph (TouchBistro sends the salad to the grill); the
+paper lost the menu's header; a menu short of a course never reaches the kitchen (Sales refuses it,
+``apps/sale/tests/test_integration_combo.py``).
 """
 
 from decimal import Decimal
@@ -23,6 +23,8 @@ from apps.kitchen.models import Ticket, TicketItem
 
 from .conftest import (
     A,
+    HUB_DB,
+    HUB_DB_COMMITTED,
     add_line,
     ctx_for,
     fire,
@@ -33,7 +35,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 FOOD = "restaurant.food"
 
@@ -122,6 +124,7 @@ def dishes(ticket) -> list[tuple]:
     ]
 
 
+@HUB_DB_COMMITTED
 def test_each_dish_of_a_menu_goes_to_its_own_station_under_the_menus_header(relay, menu, product):
     options, _, stations = menu
     order = open_check("Table 4")
@@ -157,6 +160,7 @@ def test_each_dish_of_a_menu_goes_to_its_own_station_under_the_menus_header(rela
     assert dishes(grill) == [("Steak", Decimal("2"), "MENU", "Grill", "No salt")]
 
 
+@HUB_DB_COMMITTED
 def test_on_paper_each_printer_gets_its_dishes_under_the_menus_header(relay, menu):
     options, _, _ = menu
     order = open_check("Table 4")
@@ -178,6 +182,7 @@ def test_on_paper_each_printer_gets_its_dishes_under_the_menus_header(relay, men
     }
 
 
+@HUB_DB_COMMITTED
 def test_a_menu_without_a_kitchen_name_is_headed_by_its_name(relay, menu):
     options, _, _ = menu
     setup("combo.combo.update", {"combo": "Menu of the day", "kitchen_name": ""})
@@ -191,6 +196,7 @@ def test_a_menu_without_a_kitchen_name_is_headed_by_its_name(relay, menu):
     assert [item.menu_name for item in ticket.items] == ["Menu of the day", "Menu of the day"]
 
 
+@HUB_DB_COMMITTED
 def test_two_menus_on_one_check_stay_two_groups(relay, menu):
     options, _, _ = menu
     order = open_check("Table 4")
@@ -229,6 +235,7 @@ def test_the_board_shows_the_dishes_of_a_menu_with_the_ids_they_are_saved_with(m
     ]
 
 
+@HUB_DB_COMMITTED
 def test_voiding_the_menu_in_the_till_strikes_all_its_dishes(relay, menu):
     options, _, _ = menu
     order = open_check("Table 4")

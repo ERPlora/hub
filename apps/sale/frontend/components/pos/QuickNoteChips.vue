@@ -3,7 +3,7 @@
 // chips, a window at a time; a chip is pressed while the note holds it, a tap adds it after a comma or
 // takes it out (never twice). «Loading quick notes…» meanwhile; if they cannot be read, the note is
 // typed by hand. Mounted only while the note sheet is open.
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonChip } from '@ionic/vue';
 
 import { useLiveWindows } from '../../composables/useLiveWindows';
 import type { QuickNoteOut } from '../../operations';
@@ -38,17 +38,16 @@ const notes = useLiveWindows<'sale.quick_note.list', QuickNoteOut>(
     v-if="notes.rows.value.length"
     class="pos-sheet-chips"
   >
-    <button
+    <ion-chip
       v-for="item in notes.rows.value"
       :key="item.id"
-      type="button"
       class="pos-sheet-chip"
       :data-testid="`pos-quick-note-${item.id}`"
       :aria-pressed="noteHasChip(text, item.text) ? 'true' : 'false'"
       @click="text = toggleNoteChip(text, item.text)"
     >
       {{ item.text }}
-    </button>
+    </ion-chip>
     <ion-button
       v-if="notes.hasMore.value"
       size="small"

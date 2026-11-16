@@ -12,38 +12,19 @@ import time
 from contextlib import contextmanager
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from django.test import RequestFactory
 from live.errors import NotFound, OperationError
+from live.operations import atomic
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings
-from apps.printing.tests.conftest import RECEIPT, ctx_for, enqueue, printer, run
+from apps.printing.tests.conftest import HUB_DB_COMMITTED, RECEIPT, ctx_for, enqueue, printer, run
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, in_a_thread
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Business A on a plan with room for several sessions at once: on Free's, the second would wait for its turn instead
+#: of meeting the first at a row's lock.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def set_up(device: str, *printers: Printer) -> None:
@@ -69,7 +50,7 @@ def test_a_device_that_prints_twice_at_once_for_the_first_time_is_paired_once():
 
 
 def test_two_devices_at_once_take_two_different_jobs(monkeypatch):
-    """hub#2029: two tills that reach the kitchen's printer never print the same order twice. The race is made
+    """Two tills that reach the kitchen's printer never print the same order twice. The race is made
     certain, not left to the threads' timing: device A has read its job and holds it when device B asks."""
     till = printer("Till")
     for device in ("A", "B"):  # set up as «A» and «B»: the job names its device by that name
@@ -138,12 +119,14 @@ ADMIN_LOCK_TIMEOUT = "500ms"
 LOCK_NOT_AVAILABLE = "55P03"
 
 
-def delete_as_the_admin(printer_id) -> None:
-    """What the admin's «Delete» runs (``Printer.delete``), giving up when a write holds the printer."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+def delete_as_the_admin(printer_id) -> bool:
+    """What the admin's «Delete» runs (``Printer.delete``), giving up when a write holds the printer; whether it
+    deleted it."""
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute(f"SET LOCAL lock_timeout = '{ADMIN_LOCK_TIMEOUT}'")
         Printer.objects.get(pk=printer_id).delete()
+    return True
 
 
 @contextmanager
@@ -159,12 +142,13 @@ def deleted_after_the_first_read_of(model, gone):
             deletions.extend(at_once(lambda: delete_as_the_admin(gone.id)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
 def deleted(deletions) -> list[str]:
-    return ["ok" if not isinstance(result, Exception) else repr(result) for result in deletions]
+    """Each deletion's outcome: ``ok`` only for one that ran to its end (a session still running has none)."""
+    return ["ok" if result is True else repr(result) for result in deletions]
 
 
 def held(deletions) -> bool:
@@ -288,16 +272,7 @@ def paper(name: str, key: str):
 def staggered(*calls):
     """Runs every ``call`` in its own thread and session, started together but paced by the calls themselves."""
     results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            results[index] = call()
-        except Exception as error:  # reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
+    threads = [in_a_thread(call, results, i) for i, call in enumerate(calls)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -312,7 +287,7 @@ def test_two_rounds_of_paper_on_the_same_printers_in_inverse_order_never_deadloc
 
     def round_of(first, second, tag):
         def go():
-            with transaction.atomic():  # as Kitchen does: every sheet of a ticket in its own transaction
+            with atomic():  # as Kitchen does: every sheet of a ticket in its own transaction
                 one = paper(first, f"{tag}-1")
                 both_hold_one.wait(5)
                 time.sleep(0.3)
@@ -333,7 +308,7 @@ def test_a_round_of_paper_while_a_printer_with_queue_is_deactivated_never_deadlo
     round_holds_kitchen_2 = threading.Event()
 
     def round_of_paper():
-        with transaction.atomic():
+        with atomic():
             first = paper("Kitchen 2", "round-kitchen-2")
             round_holds_kitchen_2.set()
             time.sleep(0.6)  # the deactivation is under way
@@ -364,7 +339,7 @@ def test_choosing_a_printer_while_its_function_is_changed_never_deadlocks():
                 time.sleep(0.6)  # the change of function is under way
             return result
 
-        with connection.execute_wrapper(pause_after_the_settings_are_read):
+        with connections[current_alias()].execute_wrapper(pause_after_the_settings_are_read):
             return run("printing.settings.update", {"kitchen_printer": "Kitchen"}).kitchen_printer_id
 
     def change_function():

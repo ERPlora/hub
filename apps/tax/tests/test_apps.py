@@ -3,15 +3,16 @@ the Home."""
 
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.tax import events as E
-from base import home
+from base import activation, home
 
 
 def tax():
@@ -85,12 +86,21 @@ def test_navigation_is_the_four_tabs_with_iconify_icons():
     ]
 
 
+#: The reads that are no assistant tool: what names a rule on the assistant's card; the model reads the rules by their
+#: list.
+INTERNAL_READS = {"tax.rule.get"}
+
+
 def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
     # operation, and a write says how risky it is (high: fiscal, bulk).
     ops = {name: op for name, op in registry.items() if name.startswith("tax.")}
-    assert len(ops) == 18
+    assert len(ops) == 19
+    assert {name for name, op in ops.items() if op.ai is INTERNAL} == INTERNAL_READS
     for name, op in ops.items():
+        if name in INTERNAL_READS:
+            assert (op.kind, op.expose_api) == ("query", False), name
+            continue
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name
         )
@@ -100,9 +110,8 @@ def test_every_operation_is_described_for_the_assistant():
             assert "risk" not in op.ai, name
 
 
-# The Home's hook (PLAN-HUB round 2026-10-21; FIX-TAX-SETUP-HOOKS): the old module's own item «Your taxes»
-# (module.json `setup`, taxes#19), which reads the same query as the notice of the tax screens (TAX-F17). The old
-# module declared no panel and no bell row.
+# The Home's step «Your taxes», which reads the same query as the notice of the tax screens (TAX-F17). The old module
+# declared no panel and no bell row.
 
 
 def test_the_homes_step_is_your_taxes_done_once_one_root_rule_applies_today():
@@ -139,7 +148,7 @@ def test_the_homes_step_is_your_taxes_done_once_one_root_rule_applies_today():
 
 
 def test_the_step_says_the_words_of_the_notice_in_the_language_of_whoever_reads_it():
-    # gh:hub#2356: the old checklist said a module's step in English to a Spanish reader.
+    # A Spanish reader never reads a module's step in English.
     (step,) = tax().setup
     with translation.override("en"):
         english = (str(step.title), str(step.description))
@@ -176,3 +185,41 @@ def test_the_steps_icon_is_registered():
 def test_taxes_brings_no_panels_and_no_bell_rows_to_the_home():
     # The old module declared neither (its module.json has `widgets` and `bell` null).
     assert (tax().widgets, tax().bell) == ([], [])
+
+
+def test_taxes_is_mandatory_in_every_country_and_the_platform_may_turn_it_on():
+    """No sale is priced without it, in any country, and turning it on binds the business to nobody, so the platform may
+    turn it on by itself at sign-up."""
+    assert tax().mandatory == {"countries": "all", "platform_turns_on": True}
+
+
+@pytest.mark.parametrize("country", ["ES", "PT", "JP", ""])
+def test_every_business_is_born_with_taxes_on_and_none_with_verifactu(country):
+    """What the platform turns on by itself at sign-up, read from every app's declaration, is Taxes,
+    in every country; never VeriFactu, which its owner turns on (it binds the business to the AEAT)."""
+    assert "tax" in activation.born_on(country)
+    assert "verifactu" not in activation.born_on(country)
+
+
+def test_while_taxes_is_off_whoever_runs_a_business_of_any_country_is_asked_to_turn_it_on():
+    for country, named in (("PL", "Poland"), ("JP", "Japan"), ("", "Spain")):
+        with translation.override("en"):
+            (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country=country)
+        assert (step["key"], step["title"], step["description"]) == (
+            "base.mandatory.tax",
+            "Turn on Taxes",
+            f"It is mandatory for businesses in {named}.",
+        )
+    with translation.override("es"):
+        (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="PT")
+    assert (step["title"], step["description"]) == ("Activa Impuestos", "Es obligatoria para los negocios de Portugal.")
+    assert home.mandatory_steps([tax()], on=frozenset({"tax"}), hub_country="PT") == []
+
+
+def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
+    """Its store icon (``calculator-outline``) is baked apart and the shell has not registered it: HubIcon would refuse
+    it. The step paints Taxes as «My apps» does."""
+    (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="ES")
+    registry = Path(settings.BASE_DIR, "packages/ui/src/shell/icons.ts").read_text()
+    assert step["icon"] == tax().navigation[0].icon
+    assert f"'{step['icon'].removeprefix('ion:')}'" in registry

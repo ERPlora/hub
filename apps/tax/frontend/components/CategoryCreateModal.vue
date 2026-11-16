@@ -7,6 +7,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 const open = defineModel<boolean>('open', { default: false });
 
 const blank = () => ({ key: '', name: '', description: '' });
@@ -35,11 +37,14 @@ function cancel(): void {
   form.value = blank();
   error.value = null;
 }
+
+const canDismiss = useUnsavedFormOnOpen('tax-category-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-category-form"
     :title="$t('tax.categories.form.title')"
     :submit-label="$t('tax.add')"
@@ -53,6 +58,7 @@ function cancel(): void {
       <div class="tax-form">
         <ion-input
           data-testid="tax-category-form-key"
+          name="key"
           :value="form.key"
           :label="$t('tax.categories.columns.key')"
           :placeholder="$t('tax.categories.form.keyPlaceholder')"
@@ -67,6 +73,7 @@ function cancel(): void {
         />
         <ion-input
           data-testid="tax-category-form-name"
+          name="name"
           :value="form.name"
           :label="$t('tax.categories.columns.name')"
           :placeholder="$t('tax.categories.form.namePlaceholder')"
@@ -80,6 +87,7 @@ function cancel(): void {
         />
         <ion-input
           data-testid="tax-category-form-description"
+          name="description"
           :value="form.description"
           :label="$t('tax.categories.columns.description')"
           :placeholder="$t('tax.categories.form.descriptionPlaceholder')"

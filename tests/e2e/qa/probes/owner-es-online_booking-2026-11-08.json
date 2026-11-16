@@ -1,0 +1,20 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"owner.es.online_booking.booking.get","app":"online_booking","tool":"online_booking.booking.get","role":"owner","language":"es","phrase":"abre la reserva online de Web QA de mañana con contacto, servicio, profesional y estado","expect":"read","lookups":["online_booking.booking.list"]},
+    {"id":"owner.es.online_booking.booking.list","app":"online_booking","tool":"online_booking.booking.list","role":"owner","language":"es","phrase":"lista las reservas que han hecho las propias clientas por la web, de la más reciente a la más antigua","expect":"read"},
+    {"id":"owner.es.online_booking.public.booking","app":"online_booking","tool":"online_booking.public.booking","role":"owner","language":"es","phrase":"comprueba la reserva detrás del enlace personal de Web QA y si todavía puede cancelarla","expect":"read"},
+    {"id":"owner.es.online_booking.public.page","app":"online_booking","tool":"online_booking.public.page","role":"owner","language":"es","phrase":"¿qué título, textos, color, logo y reglas ve una clienta en la página pública de reservas?","expect":"read"},
+    {"id":"owner.es.online_booking.public.services","app":"online_booking","tool":"online_booking.public.services","role":"owner","language":"es","phrase":"¿qué servicios puede reservar una clienta en la web, con precio y duración?","expect":"read"},
+    {"id":"owner.es.online_booking.public.slots","app":"online_booking","tool":"online_booking.public.slots","role":"owner","language":"es","phrase":"¿qué huecos libres muestra la web para un Corte QA mañana con cualquier profesional?","expect":"read"},
+    {"id":"owner.es.online_booking.settings.get","app":"online_booking","tool":"online_booking.settings.get","role":"owner","language":"es","phrase":"revisa los ajustes de la web de reservas y las reglas de la agenda que utiliza","expect":"read"},
+    {"id":"owner.es.online_booking.public.book","app":"online_booking","tool":"online_booking.public.book","role":"owner","language":"es","phrase":"como si fuera la clienta Web QA, reserva online un Corte QA para mañana a las 13:00, móvil 611 999 888, con cualquier profesional","expect":"card","decide":"confirm"},
+    {"id":"owner.es.online_booking.booking.cancel","app":"online_booking","tool":"online_booking.booking.cancel","role":"owner","language":"es","phrase":"cancela la reserva APT-20261109-0002 porque ha cambiado de planes","expect":"card","decide":"cancel"},
+    {"id":"owner.es.online_booking.booking.complete","app":"online_booking","tool":"online_booking.booking.complete","role":"owner","language":"es","phrase":"marca como completada la reserva APT-20261109-0002, sin cobrarla","expect":"card","decide":"cancel"},
+    {"id":"owner.es.online_booking.booking.confirm","app":"online_booking","tool":"online_booking.booking.confirm","role":"owner","language":"es","phrase":"confirma la reserva online pendiente APT-20261109-0002 para dejarle el hueco","expect":"card","decide":"cancel"},
+    {"id":"owner.es.online_booking.booking.delete","app":"online_booking","tool":"online_booking.booking.delete","role":"owner","language":"es","phrase":"elimina de la bandeja y de la agenda la reserva APT-20261109-0002","expect":"card","decide":"cancel"},
+    {"id":"owner.es.online_booking.booking.no_show","app":"online_booking","tool":"online_booking.booking.no_show","role":"owner","language":"es","phrase":"registra que Web QA no se presentó a su reserva online ya pasada","expect":"card","decide":"cancel"},
+    {"id":"owner.es.online_booking.public.cancel","app":"online_booking","tool":"online_booking.public.cancel","role":"owner","language":"es","phrase":"como si fuera la clienta, cancela la reserva detrás del enlace personal de Web QA","expect":"card","decide":"cancel"},
+    {"id":"owner.es.online_booking.settings.update","app":"online_booking","tool":"online_booking.settings.update","role":"owner","language":"es","phrase":"activa la web de reservas, exige email y permite elegir profesional a la clienta","expect":"card","decide":"cancel"}
+  ]
+}

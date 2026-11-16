@@ -1,13 +1,13 @@
-"""rv-hub-244 (BASE-F84, G136): the pass is spent in the same transaction as the command it lets through
+"""BASE-F84: the pass is spent in the same transaction as the command it lets through
 (``base.approval_spend``, from ``LIVE["operation_database"]``), with its row locked: a command that fails for a reason of
 the business leaves it unspent and the same request goes through with it after; one that went through cannot be
 repeated; of two at once with the same pass, only one runs.
 """
 
-import pytest
-
 from base.models import Approval, Membership
-from base.tests.test_approvals import (  # noqa: F401 — the fixtures of the approvals' tests
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tenancy.tests.concurrency import plan_with_room
+from base.tests.test_approvals import (
     APPROVABLE,
     CHANGE,
     SETTINGS,
@@ -21,7 +21,10 @@ from base.tests.test_approvals import (  # noqa: F401 — the fixtures of the ap
 )
 from base.tests.test_people import with_pin
 
-pytestmark = pytest.mark.django_db
+#: The fixtures of the approvals' tests and of the businesses' own databases these tests take.
+__all__ = ["adam", "approvable", "eva", "in_business_a", "plan_with_room"]
+
+pytestmark = HUB_DB
 
 
 def failing_once(monkeypatch, *, wait: float = 0.0) -> dict:
@@ -52,7 +55,7 @@ def failing_once(monkeypatch, *, wait: float = 0.0) -> dict:
 
 
 class TestTheSpendIsTheCommands:
-    """rv-hub-244: the pass is spent in the same transaction as the command it lets through, with its row locked: a
+    """The pass is spent in the same transaction as the command it lets through, with its row locked: a
     command that fails for a reason of the business leaves it unspent; one that went through cannot be repeated."""
 
     def test_an_approved_command_that_fails_is_repeated_with_the_same_pass_and_goes_through(self, client, adam, eva, monkeypatch):
@@ -76,18 +79,18 @@ class TestTheSpendIsTheCommands:
         assert code(again) == "requires_elevation"
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch):
-    """rv-hub-244: the pass's row is locked in the command's transaction: the second waits, finds it spent and is
+@HUB_DB_COMMITTED
+def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch, plan_with_room):
+    """The pass's row is locked in the command's transaction: the second waits, finds it spent and is
     refused; the command runs once."""
     import threading
 
     from django.db import connections
     from django.test import Client
 
-    make_user("saas:2", host="a", role=Membership.Role.ADMIN, first_name="Adam")
+    make_user("saas:2", host=A.key, role=Membership.Role.ADMIN, first_name="Adam")
     with_pin("saas:2", "2580")
-    eva = make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
+    eva = make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva")
     first, second = Client(), Client()
     first.force_login(eva)
     second.force_login(eva)
@@ -117,9 +120,9 @@ def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch):
 
 
 def test_the_spend_opens_the_transaction_on_the_alias_the_tenancy_gave_never_one_of_its_own(monkeypatch):
-    """rv-hub-244 (ronda 2): ``spending`` never chooses a database: the transaction it opens is on the alias the tenancy
-    handed the command (phase 2, S5: the hub's own), so the pass and the command share one transaction there too.
-    In the shared mode every alias is ``default`` and no request can tell; this pins the contract."""
+    """``spending`` never chooses a database: the transaction it opens is on the alias the tenancy handed the command
+    (the hub's own), so the pass and the command share one transaction there too. In the suite's shared fallback
+    every alias is ``default`` and no request can tell; this pins the contract."""
     from contextlib import contextmanager
     from types import SimpleNamespace
 

@@ -1,7 +1,3 @@
-// The gate of an app's screens (BASE-G132, G134): a route of an app the session gives `off` (a paid app the business
-// has no right to; phase 2 adds turned off and activating) mounts base's «why it does not open» in the same address,
-// as the shell's web-only gate does. An app that is on, one the session does not list (this person may not see it:
-// its own screens say so) and a session that has not arrived yet pass.
 import type { SessionMe } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import { ref } from 'vue';

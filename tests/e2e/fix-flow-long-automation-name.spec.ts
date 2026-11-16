@@ -1,11 +1,11 @@
 // flow: FLOW-F02
-// — On a tablet (834 px), «Your automations» cut a long name in the middle of a word and with no «…» («Tell the
+// On a tablet (834 px), «Your automations» must not cut a long name in the middle of a word with no «…» («Tell the
 // customer by WhatsApp when thei»): the cell gives its own span one line with «…», but the name's span stacks the name
-// over «when it starts», and the name inside it ran on to the edge, where the span clipped it. The owner of hub `a`
+// over «when it starts», so the name inside it must end in «…» itself instead of running on to the edge. The owner of hub `a`
 // finds an automation with a long name (made for this run, through the API) at 390, 834 and 1440 px: in the table it
 // is one line ending in «…», the whole name in its `title`; on a phone (cards) its title wraps and, past two lines,
-// ends in «…». Never a word cut at the edge with no sign. No sideways scroll. Each width leaves its capture
-// `FIX-HUB-FLOW-LONG-AUTOMATION-NAME-CUT-MID-WORD-ON-TABLET-<width>`. The automation is deleted after it.
+// ends in «…». Never a word cut at the edge with no sign. No sideways scroll. Each width leaves its capture.
+// The automation is deleted after it.
 import { expect, type Locator, test } from '@playwright/test';
 
 import { A, api, capture, horizontalOverflow, shown, untilStill } from './helpers';

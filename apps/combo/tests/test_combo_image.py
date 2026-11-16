@@ -1,10 +1,10 @@
-"""A menu's image (COMBO-F14; round 2026-10-30): ``Combo.image``, as a product's (INVENTORY-F30, F31) through
+"""A menu's image (COMBO-F14): ``Combo.image``, as a product's (INVENTORY-F30, F31) through
 ``base.images``.
 
 The market sells a set menu on the till as one more item, with its picture: Odoo POS (a combo is a product, with its
 image), Lightspeed (a combo has its own image), Toast (a combo is a menu item, which takes an image), Shopify POS (a
-bundle is a product), Loyverse (a composite item has its picture), Square and SumUp (items with photos); the old
-library already had ``menu_dia``, ``menu_infantil``, ``menu_hamburguesa`` and ``menu_kebab``. So a menu shows an image
+bundle is a product), Loyverse (a composite item has its picture), Square and SumUp (items with photos); the shared
+library has ``menu_dia``, ``menu_infantil``, ``menu_hamburguesa`` and ``menu_kebab``. So a menu shows an image
 of the shared library or a photo of its own, or its initials: ``combo.combo.set_image`` (the library or none),
 ``combo.combo.upload_image`` (a photo, kept as a 512 × 512 WebP), ``combo.combo.suggest_image`` (the library's best for
 its name, never set). Withdrawing the menu (COMBO-F04) deletes its photo once saved.
@@ -33,12 +33,13 @@ from apps.combo.schemas import (
 )
 from base.models import Hub
 from base.storage import hub_prefix
+from base.tenancy.context import current_alias
 from base.tests.test_image_catalog import IMAGES, write_library
 from base.tests.test_images import hub_files  # noqa: F401 - the store fixture
 
-from .conftest import ctx_for, make_combo, make_group, make_option, make_product, run
+from .conftest import HOST, HUB_DB, A, ctx_for, make_combo, make_group, make_option, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 FOLDER = "combo/combos/"
 MENU = "catalog:hospitality/menu_dia"
@@ -73,7 +74,7 @@ def upload(combo_id, raw=None, role="hub_admin"):
 
 
 def key(reference: str) -> str:
-    return f"{hub_prefix(Hub.objects.get(slug='a').id)}/{reference.removeprefix('file:')}"
+    return f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}"
 
 
 def test_a_menu_is_born_without_an_image_and_its_photos_are_the_hubs_sessions_only():
@@ -136,12 +137,12 @@ def test_a_photo_takes_the_place_of_the_last_one_and_withdrawing_the_menu_delete
     combo = make_combo()
     first = upload(combo.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         second = upload(combo.id).image
     assert re.fullmatch(rf"file:{FOLDER}[0-9a-f]{{32}}\.webp", second)
     assert not hub_files.exists(key(first)) and hub_files.exists(key(second))
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("combo.combo.delete", {"id": str(combo.id)})
     assert not hub_files.exists(key(second))
 
@@ -170,13 +171,13 @@ def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(library):
 
 def test_the_routes(client, make_user, library):
     combo = make_combo()
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
 
     response = client.post(
         "/api/combo/combos/image",
         json.dumps({"id": str(combo.id), "image": MENU}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
 
     assert response.status_code == 200, response.content
@@ -186,8 +187,8 @@ def test_the_routes(client, make_user, library):
 def test_asked_for_a_menus_photo_the_assistants_turn_offers_the_suggestion_and_the_set():
     from base import assistant
 
-    tools = assistant.catalog(ctx_for("hub_admin"))
-    offered = [op.name for op in assistant.relevant(tools, ["ponle foto al menú del día"], "es")]
+    tools = assistant.tools.catalog(ctx_for("hub_admin"))
+    offered = [op.name for op in assistant.relevance.relevant(tools, ["ponle foto al menú del día"], "es")]
 
     assert {"combo.combo.suggest_image", "combo.combo.set_image"} <= set(offered)
     assert "combo.combo.upload_image" not in tools

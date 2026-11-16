@@ -1,5 +1,5 @@
 // base-money-thousands-grouping (hub#692): the Hub writes an amount one way, its thousands grouped from four digits on
-// («1.234,56 €», legacy hub#1090), with the platform's `formatMoney` (`@erplora/ui/components`, `format/money.ts`). A
+// («1.234,56 €»), with the platform's `formatMoney` (`@erplora/ui/components`, `format/money.ts`). A
 // money formatter of an app's own keeps Intl's Spanish default, which waits for five digits: «1234,56 €» in one screen
 // beside «1.234,56 €» in the next. This guard looks, by app (and `ui`, the shared package), for the currency formats
 // that do not group always, and there may be none.
@@ -12,28 +12,15 @@
 // figure written while the currency is unknown (the other branch) groups too. Not counted: the sign alone (a format
 // whose `formatToParts` is searched for its `currency` part: «€», «zł»), and every number that is no amount (a quantity
 // or a percentage has no `style: 'currency'`; what a person types in a money field is no format).
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-const BASE_FRONTEND = dirname(fileURLToPath(import.meta.url));
-const HUB = resolve(BASE_FRONTEND, '..', '..');
+import { bare, findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
+import { NO_CLOCK } from '../../vitest.load';
 
 const GROUP_THE_AMOUNT =
   'write the amount with formatMoney of @erplora/ui/components (the platform\'s one way to write an amount), or ' +
   "give the format useGrouping: 'always'";
-
-/** `node` without the parentheses, `as` and `satisfies` around it. */
-function bare(node: ts.Expression): ts.Expression {
-  let current = node;
-  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
-    current = current.expression;
-  }
-  return current;
-}
 
 /** Whether `object` sets `name` to the string `value` (`style: 'currency'`, `useGrouping: 'always' as const`). */
 function says(object: ts.ObjectLiteralExpression, name: string, value: string): boolean {
@@ -169,13 +156,7 @@ const CURRENCY_STYLE = /['"`]?style['"`]?\s*:\s*['"`]currency['"`]/;
  *  group always. */
 export function ungroupedFormats(text: string, name: string): number[] {
   if (!CURRENCY_STYLE.test(text)) return [];
-  const blocks = name.endsWith('.vue')
-    ? [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((match) => ({
-        code: match[1],
-        offset: text.slice(0, (match.index ?? 0) + match[0].indexOf(match[1])).split('\n').length - 1,
-      }))
-    : [{ code: text, offset: 0 }];
-  return blocks.flatMap(({ code, offset }) => {
+  return scriptBlocks(text, name).flatMap(({ code, offset }) => {
     const source = new Source(code, name.endsWith('.vue') ? `${name}.ts` : name);
     return source.currencyFormats
       .filter((object) => !source.isSign(object) && !source.groupsAlways(object))
@@ -183,40 +164,10 @@ export function ungroupedFormats(text: string, name: string): number[] {
   });
 }
 
-/** The sources the guard reads under `dir`: `.ts` and `.vue`, without tests, their helpers, declarations or builds. */
-function sources(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return entry.name.startsWith('.') || ['node_modules', '__tests__', 'generated', 'dist'].includes(entry.name) ? [] : sources(path);
-    }
-    if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.d.ts')) return [];
-    return entry.name.endsWith('.ts') || entry.name.endsWith('.vue') ? [path] : [];
-  });
-}
-
 /** Every currency format of the Hub's frontends (and of the shared `@erplora/ui`) that does not group always, as
  *  `<path>:<line>`, by app. */
-function ungroupedByApp(): Record<string, string[]> {
-  const apps = readdirSync(join(HUB, 'apps'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ app: entry.name, dir: join(HUB, 'apps', entry.name, 'frontend') }));
-  const found: Record<string, string[]> = {};
-  const shared = { app: 'ui', dir: join(HUB, 'packages', 'ui', 'src') };
-  for (const { app, dir } of [{ app: 'base', dir: BASE_FRONTEND }, shared, ...apps]) {
-    let files: string[];
-    try {
-      files = sources(dir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw error;
-    }
-    for (const file of files.sort()) {
-      const where = relative(HUB, file);
-      for (const line of ungroupedFormats(readFileSync(file, 'utf8'), file)) (found[app] ??= []).push(`${where}:${line}`);
-    }
-  }
-  return found;
+function ungroupedByApp(): Promise<Record<string, string[]>> {
+  return findingsByApp(hubFrontends({ ui: true }), ungroupedFormats);
 }
 
 describe('guardrail: every amount of the Hub groups its thousands (base-money-thousands-grouping)', () => {
@@ -266,9 +217,8 @@ describe('guardrail: every amount of the Hub groups its thousands (base-money-th
     expect(ungroupedFormats(component.join('\n'), 'Total.vue')).toEqual([3]);
   });
 
-  it('no app, nor base or `ui`, has a currency format that does not group always', () => {
-    expect(ungroupedByApp(), GROUP_THE_AMOUNT).toEqual({});
-    // It reads every frontend file of the Hub (some 1,600): the limit of the guardrails that read a whole tree (60 s,
-    // tsconfig.test.ts).
-  }, 60_000);
+  it('no app, nor base or `ui`, has a currency format that does not group always', async () => {
+    expect(await ungroupedByApp(), GROUP_THE_AMOUNT).toEqual({});
+    // It reads every frontend file of the Hub (some 2,000) without holding the worker, as long as the machine makes it (hub#1315).
+  }, NO_CLOCK);
 });

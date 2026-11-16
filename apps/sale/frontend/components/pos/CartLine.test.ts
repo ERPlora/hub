@@ -166,7 +166,7 @@ describe('CartLine: sent to the kitchen', () => {
     expect(row.find('.pos-line__qty').text()).toBe('×3');
     expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(false);
     for (const id of ['discount', 'note', 'gift']) expect(m.find(`pos-line-l1-${id}`).exists()).toBe(false);
-    expect(m.find('pos-line-l1-staff').attributes('disabled')).toBeDefined();
+    expect((m.find('pos-line-l1-staff').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
     const voiding = m.find('pos-line-l1-void');
     expect(voiding.attributes('aria-label')).toBe('Anular este artículo');
     await click(voiding.element);

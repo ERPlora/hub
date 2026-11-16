@@ -1,8 +1,8 @@
 // Types of the kitchen app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/kitchen/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: moments ISO 8601 with their zone, money in whole cents, quantities as decimal strings.
+// apps/kitchen/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// no path parameters, an id travels in the input. On the wire: moments ISO 8601 with their zone, money in whole cents,
+// quantities as decimal strings.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type TicketStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
@@ -161,6 +161,15 @@ export interface TicketsOut {
   tickets: TicketOut[];
 }
 
+export interface NoticeOut {
+  id: string;
+  at: string;
+  number: string;
+  label: string;
+  dish_names: string;
+  waiter: string;
+}
+
 export interface TicketSendIn {
   order_id: string;
   label?: string;
@@ -303,6 +312,8 @@ export interface LogOut {
   item_name: string;
   station_name: string;
   actor: string;
+  /** No person did it: the platform (the kitchen by itself, an automation, a recovery). */
+  by_platform: boolean;
   notes: string;
   created_at: string;
 }
@@ -314,6 +325,10 @@ declare module '@erplora/ui/sdk' {
     'kitchen.ticket.list': { input: TicketListIn; output: Page<TicketRowOut> };
     'kitchen.ticket.get': { input: TicketRefIn; output: TicketOut };
     'kitchen.ticket.by_order': { input: ByOrderIn; output: TicketsOut };
+    'kitchen.ticket.notices': {
+      input: { since?: string | null; limit?: number };
+      output: { rows: NoticeOut[] };
+    };
     'kitchen.ticket.create': { input: TicketCreateIn; output: TicketOut };
     'kitchen.ticket.send': { input: TicketSendIn; output: TicketOut };
     'kitchen.ticket.start': { input: TicketRefIn; output: TicketOut };

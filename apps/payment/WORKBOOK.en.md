@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1123e24f3d0b2e9f7afa89c1b1bcda6d248d8aa73f2bf0d4ff14f81193aa3906 -->
+<!-- generated from WORKBOOK.md sha256:5bbd916c4e33acabf5253e3713cc972f403033e29912af5de23c55ed1f4dc0e7 -->
 
 ## What it is for and who it is for
 
@@ -18,6 +18,12 @@ Who uses it:
 - The **employee**: only looks at the list of payments and the list of methods.
 - The **manager**, the **administrator** and the **owner**: also record payments, mark them as sent and
   as completed, approve and cancel them, and manage the payment methods.
+- The **assistant** (by voice or by text, with the session of whoever speaks) does the same. Before an
+  action it asks to confirm with its card (BASE-F97), which names each record as the screens name it,
+  never by its identifier: the payment by its reference ("Payment: PAY-20261014-0003"), as
+  "Cancel payment — PAY-20261014-0003", and the method by its name ("Method: BBVA account"), as
+  "Editing method — BBVA account". What the person asking may not see, or what no longer exists, is
+  left out.
 
 ## Reference adopted
 
@@ -91,13 +97,19 @@ or **Activate**.
 |---|---|
 | Loading | "Loading…" while the first result arrives. |
 | Empty | "No payments." or "No payment methods."; with a search or a filter, "No results". |
-| Error | The table's notice with "Retry". A refusal of the form shows inside the form, each reason under its field, without losing what was typed; that of a row action, above the table. |
+| Error | The table's notice with "Retry". A refusal of the form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888); that of a row action, above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
 
 Amounts and dates show in the format of the language of whoever looks; the amount, in the payment's
 currency.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); the whole account read when editing a method is no change.
 
 ## Flows
 
@@ -147,7 +159,10 @@ Steps:
    recorded only once.
 In: the form's data; the business's currency, its country's (a payment that does not say its currency is
 recorded in it, also through the assistant or the API). While the app does not know the business's
-currency yet, the field says "Amount" and "Record payment" waits. Through the assistant or the API, the
+currency yet, the field says "Amount" and "Record payment" waits; leaving the amount keeps it as typed,
+without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Record payment" lights up (hub#938).
+Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
 recorded instead of recording another.
@@ -259,8 +274,12 @@ Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Methods
 Steps:
-1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens.
-2. Change the name, the type or the account and tap **Save**.
+1. In **Payments → Methods** tap a row (or its **Edit**): "Editing method — {name}" opens with what the
+   row already says; **Account** and **Save** wait in grey while the whole method arrives (the list
+   masks the account).
+2. Change the name, the type or the account and tap **Save**. The name and the type can be changed
+   before the whole method arrives: what was typed stays, and the method, when it arrives, fills only
+   what has not been touched.
 3. To stop using it, tap **Deactivate** in its row: it moves to **Deactivated** and no longer shows in
    "New payment". **Activate** brings it back.
 In: the method (through the assistant, by its name) and what changes.
@@ -317,7 +336,7 @@ cancelling need a person: an automation does not do them.
 | Manager | yes | yes | yes |
 | Employee | yes | no | no |
 
-Whoever has both permissions can approve what they recorded (as today and as QuickBooks; see
+Whoever has both permissions can approve what they recorded (as QuickBooks; see
 "Reference adopted"); the payment keeps who recorded it, who approved it (`approved_by`,
 `approved_at`), when it was sent and completed (`sent_at`, `completed_at`) and who cancelled it and when
 (`cancelled_by`, `cancelled_at`).

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-// «Recent AEAT events», VeriFactu's panel of the Home (FIX-VERIFACTU-SETUP-HOOKS; the old module's
-// `erp-verifactu-events-widget`). base's WidgetPanel paints its frame (title, icon) and mounts it; it follows the
-// latest events itself, each with its moment, its type in the reader's language — never its code
-// (gh:verifactu#139), which is why it is a component and not a declarative timeline — and the sentence the server
-// composes in that language, as the Events tab says them. A failed read says so, never the list it had.
+// «Recent AEAT events», VeriFactu's panel of the Home. base's WidgetPanel paints its frame (title, icon) and mounts it;
+// it follows the latest events itself, each with its moment, its type in the reader's language — never its code, which
+// is why it is a component and not a declarative timeline — and the sentence the server composes in that language, as
+// the Events tab says them. A failed read says so, never the list it had.
 import { formatDateTime } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';

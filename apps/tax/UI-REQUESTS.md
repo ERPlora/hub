@@ -3,12 +3,12 @@
 Lo que las páginas de Impuestos necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo
 más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-**Estado al cerrar la app (CLOSE-TAX, 2026-10-22):** las dos peticiones siguen abiertas: ninguna ha llegado
-a `ERPlora/ui` (`origin/main` de635ff; el puntero del Hub, 07b4392). Sus sustitutos funcionan y ningún flujo
-está roto; van propuestas para `## 6` de `MIGRATION.md` como `tax:ui-live-server-table` y
-`tax:ui-percent-date-format`. La primera es la misma que `cart_checkout:ui-live-server-table` y
-`combo:ui-live-server-table` (las copias de casi todas las apps salen de las de Impuestos): con una
-compartida se cierran todas.
+**Estado al cerrar la app (CLOSE-TAX, 2026-10-22):** las dos peticiones siguen abiertas: ninguna ha llegado a
+`ERPlora/ui` (`origin/main` de635ff; el puntero del Hub, 07b4392). Sus sustitutos funcionan y ningún flujo está roto;
+van propuestas para `## 6` de `archive/migration/MIGRATION.md` de `ERPlora/erplora-next` como
+`tax:ui-live-server-table` y `tax:ui-percent-date-format`. La primera es la misma que
+`cart_checkout:ui-live-server-table` y `combo:ui-live-server-table` (las copias de casi todas las apps salen de las de
+Impuestos): con una compartida se cierran todas.
 
 ## `useServerTable` y `useLiveList` en el SDK (`@erplora/ui/sdk`)
 

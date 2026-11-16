@@ -2,7 +2,9 @@
 // «Which data?» (WORKBOOK FLOW-F11; the old module's `erp-flows-field-picker`): the one picker the editor
 // shares. The data a step can insert are offered grouped by where they come from — what started the
 // automation, with a real example of this business beside each, and what each earlier action or read
-// leaves — and are chosen, never typed. A list is never offered: a path cannot index one.
+// leaves — and are chosen, never typed. A list is never offered: a path cannot index one. It follows what the
+// editor knows (hub#969): «Loading…» until the catalog of actions is in, never «nothing to insert» meanwhile; a
+// catalog that could not be read is said here too, with «Retry», since the dialog covers the editor's own notice.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonButtons, IonContent, IonHeader, IonItem, IonList, IonModal, IonNote, IonTitle, IonToolbar } from '@ionic/vue';
 import { computed } from 'vue';
@@ -11,9 +13,20 @@ import { usePhrasing } from '../composables/usePhrasing';
 import type { DataChoice } from '../lib/document';
 import { pathLabel } from '../lib/phrasing';
 import type { CatalogOut, Step } from '../operations';
+import CatalogError from './CatalogError.vue';
+import LoadingNote from './LoadingNote.vue';
 
-const props = defineProps<{ open: boolean; choices: readonly DataChoice[]; steps: readonly Step[]; catalog: CatalogOut | null }>();
-const emit = defineEmits<{ pick: [path: string]; 'update:open': [open: boolean] }>();
+const props = defineProps<{
+  open: boolean;
+  choices: readonly DataChoice[];
+  steps: readonly Step[];
+  catalog: CatalogOut | null;
+  /** The catalog is still being read: what the earlier steps leave is not known yet. */
+  loading?: boolean;
+  /** The catalog could not be read. */
+  error?: unknown;
+}>();
+const emit = defineEmits<{ pick: [path: string]; 'update:open': [open: boolean]; retry: [] }>();
 const phrasing = usePhrasing();
 
 const groups = computed(() => {
@@ -67,40 +80,52 @@ function choose(path: string): void {
       </IonToolbar>
     </IonHeader>
     <IonContent class="ion-padding">
-      <p
-        v-if="!choices.length"
-        class="flow-picker__none"
-        data-testid="flow-picker-none"
-      >
-        {{ $t('flow.picker.none') }}
-      </p>
-      <IonList
-        v-for="group in groups"
-        :key="group.id"
-      >
-        <h3
-          class="flow-picker__group"
-          :data-testid="`flow-picker-group-${group.id}`"
+      <LoadingNote
+        v-if="loading"
+        data-testid="flow-picker-loading"
+      />
+      <template v-else>
+        <CatalogError
+          v-if="error"
+          :error="error"
+          testid="flow-picker"
+          @retry="emit('retry')"
+        />
+        <p
+          v-else-if="!choices.length"
+          class="flow-picker__none"
+          data-testid="flow-picker-none"
         >
-          {{ heading(group.id) }}
-        </h3>
-        <IonItem
-          v-for="choice in group.choices"
-          :key="choice.path"
-          button
-          :detail="false"
-          :data-testid="`flow-picker-${choice.path}`"
-          @click="choose(choice.path)"
+          {{ $t('flow.picker.none') }}
+        </p>
+        <IonList
+          v-for="group in groups"
+          :key="group.id"
         >
-          <span class="flow-picker__label">{{ pathLabel(choice.path, steps, catalog, phrasing) }}</span>
-          <IonNote
-            v-if="choice.example !== undefined"
-            slot="end"
+          <h3
+            class="flow-picker__group"
+            :data-testid="`flow-picker-group-${group.id}`"
           >
-            {{ example(choice.example) }}
-          </IonNote>
-        </IonItem>
-      </IonList>
+            {{ heading(group.id) }}
+          </h3>
+          <IonItem
+            v-for="choice in group.choices"
+            :key="choice.path"
+            button
+            :detail="false"
+            :data-testid="`flow-picker-${choice.path}`"
+            @click="choose(choice.path)"
+          >
+            <span class="flow-picker__label">{{ pathLabel(choice.path, steps, catalog, phrasing) }}</span>
+            <IonNote
+              v-if="choice.example !== undefined"
+              slot="end"
+            >
+              {{ example(choice.example) }}
+            </IonNote>
+          </IonItem>
+        </IonList>
+      </template>
     </IonContent>
   </IonModal>
 </template>

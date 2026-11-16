@@ -1,4 +1,4 @@
-// Taxes → Settings (TAX-F11, pm#629 VF-17; the WORKBOOK's «Ajustes»): «Your business's tax region» with the
+// Taxes → Settings (TAX-F11; the WORKBOOK's «Ajustes»): «Your business's tax region» with the
 // business's country (read only: it is the one of its ERPlora account) and «Tax region» — «Whole country
 // (VAT)», «Canary Islands (IGIC)», «Ceuta (IPSI)» or «Melilla (IPSI)» —, and «Save» → «Tax region saved.».
 // The values are the business's (`tax.settings.get`, live): «Loading the tax settings…» first; a failed load
@@ -75,6 +75,24 @@ describe('SettingsPage', () => {
       ['ES-ML', 'Melilla (IPSI)'],
     ]);
     expect(s.find('tax-settings-region-help').text()).toContain('create one per category in Rules');
+  });
+
+  it('in a country without tax territories (hub#996), only the whole country, and the help says so', async () => {
+    const s = await setup();
+    await s.show({ country_code: 'PT', region_code: null, regions: [], updated_at: null });
+    expect(s.find('tax-settings-country').text()).toContain('Portugal');
+    expect(s.wrapper.findAllComponents(IonSelectOption).map((o) => [o.props('value'), o.text()])).toEqual([['', 'Whole country (VAT)']]);
+    expect(s.find('tax-settings-region-help').text()).toBe(
+      'Portugal has no tax territories of its own: each category is charged with the rule of the whole country, which you create in Rules.',
+    );
+  });
+
+  it('says it in Spanish too', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show({ country_code: 'PT', region_code: null, regions: [], updated_at: null });
+    expect(s.find('tax-settings-region-help').text()).toBe(
+      'Portugal no tiene territorios con impuestos propios: cada categoría se cobra con la regla de todo el país, que se crea en Reglas.',
+    );
   });
 
   it('«Save» keeps the region chosen and says «Tax region saved.»; the whole country sends none', async () => {

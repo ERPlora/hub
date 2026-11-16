@@ -14,12 +14,14 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday, salonCleanUp } from './appointment-helpers';
-import { saasSql } from './assistant-real';
+import { emptyMonth } from './assistant-real';
+import { cardDeletes } from './customer-helpers';
 import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { capture, psql, shown } from './helpers';
+import { chats, relay } from './provider-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { post } from './service-helpers';
-import { answerSpec, chats, customerWrites, relay } from './whatsapp-answer-helpers';
+import { answerSpec, customerWrites } from './whatsapp-answer-helpers';
 import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-OFFER-BOOK-APPOINTMENTS';
@@ -34,7 +36,6 @@ const DAY = aMonday();
  *  professional and open day, the conversations and channel of the inbox's specs, and the month's messages of `a`. */
 function cleanUp(): void {
   const flows = "select id from flow_flow where recipe like 'whatsapp_inbox/%'";
-  const customers = `select id from customer_customer where name like '${TAG}%'`;
   psql(
     [
       `delete from flow_question where flow_id in (${flows})`,
@@ -44,15 +45,8 @@ function cleanUp(): void {
     ].join('; '),
   );
   inboxCleanUp();
-  psql(
-    [
-      ...['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_orderlink', 'customer_purchase'].map(
-        (table) => `delete from ${table} where customer_id in (${customers})`,
-      ),
-      `delete from customer_customer where name like '${TAG}%'`,
-    ].join('; '),
-  );
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
+  psql(cardDeletes(`select id from customer_customer where name like '${TAG}%'`).join('; '));
+  emptyMonth();
 }
 
 test.beforeAll(keepPhoto);

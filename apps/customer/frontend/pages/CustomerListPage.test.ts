@@ -25,6 +25,7 @@ import {
   subId,
   VIEWER,
 } from '../__tests__/mount-customer';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import CustomerCreateModal from '../components/CustomerCreateModal.vue';
 import CustomerExportButton from '../components/CustomerExportButton.vue';
 import CustomerStats from '../components/CustomerStats.vue';
@@ -92,7 +93,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('CustomerListPage: the screen', () => {
-  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+  it('on a phone the card names the row once: its title stands for the Name column', async () => {
     const s = await setup();
     expect(s.prop('cardTitleColumn')).toBe('name');
   });
@@ -138,6 +139,7 @@ describe('CustomerListPage: the screen', () => {
 
   it('paints Name, Email, Phone, Stage and Spent (money), each sortable on the server', async () => {
     const s = await setup();
+    await s.result(s.call, 'base.business.get', business());
     await s.show(PAGE);
     const columns = s.prop<{ key: string; label: string; sortable?: boolean }[]>('columns');
     expect(columns.map((c) => [c.key, c.label, c.sortable])).toEqual([
@@ -151,8 +153,8 @@ describe('CustomerListPage: the screen', () => {
     expect(s.wrapper.findAll('[data-testid="customer-list-stage"]').map((c) => c.text())).toEqual(['Active', 'VIP']);
     expect(s.wrapper.findAll('[data-testid="customer-list-phone"]').map((c) => c.text())).toEqual(['+34 600 111 222', '+34 600 111 222']);
     expect(s.wrapper.findAll('[data-testid="customer-list-spent"]').map((c) => c.text())).toEqual([
-      '45.50',
-      '45.50',
+      '€45.50',
+      '€45.50',
     ]);
   });
 
@@ -178,7 +180,6 @@ describe('CustomerListPage: the screen', () => {
   });
 
   it('filters behind the table funnel: stage and spent (euros, as typed) on their columns, then source and active', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     expect(s.prop('filterable')).toBe(true);
@@ -210,7 +211,7 @@ describe('CustomerListPage: the screen', () => {
     ]);
   });
 
-  it('the funnel panel applies on «Apply», reads «1.000» as a thousand euros and counts the filters in use', async () => {
+  it('the funnel panel applies on «Apply», reads «1.000,50» with its thousands and counts the filters in use', async () => {
     const s = await setup();
     await s.show(PAGE);
     await s.testid('customer-list-filters-toggle').trigger('click');
@@ -219,14 +220,14 @@ describe('CustomerListPage: the screen', () => {
     const set = (name: string, event: string, value: string) =>
       panel.get(`[data-testid="customer-list-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
     set('lifecycle_stage', 'ionChange', 'vip');
-    set('spent_from', 'ionInput', '1.000');
+    set('spent_from', 'ionInput', '1.000,50');
     set('is_active', 'ionChange', 'false');
     await flush();
     expect(s.params(LIST), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'name', descending: false, limit: 50, offset: 0 }]);
     await panel.get('[data-testid="customer-list-filters-apply"]').trigger('click');
     await flush();
     expect(s.params(LIST)).toEqual([
-      { lifecycle_stage: 'vip', is_active: false, spent_min: 100000, sort: 'name', descending: false, limit: 50, offset: 0 },
+      { lifecycle_stage: 'vip', is_active: false, spent_min: 100050, sort: 'name', descending: false, limit: 50, offset: 0 },
     ]);
     expect(s.testid('customer-list-filters-count').text()).toBe('3');
   });
@@ -271,10 +272,11 @@ describe('CustomerListPage: the screen', () => {
 
   it('an amount it cannot read is said under its field, and neither filters nor makes the list look filtered', async () => {
     const s = await setup();
+    await s.result(s.call, 'base.business.get', business());
     await s.show(PAGE);
     expect(s.prop('filterErrors')).toEqual({});
     await s.filter({ spent_from: 'mil' });
-    expect(s.prop('filterErrors')).toEqual({ spent_from: 'Write an amount, like 1.000,50.' });
+    expect(s.prop('filterErrors')).toEqual({ spent_from: 'This is not an amount. Type a figure, for example 12.50.' });
     expect(s.params(LIST)).toEqual([{ sort: 'name', descending: false, limit: 50, offset: 0 }]);
     await s.show(EMPTY, 2);
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No customers.');
@@ -447,7 +449,7 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     expect(spent(s)).toEqual(['€45.50', '€45.50']);
   });
 
-  it('an amount of four figures groups its thousands, in both languages (hub#512)', async () => {
+  it('an amount of four figures groups its thousands, in both languages', async () => {
     const big = { ...PAGE, rows: [row('c1', 'Ana García', { total_spent: 123456 })], total: 1 };
     const es = await setup({ locale: 'es' });
     await es.result(es.call, BUSINESS, business());
@@ -460,10 +462,10 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     expect(spent(en)).toEqual(['€1,234.56']);
   });
 
-  it('until the business answers, «Spent» is a figure without a symbol, never euros', async () => {
+  it('until the business answers, «Spent» is a dash, never euros', async () => {
     const s = await setup();
     await s.show(PAGE);
-    expect(spent(s)).toEqual(['45.50', '45.50']);
+    expect(spent(s)).toEqual(['—', '—']);
   });
 
   it('«Spent» is typed in the business\'s currency: złoty with its symbol, yen without decimals', async () => {
@@ -478,7 +480,7 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     await yen.show(PAGE);
     await yen.filter({ spent_from: '1250', spent_to: '12,5' });
     expect(yen.params(LIST)).toEqual([{ spent_min: 1250, sort: 'name', descending: false, limit: 50, offset: 0 }]);
-    expect(yen.prop('filterErrors')).toEqual({ spent_to: 'Write an amount, like 1.000,50.' });
+    expect(yen.prop('filterErrors')).toEqual({ spent_to: 'This is not an amount. Type a figure, for example 12.' });
     expect(spent(yen)).toEqual(['¥4,550', '¥4,550']);
   });
 
@@ -509,8 +511,9 @@ describe('CustomerListPage: language and markup', () => {
     const fields = s.prop<Array<{ label: string; options?: Array<{ label: string }> }>>('filterFields');
     expect(fields.map((f) => f.label)).toEqual(['Origen', 'Activo']);
     expect(fields[1].options?.map((o) => o.label)).toEqual(['Activos', 'No activos']);
+    await s.result(s.call, 'base.business.get', business());
     await s.filter({ spent_to: 'mil' });
-    expect(s.prop('filterErrors')).toEqual({ spent_to: 'Escribe un importe, como 1.000,50.' });
+    expect(s.prop('filterErrors')).toEqual({ spent_to: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.' });
   });
 
   it('has no OutfitKit tag and formats nothing by hand', () => {
@@ -519,9 +522,22 @@ describe('CustomerListPage: language and markup', () => {
   });
 });
 
-describe('CustomerListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('CustomerListPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('CustomerListPage: «Spent» is read as every amount of the Hub', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['spent_from', 'spent_to'],
+    params: ['spent_min', 'spent_max'],
+    async open(money) {
+      const s = await setup();
+      await s.result(s.call, 'base.business.get', business({ currency: money.currency, currency_decimals: money.decimals }));
+      await s.show(PAGE);
+      return { filter: s.filter, query: () => s.params(LIST).at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

@@ -36,7 +36,7 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('TagListPage', () => {
-  it('on a phone the card names the row once: its title stands for the Name column (customers#95)', async () => {
+  it('on a phone the card names the row once: its title stands for the Name column', async () => {
     const s = await setup();
     expect(s.prop('cardTitleColumn')).toBe('name');
   });
@@ -61,7 +61,6 @@ describe('TagListPage', () => {
   });
 
   it('filters by active behind the table funnel, on its column', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     expect(s.prop('filterable')).toBe(true);
@@ -128,7 +127,7 @@ describe('TagListPage', () => {
   });
 });
 
-describe('TagListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('TagListPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

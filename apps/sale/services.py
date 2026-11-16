@@ -56,6 +56,7 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
     sale_number,
 )
 from apps.sale.queries import (
@@ -119,6 +120,8 @@ from apps.sale.queries import (
 )
 from apps.sale.schemas import (
     VoucherLineOut,
+    VoucherSessionIn,
+    VoucherSessionOut,
     VoucherSoldIn,
     VoucherUnsoldIn,
     COUNTRY_CODE,
@@ -170,6 +173,7 @@ from apps.sale.schemas import (
     SplitLineOut,
     VoidIn,
 )
+from apps.tax.queries import business_today
 
 #: Units one line may be split into (a voucher covers one line of one unit).
 MAX_LINE_SPLIT = 50
@@ -287,6 +291,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
 @operation(
     "sale.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=SettingsPatchIn,
     output=SettingsOut,
@@ -304,7 +309,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
             "es": (
                 "que no se pueda cobrar sin cliente",
                 "pon el descuento máximo en un 15 %",
-                "quiero que salga factura por defecto",
+                "que cada venta salga con factura por defecto",
                 "cambia el texto del pie del ticket",
             ),
         },
@@ -333,6 +338,7 @@ def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
 @operation(
     "sale.payment_method.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_paymentmethod",
     input=PaymentMethodIn,
     output=PaymentMethodOut,
@@ -389,6 +395,7 @@ def _department_out(ctx: OperationContext, department: Department) -> dict:
 @operation(
     "sale.department.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=DepartmentIn,
     output=DepartmentOut,
@@ -423,21 +430,28 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
 @operation(
     "sale.department.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=DepartmentUpdateIn,
     output=DepartmentOut,
     ai=AI(
-        description="Change the name, the tax category or the position of a department of the open price (named by its id "
-        "or its name). What was already sold keeps the name and the VAT it was charged with.",
+        description="Change the name, the tax category (the VAT its products charge: a cheaper reduced rate, the "
+        "standard one) or the position of a department of the open price. Pass its current name in department, or its "
+        "id when already known; never ask the person for an internal id. What was already sold keeps the name and the "
+        "VAT it was charged with.",
         risk="normal",
         asks={
             "en": (
                 "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
+                "put the bakery section first",
+                "sweets go at the reduced rate",
             ),
             "es": (
                 "pon la sección de bebidas al IVA general",
                 "renombra el departamento «Varios» a «Otros»",
+                "pon la bollería la primera de las secciones",
+                "las chuches pásalas al IVA reducido",
             ),
         },
     ),
@@ -458,6 +472,7 @@ def update_department(ctx: OperationContext, data: DepartmentUpdateIn) -> dict:
 @operation(
     "sale.department.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=DepartmentRefIn,
     output=DepartmentOut,
@@ -492,6 +507,7 @@ def delete_department(ctx: OperationContext, data: DepartmentRefIn) -> dict:
 @operation(
     "sale.quick_note.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=QuickNoteIn,
     output=QuickNoteOut,
@@ -521,20 +537,26 @@ def create_quick_note(ctx: OperationContext, data: QuickNoteIn) -> dict:
 @operation(
     "sale.quick_note.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=QuickNoteUpdateIn,
     output=QuickNoteOut,
     ai=AI(
-        description="Change the text or the position of a quick note of the till (named by its id or its text).",
+        description="Change the text or the position of a quick note of the till. Pass its current text in quick_note, "
+        "or its id when already known; never ask the person for an internal id.",
         risk="normal",
         asks={
             "en": (
                 "change the 'no salt' note to 'low salt'",
                 "move 'no ice' to the top of the notes",
+                "the note should read 'gluten free' instead of 'no gluten'",
+                "where it says 'spicy', put 'hot'",
             ),
             "es": (
                 "cambia la nota «sin sal» por «poca sal»",
                 "sube «sin hielo» a la primera de las notas",
+                "la nota que pone «sin gluten», que diga «apto para celíacos»",
+                "escribe «sin lactosa» en vez de «sin leche»",
             ),
         },
     ),
@@ -553,6 +575,7 @@ def update_quick_note(ctx: OperationContext, data: QuickNoteUpdateIn) -> dict:
 @operation(
     "sale.quick_note.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.manage_settings",
     input=QuickNoteRefIn,
     output=QuickNoteOut,
@@ -684,6 +707,7 @@ def _open_check_of(appointment_id) -> Order | None:
 @operation(
     "sale.order.open",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderOpenIn,
     output=OrderOut,
@@ -746,12 +770,14 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
 @operation(
     "sale.order.add_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderAddLineIn,
     output=OrderOut,
     ai=AI(
         description="Add a product of the catalog (by id, SKU or name) to an open check, with its quantity in the product's "
-        "unit. The price is the catalog's and stays frozen on the line.",
+        "unit. Find a check the person names with sale.order.list(search=...); never ask them for order_id. The price is "
+        "the catalog's and stays frozen on the line.",
         risk="normal",
         asks={
             "en": (
@@ -779,12 +805,14 @@ def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
 @operation(
     "sale.order.add_open_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.sell_open_price",
     input=OrderAddOpenLineIn,
     output=OrderOut,
     ai=AI(
         description="Add an open-price line to an open check: the amount typed, charged at a department's VAT (or a tax "
-        "category's when there are no departments). Needs the open-price permission.",
+        "category's when there are no departments). Find a check the person names with sale.order.list(search=...); "
+        "never ask them for order_id. Needs the open-price permission.",
         risk="normal",
         asks={
             "en": (
@@ -811,14 +839,16 @@ def add_open_line(ctx: OperationContext, data: OrderAddOpenLineIn) -> dict:
 @operation(
     "sale.order.add_service_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderAddServiceLineIn,
     output=OrderOut,
     expose_api=True,
     ai=AI(
-        description="Add a service of Services (by id or name) to an open check. A fixed-price service takes its price; one "
-        "without a fixed price (from, hourly, variable, free) needs the amount charged, within its minimum and maximum. "
-        "Its tax category is the service's.",
+        description="Add a service of Services (by id or name) to an open check. Find a check the person names with "
+        "sale.order.list(search=...); never ask them for order_id. A fixed-price service takes its price; one without a "
+        "fixed price (from, hourly, variable, free) needs the amount charged, within its minimum and maximum. Its tax "
+        "category is the service's.",
         risk="normal",
         asks={
             "en": (
@@ -845,14 +875,16 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
 @operation(
     "sale.order.add_combo_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderAddComboLineIn,
     output=OrderOut,
     expose_api=True,
     ai=AI(
         description="Add a menu of Menus (by id or name) to an open check with the dishes picked in each course "
-        "(«menu of the day with lentils, hake and flan»). Menus checks the courses and prices it: its closed price plus "
-        "the supplements, frozen on the line; the kitchen receives its dishes.",
+        "(«menu of the day with lentils, hake and flan»). Find a check the person names with "
+        "sale.order.list(search=...); never ask them for order_id. Menus checks the courses and prices it: its closed "
+        "price plus the supplements, frozen on the line; the kitchen receives its dishes.",
         risk="normal",
         asks={
             "en": (
@@ -917,15 +949,17 @@ def _release_vouchers(ctx: OperationContext, lines) -> None:
 @operation(
     "sale.order.apply_voucher",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderApplyVoucherIn,
     output=OrderOut,
     expose_api=True,
     ai=AI(
         description="Pay a line of a service of an open check with one session of a customer's voucher (Services): the "
-        "session is held for the line and the line is charged at 0. One unit per line (split it first). Read the "
-        "customer's vouchers for that service with service.grant.tender_options. The sale must then be charged to the "
-        "voucher's owner.",
+        "session is held for the line and the line is charged at 0. Resolve the check with sale.order.list(search=...) "
+        "and its line with sale.order.get, then read the customer's vouchers for that service with "
+        "service.grant.tender_options; never ask the person for order_id, line_id or grant_id. One unit per line "
+        "(split it first). The sale must then be charged to the voucher's owner.",
         risk="normal",
         asks={
             "en": (
@@ -986,22 +1020,24 @@ def apply_voucher(ctx: OperationContext, data: OrderApplyVoucherIn) -> dict:
 @operation(
     "sale.order.remove_voucher",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderLineRefIn,
     output=OrderOut,
     expose_api=True,
     ai=AI(
         description="Undo the voucher of a line of an open check: its session goes back to the voucher and the line is "
-        "charged at its price again. Only before the sale is charged.",
+        "charged at its price again. Resolve the check with sale.order.list(search=...) and its line with "
+        "sale.order.get; never ask the person for order_id or line_id. Only before the sale is charged.",
         risk="normal",
         asks={
             "en": (
                 "don't use the voucher for the haircut after all",
-                "take the voucher off that line",
+                "leave the voucher unused on this check",
             ),
             "es": (
                 "al final no uses el bono en el corte",
-                "quita el bono de esa línea",
+                "deja el bono sin usar en esta cuenta",
             ),
         },
     ),
@@ -1022,12 +1058,14 @@ def remove_voucher(ctx: OperationContext, data: OrderLineRefIn) -> dict:
 @operation(
     "sale.order.update_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderUpdateLineIn,
     output=OrderOut,
     ai=AI(
         description="Change a pending line of an open check: its quantity, whether it is a comp (charged at 0, with a "
-        "reason) and its note. Priced from the line's frozen price.",
+        "reason) and its note. Resolve the check with sale.order.list(search=...) and its line with sale.order.get; "
+        "never ask the person for order_id or line_id. Priced from the line's frozen price.",
         risk="normal",
         asks={
             "en": (
@@ -1069,12 +1107,14 @@ def update_line(ctx: OperationContext, data: OrderUpdateLineIn) -> dict:
 @operation(
     "sale.order.set_line_staff",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetLineStaffIn,
     output=OrderOut,
     ai=AI(
         description="Say who did a pending line of an open check (a member of Staff), or empty for the check's professional. "
-        "Money does not change.",
+        "Resolve the check with sale.order.list(search=...), its line with sale.order.get and the person with "
+        "staff.member.list(search=...); never ask for order_id, line_id or staff_id. Money does not change.",
         risk="normal",
         asks={
             "en": (
@@ -1100,6 +1140,7 @@ def set_line_staff(ctx: OperationContext, data: OrderSetLineStaffIn) -> dict:
 @operation(
     "sale.order.split_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderLineRefIn,
     output=SplitLineOut,
@@ -1151,6 +1192,7 @@ def split_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
 @operation(
     "sale.order.remove_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderLineRefIn,
     output=OrderOut,
@@ -1195,12 +1237,14 @@ def remove_line(ctx: OperationContext, data: OrderLineRefIn) -> dict:
 @operation(
     "sale.order.void_line",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.void_sale",
     input=OrderVoidLineIn,
     output=OrderOut,
     ai=AI(
         description="Void a line of an open check that was ALREADY sent to the kitchen, with a mandatory reason: it leaves "
-        "the check, keeps the reason, who and when, and the kitchen is told.",
+        "the check, keeps the reason, who and when, and the kitchen is told. Resolve the check with "
+        "sale.order.list(search=...) and its line with sale.order.get; never ask the person for order_id or line_id.",
         risk="high",
         asks={
             "en": (
@@ -1302,7 +1346,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "channel": data.channel,
             "priority": data.priority,
             "round_no": round_no,
-            # Who attends the check («Atiende» of the till), else who sends the round (kitchen#82).
+            # Who attends the check («Atiende» of the till), else who sends the round.
             "waiter": data.waiter or person_label(ctx),
             "items": [
                 {
@@ -1348,12 +1392,14 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
 @operation(
     "sale.order.split",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSplitIn,
     output=OrderSplitOut,
     ai=AI(
         description="Split an open check in two: the lines named move whole (amount, VAT and kitchen round) to a new check; "
-        "with no lines the new check is blank. Both add up to the original to the cent.",
+        "with no lines the new check is blank. Resolve the check with sale.order.list(search=...) and the lines to move "
+        "with sale.order.get; never ask the person for order_id or line_ids. Both add up to the original to the cent.",
         risk="normal",
         asks={
             "en": (
@@ -1398,6 +1444,7 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
 @operation(
     "sale.order.merge",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderMergeIn,
     output=OrderOut,
@@ -1407,7 +1454,7 @@ def split(ctx: OperationContext, data: OrderSplitIn) -> dict:
         risk="normal",
         asks={
             "en": (
-                "merge tables 3 and 4",
+                "merge the checks of tables 3 and 4",
                 "put the bar tab together with table 2's",
             ),
             "es": (
@@ -1467,6 +1514,7 @@ VOID_PERMISSION = "sale.void_sale"
 @operation(
     "sale.order.void",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     # An empty check (no live line, no charge) is voided by whoever builds checks: a party that leaves
     # without ordering needs no manager (TABLE-F21). One with something on it asks ``VOID_PERMISSION``.
     permission="sale.add_sale",
@@ -1496,6 +1544,7 @@ def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
 @operation(
     "sale.order.void_ordered",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     # The manager's door to the very same void for a check with something ordered or charged on it (SALE-F18):
     # its own permission is the void's, so a cashier's request is one a manager approves with their PIN (BASE-F84).
     permission=VOID_PERMISSION,
@@ -1601,6 +1650,7 @@ def _set_discount(
 @operation(
     "sale.order.set_discount",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetDiscountIn,
     output=OrderOut,
@@ -1627,6 +1677,7 @@ def set_discount(ctx: OperationContext, data: OrderSetDiscountIn) -> dict:
 @operation(
     "sale.order.set_discount_over_limit",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.discount_over_limit",
     input=OrderSetDiscountIn,
     output=OrderOut,
@@ -1681,6 +1732,7 @@ def _set_line_discount(
 @operation(
     "sale.order.set_line_discount",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetLineDiscountIn,
     output=OrderOut,
@@ -1707,6 +1759,7 @@ def set_line_discount(ctx: OperationContext, data: OrderSetLineDiscountIn) -> di
 @operation(
     "sale.order.set_line_discount_over_limit",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.discount_over_limit",
     input=OrderSetLineDiscountIn,
     output=OrderOut,
@@ -1735,12 +1788,14 @@ def set_line_discount_over_limit(
 @operation(
     "sale.order.set_label",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetLabelIn,
     output=OrderOut,
     ai=AI(
         description="Set the title of an open check (e.g. «Table 4», «Ana — terrace»): how it is recognised among the open "
-        "checks when it is parked.",
+        "checks when it is parked. Find a check the person names with sale.order.list(search=...); never ask them for "
+        "order_id.",
         risk="normal",
         asks={
             "en": (
@@ -1765,11 +1820,14 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
 @operation(
     "sale.order.set_appointment",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.add_sale",
     input=OrderSetAppointmentIn,
     output=OrderOut,
     ai=AI(
-        description="Link an open check to the appointment it charges (or unlink it): charging it then tells the diary.",
+        description="Link an open check to the appointment it charges (or unlink it): charging it then tells the diary. "
+        "Find the check with sale.order.list(search=...) and the appointment by customer, service or date with "
+        "appointment.appointment.list; never ask the person for order_id or appointment_id.",
         risk="normal",
         asks={
             "en": (
@@ -1800,7 +1858,7 @@ def set_appointment(ctx: OperationContext, data: OrderSetAppointmentIn) -> dict:
 # ── Charging ─────────────────────────────────────────────────────────────────────────────────────
 
 
-def _customer_details(data: CompleteIn) -> tuple:
+def _customer_details(ctx: OperationContext, data: CompleteIn) -> tuple:
     """``(card, name, tax id, address, country)`` of the sale's customer: what was sent, else the card's.
     The name is the fiscal one, as Invoicing reads a card: its company when it has one (the NombreRazon
     that goes with the company's tax ID), else the person. The card is locked before the check, as Customers'
@@ -1808,7 +1866,7 @@ def _customer_details(data: CompleteIn) -> tuple:
     gone (404), and one that comes after waits for the charge and finds the sale that protects the card."""
     card = None
     if data.customer_id is not None or data.customer:
-        card = find_customer(data.customer_id, data.customer, lock=True)
+        card = find_customer(ctx, data.customer_id, data.customer, lock=True)
     name = data.customer_name or ((card.company_name or card.name) if card else "")
     tax_id = data.customer_tax_id or (card.tax_id if card else "")
     if data.customer_address:
@@ -1852,7 +1910,7 @@ def _checked_tax_id(tax_id: str, country: str, id_type: str) -> str:
         ) from None
 
 
-def _check_discounts(
+def _check_discounts(  # noqa: PLR0913
     lines: list[OrderLine],
     percent: Decimal,
     amount: int,
@@ -1890,7 +1948,7 @@ def _check_discounts(
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
 
 
-def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
+def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:  # noqa: C901, PLR0912
     """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
     no cash at all when the whole ``operation`` reaches the cash limit."""
     if total == 0:
@@ -1960,10 +2018,10 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
 
 # ── The fiscal document of a write: Invoicing, by name, in the same transaction ──────────────────
 
-#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT
-#: now (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal.
-#: Working-rules §15, as the old Hub's ``enforce_fiscal_road`` (HUB-1935): nothing is charged that could never be
-#: filed. The route's lacks and the server's (its own certificate it cannot open, no gateway, real filing closed).
+#: VeriFactu's refusals (through Invoicing, unchanged) of a business that files for real and cannot reach the AEAT now
+#: (verifactu WORKBOOK, «Contrato con Facturación»): not a document that waits but the write's own refusal. Nothing is
+#: charged that could never be filed. The route's lacks and the server's (its own certificate it cannot open, no
+#: gateway, real filing closed).
 NO_WAY_TO_THE_AEAT = frozenset(
     {
         "verifactu.representation_not_approved",
@@ -1984,7 +2042,7 @@ RECIPIENT_KEYS = (
 )
 
 
-def _fiscal_document(
+def _fiscal_document(  # noqa: C901
     ctx: OperationContext,
     name: str,
     data: dict,
@@ -1992,9 +2050,9 @@ def _fiscal_document(
     typed_recipient: bool = False,
     strict: bool = False,
 ) -> dict:
-    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund
-    or a void), run by name with the seller's session INSIDE this write's transaction (CLAUDE.md
-    «Fiscal»): the document and its number commit with the sale, or neither does.
+    """Invoicing's operation ``name`` (its ticket or invoice of a charge, its rectifying invoice of a refund or a void),
+    run by name with the seller's session INSIDE this write's transaction: the document and its number commit with the
+    sale, or neither does.
 
     ``{status, id, number, type}``: «issued» with the document; «none» when there is nothing to declare
     (a refund of no money); «unavailable» when Invoicing is not in this business (the sale stays a ticket
@@ -2140,8 +2198,8 @@ def _replay(ctx: OperationContext, data: CompleteIn) -> dict | None:
         )
     if not same:
         raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
-    # The same attempt again is the till's retry: a document that waited is asked for once more (phase 1
-    # has no relay to issue it on its own); still refused, it keeps waiting, in sight.
+    # The same attempt again is the till's retry: a document that waited is asked for once more (no relay issues it on
+    # its own); still refused, it keeps waiting, in sight.
     _issue_waiting_document(ctx, sale)
     with translation.override(ctx.language):
         return sale_detail(sale, already=True)
@@ -2165,13 +2223,13 @@ def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
         return answer
 
 
-def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:
+def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> dict:  # noqa: C901, PLR0912, PLR0915
     answer = _replay(ctx, data)
     if answer is not None:
         return answer
     settings = current_settings()
     card, customer_name, customer_tax_id, customer_address, customer_country = (
-        _customer_details(data)
+        _customer_details(ctx, data)
     )
 
     if data.order_id is not None:
@@ -2474,6 +2532,37 @@ def voucher_unsold(ctx: OperationContext, data: VoucherUnsoldIn) -> dict:
     return {"sale_id": line.sale_id, "line_id": line.id}
 
 
+@operation(
+    "sale.voucher_session.record",
+    kind="command",
+    permission="sale.add_sale",
+    input=VoucherSessionIn,
+    output=VoucherSessionOut,
+    ai=INTERNAL,
+)
+def record_voucher_session(ctx: OperationContext, data: VoucherSessionIn) -> dict:
+    """Services' step when a session of a voucher is spent outside the till saying who did it (SERVICE-F21): no line
+    carries it, so what it is worth counts in her production on today's business day (SALE-F28), the till's: the day a
+    sale charged at that moment would count on. Whoever may sell may say who did a service, as on a line. The same
+    session told again counts once: the first telling stays."""
+    session, created = VoucherSession.objects.get_or_create(
+        session_id=data.session_id,
+        defaults={"staff_id": data.staff_id, "business_day": business_today(), "value": data.value},
+    )
+    if created:
+        record_event(
+            ctx,
+            events.VOUCHER_SESSION_RECORDED,
+            {"session_id": str(session.session_id), "staff_id": str(session.staff_id)},
+        )
+    return {
+        "session_id": session.session_id,
+        "staff_id": session.staff_id,
+        "business_day": session.business_day,
+        "value": session.value,
+    }
+
+
 def _voucher_value(line: OrderLine, session_values: dict) -> int:
     """What the session paying ``line`` is worth to who does it (SALE-F28): what Services fixed on delivering it. An
     unlimited voucher has no sessions to divide its price by (``None``): the price of the line, as a salon's till counts
@@ -2547,7 +2636,7 @@ def _sale_lines(
     return rows
 
 
-def _completed_payload(
+def _completed_payload(  # noqa: PLR0913, PLR0917
     sale, lines, payments, tax_id, address, country, id_type
 ) -> dict:
     """What ``sale.sale.completed`` carries: Inventory reads ``items``, Customers the customer and total."""
@@ -2668,7 +2757,9 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
     output=SaleOut,
     ai=AI(
         description="The manager's door to the very same charge as sale.sale.complete, for a discount bigger than the "
-        "business's cap. Never use it to dodge the cap when the discount fits under it.",
+        "business's cap. For a named open check, resolve it with sale.order.list(search=...) and charge it directly; "
+        "do not stop at sale.order.set_discount_over_limit or ask the person for order_id. Never use it to dodge the "
+        "cap when the discount fits under it.",
         risk="high",
         asks={
             "en": (
@@ -2780,8 +2871,9 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
     ai=AI(
         description="Issue now the fiscal documents of a sale (by its id or number) that wait because Invoicing could "
         "not issue them in the charge, the void or a refund (no issuer yet, no permission…): its ticket or invoice, "
-        "the rectifying invoice of its void and those of its refunds. A refusal says why and changes nothing; with "
-        "nothing waiting, nothing happens.",
+        "the rectifying invoice of its void and those of its refunds. If no number was given, find the sale with "
+        "sale.sale.list; do not charge it again and never ask for its internal id. A refusal says why and changes "
+        "nothing; with nothing waiting, nothing happens.",
         risk="high",
         asks={
             "en": (
@@ -2948,9 +3040,10 @@ def _refund_replay(data: RefundIn) -> dict | None:
     ai=AI(
         description="Refund a charged sale (by its id or number), whole or in part, with a mandatory reason: how much goes "
         "back on each of its tenders (never more than each charged minus what it already returned; another method if the "
-        "original is gone) and, if the customer returns them, which lines and how many units. A line paid with a voucher "
-        "gives its session back, also with no money at all. Read sale.refund.options "
-        "first. Send an idempotency_key on a retry.",
+        "original is gone) and, if the customer returns them, which lines and how many units. If no number was given, "
+        "find the sale with sale.sale.list. Read sale.refund.options first for its tender and line ids; never ask the "
+        "person for internal ids. A line paid with a voucher gives its session back, also with no money at all. Send an "
+        "idempotency_key on a retry.",
         risk="high",
         asks={
             "en": (
@@ -3190,11 +3283,11 @@ class _Unprintable(Exception):
 
 
 def _queue_paper(ctx: OperationContext, request: dict) -> dict:
-    """Asks Printing for one paper by its operation's name (no ``requires``; PLAN-HUB: the charge calls the queue
-    inside its own transaction, and nothing happens when Printing is not on), in a savepoint of its own. A job no
-    printer would take (it would wait in the queue for ever) is undone. Never raises for Printing: off, absent,
-    refusing, failing or without a printer, the answer is «not queued» and the device prints the screen's paper;
-    the write that asked goes on."""
+    """Asks Printing for one paper by its operation's name (no ``requires``: the charge calls the queue inside its own
+    transaction, and nothing happens when Printing is not on), in a savepoint of its own. A job no printer would take
+    (it would wait in the queue for ever) is undone. Never raises for Printing: off, absent, refusing, failing or
+    without a printer, the answer is «not queued» and the device prints the screen's paper; the write that asked goes
+    on."""
     try:
         op = get(PRINT_JOB)
     except UnknownOperation:
@@ -3233,7 +3326,7 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
+def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:  # noqa: PLR0913
     """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
     itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
     fiscal document still pending never prints as if issued: the screen's paper says it is pending."""
@@ -3283,7 +3376,7 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
             "en": (
                 "print the last ticket again",
                 "reprint the receipt of sale 7",
-                "she wants a copy of the invoice",
+                "print her a copy of the invoice of sale 7",
             ),
             "es": (
                 "imprime otra vez el último ticket",
@@ -3303,6 +3396,7 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
 @operation(
     "sale.order.print_bill",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="sale.view_sale",
     input=OrderRefIn,
     output=PaperOut,

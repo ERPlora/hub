@@ -1,10 +1,9 @@
 // The pages of a hub that does not open — still being prepared (503), gone (410), suspended for an unpaid invoice
-// (402) — and the sign-in to start again (403) wear ERPlora's look (FIX-HUB-CSP-WHATSAPP-MEDIA; seen by APP-HUBS-1,
-// saas#66: they came out as bare HTML in Times). They are rendered without the request, so with no nonce: base's
-// static stylesheet and logo, which the strict CSP lets in from 'self'. Each page in three sizes
-// (FIX-HUB-CSP-WHATSAPP-MEDIA-gate-<page>-390|834|1440): its stylesheet applied (the system font, the logo painted),
+// (402) — and the sign-in to start again (403) wear ERPlora's look, never bare HTML in Times. They are rendered
+// without the request, so with no nonce: base's static stylesheet and logo, which the strict CSP lets in from 'self'.
+// Each page in three sizes: its stylesheet applied (the system font, the logo painted),
 // nothing scrolling sideways and no CSP violation. The hubs it creates are deleted after the file.
-// flow: ninguno — FIX base (páginas de puerta del Hub sin estilos; la vio APP-HUBS-1, saas#66)
+// flow: none — the styles of the Hub's gate pages
 import { execFileSync } from 'node:child_process';
 
 import { expect, type Page, type Response, test } from '@playwright/test';

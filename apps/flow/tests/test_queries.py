@@ -18,11 +18,12 @@ from apps.flow import queries
 from apps.flow.models import Draft, Flow, FlowRun
 from apps.task.models import Task
 
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import A, B, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
+from .conftest import A, B, HUB_DB, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def outbox(name: str, payload: dict, scope=A, **fields) -> OutboxEvent:
@@ -32,6 +33,18 @@ def outbox(name: str, payload: dict, scope=A, **fields) -> OutboxEvent:
 
 
 # The catalog: only what the active apps declare, never a made-up name
+
+
+@pytest.mark.parametrize(("language", "label"), [("es", "Crear una tarea"), ("en", "Create a task")])
+def test_an_operation_is_named_as_the_history_names_it(language, label):
+    """The card of a grant says each permission by this label, never by its operation name (hub#504)."""
+    named = run("flow.operation.get", {"operation": "task.task.create"}, ctx=ctx_for(language=language))
+    assert named.model_dump() == {"operation": "task.task.create", "label": label}
+
+
+def test_an_operation_that_is_not_registered_has_no_name():
+    with pytest.raises(NotFound):
+        run("flow.operation.get", {"operation": "ghost.thing.missing"})
 
 
 def test_the_catalog_lists_the_events_of_the_active_apps_but_its_own():
@@ -68,7 +81,7 @@ def test_every_app_a_factory_recipe_names_has_its_name_in_the_catalog():
     rows = [*catalog.events, *catalog.actions]
     named = {row.app for row in rows}
     wanted = set()
-    for _config, recipe in recipes.declarations():
+    for _config, recipe in recipes.declarations(A):
         steps = recipe.get("steps") or []
         names = [(recipe.get("trigger") or {}).get("event", ""), *(step.get("operation", "") for step in steps)]
         names += [tool for step in steps for tool in step.get("tools") or []]
@@ -107,16 +120,53 @@ def test_the_catalog_offers_the_actions_and_reads_a_person_can_be_granted():
     assert not any(name.startswith("flow.") for name in actions)
 
 
-def test_an_app_that_is_not_active_is_not_in_the_catalog(monkeypatch):
-    active = {
-        label: config
-        for label, config in queries.active_apps().items()
-        if label != "task"
-    }
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+def test_the_catalog_offers_what_a_step_leaves_inside_an_object_never_inside_a_list():
+    """FLOW-F11, hub#963: «Insert a datum» offers, besides a step's first level, what it leaves inside an object of it,
+    by the path the engine resolves (``step_data``): the price and total of the line a step adds to a cart and the
+    cart's total after it, the number and total of a sale's invoice; never a datum inside a list, which no path
+    names."""
+    actions = {action.name: action for action in run("flow.catalog.read").actions}
+    added = actions["cart_checkout.item.add"].outputs
+    assert {"item", "removed", "cart", "item.unit_price", "item.line_total", "cart.total_amount"} <= set(added)
+    # An object comes before what it holds: the picker reads «Item», then «Item › Unit price».
+    assert added.index("item") < added.index("item.unit_price") < added.index("removed")
+    invoice = actions["invoice.invoice.by_source"].outputs
+    assert {"found", "count", "invoice", "invoice.number", "invoice.total_amount", "invoice.rectifies.total_amount"} <= set(invoice)
+    assert "invoice.lines" in invoice
+    assert not [path for path in invoice if path.startswith(("invoice.lines.", "invoice.tax_breakdown."))]
+    # The same paths the engine resolves, for every action and read: nothing walked twice.
+    operations = queries.ask_first_catalog(A)
+    for name, action in actions.items():
+        assert action.outputs[: len(queries.step_data(operations[name]))] == list(queries.step_data(operations[name])), name
+
+
+def test_what_a_step_leaves_is_read_from_one_build_of_its_schema(monkeypatch):
+    """The catalog walks some 500 operations on every read: what a step leaves, inside its objects too, comes from a
+    single build of its output's schema (a second one per operation cost the editor half a second more)."""
+    op = queries.ask_first_catalog(A)["cart_checkout.item.add"]
+    built = []
+    schema = op.output.model_json_schema
+    monkeypatch.setattr(op.output, "model_json_schema", lambda *args, **kwargs: built.append(1) or schema(*args, **kwargs))
+    assert "item.unit_price" in queries.action_outputs(op)
+    assert len(built) == 1
+
+
+def test_an_app_that_is_not_active_is_not_in_the_catalog():
+    run("base.app.disable", {"app": "task"})
     catalog = run("flow.catalog.read")
     assert not any(event.app == "task" for event in catalog.events)
     assert not any(action.app == "task" for action in catalog.actions)
+
+
+def test_the_catalog_names_the_apps_that_are_off_so_the_editor_can_say_why_a_step_is_missing(
+    django_capture_on_commit_callbacks,
+):
+    assert "task" not in [app.app for app in run("flow.catalog.read").off_apps]
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
+        run("base.app.disable", {"app": "task"})
+    off = run("flow.catalog.read").off_apps
+    assert {"app": "task", "app_name": "Tasks"} in [app.model_dump() for app in off]
+    assert "flow" not in [app.app for app in off]
 
 
 def test_the_catalog_needs_view():
@@ -329,7 +379,7 @@ def test_the_sample_is_the_newest_event_of_this_business():
 
 
 def test_the_sample_of_a_real_customer_carries_no_personal_data():
-    # hub#826, hub#2525: the example beside each datum is what the event brought, and an event brings
+    # The example beside each datum is what the event brought, and an event brings
     # ids, never a customer's name, city or notes (the real Customers app, not a hand-made outbox row).
     created = run(
         "customer.customer.create",
@@ -449,10 +499,10 @@ def test_try_says_what_the_action_would_refuse_and_what_it_is_not_allowed():
 def test_try_says_an_action_of_an_app_that_is_not_here_is_unavailable(monkeypatch):
     active = {
         label: config
-        for label, config in queries.active_apps().items()
+        for label, config in queries.active_apps(A).items()
         if label != "task"
     }
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
     outbox("sale.sale.completed", {"total": 20000})
     document = {"trigger": {"kind": "manual"}, "steps": [TASK_STEP]}
     assert try_(document).steps[0].outcome == "unavailable"
@@ -486,7 +536,7 @@ def test_the_system_context_reads_everything():
     assert run("flow.flow.list", {}, system_context(A)).total == 1
 
 
-# What needs a person in front is never offered (review 2026-10-15, item 1)
+# What needs a person in front is never offered
 
 
 def test_the_catalog_never_offers_an_action_that_needs_a_person():
@@ -580,8 +630,8 @@ def test_a_recipe_turned_on_says_which_automation_it_is_and_how_it_is():
 
 
 def test_a_recipe_this_business_cannot_offer_is_listed_apart_with_its_reason(monkeypatch):
-    active = {label: config for label, config in queries.active_apps().items() if label != "task"}
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    active = {label: config for label, config in queries.active_apps(A).items() if label != "task"}
+    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
     listed = run("flow.recipe.list")
     assert GAP not in {recipe.ref for recipe in listed.recipes}
     aside = next(item for item in listed.set_aside if item.ref == GAP)
@@ -600,7 +650,7 @@ def test_only_whoever_may_see_automations_reads_the_recipes():
 
 @pytest.mark.parametrize("column", ["updated_at", "name"])
 def test_ties_go_by_id_in_the_lists_own_direction(column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows."""
     flows = [make_flow("Same") for _ in range(4)]
     Flow.objects.update(updated_at=timezone.now())

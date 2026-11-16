@@ -1,29 +1,48 @@
-"""Control's commands: the database clusters the hubs' databases are on (round 2026-10-30b of PLAN-DB, decision 1 of
-Ioan; tranche S7, part 1).
+"""Control's commands: the database clusters the hubs' databases are on.
 
 The Hub admin (``control.admin``) registers, edits, closes and deletes a cluster only through these operations, for
 the platform's admins (staff and superuser, ``platform_admin``) or the platform itself; support only reads. Each runs
 on control (the registry's scope) and records its event in control's outbox in the same transaction.
 
 - A cluster with a ``secret_name`` is saved only once its app's secret (``<secret_name>/app``) resolves through
-  ``base.tenancy.credentials.credentials_for``: the web, where the admin runs, may read only that one (aws#23), so the
+  ``base.tenancy.credentials.credentials_for``: the web, where the admin runs, may read only that one, so the
   migrator's is never asked from here (the worker and ``hub-migrate`` read it when they first reach the cluster).
 - «Close to new hubs» (``control.cluster.close``) takes it out of the placement of new hubs
-  (``base.services.place_hub``); the hubs on it stay there.
+  (``base.services.provisioning.place_hub``); the hubs on it stay there.
 - Its writer (``host``, ``port``) never changes under the hubs on it: another writer is another server, and the way
   there is moving them (``base.hub.move``). Its PgBouncer, limit, secret and name may change.
 - A cluster any hub's row still points at (a purged demo's included: the foreign key protects it), a hub is moving to,
   or that still keeps a hub's moved copy, is never deleted.
 - ``control.hub.move`` asks the worker to move a ready hub's own database to another cluster (``base.tenancy.move``):
   only to an open one with room (as a new hub is placed, counting the hubs on their way there), and only a database
-  small enough for a copy (:data:`MOVE_MAX_BYTES`, measured on its server: ``control.queries``); a larger one needs
-  logical replication, which the Hub does not do yet. Its host answers 503 «maintenance» until the worker is done.
+  that is on its server (``control.queries``). Its size stops nothing: the copy goes through the dumps bucket, never
+  the worker's disk. Its host answers 503 «maintenance» until the worker is done.
+  Asked for the business's night (``when="at_night"``), nothing closes: the hub keeps the cluster and the moment it
+  starts (:func:`night_start`, on the business's own clock), the same checks are made again when the worker starts it
+  (:func:`start_scheduled_move`, under the hub's lease), and «Cancel the move» takes it away until then.
+- ``control.hub.restore`` asks the worker to put a ready hub's database back as it was at a moment
+  (``base.tenancy.restore``): from the copy of it on a temporary cluster (a point-in-time restore of its own, registered
+  closed to new hubs, with no hub on it). Its size stops nothing: the copy goes through the dumps bucket, never the
+  worker's disk. Its host answers 503 «maintenance» until the worker is done. The worker refuses it, nothing changed, while the hub's database has a
+  production VeriFactu record the copy lacks or has otherwise (it reads both with the migrator, which the web does not
+  have; it only reads).
+- ``control.hub.restore_aside`` asks the worker for a separate copy of a ready hub's database as it was at a moment
+  (``base.tenancy.restore``), from the same copy and under the same conditions, made on the hub's
+  own cluster as ``<control>_copy_<hex>`` (a ``RestoredCopy`` row): the business is never closed nor changed, so its
+  fiscal records stop nothing, and the copy is no business, closed to the app: nothing in it reaches the tax authority.
 
 Each locks the cluster's row first, as the placement does, so a hub placed at the same time is either counted or
 placed after.
+
+``control.freeze.set`` freezes the platform for a database upgrade with Blue/Green, or lifts its freeze: while
+frozen the worker makes, drops and moves no database and makes no app's tables, and ``migrate_hubs`` refuses to start,
+while the relay, the tasks and the sends to the AEAT go on. It is
+idempotent: frozen again, the freeze in course is kept as it was (who, since when, why); lifted again, nothing changes.
+Only a real change records its event. Its one row is locked first, so two admins at once change it once.
 """
 
 import datetime as dt
+import uuid
 from contextlib import contextmanager
 from uuid import UUID
 
@@ -36,28 +55,59 @@ from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
+from base.business import zone_of
 from base.registry import internal_only
+from base.tenancy import names
+from base.tenancy.connections import control_name
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from control import events, queries
-from control.models import Cluster, Hub, HubDue, LeftoverDatabase, MovedCopy
+from control.models import (
+    Cluster,
+    CopyRecovery,
+    Freeze,
+    Hub,
+    HubDue,
+    LeftoverDatabase,
+    MovedCopy,
+    RestoredCopy,
+)
 from control.schemas import (
     ClusterDeletedOut,
     ClusterIdIn,
     ClusterIn,
     ClusterOut,
     ClusterUpdateIn,
+    CopyRecoverIn,
+    CopyRecoveryOut,
+    FreezeIn,
+    FreezeOut,
     HubIdIn,
     HubMoveIn,
     HubMoveOut,
+    HubRestoreIn,
+    MOVE_AT_NIGHT,
+    HubRestoreOut,
+    RestoredCopyOut,
 )
 
 #: What a cluster is registered with (``ClusterIn``), in the model's own names.
 CLUSTER_FIELDS = tuple(ClusterIn.model_fields)
 #: Which server it is: never changed under the hubs on it.
 WRITER_FIELDS = ("host", "port")
-#: The largest database a move copies (``pg_dump``/``pg_restore``, its hub closed meanwhile): a few minutes' work. A
-#: larger one needs logical replication, which the Hub does not do yet.
-MOVE_MAX_BYTES = 512 * 1024 * 1024
+#: When a move asked for the night may start, on the business's own clock: Square's nightly updates run at 03:00, after
+#: the bars close and before the bakeries open. It bounds the start, as AWS's maintenance window does, not the end.
+NIGHT_STARTS = dt.time(3)
+NIGHT_ENDS = dt.time(5)
+
+
+def night_start(now: dt.datetime, zone: dt.tzinfo) -> dt.datetime:
+    """When a move asked at ``now`` for the night of a business on ``zone`` starts: ``now`` inside its window, else
+    the next :data:`NIGHT_STARTS` on that clock."""
+    local = now.astimezone(zone)
+    if NIGHT_STARTS <= local.time() < NIGHT_ENDS:
+        return now
+    day = local.date() if local.time() < NIGHT_STARTS else local.date() + dt.timedelta(days=1)
+    return dt.datetime.combine(day, NIGHT_STARTS, tzinfo=zone)
 
 
 def platform_admin_only(ctx: OperationContext) -> None:
@@ -75,12 +125,13 @@ def living_hubs(cluster: Cluster):
 
 def _holds_anything(cluster: Cluster) -> bool:
     """Whether a database of a hub is, or is about to be, on ``cluster``: a living hub, one on its way there, or a
-    copy or a leftover of a move kept there."""
+    copy or a leftover of a move kept there, a separate copy there or one still to make from it."""
     return (
         living_hubs(cluster).exists()
-        or Hub.objects.filter(moving_to=cluster).exists()
+        or Hub.objects.filter(Q(moving_to=cluster) | Q(move_scheduled_to=cluster) | Q(restoring_from=cluster)).exists()
         or MovedCopy.objects.filter(cluster=cluster).exists()
         or LeftoverDatabase.objects.filter(cluster=cluster).exists()
+        or RestoredCopy.objects.filter(Q(cluster=cluster) | Q(source=cluster)).exists()
     )
 
 
@@ -191,7 +242,9 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
     """Delete a cluster that no hub's row points at; one that holds any is refused with how many."""
     platform_admin_only(ctx)
     cluster = _locked(data.id)
-    held = Hub.objects.filter(Q(cluster=cluster) | Q(moving_to=cluster)).count()
+    held = Hub.objects.filter(
+        Q(cluster=cluster) | Q(moving_to=cluster) | Q(move_scheduled_to=cluster) | Q(restoring_from=cluster)
+    ).count()
     if held:
         raise Conflict(
             ngettext(
@@ -215,6 +268,19 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
             % {"count": kept},
             code="control.cluster_holds_hubs",
         )
+    aside = RestoredCopy.objects.filter(Q(cluster=cluster) | Q(source=cluster)).count()
+    if aside:
+        raise Conflict(
+            ngettext(
+                "%(count)d separate copy of a hub is on this cluster or still to be made from it: it is deleted once "
+                "the copy is made or dropped.",
+                "%(count)d separate copies of hubs are on this cluster or still to be made from it: it is deleted once "
+                "the copies are made or dropped.",
+                aside,
+            )
+            % {"count": aside},
+            code="control.cluster_holds_hubs",
+        )
     cluster.delete()
     _record(ctx, events.CLUSTER_DELETED, cluster, data.id)
     return {"id": data.id}
@@ -224,23 +290,24 @@ def _move_refused(message: str, code: str) -> Conflict:
     return Conflict(message, code=code)
 
 
-def _room_for_one_more(cluster: Cluster) -> bool:
-    """Whether ``cluster`` takes one more hub: its living hubs and the ones on their way there, under its limit."""
+def _room_for_one_more(cluster: Cluster, besides: Hub) -> bool:
+    """Whether ``cluster`` takes ``besides`` too: its living hubs and the others on their way there, now or in their
+    night, under its limit."""
     if cluster.max_hubs == 0:
         return True
-    taken = living_hubs(cluster).count() + Hub.objects.filter(moving_to=cluster).count()
-    return taken < cluster.max_hubs
+    coming = Hub.objects.filter(Q(moving_to=cluster) | Q(move_scheduled_to=cluster)).exclude(pk=besides.pk)
+    return living_hubs(cluster).count() + coming.count() < cluster.max_hubs
 
 
-# Not an assistant tool: the platform's admins, in the Hub admin («Move to cluster…»).
-@operation("control.hub.move", kind="command", permission=None, input=HubMoveIn, output=HubMoveOut, ai=INTERNAL)
-def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
-    """Ask the worker to move the ready hub ``data.hub``'s own database to the cluster ``data.cluster``."""
-    platform_admin_only(ctx)
-    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
-    if hub is None:
-        raise NotFound(gettext("No hub has this id."))
-    target = _locked(data.cluster)
+def _scheduled_move_refused() -> Conflict:
+    return _move_refused(
+        gettext("This hub already has a move asked for the night: cancel it first."), "control.hub_move_scheduled"
+    )
+
+
+def _movable(hub: Hub, target: Cluster) -> None:
+    """Refuse (``Conflict``) unless the ready ``hub`` moves to ``target`` now: what a move asked now checks, and a move
+    asked for the night checks again when the worker starts it."""
     if hub.status != Hub.Status.READY or not hub.db_name:
         raise _move_refused(
             gettext("Only a ready hub with a database of its own moves."), "control.hub_not_movable"
@@ -249,33 +316,61 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
         raise _move_refused(gettext("A demo does not move: it ends on its own."), "control.hub_is_demo")
     if hub.moving_to_id is not None:
         raise _move_refused(gettext("This hub is already moving."), "control.hub_moving")
+    if hub.restoring_from_id is not None:
+        raise _restoring()
     if hub.cluster_id == target.pk:
         raise _move_refused(gettext("This hub is on that cluster already."), "control.hub_already_there")
     if not target.is_open:
         raise _move_refused(gettext("That cluster is closed to new hubs."), "control.cluster_closed")
-    if not _room_for_one_more(target):
+    if not _room_for_one_more(target, hub):
         raise _move_refused(gettext("That cluster has no room for another hub."), "control.cluster_full")
-    size = queries.measure(hub.cluster, [hub.db_name]).get(hub.db_name)
-    if size is None:
+    if hub.db_name not in queries.measure(hub.cluster, [hub.db_name]):
         raise _move_refused(
             gettext("The database of this hub is not on its server: there is nothing to move."),
             "control.hub_database_missing",
         )
-    if size > MOVE_MAX_BYTES:
-        raise _move_refused(
-            gettext("This hub's database is too large to move with a copy: it needs logical replication."),
-            "control.hub_too_large",
-        )
-    origin = hub.cluster_id
-    hub.moving_to = target
+
+
+def _move_answer(hub: Hub) -> dict:
+    return {
+        "id": hub.pk,
+        "slug": hub.slug,
+        "cluster": hub.cluster_id,
+        "moving_to": hub.moving_to_id,
+        "scheduled_to": hub.move_scheduled_to_id,
+        "scheduled_for": hub.move_scheduled_for,
+    }
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin («Move to cluster…»).
+@operation("control.hub.move", kind="command", permission=None, input=HubMoveIn, output=HubMoveOut, ai=INTERNAL)
+def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
+    """Ask the worker to move the ready hub ``data.hub``'s own database to the cluster ``data.cluster``: now, or in the
+    business's next night (``data.when``)."""
+    platform_admin_only(ctx)
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    target = _locked(data.cluster)
+    if hub.move_scheduled_to_id is not None:
+        raise _scheduled_move_refused()
+    _movable(hub, target)
+    origin = str(hub.cluster_id) if hub.cluster_id else ""
     hub.last_error = ""
+    if data.when == MOVE_AT_NIGHT:
+        hub.move_scheduled_to = target
+        hub.move_scheduled_for = night_start(timezone.now(), zone_of(hub.timezone))
+        hub.save(update_fields=["move_scheduled_to", "move_scheduled_for", "last_error", "updated_at"])
+        at = hub.move_scheduled_for.astimezone(dt.UTC).isoformat()
+        payload = {"id": str(hub.pk), "slug": hub.slug, "from": origin, "to": str(target.pk), "at": at}
+        record_event(ctx, events.HUB_MOVE_SCHEDULED, payload)
+        return _move_answer(hub)
+    hub.moving_to = target
     hub.save(update_fields=["moving_to", "last_error", "updated_at"])
     record_event(
-        ctx,
-        events.HUB_MOVE_REQUESTED,
-        {"id": str(hub.pk), "slug": hub.slug, "from": str(origin) if origin else "", "to": str(target.pk)},
+        ctx, events.HUB_MOVE_REQUESTED, {"id": str(hub.pk), "slug": hub.slug, "from": origin, "to": str(target.pk)}
     )
-    return {"id": hub.pk, "slug": hub.slug, "cluster": origin, "moving_to": target.pk}
+    return _move_answer(hub)
 
 
 # Not an assistant tool: the platform's admins, in the Hub admin («Cancel the move»).
@@ -285,18 +380,236 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
 def hub_move_cancel(ctx: OperationContext, data: HubIdIn) -> dict:
     """Ask the worker to undo the move of ``data.id``, started or not: the hub is marked (``move_undo_asked_at``) and the
     worker puts it back on its origin. No note of a copy is made nor taken here: an older copy of the same hub on its
-    server is never taken for its data (review of W8, round 3)."""
+    server is never taken for its data. A move asked for the night that has not started is just taken away: nothing
+    was closed."""
     platform_admin_only(ctx)
     hub = Hub.objects.select_for_update().filter(pk=data.id).first()
     if hub is None:
         raise NotFound(gettext("No hub has this id."))
+    if hub.moving_to_id is None and hub.move_scheduled_to_id is not None:
+        target = hub.move_scheduled_to_id
+        hub.move_scheduled_to, hub.move_scheduled_for = None, None
+        hub.save(update_fields=["move_scheduled_to", "move_scheduled_for", "updated_at"])
+        record_event(
+            ctx, events.HUB_SCHEDULED_MOVE_CANCELLED, {"id": str(hub.pk), "slug": hub.slug, "to": str(target)}
+        )
+        return _move_answer(hub)
     if hub.moving_to_id is None:
         raise _move_refused(gettext("This hub is not moving."), "control.hub_not_moving")
     hub.move_undo_asked_at = timezone.now()
     hub.last_error = "move_cancelled: the move was cancelled in the Hub admin."
     hub.save(update_fields=["move_undo_asked_at", "last_error", "updated_at"])
     record_event(ctx, events.HUB_MOVE_CANCEL_REQUESTED, {"id": str(hub.pk), "slug": hub.slug})
-    return {"id": hub.pk, "slug": hub.slug, "cluster": hub.cluster_id, "moving_to": hub.moving_to_id}
+    return _move_answer(hub)
+
+
+def _restoring() -> Conflict:
+    return _move_refused(gettext("This hub is being restored from a copy."), "control.hub_restoring")
+
+
+def _copy_to_restore(hub: Hub, source: Cluster) -> None:
+    """Refuse unless the copy of ``hub``'s database is on ``source`` under its name, of any size."""
+    if hub.db_name not in queries.measure(source, [hub.db_name]):
+        raise _move_refused(
+            gettext("The hub's database is not on that cluster: there is no copy to restore it from."),
+            "control.restore_copy_missing",
+        )
+
+
+def _restorable(data: HubRestoreIn) -> tuple[Hub, Cluster]:
+    """The ready hub ``data.hub`` and the temporary cluster ``data.cluster``, both locked, when a copy of its database
+    as it was at ``data.at`` can be taken from that cluster: what a restore in place and a copy aside both ask."""
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    source = _locked(data.cluster)
+    if hub.status != Hub.Status.READY or not hub.db_name:
+        raise _move_refused(
+            gettext("Only a ready hub with a database of its own is restored."), "control.hub_not_restorable"
+        )
+    if hub.is_demo:
+        raise _move_refused(gettext("A demo is not restored: it ends on its own."), "control.hub_is_demo")
+    if hub.moving_to_id is not None:
+        raise _move_refused(gettext("This hub is already moving."), "control.hub_moving")
+    if hub.restoring_from_id is not None:
+        raise _restoring()
+    if hub.cluster_id == source.pk:
+        raise _move_refused(
+            gettext("The copy comes from a temporary cluster restored to that moment, never from the hub's own."),
+            "control.restore_from_own_cluster",
+        )
+    if source.is_open:
+        raise _move_refused(
+            gettext("A copy is restored only from a cluster closed to new hubs: a temporary one."),
+            "control.cluster_open",
+        )
+    if living_hubs(source).exists():
+        raise _move_refused(
+            gettext("Hubs live on that cluster: the copy comes from a temporary one with none."),
+            "control.cluster_holds_hubs",
+        )
+    if data.at > timezone.now():
+        message = gettext("That moment has not come yet.")
+        raise InvalidPayload(message, code="control.restore_point_ahead", fields={"at": message})
+    _copy_to_restore(hub, source)
+    return hub, source
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin.
+@operation(
+    "control.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubRestoreOut, ai=INTERNAL
+)
+def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
+    """Ask the worker to put the ready hub ``data.hub``'s database back as it was at ``data.at``, from its copy on the
+    temporary cluster ``data.cluster``."""
+    platform_admin_only(ctx)
+    hub, source = _restorable(data)
+    hub.restoring_from = source
+    hub.restore_point = data.at
+    hub.last_error = ""
+    hub.save(update_fields=["restoring_from", "restore_point", "last_error", "updated_at"])
+    record_event(
+        ctx,
+        events.HUB_RESTORE_REQUESTED,
+        {"id": str(hub.pk), "slug": hub.slug, "from": str(source.pk), "at": data.at.isoformat()},
+    )
+    return {
+        "id": hub.pk,
+        "slug": hub.slug,
+        "cluster": hub.cluster_id,
+        "restoring_from": source.pk,
+        "restore_point": data.at,
+    }
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin.
+@operation(
+    "control.hub.restore_aside",
+    kind="command",
+    permission=None,
+    input=HubRestoreIn,
+    output=RestoredCopyOut,
+    ai=INTERNAL,
+)
+def hub_restore_aside(ctx: OperationContext, data: HubRestoreIn) -> dict:
+    """Ask the worker for a separate copy of the ready hub ``data.hub``'s database as it was at ``data.at``, from its
+    copy on the temporary cluster ``data.cluster``, made on the hub's own cluster; the hub is not touched."""
+    platform_admin_only(ctx)
+    hub, source = _restorable(data)
+    copy_id = uuid.uuid7()
+    copy = RestoredCopy.objects.create(
+        id=copy_id,
+        hub=hub,
+        cluster=hub.cluster,
+        source=source,
+        restore_point=data.at,
+        db_name=names.copy_db_name(control_name(), copy_id),
+        asked_by=_who(ctx),
+    )
+    record_event(
+        ctx,
+        events.HUB_RESTORE_ASIDE_REQUESTED,
+        {
+            "id": str(copy.pk),
+            "hub": str(hub.pk),
+            "slug": hub.slug,
+            "from": str(source.pk),
+            "at": data.at.isoformat(),
+            "database": copy.db_name,
+        },
+    )
+    return {
+        "id": copy.pk,
+        "hub": hub.pk,
+        "slug": hub.slug,
+        "db_name": copy.db_name,
+        "cluster": copy.cluster_id,
+        "source": source.pk,
+        "restore_point": data.at,
+        "status": copy.status,
+    }
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin.
+@operation(
+    "control.copy.recover",
+    kind="command",
+    permission=None,
+    input=CopyRecoverIn,
+    output=CopyRecoveryOut,
+    ai=INTERNAL,
+)
+def copy_recover(ctx: OperationContext, data: CopyRecoverIn) -> dict:
+    """Ask the worker to bring back into its business what the separate copy ``data.copy_id`` holds and the business
+    lacks, of the apps ``data.apps`` (``base.tenancy.recovery``): each record created by its app's own
+    operation, in the staff member's language. Only from a made copy, of apps that say what they give back from one,
+    and one recovery of a copy at a time; the business is not touched by the ask."""
+    # Imported here: base.tenancy.recovery runs on control.services (its worker's side, below).
+    from base.tenancy.recovery import recoverable_apps
+
+    platform_admin_only(ctx)
+    copy = RestoredCopy.objects.select_related("hub").filter(pk=data.copy_id).first()
+    if copy is None:
+        raise NotFound(gettext("This separate copy does not exist."))
+    if copy.status != RestoredCopy.Status.MADE:
+        raise Conflict(gettext("Only a separate copy that is made gives anything back."), code="control.copy_not_made")
+    recoverable, apps = recoverable_apps(), list(dict.fromkeys(data.apps))
+    unknown = [label for label in apps if label not in recoverable]
+    if unknown:
+        message = gettext("These apps give nothing back from a separate copy: %(apps)s.") % {"apps": ", ".join(unknown)}
+        raise InvalidPayload(message, code="control.copy_app_not_recoverable", fields={"apps": message})
+    if CopyRecovery.objects.filter(copy=copy, status=CopyRecovery.Status.ASKED).exists():
+        raise Conflict(
+            gettext("This separate copy is already giving something back: wait until it is done."),
+            code="control.copy_recovery_pending",
+        )
+    recovery = CopyRecovery.objects.create(copy=copy, apps=apps, language=ctx.language or "en", asked_by=_who(ctx))
+    record_event(
+        ctx,
+        events.COPY_RECOVERY_REQUESTED,
+        {"id": str(recovery.pk), "copy": str(copy.pk), "hub": str(copy.hub_id), "slug": copy.hub.slug, "apps": apps},
+    )
+    return {
+        "id": recovery.pk,
+        "copy_id": copy.pk,
+        "hub": copy.hub_id,
+        "slug": copy.hub.slug,
+        "apps": apps,
+        "status": recovery.status,
+    }
+
+
+def _who(ctx: OperationContext) -> str:
+    """Who changes the switch, as the Hub admin shows it: the staff member's name (or username), or the platform."""
+    actor = ctx.actor
+    if hasattr(actor, "get_username"):
+        return (actor.get_full_name() or actor.get_username())[:150]
+    return str(actor)[:150]
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin (Admin › Freeze).
+@operation("control.freeze.set", kind="command", permission=None, input=FreezeIn, output=FreezeOut, ai=INTERNAL)
+def freeze_set(ctx: OperationContext, data: FreezeIn) -> dict:
+    """Freeze the platform for a database upgrade (``data.frozen``, with why) or lift its freeze; asked while already
+    so, it is left as it is."""
+    platform_admin_only(ctx)
+    row = Freeze.objects.select_for_update().first()
+    if row is None:
+        # Control's migration makes it; only a database whose rows were emptied by hand lacks it. One row at most: a
+        # second made at the same time is refused by its constraint, and this call fails rather than write twice.
+        row = Freeze.objects.create()
+    if row.frozen == data.frozen:
+        return queries.freeze_answer(row)
+    now = timezone.now()
+    if data.frozen:
+        row.frozen, row.reason, row.since, row.by = True, data.reason, now, _who(ctx)
+        record_event(ctx, events.FREEZE_STARTED, {"reason": row.reason})
+    else:
+        started = row.since
+        row.frozen, row.reason, row.since, row.by = False, "", now, _who(ctx)
+        record_event(ctx, events.FREEZE_LIFTED, {"frozen_since": started.isoformat() if started else ""})
+    row.save(update_fields=["frozen", "reason", "since", "by"])
+    return queries.freeze_answer(row)
 
 
 # ── The worker's side of a move (``base.tenancy.move``): no operations, the platform's own steps on control ─────────
@@ -316,14 +629,57 @@ def _control_transaction():
         yield
 
 
+def moves_scheduled_due(now: dt.datetime) -> list[UUID]:
+    """The hubs whose move asked for the night is due by ``now``, the earliest first."""
+    due = Hub.objects.filter(move_scheduled_to__isnull=False, move_scheduled_for__lte=now)
+    return list(due.order_by("move_scheduled_for", "pk").values_list("pk", flat=True))
+
+
+def start_scheduled_move(hub_id: UUID, now: dt.datetime, *, owner: str) -> bool:
+    """Start the move of ``hub_id`` asked for its night, in one transaction on its locked row, while ``owner`` holds its
+    lease (``MoveTaken`` otherwise, nothing written): due and in its night, it moves from now on (``moving_to``); due
+    by its day, it waits for its next night; one a move now would be refused ends with why (``last_error``), nothing
+    closed. Whether it started."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=hub_id).first()
+        if hub is None or hub.move_scheduled_to_id is None or hub.move_scheduled_for > now:
+            return False
+        _held(hub, owner, forward=False, lock=True)
+        starts = night_start(now, zone_of(hub.timezone))
+        if starts != now:
+            hub.move_scheduled_for = starts
+            hub.save(update_fields=["move_scheduled_for", "updated_at"])
+            return False
+        target = _locked(hub.move_scheduled_to_id)
+        hub.move_scheduled_to, hub.move_scheduled_for = None, None
+        fields = ["move_scheduled_to", "move_scheduled_for", "last_error", "updated_at"]
+        try:
+            _movable(hub, target)
+        except Conflict as refused:
+            hub.last_error = f"move_not_started: {refused.code}: {refused.message}"[:2000]
+            hub.save(update_fields=fields)
+            return False
+        hub.moving_to = target
+        hub.last_error = ""
+        hub.save(update_fields=[*fields, "moving_to"])
+        return True
+
+
 def hubs_moving() -> list[UUID]:
     """The hubs asked to move (or whose move is being undone), the longest asked first."""
     return list(Hub.objects.filter(moving_to__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True))
 
 
+def hubs_restoring() -> list[UUID]:
+    """The hubs asked to be restored (or whose restore is being undone), the longest asked first."""
+    return list(
+        Hub.objects.filter(restoring_from__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True)
+    )
+
+
 def moving_row(hub_id: UUID) -> Hub | None:
-    """``hub_id``'s row with the cluster it is on and the one it is moving to, as it is now."""
-    return Hub.objects.select_related("cluster", "moving_to").filter(pk=hub_id).first()
+    """``hub_id``'s row with the cluster it is on and the one it is moving to or restored from, as it is now."""
+    return Hub.objects.select_related("cluster", "moving_to", "restoring_from").filter(pk=hub_id).first()
 
 
 def _ours(hub: Hub, target_id: UUID, owner: str, *, forward: bool, lock: bool = False) -> None:
@@ -331,12 +687,23 @@ def _ours(hub: Hub, target_id: UUID, owner: str, *, forward: bool, lock: bool = 
     forward, nobody asked to undo it. ``lock``: the lease's row is locked too (the switch, in its transaction)."""
     if hub.moving_to_id != target_id:
         raise MoveTaken(f"{hub.slug} no longer moves to {target_id}: another worker finished or undid it.")
+    _held(hub, owner, forward=forward, lock=lock)
+
+
+def _restoring_ours(hub: Hub, source_id: UUID, owner: str, *, forward: bool, lock: bool = False) -> None:
+    """:func:`_ours` for a restore: it is still restored from ``source_id``."""
+    if hub.restoring_from_id != source_id:
+        raise MoveTaken(f"{hub.slug} is no longer restored from {source_id}: another worker finished or undid it.")
+    _held(hub, owner, forward=forward, lock=lock)
+
+
+def _held(hub: Hub, owner: str, *, forward: bool, lock: bool) -> None:
     # Whoever holds it: one that ran out and nobody took is still ``owner``'s (``base.services.renew_lease`` too).
     leases = HubDue.objects.select_for_update() if lock else HubDue.objects
     if not leases.filter(pk=hub.pk, lease_owner=owner).exists():
         raise MoveTaken(f"the lease of {hub.slug} is no longer {owner}'s.")
     if forward and hub.move_undo_asked_at is not None:
-        raise MoveTaken(f"the move of {hub.slug} is to be undone.")
+        raise MoveTaken(f"the copy of {hub.slug} is to be undone.")
 
 
 def still_ours(hub_id: UUID, target_id: UUID, owner: str, *, forward: bool = True) -> None:
@@ -347,6 +714,15 @@ def still_ours(hub_id: UUID, target_id: UUID, owner: str, *, forward: bool = Tru
     _ours(hub, target_id, owner, forward=forward)
 
 
+def still_restoring(hub_id: UUID, source_id: UUID, owner: str, *, forward: bool = True) -> None:
+    """Before a drop, a rename or the end of a restore: ``MoveTaken`` unless it is still ``owner``'s
+    (:func:`_restoring_ours`)."""
+    hub = Hub.objects.filter(pk=hub_id).first()
+    if hub is None:
+        raise MoveTaken(f"the hub {hub_id} is gone.")
+    _restoring_ours(hub, source_id, owner, forward=forward)
+
+
 def attributed(cluster_id: UUID | None, db_name: str, *, besides: UUID | None = None) -> bool:
     """Whether control says ``db_name`` on ``cluster_id`` is a hub's database: one on that cluster (whichever), or one
     moving to it other than ``besides`` (the hub whose move asks)."""
@@ -354,7 +730,7 @@ def attributed(cluster_id: UUID | None, db_name: str, *, besides: UUID | None = 
     return Hub.objects.filter(Q(cluster_id=cluster_id) | moving_there, db_name=db_name).exists()
 
 
-def move_finished(
+def move_finished(  # noqa: PLR0913
     hub_id: UUID, target_id: UUID, origin: UUID | None, copy_name: str, at: dt.datetime, *, owner: str
 ) -> None:
     """Switch ``hub_id`` to ``target_id`` and date its copy on ``origin`` (none: the settings' own server), in one
@@ -367,24 +743,48 @@ def move_finished(
         hub.moving_to = None
         hub.last_error = ""
         hub.save(update_fields=["cluster", "moving_to", "last_error", "updated_at"])
-        MovedCopy.objects.update_or_create(
-            cluster_id=origin,
-            db_name=copy_name,
-            defaults={"hub_id": hub_id, "moved_at": at, "schema_state": "", "schema_apps": None},
-        )
+        _dated(hub_id, origin, copy_name, at)
+
+
+def _dated(hub_id: UUID, cluster_id: UUID | None, copy_name: str, at: dt.datetime) -> None:
+    """The copy ``copy_name`` on ``cluster_id`` left behind at ``at``: its note dated (its days count from then)."""
+    MovedCopy.objects.update_or_create(
+        cluster_id=cluster_id,
+        db_name=copy_name,
+        defaults={"hub_id": hub_id, "moved_at": at, "schema_state": "", "schema_apps": None},
+    )
+
+
+def restore_finished(  # noqa: PLR0913
+    hub_id: UUID, source_id: UUID, cluster_id: UUID | None, kept_name: str, at: dt.datetime, *, owner: str
+) -> None:
+    """End the restore of ``hub_id`` and date the database it replaced, kept on its cluster (none: the settings' own
+    server), in one transaction on its locked row; ``MoveTaken`` when the restore is no longer ``owner``'s (nothing
+    written then). The schema record is the new database's, which its migration wrote."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _restoring_ours(hub, source_id, owner, forward=True, lock=True)
+        hub.restoring_from = None
+        hub.restore_point = None
+        hub.last_error = ""
+        hub.save(update_fields=["restoring_from", "restore_point", "last_error", "updated_at"])
+        _dated(hub_id, cluster_id, kept_name, at)
 
 
 def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str) -> None:
-    """The move of ``hub_id`` was undone: ready where it was, with why, no longer asked to be undone, its note forgotten
-    and the schema record of its origin given back (the destination's migration wrote its own meanwhile)."""
+    """The move (or the restore) of ``hub_id`` was undone: ready where it was on its own database, with why, no longer
+    asked to be undone, its note forgotten and the schema record of before given back (the migration of the database
+    it was copied to wrote its own meanwhile)."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().get(pk=hub_id)
         note = MovedCopy.objects.filter(hub=hub, cluster_id=origin, db_name=copy_name, moved_at__isnull=True).first()
-        fields = ["moving_to", "move_undo_asked_at", "last_error", "updated_at"]
+        fields = ["moving_to", "restoring_from", "restore_point", "move_undo_asked_at", "last_error", "updated_at"]
         if note is not None and note.schema_state:
             hub.schema_state, hub.schema_apps = note.schema_state, note.schema_apps or {}
             fields += ["schema_state", "schema_apps"]
         hub.moving_to = None
+        hub.restoring_from = None
+        hub.restore_point = None
         hub.move_undo_asked_at = None
         hub.last_error = error[:2000]
         hub.save(update_fields=fields)
@@ -393,8 +793,8 @@ def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str) -
 
 
 def move_stuck(hub_id: UUID, error: str) -> None:
-    """The move of ``hub_id`` failed and could not be undone yet: still moving (its host closed), asked to be undone on
-    the next pass, never taken forward."""
+    """The move (or the restore) of ``hub_id`` failed and could not be undone yet: still copying (its host closed),
+    asked to be undone on the next pass, never taken forward."""
     with _control_transaction():
         Hub.objects.filter(pk=hub_id).update(
             last_error=error[:2000], move_undo_asked_at=timezone.now(), updated_at=timezone.now()
@@ -402,7 +802,7 @@ def move_stuck(hub_id: UUID, error: str) -> None:
 
 
 def pending_copy(hub_id: UUID) -> MovedCopy | None:
-    """The note of ``hub_id``'s move in course (no ``moved_at`` yet), if any."""
+    """The note of ``hub_id``'s move or restore in course (no ``moved_at`` yet), if any."""
     return MovedCopy.objects.select_related("cluster").filter(hub_id=hub_id, moved_at__isnull=True).first()
 
 
@@ -450,3 +850,168 @@ def leftovers() -> list[LeftoverDatabase]:
 def forget_leftover(cluster_id: UUID, db_name: str) -> None:
     with _control_transaction():
         LeftoverDatabase.objects.filter(cluster_id=cluster_id, db_name=db_name).delete()
+
+
+# ── The worker's side of a separate copy (``base.tenancy.restore``): under the row's own lease ───────────────────────
+
+
+def copies_to_make() -> list[UUID]:
+    """The separate copies still to make, the longest asked first."""
+    return list(
+        RestoredCopy.objects.filter(status=RestoredCopy.Status.COPYING)
+        .order_by("asked_at", "pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def _claim(model, row_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str, status: str) -> bool:  # noqa: PLR0913, PLR0917
+    """Take for ``owner`` the lease of the row ``row_id`` of ``model`` (a separate copy or a recovery from one) while it
+    is ``status``; whether it was taken (not when someone else holds it, or it is no longer ``status``, or gone)."""
+    with _control_transaction():
+        row = (
+            model.objects.select_for_update(skip_locked=True, of=("self",))
+            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now), pk=row_id, status=status)
+            .first()
+        )
+        if row is None:
+            return False
+        model.objects.filter(pk=row_id).update(lease_owner=owner, lease_until=now + lease)
+    return True
+
+
+def _release(model, row_id: UUID, owner: str) -> None:
+    """``owner``'s lease of the row ``row_id`` of ``model`` given back (a stopped worker's: the next one goes on at
+    once)."""
+    model.objects.filter(pk=row_id, lease_owner=owner).update(lease_owner="", lease_until=None)
+
+
+def claim_copy(copy_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> RestoredCopy | None:
+    """Take for ``owner`` the lease of the separate copy ``copy_id`` still to make, with its hub and clusters; ``None``
+    when someone else holds it (or it is made, failed or gone)."""
+    if not _claim(RestoredCopy, copy_id, now, lease, owner, RestoredCopy.Status.COPYING):
+        return None
+    return RestoredCopy.objects.select_related("hub", "cluster", "source").get(pk=copy_id)
+
+
+def renew_copy(copy_id: UUID, lease: dt.timedelta, owner: str) -> None:
+    """``owner``'s lease of the copy ``copy_id`` renewed from now, while it is still ``owner``'s."""
+    RestoredCopy.objects.filter(pk=copy_id, lease_owner=owner).update(lease_until=timezone.now() + lease)
+
+
+def _making(copy_id: UUID, owner: str, *, lock: bool = False) -> RestoredCopy:
+    rows = RestoredCopy.objects.select_for_update() if lock else RestoredCopy.objects
+    row = rows.filter(pk=copy_id).first()
+    if row is None or row.status != RestoredCopy.Status.COPYING or row.lease_owner != owner:
+        raise MoveTaken(f"the separate copy {copy_id} is no longer {owner}'s to make.")
+    return row
+
+
+def still_making(copy_id: UUID, owner: str) -> None:
+    """Before a drop or the end of a separate copy: ``MoveTaken`` unless it is still ``owner``'s to make."""
+    _making(copy_id, owner)
+
+
+def copy_made(copy_id: UUID, at: dt.datetime, owner: str) -> None:
+    """The separate copy ``copy_id`` is made: dated, its temporary cluster let go and its lease given back, on its
+    locked row, only if it is still ``owner``'s (``MoveTaken`` otherwise: nothing written)."""
+    with _control_transaction():
+        _making(copy_id, owner, lock=True)
+        RestoredCopy.objects.filter(pk=copy_id).update(
+            status=RestoredCopy.Status.MADE, made_at=at, source=None, last_error="", lease_owner="", lease_until=None
+        )
+
+
+def copy_failed(copy_id: UUID, error: str, owner: str) -> None:
+    """The separate copy ``copy_id`` could not be made (nothing of it is left): why, its temporary cluster let go and
+    its lease given back, only if it is still ``owner``'s (``MoveTaken`` otherwise: nothing written)."""
+    with _control_transaction():
+        _making(copy_id, owner, lock=True)
+        RestoredCopy.objects.filter(pk=copy_id).update(
+            status=RestoredCopy.Status.FAILED, source=None, last_error=error, lease_owner="", lease_until=None
+        )
+
+
+def release_copy(copy_id: UUID, owner: str) -> None:
+    """``owner``'s lease of the copy ``copy_id`` given back (a stopped worker's: the next one goes on at once)."""
+    _release(RestoredCopy, copy_id, owner)
+
+
+def aside_copies_due(before: dt.datetime) -> list[RestoredCopy]:
+    """The separate copies past their days by ``before``: made by then, or failed and asked by then (nothing of those
+    is left but the row); never one still to make. The oldest first, with their cluster."""
+    return list(
+        RestoredCopy.objects.select_related("cluster")
+        .filter(
+            Q(status=RestoredCopy.Status.MADE, made_at__lte=before)
+            | Q(status=RestoredCopy.Status.FAILED, asked_at__lte=before)
+        )
+        .order_by("asked_at", "pk")
+    )
+
+
+def forget_aside_copy(copy_id: UUID) -> None:
+    """The separate copy ``copy_id`` is gone: its row goes too."""
+    with _control_transaction():
+        RestoredCopy.objects.filter(pk=copy_id).delete()
+
+
+# ── The worker's side of a recovery from a separate copy (``base.tenancy.recovery``): its own lease ──────────────────
+
+
+def recoveries_due() -> list[UUID]:
+    """The recoveries still to do, of copies that are made, the longest asked first."""
+    return list(
+        CopyRecovery.objects.filter(status=CopyRecovery.Status.ASKED, copy__status=RestoredCopy.Status.MADE)
+        .order_by("asked_at", "pk")
+        .values_list("pk", flat=True)
+    )
+
+
+def claim_recovery(recovery_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> CopyRecovery | None:
+    """Take for ``owner`` the lease of the recovery ``recovery_id`` still to do, with its copy, its hub and their
+    clusters; ``None`` when someone else holds it (or it is done, failed or gone)."""
+    if not _claim(CopyRecovery, recovery_id, now, lease, owner, CopyRecovery.Status.ASKED):
+        return None
+    return CopyRecovery.objects.select_related("copy", "copy__cluster", "copy__hub", "copy__hub__cluster").get(
+        pk=recovery_id
+    )
+
+
+def still_recovering(recovery_id: UUID, lease: dt.timedelta, owner: str) -> None:
+    """Before each record a recovery creates: its lease renewed from now while it is still ``owner``'s to do;
+    ``MoveTaken`` otherwise (nothing renewed)."""
+    renewed = CopyRecovery.objects.filter(
+        pk=recovery_id, status=CopyRecovery.Status.ASKED, lease_owner=owner
+    ).update(lease_until=timezone.now() + lease)
+    if not renewed:
+        raise MoveTaken(f"the recovery {recovery_id} is no longer {owner}'s to do.")
+
+
+def _recovery_ended(recovery_id: UUID, owner: str, **ended) -> None:
+    """The recovery ``recovery_id`` ended as ``ended`` says, its lease given back, on its locked row, only if it is
+    still ``owner``'s to do (``MoveTaken`` otherwise: nothing written)."""
+    with _control_transaction():
+        row = CopyRecovery.objects.select_for_update().filter(pk=recovery_id).first()
+        if row is None or row.status != CopyRecovery.Status.ASKED or row.lease_owner != owner:
+            raise MoveTaken(f"the recovery {recovery_id} is no longer {owner}'s to do.")
+        CopyRecovery.objects.filter(pk=recovery_id).update(lease_owner="", lease_until=None, **ended)
+
+
+def recovery_done(recovery_id: UUID, results: list[dict], at: dt.datetime, owner: str) -> None:
+    """The recovery ``recovery_id`` is done: what each app gave back (``results``), dated."""
+    _recovery_ended(
+        recovery_id, owner, status=CopyRecovery.Status.DONE, results=results, done_at=at, last_error=""
+    )
+
+
+def recovery_failed(recovery_id: UUID, error: str, results: list[dict], at: dt.datetime, owner: str) -> None:
+    """The recovery ``recovery_id`` stopped at ``error``: what it gave back until then (``results``), dated."""
+    _recovery_ended(
+        recovery_id, owner, status=CopyRecovery.Status.FAILED, results=results, done_at=at, last_error=error
+    )
+
+
+def release_recovery(recovery_id: UUID, owner: str) -> None:
+    """``owner``'s lease of the recovery ``recovery_id`` given back: a recovery left for later (its business was being
+    moved or restored) or stopped goes on at the next pass."""
+    _release(CopyRecovery, recovery_id, owner)

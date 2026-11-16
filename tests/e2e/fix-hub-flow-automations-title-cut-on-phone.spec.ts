@@ -1,10 +1,9 @@
 // flow: flow-automations-list
-// — On a phone, in Spanish, the bar of «Automatizaciones» read «A» (375 px) or «A…» (390 px): its one action, «Nueva
-// automatización» with its icon and its text, took the whole width. The owner of hub `a` opens the list in Spanish at
+// On a phone, in Spanish, the bar of «Automatizaciones» must not read «A» (375 px) or «A…» (390 px) because its one
+// action, «Nueva automatización» with its icon and its text, takes the whole width. The owner of hub `a` opens the list in Spanish at
 // 375, 390, 834 and 1440 px: the title is read whole (its `.toolbar-title` not cut with «…») and «Nueva automatización»
 // is still one tap away, by its name. On a phone it is only its «+» (Material's top app bar, iOS's navigation bars),
-// from a tablet on, its icon and its text. No sideways scroll. Each width leaves its capture
-// `FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE-<width>`. Nothing is created.
+// from a tablet on, its icon and its text. No sideways scroll. Each width leaves its capture. Nothing is created.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';

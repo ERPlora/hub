@@ -13,11 +13,11 @@ import { useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
+import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { noAllowance } from '../lib/plan';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
-import PlanUpgradeLink from './PlanUpgradeLink.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
 
 const props = withDefaults(
@@ -172,7 +172,9 @@ watch(
             class="wa-composer__link"
             data-testid="whatsapp-inbox-composer-upgrade"
             :url="upgradeUrl"
-          />
+          >
+            {{ $t('whatsapp_inbox.upgradePlan') }}
+          </PlanUpgradeLink>
         </template>
       </InlineFeedback>
       <InlineFeedback

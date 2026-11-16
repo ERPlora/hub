@@ -3,14 +3,13 @@ payments (record with their reference of the day, approve, send, complete, cance
 
 The cases come from the old module's WORKFLOW and tests, with its silent no-ops turned into refusals:
 a step from the wrong state, or a payment from a method that does not exist or is deactivated, says
-why, changes nothing, spends no number and records no event (PAYMENTS-F02 to F05 «parcial»).
+why, changes nothing, spends no number and records no event (PAYMENT-F02 to F05).
 """
 
 import datetime as dt
 import json
 import uuid
 
-import psycopg
 import pytest
 from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
@@ -19,10 +18,11 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.payment.models import Payment, PaymentCounter, PaymentMethod
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_method, make_payment
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_method, make_payment
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TODAY = dt.date(2026, 10, 14)
 WAIT = 1.0
@@ -240,7 +240,7 @@ def test_past_9999_the_number_is_written_whole(bank):
     assert record(bank).reference == "PAY-20261014-10000"
 
 
-# The same attempt sent again (payments#8: a retry used to record a second payment)
+# The same attempt sent again (a retry used to record a second payment)
 
 
 def test_the_same_attempt_sent_again_answers_the_payment_it_recorded(bank):
@@ -364,7 +364,7 @@ def test_a_name_that_matches_several_methods_says_which(bank):
 
 
 def test_without_a_currency_the_payment_is_in_the_business_currency(bank):
-    # The old payments#38: the assistant or an API integration may leave it out.
+    # The assistant or an API integration may leave it out.
     assert record(bank).currency == "EUR"
     assert record(bank, currency=None).currency == "EUR"
     assert record(bank, currency="  ").currency == "EUR"
@@ -575,21 +575,6 @@ def test_cancelling_needs_the_approve_permission(bank):
 # ── Notifications: after the COMMIT, on the channel of the command's scope only ───────────────
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=WAIT, stop_after=None):
     return [
         (note.channel, json.loads(note.payload))
@@ -597,33 +582,39 @@ def received(session, timeout=WAIT, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_payment_recorded_in_b_notifies_the_channel_of_b_only(listen):
-    method = make_method()
+@HUB_DB_COMMITTED
+def test_a_payment_recorded_in_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-
-    run(
-        "payment.payment.create",
-        {
-            "method_id": str(method.id),
-            "payment_date": "2026-10-10",
-            "amount": 100,
-            "beneficiary_name": "Proveedor",
-        },
-        scope=B,
-    )
+    with use_hub(hub_b):
+        method = make_method()
+        run(
+            "payment.payment.create",
+            {
+                "method_id": str(method.id),
+                "payment_date": "2026-10-10",
+                "amount": 100,
+                "beneficiary_name": "Proveedor",
+            },
+            scope=B,
+        )
 
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": ["payment.payment.created"]})
     ]
     assert received(on_a, timeout=QUIET) == []
+    # The channel is the command's scope; the rows of the outbox carry theirs, and B's database holds them all.
+    with use_hub(hub_b):
+        assert set(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == {(B.kind, B.key)}
+    assert not OutboxEvent.objects.exists()
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_refused_step_notifies_nobody(listen):
-    payment = make_payment(make_method(), status="completed")
+@HUB_DB_COMMITTED
+def test_a_refused_step_notifies_nobody(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    with pytest.raises(Conflict):
-        run("payment.payment.approve", {"id": str(payment.id)}, scope=B)
+    with use_hub(hub_b):
+        payment = make_payment(make_method(), status="completed")
+        with pytest.raises(Conflict):
+            run("payment.payment.approve", {"id": str(payment.id)}, scope=B)
+        assert not OutboxEvent.objects.exists()
     assert received(on_b, timeout=QUIET) == []
     assert received(on_a, timeout=QUIET) == []

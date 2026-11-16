@@ -1,0 +1,20 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261109.owner.es.preparation_sales.inventory.product.create_lentils","app":"inventory","tool":"inventory.product.create","role":"owner","language":"es","phrase":"crea Lentejas con SKU QA-LENTEJAS, precio 4,50 €, coste 1,20 €, IVA de comida y 50 unidades iniciales","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.inventory.product.create_hake","app":"inventory","tool":"inventory.product.create","role":"owner","language":"es","phrase":"crea Merluza con SKU QA-MERLUZA, precio 8,90 €, coste 3,20 €, IVA de comida y 50 unidades iniciales","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.inventory.product.create_flan","app":"inventory","tool":"inventory.product.create","role":"owner","language":"es","phrase":"crea Flan con SKU QA-FLAN, precio 2,40 €, coste 0,70 €, IVA de comida y 50 unidades iniciales","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.staff.member.create_laura","app":"staff","tool":"staff.member.create","role":"owner","language":"es","phrase":"da de alta a Laura QA como camarera, sin cuenta de erplora.com","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.service.service.create_cut","app":"service","tool":"service.service.create","role":"owner","language":"es","phrase":"crea el servicio Corte QA, de 30 minutos y 12 €, con el IVA de la comida","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.combo.create_menu","app":"combo","tool":"combo.combo.create","role":"owner","language":"es","phrase":"crea Menú QA cerrado a 12 €, con el IVA de la comida","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.group.create_first","app":"combo","tool":"combo.group.create","role":"owner","language":"es","phrase":"añade a Menú QA el curso Primero, con una elección obligatoria","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.group.create_second","app":"combo","tool":"combo.group.create","role":"owner","language":"es","phrase":"añade a Menú QA el curso Segundo, con una elección obligatoria","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.group.create_dessert","app":"combo","tool":"combo.group.create","role":"owner","language":"es","phrase":"añade a Menú QA el curso Postre, con una elección obligatoria","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.option.create_lentils","app":"combo","tool":"combo.option.create","role":"owner","language":"es","phrase":"añade Lentejas como opción de Primero en Menú QA, sin suplemento","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.option.create_hake","app":"combo","tool":"combo.option.create","role":"owner","language":"es","phrase":"añade Merluza como opción de Segundo en Menú QA, sin suplemento","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.combo.option.create_flan","app":"combo","tool":"combo.option.create","role":"owner","language":"es","phrase":"añade Flan como opción de Postre en Menú QA, sin suplemento","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.appointment.appointment.create_ana","app":"appointment","tool":"appointment.appointment.create","role":"owner","language":"es","phrase":"agenda a Ana QA mañana a las 18:00 con Laura QA para Corte QA","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.service.package.create_voucher","app":"service","tool":"service.package.create","role":"owner","language":"es","phrase":"crea el paquete Bono QA con tres sesiones de Corte QA por 30 €","expect":"card","decide":"confirm"},
+    {"id":"qa20261109.owner.es.preparation_sales.service.grant.create_ana","app":"service","tool":"service.grant.create","role":"owner","language":"es","phrase":"emite para Ana QA un Bono QA de tres sesiones de Corte QA","expect":"card","decide":"confirm"}
+  ]
+}

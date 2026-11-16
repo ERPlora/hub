@@ -1,0 +1,11 @@
+{
+  "business": "Café Aurora",
+  "open": true,
+  "tables": 12,
+  "manager": null,
+  "products": [
+    { "name": "Café solo", "price": 1.2, "tags": ["hot", "drink"] },
+    { "name": "Tostada", "price": 2.5, "tags": ["food"] }
+  ],
+  "note": "<b>not markup</b>"
+}

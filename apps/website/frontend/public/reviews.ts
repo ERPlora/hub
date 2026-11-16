@@ -1,4 +1,4 @@
-// The public page's Google reviews (2026-10-22): the server paints the rating, its stars, the count and up to five
+// The public page's Google reviews: the server paints the rating, its stars, the count and up to five
 // review cards with what the Hub keeps from Google (`templates/website/sections/reviews.html`, good for search engines
 // and for a visitor without JS) inside `[data-ep-block="reviews"]`; once the page loads, this refreshes the summary
 // (`[data-ep-reviews-summary]`) and the cards (`[data-ep-reviews-list]`) from `/api/website/public/reviews`, so what

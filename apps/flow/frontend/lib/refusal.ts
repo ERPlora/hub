@@ -1,4 +1,4 @@
-// What a person reads when something of Automations fails (hub#2320; the pattern of printing's and
+// What a person reads when something of Automations fails (the pattern of printing's and
 // sale's `refusal.ts`): the server's refusal as it came, already in the person's language; a failure the
 // server did not word — the network, an answer that is not the API's envelope, a failure of the server
 // itself (`internal_error`, any 5xx), anything that is not an API error — says the screen's sentence.

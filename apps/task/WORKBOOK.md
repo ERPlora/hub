@@ -6,9 +6,7 @@ Lo que no entra todavía: ver «Lo que NO hace, a propósito».
 
 > Manual de usuario y especificación de la app `task`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
-> y páginas). Parte del `WORKFLOW.md` del módulo Tareas del producto actual
-> (`modules-workspace/modules/tasks`, `origin/main` `99f1c53`, v1.0.31). Hace lo mismo, se ve igual y
-> conserva toda su funcionalidad salvo lo que dice «Cambios frente al producto actual», al final.
+> y páginas).
 
 ## Para qué sirve y para quién
 
@@ -36,9 +34,7 @@ almacén para mañana y asígnala a Ana», «¿qué tareas tengo?», «completa 
 
 ## Referencia adoptada
 
-**A quién se asigna una tarea y qué ve el empleado** (skill `market-decision`, 2026-10-14). En el
-producto actual el responsable era una referencia de texto a un usuario del hub, sin vínculo con
-Personal, y todos veían y cambiaban todo.
+**A quién se asigna una tarea y qué ve el empleado** (skill `market-decision`, 2026-10-14).
 
 | Producto | Cómo lo resuelve | Fuente |
 |---|---|---|
@@ -138,10 +134,16 @@ la crea dentro del proyecto.
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado. |
 | Vacío | «Sin tareas.», «Sin tareas abiertas asignadas a ti.», «Sin subtareas.», «Sin comentarios.», «Sin proyectos.» o «Este proyecto aún no tiene tareas.»; con búsqueda o filtro, «Sin resultados». |
-| Error | El aviso de la tabla con «Reintentar». El rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla; el de la hoja, dentro de la hoja. |
+| Error | El aviso de la tabla con «Reintentar». El rechazo de un formulario sale dentro del formulario, sin perder lo tecleado, y cada campo rechazado dice su motivo debajo y lo pierde en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888), también en los buscadores (**Asignada a** y **Proyecto**), en cuanto se elige otro. El de una acción de fila sale encima de la tabla; el de la hoja, dentro de la hoja. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
+
+## Cambios sin guardar en Android
+
+En «Nueva tarea», «Editando tarea» y «Nuevo proyecto», el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios» cierra
+la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
 
 ## Flujos
 
@@ -164,7 +166,6 @@ la crea dentro del proyecto.
 | TASK-F15 | Cuando alguien deja el equipo | hecho |
 
 ### TASK-F01 Crear una tarea
-<!-- origen: fi:modules/tasks#command-handler-wasm-tasks-tasks-create-create_task old:tasks/WORKFLOW.md#que-hay-hoy -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado, asistente, una automatización con permiso
 Pantalla: Tareas
@@ -187,7 +188,6 @@ está activa en el equipo.» o, por nombre, varias personas o proyectos que enca
 Implicados: Personal (la ficha del responsable)
 
 ### TASK-F02 Ver y buscar las tareas
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos; el empleado ve solo las suyas
 Pantalla: Tareas → Todas
@@ -203,7 +203,6 @@ Si falla: un filtro que no existe, «422».
 Implicados: Personal (el nombre del responsable)
 
 ### TASK-F03 Ver mis tareas
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-my -->
 Estado: hecho (servidor y pantalla)
 Actor: quien tiene ficha vinculada a su cuenta, asistente
 Pantalla: Tareas → Mis tareas
@@ -218,7 +217,6 @@ Si falla: nada propio.
 Implicados: Personal (mi ficha)
 
 ### TASK-F04 Abrir una tarea
-<!-- origen: fi:modules/tasks#query-tasks-tasks-get -->
 Estado: hecho (servidor y pantalla)
 Actor: quien la ve
 Pantalla: Tarea (hoja)
@@ -232,7 +230,6 @@ ve); varias tareas que encajan con el título: se dicen cuáles.
 Implicados: ninguno
 
 ### TASK-F05 Iniciar o cambiar el estado
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-update_status-update_status -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla (el empleado, las suyas)
 Pantalla: Tareas (acción **Iniciar**), Tarea (selector **Estado**)
@@ -248,7 +245,6 @@ quien ve todas las tareas pero solo puede cambiar las suyas, «Solo puedes cambi
 Implicados: ninguno
 
 ### TASK-F06 Completar una tarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-handler-wasm-tasks-tasks-complete-complete_task -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tareas (acción **Completar**), Tarea (botón **Completar**)
@@ -264,7 +260,6 @@ se cambia el estado.
 Implicados: ninguno
 
 ### TASK-F07 Asignar, reasignar o desasignar
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-assign -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
@@ -281,7 +276,6 @@ equipo.», «No tienes ficha en Personal: no se te puede asignar.» (asignármel
 Implicados: Personal
 
 ### TASK-F08 Editar una tarea
-<!-- origen: nuevo (el producto actual no editaba una tarea) -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea → **Editar**
@@ -295,7 +289,6 @@ Si falla: los mismos rechazos que al crear.
 Implicados: ninguno
 
 ### TASK-F09 Añadir una subtarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-tasks-subtasks -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede crear tareas y ve la madre
 Pantalla: Tarea
@@ -309,7 +302,6 @@ Si falla: el motivo dentro de la hoja; el título tecleado se queda.
 Implicados: ninguno
 
 ### TASK-F10 Comentar una tarea
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-tasks-add_comment fi:modules/tasks#query-tasks-tasks-comments -->
 Estado: hecho (servidor y pantalla)
 Actor: quien puede cambiarla
 Pantalla: Tarea
@@ -323,7 +315,6 @@ Si falla: texto vacío; «Esa tarea no existe en este negocio.».
 Implicados: ninguno
 
 ### TASK-F11 Borrar una tarea
-<!-- origen: nuevo (el producto actual describía el borrado sin acción) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Tarea → **Borrar**
@@ -332,11 +323,12 @@ Pasos:
 2. Pulsa **Borrar** en el aviso: la tarea desaparece **con sus subtareas y sus comentarios**.
 Entra: la tarea.
 Sale: `task.task.deleted`.
-Si falla: «Esa tarea no existe en este negocio.».
+Si falla: «Esa tarea no existe en este negocio.». Por el asistente, un nombre que vale para varias tareas o para
+ninguna no saca tarjeta, y si antes del «sí» otra tarea encaja mejor con lo dicho no se borra nada y sale la tarjeta
+nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F12 Crear un proyecto
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#command-tasks-projects-create -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Proyectos
@@ -351,7 +343,6 @@ Si falla: «Ya hay un proyecto con ese código.» bajo el campo; un color que no
 Implicados: Personal (el dueño)
 
 ### TASK-F13 Abrir y cambiar un proyecto
-<!-- origen: old:tasks/WORKFLOW.md#que-hay-hoy fi:modules/tasks#query-tasks-projects-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos lo abren; lo cambian el propietario, el administrador y el responsable
 Pantalla: Proyecto (hoja)
@@ -367,7 +358,6 @@ vacío no se envía.
 Implicados: ninguno
 
 ### TASK-F14 Borrar un proyecto
-<!-- origen: nuevo (el producto actual no borraba proyectos) -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente (con confirmación reforzada)
 Pantalla: Proyecto → **Borrar**
@@ -376,11 +366,12 @@ Pasos:
 2. Pulsa **Borrar** en el aviso: el proyecto desaparece; **sus tareas siguen**, sin proyecto.
 Entra: el proyecto.
 Sale: `task.project.deleted`.
-Si falla: «Ese proyecto no existe en este negocio.».
+Si falla: «Ese proyecto no existe en este negocio.». Por el asistente, un nombre que vale para varios proyectos o para
+ninguno no saca tarjeta, y si antes del «sí» otro proyecto encaja mejor con lo dicho no se borra nada y sale la tarjeta
+nueva (BASE-F97).
 Implicados: ninguno
 
 ### TASK-F15 Cuando alguien deja el equipo
-<!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -401,7 +392,24 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 habla) y la API, con las mismas reglas y los mismos permisos. Una tarea se nombra por su id, su número
 o su título; un proyecto por su id, su código o su nombre; una persona por su id o su nombre. Si un
 nombre vale para varias, se dice cuáles y se pide que elija (`task.ambiguous_task`,
-`task.ambiguous_project`, `staff.ambiguous_member`).
+`task.ambiguous_project`, `staff.ambiguous_member`). Antes de una escritura, el asistente pide confirmar con su
+tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id: la tarea por su título
+(«Tarea: Limpiar el almacén»), el proyecto por su nombre («Proyecto: Apertura del local») y la persona por su nombre
+completo («Asignada a: Ana López»). Lo que quien pregunta no puede ver no sale: el empleado no ve nombrada una tarea
+ajena, como no la ve en su lista. Una tarea dicha por su número o su título al cambiarla, cambiar su estado,
+completarla, asignarla o borrarla, y un proyecto dicho por su código o su nombre al cambiarlo o borrarlo, se buscan
+como los buscará la acción (el mismo título antes que uno que lo contenga, y una tarea abierta antes que una cerrada),
+y la tarjeta enseña lo que se va a tocar, con su título o su nombre entero («Tarea: Llamar al proveedor» cuando se dijo
+«llamar»). Si lo dicho vale para varias o para ninguna, no sale ninguna tarjeta: el asistente oye «Hay varias tareas
+que se llaman «llamar»: …», con el número y el título de cada una, y pregunta cuál, o «Esa tarea no existe en este
+negocio.». El «sí» vale solo para
+lo que enseñó la tarjeta: si antes de confirmar alguien crea una tarea que encaja mejor con lo dicho («Llamar» cuando la
+tarjeta decía «Llamar al proveedor»), no se toca nada y sale la tarjeta nueva. La tarea de un comentario, la tarea
+madre y el proyecto de una tarea nueva, y el proyecto al que se pasa una tarea, dichos por su nombre, salen también
+como los encuentra la acción, y el «sí» vale solo para ellos; si lo dicho vale para varios, la tarjeta lo dice tal como
+se dijo (hub#1245). Si la tarea o el proyecto llegan por su identificador junto al nombre de otra u otro, la tarjeta no
+lee ni enseña ese nombre, que la acción no usa; y al pasar una tarea a un proyecto dicho por su nombre, que gana a un
+identificador que llegue a su lado, la tarjeta solo enseña ese proyecto (hub#1250).
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -499,16 +507,53 @@ cliente o a un compañero).
   del admin del Hub (`lock_members` de Personal y luego lo que la nombra), así que uno espera al otro y
   nunca en círculo. Si la persona ya se borró, la escritura responde «no existe» en su campo, nunca 500.
 - Las listas ordenan por su columna con los vacíos al final y desempatan por `id` en la misma dirección
-  (`base.ordering.list_order_for`; regla del producto actual, hub#2355, como Ventas, Caja e Inventario): la fila tocada no salta
-  y las páginas no repiten ni pierden filas (hub#2352).
+  (`base.ordering.list_order_for`, como Ventas, Caja e Inventario): la fila tocada no salta
+  y las páginas no repiten ni pierden filas.
 - El «hoy» es `business_today` (`base.business.business_zone`, hub#779); las páginas calculan «vencida» y «vence hoy»
   en esa misma zona (`useBusinessZone`), para que la pantalla y el filtro «Vencidas» no se contradigan.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
-  borrar una tarea o un proyecto) y todo campo de entrada lleva `description`.
-- El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
-  escritura cruda del admin no deja aviso.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+  borrar una tarea o un proyecto) y todo campo de entrada lleva `description`. Cada herramienta dice
+  además sus `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`: Tareas está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1098), y los `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «tarea»
+  como `task`, «proyecto» como `project` y «comenta en…» o «un comentario» como `comment` (por sus frases,
+  no por la palabra: «comentario» comparte raíz con los «comensales» de Mesas). Así comentar, cambiar el
+  estado, completar o cambiar un proyecto desde el chat (TASK-F05, F06, F10 y F13) llegan a su operación: las
+  frases reales de la QA del asistente (`tests/e2e/qa/probes/owner-es-task-2026-11-08.json`) quedan entre las
+  20 primeras herramientas del turno (`tests/test_assistant_asks.py`).
+- La tarjeta de confirmación del asistente (BASE-F97, hub#677) nombra el registro que una escritura señala por su id
+  con las marcas `refers` de `schemas.py`, leídas como quien pregunta con las lecturas por id que ya existen: la
+  tarea por su `title` con `task.task.detail` (`A_TASK`: el `id` de `TaskRefIn`, `parent_id` y el `task_id` de un
+  comentario), el proyecto por su `name` con `task.project.detail` (`A_PROJECT`: el `id` de `ProjectRefIn` y
+  `project_id`) y la persona por su `full_name` con `staff.member.detail` de Personal, que es de sus `requires`
+  (`A_MEMBER`: `assigned_to_id`, `member_id` y `owner_id`). El `id` de una tarea o de un proyecto lleva el título
+  con la palabra de su lista («Tarea», «Proyecto»), nunca «Registro». Sin persona detrás, sin `task.view` (o sin
+  `staff.view` para una persona), una tarea que el empleado no ve, un id de otro negocio o algo que ya no está: el
+  registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. Dicho por su nombre, el `task` de
+  `TaskRefIn` y el `project` de `ProjectRefIn` llevan la misma marca leída por ese nombre (`A_TASK_BY_NAME`,
+  `A_PROJECT_BY_NAME`: una tarea se busca sola por su número o su título y un proyecto solo por su código o su nombre),
+  y las siete escrituras cuya entrada es una de ellas declaran su `check` (`base.assistant.cards.checked`):
+  `task.task.update`, `set_status`, `complete`, `assign` y `delete`, `task.task.detail`; `task.project.update` y
+  `delete`, `task.project.detail`. Antes de dibujar la tarjeta, el turno busca el registro como lo hará la escritura,
+  un nombre que encaja con varios o con ninguno vuelve al modelo, y la huella de la tarjeta lleva el id de lo
+  encontrado, así que el «sí» vale solo para ello (hub#1208, hub#1219; `tests/test_assistant_yes_for_its_card.py`,
+  con el trinquete de las escrituras que comprueban y las que leen por su nombre; `tests/test_apps.py` admite `check`
+  solo en ellas). El `task` de `CommentIn`, el `parent` y el `project` de `TaskIn` y el `project` de `TaskPatchIn` no
+  tienen lectura cuya entrada quepa en la suya (`base.E012`), así que van sin `check`, pero con la misma marca
+  `names(…, as_said=True)`: la tarjeta los lee por su nombre, su id va en la huella y un nombre que vale para varios
+  sale tal como se dijo, nunca fuera de la tarjeta (hub#1245). Junto al id con que la escritura toma su registro en
+  su lugar, la tarjeta deja sin leer el nombre (`base.schemas.unless_given`, hub#1250), y en `TaskPatchIn` al revés:
+  el `project_id` junto a un `project` (`UNLESS` de `tests/test_assistant_yes_for_its_card.py`).
+  Tareas no tiene listas cerradas sin etiqueta en sus escrituras: el estado y la prioridad salen con las de sus
+  modelos.
+- El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (PLAN §17); una
+  escritura cruda del admin no deja aviso. En español nombra la tarea en femenino, como la hoja: **Creada por**,
+  **Creada el** y **Actualizada el** llevan el contexto `task` (`pgettext_lazy`), porque sin él saldrían el
+  «creado por» de Inventario y el masculino del proyecto; el proyecto y el comentario siguen en masculino
+  (`tests/test_admin.py`, `tests/test_i18n.py`).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -518,12 +563,11 @@ cliente o a un compañero).
 - La hoja de la tarea y la del proyecto son `ion-modal` con sus consultas en vivo; la ruta de
   subtareas abiertas (**Volver**) vive en la hoja.
 - Los selectores de persona y de proyecto buscan en el servidor (`Combo` de `@erplora/ui`).
-- Los iconos son los registrados en la shell: Proyectos ya lleva la carpeta del producto actual
+- Los iconos son los registrados en la shell: Proyectos lleva la carpeta
   (`ion:folder-outline`); los otros cuatro (`checkbox-outline` del módulo y de la pestaña Tareas,
   `open-outline`, `play-circle-outline` y `checkmark-done-outline` de las acciones de fila) esperan en
   `UI-REQUESTS.md` con su sustituto.
-- Las hojas no cambian la URL (como las de Servicios y Personal, y como el panel del producto actual,
-  que tampoco tenía sub-ruta): no hay enlace directo a una tarea ni a un proyecto.
+- Las hojas no cambian la URL (como las de Servicios y Personal): no hay enlace directo a una tarea ni a un proyecto.
 
 ## Lo que NO hace, a propósito
 
@@ -533,32 +577,3 @@ cliente o a un compañero).
 - **No adjunta ficheros**.
 - **No gestiona incidencias de clientes**.
 - **No edita ni borra comentarios**: el hilo es un registro.
-
-## Cambios frente al producto actual
-
-- **El responsable es una ficha de Personal** (`requires = ["staff"]`), no una referencia de texto a
-  un usuario: ver «Referencia adoptada». Lo mismo el dueño de un proyecto. La baja de una persona
-  desasigna sus tareas abiertas (TASK-F15, nuevo).
-- **El empleado ve y cambia las suyas**; el responsable, todas. Antes los tres papeles lo veían y
-  cambiaban todo. Los **proyectos** los crea y cambia el responsable (antes también el empleado).
-- **Autor y creador salen de la sesión**: antes se podían mandar en la petición y firmar como otro.
-- **Nada falla en silencio**: crear con un proyecto o una madre que no existen, completar una tarea
-  cerrada o tocar una que no existe dan su error y no gastan número ni avisan. Antes eran no-ops que
-  a veces avisaban igual.
-- **Editar una tarea** (TASK-F08), **borrar una tarea** (TASK-F11) y **borrar un proyecto** (TASK-F14)
-  son nuevos: el producto actual describía el borrado pero no tenía acción.
-- **Nueva tarea** pide todos los campos (antes solo título y prioridad); la lista tiene la columna
-  **Responsable** y **Proyecto** (oculta).
-- **La fecha límite es un día** (sin hora), en la zona del negocio; antes se guardaba como fecha y hora
-  UTC y la pantalla solo enseñaba el día.
-- **El número** usa el día del negocio, no el día UTC.
-- **El color** de un proyecto es #RRGGBB (antes, cualquier texto, que se pintaba tal cual en el estilo).
-- **Avisos**: `task.*` en vez de `tasks.*`; `task.task.completed` sale siempre que una tarea llega a
-  Hecha; nuevos `task.task.updated`, `task.task.deleted` y `task.project.deleted`.
-- **Nombres de servicio**: `task.task.detail` (antes `tasks.tasks.get`), `task.task.mine` (`…my`),
-  `task.task.set_status` (`…update_status`), `task.comment.list` y `task.comment.add`
-  (`tasks.tasks.comments`, `…add_comment`).
-- Las listas paginan con hasta 100 por página; las subtareas salen en orden de alta.
-- La hoja de la tarea y la del proyecto se abren en un diálogo encima de la lista (antes, un panel
-  dentro de la página) y el alta en un formulario (antes, el panel lateral de la tabla): ver
-  `UI-REQUESTS.md`.

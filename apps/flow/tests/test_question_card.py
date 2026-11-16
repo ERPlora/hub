@@ -1,42 +1,31 @@
-"""FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES (FLOW-F29 step 1, FLOW-F38 step 4): the assistant's change that
-waits in «Waiting for your answer» painted each datum as the model sent it, in its details — «Services: [{}]», an
-amount in cents, «True», a day and a time as ISO 8601 writes them — and was written once, for nobody, when it was
-asked: it could neither name a record nor say the business's hour. Now each datum comes with the question as the
-assistant's confirmation card in the chat says it (BASE-F97 step 2, ``base.assistant.card``), read for whoever opens
-the inbox: a moment in their language at the business's hour, a value of a closed list by its label, an amount in
-cents marked as money, a yes or no as one, a list as a list, and a record by its name only when they may read it —
-never by its id. The details keep only what the assistant said.
+"""FLOW-F29 step 1, FLOW-F38 step 4: in the assistant's change that waits in «Waiting for your answer» each datum comes
+with the question as the assistant's confirmation card in the chat says it (BASE-F97 step 2, ``base.assistant.cards.card``),
+read for whoever opens the inbox: a moment in their language at the business's hour, a value of a closed list by its
+label, an amount in cents marked as money, a yes or no as one, a list as a list, and a record by its name only when they
+may read it — never by its id. The details keep only what the assistant said.
 """
 
 import datetime as dt
 import json
 import re
-from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.operations import Operation, registry
 from ninja import Field, Schema
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, Question
 from apps.flow.queries import TURN
-from base import relay
 from base.models import Hub, Membership
 from base.schemas import names
 from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import ctx_for, make_flow, run
+from .conftest import A, CHAT, HUB_DB, NOON, QUOTA, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
-MADRID = ZoneInfo("Europe/Madrid")
-NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-CHAT = "/internal/assistant/chat"
-QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 SERVICE = "0192f0b2-2222-7000-8000-000000000002"
 MEMBER = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -51,10 +40,12 @@ class ChoreStepIn(Schema):
 
 
 class ChorePlanIn(Schema):
-    """A write with one datum of each kind the card says in words."""
+    """A write with one datum of each kind the card says in words. ``price`` is an amount by its schema's mark;
+    ``price_cents`` is named as one but carries no mark, so it is none (hub#917: only the mark says an amount)."""
 
     title: str
     due_at: dt.datetime
+    price: int = Field(json_schema_extra={"money": True})
     price_cents: int
     urgent: bool
     steps: list[ChoreStepIn]
@@ -76,6 +67,7 @@ PLAN = Operation(
 CHORE = {
     "title": "Call Ana",
     "due_at": "2026-11-02T10:00:00+01:00",
+    "price": 2500,
     "price_cents": 1500,
     "urgent": True,
     "steps": [{"title": "Dial"}, {"title": "Note it"}],
@@ -100,27 +92,10 @@ def plan(monkeypatch):
 
 
 @pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
-
-
-@pytest.fixture
 def eva():
     """Eva Gil, an employee of the business, as erplora.com names her (``saas:3``)."""
     user = get_user_model().objects.create_user(username="saas:3", password="pw", first_name="Eva", last_name="Gil")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.EMPLOYEE)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.EMPLOYEE)
     return user
 
 
@@ -165,13 +140,15 @@ def test_each_datum_of_the_change_comes_as_the_chat_card_says_it(gateway, clock,
     assert values(row) == {
         "title": "Call Ana",
         "due_at": due,
+        "price": 2500,
         "price_cents": 1500,
         "urgent": True,
         "steps": [{"title": "Dial"}, {"title": "Note it"}],
         "person": "Eva Gil",
     }
     assert kinds(row) == {
-        "title": "text", "due_at": "text", "price_cents": "money", "urgent": "bool", "steps": "list", "person": "text",
+        "title": "text", "due_at": "text", "price": "money", "price_cents": "text", "urgent": "bool", "steps": "list",
+        "person": "text",
     }
     assert {field["name"]: field["label"] for field in row["fields"]}["title"] == label
     shown = json.dumps(row["fields"], ensure_ascii=False)
@@ -198,12 +175,12 @@ def test_a_record_is_named_only_for_whoever_may_read_it(gateway, clock, worker, 
     assert "saas:3" not in json.dumps(other, ensure_ascii=False)
 
 
-def test_a_moment_is_said_at_the_businesss_hour(gateway, clock, worker, plan, eva):
+def test_a_moment_is_said_at_the_businesss_hour(gateway, clock, worker, plan, eva, in_business_a):
     """The business's own zone (Settings › Business), in the hub whoever opens the inbox works in."""
     clock(NOON)
-    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
+    Hub.objects.filter(pk=in_business_a.pk).update(name="Bar A", timezone="Atlantic/Canary")
     question = waiting(worker, gateway, PLAN.name, CHORE)
-    with use_hub(hub):
+    with use_hub(Hub.objects.get(pk=in_business_a.pk)):
         assert values(row_of(question, OWNER))["due_at"] == "2 nov 2026, 9:00"
 
 
@@ -239,12 +216,10 @@ def test_a_question_an_automation_step_asks_has_no_data_of_a_change(clock):
     assert (row["details"], row["fields"]) == ("Ana, 15 €", [])
 
 
-
-# --- The action it waits on (FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION) ------------------------------
-# The card was always titled «The assistant wants to change something in «Reservations»», a cancellation too: whoever
-# approved read the record, the reason and on whose behalf, never the action. Now the card says the action first, as
-# the History names it (``queries.action_label``), and its title, in the language of whoever reads it — also for a
-# question that was already waiting, since both come from the change it waits on, never from what was kept.
+# --- The action it waits on -----------------------------------------------------------------------------------------
+# The card says the action first, as the History names it (``queries.action_label``), and its title, in the language
+# of whoever reads it, never a bare «The assistant wants to change something in «Reservations»» — also for a question
+# that was already waiting, since both come from the change it waits on, never from what was kept.
 
 RESERVATION = "0192f0b2-4444-7000-8000-000000000004"
 

@@ -1,4 +1,4 @@
-// The Home (BASE-G127; the old hub's dashboard, PLAN-HUB round 2026-10-21): headed by the business's name (a
+// The Home: headed by the business's name (a
 // greeting by the hour while it has none) and today's date; «Summary» = «My apps», «Finish setting up your
 // business» and the board; «Activity» = the last sales. The tab is in the address: `/#actividad` opens it.
 import { AppPage } from '@erplora/ui/shell';

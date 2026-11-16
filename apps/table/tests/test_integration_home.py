@@ -1,7 +1,6 @@
-"""Tables on the Home (PLAN-HUB round 2026-10-21; FIX-TABLE-SETUP-HOOKS): base's own query brings the old module's
-item «Your tables» (module.json `setup`, tables#24), recommended, pending until one table of the room is in use (not
-deleted, active), to whoever adds tables, leading to the list of tables. Every change of it records an event it is
-refreshed on, and a change in hub B re-runs B's Home only.
+"""Tables on the Home: base's own query brings the step «Your tables», recommended, pending until one table of the room
+is in use (not deleted, active), to whoever adds tables, leading to the list of tables. Every change of it records an
+event it is refreshed on, and a change in hub B re-runs B's Home only.
 
 base and table run for real: the step comes from TableConfig through base's own query, as the person.
 """
@@ -16,8 +15,9 @@ from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
-from apps.table.tests.conftest import A, B, ctx_for, make_session, make_table, make_zone, run
+from apps.table.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_session, make_table, make_zone, run
 from base.schemas import SetupStatusIn
+from base.tenancy.context import use_hub
 
 STEP = "table.tables"
 WAIT = 1.0
@@ -36,7 +36,7 @@ def table_app():
     return apps.get_app_config("table")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_without_tables_has_your_tables_pending_and_it_leads_to_the_tables():
     item = step(ctx_for("hub_owner"))
     assert {name: item[name] for name in ("key", "state", "level", "required", "actionable", "route", "order", "icon")} == {
@@ -55,7 +55,7 @@ def test_a_hub_without_tables_has_your_tables_pending_and_it_leads_to_the_tables
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_old_words():
     item = step(ctx_for("hub_owner", language="es"))
     assert (item["title"], item["description"]) == (
@@ -64,7 +64,7 @@ def test_in_spanish_it_says_the_old_words():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_zone_alone_is_not_enough_its_first_table_ticks_it():
     zone = make_zone()
     assert step(ctx_for())["state"] == "pending"
@@ -72,27 +72,27 @@ def test_a_zone_alone_is_not_enough_its_first_table_ticks_it():
     assert step(ctx_for())["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_table_switched_off_or_deleted_is_not_in_use():
-    # tables#24: a deleted table is gone and one switched off cannot be sat at.
+    # A deleted table is gone and one switched off cannot be sat at.
     zone = make_zone()
     make_table("1", zone=zone, is_active=False)
     make_table("2", zone=zone, is_deleted=True)
     assert step(ctx_for())["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_full_or_blocked_room_is_still_set_up():
-    # tables#24: occupancy is not set-up; reading the status would put the step back to pending in mid-service.
+    # Occupancy is not set-up; reading the status would put the step back to pending in mid-service.
     zone = make_zone()
     make_session(make_table("1", zone=zone))
     make_table("2", zone=zone, blocked=True)
     assert step(ctx_for())["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_manager_who_adds_tables_is_told_and_the_waiter_is_not():
-    # Recommended, never ⛔: who cannot add a table is not told (base's rule; hub#435 is for the wall only).
+    # Recommended, never ⛔: who cannot add a table is not told (base's rule; only a pending ⛔ is told to all).
     assert step(ctx_for("hub_manager"))["state"] == "pending"
     assert step(ctx_for("hub_employee")) is None
 
@@ -121,7 +121,7 @@ CHANGES = {
 }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "event,change,state",
     [(event, change, state) for event, cases in CHANGES.items() for change, state in cases],
@@ -168,11 +168,12 @@ def received(session, timeout=WAIT):
 
 
 # Transactional: the notice leaves after a real COMMIT.
-@pytest.mark.django_db(transaction=True)
-def test_a_table_added_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen):
+@HUB_DB_COMMITTED
+def test_a_table_added_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    zone = run("table.zone.create", {"name": "Terrace"}, ctx_for(scope=B))
-    run("table.table.create", {"zone_id": str(zone.id), "number": "1"}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        zone = run("table.zone.create", {"name": "Terrace"}, ctx_for(scope=B))
+        run("table.table.create", {"zone_id": str(zone.id), "number": "1"}, ctx_for(scope=B))
 
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}

@@ -33,6 +33,7 @@ describe('QuickNoteChips', () => {
     await m.result(OP, page([note('q1', 'No ice'), note('q2', 'Well done')]));
     expect(m.find('pos-quick-notes-loading').exists()).toBe(false);
     expect(m.find('pos-quick-note-q1').attributes('aria-pressed')).toBe('true');
+    expect(m.find('pos-quick-note-q1').element.tagName.toLowerCase()).toBe('ion-chip');
     expect(m.find('pos-quick-note-q2').attributes('aria-pressed')).toBe('false');
   });
 

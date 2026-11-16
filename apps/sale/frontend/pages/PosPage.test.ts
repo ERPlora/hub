@@ -141,6 +141,15 @@ describe('PosPage: the screen', () => {
   });
 });
 
+/** A check with a line whose valuation the server refused (no tax rule applies to it). */
+async function refusedCheck() {
+  const s = await setup();
+  await s.addProduct();
+  s.net.lastStream().push(errorFrame(s.subId('sale.checkout.preview'), 'sale.no_tax_rule'));
+  await s.reopen();
+  return s;
+}
+
 describe('PosPage: selling', () => {
   it('a tap opens the check, which is then followed live and valued by the server', async () => {
     const s = await setup();
@@ -152,6 +161,27 @@ describe('PosPage: selling', () => {
     await s.result('sale.checkout.preview', preview({ total: 150 }));
     expect(plain(s.find('pos-total').text())).toBe('€1.50');
     expect(s.wrapper.findComponent(CartLines).props('lines')).toEqual(CHECK.lines);
+  });
+
+  it('a valuation refusal says why instead of an endless dash, and the next valuation clears it', async () => {
+    const s = await refusedCheck();
+    expect(s.find('pos-total').text()).toBe('—');
+    expect(s.find('pos-preview-error').text()).toContain('msg sale.no_tax_rule');
+    await s.result('sale.checkout.preview', preview({ total: 150 }));
+    expect(s.find('pos-preview-error').exists()).toBe(false);
+    expect(plain(s.find('pos-total').text())).toBe('€1.50');
+  });
+
+  it('a refused check that is parked leaves no reason behind on the empty till', async () => {
+    const s = await refusedCheck();
+    expect(s.find('pos-preview-error').exists()).toBe(true);
+    await click(s.find('pos-park').element);
+    s.reply(CHECK);
+    s.wrapper.findComponent(ParkSheet).vm.$emit('park', 'Ana');
+    await settle();
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBeNull();
+    expect(s.find('pos-total').exists()).toBe(true);
+    expect(s.find('pos-preview-error').exists()).toBe(false);
   });
 
   it('a reload comes back to the check the device had', async () => {
@@ -694,7 +724,7 @@ describe('PosPage: the phone', () => {
   });
 
 
-  // FIX-SALE-POS-NO-SPEAK-KEY: «Speak» opens the assistant docked beside the screen (from 768 px); on a tablet the till
+  // «Speak» opens the assistant docked beside the screen (from 768 px); on a tablet the till
   // left beside it is too narrow for the catalogue and the check side by side, whatever the window's width.
   it('a till narrower than the catalogue and the check need (beside the docked assistant) is laid out as on a phone', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
@@ -900,7 +930,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it (kitchen#82)', async () => {
+  it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it', async () => {
     const s = await setup({ session: WITH_KITCHEN });
     await click(s.find('pos-staff-chip').element);
     await settle();
@@ -922,7 +952,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     ]);
   });
 
-  it('a round sent whose sheet did not print says so in words at the top, never the raw reason (hub#2257, KITCHEN-F08, hub#748)', async () => {
+  it('a round sent whose sheet did not print says so in words at the top, never the raw reason (KITCHEN-F08, hub#748)', async () => {
     const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
     await s.addProduct();
     kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));
@@ -962,7 +992,7 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('a round a charge sends whose sheet did not print is said at the top, for just as long (hub#732, hub#2257)', async () => {
+  it('a round a charge sends whose sheet did not print is said at the top, for just as long (hub#732)', async () => {
     const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
     await s.addProduct();
     kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));

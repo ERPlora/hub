@@ -1,12 +1,12 @@
-"""Guardrails of the Hub's source (round 11 plan, H3; CLAUDE.md «Tenencia del Hub» and «Un solo
-camino hacia el servidor»; PLAN-DB §14, items 5 and 10). Static and fast: each check is a pure
+"""Guardrails of the Hub's source: the tenancy (one database per hub) and the single path to the server (every
+read and write through an operation). Static and fast: each check is a pure
 function over source text (or the ``DATABASES`` dict), proven by a made-up offender (the positive
 control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 
 (a) Only the doors touch the ORM: managers, QuerySet methods, model writes, ``transaction``,
-    ``connection``, ``QuerySet``/``Manager`` and ``get_object_or_404`` appear only in
-    ``services.py`` and ``queries.py`` (plus the owners and exceptions of ``ORM_OWNERS`` and
-    ``ORM_EXCEPTIONS``, each with its reason). Known limit: it reads shape, not types, so methods
+    ``connection``, ``QuerySet``/``Manager`` and ``get_object_or_404`` appear only in an app's ``services`` and
+    ``queries``, a file or a package (``orm_doors.py``), plus the owners and exceptions of ``ORM_OWNERS`` and
+    ``ORM_EXCEPTIONS``, each with its reason. Known limit: it reads shape, not types, so methods
     shared with dicts, sets, strings or paths (``get``, ``update``, ``count``, ``exists``, ``add``…)
     are only caught when they hang from a manager (``Model.objects.get``).
 (b) No alias chosen by hand: no ``using=``, ``.using(`` or ``connections[``; no session
@@ -17,24 +17,13 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 (d) Hub aliases (``hub_<hex>``, ``hub_<hex>__ddl``, ``demo_…``, ``hub_template…``) go through PgBouncer in
     transaction mode: no ``pool``, ``CONN_MAX_AGE`` 0, no server-side cursors and no prepared statements; no alias
     has ``ATOMIC_REQUESTS``.
-(e) Phase 2's tenancy (plan 2026-10-22, S1; PLAN-DB §14.5, §14.9): no ``CREATE``/``DROP DATABASE`` built by string
-    formatting (``base.tenancy.names``: ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is
-    swapped in); ``apps/`` never imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside
-    ``live.broker``; phase 1's shared database (``use_shared_database``) is gone since S5 and nobody brings it back;
-    the tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
-    ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``): S2's first step moved the last ones.
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
     it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo, and the helpers of its
     ``tests`` folders, but the submodules of ``packages/``.
-(g) Operations that need the hub's own database (PLAN-DB §14.14, round 2026-10-30, decision 3): in a hub that still
-    shares control's (``db_name=""``) each refuses with its domain error before it reads or writes anything of the
-    business in ``default``, and an API key is refused for that reason (never let through by a session). Since S5 such
-    a business is not served at all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
-    legacy.py``). Unlike (a)–(f), these run operations on the test database.
-(i) The tests read who is connected to a database in one place (``sessions_by_hand``): ``base/tenancy/tests/hubs.py``,
-    which counts only clients' sessions. A count of its own also counts the server's processes on that database, an
-    autovacuum worker among them, and falls now and then with nothing broken (hub#819).
+
+The tenancy's rules (e) and (g) are ``tests/test_guardrails_tenancy.py``; (i), (j) and (k), which run over the
+suite like (f), ``tests/test_guardrails_suite.py``.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -44,93 +33,88 @@ import ast
 import re
 from pathlib import Path, PurePosixPath
 
-import pytest
 from django.conf import settings
+from orm_doors import is_door
 
 HUB_DIR = Path(__file__).resolve().parent.parent
 SOURCE_ROOTS = ("base", "control", "apps")
 
 # ── (a) Who may touch the ORM ──────────────────────────────────────────────────────────────────
 
-#: The doors (CLAUDE.md «Un solo camino hacia el servidor»): reads in ``queries.py``, writes in
-#: ``services.py``; their ``@operation`` applies hub, active app, permission and transaction.
-ORM_DOORS = frozenset({"services.py", "queries.py"})
 #: Owners of the ORM that are no path to the data from the API: ``models.py`` declares the schema
 #: (managers, QuerySets, constraints with ``Q``); ``admin.py`` is Django's admin, the second write
-#: path the plan accepts (PLAN-DB §14.10, §16; PLAN §17–§18), whose actions call ``services.py``.
+#: path the platform accepts, whose actions call ``services.py``.
 ORM_OWNERS = frozenset({"models.py", "admin.py"})
 #: Files outside the doors that may touch the ORM, each with its reason. Not here on purpose:
 #: ``live.py`` (it only names events), ``api.py`` (one operation per route), ``auth.py`` (reads
 #: ``Membership.Role``, an enum), ``auth_views.py`` (opens the session through ``services``),
 #: ``middleware.py`` (only ``request.user``, loaded by Django), ``management/commands/`` (all by
-#: API, working rules §4: a command calls an operation).
-#: ``/readyz`` (PLAN-AWS §5) is the deploy gate: it must reach the database without an operation.
+#: API: a command calls an operation).
+#: ``/readyz`` is the deploy gate: it must reach the database without an operation.
 READYZ_REASON = (
     "/readyz reads django_migrations on the control database (connections[DEFAULT_DB_ALIAS], "
     "MigrationExecutor): a platform probe that never reads a hub's data."
 )
-#: Round 16 (PLAN §21; spec §3.3): the registry of the Hub's modules in the SaaS's ``shared`` schema.
+#: The registry of the Hub's modules in the SaaS's ``shared`` schema.
 SHARED_CATALOG_REASON = (
     "register_apps writes shared.app and shared.app_doc on the `shared` alias for no hub and no user, "
     "so it is no @operation; it is the only module that imports shared.models and names that alias "
     "(base/tests/test_shared_lint.py), and the hub_shared role (SELECT, INSERT, UPDATE on those two "
     "tables) is the boundary."
 )
-#: APP-BASE-5 (rv-hub-244): a manager's pass is spent in the transaction of the command it lets through.
+#: A manager's pass is spent in the transaction of the command it lets through.
 APPROVAL_SPEND_REASON = (
     "LIVE['operation_database'] wraps @operation's transaction: for the command a request's pass is for, "
     "base.approval_spend opens that transaction on the alias the tenancy gave the command (never one of its own) and "
     "spends the pass through the base.approval.spend operation inside it, so a command that fails rolls the spend back "
     "and two at once lock the same row; it reads and writes nothing itself."
 )
-#: Phase 2 (plan 2026-10-22, S1): the tenancy itself chooses and checks the hubs' aliases.
+#: The tenancy itself chooses and checks the hubs' aliases.
 TENANCY_ALIASES_REASON = (
     "use_hub registers a hub's alias the first time a process uses it, swapping in a copy of "
-    "connections.settings under a lock, never changing it in place (PLAN-DB §4)."
+    "connections.settings under a lock, never changing it in place."
 )
 TENANCY_IDENTITY_REASON = (
     "use_hub reads base_hub_identity on the hub's own alias once per process before serving anything from it: "
-    "a database that says it is another hub is refused (PLAN-DB §3, §14.4); outside any operation by design."
+    "a database that says it is another hub is refused; outside any operation by design."
 )
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
         "The context builder reads Membership and a fresh copy of the user before any operation "
-        "runs, so it cannot go through one; read only; phase 2 replaces it with the hub's staff."
+        "runs, so it cannot go through one; read only."
     ),
     "base/health.py": READYZ_REASON,
     "base/registry.py": (
         "The host gate reads the registry's row of the Host's slug (404, 410, 503) before any operation runs, "
-        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
-        "(plan 2026-10-17, §1.2)."
+        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations."
     ),
     "base/approval_spend.py": APPROVAL_SPEND_REASON,
     "base/tenancy/migrator.py": (
-        "Phase 2: the only function that changes a hub's schema, through its direct __ddl "
-        "connection and the schema lock (CLAUDE.md «Tenencia del Hub»)."
+        "The only function that changes a hub's schema, through its direct __ddl "
+        "connection and the schema lock."
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
     "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
     "base/worker.py": (
         "The worker's slow passes (a hub's copy, the nightly measurement) run in threads of their own, one piece at a "
-        "time (PLAN-DB round 2026-10-31b, C8): each closes its thread's connections when it ends "
+        "time: each closes its thread's connections when it ends "
         "(connections.close_all, as migrate_hubs' threads do); no query, no write."
     ),
     "base/tenancy/router.py": (
         "The TenantRouter compares the databases behind two aliases (connections.settings) to allow a relation: it "
-        "routes, it never queries (PLAN-DB §4)."
+        "routes, it never queries."
     ),
     "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,
     "apps/website/qr.py": (
-        "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
-        "(round 2026-10-21)."
+        "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database."
     ),
     "base/images.py": (
         "Pillow's Image.save writes a photo into a memory buffer, and the hub file store's save and delete keep and "
-        "remove its file (storages, not the ORM): no model and no database (round 2026-10-30)."
+        "remove its file (storages, not the ORM): no model and no database."
     ),
     "base/files.py": (
-        "Files (APP-BASE-8) writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
+        "The Files module writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
         "delete) under the hub's prefix: no model and no database (it imports neither, "
         "base/tests/test_files.py::test_files_touches_no_model_nor_database); only base.file.* operations reach it."
     ),
@@ -171,13 +155,12 @@ ALIAS_EXCEPTIONS: dict[str, str] = {
     "base/health.py": READYZ_REASON,
     "base/registry.py": (
         "The host gate reads the registry's row of the Host's slug (404, 410, 503) before any operation runs, "
-        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
-        "(plan 2026-10-17, §1.2)."
+        "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations."
     ),
     "base/approval_spend.py": APPROVAL_SPEND_REASON,
     "base/tenancy/migrator.py": (
-        "Phase 2: the schema migrator opens hub_<hex>__ddl itself and takes the session "
-        "pg_advisory_lock of the schema (CLAUDE.md «Tenencia del Hub», PLAN-DB §14.5)."
+        "The schema migrator opens hub_<hex>__ddl itself and takes the session "
+        "pg_advisory_lock of the schema."
     ),
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
@@ -216,7 +199,8 @@ def is_migration(path: PurePosixPath) -> bool:
 def orm_rule_applies(path: PurePosixPath) -> bool:
     """Whether rule (a) reads ``path``: not a door, an owner, a migration or an exception."""
     return not (
-        path.name in ORM_DOORS | ORM_OWNERS
+        is_door(path)
+        or path.name in ORM_OWNERS
         or is_migration(path)
         or str(path) in ORM_EXCEPTIONS
     )
@@ -246,7 +230,7 @@ def _is_db_handle(dotted: str) -> bool:
     return parts[:2] == ["django", "db"] and len(parts) > 2 and parts[2] in DB_HANDLES
 
 
-def orm_touches(source: str) -> list[tuple[int, str]]:
+def orm_touches(source: str) -> list[tuple[int, str]]:  # noqa: C901
     """``(line, what)`` for every place in ``source`` that reaches the ORM or the database."""
     found: set[tuple[int, str]] = set()
     for node in ast.walk(ast.parse(source)):
@@ -374,153 +358,6 @@ def database_problems(databases: dict) -> list[str]:
         if db.get("ATOMIC_REQUESTS"):
             problems.append(f"{alias}: ATOMIC_REQUESTS")
     return problems
-
-
-# ── (e) Phase 2's tenancy ──────────────────────────────────────────────────────────────────────
-
-#: ``CREATE DATABASE``/``DROP DATABASE`` in a string: its name may only come through ``sql.Identifier``.
-DATABASE_DDL_RE = re.compile(r"\b(?:CREATE|DROP|ALTER)\s+DATABASE\b", re.IGNORECASE)
-#: Methods that change a dict in place.
-DICT_MUTATORS = frozenset({"update", "pop", "popitem", "setdefault", "clear", "__setitem__", "__delitem__"})
-#: A ``LISTEN``/``UNLISTEN`` statement, alone in its string (a docstring that mentions it is no statement).
-LISTEN_RE = re.compile(r"(?:UN)?LISTEN(?:\s+\S+)?\s*;?")
-#: ``transaction.on_commit`` in the modules, by file and count: with the hub's own database the operation's transaction
-#: is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a rollback). S2's
-#: first step moved the last ones (website's) to ``live.operations.on_commit``: it stays empty.
-PENDING_S2_ON_COMMIT: dict[str, int] = {}
-#: Hub models that still have a ``hub_id`` column, each with its reason (PLAN-DB §11: the border is the database).
-HUB_ID_COLUMNS: dict[str, str] = {
-    "base.hubidentity": "the identity of the hub's database itself (PLAN-DB §3).",
-    "website.site": "phase 1's scaffold so that a hub's website is not another's /: it goes in S5 (plan, decision 2).",
-    "website.image": "phase 1's scaffold, with the site's: it goes in S5 (plan, decision 2).",
-    "verifactu.config": "not tenancy: the business's id in the SaaS; it becomes business_id (plan, decision 2).",
-}
-
-
-def bare_on_commit_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every ``transaction.on_commit(`` and every import of Django's ``on_commit``."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "on_commit"
-            and _receiver_name(node.func.value) == "transaction"
-        ):
-            found.add((node.lineno, "transaction.on_commit("))
-        elif (
-            isinstance(node, ast.ImportFrom)
-            and node.module == "django.db.transaction"
-            and any(alias.name == "on_commit" for alias in node.names)
-        ):
-            found.add((node.lineno, "from django.db.transaction import on_commit"))
-    return sorted(found)
-
-
-def database_ddl_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every ``CREATE``/``DROP``/``ALTER DATABASE`` built by formatting a string."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        texts: list[str] = []
-        if isinstance(node, ast.JoinedStr):
-            texts = [part.value for part in node.values if isinstance(part, ast.Constant) and isinstance(part.value, str)]
-        elif isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
-            texts = [side.value for side in (node.left, node.right) if isinstance(side, ast.Constant) and isinstance(side.value, str)]
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "format"
-            and isinstance(node.func.value, ast.Constant)
-            and isinstance(node.func.value.value, str)
-        ):
-            texts = [node.func.value.value]
-        if any(DATABASE_DDL_RE.search(text) for text in texts):
-            found.add((node.lineno, "database DDL by string formatting"))
-    return sorted(found)
-
-
-def _is_connections_settings(node: ast.AST) -> bool:
-    return isinstance(node, ast.Attribute) and node.attr == "settings" and _receiver_name(node.value) == "connections"
-
-
-def settings_mutation_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every change in place of ``connections.settings`` (an item set or deleted, a mutator)."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        targets = []
-        if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-        elif isinstance(node, ast.Delete):
-            targets = node.targets
-        for target in targets:
-            if isinstance(target, ast.Subscript) and _is_connections_settings(target.value):
-                found.add((node.lineno, "connections.settings[...] changed in place"))
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in DICT_MUTATORS
-            and _is_connections_settings(node.func.value)
-        ):
-            found.add((node.lineno, f"connections.settings.{node.func.attr}("))
-    return sorted(found)
-
-
-def tenancy_import_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every import of ``base.tenancy``."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Import):
-            found |= {(node.lineno, a.name) for a in node.names if a.name.startswith("base.tenancy")}
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            if node.module.startswith("base.tenancy") or (
-                node.module == "base" and any(a.name == "tenancy" for a in node.names)
-            ):
-                found.add((node.lineno, node.module))
-    return sorted(found)
-
-
-def listen_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, "LISTEN")`` for every SQL string that starts with ``LISTEN``/``UNLISTEN``."""
-    return sorted(
-        {
-            (node.lineno, "LISTEN")
-            for node in ast.walk(ast.parse(source))
-            if isinstance(node, ast.Constant) and isinstance(node.value, str) and LISTEN_RE.fullmatch(node.value.strip())
-        }
-    )
-
-
-def shared_database_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, "use_shared_database")`` for every use of phase 1's shared database (a call or an import)."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        if (isinstance(node, ast.Name) and node.id == "use_shared_database") or (
-            isinstance(node, ast.Attribute) and node.attr == "use_shared_database"
-        ):
-            found.add((node.lineno, "use_shared_database"))
-        elif isinstance(node, ast.alias) and node.name == "use_shared_database":
-            found.add((getattr(node, "lineno", 0), "use_shared_database"))
-    return sorted(found)
-
-
-def fallback_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, "_test_fallback")`` for every assignment of the tests' fallback (an attribute or ``setattr``)."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, (ast.Assign, ast.AugAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            if any(isinstance(target, ast.Attribute) and target.attr == "_test_fallback" for target in targets):
-                found.add((node.lineno, "_test_fallback"))
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "setattr"
-            and len(node.args) >= 2
-            and isinstance(node.args[1], ast.Constant)
-            and node.args[1].value == "_test_fallback"
-        ):
-            found.add((node.lineno, "_test_fallback"))
-    return sorted(found)
 
 
 # ── (f) The tests read the clock when they run ─────────────────────────────────────────────────
@@ -790,7 +627,7 @@ def test_database_check_sees_pools_persistent_connections_and_server_cursors_on_
 def test_the_scan_reads_the_real_source_and_finds_the_orm_behind_the_doors():
     files = source_files(HUB_DIR)
 
-    assert PurePosixPath("base/services.py") in files
+    assert PurePosixPath("base/services/__init__.py") in files
     assert PurePosixPath("apps/demo/queries.py") in files
     assert not [path for path in files if "tests" in path.parts]
     # Real code, real ORM: a scanner that went blind would let every check below pass.
@@ -812,7 +649,7 @@ def test_only_the_doors_touch_the_orm():
     )
 
     assert offenders == [], (
-        "Only services.py and queries.py touch the ORM (CLAUDE.md, PLAN §14): move these reads and "
+        "Only an app's services and queries touch the ORM: move these reads and "
         f"writes behind an @operation, or add a reasoned entry to ORM_EXCEPTIONS: {offenders}"
     )
 
@@ -830,8 +667,7 @@ def test_no_alias_is_chosen_by_hand():
     )
 
     assert offenders == [], (
-        "The hub's database is chosen by use_hub and the TenantRouter, never by hand (CLAUDE.md "
-        f"«Tenencia del Hub», PLAN-DB §14.5): {offenders}"
+        f"The hub's database is chosen by use_hub and the TenantRouter, never by hand: {offenders}"
     )
 
 
@@ -842,185 +678,12 @@ def test_no_generic_foreign_key():
     )
 
     assert offenders == [], (
-        f"No GenericForeignKey in a hub's models (CLAUDE.md, PLAN-DB §14.5): {offenders}"
+        f"No GenericForeignKey in a hub's models: {offenders}"
     )
 
 
 def test_hub_aliases_go_through_pgbouncer_safely():
     assert database_problems(settings.DATABASES) == []
-
-
-
-# ── (e) Phase 2's tenancy: positive controls ───────────────────────────────────────────────────
-
-TENANCY_OFFENDER = """\
-from base.tenancy.context import use_hub
-from base import tenancy
-import base.tenancy.router
-from base.tenancy.context import use_shared_database
-cursor.execute(f"CREATE DATABASE {name} TEMPLATE {template}")
-cursor.execute("DROP DATABASE %s" % name)
-cursor.execute("ALTER DATABASE {} RENAME".format(name))
-connections.settings[alias] = cfg
-connections.settings.update({alias: cfg})
-del connections.settings[alias]
-cursor.execute("LISTEN hub_x")
-context._test_fallback = SHARED
-setattr(context, "_test_fallback", SHARED)
-transaction.on_commit(partial(notify, scope), robust=True)
-from django.db.transaction import on_commit
-"""
-TENANCY_LOOKALIKES = """\
-\"\"\"LISTEN on control, never CREATE DATABASE by hand.\"\"\"
-query = sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name))
-connections.settings = {**connections.settings, alias: cfg}
-settings = dict(connections.settings)
-fallback = context._test_fallback
-operations.on_commit(partial(notify, scope))
-transaction.atomic(using=alias)
-"""
-
-
-def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
-    assert database_ddl_touches(TENANCY_OFFENDER) == [(5, "database DDL by string formatting")] * 1 + [
-        (6, "database DDL by string formatting"),
-        (7, "database DDL by string formatting"),
-    ]
-    assert settings_mutation_touches(TENANCY_OFFENDER) == [
-        (8, "connections.settings[...] changed in place"),
-        (9, "connections.settings.update("),
-        (10, "connections.settings[...] changed in place"),
-    ]
-    assert tenancy_import_touches(TENANCY_OFFENDER) == [
-        (1, "base.tenancy.context"),
-        (2, "base"),
-        (3, "base.tenancy.router"),
-        (4, "base.tenancy.context"),
-    ]
-    assert listen_touches(TENANCY_OFFENDER) == [(11, "LISTEN")]
-    assert shared_database_touches(TENANCY_OFFENDER) == [(4, "use_shared_database")]
-    assert fallback_touches(TENANCY_OFFENDER) == [(12, "_test_fallback"), (13, "_test_fallback")]
-    assert bare_on_commit_touches(TENANCY_OFFENDER) == [
-        (14, "transaction.on_commit("),
-        (15, "from django.db.transaction import on_commit"),
-    ]
-    for check in (
-        database_ddl_touches,
-        settings_mutation_touches,
-        tenancy_import_touches,
-        listen_touches,
-        shared_database_touches,
-        fallback_touches,
-        bare_on_commit_touches,
-    ):
-        assert check(TENANCY_LOOKALIKES) == [], check.__name__
-
-
-# ── (e) Phase 2's tenancy: the real tree ───────────────────────────────────────────────────────
-
-
-def _everywhere(check) -> list[str]:
-    return _offenders(lambda path: check((HUB_DIR / path).read_text()), source_files(HUB_DIR))
-
-
-def test_no_database_ddl_is_built_by_string_formatting():
-    offenders = _everywhere(database_ddl_touches)
-
-    assert offenders == [], (
-        "A database's name reaches SQL only as sql.Identifier, validated by base.tenancy.names (PLAN-DB §3): "
-        f"{offenders}"
-    )
-
-
-def test_connections_settings_is_never_changed_in_place():
-    offenders = _everywhere(settings_mutation_touches)
-
-    assert offenders == [], (
-        "Other threads read connections.settings: swap in a copy under the lock (base.tenancy.connections): "
-        f"{offenders}"
-    )
-
-
-def test_the_modules_never_import_the_tenancy():
-    files = [path for path in source_files(HUB_DIR) if path.parts[0] == "apps"]
-
-    offenders = _offenders(lambda path: tenancy_import_touches((HUB_DIR / path).read_text()), files)
-
-    assert offenders == [], f"A module never chooses its database: @operation and use_hub do (CLAUDE.md): {offenders}"
-
-
-def test_nothing_but_live_listens():
-    offenders = _everywhere(listen_touches)
-
-    assert offenders == [], f"One LISTEN per process, on control, in live.broker (PLAN-DB §9): {offenders}"
-
-
-def test_nothing_runs_on_a_shared_database_any_more():
-    offenders = _offenders(lambda path: shared_database_touches((HUB_DIR / path).read_text()), source_files(HUB_DIR))
-
-    assert offenders == [], (
-        "Phase 1's shared database is gone since S5 (base.tenancy.cut): every business has its own; run in "
-        f"use_hub(hub) or use_control(): {offenders}"
-    )
-
-
-def test_the_tests_fallback_is_never_set_outside_the_tests():
-    offenders = _everywhere(fallback_touches)
-
-    assert offenders == [], f"Only the suite's conftest.py sets base.tenancy.context._test_fallback: {offenders}"
-
-
-def test_no_hub_model_carries_its_hub_but_the_listed_ones():
-    from django.apps import apps
-
-    from base.tenancy import inventory
-
-    found = sorted(
-        model._meta.label_lower
-        for model in apps.get_models()
-        if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
-        and any(getattr(field, "column", None) == "hub_id" for field in model._meta.concrete_fields)
-    )
-
-    assert found == sorted(HUB_ID_COLUMNS), (
-        "The border between hubs is the database, not a column (PLAN-DB §11): drop hub_id, or add a reasoned entry "
-        f"to HUB_ID_COLUMNS (and remove those that no longer have one): {found}"
-    )
-
-
-def _on_commit_counts(files) -> dict[str, int]:
-    counts = {str(path): len(bare_on_commit_touches((HUB_DIR / path).read_text())) for path in files}
-    return {path: count for path, count in counts.items() if count}
-
-
-def on_commit_problems(counts: dict[str, int]) -> dict[str, tuple[int, int]]:
-    """``{file: (found, listed)}`` wherever the bare calls differ from ``PENDING_S2_ON_COMMIT``."""
-    return {
-        path: (counts.get(path, 0), PENDING_S2_ON_COMMIT.get(path, 0))
-        for path in set(counts) | set(PENDING_S2_ON_COMMIT)
-        if counts.get(path, 0) != PENDING_S2_ON_COMMIT.get(path, 0)
-    }
-
-
-def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
-    assert PENDING_S2_ON_COMMIT == {}, "S2's first step emptied it: a module never goes back to a bare on_commit"
-    assert on_commit_problems({}) == {}
-    assert on_commit_problems({"apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
-    # Moved off (flow's and the inbox's through base.outbound, website's to live.operations.on_commit): none comes back.
-    assert on_commit_problems({"apps/flow/services.py": 1}) == {"apps/flow/services.py": (1, 0)}
-    assert on_commit_problems({"apps/whatsapp_inbox/services.py": 1}) == {"apps/whatsapp_inbox/services.py": (1, 0)}
-    assert on_commit_problems({"apps/website/services.py": 4}) == {"apps/website/services.py": (4, 0)}
-
-
-def test_the_modules_run_after_the_commit_only_through_live():
-    files = [path for path in source_files(HUB_DIR) if path.parts[0] == "apps"]
-
-    problems = on_commit_problems(_on_commit_counts(files))
-
-    assert problems == {}, (
-        "A module runs after the COMMIT with live.operations.on_commit, on its operation's alias; a bare "
-        f"transaction.on_commit registers on default, outside the hub's transaction: {{file: (found, listed)}} {problems}"
-    )
 
 
 # ── (f) The tests read the clock when they run: positive and negative controls ─────────────────
@@ -1138,179 +801,7 @@ def test_no_test_reads_the_clock_at_import():
     )
 
 
-# ── (g) Operations that need the hub's own database (PLAN-DB §14.14) ─────────────────────────────────────────────────
-
-#: Any key's id: no key exists in a hub without its own database.
-ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
-#: The operations that run only in a hub with its own database (round 2026-10-30, Ioan's decision 3), with what each
-#: answers in one that still shares control's (``db_name=""``): ``{operation: (payload, status, code)}``, a domain error
-#: that never names the infrastructure. S2b/S3 add the usage (``base.plan.usage``, ``/internal/usage``) and the apps'
-#: activation; S5 retires the ``db_name=""`` branch and, with it, these errors. ``base.api_key.detail`` still answers
-#: as for a key that does not exist (404, ``base/queries.py``), not yet its 409.
-OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
-    "base.api_key.create": ({"name": "Till", "mode": "full"}, 409, "base.api_keys_unavailable"),
-    "base.api_key.rotate": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
-    "base.api_key.revoke": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
-    "base.api_key.detail": ({"id": ANY_KEY}, 404, "not_found"),
-    "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
-    # A copy of the business's data (S2b): none is ever made in a business that shares its database.
-    "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
-    # An app's tables made when it is turned on (S3): only a hub with its own database ever waits for them, so there is
-    # nothing to try again.
-    "base.app.retry": ({"app": "printing"}, 409, "base.app_not_failed"),
-}
-#: ``base.hub.reset_apply`` (S2b, the worker's emptying of a reset) and ``base.app.activation_settle`` (S3, the worker's
-#: step after making an app's tables) are not above: they are the platform's alone, refused to anyone else before
-#: anything is read (review of hub#490), and to the platform itself on a business without its own database
-#: (base/tests/test_worker_data.py::test_the_emptying_is_never_run_on_a_shared_database,
-#: base/tests/test_app_activation_tables.py).
-#: What the screens of those features read in any hub: in one without its own database the answer says «not available
-#: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
-OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
-    "base.api_key.list": ({}, {"available": False, "keys": []}),
-    # Settings › Data's «Copies» and the last reset (S2b).
-    "base.hub.dumps": ({}, {"available": False, "reset": None, "dumps": []}),
-    # System's size of the business's database (BASE-F40, S2b): «Usage and plan» reads the same answer, whose people
-    # and devices are control's (Membership, SessionOwner) and stay for every business.
-    "base.plan.usage": ({}, {"database": {"available": False, "bytes": None, "day": None}}),
-}
-#: Tables of a hub that those operations may still read in control's database for a hub without its own, each with its
-#: reason; anything else of a hub's there is the business's data and is never touched.
-SHARED_MODE_READS: dict[str, str] = {
-    "base_appactivation": (
-        "what is on is read before any operation runs; a business without its own database exists only under the "
-        "suite's fallback since S5 (base/tenancy/tests/legacy.py), where decision (i) still turns its apps on at once."
-    ),
-}
-
-
-def _business_tables() -> set[str]:
-    """Every table of a hub's model (and of the outbox), but those ``SHARED_MODE_READS`` lets through."""
-    from django.apps import apps
-
-    from base.tenancy import inventory
-
-    return {
-        model._meta.db_table
-        for model in apps.get_models(include_auto_created=True)
-        if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
-    } - set(SHARED_MODE_READS)
-
-
-def business_touches(sent: dict[str, list[str]], tables: set[str]) -> dict[str, list[str]]:
-    """``{alias: [table, …]}`` for every statement of ``sent`` that names one of ``tables`` (quoted, as Django does)."""
-    found = {
-        alias: sorted({table for statement in statements for table in tables if f'"{table}"' in statement})
-        for alias, statements in sent.items()
-    }
-    return {alias: names for alias, names in found.items() if names}
-
-
-def _defined_in(name: str) -> str:
-    import inspect
-
-    from live.operations import get
-
-    return Path(inspect.getsourcefile(get(name).fn)).resolve().relative_to(HUB_DIR).as_posix()
-
-
-def test_the_own_database_checks_see_what_they_must():
-    tables = {"sale_order", "base_apikey"}
-    sent = {
-        "default": ['SELECT "base_hub"."id" FROM "base_hub"', 'SELECT COUNT(*) FROM "sale_order"'],
-        "hub_x": ['INSERT INTO "base_apikey" ("id") VALUES (%s)'],
-    }
-    assert business_touches(sent, tables) == {"default": ["sale_order"], "hub_x": ["base_apikey"]}
-    assert business_touches({"default": ['SELECT "base_hub"."id" FROM "base_hub"']}, tables) == {}
-    assert "base_hub" not in _business_tables() and "base_appactivation" not in _business_tables()
-    assert {"base_apikey", "sale_order", "live_outboxevent"} <= _business_tables()
-
-
-def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
-    """Their files are where the ORM is (``services.py``/``queries.py``), which ``test_nothing_runs_on_a_shared_database
-    _any_more`` keeps off any shared database: since S5 there is none."""
-    defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
-
-    assert set(defined.values()) <= {"base/services.py", "base/queries.py"}, defined
-
-
-def _as_admin_of(slug: str):
-    from live.context import OperationContext, Scope
-
-    return OperationContext(scope=Scope("host", slug), actor="ana", permissions=frozenset({"*"}), language="en")
-
-
-def _run_in_a_hub_without_its_database(name: str, payload: dict):
-    """``name`` as an administrator of ``a`` (``db_name=""``, phase 1), in its context; ``(answer or error, sent)``.
-
-    Since S5 production never enters such a business (``HubWithoutDatabase``, 503 at its door): only the suite's
-    fallback does (``base/tenancy/tests/legacy.py``), and there these refusals still keep its data untouched."""
-    from live.errors import OperationError
-    from live.operations import get
-
-    from base.models import Hub
-    from base.tenancy import context
-    from base.tenancy.tests import hubs
-
-    hub = Hub.objects.get(slug="a")
-    assert not hub.db_name and context.serves_hubs_without_database()
-    op = get(name)
-    with hubs.watched() as sent, context.use_hub(hub):
-        try:
-            outcome = op(_as_admin_of(hub.slug), op.input.model_validate(payload))
-        except OperationError as error:
-            outcome = error
-    return outcome, sent
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("name", sorted(OWN_DATABASE_OPERATIONS))
-def test_in_a_hub_without_its_own_database_each_refuses_and_touches_no_business_data(name):
-    from live.errors import OperationError
-
-    payload, status, code = OWN_DATABASE_OPERATIONS[name]
-
-    refused, sent = _run_in_a_hub_without_its_database(name, payload)
-
-    assert isinstance(refused, OperationError), refused
-    assert (refused.status, refused.code) == (status, code)
-    assert set(sent) <= {"default"}, sent
-    assert business_touches(sent, _business_tables()) == {}
-    assert any('"base_hub"' in statement for statement in sent["default"])
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("name", sorted(OWN_DATABASE_READS))
-def test_in_a_hub_without_its_own_database_its_screen_reads_not_available_and_no_business_data(name):
-    payload, answer = OWN_DATABASE_READS[name]
-
-    read, sent = _run_in_a_hub_without_its_database(name, payload)
-
-    assert read.model_dump(mode="json", include=set(answer)) == answer
-    assert set(sent) <= {"default"}, sent
-    assert business_touches(sent, _business_tables()) == {}
-
-
-@pytest.mark.django_db
-def test_an_api_key_on_a_hub_without_its_own_database_is_refused_for_that_reason_not_let_through_by_a_session(client):
-    from django.contrib.auth import get_user_model
-
-    from base.models import Membership
-
-    user = get_user_model().objects.create_user(username="ana", password="pw")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.ADMIN)
-    client.force_login(user)
-    key = {"HTTP_AUTHORIZATION": "Bearer erpk_live_" + "x" * 43}
-
-    refused = client.get("/api/demo/items", HTTP_HOST="a.localhost", **key)
-
-    assert refused.status_code == 401
-    assert refused.json()["error"]["code"] == "base.api_keys_unavailable"
-    # Without the key, the same session goes on as always.
-    assert client.get("/api/demo/items", HTTP_HOST="a.localhost").status_code == 200
-
-
-# ── (h) A hub's model never links to control's (tenancy, W10; PLAN-DB §2) ──────────────────────────────────────────
+# ── (h) A hub's model never links to control's ────────────────────────────────────────────────────────────────────
 
 
 def control_links(models, classify) -> list[str]:
@@ -1394,57 +885,4 @@ def test_no_hub_model_links_to_a_control_model():
     assert offenders == [], (
         "A hub's model lives in the hub's database, where control's tables are not: link a person of the business "
         f"to base.HubUser, never to settings.AUTH_USER_MODEL, auth, control or base.Membership: {offenders}"
-    )
-
-
-# ── (i) The tests read who is connected to a database in one place (hub#819) ─────────────────────────────────────────
-
-#: The one reading of ``pg_stat_activity`` by database in the suite; this very file only names it in its controls.
-SESSIONS_READERS = frozenset({"base/tenancy/tests/hubs.py", "tests/test_guardrails.py"})
-SESSIONS_BY_HAND = re.compile(
-    r"""pg_stat_activity\b.{0,40}?\bdatname\s*=\s*%s(?![\s"']*AND\s+wait_event_type)""", re.DOTALL
-)
-
-
-def sessions_by_hand(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every read of ``pg_stat_activity`` by the name of a database. Who waits for a lock
-    (``wait_event_type``, the concurrency tests') is another question, and stays theirs."""
-    return [
-        (source.count("\n", 0, found.start()) + 1, "pg_stat_activity by database")
-        for found in SESSIONS_BY_HAND.finditer(source)
-    ]
-
-
-def test_the_sessions_scanner_sees_a_count_by_hand_and_leaves_the_lock_waits_alone():
-    one_line = 'conn.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", [name])\n'
-    split = 'x = 1\ncursor.execute(\n    "SELECT pid FROM pg_stat_activity "\n    "WHERE datname = %s", [name]\n)\n'
-    locks = (
-        '"SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"\n'
-        '" AND wait_event_type = \'Lock\' AND pid <> pg_backend_pid()"\n'
-    )
-
-    locks_by_name = (
-        '"SELECT count(*) FROM pg_stat_activity WHERE datname = %s AND wait_event_type = \'Lock\' "\n'
-        '"SELECT count(*) FROM pg_stat_activity WHERE datname = %s "\n"  AND wait_event_type = \'Lock\'"\n'
-    )
-
-    assert sessions_by_hand(one_line) == [(1, "pg_stat_activity by database")]
-    assert sessions_by_hand(split) == [(3, "pg_stat_activity by database")]
-    assert sessions_by_hand(locks) == []
-    assert sessions_by_hand(locks_by_name) == []
-
-
-def test_no_test_counts_the_sessions_on_a_database_by_hand():
-    files = suite_files(HUB_DIR)
-    # A walk gone blind, or a reader that moved, would let the check pass.
-    assert {PurePosixPath(path) for path in SESSIONS_READERS} <= set(files)
-    assert sessions_by_hand((HUB_DIR / "base/tenancy/tests/hubs.py").read_text())
-
-    offenders = _offenders(
-        lambda path: [] if str(path) in SESSIONS_READERS else sessions_by_hand((HUB_DIR / path).read_text()), files
-    )
-
-    assert offenders == [], (
-        "`pg_stat_activity` lists the server's own processes too: an autovacuum worker on the database makes such a "
-        f"count fall now and then with nothing broken. Use hubs.client_sessions_on or hubs.assert_nobody_on: {offenders}"
     )

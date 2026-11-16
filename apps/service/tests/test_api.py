@@ -1,6 +1,6 @@
 """The service app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction. No path parameters: a record travels in the input (query string on GET, body on POST),
 by its id or by its name.
 """
@@ -11,10 +11,11 @@ import uuid
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.service.api import router
 from config.api import api
 
-from .conftest import make_customer, make_member, make_tax
+from .conftest import HOST, HUB_DB, A, B, make_customer, make_member, make_tax
 from .test_service_image import IMAGE_ROUTES
 
 ROUTES = {
@@ -61,16 +62,6 @@ ROUTES = {
 } | IMAGE_ROUTES
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def tax(db):
     return make_tax()
@@ -78,13 +69,13 @@ def tax(db):
 
 @pytest.fixture
 def admin_client(client, make_user, tax):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user, tax):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -104,6 +95,18 @@ def test_every_route_is_bound_to_its_operation():
 def test_the_reactions_have_no_route():
     bound = {operation for _, _, operation in ROUTES}
     assert not bound & {"service.assignment.release_member", "service.grant.reassign"}
+
+
+def test_making_a_service_or_a_category_again_from_a_copy_has_no_route():
+    # Only the recovery from a separate copy makes a service again with who performed it there, and a category with
+    # what the business kept of what it had inside.
+    bound = {operation for _, _, operation in ROUTES}
+    assert not bound & {
+        "service.service.recover",
+        "service.category.recover",
+        "service.service.return_to_category",
+        "service.category.return_to_parent",
+    }
 
 
 def test_the_sessions_of_the_till_have_no_route_sales_runs_them():
@@ -126,7 +129,7 @@ def test_the_api_keeps_parity():
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/service/services"),
@@ -136,7 +139,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_creates_services_and_vouchers_but_does_not_archive(
     employee_client, tax
 ):
@@ -164,15 +167,15 @@ def test_an_employee_reads_creates_services_and_vouchers_but_does_not_archive(
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/service/services", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/service/services", host=f"{B.key}.localhost").status_code == 403
 
 
 # Validation and refusals
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_service_is_422_per_field(admin_client):
     response = post(
         admin_client,
@@ -185,7 +188,7 @@ def test_an_invalid_service_is_422_per_field(admin_client):
     assert set(error["fields"]) == {"name", "price", "pricing_type"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_service_without_a_tax_category_is_422_under_its_field(admin_client):
     response = post(admin_client, "/service/services", {"name": "Cut"})
     assert response.status_code == 422
@@ -194,7 +197,7 @@ def test_a_service_without_a_tax_category_is_422_under_its_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/service/services", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -203,7 +206,7 @@ def test_a_limit_over_100_is_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_domain_refusal_is_a_409_with_its_code_and_field(admin_client):
     assert (
         post(admin_client, "/service/categories", {"name": "Hair"}).status_code == 201
@@ -219,7 +222,7 @@ def test_a_domain_refusal_is_a_409_with_its_code_and_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_service_is_404_and_one_not_named_is_422(admin_client):
     missing = get(admin_client, "/service/services/detail", id=str(uuid.uuid7()))
     assert (missing.status_code, missing.json()["error"]["code"]) == (
@@ -229,13 +232,13 @@ def test_a_missing_service_is_404_and_one_not_named_is_422(admin_client):
     assert get(admin_client, "/service/services/detail").status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_messages_speak_spanish(admin_client):
     response = admin_client.post(
         "/api/service/services",
         json.dumps({"name": "Corte"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.json()["error"]["fields"] == {
@@ -243,7 +246,7 @@ def test_the_messages_speak_spanish(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_cannot_date_a_voucher_in_the_future(employee_client):
     future = "2099-01-01T10:00:00+00:00"
     response = post(employee_client, "/service/grants", {"package": "Bono", "customer": "Lucía", "granted_at": future})
@@ -254,7 +257,7 @@ def test_an_employee_cannot_date_a_voucher_in_the_future(employee_client):
 # The whole app over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_round_trip(admin_client, tax):
     hair = post(admin_client, "/service/categories", {"name": "Hair"}).json()
     created = post(
@@ -474,6 +477,7 @@ def test_round_trip(admin_client, tax):
     assert get(admin_client, "/service/categories").json()["total"] == 0
 
 
+@HUB_DB
 def test_the_till_reads_the_vouchers_that_can_pay_a_service(employee_client, tax):
     from .conftest import make_grant, make_package, make_service
 

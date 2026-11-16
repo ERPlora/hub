@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { business, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, POLISH } from '../__tests__/mount-sale';
+import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import RefundModal from '../components/sales/RefundModal.vue';
@@ -228,7 +229,7 @@ describe('SalesPage: the period (SALE-F28 step 1)', () => {
     expect(s.paramsOf('sale.sale.stats')).toEqual([{}]);
   });
 
-  it('«7 days» adds what was sold each of those days, under the figures (SALE-G01)', async () => {
+  it('«7 days» adds what was sold each of those days, under the figures (SALE-F28)', async () => {
     const s = await setup();
     await s.show(PAGE);
     expect(s.paramsOf('sale.sale.last_7_days')).toEqual([]);
@@ -309,7 +310,6 @@ describe('SalesPage: search, filters, sort and pages', () => {
     expect(s.list()[0]).toMatchObject({ status: 'voided', date_from: '2026-10-08', date_to: '2026-10-14' });
   });
 
-  // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)
   it('filters behind the table funnel, on their columns: date, payment (searched), status and total (as typed)', async () => {
     const s = await setup();
     await s.show(PAGE);
@@ -359,7 +359,10 @@ describe('SalesPage: search, filters, sort and pages', () => {
     await s.show(EMPTY);
     expect(s.prop('filterErrors')).toEqual({});
     await s.filter({ total_max: 'doce', date_from: '2026-10-14', date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_max: 'Type an amount, like 12.50', date_to: 'The end date cannot be before the start date.' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_max: 'This is not an amount. Type a figure, for example 12.50.',
+      date_to: 'The end date cannot be before the start date.',
+    });
     expect(s.list()).toEqual([{ ...TODAY, sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
     expect((s.find('sales-range').element as HTMLElement & { value?: unknown }).value).toBe('today');
     await s.show(EMPTY);
@@ -570,13 +573,28 @@ describe('SalesPage: the rest', () => {
     type Column = { key: string; filter?: { options?: Array<{ label: string }> } };
     expect(s.prop<Column[]>('columns').find((c) => c.key === 'status')?.filter?.options?.map((o) => o.label)).toEqual(['Completada', 'Anulada', 'Devuelta']);
     await s.filter({ total_min: 'mil', date_from: '2026-10-14', date_to: '2026-10-01' });
-    expect(s.prop('filterErrors')).toEqual({ total_min: 'Escribe un importe, como 12,50', date_to: 'La fecha final no puede ser anterior a la inicial.' });
+    expect(s.prop('filterErrors')).toEqual({
+      total_min: 'Esto no es un importe. Escribe una cifra, por ejemplo 12,50.',
+      date_to: 'La fecha final no puede ser anterior a la inicial.',
+    });
   });
 });
 
-describe('SalesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('SalesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+});
+
+describe('SalesPage: «Total» is read as every amount of the Hub', () => {
+  itReadsAmountFiltersAsTheHub({
+    ends: ['total_min', 'total_max'],
+    params: ['total_min', 'total_max'],
+    async open(money) {
+      const s = await setup({ business: business({ currency: money.currency, currency_decimals: money.decimals }) });
+      await s.show(PAGE);
+      return { filter: s.filter, query: () => s.list().at(-1) as Record<string, unknown>, says: () => s.prop('filterErrors') };
+    },
   });
 });

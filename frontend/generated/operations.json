@@ -99,6 +99,10 @@
     "method": "get",
     "path": "/api/settings/data/dumps/link"
   },
+  "base.system.cards": {
+    "method": "get",
+    "path": "/api/system/cards"
+  },
   "base.system.status": {
     "method": "get",
     "path": "/api/system/status"
@@ -1946,6 +1950,10 @@
   "kitchen.ticket.by_order": {
     "method": "get",
     "path": "/api/kitchen/tickets/by_order"
+  },
+  "kitchen.ticket.notices": {
+    "method": "get",
+    "path": "/api/kitchen/tickets/notices"
   },
   "kitchen.ticket.create": {
     "method": "post",

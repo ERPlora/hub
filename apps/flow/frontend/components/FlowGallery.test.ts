@@ -19,6 +19,7 @@ const ALL_EVENTS = [
   'reservation.reservation.created',
 ];
 const catalog = (events = ALL_EVENTS, actions = ['task.task.create', 'customer.note.add']): CatalogOut => ({
+  off_apps: [],
   events: events.map((name) => ({ name, app: name.split('.')[0], app_name: name.split('.')[0] })),
   actions: actions.map((name) => ({ name, kind: 'command', app: name.split('.')[0], app_name: name.split('.')[0], description: '', fields: [], outputs: [] })),
 });
@@ -71,7 +72,7 @@ describe('Gallery', () => {
     expect(m.find('flow-card-open-welcome').text()).toContain('Unfinished');
     await click(m.find('flow-card-open-welcome').element);
     expect(m.find('flow-card-panel-welcome').text()).toContain('Careful: «Mine» already starts with the same thing.');
-    // flows#141: «Use this one» stays, second to «See it», and makes a second one.
+    // «Use this one» stays, second to «See it», and makes a second one.
     expect((m.find('flow-card-use-welcome').element as unknown as { fill?: string }).fill).toBe('outline');
     expect(m.find('flow-card-panel-welcome').exists()).toBe(true);
     await click(m.find('flow-card-see-welcome').element);

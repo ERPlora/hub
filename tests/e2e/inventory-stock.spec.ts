@@ -8,7 +8,8 @@
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
-import { cleanInventory, createProduct, dialog, fill, productBySku, productRow, productsReady, rowAction, searchProducts, shootFlow, stamp } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, productBySku, productRow, productsReady, searchProducts, shootFlow, stamp } from './inventory-helpers';
+import { rowAction } from './service-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -29,7 +30,7 @@ test('INVENTORY-F13/F14/F16: receiving and counting change the stock and show up
   await expect(shown(ledger).locator('[data-testid=inventory-movements-row]')).toHaveCount(1); // the «Initial» 5
 
   // Receive 3.
-  await rowAction(page, flour.id, 'receive');
+  await rowAction(page, 'inventory-products', flour.id, 'receive');
   const receive = dialog(page, 'inventory-stock-form');
   await expect(receive).toBeVisible();
   await expect(receive.locator('[data-testid=inventory-stock-current] ion-note')).toHaveText('5');
@@ -45,7 +46,7 @@ test('INVENTORY-F13/F14/F16: receiving and counting change the stock and show up
   await expect(shown(ledger).locator('[data-testid=inventory-movements-row]').first().locator('[data-testid=inventory-movement-type]')).toHaveText(/^(Reception|Recepción)$/);
 
   // Count 6 (the total, not the difference): «Difference −2», the reason required.
-  await rowAction(page, flour.id, 'count');
+  await rowAction(page, 'inventory-products', flour.id, 'count');
   const count = dialog(page, 'inventory-stock-form');
   await fill(count, 'inventory-stock-qty', '6');
   await expect(count.locator('[data-testid=inventory-stock-diff] ion-note')).toHaveText('-2');

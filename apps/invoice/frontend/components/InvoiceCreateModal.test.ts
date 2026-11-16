@@ -13,6 +13,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import type { Business } from '../../../../base/frontend/operations';
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, POLISH } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from './InvoiceCreateModal.vue';
 import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
@@ -45,9 +47,11 @@ const settingsOf = (tax: string) => ({ country_code: 'ES', region_code: REGIONS[
 const RECIPIENT = { customerId: null, name: 'Talleres Pérez SL', taxId: 'B12345674', address: 'Calle Luna 3', country: 'ES', idType: '' };
 const CREATED = { id: 'i9', number: 'FACT-2026-000009' };
 
-async function setup(locale: 'en' | 'es' = 'en') {
+/** The window open (unless `open` is false: the page mounts it closed), its stream live and the business answered
+ *  (`base.business.get`: in Spain, in euros, unless `company` says another; `null` = not answered yet). */
+async function setup(locale: 'en' | 'es' = 'en', company: Partial<Business> | null = {}, open = true) {
   const m = await mountInvoice(InvoiceCreateModal, {
-    props: { open: true },
+    props: { open },
     locale,
     stubs: { SeriesSelect: SeriesSelectStub, CustomerSearch: CustomerSearchStub },
   });
@@ -68,6 +72,7 @@ async function setup(locale: 'en' | 'es' = 'en') {
   const submit = () => m.inDoc('invoice-create-submit') as HTMLElement & { disabled: boolean };
   const editor = () => m.wrapper.findComponent(InvoiceLinesEditor);
   const call = await m.live();
+  if (company) await m.result('base.business.get', business(company));
   /** The business's territory (its tax, from Taxes) and the rate a typed line starts with there. */
   async function territory(tax: string, rate: string | null) {
     await m.result(SETTINGS, settingsOf(tax));
@@ -131,8 +136,7 @@ describe('InvoiceCreateModal', () => {
 
   it('reads each price in the business’s money: «12,50 zł» in Poland, «1.234» yen in Japan (flow business-currency)', async () => {
     for (const [country, typed, cents] of [[POLISH, '12,50 zł', 1250], [JAPANESE, '1.234', 1234]] as const) {
-      const s = await setup();
-      await s.result('base.business.get', business(country));
+      const s = await setup('en', country);
       await s.choose('TICKET', 'F2');
       await s.line('Course', typed);
       s.answer(201, CREATED);
@@ -141,6 +145,23 @@ describe('InvoiceCreateModal', () => {
       expect((s.sent()[0]?.body as { lines: { unit_price: number }[] }).lines[0].unit_price).toBe(cents);
       s.wrapper.unmount();
     }
+  });
+
+  it('reads no price before the business’s money answers: «Issue invoice» waits for it, then «12,50 zł» is issued in złoty (hub#907)', async () => {
+    const s = await setup('en', null);
+    await s.choose('TICKET', 'F2');
+    await s.line('Course', '12,50 zł');
+    // A click while the business has not answered: the price is not read yet (never «not an amount», never sent).
+    await click(s.submit());
+    expect(s.inDoc('invoice-create-error')?.textContent ?? '').not.toContain('not an amount');
+    expect(s.sent()).toEqual([]);
+    expect(s.submit().disabled).toBe(true);
+    await s.result('base.business.get', business(POLISH));
+    expect(s.submit().disabled).toBe(false);
+    s.answer(201, CREATED);
+    await click(s.submit());
+    expect(s.inDoc('invoice-create-error')).toBeNull();
+    expect((s.sent()[0]?.body as { lines: { unit_price: number }[] }).lines[0].unit_price).toBe(1250);
   });
 
   it('a price that is not an amount is said with its line, and nothing is sent', async () => {
@@ -195,6 +216,67 @@ describe('InvoiceCreateModal', () => {
     await click(s.submit());
     expect(s.inDoc('invoice-create-error')?.textContent).toContain('Check the highlighted details.');
     expect(taxId.errorText).toBe('That tax ID is not valid.');
+  });
+
+  // Every field of a line, not the rate alone: each is named by the key the server refuses it under
+  // (`lines.<index>.<the command's field>`), which the guardrail cannot check for a field that paints through a function.
+  it.each([
+    { field: 'description', key: 'description', typed: 'Evening course' },
+    { field: 'quantity', key: 'quantity', typed: '2' },
+    { field: 'price', key: 'unit_price', typed: '12' },
+    { field: 'tax-rate', key: 'tax_rate', typed: '21' },
+  ])(
+    'two lines whose $field is refused with the same words: the corrected line alone loses them (hub#888)',
+    async ({ field, key, typed }) => {
+      const s = await setup();
+      await s.choose('TICKET', 'F2');
+      s.editor().vm.$emit('update:modelValue', [
+        { uid: 1, description: 'Course', quantity: '1', price: '10', taxRate: 'x' },
+        { uid: 2, description: 'Dye kit', quantity: '1', price: '5', taxRate: 'x' },
+      ]);
+      await s.wrapper.vm.$nextTick();
+      s.answer(422, {
+        error: {
+          code: 'invalid_payload',
+          message: 'Check the highlighted details.',
+          fields: { [`lines.0.${key}`]: 'Enter a number.', [`lines.1.${key}`]: 'Enter a number.' },
+        },
+      });
+      await click(s.submit());
+      const first = s.inDoc(`invoice-line-1-${field}`) as HTMLElement & { errorText?: string; name?: string };
+      const second = s.inDoc(`invoice-line-2-${field}`) as HTMLElement & { errorText?: string; name?: string };
+      expect([first.errorText, second.errorText]).toEqual(['Enter a number.', 'Enter a number.']);
+      expect([first.name, second.name]).toEqual([`lines.0.${key}`, `lines.1.${key}`]);
+
+      first.dispatchEvent(new Event('input', { bubbles: true }));
+      await ionValue(first, typed, 'ionInput');
+      expect(first.errorText).toBeFalsy();
+      expect(first.classList.contains('ion-invalid')).toBe(false);
+      expect(second.errorText).toBe('Enter a number.');
+      expect(second.classList.contains('ion-invalid')).toBe(true);
+    },
+  );
+
+  it('the refused notes lose their message when corrected, though a line says the same words (hub#888)', async () => {
+    const s = await setup();
+    await s.choose('TICKET', 'F2');
+    await s.line('Course', '10');
+    s.answer(422, {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { notes: 'Enter a valid text.', 'lines.0.description': 'Enter a valid text.' },
+      },
+    });
+    await click(s.submit());
+    const notes = s.inDoc('invoice-create-notes') as HTMLElement & { errorText?: string };
+    const description = s.inDoc('invoice-line-1-description') as HTMLElement & { errorText?: string };
+    expect([notes.errorText, description.errorText]).toEqual(['Enter a valid text.', 'Enter a valid text.']);
+
+    notes.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(notes, 'Paid in cash', 'ionInput');
+    expect(notes.errorText).toBeFalsy();
+    expect(description.errorText).toBe('Enter a valid text.');
   });
 
   it('follows what a typed line starts with: the territory’s tax (from Taxes) and its general rate', async () => {
@@ -266,5 +348,53 @@ describe('InvoiceCreateModal', () => {
     const s = await setup('es');
     expect(s.inDoc('invoice-create')?.getAttribute('aria-label')).toBe('Nueva factura manual');
     expect(s.submit().textContent?.trim()).toBe('Emitir factura');
+  });
+});
+
+// hub#938 (INVOICE-F03): if the business's money cannot be read, «New manual invoice» says so with «Retry» instead of
+// waiting in grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('InvoiceCreateModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Issue invoice» lights up (opened after the failure: %s)', async (late) => {
+    const s = await setup('en', null, !late);
+    // Each opening starts from blank lines: they are written once open.
+    async function fill() {
+      await s.choose('TICKET', 'F2');
+      await s.line('Course', '1500');
+    }
+    async function opens() {
+      await s.wrapper.setProps({ open: true });
+      await fill();
+    }
+    if (!late) await fill();
+    await expectWindowSaysMoneyUnreadable(s, 'invoice-create-submit', s.sent, late ? opens : undefined);
+  });
+});
+
+describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes, also once the default rate arrives; notes or a line written ask; restored as opened closes again', async () => {
+    const s = await setup();
+    await s.territory('vat', '21.00');
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('invoice-create'),
+      change: () => ionValue(s.inDoc('invoice-create-notes'), 'Paid by transfer', 'ionInput'),
+      restore: () => ionValue(s.inDoc('invoice-create-notes'), '', 'ionInput'),
+    });
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('invoice-create'),
+      change: () => s.line('Course', '100', '1', '21'),
+      restore: () => s.line('', '', '1', '21'),
+    });
+  });
+
+  it('the series the select picks on opening is no change; another series chosen asks', async () => {
+    const s = await setup();
+    await s.choose('FACT', 'F1');
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('invoice-create'),
+      change: () => s.choose('TICKET', 'F2'),
+      restore: () => s.choose('FACT', 'F1'),
+    });
   });
 });

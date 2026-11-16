@@ -11,7 +11,8 @@ from live.outbox import channel_for
 from live.live_registry import live_registry
 
 from apps.whatsapp_inbox import events as E
-from apps.whatsapp_inbox.tests.conftest import A, B, receive
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, A, B, receive
+from base.tenancy.context import use_hub
 
 EVENTS_SOURCE = Path(E.__file__).read_text()
 CARD = [
@@ -137,15 +138,16 @@ def heard(session, timeout=5.0, stop_after=None):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_message_received_by_hub_b_notifies_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_message_received_by_hub_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    receive("wamid.1", scope=B)
+    with use_hub(hub_b):
+        receive("wamid.1", scope=B)
     assert heard(on_b, stop_after=1) == [(channel_for(B), {"events": [E.MESSAGE_RECEIVED]})]
     assert heard(on_a, timeout=0.5) == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_refused_message_notifies_nobody(listen):
     on_a = listen(A)
     with pytest.raises(InvalidPayload):

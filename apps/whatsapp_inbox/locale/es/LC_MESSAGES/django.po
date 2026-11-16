@@ -55,12 +55,6 @@ msgctxt "whatsapp channel"
 msgid "Needs reconnecting"
 msgstr "Hay que reconectar"
 
-msgid "host"
-msgstr "host"
-
-msgid "First label of the host of the business, e.g. “a” for a.localhost."
-msgstr "Primera etiqueta del host del negocio, p. ej. «a» para a.localhost."
-
 msgid "status"
 msgstr "estado"
 
@@ -82,6 +76,7 @@ msgstr "mes de la cifra"
 msgid "version"
 msgstr "versión"
 
+msgctxt "whatsapp channel"
 msgid "synced at"
 msgstr "sincronizado el"
 
@@ -157,9 +152,6 @@ msgstr "borrado en erplora.com"
 msgid "number to erase at erplora.com"
 msgstr "número que borrar en erplora.com"
 
-msgid "business that erased it"
-msgstr "negocio que lo borró"
-
 msgid "created at"
 msgstr "creado el"
 
@@ -228,6 +220,7 @@ msgstr "dirección"
 msgid "origin"
 msgstr "origen"
 
+msgctxt "whatsapp message"
 msgid "source"
 msgstr "procedencia"
 
@@ -610,11 +603,16 @@ msgstr "botones"
 msgid "changes not yet at Meta"
 msgstr "cambios que aún no han llegado a Meta"
 
+msgctxt "whatsapp template"
 msgid "deleted at"
 msgstr "borrada el"
 
 msgid "deletion at Meta"
 msgstr "borrado en Meta"
+
+msgctxt "whatsapp template"
+msgid "synced at"
+msgstr "sincronizada el"
 
 msgid "erplora.com did not answer: Meta still has the template. Try again."
 msgstr "erplora.com no ha contestado: Meta aún tiene la plantilla. Inténtalo de nuevo."
@@ -747,6 +745,16 @@ msgstr "Teléfono"
 
 msgid "Template"
 msgstr "Plantilla"
+
+# The record a write acts on, by its name on the card (hub#571)
+msgid "Conversation"
+msgstr "Conversación"
+
+msgid "Message"
+msgstr "Mensaje"
+
+msgid "Note"
+msgstr "Nota"
 
 msgid "Meta connection code"
 msgstr "Código de conexión de Meta"

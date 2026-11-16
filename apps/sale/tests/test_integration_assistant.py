@@ -1,7 +1,7 @@
-"""The assistant's card for a write of sale (FIX-HUB-SALE-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258): in
-Spanish, every datum it sends by the name the Sales screens give it, never by the title pydantic makes up from the
-field («Allocations», «Line Id», «Combo Lines»). The card is base's (``base.assistant.card``); the names are sale's:
-the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of sale (base's half is hub#258): in Spanish, every datum it sends by the name the
+Sales screens give it, never by the title pydantic makes up from the field («Allocations», «Line Id», «Combo Lines»).
+The card is base's (``base.assistant.cards.card``); the names are sale's: the titles of its schemas and the ``verbose_name``
+of its models, with their Spanish in its catalog."""
 
 import json
 import re
@@ -12,9 +12,9 @@ from django.apps import apps
 from live.context import system_context
 from live.operations import get, registry
 
-from apps.sale.tests.conftest import A, ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import technical_names
 
 FRONTEND = Path(apps.get_app_config("sale").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["sale"]
@@ -26,43 +26,36 @@ def labels(card: dict) -> list[str]:
 
 
 def sale_writes() -> list:
-    return [op for op in registry.values() if op.app_label == "sale" and op.kind == "command" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "sale" and op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_no_datum_of_a_write_of_sale_reaches_a_spanish_card_by_its_technical_name():
     """Every write of sale the assistant may ask for, with all its data: each datum by a name of its own in Spanish,
     never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = sale_writes()
     assert len(writes) > 30  # positive control: the registry has sale's writes
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_a_refunds_money_as_the_refund_screen_does():
     refund = get("sale.sale.refund")
     arguments = {"allocations": [{"payment_id": "x", "amount": 500}]}
-    assert labels(assistant.card(refund, arguments, "es")) == [SCREENS["refund"]["amount"]]
-    assert labels(assistant.card(refund, arguments, "en")) == [SCREENS_EN["refund"]["amount"]]
+    assert labels(assistant.cards.card(refund, arguments, "es")) == [SCREENS["refund"]["amount"]]
+    assert labels(assistant.cards.card(refund, arguments, "en")) == [SCREENS_EN["refund"]["amount"]]
 
 
 def test_the_card_names_the_lines_a_check_starts_with_by_their_kind():
     arguments = {"open_lines": [], "service_lines": [], "combo_lines": []}
     open_check = get("sale.order.open")
-    assert labels(assistant.card(open_check, arguments, "es")) == [
+    assert labels(assistant.cards.card(open_check, arguments, "es")) == [
         "Líneas de precio libre",
         SCREENS["pos"]["services"],
         "Menús",
     ]
-    assert labels(assistant.card(open_check, arguments, "en")) == ["Open-price lines", SCREENS_EN["pos"]["services"], "Menus"]
+    assert labels(assistant.cards.card(open_check, arguments, "en")) == ["Open-price lines", SCREENS_EN["pos"]["services"], "Menus"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("language", "expected"), [("es", ["Línea", "Bono"]), ("en", ["Line", "Voucher"])])
 def test_the_card_names_a_line_of_the_check_and_the_voucher_that_pays_it(product, customer, language, expected):
     """With real records: a record the card cannot name is left out (BASE-F97), so an id that is none has no label."""
@@ -82,32 +75,32 @@ def test_the_card_names_a_line_of_the_check_and_the_voucher_that_pays_it(product
         system_context(A),
     )
     arguments = {"line_id": str(order.lines[0].id), "grant_id": str(grant.id)}
-    assert labels(assistant.card(get("sale.order.apply_voucher"), arguments, language, ctx_for(language=language))) == expected
+    assert labels(assistant.cards.card(get("sale.order.apply_voucher"), arguments, language, ctx_for(language=language))) == expected
 
 
 def test_the_card_names_what_goes_to_the_kitchen_as_the_kitchen_reads_it():
     """Dine in, takeaway or delivery; the rush the till marks; who serves the check («Atiende»)."""
     arguments = {"channel": "takeaway", "priority": "rush", "waiter": "Ana"}
     fire = get("sale.order.fire")
-    assert labels(assistant.card(fire, arguments, "es")) == ["Tipo de pedido", "Prioridad", "Atendido por"]
-    assert labels(assistant.card(fire, arguments, "en")) == ["Order type", "Priority", "Served by"]
+    assert labels(assistant.cards.card(fire, arguments, "es")) == ["Tipo de pedido", "Prioridad", "Atendido por"]
+    assert labels(assistant.cards.card(fire, arguments, "en")) == ["Order type", "Priority", "Served by"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_two_checks_of_a_merge_and_the_lines_of_a_split(product):
     scissors = product("Scissors", "SCI", 1210, "product.generic")
     first, second = (run("sale.order.open", {"lines": [{"product_id": str(scissors.id)}]}) for _ in range(2))
     arguments = {"from_order_id": str(first.id), "to_order_id": str(second.id)}
-    merge = assistant.card(get("sale.order.merge"), arguments, "es", ctx_for(language="es"))
+    merge = assistant.cards.card(get("sale.order.merge"), arguments, "es", ctx_for(language="es"))
     assert labels(merge) == ["Cuenta de origen", "Cuenta de destino"]
-    assert labels(assistant.card(get("sale.order.split"), {"line_ids": []}, "es")) == ["Líneas a mover"]
-    assert labels(assistant.card(get("sale.sale.complete"), {"line_ids": []}, "es")) == ["Líneas a cobrar"]
+    assert labels(assistant.cards.card(get("sale.order.split"), {"line_ids": []}, "es")) == ["Líneas a mover"]
+    assert labels(assistant.cards.card(get("sale.sale.complete"), {"line_ids": []}, "es")) == ["Líneas a cobrar"]
 
 
 def test_the_card_names_a_quick_note_and_a_reprint():
-    note = assistant.card(get("sale.quick_note.delete"), {"quick_note": "Sin sal"}, "es")
+    note = assistant.cards.card(get("sale.quick_note.delete"), {"quick_note": "Sin sal"}, "es")
     assert labels(note) == [SCREENS["quickNotes"]["entity"]["one"].capitalize()]
-    reprint = assistant.card(get("sale.sale.print"), {"duplicate": True}, "es")
+    reprint = assistant.cards.card(get("sale.sale.print"), {"duplicate": True}, "es")
     assert labels(reprint) == ["Imprimir como duplicado"]
 
 
@@ -122,7 +115,7 @@ def test_no_label_of_a_write_of_sale_names_the_internal_unit_of_its_money():
     for op in writes:
         props = op.input.model_json_schema().get("properties", {})
         for language in ("es", "en"):
-            for field in assistant.card(op, dict.fromkeys(props, "x"), language)["fields"]:
+            for field in assistant.cards.card(op, dict.fromkeys(props, "x"), language)["fields"]:
                 if unit.search(field["label"]):
                     named_by_unit.setdefault(op.name, []).append((language, field["label"]))
     assert named_by_unit == {}
@@ -147,7 +140,7 @@ def test_every_write_of_sale_names_the_tickets_fixed_discount_alike_apart_from_i
             ("es", "Descuento (%)", "Descuento de importe fijo"),
             ("en", "Discount (%)", "Fixed-amount discount"),
         ):
-            card = assistant.card(op, {"discount_percent": "10", "discount_amount": 1250}, language)
+            card = assistant.cards.card(op, {"discount_percent": "10", "discount_amount": 1250}, language)
             fields = {field["name"]: field for field in card["fields"]}
             assert (op.name, language, fields["discount_percent"]["label"]) == (op.name, language, percent)
             assert (op.name, language, fields["discount_amount"]["label"], fields["discount_amount"]["kind"], fields["discount_amount"]["value"]) == (

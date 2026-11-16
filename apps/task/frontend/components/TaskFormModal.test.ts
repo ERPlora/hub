@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { TaskOut } from '../operations';
 import { click, ionValue, mountTask, settle } from '../__tests__/mount-task';
 import TaskFormModal from './TaskFormModal.vue';
@@ -168,5 +169,39 @@ describe('TaskFormModal: Editing task — {number}', () => {
       'Vence',
       'Sin proyecto',
     ]);
+  });
+});
+
+describe('TaskFormModal: fields refused with the same words (hub#888)', () => {
+  // A new task's fields, each refused under its own key; Assigned to and Project are Combos, named by the key of their id.
+  const FIELD_OF: Record<string, string> = { assigned_to_id: 'assignee', project_id: 'project' };
+  const KEYS = ['title', 'description', 'priority', 'due_date', 'assigned_to_id', 'project_id', 'tags'];
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('title'), 'Mop', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'priority');
+});
+
+describe('TaskFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('new task: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('task-form'),
+      change: () => ionValue(s.field('title'), 'Count the till', 'ionInput'),
+      restore: () => ionValue(s.field('title'), '', 'ionInput'),
+    });
+  });
+
+  it('editing: the task as loaded closes; a change asks; restored as loaded closes again', async () => {
+    const s = await setup(TASK);
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('task-form'),
+      change: () => ionValue(s.field('title'), 'Clean the cellar', 'ionInput'),
+      restore: () => ionValue(s.field('title'), TASK.title, 'ionInput'),
+    });
   });
 });

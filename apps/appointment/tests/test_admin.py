@@ -1,9 +1,11 @@
-"""Django admin of the appointment app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the appointment app: full CRUD on every table, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it adds, changes and deletes every table so
 that support can repair; it does not go through the operations' rules, so it warns rather than prevents.
 What the database fills in (ids and timestamps) is shown, not edited.
 """
+
+import re
 
 import pytest
 from django.contrib import admin
@@ -31,7 +33,7 @@ from apps.appointment.models import (
     Settings,
 )
 
-from .conftest import MONDAY, at, make_appointment, make_block
+from .conftest import HUB_DB, MONDAY, at, make_appointment, make_block, make_series
 
 MODELS = {
     Appointment: AppointmentAdmin,
@@ -76,6 +78,7 @@ def test_every_model_is_registered_and_the_children_are_inlines():
     )
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -111,8 +114,8 @@ def test_support_sees_and_repairs_every_field_of_an_appointment():
     assert editable <= set(AppointmentAdmin.fields)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser, salon):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff, salon):
     appointment = make_appointment(
         salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), number="APT-ADMIN-1"
     )
@@ -120,7 +123,6 @@ def test_changelists_and_change_pages_render(client, superuser, salon):
     block = make_block(at(MONDAY, "12:00"), at(MONDAY, "13:00"), title="Training")
     Settings.objects.create()
     Counter.objects.create(day=MONDAY, last_number=4)
-    client.force_login(superuser)
     for path, text in (
         ("/admin/appointment/appointment/", b"APT-ADMIN-1"),
         (f"/admin/appointment/appointment/{appointment.pk}/change/", b"Haircut"),
@@ -132,5 +134,43 @@ def test_changelists_and_change_pages_render(client, superuser, salon):
         ("/admin/appointment/settings/", b"60"),
         ("/admin/appointment/counter/", b"4"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
+
+
+@HUB_DB
+def test_the_admin_in_spanish_says_citas_own_words(hub_staff, salon):
+    """An appointment's page reads its dates and authors in the feminine of a «cita» («Borrada el», «Creada el»,
+    «Actualizada por»…) and its history names who did each change «Quién», as Citas' WORKBOOK says it; the series'
+    list filters and shows the «Activa» ones; a block keeps the masculine of a «bloqueo». Not the «Eliminado el»,
+    «Creado el», «Por» and «Activo» of the apps loaded before it that say the same English (hub#633)."""
+    appointment = make_appointment(
+        salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), number="APT-ES-1"
+    )
+    History.objects.create(appointment=appointment, action="created", actor="Ana")
+    make_series(salon)
+    block = make_block(at(MONDAY, "12:00"), at(MONDAY, "13:00"), title="Formación")
+
+    def page(path: str) -> str:
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es")
+        assert response.status_code == 200, path
+        return response.content.decode()
+
+    shown = page(f"/admin/appointment/appointment/{appointment.pk}/change/")
+    assert '<label for="id_customer_name">Nombre del cliente:</label>' in shown  # the page is in Spanish
+    assert "<legend>Borrada el:</legend>" in shown  # a date and a time: a fieldset
+    for label in ("Creada el", "Actualizada el"):
+        assert f"<label>{label}:</label>" in shown, label  # read only
+    for field, label in (("created_by", "Creada por"), ("updated_by", "Actualizada por")):
+        assert f'<label for="id_{field}">{label}:</label>' in shown, label
+    assert re.search(r'<th class="column-actor">Quién\s*</th>', shown)  # the history's column
+    assert not re.search(r">(Eliminado|Creado|Actualizado) (el|por):<", shown)
+
+    series = page("/admin/appointment/recurring/")
+    assert '<details data-filter-title="repetición"' in series  # the page is in Spanish: the frequency's filter
+    assert '<details data-filter-title="activa"' in series
+    assert re.search(r'class="sortable column-is_active">\s*<div class="text"><a [^>]*>Activa</a>', series)
+
+    blocked = page(f"/admin/appointment/blockedtime/{block.pk}/change/")
+    assert '<label for="id_created_by">Creado por:</label>' in blocked
+    assert "<label>Creado el:</label>" in blocked and "<label>Actualizado el:</label>" in blocked

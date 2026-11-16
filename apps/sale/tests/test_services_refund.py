@@ -14,9 +14,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.sale.models import PaymentMethod, Refund, Sale
-from apps.sale.tests.conftest import ctx_for, run
+from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:
@@ -201,7 +201,7 @@ def test_a_tender_never_gives_back_more_than_it_has_left(mixed):
 
 
 def test_what_a_tender_has_left_is_said_with_its_thousands_grouped(product):
-    # hub#1090: «1.500,00 €» and «1.400,00 €» in Spanish, «€1,500.00» and «€1,400.00» in English; never
+    # «1.500,00 €» and «1.400,00 €» in Spanish, «€1,500.00» and «€1,400.00» in English; never
     # «1500.00 €» (no thousands and the English decimal point in a Spanish sentence).
     product("Television", "TVS", 150000, "product.generic")
     sale = charge("pos-tv-0001", [{"product": "TVS"}], [{"method": "card"}])

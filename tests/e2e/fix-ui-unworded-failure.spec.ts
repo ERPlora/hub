@@ -1,4 +1,4 @@
-// flow: KITCHEN-F01 — hub#2281: a failure the server did not word reaches the screen as a sentence in the
+// flow: KITCHEN-F01 — a failure the server did not word reaches the screen as a sentence in the
 // person's language that says what happened and what to do, never the SDK's English («Unexpected response
 // (HTTP 502)», «Network error (Failed to fetch)»). Seen in Kitchen › Stations › «Add station»: saving answers a
 // proxy's 502 HTML page, or never gets an answer, and the panel says why in Spanish, as Ioan sees it, at 390, 834
@@ -40,7 +40,7 @@ async function breakSaving(page: Page, answer: 'bad-gateway' | 'no-network'): Pr
 }
 
 for (const size of SIZES) {
-  test(`hub#2281 at ${size.label}: «Add station» says in Spanish what happened and what to do when the server did not word it`, async ({ browser }) => {
+  test(`«Add station» says in Spanish what happened and what to do when the server did not word it, at ${size.label}`, async ({ browser }) => {
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
       await shown(page).locator('[data-testid=kitchen-stations-primary-action]').click();

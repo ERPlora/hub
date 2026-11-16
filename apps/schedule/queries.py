@@ -15,7 +15,7 @@ from django.utils import formats, timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.schedule import engine
 from apps.schedule.models import (
@@ -29,16 +29,19 @@ from apps.schedule.models import (
     WeekDayInterval,
 )
 from apps.schedule.schemas import (
+    ByIdIn,
     HoursRangeIn,
     HoursRangeOut,
     IsOpenIn,
     IsOpenOut,
     NoParamsIn,
     OverrideListIn,
+    OverrideOut,
     OverridePage,
     PageIn,
     SettingsOut,
     SpecialDayListIn,
+    SpecialDayOut,
     SpecialDayPage,
     WeekOut,
 )
@@ -71,7 +74,7 @@ OVERRIDE_SORTS = {
 
 def day_label(day: dt.date, language: str) -> str:
     """``day`` ready to say in ``language``, its weekday first («martes, 5 de marzo de 2030»): what a flow's
-    template prints as it comes, with no formatter (appointments#151). Appointments and Reservations, which
+    template prints as it comes, with no formatter. Appointments and Reservations, which
     both require this app, say their days with it."""
     with translation.override(language):
         return f"{formats.date_format(day, 'l')}, {formats.date_format(day, 'DATE_FORMAT')}"
@@ -310,7 +313,18 @@ def _page(rows: QuerySet[Any], params: PageIn, out: Any) -> dict:
     ai={
         "description": "Returns the business's usual opening week: each day closed, not set or with its opening "
         "intervals (several = split shift; closing before opening = past midnight; 00:00–00:00 = 24 hours), and "
-        "whether the week is still the default one nobody confirmed."
+        "whether the week is still the default one nobody confirmed.",
+        "asks": {
+            "en": (
+                "show me when we usually open, Monday to Sunday",
+                "which weekdays are we normally closed?",
+            ),
+            "es": (
+                "enséñame cuándo abrimos habitualmente, de lunes a domingo",
+                "¿cuándo descansamos normalmente?",
+                "¿cuándo solemos abrir y cerrar de lunes a viernes?",
+            ),
+        },
     },
 )
 def get_week(ctx: OperationContext, data: NoParamsIn) -> dict:
@@ -326,7 +340,17 @@ def get_week(ctx: OperationContext, data: NoParamsIn) -> dict:
     output=SpecialDayPage,
     expose_api=True,
     ai={
-        "description": "Lists the special days (holidays, closures, days with other hours) with their intervals."
+        "description": "Lists the special days (holidays, closures, days with other hours) with their intervals.",
+        "asks": {
+            "en": (
+                "which holidays have we got on the calendar?",
+                "list the special days of this year",
+            ),
+            "es": (
+                "¿qué festivos tenemos apuntados este año?",
+                "dime las fiestas y las fechas especiales del calendario",
+            ),
+        },
     },
 )
 def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
@@ -360,7 +384,19 @@ def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
     output=OverridePage,
     expose_api=True,
     ai={
-        "description": "Lists the temporary changes of the opening hours (a range of dates closed or with other hours)."
+        "description": "Lists the temporary changes of the opening hours (a range of dates closed or with other "
+        "hours).",
+        "asks": {
+            "en": (
+                "which temporary changes of the opening are planned?",
+                "is there a summer closure planned?",
+            ),
+            "es": (
+                "¿qué cambios temporales de apertura hay programados?",
+                "¿cuándo cerramos por vacaciones o hacemos horario de verano?",
+                "¿hay alguna temporada de reformas con otra apertura?",
+            ),
+        },
     },
 )
 def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
@@ -384,6 +420,32 @@ def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     )
 
 
+# Not assistant tools: what names a special day or a temporary change on the card of a write (``schemas.A_SPECIAL_DAY``,
+# ``A_OVERRIDE``), as their list shows them; the model finds them in their lists.
+@operation(
+    "schedule.special_day.get",
+    kind="query",
+    permission="schedule.view",
+    input=ByIdIn,
+    output=SpecialDayOut,
+    ai=INTERNAL,
+)
+def get_special_day(ctx: OperationContext, data: ByIdIn) -> dict:
+    return special_day_out(resolve_special_day(data.id, None))
+
+
+@operation(
+    "schedule.override.get",
+    kind="query",
+    permission="schedule.view",
+    input=ByIdIn,
+    output=OverrideOut,
+    ai=INTERNAL,
+)
+def get_override(ctx: OperationContext, data: ByIdIn) -> dict:
+    return override_out(resolve_override(data.id, None))
+
+
 @operation(
     "schedule.settings.get",
     kind="query",
@@ -391,7 +453,18 @@ def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     input=NoParamsIn,
     output=SettingsOut,
     ai={
-        "description": "Returns the settings of the opening hours (the day the week starts on) and the business's time zone."
+        "description": "Returns the settings of the opening hours (the day the week starts on) and the business's "
+        "time zone.",
+        "asks": {
+            "en": (
+                "does our week start on Monday or on Sunday?",
+                "which time zone is our calendar in?",
+            ),
+            "es": (
+                "¿la semana del calendario arranca en lunes o en domingo?",
+                "¿en qué zona horaria tenemos el calendario?",
+            ),
+        },
     },
 )
 def get_settings(ctx: OperationContext, data: NoParamsIn) -> dict:
@@ -409,7 +482,18 @@ def get_settings(ctx: OperationContext, data: NoParamsIn) -> dict:
         "description": "Says whether the business is open at a moment (now if none) on its own clock, which rule "
         "decided (special day > yearly special day > temporary change > usual week > nothing) and why, as a stable "
         "code: exception_closed, exception_hours, open_interval, closed_today, overnight_open, outside_hours or "
-        "no_hours (nothing configured: not open)."
+        "no_hours (nothing configured: not open).",
+        "asks": {
+            "en": (
+                "is the shop open right now?",
+                "will the shop be open tomorrow at nine?",
+            ),
+            "es": (
+                "¿seguimos abiertos todavía?",
+                "¿el local estará abierto mañana a las nueve?",
+                "¿está cerrado el local en este momento?",
+            ),
+        },
     },
 )
 def business_is_open(ctx: OperationContext, data: IsOpenIn) -> dict:
@@ -439,7 +523,18 @@ def business_is_open(ctx: OperationContext, data: IsOpenIn) -> dict:
     ai={
         "description": "Returns the business's opening hours of each day of a range (up to 366 days): the rule that "
         "governs the day and its opening spans as wall-clock date and time. A booking fits when it lies inside one "
-        "span of its day or of the eve (past midnight). The authoritative answer to when the business is open."
+        "span of its day or of the eve (past midnight). The authoritative answer to when the business is open.",
+        "asks": {
+            "en": (
+                "what are our opening times for every date from 1 to 15 December?",
+                "which rule sets our opening on every date of next month?",
+            ),
+            "es": (
+                "¿cuándo abrimos cada día entre el 1 y el 15 de diciembre?",
+                "¿de dónde sale la apertura de cada día del mes que viene?",
+                "dime día a día cuándo abrimos la próxima quincena",
+            ),
+        },
     },
 )
 def hours_for_range(ctx: OperationContext, data: HoursRangeIn) -> dict:

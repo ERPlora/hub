@@ -1,4 +1,4 @@
-"""Django admin of the service app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the service app: full CRUD on every table for support.
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations'
 rules (a name taken, a voucher's balance, the sessions that are never edited), so it warns rather than
@@ -214,6 +214,7 @@ class RedemptionInline(admin.TabularInline):
     extra = 0
     fields = (
         "service",
+        "member",
         "status",
         "order_line_id",
         "hold_until",

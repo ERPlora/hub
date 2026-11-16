@@ -1,15 +1,16 @@
 // flow: WHATSAPP_INBOX-F09
-// The WhatsApp inbox's counter of the bell (FIX-WHATSAPP_INBOX-SETUP-HOOKS; the old module's `bell`, whatsapp_inbox#244,
-// hub#1678; the old hub's bell, docs/reference/old-hub/notifications-*.png): on the Home of hub `a`, as its owner reads
+// The WhatsApp inbox's counter of the bell (the old module's `bell`,
+// the old hub's bell): on the Home of hub `a`, as its owner reads
 // it in Spanish, a customer writes on WhatsApp and the bell's badge counts her without a reload; opened, the row
 // «Clientes de WhatsApp esperando respuesta (N)» leads to the inbox, where the owner answers her from the composer, and
-// the badge goes down by itself. In each of the three sizes, leaving the capture `FIX-WHATSAPP_INBOX-SETUP-HOOKS-<width>`
+// the badge goes down by itself. In each of the three sizes, leaving the capture `<KEY>-<width>`
 // with the bell open. erplora.com's pushes (the customer's message, the number connected) run as its doors do
 // (whatsapp-helpers.ts); nothing seeds erplora.com, so `a`'s photo stays as it was. What it creates (`e2e.` numbers and
 // names, the number's row) is removed before and after.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, badgeSays, capturedFitting, openBell, psql, shown } from './helpers';
+import { spanishOwnerOnMyApps as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS } from './service-helpers';
 import { cleanUp, e2ePhone, keepPhoto, PREFIX, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
 
@@ -40,37 +41,6 @@ async function counters(context: BrowserContext): Promise<{ total: number; waiti
   return { total, waiting };
 }
 
-/**
- * The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home, with
- * the instant of every `/api/live` the page opens: a new stream brings every result again, so a count that changes
- * without one came over the stream already open, re-run by the counter's own events.
- */
-async function spanishOwner(
-  browser: Browser,
-  viewport: { width: number; height: number },
-): Promise<{ context: BrowserContext; page: Page; streams: number[] }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  const streams: number[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(Date.now());
-  });
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(shown(page).locator('[data-testid="home-my-apps"]')).toBeVisible();
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page, streams };
-}
-
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
-
-const badge = (page: Page): Locator => bellBadge(page);
 const waitingRow = (page: Page): Locator =>
   page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: new RegExp(`^\\s*${LABEL} \\(\\d+\\)\\s*$`) });
 const rowOf = (page: Page, contact: string): Locator =>
@@ -78,13 +48,8 @@ const rowOf = (page: Page, contact: string): Locator =>
 const panel = (page: Page): Locator => shown(page).locator('[data-testid=whatsapp-inbox-detail]');
 
 /** The badge says `total`, or is not shown at zero. */
-async function badgeSays(page: Page, total: number): Promise<void> {
-  if (total > 0) await expect(badge(page)).toHaveText(String(total));
-  else await expect(badge(page)).toHaveCount(0);
-}
-
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
-  test(`${KEY} WHATSAPP_INBOX-F09 la campana cuenta «${LABEL}»: a customer writing counts live, leads to the inbox and goes once answered — ${label}`, async ({
+  test(`WHATSAPP_INBOX-F09: the bell counts «${LABEL}»: a customer writing counts live, leads to the inbox and goes once answered — ${label}`, async ({
     browser,
   }) => {
     // erplora.com says the number is connected (each test again: a refused delivery may change it).
@@ -111,10 +76,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       const row = waitingRow(page);
       await expect(row).toHaveText(`${LABEL} (${before.waiting + 1})`);
       await expect(row).toHaveAttribute('data-reachable', 'true');
-      await untilStill(page);
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capturedFitting(page, `${KEY}-${label}`, label);
 
       // The row leads to the inbox, where she is.
       await row.click();

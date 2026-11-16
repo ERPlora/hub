@@ -7,6 +7,7 @@ import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { ref, watch } from 'vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import type { CartOut } from '../operations';
 
@@ -51,11 +52,14 @@ async function save(): Promise<void> {
   emit('created', cart);
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('cart-checkout-cart-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="cart-checkout-cart-form"
     :title="$t('cart_checkout.carts.form.title')"
     :submit-label="$t('cart_checkout.carts.form.submit')"
@@ -68,6 +72,7 @@ async function save(): Promise<void> {
       <div class="cart-checkout-cart-form">
         <ion-input
           data-testid="cart-checkout-cart-form-session"
+          name="session_token"
           :value="form.session"
           :label="$t('cart_checkout.carts.form.session')"
           :placeholder="$t('cart_checkout.carts.form.sessionPlaceholder')"
@@ -82,6 +87,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="cart-checkout-cart-form-email"
+          name="customer_email"
           :value="form.email"
           type="email"
           inputmode="email"
@@ -97,6 +103,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="cart-checkout-cart-form-name"
+          name="customer_name"
           :value="form.name"
           :label="$t('cart_checkout.carts.form.name')"
           :placeholder="$t('cart_checkout.carts.form.namePlaceholder')"

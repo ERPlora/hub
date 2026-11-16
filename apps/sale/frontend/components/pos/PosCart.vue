@@ -4,10 +4,12 @@
 // the heading (title and chips), the lines (they scroll; in the phone's drawer the heading scrolls with them, hub#630)
 // and the foot (always in view). It paints what
 // the page knows of the check and asks for everything; the page writes (`useTill`). With Kitchen (SALE-F20,
-// `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending, says how many
-// items wait (also to a screen reader) and carries the send bar; a send goes up (`send`, with its rush). With
+// `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending and says how many
+// items wait (also to a screen reader); while something waits, both carry the send bar above the foot, so the tab a
+// check opens on offers it too (hub#1017); a send goes up (`send`, with its rush). With
 // the right to see Kitchen's tickets (`kitchenTickets`), «Tickets · N» rides beside the head of what was sent
 // (KITCHEN-F19, F20). Android's Back closes the open dropdown.
+import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useSystemBack } from '../../composables/pos/useSystemBack';
@@ -27,6 +29,8 @@ const props = defineProps<{
   label: string;
   /** The preview's total; `undefined` while it is on its way. */
   total: number | undefined;
+  /** Why the server could not value the check; `null` when its preview is valid or pending. */
+  previewError?: string | null;
   ticketDiscount: number;
   marks: readonly string[];
   staffNames: Readonly<Record<string, string>>;
@@ -95,6 +99,11 @@ const roundLabel = computed(() => {
   return count === 1 ? t('sale.pos.kitchen.roundTabPendingOne') : t('sale.pos.kitchen.roundTabPending', { count });
 });
 
+function onTabChange(event: CustomEvent<{ value?: string | number }>): void {
+  const next = String(event.detail.value ?? '');
+  if (next === 'check' || next === 'round') tab.value = next;
+}
+
 function resume(row: OrderRow): void {
   checksOpen.value = false;
   emit('resume', row);
@@ -136,7 +145,8 @@ function park(): void {
       @close="checksOpen = false"
     />
     <!-- What sits between the bar and the foot. The side column keeps its heading and scrolls the lines; the phone's
-         drawer, and a column just as low, scroll it all as one, so «Charge» stays in view above the tab bar (hub#630). The
+         drawer, and a column too low for a whole line beside them (hub#820), scroll it all as one, so «Charge» stays in
+         view above the tab bar (hub#630). The
          send bar rides here too: outside, it took all of this when low, tabs and lines included (hub#787). -->
     <div class="pos-cart__scroll">
       <CartHeading
@@ -150,40 +160,37 @@ function park(): void {
         @staff="emit('staff')"
         @ask-customer="emit('askCustomer')"
       />
-      <div
+      <ion-segment
         v-if="kitchen"
         class="pos-cart__tabs"
-        role="tablist"
+        :value="tab"
         data-testid="pos-cart-tabs"
+        @ion-change="onTabChange"
       >
-        <button
-          type="button"
-          role="tab"
+        <ion-segment-button
+          value="check"
           class="pos-cart__tab"
           :aria-selected="tab === 'check' ? 'true' : 'false'"
           data-testid="pos-cart-tab-check"
-          @click="tab = 'check'"
         >
-          {{ t('sale.pos.kitchen.accountTab') }}
-        </button>
-        <button
-          type="button"
-          role="tab"
+          <ion-label>{{ t('sale.pos.kitchen.accountTab') }}</ion-label>
+        </ion-segment-button>
+        <ion-segment-button
+          value="round"
           class="pos-cart__tab"
           :aria-selected="tab === 'round' ? 'true' : 'false'"
           :aria-label="roundLabel"
           data-testid="pos-cart-tab-round"
-          @click="tab = 'round'"
         >
-          {{ t('sale.pos.kitchen.roundTab') }}
+          <ion-label>{{ t('sale.pos.kitchen.roundTab') }}</ion-label>
           <span
             v-if="pending.length"
             class="pos-cart__badge"
             aria-hidden="true"
             data-testid="pos-cart-tab-round-badge"
           >{{ pending.length }}</span>
-        </button>
-      </div>
+        </ion-segment-button>
+      </ion-segment>
       <div class="pos-cart__body">
         <p
           v-if="roundMode && pending.length"
@@ -225,7 +232,7 @@ function park(): void {
         </CartLines>
       </div>
       <KitchenSendBar
-        v-if="roundMode && pending.length"
+        v-if="kitchen && pending.length"
         :pending="pending.length"
         :busy="busy"
         @send="emit('send', $event)"
@@ -234,6 +241,7 @@ function park(): void {
     <CartFooter
       :has-lines="hasLines"
       :total="total"
+      :preview-error="previewError"
       :discount-percent="order?.discount_percent ?? '0'"
       :discount-amount="order?.discount_amount ?? 0"
       :ticket-discount="ticketDiscount"
@@ -253,8 +261,8 @@ function park(): void {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--ion-background-color, #fff);
-  border-left: 1px solid var(--ion-border-color, #e6e3db);
+  background: var(--ion-card-background);
+  border-left: 1px solid var(--ep-border);
 }
 /* A scroll container: its automatic minimum height is 0, so it gives way to the bar and the foot. It is also what the
    send bar measures to know whether it can stay pinned (KitchenSendBar, hub#787). */
@@ -275,43 +283,52 @@ function park(): void {
   flex: 1 0 auto;
   overflow: visible;
 }
-/* A side column as low as that, under the red strip of a small tablet: the same, or the lines get 0 px and no way to
-   them (hub#787). The height is the one at which the send bar stops being pinned (KitchenSendBar). */
-@container pos-cart-middle (max-height: 13rem) {
+/* A side column too low for a whole line beside the heading (95 px), the tabs (60 with their margin) and the send bar
+   (67): the same, or the lines get a slit (hub#787, hub#820). Measured: a line is 139 px, so the heading and the tabs
+   stay in place only above 360 px; 23rem leaves the line 8 px to spare. The send bar stays pinned down to 13rem
+   (KitchenSendBar). */
+@container pos-cart-middle (max-height: 23rem) {
   .pos-cart__body {
     flex: 1 0 auto;
     overflow: visible;
   }
 }
+/* Ionic's segment clips what overflows it, so as a flex item it would give way to the lines down to its padding: 8 px,
+   with both tabs cut away under them; and it is as wide as the column, so its margin pushed «Current order» past the
+   edge (hub#1435). */
 .pos-cart__tabs {
+  flex: none;
+  width: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.25rem;
   margin: 0 0.75rem 0.5rem;
   padding: 0.25rem;
-  background: var(--ion-color-light, #f4f3ef);
+  background: var(--ep-surface-muted);
   border-radius: 12px;
 }
+/* A column too low to keep «Send order» pinned (KitchenSendBar): the tabs give up 8 px of spare room around them, so
+   that a phone on its side still shows some of the first line as the check opens (hub#800). */
+@container pos-cart-middle (max-height: 13rem) {
+  .pos-cart__tabs {
+    margin-bottom: 0.25rem;
+    padding: 0.125rem;
+  }
+}
 .pos-cart__tab {
-  display: inline-flex;
   min-width: 0;
   min-height: 2.5rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.5rem;
-  font: inherit;
   font-weight: 600;
-  color: var(--ion-color-medium-shade, #636469);
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
-  cursor: pointer;
-}
-.pos-cart__tab[aria-selected='true'] {
-  color: var(--ion-text-color, #1c1b18);
-  background: var(--ion-background-color, #fff);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  text-transform: none;
+  --background: transparent;
+  --background-checked: var(--ion-card-background);
+  --color: var(--ion-color-medium-shade);
+  --color-checked: var(--ep-primary-text);
+  --border-radius: 9px;
+  --indicator-color: transparent;
+  --indicator-box-shadow: var(--ep-shadow-xs);
+  --padding-start: 0.5rem;
+  --padding-end: 0.5rem;
 }
 .pos-cart__badge {
   min-width: 1.35rem;

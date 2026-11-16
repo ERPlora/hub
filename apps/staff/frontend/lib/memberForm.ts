@@ -32,10 +32,11 @@ export interface MemberForm {
 }
 
 /** Who sends the form: whether they may see (and so send) the pay, and the business's currency it is typed in
- *  (`useBusinessMoney`; unknown while it has not answered: two decimals). */
+ *  (`useBusinessMoney`). The money is required: the dialog sends nothing before the business answers (hub#921: «1500»
+ *  yen read with two decimals would be sent as 150000). */
 export interface SendOptions {
   pay: boolean;
-  money?: Money;
+  money: Money;
 }
 
 const TEXTS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'color', 'specialties', 'bio'] as const;
@@ -69,7 +70,7 @@ function commission(text: string): string {
 }
 
 /** Whole minor units of `money`, or the text as typed when it is not a figure (the server refuses it under its field). */
-function rate(text: string, money?: Money): number {
+function rate(text: string, money: Money): number {
   const cents = centsFromText(text, money);
   return (cents ?? text.trim()) as number;
 }

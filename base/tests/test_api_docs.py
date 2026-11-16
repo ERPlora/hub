@@ -1,4 +1,4 @@
-"""BASE-G150, G100, G02, G04 and G48: the documentation of the business's API, shown or hidden in Settings › General.
+"""The documentation of the business's API, shown or hidden in Settings › General.
 
 Whoever runs the business turns «Show the API documentation» on (it comes off); then anyone of the business reads it:
 the OpenAPI document of what the apps this business has publish (``expose_api``) — never the platform's own routes,

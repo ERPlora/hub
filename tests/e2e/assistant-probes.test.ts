@@ -1,5 +1,5 @@
 // @vitest-environment node
-// The pure parts of layer 2 of the assistant's QA (docs plan 2026-10-31, the assistant's knowledge and QA, §1.5): the
+// The pure parts of layer 2 of the assistant's QA, the one with the real model: the
 // probe files a QA agent writes (a NEW natural phrase per tool, role and language), how each probe is checked against
 // the catalogue `manage.py export_assistant_catalog` exports, the verdict of a turn with the real model, the report,
 // the skeleton generator (`pnpm qa:probes`) and the SaaS seed of a manager and an admin of `a`. The spec

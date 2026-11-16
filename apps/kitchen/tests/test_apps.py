@@ -93,16 +93,49 @@ def test_navigation_is_the_four_sections_of_the_old_module_with_registered_icons
     ]
 
 
+def test_every_new_ticket_has_a_device_notice_that_opens_the_kitchen_display():
+    from live.meta import DeviceNotice
+
+    [notice] = kitchen().notices
+    assert isinstance(notice, DeviceNotice)
+    assert (notice.key, notice.operation) == ("received", "kitchen.ticket.notices")
+    assert [str(text) for text in notice.title] == [
+        "New kitchen ticket · {label}",
+        "New kitchen ticket · {number}",
+    ]
+    assert [str(text) for text in notice.body] == ["{dish_names}", "Waiter: {waiter}"]
+    assert notice.route == "/kitchen/display"
+    assert notice.permission == "kitchen.view_ticket"
+    assert notice.refresh_on == [
+        "kitchen.ticket.received",
+        "kitchen.ticket.created",
+        "sale.order.fired",
+    ]
+
+
+#: The reads that are no assistant tool: what names a station and a dish on the assistant's card (hub#671); the
+#: model reads the stations from their list and the dishes with their ticket.
+INTERNAL_READS = {"kitchen.station.get", "kitchen.item.get"}
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
-    from live.operations import registry
+    from live.operations import AI, INTERNAL, MIN_ASKS, registry
 
     operations = [op for name, op in registry.items() if name.startswith("kitchen.")]
-    assert len(operations) == 29
+    assert len(operations) == 32
+    assert {op.name for op in operations if op.ai is INTERNAL} == INTERNAL_READS
     for op in operations:
+        if op.name in INTERNAL_READS:
+            assert (op.kind, op.expose_api) == ("query", False), op.name
+            continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
+            expected |= {"asks"}
+            said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
+            assert min(said.values()) >= MIN_ASKS, (op.name, said)
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
@@ -131,7 +164,7 @@ def test_every_input_field_says_what_it_is():
 
 
 def test_the_reaction_to_sales_is_the_systems_only():
-    # kitchen.ticket.sync runs as the system (the relay, phase 2): no role holds its permission.
+    # kitchen.ticket.sync runs as the system (the relay's reaction to Sales): no role holds its permission.
     from live.operations import get
 
     assert get("kitchen.ticket.sync").permission == "kitchen.system"

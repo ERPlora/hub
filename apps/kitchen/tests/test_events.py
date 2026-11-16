@@ -7,13 +7,13 @@ cancels its rounds), line_voided.hub (a voided line strikes its dish). Each reac
 through an operation of this app; delivering it twice changes nothing.
 """
 
-import pytest
-
 from apps.kitchen import events
 from apps.kitchen.models import LogEntry, Ticket, TicketItem
 
 from .conftest import (
     A,
+    HUB_DB,
+    HUB_DB_COMMITTED,
     add_line,
     charge,
     fire,
@@ -24,7 +24,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def last_payload(name: str) -> dict:
@@ -142,6 +142,7 @@ def saved(ticket_id) -> str:
     return Ticket.objects.get(pk=ticket_id).status
 
 
+@HUB_DB_COMMITTED
 def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay, clock, product):
     """KITCHEN-F05, F08: Sales' command only records ``sale.order.fired``; the tick opens the ticket with its
     priority, its History and its sheet; a second tick changes nothing."""
@@ -162,8 +163,9 @@ def test_a_round_sales_fires_alone_is_saved_and_printed_by_the_relay_once(relay,
     assert (Ticket.objects.count(), len(kitchen_sheets()), LogEntry.objects.count()) == (1, 1, 1)
 
 
+@HUB_DB_COMMITTED
 def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takeaway(relay, product):
-    """KITCHEN-F04, F05, F08 (kitchen#148): a drink routed to the bar, fired with no title and no channel, opens
+    """KITCHEN-F04, F05, F08: a drink routed to the bar, fired with no title and no channel, opens
     a «dine in» ticket whose sheet goes to the bar's printer, never the kitchen's nor as «takeaway»."""
     from apps.printing.models import PrintJob
 
@@ -182,6 +184,7 @@ def test_a_beer_sold_at_the_bar_without_a_table_prints_at_the_bar_never_as_takea
     assert list(sheets.values_list("usage", flat=True)) == ["bar"]
 
 
+@HUB_DB_COMMITTED
 def test_a_round_the_kitchen_sends_is_not_printed_twice_when_the_relay_brings_its_fire(relay, product):
     """KITCHEN-F18, F08: the send prints its sheet in its own transaction; the relay later hands the kitchen the
     same round (``sale.order.fired``), and the queue keeps one sheet per printer."""
@@ -198,6 +201,7 @@ def test_a_round_the_kitchen_sends_is_not_printed_twice_when_the_relay_brings_it
     assert (saved(ticket.id), Ticket.objects.get().priority) == ("pending", "rush")
 
 
+@HUB_DB_COMMITTED
 def test_charging_the_whole_check_serves_its_ready_round_through_the_relay(relay, clock, product):
     """KITCHEN-F27: the tick brings the charge; the ready round is served once, the one that cooks is left, and a
     check charged only in part closes nothing."""
@@ -221,6 +225,7 @@ def test_charging_the_whole_check_serves_its_ready_round_through_the_relay(relay
     assert LogEntry.objects.filter(action="served").count() == 1
 
 
+@HUB_DB_COMMITTED
 def test_voiding_a_check_cancels_its_rounds_through_the_relay(relay, clock, product):
     """KITCHEN-F28: the tick brings the voided check; its round on the line is cancelled with its History."""
     order, lines = fired_round(product, "Burger")
@@ -235,10 +240,11 @@ def test_voiding_a_check_cancels_its_rounds_through_the_relay(relay, clock, prod
     assert LogEntry.objects.filter(ticket_id=lines[0].id, action="cancelled").count() == 1
 
 
+@HUB_DB_COMMITTED
 def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_slip_through_the_relay(
     relay, clock, product
 ):
-    """KITCHEN-F22, F28 (kitchen#168): the round went to paper; deleting its check in the till cancels it, and the
+    """KITCHEN-F22, F28: the round went to paper; deleting its check in the till cancels it, and the
     tick prints the «CANCELLED» slip of what was left, so the kitchen stops cooking it."""
     from apps.printing.models import PrintJob
 
@@ -260,8 +266,9 @@ def test_a_printed_round_whose_check_is_deleted_in_the_till_prints_its_cancel_sl
     )
 
 
+@HUB_DB_COMMITTED
 def test_a_line_voided_in_the_till_strikes_its_dish_and_prints_its_slip_through_the_relay(relay, clock, product):
-    """KITCHEN-F29 (hub#2640): the tick brings the voided line; its dish is struck with the reason, the rest of the
+    """KITCHEN-F29: the tick brings the voided line; its dish is struck with the reason, the rest of the
     round cooks on, and the station that had it on paper gets its void slip."""
     order = open_check("Table 4")
     add_line(order.id, product("Burger"))

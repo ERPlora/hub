@@ -6,10 +6,9 @@ to the kitchen (``kitchen.ticket.receive``), as production runs it: nothing is c
 reaches the dish by its kitchen name, in the order chosen, under the dish on the card and as one line each
 on paper, with the waiter's note after them.
 
-Traps of the old product: pm#93 and sales#237 (the chain of options till → ticket → kitchen, end to end),
-hub#1156 (the paper lost the options that the row had), kitchen#64 (the options travel to paper as a LIST,
-one line each, never a joined string), sales#156 and pm#115 (the note of the line, the only place an allergy
-lives, reaches card and paper).
+Traps of the old product: the chain of options till → ticket → kitchen, end to end; the paper lost the options
+that the row had; the options travel to paper as a LIST, one line each, never a joined string; the note of the
+line, the only place an allergy lives, reaches card and paper.
 """
 
 import pytest
@@ -17,9 +16,9 @@ from live.context import system_context
 
 from apps.kitchen.models import TicketItem
 
-from .conftest import A, add_line, fire, open_check, run
+from .conftest import A, HUB_DB, HUB_DB_COMMITTED, add_line, fire, open_check, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 FOOD = "restaurant.food"
 GENERIC = "product.generic"
@@ -64,6 +63,7 @@ def kitchen_sheets():
     )
 
 
+@HUB_DB_COMMITTED
 def test_the_options_of_a_dish_reach_its_card_and_its_paper_through_the_relay(relay, burger):
     dish, options = burger
     order = open_check("Table 4")
@@ -103,6 +103,7 @@ def test_the_options_of_a_dish_reach_its_card_and_its_paper_through_the_relay(re
     ]
 
 
+@HUB_DB_COMMITTED
 def test_a_dish_without_options_carries_none_on_card_or_paper(relay, product):
     order = open_check("Table 4")
     add_line(order.id, product("Fries"))

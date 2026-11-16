@@ -1,10 +1,7 @@
-"""Models of the online booking app: the public page's settings and the link of each booking made on it.
-
-A booking is an appointment of Citas (``source = "online"``): status, time, services, professional and the
+"""A booking is an appointment of Citas (``source = "online"``): status, time, services, professional and the
 customer's card live there. This app keeps only what is its own: the page (one row; without it, the factory
 values apply) and, for each booking made on the page, the hash of the customer's link and a fingerprint of
-the visitor (for the limits), both emptied when her data is erased. Phase 1 has no tenancy: every scope
-shares these tables; phase 2 moves them to each hub's database.
+the visitor (for the limits), both emptied when her data is erased.
 """
 
 from django.db import models

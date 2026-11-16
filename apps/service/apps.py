@@ -15,7 +15,7 @@ class ServiceConfig(LiveAppConfig):
     icon = "ion:briefcase-outline"
     category = Category.CATALOG
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your service menu: prices, durations, who performs each service and prepaid session vouchers."
     )
@@ -31,10 +31,16 @@ class ServiceConfig(LiveAppConfig):
     # The tax category of each service (tax.TaxCategory), the professionals who perform it
     # (staff.Member) and the owner of a voucher (customer.Customer).
     requires = ["tax", "staff", "customer"]
-    # The services' own photos (SERVICE-F35; round 2026-10-30, base.images): served by /p/media/ to the hub's sessions
-    # only.
+    # The services' own photos (SERVICE-F35; base.images): served by /p/media/ to the hub's sessions only.
     members_media = ["service/services/"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «bono» (a voucher, a pack) is the
+    # voucher of the catalogue (service.package) or the one sold to a customer (service.grant), and an «asignación»
+    # (what one «asigna») is a professional's assignment to a service (service.assignment).
+    assistant_synonyms = (
+        ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
+        ("asignacion", "asignaciones", "assignment", "assignments"),
+    )
     permissions = [
         "service.view_service",
         "service.add_service",
@@ -90,10 +96,9 @@ class ServiceConfig(LiveAppConfig):
             "service.grant_package",
         ],
     }
-    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your service catalogue» (module.json
-    # `setup`, services#26), order 31 and important, done once one offered service can be charged (its tax category
-    # alive), for whoever adds services, leading to the list of services. Refreshed on what changes the services on
-    # offer. The old module declared no panel and no bell row.
+    # The Home's step «Your service catalogue», order 31 and important, done once one offered service can be charged
+    # (its tax category alive), for whoever adds services, leading to the list of services. Refreshed on what changes
+    # the services on offer. The old module declared no panel and no bell row.
     setup = [
         SetupStep(
             key="catalog",
@@ -131,3 +136,49 @@ class ServiceConfig(LiveAppConfig):
         ),
         Nav("packages", _("Packages"), "ion:gift-outline", "/service/packages"),
     ]
+
+    def recoverable_from_copy(self) -> list:
+        """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
+        recovers from it (BASE-F114), in this order: first the categories the business lacks
+        (``queries.categories_in_copy``, ``queries.categories_not_in_business``), each made again by
+        ``service.category.recover``: created by ``service.category.create``, the screen's own, parents first;
+        then the services the copy offers and the business
+        lacks (``queries.recoverable_services_in_copy``, ``queries.services_not_in_business``), each made again by
+        ``service.service.recover``: created by ``service.service.create``, the screen's own, in its category (the same
+        one, or the one brought back just before with its name), and assigned to each professional who performed it
+        there and the business still has, by ``service.assignment.assign``, the screen's own too; last, what a category
+        brought back had inside it and the business keeps where deleting it left it (SERVICE-F08), each service and
+        each subcategory put back into it by its own link, counted apart because it touches what the business has."""
+        from apps.service import queries  # the models are not loaded yet when this module is
+        from base.recovery import Recoverable
+
+        return [
+            Recoverable(
+                label=_("Service categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.categories_not_in_business,
+                create="service.category.recover",
+            ),
+            Recoverable(
+                label=self.verbose_name,
+                reads_since="0003_service_image",
+                read=queries.recoverable_services_in_copy,
+                missing=queries.services_not_in_business,
+                create="service.service.recover",
+            ),
+            Recoverable(
+                label=_("Service links to categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.service_links_not_in_business,
+                create="service.service.return_to_category",
+            ),
+            Recoverable(
+                label=_("Subcategory links to categories"),
+                reads_since="0001_initial",
+                read=queries.categories_in_copy,
+                missing=queries.subcategory_links_not_in_business,
+                create="service.category.return_to_parent",
+            ),
+        ]

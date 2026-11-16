@@ -1,4 +1,4 @@
-"""``base.app.list``: the Apps screen (BASE-G67…G74; PLAN §20.4.1, PLAN-HUB §1a «GET /api/modules»).
+"""``base.app.list``: the Apps screen.
 
 Every module of the deployment the scope shows (``home.shown_modules``), from its ``LiveAppConfig`` in this process
 (never the SaaS): name, icon, category, one line, whether it is paid and where its right comes from
@@ -9,7 +9,7 @@ changes (``base.hub.state_applied``): a module bought there turns up here withou
 
 import pytest
 from django.apps import apps
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.live_registry import live_registry
 from live.meta import module_configs
 from live.operations import get
@@ -17,11 +17,14 @@ from live.operations import get
 from base.events import HUB_STATE_APPLIED
 from base.models import Hub
 from base.schemas import AppListIn, AppListOut
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: Business A, entered for every test with its own database.
+__all__ = ["in_business_a"]
+
 HOME = "base.view_home"
 
 
@@ -90,15 +93,39 @@ def test_names_and_categories_in_the_language_of_who_asks():
     )
 
 
+def test_each_app_says_whether_the_business_must_have_it_on_in_its_country():
+    """hub#997: Apps says «Mandatory in {country}» of what the business's country requires (each app declares it:
+    Taxes everywhere, VeriFactu in Spain), on or off; A has no country, so it is in Spain."""
+    document = app_list()
+    mandatory = {row["id"] for row in document["apps"] if row["mandatory"]}
+    assert mandatory == {"tax", "verifactu"}
+    assert document["country_name"] == "Spain"
+    assert app_list(language="es")["country_name"] == "España"
+
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    document = app_list(language="es")
+    assert {row["id"] for row in document["apps"] if row["mandatory"]} == {"tax"}
+    assert document["country_name"] == "Polonia"
+
+
+def test_each_business_reads_its_own_country(hub_b):
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    Hub.objects.filter(slug=B.key).update(country="ES")
+    in_a = by_id(app_list())["verifactu"]["mandatory"]
+    with use_hub(hub_b):
+        in_b = by_id(app_list(scope=B))["verifactu"]["mandatory"]
+    assert (in_a, in_b) == (False, True)
+
+
 def test_open_leads_to_the_first_screen_of_the_app_for_who_may_see_it():
-    """BASE-G68: «Open» only where the person has a screen to open; no permission of the app, no «Open»."""
+    """«Open» only where the person has a screen to open; no permission of the app, no «Open»."""
     with_permission = by_id(app_list("demo.view"))["demo"]
     without = by_id(app_list())["demo"]
     assert (with_permission["path"], without["path"]) == ("/demo/items", None)
 
 
 def test_what_an_app_needs_and_what_needs_it():
-    """BASE-G73: what comes along with an app (its ``requires``, transitively) and what an app is needed by."""
+    """What comes along with an app (its ``requires``, transitively) and what an app is needed by."""
     document = by_id(app_list())
     for config in module_configs():
         assert set(document[config.label]["requires"]) >= set(config.requires)
@@ -109,13 +136,13 @@ def test_what_an_app_needs_and_what_needs_it():
 
 def test_the_store_of_this_business(settings):
     settings.SAAS_URL = "https://erplora.com"
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     assert app_list()["store_url"] == f"https://erplora.com/dashboard/store/modules?business={hub.id}"
 
 
 def test_a_paid_app_without_its_right_is_blocked_and_says_so(paid_demo):
-    """BASE-G74: bought on erplora.com; until then its state is ``blocked`` and it has no «Open»."""
-    keep("a", {"modules": []})
+    """Bought on erplora.com; until then its state is ``blocked`` and it has no «Open»."""
+    keep(A.key, {"modules": []})
     demo = by_id(app_list("demo.view"))["demo"]
     assert {key: demo[key] for key in ("premium", "right", "state", "path")} == {
         "premium": True,
@@ -125,20 +152,23 @@ def test_a_paid_app_without_its_right_is_blocked_and_says_so(paid_demo):
     }
 
 
-def test_a_paid_app_says_where_its_right_comes_from(paid_demo):
-    """BASE-G70: «Included in your plan» or «Subscribed», from the SaaS's photo."""
-    keep("a", {"modules": [{"id": "demo", "source": "plan"}]})
-    keep("b", {"modules": [{"id": "demo", "source": "purchase"}]})
-    in_a, in_b = by_id(app_list("demo.view"))["demo"], by_id(app_list("demo.view", scope=B))["demo"]
+def test_a_paid_app_says_where_its_right_comes_from(paid_demo, hub_b):
+    """«Included in your plan» or «Subscribed», from the SaaS's photo."""
+    keep(A.key, {"modules": [{"id": "demo", "source": "plan"}]})
+    keep(B.key, {"modules": [{"id": "demo", "source": "purchase"}]})
+    in_a = by_id(app_list("demo.view"))["demo"]
+    with use_hub(hub_b):
+        in_b = by_id(app_list("demo.view", scope=B))["demo"]
     assert (in_a["right"], in_a["state"], in_a["path"]) == ("plan", "on", "/demo/items")
     assert (in_b["right"], in_b["state"]) == ("purchase", "on")
 
 
-def test_each_business_reads_its_own_photo(paid_demo):
-    keep("a", {"modules": [{"id": "demo", "source": "purchase"}]})
-    keep("b", {"modules": []})
+def test_each_business_reads_its_own_photo(paid_demo, hub_b):
+    keep(A.key, {"modules": [{"id": "demo", "source": "purchase"}]})
+    keep(B.key, {"modules": []})
     assert by_id(app_list(scope=A))["demo"]["state"] == "on"
-    assert by_id(app_list(scope=B))["demo"]["state"] == "blocked"
+    with use_hub(hub_b):
+        assert by_id(app_list(scope=B))["demo"]["state"] == "blocked"
 
 
 def test_a_module_out_of_the_store_stays_out_on_a_customers_hub(settings):
@@ -147,7 +177,7 @@ def test_a_module_out_of_the_store_stays_out_on_a_customers_hub(settings):
 
 
 def test_an_anonymous_visitor_or_a_stranger_gets_no_list(client):
-    response = client.get("/api/apps", HTTP_HOST="a.localhost:8000")
+    response = client.get("/api/apps", HTTP_HOST=HOST)
     assert response.status_code in (401, 403)
 
 
@@ -159,13 +189,13 @@ def test_over_http(client, make_user):
     [route] = router.path_operations["/apps"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.app.list")
     assert resolve("/api/apps").url_name
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
-    response = client.get("/api/apps", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    response = client.get("/api/apps", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 200
     assert by_id(response.json())["tax"]["name"] == "Impuestos"
 
 
-# ── base.plan.usage: how much of the plan's limits the business uses (BASE-G81) ──────────────────────────────
+# ── base.plan.usage: how much of the plan's limits the business uses ─────────────────────────────────────────
 
 
 def plan_usage(*permissions, scope=A):
@@ -184,40 +214,41 @@ def test_plan_usage_is_for_who_runs_the_business():
 
 
 def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
-    keep("a", {"plan": {"slug": "starter", "max_users": 3, "max_devices": 2}})
-    make_user("ana", host="a", role="hub_owner")
-    make_user("leo", host="a", role="hub_employee")
-    make_user("old", host="a", role="hub_employee", is_active=False)
-    make_user("bea", host="b", role="hub_owner")
+    keep(A.key, {"plan": {"slug": "starter", "max_users": 3, "max_devices": 2}})
+    make_user("ana", host=A.key, role="hub_owner")
+    make_user("leo", host=A.key, role="hub_employee")
+    make_user("old", host=A.key, role="hub_employee", is_active=False)
+    make_user("bea", host=B.key, role="hub_owner")
 
     usage = plan_usage("base.administer_hub")
     assert (usage["known"], usage["demo"]) == (True, False)
     assert usage["people"] == {"used": 2, "limit": 3}
     # The devices in use are those with a session open here (base/tests/test_access_devices.py): none yet.
     assert usage["devices"] == {"used": 0, "limit": 2}
-    # `a` shares control's database: no size of its own (base/tests/test_usage.py, BASE-F40); the rest of what this
-    # answer says of the business, in base/tests/test_plan_usage_figures.py.
-    assert usage["database"] == {"available": False, "bytes": None, "day": None}
+    # A's own database, not measured yet: its size comes with the night's measure (base/tests/test_usage.py,
+    # BASE-F40); the rest of what this answer says of the business, in base/tests/test_plan_usage_figures.py.
+    assert usage["database"] == {"available": True, "bytes": None, "day": None}
 
 
 def test_zero_in_the_plan_is_no_limit():
-    keep("a", {"plan": {"slug": "standard", "max_users": 0, "max_devices": 0}})
+    keep(A.key, {"plan": {"slug": "standard", "max_users": 0, "max_devices": 0}})
     usage = plan_usage("base.administer_hub")
     assert (usage["people"]["limit"], usage["devices"]["limit"]) == (None, None)
 
 
 @pytest.mark.parametrize("state", [{}, {"plan": None}, {"plan": "free"}, {"plan": {"slug": "x", "max_users": "3"}}])
 def test_without_a_readable_plan_it_says_it_does_not_know_it(state):
-    keep("a", state)
+    keep(A.key, state)
     usage = plan_usage("base.administer_hub")
     assert usage["known"] is False
     assert (usage["people"]["limit"], usage["devices"]["limit"]) == (None, None)
 
 
-def test_each_business_its_own_plan(make_user):
-    keep("a", {"plan": {"max_users": 3, "max_devices": 1}})
-    keep("b", {"plan": {"max_users": 10, "max_devices": 5}})
-    assert plan_usage("base.administer_hub", scope=B)["people"]["limit"] == 10
+def test_each_business_its_own_plan(make_user, hub_b):
+    keep(A.key, {"plan": {"max_users": 3, "max_devices": 1}})
+    keep(B.key, {"plan": {"max_users": 10, "max_devices": 5}})
+    with use_hub(hub_b):
+        assert plan_usage("base.administer_hub", scope=B)["people"]["limit"] == 10
 
 
 def test_plan_usage_over_http(client, make_user):
@@ -228,8 +259,8 @@ def test_plan_usage_over_http(client, make_user):
     [route] = router.path_operations["/system/plan"].operations
     assert (route.methods, route.operation_id) == (["GET"], "base.plan.usage")
     assert resolve("/api/system/plan").url_name
-    keep("a", {"plan": {"max_users": 3, "max_devices": 2}})
-    client.force_login(make_user("leo", host="a", role="hub_employee"))
-    assert client.get("/api/system/plan", HTTP_HOST="a.localhost:8000").status_code == 403
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
-    assert client.get("/api/system/plan", HTTP_HOST="a.localhost:8000").json()["people"] == {"used": 2, "limit": 3}
+    keep(A.key, {"plan": {"max_users": 3, "max_devices": 2}})
+    client.force_login(make_user("leo", host=A.key, role="hub_employee"))
+    assert client.get("/api/system/plan", HTTP_HOST=HOST).status_code == 403
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
+    assert client.get("/api/system/plan", HTTP_HOST=HOST).json()["people"] == {"used": 2, "limit": 3}

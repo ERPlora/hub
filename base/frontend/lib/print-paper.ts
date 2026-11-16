@@ -1,4 +1,4 @@
-// A paper printed inside the installed app (hub#455; ERPlora/app hub#2006, hub#2008): the app's webview prints
+// A paper printed inside the installed app (hub#455): the app's webview prints
 // nothing on `window.print()`, so the paper goes to the app's own print screen — the `print_document` command, which
 // takes a whole HTML document and opens the system's print dialog with it (a printer or «Save as PDF»: Android's
 // PrintManager, the desktop's print window). In a browser nothing changes: the caller opens the browser's dialog.
@@ -8,7 +8,7 @@
 // font-src data: https:`): the paper's own markup, the page's CSS rules that dress the paper (inline, in one
 // `<style>`) and its images at their full address. It is a string read from the DOM (`outerHTML`, `cssText`), never
 // written back into the page, so Trusted Types have nothing to say.
-import { nativeBridge } from '@erplora/ui/shell';
+import { isOlderAppRefusal, nativeBridge } from '@erplora/ui/shell';
 
 /** The app's command for the system's print screen (ERPlora/app `src-tauri/src/lib.rs`). */
 export const PRINT_DOCUMENT_COMMAND = 'print_document';
@@ -124,7 +124,7 @@ function reasonOf(answer: string): PrintRefusalReason {
   if (answer === 'print_document_refused') return 'refused';
   if (answer === 'not_the_linked_hub') return 'unlinked';
   // An app from before the command (Tauri's own answers: the ACL knows no such permission, or no such command).
-  if (/not found|not allowed/i.test(answer)) return 'outdated';
+  if (isOlderAppRefusal(answer)) return 'outdated';
   return 'failed';
 }
 

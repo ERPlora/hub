@@ -5,9 +5,11 @@
 // the tax of the business's territory, as Taxes publishes it (`useTaxKind`, `tax.settings.get`), and starts at
 // its general rate (`invoice.invoice.line_defaults`); both followed live (TAX-F11): «VAT %» and 21 on the
 // peninsula, «IGIC %» in the Canary Islands, «IPSI %» in Ceuta and Melilla, blank when the territory has no
-// rule of its own tax; a plain «Tax %» while the territory's tax is not known. «Issue invoice» stays grey until every
-// line has a description, a quantity, a price and a rate and, for an invoice series (F1), until the
-// recipient is complete; a price that is not an amount is said with its line before anything is sent.
+// rule of its own tax; a plain «Tax %» while the territory's tax is not known. «Issue invoice» stays grey until the
+// business has answered its money (each price is read in it; if that read fails the window says so with «Retry»,
+// hub#938), every line has a description, a quantity, a price
+// and a rate and, for an invoice series (F1), until the recipient is complete; a price that is not an amount is
+// said with its line before anything is sent.
 // It runs `invoice.invoice.create` (the server computes the tax, closed once per rate, and numbers it),
 // says «Invoice <number> issued» and closes; the list paints the new row by itself, live. A refusal stays in
 // the window, under its field when it is one (recipient, notes or line) until that field is corrected
@@ -18,6 +20,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 import { useTaxKind } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { typedRate, useBusinessMoney } from '../lib/format';
@@ -68,9 +72,33 @@ watch(defaultRate, (now, before) => {
   lines.value = lines.value.map((line) => (line.taxRate === before ? { ...line, taxRate: now } : line));
 });
 
+/** The series the window opened with; the first one the select picks for it, if it had none. */
+const openedSeries = shallowRef('');
+watch(
+  open,
+  (now) => {
+    if (now) openedSeries.value = seriesCode.value;
+  },
+  { immediate: true },
+);
+watch(seriesCode, (code) => {
+  if (!openedSeries.value) openedSeries.value = code;
+});
+/** The window always opens blank, its line at the territory's rate (which may arrive after it opened). */
+const opened = () => ({ series: openedSeries.value, recipient: recipientFrom(null), notes: '', lines: [blankLine(1, defaultRate.value)] });
+const canDismiss = useUnsavedForm(
+  'invoice-create',
+  () => (open.value ? { series: seriesCode.value, recipient: recipient.value, notes: notes.value, lines: lines.value } : opened()),
+  opened,
+);
+
 /** An invoice (F1) names its recipient whole; a ticket (F2) may name nobody. */
 const needsRecipient = computed(() => invoiceType.value !== 'F2');
-const ready = computed(() => linesReady(lines.value) && (!needsRecipient.value || recipientComplete(recipient.value)));
+// No price is read before the business answers its money: until then «12,50 zł» is not an amount and «1234»
+// would be read with two decimals, whatever its currency counts (hub#907).
+const ready = computed(
+  () => !!money.value && linesReady(lines.value) && (!needsRecipient.value || recipientComplete(recipient.value)),
+);
 const error = computed<FormModalError | null>(() => {
   if (local.value) return { message: local.value };
   // Without the territory's general rate the line starts blank: the person types it.
@@ -80,8 +108,9 @@ const error = computed<FormModalError | null>(() => {
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function issue(): Promise<void> {
-  if (!ready.value || command.pending.value) return;
-  const unreadable = unreadablePrice(lines.value, money.value);
+  const business = money.value;
+  if (!business || !ready.value || command.pending.value) return;
+  const unreadable = unreadablePrice(lines.value, business);
   local.value = unreadable === null ? null : t('invoice.create.notAnAmount', { line: unreadable });
   if (local.value) return;
   let invoice;
@@ -90,7 +119,7 @@ async function issue(): Promise<void> {
       ...(seriesCode.value ? { series_code: seriesCode.value } : {}),
       ...recipientPayload(recipient.value),
       notes: notes.value.trim(),
-      lines: lines.value.map((line) => linePayload(line, money.value)),
+      lines: lines.value.map((line) => linePayload(line, business)),
     });
   } catch {
     return; // The window shows `command.error`.
@@ -104,6 +133,7 @@ async function issue(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-create"
     :title="$t('invoice.create.title')"
     :submit-label="$t('invoice.create.submit')"
@@ -115,6 +145,7 @@ async function issue(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="invoice-create__fields">
+        <BusinessMoneyError />
         <SeriesSelect
           v-model="seriesCode"
           v-model:invoice-type="invoiceType"
@@ -125,6 +156,7 @@ async function issue(): Promise<void> {
         />
         <ion-input
           data-testid="invoice-create-notes"
+          name="notes"
           :label="$t('invoice.create.notes')"
           label-placement="floating"
           fill="outline"

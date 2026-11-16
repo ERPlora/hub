@@ -1,4 +1,4 @@
-"""A product's image (round 2026-10-30, «blueprints con imágenes»; the WORKBOOK's «duda 6»): ``Product.image``.
+"""A product's image (the WORKBOOK's «duda 6»): ``Product.image``.
 
 A product shows an image of the shared library (``catalog:<folder>/<name>``, ``base.image_catalog``) or a photo of its
 own (``file:inventory/products/<uuid7 hex>.webp`` under its hub's prefix, ``base.images``), or none: the till shows its
@@ -41,12 +41,13 @@ from apps.inventory.schemas import (
 from apps.tax.models import TaxCategory
 from base.models import Hub
 from base.storage import hub_prefix
+from base.tenancy.context import current_alias
 from base.tests.test_image_catalog import image_library, webp  # noqa: F401 - the library fixture
 from base.tests.test_images import hub_files  # noqa: F401 - the store fixture
 
-from .conftest import ctx_for
+from .conftest import A, HOST, HUB_DB, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TAX = "test.general"
 FOLDER = "inventory/products/"
@@ -100,7 +101,7 @@ def clear_outbox():
 
 
 def hub_a() -> uuid.UUID:
-    return Hub.objects.get(slug="a").id
+    return Hub.objects.get(slug=A.key).id
 
 
 def key(reference: str) -> str:
@@ -243,7 +244,7 @@ def test_a_photo_of_its_own_replaced_by_an_image_of_the_library_is_deleted_once_
     created = product()
     own = upload(photo(), created.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         set_image(LATTE, created.id)
 
     assert not hub_files.exists(key(own))
@@ -294,7 +295,7 @@ def test_a_new_photo_takes_the_place_of_the_last_one_which_is_deleted_once_saved
     created = product()
     first = upload(photo(), created.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         second = upload(photo("PNG", (300, 300)), created.id).image
 
     assert second != first
@@ -318,7 +319,7 @@ def test_a_photo_the_store_fails_to_delete_is_logged_and_the_new_one_stands(
     upload(photo(), created.id)
     monkeypatch.setattr(hub_files, "delete", lambda name: (_ for _ in ()).throw(OSError("the bucket did not answer")))
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         second = upload(photo("PNG", (300, 300)), created.id).image
 
     assert Product.objects.get().image == second
@@ -346,7 +347,7 @@ def test_a_file_that_is_no_photo_is_refused_in_the_persons_language(hub_files): 
 
 def test_a_photo_past_the_plans_space_is_refused_and_the_product_keeps_its_image(hub_files):  # noqa: F811
     created = product()
-    Hub.objects.filter(slug="a").update(state={"plan": {"max_storage_bytes": 10}})
+    Hub.objects.filter(slug=A.key).update(state={"plan": {"max_storage_bytes": 10}})
 
     with pytest.raises(Conflict) as refused:
         upload(photo(), created.id)
@@ -359,7 +360,7 @@ def test_deleting_the_product_deletes_its_photo_once_saved(hub_files, django_cap
     created = product()
     own = upload(photo(), created.id).image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         run("inventory.product.delete", ProductRefIn(id=created.id))
 
     assert not hub_files.exists(key(own))
@@ -412,7 +413,7 @@ def test_it_suggests_the_librarys_images_for_the_products_name_the_best_first_an
 
 def test_the_suggestions_are_titled_in_the_businesss_language_for_an_employee_too(image_library):  # noqa: F811
     created = product("White coffee")
-    Hub.objects.filter(slug="a").update(language="es")
+    Hub.objects.filter(slug=A.key).update(language="es")
 
     found = run("inventory.product.suggest_image", ProductImageSuggestIn(id=created.id), "hub_employee", language="en")
 
@@ -464,12 +465,12 @@ def test_a_product_without_image_reads_without_asking_the_hub(monkeypatch):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 def post(client, path, data):
-    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST="a.localhost")
+    return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=HOST)
 
 
 def test_a_photo_of_nearly_2_mb_goes_through_the_route(admin_client, hub_files):  # noqa: F811
@@ -494,7 +495,7 @@ def test_set_and_suggest_over_http(admin_client, image_library):  # noqa: F811
 
     response = post(admin_client, "/inventory/products/image", {"id": str(created.id), "image": LATTE})
     found = admin_client.get(
-        "/api/inventory/products/image/suggest", {"id": str(created.id)}, HTTP_HOST="a.localhost"
+        "/api/inventory/products/image/suggest", {"id": str(created.id)}, HTTP_HOST=HOST
     )
 
     assert response.status_code == 200, response.content
@@ -507,11 +508,11 @@ def test_a_session_of_the_hub_sees_a_products_photo_and_a_visitor_does_not(admin
     created = product()
     url = upload(photo(), created.id).image_url
 
-    seen = admin_client.get(url, HTTP_HOST="a.localhost:8000")
+    seen = admin_client.get(url, HTTP_HOST=f"{HOST}:8000")
     assert seen.status_code == 200
     assert seen["Content-Type"] == "image/webp"
     admin_client.logout()
-    assert admin_client.get(url, HTTP_HOST="a.localhost:8000").status_code == 404
+    assert admin_client.get(url, HTTP_HOST=f"{HOST}:8000").status_code == 404
 
 
 def test_the_image_is_said_in_english_and_spanish():

@@ -1,6 +1,6 @@
 // The «VeriFactu receipt» of an open invoice (INVOICE-F17 with VERIFACTU-F19; the old detail's card): the state
 // of its record at the AEAT, its CSV once the AEAT answered, the QR to scan and «Check at the tax agency ↗», which
-// opens the AEAT's own page in another tab (in the installed app, the system browser: gh:hub#518). A record of the AEAT's
+// opens the AEAT's own page in another tab (in the installed app, the system browser). A record of the AEAT's
 // test environment says so.
 import { StatusPill } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';

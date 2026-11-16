@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df8a83bfc89c7619e05b8eb90bbb379b6cadfcb1a17e4aa2be4b1c1b62f7322c -->
+<!-- generated from WORKBOOK.md sha256:26fdf12c67137fa95a580dbcd7fd546931098cc86c09c82b2ef4ae3a2bd3166a -->
 
 ## What it is for and who it is for
 
@@ -68,7 +68,11 @@ the cash figures: "Current session" and "Recent discrepancies" (CASH_REGISTER-F1
 on the **Home** panels). Then the table of
 sessions, from the most recent to the oldest, 50 per page: Session, Opened on, Status ("Open", "Closed"),
 Opening, Expected, Counted, Difference. Search box "Search session…" (by number), filters (status, number
-and the four amounts) and table or card view. Per row: "Detail" always and, in the open session,
+and the four amounts) and table or card view. The amounts "from / to" are typed as in any amount field of the
+Hub and as in the other lists (hub#1196: "1.000,50", "1,000.50", "2 500", "12,50 €"; only the difference takes
+a sign, "-5"); one that cannot be read does not filter and says so under its box in the words of the amount
+field ("This is not an amount…", "This amount cannot be negative." or, with "1.000" in euros, "This amount can
+be read in two ways…"). Per row: "Detail" always and, in the open session,
 "Movement", "Count" and "Close"; tapping the row opens the detail. Each action opens its window:
 
 - **Open cash session**: "Drawer" (optional; only if there are drawers), "Opening float", "Notes", "Open
@@ -80,6 +84,12 @@ and the four amounts) and table or card view. Per row: "Detail" always and, in t
   "Total counted" field. "Register count" and "Cancel".
 - **Close session · S-…**: the shift review, "Expected in the drawer" and "Difference" live (if whoever
   closes may see them), "Counted cash", "Closing notes", "Close session" and "Cancel".
+
+The amounts ("Opening float", "Amount", the "Total counted" typed by hand and "Counted cash") are typed in the same
+field as a price everywhere else in the Hub, and read the same way (hub#1160): the label floats inside the field, on
+leaving it what was typed is rewritten in the page's format ("12.555" becomes "12555.00": €12,555.00) and, if it is
+not an amount, it says so underneath ("0.515" or "abc": "This is not an amount. Type a figure, for example 12.50.";
+"-5": "This amount cannot be negative."; "1,250": "This amount can be read in two ways…").
 
 Success shows as a green notice ("Session opened", "Cash-in recorded (…)", "Count recorded · total
 counted …", "Session S-… closed · expected … · counted … · difference …"); a refusal, inside the window,
@@ -101,7 +111,8 @@ From **Cash register**, "Detail" or tapping a row: it opens as a page, with its 
 in two columns: Status, Drawer, Opened (when and by whom), Closed (when and by whom, or "Closed by
 itself"), Movements (how many), Opening float, Sales (all payment methods) and, below, Cash sales, Card
 sales and Sales with other payment methods (this one only if there were any), Refunds, Cash in, Cash out,
-Comps, Expected, Counted and Difference, and the opening and closing notes. In an open session Counted
+Comps, Expected, Counted and Difference, and the opening and closing notes. With the Tips app turned on, also
+"Cash tips", "Card tips" and "Tips paid out" (CASH_REGISTER-F18). In an open session Counted
 and Difference show "—". Below, two tables, from the most recent to the oldest, 50 per page and as cards
 on the phone: **Movements** (When, Type, Amount with its sign, Method, Concept) and **Counts** (When,
 Count type, Total counted, Notes). Empty: "No movements in this session." and "No counts in this
@@ -130,6 +141,12 @@ changes: that way the business keeps the default ones.
 | App inactive | "Cash register is not active in this business." instead of the list. |
 | No permission | What they cannot do does not show ("Open session", "Movement", "Count", "Close", "Save"); if they get there another way, "You do not have permission". |
 
+## Unsaved changes on Android
+
+In this app's windows (drawer, opening, movement, count and closing a session), the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); the drawer chosen by itself and the cash the closing proposes from the last count are no change.
+
 ## Flows
 
 | ID | Flow | Vertical | Status |
@@ -151,6 +168,7 @@ changes: that way the business keeps the default ones.
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | not done |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 Status: done
@@ -194,7 +212,8 @@ In: the drawer's name.
 Out: the drawer (announces: `cash_register.register.created` or `cash_register.register.updated`). A
 drawer is never deleted: the sessions name it.
 If it fails: without a name, "Type the drawer's name."; with a name another drawer already has (whatever
-the case), "There is already a drawer with that name.".
+the case), "There is already a drawer with that name.". Both show under the name and go as soon as
+something is typed in it, without tapping "Save" again (hub#1470).
 Involved: CASH_REGISTER-F03
 
 ### CASH_REGISTER-F03 Open the cash shift with the starting float
@@ -217,7 +236,14 @@ business, whatever the drawer; if two devices open at once, only one opens and t
 notice); with the float required and the float empty or zero, "This business requires an opening float:
 give the cash the drawer starts with." under the field; a deactivated drawer or one that does not exist,
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
-12.50."), a negative or an ambiguous one ("1,250") is stopped before sending.
+12.50."), a negative ("This amount cannot be negative.") or an ambiguous one ("1,250") is said under the field on
+leaving it or on tapping "Open session", and nothing is sent; "12.555" is not ambiguous: it is €12,555.00, as in a
+price (hub#1160). The notice the server puts under a field (the required float) goes as soon as that field
+changes, without tapping "Open session" again; another field's stays until its own changes (hub#1470).
+"Open session" is grey while
+the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
+be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up (hub#938).
 Involved: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Sell only with the cash register open
@@ -256,9 +282,14 @@ count towards the expected cash.
 Out: the movement, in the name of whoever records it (announces: `cash_register.movement.added`). The
 sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
-the settings do not allow it; a zero, unreadable or negative amount is stopped before sending; the
+the settings do not allow it; a zero ("Invalid amount"), unreadable, negative or ambiguous amount is said under the
+field and nothing is sent (it is read as in F03); a field's notice goes as soon as that field changes,
+without tapping "Register" again, and another field's stays until its own changes (hub#1470); the
 session closed on another device: "That cash session is closed: a closed session takes no new
-movements.". A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
+movements.". "Register" is grey while the business has not yet said its currency, because the amount is
+read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Register" lights up (hub#938).
+A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
 that says why.
 Involved: none
 
@@ -282,7 +313,8 @@ system with the currency's decimals; a total typed by hand (or sent through the 
 and prevails over the breakdown.
 If it fails: a closed session, "That cash session is closed: a closed session takes no new movements."; a
 note or coin that is not of the business's currency, under the breakdown; with neither breakdown nor
-total, "Count the drawer: give its notes and coins or its total.".
+total, "Count the drawer: give its notes and coins or its total."; a total typed by hand that is not an amount says
+so under the field on leaving it (it is read as in F03) and "Register count" stays grey.
 Involved: CASH_REGISTER-F09
 
 ### CASH_REGISTER-F07 Blind count: who sees the expected cash
@@ -349,7 +381,8 @@ Steps:
    the counted cash and, if you may see the expected cash, the expected cash and the difference (with the
    blind count it does not tell them to whoever may not see them: the assistant does not know them
    either, F07), and whatever the shift review finds still open (F08).
-6. Then "Run this action?" shows with "Close in Cash register. Check each datum before going on.", the
+6. In that same answer, without you having to ask again, "Run this action?" shows with "Close in Cash
+   register. Check each datum before going on.", the
    session by its number (never by its internal code) and the counted cash and, in "What will happen", what closing gives: the "Session", the
    "Drawer" (if the session has one), the "Expected in the drawer" and the "Difference", in the business's
    currency (with the blind count, whoever may not see the expected cash does not get those two, F07).
@@ -364,7 +397,12 @@ cash; what is charged or recorded by card, transfer or other does not count), co
 `cash_register.session.closed`). The Sales lines of the shift are copied into the session: whatever
 happens afterwards (a void of a sale from yesterday) goes to the open shift, never to this one.
 If it fails: "Type the counted cash to close the session." with the field empty (the screen always asks
-for it; the required count setting enforces it on the assistant and the API too); if another device
+for it; the required count setting enforces it on the assistant and the API too); an unreadable, negative or
+ambiguous one is said under the field and closes nothing (it is read as in F03). "Close session" is grey
+while the business has not yet said its currency, and the last closing count is not written in the field
+until then: the counted cash is written and read in it (without it, "1500" yen would be saved as 150,000
+and a count of 1500 yen would show as "15.00"). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Close session" lights up (hub#938). If another device
 closed it before, "That cash session is closed: a closed session takes no new movements." (two closes at
 once: one closes, the other gets this notice). To the assistant, if the count is required and you do not
 say how much you counted, it asks for it with that same notice and no confirmation shows; if the
@@ -550,6 +588,32 @@ warn.
 If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
+### CASH_REGISTER-F18 See the tips in the cash register
+Status: not done — the Cash register does not tell yet what another app records (hub#1499)
+Vertical: common
+Actor: system, employee, manager
+Screen: Cash register, Session detail
+Steps:
+1. With the Tips app turned on, the cashier takes a tip (TIP-F02 to TIP-F05) or a manager pays it out
+   (TIP-F12).
+2. Without anyone typing anything, the open session gets its line: "Tip" in cash or by card, or "Tips paid
+   out" in cash, with the sale or the person in the concept.
+3. In the **Session detail**, the summary shows them apart from the sales, the cash in and the cash out: "Cash
+   tips", "Card tips" (and with other payment methods, if there were any) and "Tips paid out".
+4. Only cash touches the expected cash: a cash tip raises it (it is in the drawer) and a tip paid out in cash
+   lowers it (it left the drawer); a card tip does not. That way the count squares at closing (F09).
+5. The X or Z report (F16) carries the same three lines, and the "Close session" window counts the cash tips
+   in "Expected in the drawer".
+In: the cash in and cash out that Tips records in the open session, marked as its own
+(`cash_register.movement.add`).
+Out: the lines in the session (announces: `cash_register.movement.added`), with the name of the app that
+records them. The sales figures do not change: a tip is never a sale.
+If it fails: with no open session, Tips does not record a cash tip and refuses it with its notice (TIP-F04); a
+card tip is kept in Tips and goes into no session. A tip line is not corrected with a movement by hand: it is
+adjusted or voided in Tips (TIP-F06), which records the difference in the open session; the closed one is never
+touched.
+Involved: TIP-F02, TIP-F03, TIP-F04, TIP-F05, TIP-F06, TIP-F12, CASH_REGISTER-F09, CASH_REGISTER-F16
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
@@ -587,7 +651,7 @@ All of them can be followed live.
 | Opens a session with its float | open | F03, F10 | `cash_register.session.open` |
 | Closes a session with the counted cash | close | F09 | `cash_register.session.close` |
 | Closes the sessions forgotten at the cut-off of the day | close | F10 | `cash_register.session.auto_close` |
-| Records cash in or cash out | record | F05 | `cash_register.movement.add` |
+| Records cash in or cash out (also the one another app records, such as Tips, marked as its own) | record | F05, F18 | `cash_register.movement.add` |
 | Registers a count | count | F06 | `cash_register.count.add` |
 | Prints the X or Z report of a session on the receipt printer | view sessions | F16 | `cash_register.session.print` |
 
@@ -648,6 +712,7 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | App | What for | Service |
 |---|---|---|
 | Sales & POS | Knowing whether it can charge in cash (F04) | `cash_register.session.current` |
+| Tips | Recording what comes in and goes out of tips (F18) | `cash_register.movement.add` |
 
 ### Who can do what
 
@@ -663,5 +728,4 @@ Cash register was off or did not answer is seen in CASH_REGISTER-F17.
 | See the expected cash with the blind count | yes | yes | yes | no | `cash_register.view_expected_totals` |
 | Settings and drawers | yes | yes | no | no | `cash_register.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`);
-the cashier of the current product is an employee.
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

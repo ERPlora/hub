@@ -1,12 +1,9 @@
-"""The flow app's events (``flow.<entity>.<fact>``) and its reaction to every other app's events.
-
-There is no outbox relay yet (phase 2 runs it in the worker); the reaction is tested by handing ``react``
-(or ``deliver``) a real event of the outbox, made by another app's real operation, as the relay will.
+"""The reaction is tested by handing ``react`` (or ``deliver``) a real event of the outbox, made by another app's real
+operation, as the worker's outbox relay does.
 """
 
 import re
 
-import pytest
 from live.context import system_context
 from live.models import OutboxEvent
 from live.operations import NAME_RE
@@ -15,7 +12,7 @@ from apps.flow import events
 from apps.flow.models import FlowRun
 from apps.task.models import Task
 
-from .conftest import A, make_flow, run
+from .conftest import A, HUB_DB, make_flow, run
 
 PAST_FACT = re.compile(r"^flow\.[a-z_]+\.[a-z_]+ed$")
 
@@ -62,13 +59,18 @@ def test_all_lists_every_event_once_and_the_groups_cover_them():
     assert events.FLOW_EVENTS + events.RUN_EVENTS + events.DRAFT_EVENTS + events.SECRET_EVENTS + events.QUESTION_EVENTS == events.ALL
 
 
-def test_it_reacts_to_every_event_and_to_its_own_parked_runs():
+def test_it_reacts_to_every_event_to_its_own_parked_runs_and_to_an_erased_card():
     # The relay hands every other app's event to flow (WORKBOOK FLOW-F21), and its own `flow.run.parked`,
-    # so the worker makes a parked call (FLOW-F27), never the request that parked it.
-    assert events.REACTIONS == {"*": "flow.run.react", "flow.run.parked": "flow.run.call"}
+    # so the worker makes a parked call (FLOW-F27), never the request that parked it. An erased card
+    # (CUSTOMER-F16) first stops the runs that keep her data, then starts what waits for it (hub#1225).
+    assert events.REACTIONS == {
+        "*": "flow.run.react",
+        "flow.run.parked": "flow.run.call",
+        "customer.customer.erased": "flow.customer.erase",
+    }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_starts_the_flows_of_a_real_event_as_the_platform():
     flow = make_flow()
     run("customer.customer.create", {"name": "Ana López"}, system_context(A))
@@ -81,7 +83,7 @@ def test_react_starts_the_flows_of_a_real_event_as_the_platform():
     assert Task.objects.filter(title="Welcome the new customer").count() == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_passes_the_id_and_the_actor_of_the_event():
     make_flow()
     result = events.react(

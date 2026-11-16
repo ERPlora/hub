@@ -4,9 +4,10 @@ Lo que las páginas de Menús necesitan de `@erplora/ui` y todavía no está. Mi
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
 **Al cerrar la app (2026-10-21)**, contra `ERPlora/ui` `origin/main` `f62af6b`: no ha llegado nada de lo de abajo.
-Ninguno rompe un flujo (todos tienen su sustituto), así que pasan a «Fuera por ahora» (`## 6` de `MIGRATION.md`) con
-las claves `combo:ui-icons`, `combo:ui-money-reader` y `combo:ui-live-server-table`. Quien los suba a `ui` los borra
-de aquí y cambia el sustituto en la misma PR del puntero.
+Ninguno rompe un flujo (todos tienen su sustituto), así que pasan a «Fuera por ahora» (`## 6` de
+`archive/migration/MIGRATION.md` de `ERPlora/erplora-next`) con las claves `combo:ui-icons`, `combo:ui-money-reader` y
+`combo:ui-live-server-table`. Quien los suba a `ui` los borra de aquí y cambia el sustituto en la misma PR del
+puntero.
 
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
@@ -19,10 +20,9 @@ de aquí y cambia el sustituto en la misma PR del puntero.
 
 ## Componentes compartidos
 
-- **Lector de importes** (`lib/money.ts` + `components/MoneyInput.vue`): es el mismo de Servicios e
-  Inventario con el signo opcional (`signed`) que necesita el suplemento. Cada app lleva hoy su copia
-  porque una app no importa el código de otra; debería vivir en `@erplora/ui/components` como
-  `MoneyInput` con la prop `signed`. Al llegar, se borran las copias.
+- **Lector de importes**: llegó (hub#924, parte 2): `MenuFormModal` y `CourseCard` usan el `MoneyInput` de
+  `@erplora/ui/components` (el suplemento, con la prop `signed` y su botón ±) y leen con
+  `parseMoney(text, { money, signed })`; la copia de la app (`lib/money.ts` + `components/MoneyInput.vue`) se borró.
 - **`useLiveList` / `useServerTable` / `useT`**: copias de las de Impuestos, como en el resto de apps;
   mismo destino (`@erplora/ui/sdk`).
 - **Nombre de un buscador suelto** (`useSearchbarName`, la misma petición que `sale`): Ionic 8 anuncia el campo de

@@ -5,11 +5,8 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.schedule import models, queries, schemas, services
 from apps.schedule.models import (
@@ -21,7 +18,19 @@ from apps.schedule.models import (
     WeekDay,
     WeekDayInterval,
 )
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("schedule").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -35,76 +44,34 @@ MODELS = (
 )
 
 
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, messages, day names) and the titles
     of its schemas."""
     config = apps.get_app_config("schedule")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        # The Home's step (FIX-SCHEDULE-SETUP-HOOKS).
+        *config_texts(config),
+        # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
         *models.WEEKDAY_NAMES,
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += model_texts(MODELS)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles schedule's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones schedule wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "schedule"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("schedule")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert (
-        len(visible_texts()) > 40
-    )  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    """Each text of Horarios by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
+    back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=40, with_context=6) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_schedules_own_spanish():
@@ -113,7 +80,7 @@ def test_the_card_says_each_title_with_schedules_own_spanish():
     apps."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("schedule")
     assert {"Opening intervals", "Special days"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
@@ -167,14 +134,14 @@ def test_placeholders_survive_the_translation():
         ), msgid
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/schedule/special_days/delete",
         json.dumps({"special_day": "Easter"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

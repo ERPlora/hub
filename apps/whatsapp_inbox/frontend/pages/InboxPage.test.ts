@@ -87,7 +87,7 @@ describe('InboxPage: the live list', () => {
     }
   });
 
-  it('while the list loads, the table says it is loading, never «0 conversations» (gh:pm#611)', async () => {
+  it('while the list loads, the table says it is loading, never «0 conversations»', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);
     await s.result(LIST, PAGE);
@@ -245,8 +245,8 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
   });
 
-  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
-  // nothing (gh:hub#439), so there the inbox says it without the link.
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link would open
+  // nothing, so there the inbox says it without the link.
   it('«Upgrade plan» sells: never on the app surfaces, where the inbox still says the month is spent', async () => {
     applySurface('mobile');
     try {
@@ -268,6 +268,8 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
       target: '_blank',
       rel: 'noopener',
     });
+    // Each notice puts the inbox's own words inside the platform's link (hub#853): this one too, not only the cap's.
+    expect(near.find('whatsapp-inbox-upgrade').text()).toBe('Upgrade plan');
     const employee = await setup({ session: EMPLOYEE }, { ...CONNECTED, monthly_usage: 120 });
     expect(employee.find('whatsapp-inbox-near-cap').text()).toContain('You have 30 of 150 WhatsApp messages of your plan left this month.');
     expect(employee.find('whatsapp-inbox-upgrade').exists()).toBe(false);
@@ -281,7 +283,17 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(near.find('whatsapp-inbox-near-cap').exists()).toBe(false);
   });
 
-  it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (ADR-0474: 0 = none)', async () => {
+  it.each([
+    ['es', 149, 'Te queda 1 de 150 mensajes de WhatsApp de tu plan este mes.'],
+    ['es', 120, 'Te quedan 30 de 150 mensajes de WhatsApp de tu plan este mes.'],
+    ['en', 149, 'You have 1 of 150 WhatsApp messages of your plan left this month.'],
+    ['en', 120, 'You have 30 of 150 WhatsApp messages of your plan left this month.'],
+  ] as const)('in %s, near the cap with %i sent: the singular for one message left, the plural from two (hub#1044)', async (locale, used, said) => {
+    const near = await setup({ locale }, { ...CONNECTED, monthly_usage: used });
+    expect(near.find('whatsapp-inbox-near-cap').text()).toContain(said);
+  });
+
+  it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (0 = none)', async () => {
     const none = { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true };
     const s = await setup({}, none);
     const notice = s.find('whatsapp-inbox-cap-reached');
@@ -312,7 +324,7 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     }
   });
 
-  it('a number reconnected (or a new month) takes its notice away by itself, without reloading (gh:hub#2064)', async () => {
+  it('a number reconnected (or a new month) takes its notice away by itself, without reloading', async () => {
     const s = await setup({}, { ...CONNECTED, status: 'reconnect_needed', cap_reached: true });
     expect(s.find('whatsapp-inbox-reconnect').exists()).toBe(true);
     expect(s.find('whatsapp-inbox-cap-reached').exists()).toBe(true);
@@ -331,12 +343,13 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(none.find('whatsapp-inbox-upgrade').text()).toBe('Mejorar el plan');
     const near = await setup({ locale: 'es' }, { ...CONNECTED, monthly_usage: 120 });
     expect(near.find('whatsapp-inbox-near-cap').text()).toContain('Te quedan 30 de 150 mensajes de WhatsApp de tu plan este mes.');
+    expect(near.find('whatsapp-inbox-upgrade').text()).toBe('Mejorar el plan');
     await s.result(LIST, PAGE);
     expect(s.prop('searchPlaceholder')).toBe('Filtrar contacto o teléfono…');
   });
 });
 
-describe('InboxPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('InboxPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

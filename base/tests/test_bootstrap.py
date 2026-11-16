@@ -1,8 +1,8 @@
-"""``base.tenancy.bootstrap``: what ``manage.py bootstrap_databases`` runs (aws-next, «Contrato»).
+"""``base.tenancy.bootstrap``: what ``manage.py bootstrap_databases`` runs (the aws repo's ``db-bootstrap`` task).
 
-Databases ``saas``, ``hub`` and ``hub_template``; the roles of PLAN-DB §10 with their passwords
-(``*_PASSWORD``), timeouts (§12.2) and default privileges; ``vector`` in the template and in
-``saas``; the ``shared`` schema of ``saas`` for ``hub_shared`` (round 16, PLAN §21; spec §3.3).
+Databases ``saas``, ``hub`` and ``hub_template``; the platform's roles with their passwords
+(``*_PASSWORD``), timeouts and default privileges; ``vector`` in the template and in
+``saas``; the ``shared`` schema of ``saas`` for ``hub_shared``.
 Here, what each role can and cannot do once bootstrapped; the command's output and exit codes are
 ``test_bootstrap_databases.py``, which reuses these helpers.
 
@@ -28,7 +28,7 @@ from psycopg import errors, sql
 
 from base.tenancy import bootstrap
 
-#: The contract with aws-next (``stacks/prod/apps.tf``, task ``db-bootstrap``): role → variable.
+#: The contract with the aws repo (``stacks/prod/apps.tf``, task ``db-bootstrap``): role → variable.
 VARIABLES = {
     "hub_app": "HUB_APP_PASSWORD",
     "saas_app": "SAAS_APP_PASSWORD",
@@ -243,7 +243,7 @@ def test_owners_createdb_and_no_superuser_follow_plan_db(cluster):
         f"{p}saas": f"{p}saas_migrator",
     }
     assert createdb == {p + role: role == "hub_migrator" for role in VARIABLES}
-    # PLAN-DB §14.6: no role of the platform is a superuser, hub_app least of all.
+    # No role of the platform is a superuser, hub_app least of all.
     assert {name: is_super for name, _can_create, is_super in roles} == {p + role: False for role in VARIABLES}
 
 
@@ -312,7 +312,7 @@ def test_public_cannot_connect_and_each_role_reaches_only_its_databases(
 
 
 def hub_from_template(cluster: Cluster) -> str:
-    """A hub database cloned from the template and opened as the alta does (PLAN-DB §6, 1–2)."""
+    """A hub database cloned from the template and opened as a new business's sign-up does."""
     hub = cluster.prefix + "hub_cloned"
     with cluster.connect("hub_migrator", "postgres") as conn:
         conn.execute(
@@ -371,7 +371,7 @@ def test_hub_app_gets_dml_and_hub_admin_reads_what_hub_migrator_creates(
 
 @pytest.mark.parametrize("database", ["control", "a hub cloned from the template"])
 def test_hub_app_reads_the_record_of_migrations_and_never_writes_it(cluster, database):
-    # PLAN-DB §14.6: what says which schema a database has is the migrator's alone. The migrations run as hub_migrator
+    # What says which schema a database has is the migrator's alone. The migrations run as hub_migrator
     # after the bootstrap (its default privileges give hub_app DML on every table it makes), and every hub is a clone
     # of the template.
     n = cluster.names
@@ -519,7 +519,7 @@ def test_a_missing_extension_fails_in_production_and_is_skipped_locally(
 def test_a_master_that_cannot_create_an_extension_fails_with_the_servers_reason(
     cluster,
 ):
-    # What saas-migrate met in pre (saas#171) with vector; dblink is untrusted too, and in every image's contrib.
+    # What saas-migrate met in pre with vector; dblink is untrusted too, and in every image's contrib.
     reason = 'permission denied to create extension "dblink"'
 
     with pytest.raises(bootstrap.BootstrapError) as raised:
@@ -531,8 +531,8 @@ def test_a_master_that_cannot_create_an_extension_fails_with_the_servers_reason(
 def test_the_master_makes_vector_in_saas_so_the_saas_migration_only_finds_it(
     rds_cluster,
 ):
-    # saas#171: saas_migrator runs pgvector's VectorExtension (CREATE EXTENSION IF NOT EXISTS vector), which
-    # Aurora refuses it ("Must be rds_superuser"); PostgreSQL looks for the extension before it checks the role.
+    # saas_migrator runs pgvector's VectorExtension (CREATE EXTENSION IF NOT EXISTS vector), which Aurora refuses
+    # ("Must be rds_superuser"); PostgreSQL looks for the extension before it checks the role.
     n = rds_cluster.names
     migration = "CREATE EXTENSION IF NOT EXISTS vector"
 

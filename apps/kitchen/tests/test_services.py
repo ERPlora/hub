@@ -14,21 +14,12 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.kitchen.models import KitchenSettings, LogEntry, Station, Ticket, TicketItem
+from base.tenancy.context import use_hub
 
-from .conftest import (
-    A,
-    add_line,
-    charge,
-    ctx_for,
-    fire,
-    fired_round,
-    make_station,
-    open_check,
-    route_product,
-    run,
-)
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, charge, ctx_for, fire, fired_round, make_station
+from .conftest import open_check, route_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 
@@ -256,6 +247,17 @@ def test_receiving_a_round_the_kitchen_already_saved_gives_it_what_the_send_said
         "takeaway",
         "Pickup Ana",
     )
+
+
+def test_receiving_a_round_that_says_no_priority_leaves_its_ticket_normal(clock, product):
+    """The round asked for by its check and its number alone (the assistant, hub#671): a normal ticket, never one with
+    an empty priority the board cannot sort nor the card say."""
+    order = open_check("Table 4")
+    add_line(order.id, product("Burger"))
+    fired = fire(order.id)
+    data = {"order_id": str(order.id), "round_no": fired.round_no}
+    assert run("kitchen.ticket.receive", data, system_context(A)).ticket.priority == "normal"
+    assert Ticket.objects.get().priority == "normal"
 
 
 def test_a_round_of_services_only_opens_nothing(clock, product):
@@ -621,7 +623,7 @@ def test_reprinting_a_ticket_that_went_to_paper_prints_a_copy_every_time(clock, 
 
 
 def test_printing_a_ticket_that_never_went_to_paper_prints_it_as_the_first_sheet(clock, product):
-    # F09: a round fired by Sales alone (phase 1) never printed: «Reprint» prints it, not as a copy.
+    # F09: a round only Sales fired was never printed: «Reprint» prints it, not as a copy.
     _, lines = fired_round(product, "Burger")
     run("kitchen.ticket.reprint", {"ticket_id": str(lines[0].id)})
     run("kitchen.ticket.reprint", {"ticket_id": str(lines[0].id)})
@@ -975,14 +977,13 @@ def received(session, timeout=1.0, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_ticket_made_in_b_wakes_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_ticket_made_in_b_wakes_b_only(listen, hub_b):
     from live.outbox import channel_for
 
-    from .conftest import B
-
     on_a, on_b = listen(A), listen(B)
-    run("kitchen.ticket.create", {"items": [{"name": "Staff meal"}]}, ctx_for(scope=B))
+    with use_hub(hub_b):
+        run("kitchen.ticket.create", {"items": [{"name": "Staff meal"}]}, ctx_for(scope=B))
     # The ticket and its sheet (Printing's own operation, nested) wake B, each after the COMMIT.
     on_b_events = received(on_b, stop_after=2)
     assert {channel for channel, _ in on_b_events} == {channel_for(B)}

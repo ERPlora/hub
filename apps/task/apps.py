@@ -9,11 +9,11 @@ class TaskConfig(LiveAppConfig):
     label = "task"
     kind = "app"
     verbose_name = _("Tasks")
-    # The old module's `checkbox-outline`, registered in the shell (ION_ICONS).
+    # Registered in the shell (ION_ICONS).
     icon = "ion:checkbox-outline"
     category = Category.ORGANIZATION
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Your team's to-do list: tasks with who does them, priority and due date, projects and comments."
     )
@@ -28,6 +28,17 @@ class TaskConfig(LiveAppConfig):
     # The assignee and a project's owner are staff records (staff.Member).
     requires = ["staff"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «tarea» and a «proyecto» are the task
+    # and the project (task.task, task.project), and what one «comenta» a comment (task.comment), named by its phrases
+    # and never by the word: «comentario» shares its stem with «comensales», a table's guests.
+    assistant_synonyms = (
+        ("tarea", "tareas", "task", "tasks"),
+        ("proyecto", "proyectos", "project", "projects"),
+        (
+            "comment", "comments", "comenta en", "comenta que", "un comentario", "el comentario", "los comentarios",
+            "sus comentarios", "que comentarios", "de comentarios",
+        ),
+    )
     permissions = [
         "task.view",
         "task.view_all",

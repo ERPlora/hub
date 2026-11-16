@@ -14,9 +14,9 @@ from live.operations import get
 
 from apps.tax.models import TaxCategory
 
-from .conftest import FOOD, GENERIC, ctx_for, make_product, run
+from .conftest import FOOD, GENERIC, HUB_DB, ctx_for, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture

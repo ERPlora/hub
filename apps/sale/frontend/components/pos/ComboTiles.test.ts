@@ -68,15 +68,15 @@ describe('ComboTiles', () => {
     const s = await setup();
     const url = '/p/catalog/hospitality/menu_dia.webp';
     await s.result(OP, page([menu({ image: 'catalog:hospitality/menu_dia', image_url: url }), menu({ id: 'm2', name: 'Menú infantil' })], 2));
-    const thumb = s.find('pos-menu-m1').find('.pos-menu__thumb');
+    const thumb = s.find('pos-menu-m1').find('.pos-tile__thumb');
     expect([thumb.get('img').attributes('src'), thumb.get('img').attributes('alt'), thumb.get('img').attributes('loading')]).toEqual([
       url,
       'Menú del día',
       'lazy',
     ]);
     expect(thumb.get('img').classes()).toContain('item-image__photo--contain');
-    expect(s.find('pos-menu-m2').find('.pos-menu__thumb').text()).toBe('MI');
+    expect(s.find('pos-menu-m2').find('.pos-tile__thumb').text()).toBe('MI');
     await thumb.get('img').trigger('error');
-    expect(s.find('pos-menu-m1').find('.pos-menu__thumb').text()).toBe('MD');
+    expect(s.find('pos-menu-m1').find('.pos-tile__thumb').text()).toBe('MD');
   });
 });

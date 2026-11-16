@@ -1,5 +1,5 @@
-"""An automation books and moves the appointment of any professional (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL;
-WORKBOOK FLOW-F12, FLOW-F28, APPOINTMENT-F01, APPOINTMENT-F04; what WHATSAPP_INBOX-F14, F21 and F22 wait for).
+"""An automation books and moves the appointment of any professional (WORKBOOK FLOW-F12, FLOW-F28, APPOINTMENT-F01,
+APPOINTMENT-F04; what WHATSAPP_INBOX-F14, F21 and F22 wait for).
 
 A step runs with the permission of its own operation and the reads of its app, never every permission (FLOW-F12).
 Booking and moving an appointment ask for «their own» ones, and an automation has no staff record: Appointments takes
@@ -15,6 +15,7 @@ runs with its own permission, so the customer's cancellation policy goes on judg
 import json
 
 import pytest
+from live import assistant as shared
 from live.errors import InvalidPayload, PermissionDenied
 
 from apps.appointment.models import Appointment
@@ -30,15 +31,12 @@ from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixtu
     wall,
 )
 from apps.flow.models import Flow, FlowRun, Question
-from base import assistant as hub_assistant
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import ctx_for, make_flow, run
+from .conftest import CHAT, HUB_DB, QUOTA, ctx_for, make_flow, run
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime", "no_pauses")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime", "no_pauses")]
 
-CHAT = "/internal/assistant/chat"
-QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 CREATE = "appointment.appointment.create"
 RESCHEDULE = "appointment.appointment.reschedule"
 CONFIRM = "appointment.appointment.confirm"
@@ -268,8 +266,8 @@ def test_the_yes_of_who_may_cancel_cancels_any_professionals_appointment(gateway
 def test_after_the_yes_the_step_still_runs_with_only_its_own_permission(gateway, worker, beas, monkeypatch):
     # Never every permission (FLOW-F12): Appointments takes «its own» as the whole team's, nothing more is lent.
     seen = []
-    made = hub_assistant.run_tool
-    monkeypatch.setattr(hub_assistant, "run_tool", lambda ctx, op, arguments: seen.append(ctx) or made(ctx, op, arguments))
+    made = shared.run_tool
+    monkeypatch.setattr(shared, "run_tool", lambda ctx, op, arguments: seen.append(ctx) or made(ctx, op, arguments))
     ran = assistant_cancels(worker, gateway, beas)
     question = Question.objects.get(run_id=ran.id)
     worker.request("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for(permissions=MAY_CANCEL, actor="marta"))

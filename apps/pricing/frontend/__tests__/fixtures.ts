@@ -76,6 +76,7 @@ export function priceItem(overrides: Partial<PriceItemOut> = {}): PriceItemOut {
     base_price: 1500,
     min_quantity: '1.000',
     price: 1200,
+    currency: 'EUR',
     updated_at: '2026-07-15T10:00:00+02:00',
     ...overrides,
   };
@@ -89,6 +90,7 @@ export function rule(overrides: Partial<RuleOut> = {}): RuleOut {
     rule_type: 'percent',
     percent: '10.00',
     amount: null,
+    currency: 'EUR',
     buy_quantity: null,
     get_quantity: null,
     tiers: [],

@@ -8,16 +8,15 @@ import re
 import uuid
 from decimal import Decimal
 
-import pytest
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.inventory import events
 from apps.inventory.models import Product, StockMovement
 from apps.tax.models import TaxCategory
 
+from .conftest import A, HUB_DB
+
 PAST_FACT = re.compile(r"^inventory\.[a-z_]+\.[a-z_]+ed$")
-A = Scope("host", "a")
 
 
 def declared():
@@ -33,6 +32,7 @@ def test_the_events_of_the_workbook_and_the_ones_that_refresh_the_screens():
         "PRODUCT_CREATED": "inventory.product.created",
         "PRODUCT_UPDATED": "inventory.product.updated",
         "PRODUCT_DELETED": "inventory.product.deleted",
+        "PRODUCT_RESTORED": "inventory.product.restored",
         "PRODUCT_CATEGORIZED": "inventory.product.categorized",
         "PRODUCT_UNCATEGORIZED": "inventory.product.uncategorized",
         "CATEGORY_CREATED": "inventory.category.created",
@@ -55,7 +55,7 @@ def test_all_lists_every_event_once():
 
 
 def test_it_reacts_to_a_paid_sale_a_voided_one_and_a_refund():
-    # INVENTORY-F24 (2026-10-14): the units a refund brings back go back to the stock.
+    # INVENTORY-F24: the units a refund brings back go back to the stock.
     assert events.REACTIONS == {
         "sale.sale.completed": "inventory.stock.apply_sale",
         "sale.sale.voided": "inventory.stock.restore_sale",
@@ -63,7 +63,7 @@ def test_it_reacts_to_a_paid_sale_a_voided_one_and_a_refund():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_paid_sale_and_its_void_reach_the_stock_as_the_system():
     tax = TaxCategory.objects.create(key="test.general", name="General")
     coffee = Product.objects.create(name="Coffee", sku="CAF", price=100, tax_category=tax, stock=Decimal("10"))
@@ -81,7 +81,7 @@ def test_a_paid_sale_and_its_void_reach_the_stock_as_the_system():
     assert Product.objects.get().stock == Decimal("10")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_event_it_does_not_react_to_does_nothing():
     assert events.react(A, "sale.sale.reassigned", {"sale_id": str(uuid.uuid7())}) is None
     assert events.react(A, "customer.customer.created", {}) is None
@@ -93,9 +93,9 @@ def test_an_event_it_does_not_react_to_does_nothing():
 
 
 def _sale_run(name: str, data: dict):
-    from apps.sale.tests.conftest import run
+    from apps.sale.tests.conftest import ctx_for, run
 
-    return run(name, data)
+    return run(name, data, ctx_for(scope=A))
 
 
 def _last_payload(name: str) -> dict:
@@ -104,7 +104,7 @@ def _last_payload(name: str) -> dict:
     return OutboxEvent.objects.filter(name=name).order_by("-created_at", "-id").first().payload
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refund_puts_the_returned_units_back_once_as_the_system():
     from live.context import system_context
     from live.operations import get

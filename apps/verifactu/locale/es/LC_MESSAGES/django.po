@@ -20,26 +20,52 @@ msgstr "Reenviar a la AEAT"
 
 #: admin.py:38
 #, python-format
-msgid ""
-"Resend finished: %(accepted)s accepted, %(rejected)s rejected, %(waiting)s "
-"still waiting."
-msgstr ""
-"Reenvío terminado: %(accepted)s aceptados, %(rejected)s rechazados, "
-"%(waiting)s aún en espera."
+msgid "Resend finished: %(accepted)s, %(rejected)s, %(waiting)s."
+msgstr "Reenvío terminado: %(accepted)s, %(rejected)s, %(waiting)s."
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s accepted"
+msgid_plural "%(count)s accepted"
+msgstr[0] "%(count)s aceptado"
+msgstr[1] "%(count)s aceptados"
+msgstr[2] "%(count)s aceptados"
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s rejected"
+msgid_plural "%(count)s rejected"
+msgstr[0] "%(count)s rechazado"
+msgstr[1] "%(count)s rechazados"
+msgstr[2] "%(count)s rechazados"
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s still waiting"
+msgid_plural "%(count)s still waiting"
+msgstr[0] "%(count)s sigue esperando"
+msgstr[1] "%(count)s siguen esperando"
+msgstr[2] "%(count)s siguen esperando"
 
 msgid "Reschedule: send with the next pass"
 msgstr "Reprogramar: enviar en la próxima pasada"
 
 #, python-format
-msgid "Rescheduled: %(count)s record(s) go out with the next pass."
-msgstr "Reprogramado: %(count)s registro(s) salen en la próxima pasada."
+msgid "Rescheduled: %(count)s record goes out with the next pass."
+msgid_plural "Rescheduled: %(count)s records go out with the next pass."
+msgstr[0] "Reprogramado: %(count)s registro sale en la próxima pasada."
+msgstr[1] "Reprogramado: %(count)s registros salen en la próxima pasada."
+msgstr[2] "Reprogramado: %(count)s registros salen en la próxima pasada."
 
 msgid "Reschedule its queue: send with the next pass"
 msgstr "Reprogramar su cola: enviar en la próxima pasada"
 
 #, python-format
-msgid "Rescheduled: %(count)s chain(s) go out with the next pass."
-msgstr "Reprogramado: %(count)s cadena(s) salen en la próxima pasada."
+msgid "Rescheduled: %(count)s chain goes out with the next pass."
+msgid_plural "Rescheduled: %(count)s chains go out with the next pass."
+msgstr[0] "Reprogramado: %(count)s cadena sale en la próxima pasada."
+msgstr[1] "Reprogramado: %(count)s cadenas salen en la próxima pasada."
+msgstr[2] "Reprogramado: %(count)s cadenas salen en la próxima pasada."
 
 msgid "nothing is waiting in its queue."
 msgstr "no hay nada esperando en su cola."
@@ -48,15 +74,34 @@ msgid "Ask the AEAT (out of the queue if it already has it)"
 msgstr "Consultar a la AEAT (sale de la cola si ya lo tiene)"
 
 #, python-format
-msgid "Asked the AEAT: %(held)s already registered (out of the queue), %(missing)s not in the AEAT (still in the queue)."
-msgstr "Consulta a la AEAT: %(held)s ya registrados (fuera de la cola), %(missing)s no están en la AEAT (siguen en la cola)."
+msgid "Asked the AEAT: %(held)s, %(missing)s."
+msgstr "Consulta a la AEAT: %(held)s, %(missing)s."
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s already registered (out of the queue)"
+msgid_plural "%(count)s already registered (out of the queue)"
+msgstr[0] "%(count)s ya registrado (fuera de la cola)"
+msgstr[1] "%(count)s ya registrados (fuera de la cola)"
+msgstr[2] "%(count)s ya registrados (fuera de la cola)"
+
+#, python-format
+msgctxt "verifactu records"
+msgid "%(count)s not in the AEAT (still in the queue)"
+msgid_plural "%(count)s not in the AEAT (still in the queue)"
+msgstr[0] "%(count)s no está en la AEAT (sigue en la cola)"
+msgstr[1] "%(count)s no están en la AEAT (siguen en la cola)"
+msgstr[2] "%(count)s no están en la AEAT (siguen en la cola)"
 
 msgid "Correct a rejection with a new record"
 msgstr "Subsanar el rechazo con un registro nuevo"
 
 #, python-format
-msgid "Corrected: %(count)s new record(s) in the queue."
-msgstr "Subsanado: %(count)s registro(s) nuevo(s) en la cola."
+msgid "Corrected: %(count)s new record in the queue."
+msgid_plural "Corrected: %(count)s new records in the queue."
+msgstr[0] "Subsanado: %(count)s registro nuevo en la cola."
+msgstr[1] "Subsanado: %(count)s registros nuevos en la cola."
+msgstr[2] "Subsanado: %(count)s registros nuevos en la cola."
 
 msgid "only a record the AEAT rejected is corrected here; this one is registered."
 msgstr "aquí solo se subsana un registro que la AEAT rechazó; este ya está registrado."
@@ -352,6 +397,7 @@ msgid "invoice number"
 msgstr "número de factura"
 
 #: models.py:254 models.py:611
+msgctxt "verifactu record"
 msgid "issue date"
 msgstr "fecha de expedición"
 
@@ -364,6 +410,7 @@ msgid "invoice type"
 msgstr "tipo de factura"
 
 #: models.py:258
+msgctxt "verifactu record"
 msgid "rectification kind"
 msgstr "tipo de rectificativa"
 
@@ -396,6 +443,7 @@ msgid "customer document type"
 msgstr "tipo de documento del cliente"
 
 #: models.py:279
+msgctxt "verifactu record"
 msgid "tax breakdown"
 msgstr "desglose"
 
@@ -404,6 +452,7 @@ msgid "taxable base"
 msgstr "base imponible"
 
 #: models.py:282
+msgctxt "verifactu record"
 msgid "tax"
 msgstr "cuota"
 
@@ -412,6 +461,7 @@ msgid "total"
 msgstr "total"
 
 #: models.py:285
+msgctxt "verifactu record"
 msgid "correction"
 msgstr "subsanación"
 
@@ -664,6 +714,7 @@ msgid "actor"
 msgstr "quién"
 
 #: models.py:506
+msgctxt "verifactu event"
 msgid "event"
 msgstr "evento"
 
@@ -684,12 +735,18 @@ msgid "Cancellation record #%(sequence)s sealed for invoice %(invoice_number)s: 
 msgstr "Registro de anulación #%(sequence)s de la factura %(invoice_number)s sellado: %(reason_text)s"
 
 #: models.py:559
-msgid "Not sent to the AEAT yet (%(count)s record(s)): %(why)s."
-msgstr "Aún no se ha enviado a la AEAT (%(count)s registro(s)): %(why)s."
+msgid "Not sent to the AEAT yet (%(count)s record): %(why)s."
+msgid_plural "Not sent to the AEAT yet (%(count)s records): %(why)s."
+msgstr[0] "Aún no se ha enviado a la AEAT (%(count)s registro): %(why)s."
+msgstr[1] "Aún no se han enviado a la AEAT (%(count)s registros): %(why)s."
+msgstr[2] "Aún no se han enviado a la AEAT (%(count)s registros): %(why)s."
 
 #: models.py:560
-msgid "AEAT (%(environment)s): %(count)s record(s) accepted, CSV %(csv)s."
-msgstr "AEAT (%(environment)s): %(count)s registro(s) aceptado(s), CSV %(csv)s."
+msgid "AEAT (%(environment)s): %(count)s record accepted, CSV %(csv)s."
+msgid_plural "AEAT (%(environment)s): %(count)s records accepted, CSV %(csv)s."
+msgstr[0] "AEAT (%(environment)s): %(count)s registro aceptado, CSV %(csv)s."
+msgstr[1] "AEAT (%(environment)s): %(count)s registros aceptados, CSV %(csv)s."
+msgstr[2] "AEAT (%(environment)s): %(count)s registros aceptados, CSV %(csv)s."
 
 #: models.py:562
 msgid "Invoice %(invoice_number)s accepted with errors by the AEAT (%(code)s): %(message)s"
@@ -708,20 +765,29 @@ msgid "Invoice %(invoice_number)s goes out with the next pass."
 msgstr "La factura %(invoice_number)s sale en la próxima pasada."
 
 #: models.py:572
-msgid "Fingerprint chain intact: %(total)s record(s) with their SHA-256 chaining verified (%(issuer_nif)s). Amounts are not re-audited."
-msgstr "Cadena de huellas íntegra: %(total)s registro(s) con su encadenado SHA-256 verificado (%(issuer_nif)s). No se re-auditan los importes."
+msgid "Fingerprint chain intact: %(total)s record with its SHA-256 chaining verified (%(issuer_nif)s). Amounts are not re-audited."
+msgid_plural "Fingerprint chain intact: %(total)s records with their SHA-256 chaining verified (%(issuer_nif)s). Amounts are not re-audited."
+msgstr[0] "Cadena de huellas íntegra: %(total)s registro con su encadenado SHA-256 verificado (%(issuer_nif)s). No se re-auditan los importes."
+msgstr[1] "Cadena de huellas íntegra: %(total)s registros con su encadenado SHA-256 verificado (%(issuer_nif)s). No se re-auditan los importes."
+msgstr[2] "Cadena de huellas íntegra: %(total)s registros con su encadenado SHA-256 verificado (%(issuer_nif)s). No se re-auditan los importes."
 
 #: models.py:576
 msgid "Fingerprint chain BROKEN at sequence %(first_invalid_sequence)s (%(issuer_nif)s)."
 msgstr "Cadena de huellas ROTA en la secuencia %(first_invalid_sequence)s (%(issuer_nif)s)."
 
 #: models.py:578
-msgid "AEAT query: %(count)s record(s) retrieved for %(issuer_nif)s."
-msgstr "Consulta a la AEAT: %(count)s registro(s) recuperados para %(issuer_nif)s."
+msgid "AEAT query: %(count)s record retrieved for %(issuer_nif)s."
+msgid_plural "AEAT query: %(count)s records retrieved for %(issuer_nif)s."
+msgstr[0] "Consulta a la AEAT: %(count)s registro recuperado para %(issuer_nif)s."
+msgstr[1] "Consulta a la AEAT: %(count)s registros recuperados para %(issuer_nif)s."
+msgstr[2] "Consulta a la AEAT: %(count)s registros recuperados para %(issuer_nif)s."
 
 #: models.py:580
-msgid "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s (%(found)s record(s) found)."
-msgstr "Cadena recuperada desde la AEAT para %(issuer_nif)s: continúa tras la factura %(invoice_number)s (%(found)s registro(s) encontrados)."
+msgid "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s (%(found)s record found)."
+msgid_plural "Chain recovered from the AEAT for %(issuer_nif)s: it continues after invoice %(invoice_number)s (%(found)s records found)."
+msgstr[0] "Cadena recuperada desde la AEAT para %(issuer_nif)s: continúa tras la factura %(invoice_number)s (%(found)s registro encontrado)."
+msgstr[1] "Cadena recuperada desde la AEAT para %(issuer_nif)s: continúa tras la factura %(invoice_number)s (%(found)s registros encontrados)."
+msgstr[2] "Cadena recuperada desde la AEAT para %(issuer_nif)s: continúa tras la factura %(invoice_number)s (%(found)s registros encontrados)."
 
 #: models.py:584
 msgid "Chain continued manually for %(issuer_nif)s after invoice %(invoice_number)s."
@@ -964,6 +1030,7 @@ msgid "The certificate does not allow client authentication, so it cannot connec
 msgstr "El certificado no permite la autenticación de cliente, así que no puede conectar con la AEAT."
 
 #: models.py
+msgctxt "verifactu business status"
 msgid "Active"
 msgstr "Activa"
 

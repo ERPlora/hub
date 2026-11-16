@@ -3,60 +3,42 @@
 Two tasks created at the same moment get consecutive numbers, never the same one; two completions of
 the same task close it once and the second one is told it was already closed. A task or a project given
 to a person the Hub admin is deleting at that moment is never a 500, and neither is a task or a project
-deleted while it is being shown, changed or named by a new subtask, a new task or a move.
+deleted while it is being shown, changed or named by a new subtask, a new task or a move. A task given
+to someone else while the tasks of the person who left the team are released keeps its new person.
 """
 
-import threading
-import time
 from collections.abc import Callable
 from contextlib import contextmanager
 
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.db import connection, transaction
+from django.db import connections
 from django.test import RequestFactory
 from django.utils import timezone
+from live.context import system_context
 from live.errors import OperationError
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.staff.models import Member
 from apps.task import events
 from apps.task.models import Comment, Project, Task
 from apps.task.queries import PROJECT_NOT_FOUND, TASK_NOT_FOUND
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, meanwhile
 
-from .conftest import ctx_for, make_member, make_project, make_task
+from .conftest import HUB_DB_COMMITTED, A, ctx_for, make_member, make_project, make_task
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of business A at once, each committing: its plan has room for them all, so a second session meets
+#: the first at a row's lock instead of queueing for its turn.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def run(name, data):
     op = get(name)
     return op(ctx_for("hub_admin"), op.input.model_validate(data))
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # an expected refusal or an unexpected failure, both reported
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def test_tasks_created_at_once_get_consecutive_numbers():
@@ -83,8 +65,6 @@ def test_two_completions_of_the_same_task_close_it_once():
 # order the deletion takes them: the deletion waits for the write and then clears what it left, or the
 # write waits for the deletion and hears she is gone, as for a person deleted before.
 
-#: How long the deletion runs on its own before the write goes on: long enough to reach the record.
-IN_FLIGHT = 0.5
 ADMIN_DELETIONS = ["delete_model", "delete_queryset"]
 
 
@@ -104,37 +84,19 @@ def admin_delete(target, how: str) -> None:
 def deleting(target, how: str, after: Callable[[str], bool]):
     """The deletion of ``target`` (``how``: the Hub admin's «Delete», or the business's for a task or a
     project) started in another session right before the first statement of this one for which ``after``
-    holds, and left to run a moment before this one goes on."""
-    deletions: list = []
+    holds; this one goes on once the deletion waits for what it holds, or has ended."""
+    with meanwhile(after, lambda: deleted_now(target, how), first=True) as outcome:
+        yield outcome
 
-    def deletion():
-        try:
-            delete(target, how)
-            deletions.append("ok")
-        except Exception as error:  # a deadlock, reported to the test
-            deletions.append(error)
-        finally:
-            connection.close()
 
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and after(sql):
-            thread.start()
-            time.sleep(IN_FLIGHT)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "the deletion never started"
+def deleted_now(target, how: str) -> str:
+    delete(target, how)
+    return "ok"
 
 
 def deleted(deletions) -> list[str]:
-    return ["ok" if not isinstance(result, Exception) else repr(result) for result in deletions]
+    """How each deletion ended: «ok», or what stopped it (a deadlock, or ``None`` if it never ended)."""
+    return [result if result == "ok" else repr(result) for result in deletions]
 
 
 def attempt(call):
@@ -306,7 +268,7 @@ def delete(target, how: str) -> None:
     if how == "operation":
         run(DELETE_OPERATION[type(target)], {"id": str(target.pk)})
     else:
-        with transaction.atomic():
+        with atomic():
             admin_delete(target, how)
 
 
@@ -322,10 +284,10 @@ def deleted_once_found(target, how: str, found_in=None):
         result = execute(sql, params, many, context)
         found = sql.lstrip().upper().startswith("SELECT") and table in sql and context["cursor"].rowcount > 0
         if not deletions and found:
-            deletions.extend(at_once(lambda: delete(target, how)))
+            deletions.extend(at_once(lambda: deleted_now(target, how)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -607,3 +569,50 @@ def test_deleting_a_task_hung_under_one_of_its_own_subtasks_ends():
     Task.objects.filter(pk=top.pk).update(parent=under)
     assert run("task.task.delete", {"id": str(top.pk)}).id == top.pk
     assert not Task.objects.exists()
+
+
+# ── A person leaves the team while one of her tasks is given to someone else ─────────────────────
+#
+# The platform releases the open tasks of a person who left the team (``task.task.release_member``), holding
+# them from the read that finds them. Unheld, the release wrote over a reassignment made in between, and the
+# task was left with nobody.
+
+
+@pytest.fixture
+def leaving():
+    ana, bea = make_member(), make_member("Bea", "Ruiz")
+    return ana, bea, make_task(assigned_to=ana)
+
+
+def releasing(ana: Member):
+    op = get("task.task.release_member")
+    return lambda: op(system_context(A), op.input.model_validate({"id": str(ana.id)}))
+
+
+def giving(task: Task, bea: Member):
+    return lambda: run("task.task.assign", {"id": str(task.id), "member_id": str(bea.id)})
+
+
+def reads_tasks(sql: str) -> bool:
+    return sql.lstrip().startswith("SELECT") and 'FROM "task_task"' in sql
+
+
+def holds_tasks(sql: str) -> bool:
+    return reads_tasks(sql) and "FOR UPDATE" in sql
+
+
+def test_a_task_given_to_someone_else_while_her_tasks_are_released_keeps_its_new_person(leaving):
+    ana, bea, task = leaving
+    with meanwhile(reads_tasks, giving(task, bea)) as given:
+        releasing(ana)()
+    assert not isinstance(given[0], Exception), given
+    assert Task.objects.get(pk=task.pk).assigned_to_id == bea.id
+
+
+def test_a_task_given_to_someone_else_just_before_her_tasks_are_released_is_not_released(leaving):
+    ana, bea, task = leaving
+    with meanwhile(holds_tasks, releasing(ana)) as released:
+        giving(task, bea)()
+    assert not isinstance(released[0], Exception), released
+    assert released[0].released == 0
+    assert Task.objects.get(pk=task.pk).assigned_to_id == bea.id

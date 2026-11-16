@@ -31,7 +31,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.kitchen.models import (
     CategoryRoute,
@@ -52,14 +52,20 @@ from apps.kitchen.schemas import (
     BoardIn,
     BoardOut,
     ByOrderIn,
+    ItemOut,
+    ItemRefIn,
     LogListIn,
     LogPage,
     NoIn,
+    NoticesIn,
+    NoticesOut,
     RoutingListIn,
     RoutingPage,
     SettingsOut,
     StationListIn,
+    StationOut,
     StationPage,
+    StationRefIn,
     TicketListIn,
     TicketOut,
     TicketPage,
@@ -69,12 +75,14 @@ from apps.kitchen.schemas import (
 from apps.sale.models import Order, OrderLine
 from base.business import business_zone, zone_name
 from base.ordering import list_order
+from base.relay import by_platform
 
 TICKET_NOT_FOUND = _("That kitchen ticket does not exist in this business.")
 TICKET_AMBIGUOUS = _(
     "“%(said)s” matches several tickets: %(names)s. Say which one by its number."
 )
 STATION_NOT_FOUND = _("That station does not exist in this business.")
+DISH_NOT_FOUND = _("That dish is on no kitchen ticket of this business.")
 STATION_AMBIGUOUS = _("“%(said)s” matches several stations: %(names)s. Say which one.")
 
 IN_FLIGHT = (TicketStatus.PENDING, TicketStatus.PREPARING, TicketStatus.READY)
@@ -647,7 +655,7 @@ def _serve(view: TicketView, at: dt.datetime) -> None:
             item.ready_at = item.ready_at or at
 
 
-def effective(
+def effective(  # noqa: C901
     view: TicketView, settings: KitchenSettings
 ) -> tuple[TicketView, list[Change]]:
     """The ticket as it stands after what Sales did to its lines and checks, and what changed.
@@ -908,6 +916,16 @@ def _chips(views: list[TicketView], stations: dict[UUID, Station]) -> list[dict]
     output=BoardOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what's cooking right now?",
+                "what's left on the grill?",
+            ),
+            "es": (
+                "¿qué tiene pendiente ahora la plancha?",
+                "¿qué hay en marcha en la pantalla?",
+            ),
+        },
         "description": "The kitchen display: the tickets being cooked (rush first, then VIP, then the oldest) and "
         "the ones waiting at the pass, with their dishes, for every station or one («what is pending on the "
         "grill»). Also what the cash close asks: the tickets not served yet."
@@ -946,6 +964,16 @@ def board(ctx: OperationContext, params: BoardIn) -> dict:
     output=AllDayOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how many burgers are left to cook?",
+                "how many of each dish do we still have to make?",
+            ),
+            "es": (
+                "¿cuántas hamburguesas quedan por hacer?",
+                "dame el total de platos pendientes de cada puesto",
+            ),
+        },
         "description": "What is left to cook, added up per dish and station across every ticket being cooked, most "
         "first; for one station if named («how many burgers are left on the grill»)."
     },
@@ -1006,7 +1034,7 @@ def _matches(view: TicketView, params: TicketListIn) -> bool:
     )
 
 
-def merged_page(
+def merged_page(  # noqa: PLR0913, PLR0917
     first: list[dict],
     rest,
     key: Callable[[dict], tuple],
@@ -1059,6 +1087,16 @@ def _final_row(ticket: Ticket) -> dict:
     output=TicketPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what got cancelled on the display today?",
+                "list this morning's rushes",
+            ),
+            "es": (
+                "¿qué se anuló ayer en la pantalla?",
+                "busca las urgentes de esta mañana",
+            ),
+        },
         "description": "List the kitchen tickets, newest first, searching their number or label (Table 4) and "
         "filtering by status, type or priority («which tickets were cancelled today»)."
     },
@@ -1099,6 +1137,57 @@ def list_tickets(ctx: OperationContext, params: TicketListIn) -> dict:
         "total": total,
         "limit": params.limit,
         "offset": params.offset,
+    }
+
+
+#: How far back the device notices go when nobody says (the shell tells each row once per device).
+NOTICES_WINDOW = dt.timedelta(hours=24)
+
+
+@operation(
+    "kitchen.ticket.notices",
+    kind="query",
+    permission="kitchen.view_ticket",
+    input=NoticesIn,
+    output=NoticesOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": (
+                "any new rounds just in?",
+                "what has just come in?",
+            ),
+            "es": (
+                "¿hay alguna comanda nueva?",
+                "¿qué acaba de llegar a la pantalla?",
+            ),
+        },
+        "description": "The new kitchen tickets, the newest first, with their destination, dishes and waiter; "
+        "a round fired by Sales is included before the relay saves it, with the same id it keeps afterwards."
+    },
+)
+def notices(ctx: OperationContext, params: NoticesIn) -> dict:
+    since = params.since or timezone.now() - NOTICES_WINDOW
+    settings = current_settings()
+    saved = Ticket.objects.filter(is_deleted=False, received_at__gte=since).prefetch_related("items")
+    views = [
+        view
+        for view in [*saved_views(saved), *unsaved_views(settings)]
+        if view.received_at >= since
+    ]
+    views.sort(key=lambda view: (view.received_at, view.id), reverse=True)
+    return {
+        "rows": [
+            {
+                "id": view.id,
+                "at": view.received_at,
+                "number": view.number,
+                "label": view.label,
+                "dish_names": ", ".join(item.name for item in view.live_items),
+                "waiter": view.waiter,
+            }
+            for view in views[: params.limit]
+        ]
     }
 
 
@@ -1177,12 +1266,54 @@ def find_ticket_view(ref: TicketRefIn, settings: KitchenSettings) -> TicketView:
     output=TicketOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how far along is number 12?",
+                "show me number 12 with its dishes",
+            ),
+            "es": (
+                "¿cómo van los platos de la 12?",
+                "¿qué platos le quedan a la 7?",
+            ),
+        },
         "description": "One kitchen ticket with its dishes and their state, by its id, its number («ticket 12») or "
         "its label («how is table 4 going»)."
     },
 )
 def get_ticket(ctx: OperationContext, params: TicketRefIn) -> dict:
     return ticket_out(find_ticket_view(params, current_settings()))
+
+
+def find_dish(item_id: UUID, settings: KitchenSettings) -> ItemView:
+    """A dish by its id: of a saved ticket, or of a round not saved yet (the board shows it already and its dishes keep
+    their ids once saved), as Sales left it."""
+    ticket_id = (
+        TicketItem.objects.filter(pk=item_id, ticket__is_deleted=False)
+        .values_list("ticket_id", flat=True)
+        .first()
+    )
+    if ticket_id is not None:
+        views = saved_views(Ticket.objects.filter(pk=ticket_id).prefetch_related("items"))
+    else:
+        views = unsaved_views(settings)
+    holder = next((view for view in views if any(item.id == item_id for item in view.items)), None)
+    if holder is None:
+        raise NotFound(str(DISH_NOT_FOUND), code="kitchen.item_not_found")
+    return next(item for item in effective(holder, settings)[0].items if item.id == item_id)
+
+
+@operation(
+    "kitchen.item.get",
+    kind="query",
+    permission="kitchen.view_ticket",
+    input=ItemRefIn,
+    output=ItemOut,
+    ai=INTERNAL,
+)
+def get_item(ctx: OperationContext, params: ItemRefIn) -> dict:
+    """One dish by its id, for the assistant's card (``schemas.A_DISH``): the screens and the model read the dishes with
+    their ticket, so it is no tool of the assistant nor a route of the API."""
+    return item_out(find_dish(params.id, current_settings()), station_map())
 
 
 @operation(
@@ -1193,6 +1324,16 @@ def get_ticket(ctx: OperationContext, params: TicketRefIn) -> dict:
     output=TicketsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which rounds has table 4's check sent?",
+                "show me the rounds of this check",
+            ),
+            "es": (
+                "¿qué rondas ha mandado la cuenta de la mesa 4?",
+                "¿cómo van los platos de esta cuenta?",
+            ),
+        },
         "description": "The kitchen tickets of a check of Sales (its rounds, also the ones of a check merged into "
         "it), the newest round first, with their dishes and their state."
     },
@@ -1248,6 +1389,16 @@ def station_row(station: Station, in_progress: int, routes: int) -> dict:
     output=StationPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which stations do we have?",
+                "list the stations and what goes to each",
+            ),
+            "es": (
+                "¿qué estaciones tenemos?",
+                "lista las estaciones y lo que va a cada una",
+            ),
+        },
         "description": "List the kitchen stations (grill, bar…) with their destination, printer, dishes in "
         "progress and how many products and categories go to them, searching by name."
     },
@@ -1292,6 +1443,25 @@ def list_stations(ctx: OperationContext, params: StationListIn) -> dict:
 
 
 @operation(
+    "kitchen.station.get",
+    kind="query",
+    permission="kitchen.view_ticket",
+    input=StationRefIn,
+    output=StationOut,
+    ai=INTERNAL,
+)
+def get_station(ctx: OperationContext, params: StationRefIn) -> dict:
+    """One station by its id or its name, for the assistant's card (``schemas.A_STATION``): the screens and the model read
+    the stations from their list, so it is no tool of the assistant nor a route of the API."""
+    station = find_station(params.station_id, params.station)
+    routes = (
+        ProductRoute.objects.filter(station=station, product__is_deleted=False).count()
+        + CategoryRoute.objects.filter(station=station, category__is_deleted=False).count()
+    )
+    return station_row(station, in_progress_by_station(current_settings()).get(station.id, 0), routes)
+
+
+@operation(
     "kitchen.routing.list",
     kind="query",
     permission="kitchen.view_ticket",
@@ -1299,6 +1469,16 @@ def list_stations(ctx: OperationContext, params: StationListIn) -> dict:
     output=RoutingPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "where do the drinks go?",
+                "which station gets the desserts?",
+            ),
+            "es": (
+                "¿a qué estación van las bebidas?",
+                "enséñame el enrutado de los postres",
+            ),
+        },
         "description": "Which products and categories go to which station («where do the drinks go»), for every "
         "station or one, searching by the product's or category's name."
     },
@@ -1356,6 +1536,16 @@ def list_routing(ctx: OperationContext, params: RoutingListIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "after how many minutes does the display go amber?",
+                "is the display's sound on?",
+            ),
+            "es": (
+                "¿a los cuántos minutos se pone en rojo la pantalla?",
+                "¿suena la pantalla cuando entra algo?",
+            ),
+        },
         "description": "The kitchen display settings: the clock, the amber and red minutes, the sound, the pass on "
         "paper, whether the kitchen works from the screen and the default ticket type."
     },
@@ -1374,6 +1564,7 @@ def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
         "item_name": entry.item.name if entry.item else "",
         "station_name": entry.station.name if entry.station else "",
         "actor": (names or {}).get(entry.actor, entry.actor),
+        "by_platform": by_platform(entry.actor),
         "notes": entry.notes,
         "created_at": entry.created_at,
     }
@@ -1387,6 +1578,16 @@ def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
     output=LogPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who voided number 12?",
+                "what happened on the display yesterday?",
+            ),
+            "es": (
+                "¿quién anuló la comanda 12?",
+                "enséñame el historial de platos de ayer",
+            ),
+        },
         "description": "The kitchen's history, newest first: what happened (received, dish ready, served, "
         "cancelled…), on which ticket and dish, who did it and when; searching the ticket's number or the notes, "
         "by action and by days."

@@ -16,9 +16,9 @@ from live.errors import OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Channel
-from apps.whatsapp_inbox.tests.conftest import A, B, connect, ctx_for, run, system
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, HUB_DB_COMMITTED, connect, ctx_for, run, system
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 CONFIG = f"{SAAS}/internal/whatsapp/config"
@@ -70,7 +70,7 @@ def test_meta_s_window_opens_with_erplora_s_public_ids_for_this_business():
     route = respx.post(CONFIG).mock(return_value=httpx.Response(200, json=CONFIGURED))
     out = run("whatsapp_inbox.channel.prepare")
     assert out.model_dump() == {"available": True, "reason": None, **{k: v for k, v in CONFIGURED.items() if k != "configured"}}
-    assert route.calls.last.request.content == b'{"hub":"a"}'
+    assert route.calls.last.request.content == b'{"hub":"tenant-a"}'
 
 
 @respx.mock
@@ -192,7 +192,7 @@ def test_erplora_out_of_reach_is_said_with_the_old_hub_s_words():
 
 @respx.mock
 def test_a_demo_or_a_business_erplora_does_not_know_cannot_connect_a_number():
-    # gh:saas#2604: a demo connected a number it could never send from.
+    # A demo connected a number it could never send from.
     respx.post(CONFIG).mock(return_value=envelope(404, "hub_unknown", "No such business."))
     error = refusal("whatsapp_inbox.channel.prepare")
     assert (error.status, error.code) == (409, "whatsapp_inbox.hub_unknown")
@@ -208,23 +208,29 @@ def test_a_server_without_erplora_s_address_says_so(settings):
 
 
 @respx.mock
-def test_the_number_meta_s_window_chose_is_the_business_s_at_once():
+@HUB_DB
+@pytest.mark.usefixtures("no_test_fallback")
+def test_the_number_meta_s_window_chose_is_the_business_s_at_once(hub_a, hub_b):
+    from base.tenancy.context import use_hub
+    from live.context import Scope
+
     route = respx.post(CONNECT).mock(return_value=httpx.Response(200, json=CONNECTED))
-    system("whatsapp_inbox.channel.sync", {"version": 9, "status": "not_connected", "monthly_limit": 150}, B)
+    with use_hub(hub_b):
+        system("whatsapp_inbox.channel.sync", {"version": 9, "status": "not_connected", "monthly_limit": 150}, Scope("host", hub_b.slug))
 
-    out = run("whatsapp_inbox.channel.connect", WINDOW)
-
-    assert out.model_dump() == CONNECTED
-    assert route.calls.last.request.content == (
-        b'{"hub":"a","code":"AQD-one-time","event":"FINISH","waba_id":"102290129340398",'
-        b'"phone_number_id":"106540352242922","business_id":"2729063490586005"}'
-    )
-    a = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=A))
-    assert (a.status, a.phone_number, a.display_name) == ("connected", "+34910000000", "Peluquería Ana")
-    # B's number is B's: connecting A's never touches it.
-    b = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=B))
-    assert (b.status, b.phone_number, b.monthly_limit) == ("not_connected", "", 150)
-    assert events("whatsapp_inbox.channel.connected") == [{"history_requested": False}]
+    with use_hub(hub_a):
+        out = run("whatsapp_inbox.channel.connect", WINDOW, ctx_for(scope=Scope("host", hub_a.slug)))
+        assert out.model_dump() == CONNECTED
+        assert route.calls.last.request.content == (
+            b'{"hub":"tenant-a","code":"AQD-one-time","event":"FINISH","waba_id":"102290129340398",'
+            b'"phone_number_id":"106540352242922","business_id":"2729063490586005"}'
+        )
+        a = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=Scope("host", hub_a.slug)))
+        assert (a.status, a.phone_number, a.display_name) == ("connected", "+34910000000", "Peluquería Ana")
+        assert events("whatsapp_inbox.channel.connected") == [{"history_requested": False}]
+    with use_hub(hub_b):
+        b = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=Scope("host", hub_b.slug)))
+        assert (b.status, b.phone_number, b.monthly_limit) == ("not_connected", "", 150)
 
 
 @respx.mock
@@ -232,7 +238,7 @@ def test_erplora_s_next_photo_still_wins_over_its_answer():
     respx.post(CONNECT).mock(return_value=httpx.Response(200, json=CONNECTED))
     connect(version=5, status="not_connected", phone_number="", display_name="")
     run("whatsapp_inbox.channel.connect", WINDOW)
-    assert Channel.objects.get(host="a").version == 5  # the answer is no photo: its version stays
+    assert Channel.objects.get().version == 5  # the answer is no photo: its version stays
     assert connect(version=6, status="reconnect_needed").applied is True
     assert run("whatsapp_inbox.channel.get").status == "reconnect_needed"
 
@@ -342,10 +348,10 @@ def test_disconnecting_leaves_the_business_without_its_number_and_keeps_the_mont
 
     assert run("whatsapp_inbox.channel.disconnect").model_dump() == {"disconnected": True}
 
-    assert route.calls.last.request.content == b'{"hub":"a"}'
+    assert route.calls.last.request.content == b'{"hub":"tenant-a"}'
     now = run("whatsapp_inbox.channel.get")
     assert (now.status, now.phone_number, now.display_name, now.monthly_limit) == ("not_connected", "", "", 150)
-    assert Channel.objects.get(host="a").version == 3
+    assert Channel.objects.get().version == 3
     assert events("whatsapp_inbox.channel.disconnected") == [{}]
 
 
@@ -378,12 +384,12 @@ def test_a_disconnection_erplora_did_not_confirm_changes_nothing_here():
     [("whatsapp_inbox.channel.prepare", {}), ("whatsapp_inbox.channel.connect", WINDOW), ("whatsapp_inbox.channel.disconnect", {})],
 )
 def test_only_the_owner_and_the_administrators_connect_or_disconnect(role, name, payload):
-    # gh:saas#2538: an employee could disconnect the business's WhatsApp.
+    # An employee could disconnect the business's WhatsApp.
     with pytest.raises(PermissionDenied):
         run(name, payload, ctx_for(role))
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize(
     ("name", "url", "payload", "answer"),
     [

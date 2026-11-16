@@ -28,9 +28,9 @@ describe('SessionSummary', () => {
     expect(words(m.find('cash-register-summary-expected').element)).toBe('Expected zł 100.00');
   });
 
-  it('while the business is not read, a figure has no symbol, never the euro', async () => {
+  it('while the business is not read, the amount is a dash, never the euro', async () => {
     const m = await mountCash(SessionSummary, { props: { session: SESSION }, business: null });
     await m.live();
-    expect(words(m.find('cash-register-summary-expected').element)).toBe('Expected 100.00');
+    expect(words(m.find('cash-register-summary-expected').element)).toBe('Expected —');
   });
 });

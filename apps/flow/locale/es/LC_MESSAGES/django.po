@@ -77,17 +77,34 @@ msgid "search text"
 msgstr "texto de búsqueda"
 
 msgid "created by"
+msgstr "creado por"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "automation"
+msgid "created by"
 msgstr "creada por"
 
+msgctxt "automation"
 msgid "updated by"
 msgstr "cambiada por"
 
+msgctxt "automation"
 msgid "created at"
 msgstr "creada el"
 
+msgctxt "automation"
 msgid "updated at"
 msgstr "cambiada el"
 
+msgctxt "automation"
 msgid "deleted at"
 msgstr "borrada el"
 
@@ -145,6 +162,9 @@ msgstr "registro"
 msgid "outputs"
 msgstr "resultados"
 
+msgid "ids it read"
+msgstr "ids de lo que leyó"
+
 msgid "error code"
 msgstr "código de error"
 
@@ -160,6 +180,7 @@ msgstr "sigue el"
 msgid "chain"
 msgstr "cadena"
 
+msgctxt "run"
 msgid "started at"
 msgstr "empezó el"
 
@@ -478,6 +499,7 @@ msgstr "pregunta"
 msgid "questions"
 msgstr "preguntas"
 
+msgctxt "automation"
 msgid "step"
 msgstr "paso"
 
@@ -526,11 +548,17 @@ msgstr "Sus pasos usan permisos que no pide: %(names)s."
 msgid "Starts with"
 msgstr "Arranca con"
 
+msgid "Automation"
+msgstr "Automatización"
+
 msgid "Draft"
 msgstr "Borrador"
 
 msgid "Permissions"
 msgstr "Permisos"
+
+msgid "Automation run"
+msgstr "Ejecución"
 
 msgid "How it ended"
 msgstr "Cómo terminó"
@@ -558,6 +586,9 @@ msgstr "Quién lo hizo"
 
 msgid "Value"
 msgstr "Valor"
+
+msgid "Question"
+msgstr "Pregunta"
 
 msgid "Answer"
 msgstr "Respuesta"
@@ -616,3 +647,15 @@ msgid ""
 msgstr ""
 "Esa acción ya no está permitida o disponible, así que el cambio del asistente "
 "no se ha hecho."
+
+msgid "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another event."
+msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciéndela en Apps o elige otro aviso."
+
+msgid "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
+msgstr "«%(name)s» es de %(app)s, que está apagada en este negocio: enciéndela en Apps o elige otra acción."
+
+msgid "Cancelled: the customer's personal data were erased."
+msgstr "Cancelada: se borraron los datos personales del cliente."
+
+msgid "[erased with the customer's personal data]"
+msgstr "[borrado con los datos personales del cliente]"

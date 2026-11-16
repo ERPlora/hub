@@ -4,12 +4,10 @@ import gettext
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
-from apps.service import queries, schemas, services
+from apps.service import models, queries, schemas, services
 from apps.service.models import (
     Assignment,
     Category,
@@ -21,7 +19,18 @@ from apps.service.models import (
     Service,
     ServiceSettings,
 )
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
+
+from .conftest import HOST, HUB_DB, A
 
 LOCALE = Path(apps.get_app_config("service").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -37,48 +46,17 @@ MODELS = (
 )
 
 
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``, alone, in a tuple or in a dict's values."""
-    lazies = []
-    for value in vars(module).values():
-        items = (
-            value.values()
-            if isinstance(value, dict)
-            else value
-            if isinstance(value, tuple)
-            else (value,)
-        )
-        for item in items:
-            for leaf in item if isinstance(item, tuple) else (item,):
-                if type(leaf).__name__ == "__proxy__":
-                    lazies.append(leaf)
-    return lazies
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
     its schemas."""
     config = apps.get_app_config("service")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        # The Home's step (FIX-SERVICE-SETUP-HOOKS).
+        *config_texts(config),
+        # The Home's step.
         *(text for step in config.setup for text in (step.title, step.description)),
     ]
-    lazies += (
-        lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    )
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += module_texts(queries, services, schemas, models)
+    lazies += model_texts(MODELS)
     for choices in (
         Service.PricingType,
         Package.DiscountType,
@@ -87,42 +65,21 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles service's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones service wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "service"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("service")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Servicios by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=140, with_context=2) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_services_own_spanish():
@@ -131,7 +88,7 @@ def test_the_card_says_each_title_with_services_own_spanish():
     (hub#323)."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("service")
     assert {"Tax category", "Duplicate customer", "Services included"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
@@ -185,20 +142,50 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.SESSION_SETTLED) == (
             "Esa sesión del bono ya no se puede soltar: la venta está cobrada. Devolverla es una devolución."
         )
+        assert (
+            str(queries.SESSION_NOT_FOUND)
+            == "Esa sesión del bono no existe en este negocio."
+        )
         assert str(services.HOLD_LOST) % {"name": "Bono 5"} == (
             "La sesión reservada de «Bono 5» ya no está reservada (pasó su día o se soltó). Quita el bono "
             "de la línea y vuelve a aplicarlo."
         )
 
 
-@pytest.mark.django_db
+def test_spanish_says_services_own_words_not_an_earlier_apps():
+    """The texts service shares in English with an app loaded before it come out in Spanish with service's words
+    (hub#662): a voided voucher is «anulado por», as the voucher sold is masculine and its history says «Anulado por»,
+    not Ventas' «anulada por»; a category is asked for and said ambiguous as its siblings (service, package,
+    professional) are, «su id o su nombre» and «vale para varias», not Inventario's «su id, o su nombre» and «coincide
+    con varias»; a session is «sesión del bono», as service's own titles and WORKBOOK say it, in the singular and in the
+    plural."""
+    texts = {
+        "Grant.voided_by": Grant._meta.get_field("voided_by").verbose_name,
+        "Redemption": Redemption._meta.verbose_name,
+        "Redemption plural": Redemption._meta.verbose_name_plural,
+        "SAY_WHICH_CATEGORY": schemas.SAY_WHICH_CATEGORY,
+        "CATEGORY_AMBIGUOUS": queries.CATEGORY_AMBIGUOUS,
+    }
+    with translation.override("es"):
+        said = {name: str(text) for name, text in texts.items()}
+    said["CATEGORY_AMBIGUOUS"] %= {"said": "Pelo", "names": "Pelo corto, Pelo largo"}
+    assert said == {
+        "Grant.voided_by": "anulado por",
+        "Redemption": "sesión del bono",
+        "Redemption plural": "sesiones del bono",
+        "SAY_WHICH_CATEGORY": "Di qué categoría: su id o su nombre.",
+        "CATEGORY_AMBIGUOUS": "«Pelo» vale para varias categorías: Pelo corto, Pelo largo. Di cuál.",
+    }
+
+
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/service/categories/delete",
         json.dumps({"category": "Nothing"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

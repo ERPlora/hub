@@ -50,7 +50,7 @@ const cards = computed(() =>
     const stats = error.value ? undefined : data.value;
     const value = stats?.[card.field];
     let text = '—';
-    if (typeof value === 'number') text = card.kind === 'money' ? formatMoney(value, locale.value, business.value) : formatQuantity(value, '', locale.value);
+    if (typeof value === 'number') text = card.kind === 'money' ? formatMoney(value, locale.value, business.value) : formatQuantity(value, locale.value);
     return { key: card.key, label: card.label ? t(card.label) : taxLabel.value, text };
   }),
 );

@@ -1,10 +1,10 @@
-"""base/catalog.py: what the Hub registers of its modules in the SaaS (round 16, PLAN §21; spec §4).
+"""base/catalog.py: what the Hub registers of its modules in the SaaS.
 
-``user_part`` cuts the customer's part of a WORKBOOK (§4.1); ``build_registry`` reads every module's
-metadata, catalogue, baked icon and documentation without touching a database or the network
-(§4.2), gathering one error per rule; ``AppImagesFinder`` publishes ``apps/<id>/docs/img/`` as
-``catalog/<id>/img/`` (§4.4); ``known_verticals`` and ``template_apps`` derive the templates of
-PLAN §15.2 (§4.7). The last block runs it all on the real modules: the check of CI (§4.8).
+``user_part`` cuts the customer's part of a WORKBOOK; ``build_registry`` reads every module's
+metadata, catalogue, baked icon and documentation without touching a database or the network,
+gathering one error per rule; ``AppImagesFinder`` publishes ``apps/<id>/docs/img/`` as
+``catalog/<id>/img/``; ``known_verticals`` and ``template_apps`` derive the template of each
+vertical. The last block runs it all on the real modules: the check of CI.
 """
 
 import array
@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.staticfiles import finders
+from django.utils.translation import pgettext_lazy
 from live.meta import Category
 
 from base.catalog import (
@@ -36,7 +37,7 @@ CUT = "## Para quien lo mantiene"
 WORKBOOK = f"""\
 # Workbook — Things (app)
 Prefijo: THING
-Alcance MVP: fase 1
+Alcance MVP: núcleo
 Estado de la app: en construcción
 
 > Manual de usuario y especificación. Ver [los cambios](#cambios-frente-al-producto-actual).
@@ -165,7 +166,7 @@ def problems(configs, icons=ICONS) -> list[str]:
     return raised.value.problems
 
 
-# ── user_part (§4.1) ───────────────────────────────────────────────────────────────────────────
+# ── user_part ──────────────────────────────────────────────────────────────────────────────────
 
 
 def test_user_part_runs_from_the_first_section_to_the_maintainers_heading():
@@ -251,7 +252,7 @@ def test_an_anchor_to_a_heading_the_cut_leaves_out_fails():
 
 
 # The «<!-- origen: … -->» and «<!-- código: … -->» of a WORKBOOK tie it to MIGRATION.md and to its
-# sources, never reaching shared.app_doc nor the assistant (PLAN-MIGRATIONS §5).
+# sources, never reaching shared.app_doc nor the assistant.
 ORIGIN = "<!-- origen: old-hub:HUB-F212 gh:sales#131 -->"
 
 
@@ -302,7 +303,7 @@ def test_a_comment_left_open_below_the_cut_is_never_read():
     assert user_part(f"{WORKBOOK}\nAbre un comentario con `<!--`.\n") == USER_PART
 
 
-# ── build_registry (§4.2) ──────────────────────────────────────────────────────────────────────
+# ── build_registry ─────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_module_becomes_one_entry_with_both_languages_its_icon_and_its_documentation(
@@ -375,6 +376,28 @@ def test_a_name_that_is_the_same_in_both_languages_still_needs_its_msgstr(tmp_pa
     assert problem.startswith("things: verbose_name:")
 
 
+def test_a_name_said_with_a_context_is_read_with_its_context(tmp_path):
+    """A module says its name with ``pgettext_lazy`` when an earlier app translates the same English otherwise (Página
+    web's «Website» against Clientes' «Web», hub#661): its catalogue keeps only that entry, which is the one the store
+    reads, as Django does."""
+    spanish = {key: value for key, value in SPANISH.items() if key != "Things"}
+    config = module(
+        tmp_path,
+        verbose_name=pgettext_lazy("app name", "Things"),
+        spanish={**spanish, "app name\x04Things": "Cosas"},
+    )
+    [entry] = build_registry([config], icons=ICONS)
+    assert (entry.name_en, entry.name_es) == ("Things", "Cosas")
+
+
+def test_a_plain_entry_does_not_speak_for_a_name_said_with_a_context(tmp_path):
+    # Django never falls back from a context to the plain entry: neither does the store, or a typo in the context
+    # would register a Spanish that no screen shows.
+    config = module(tmp_path, verbose_name=pgettext_lazy("app name", "Things"))
+    [problem] = problems([config])
+    assert problem.startswith("things: verbose_name:") and "'app name'" in problem
+
+
 def test_a_spanish_text_longer_than_its_column_fails(tmp_path):
     spanish = {**SPANISH, "Keep your things.": "x" * 121}
     [problem] = problems([module(tmp_path, spanish=spanish)])
@@ -411,7 +434,7 @@ def test_a_module_without_workbook_fails(tmp_path):
     assert problem.startswith("things: WORKBOOK.md:")
 
 
-#: The command of PLAN-MIGRATIONS §24-D that prints the first line of a hand-made WORKBOOK.en.md.
+#: The command that prints the first line of a hand-made WORKBOOK.en.md.
 HEADER_COMMAND = (
     'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
     "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
@@ -419,7 +442,7 @@ HEADER_COMMAND = (
 
 
 def test_a_stale_translation_fails_telling_to_translate_it_by_hand_with_its_header(tmp_path):
-    """ERPlora uses no ANTHROPIC_API_KEY (PLAN-MIGRATIONS §24-D): never a command that calls the API.
+    """ERPlora uses no ANTHROPIC_API_KEY: never a command that calls the API.
 
     The command ends the line: copied to its end, it runs (a full stop after its quote would be Python).
     """
@@ -522,7 +545,7 @@ def test_stale_translations_lists_the_modules_to_translate_again(tmp_path):
     assert stale_translations(configs) == ["stale"]
 
 
-# ── AppImagesFinder (§4.4) ─────────────────────────────────────────────────────────────────────
+# ── AppImagesFinder ────────────────────────────────────────────────────────────────────────────
 
 
 def test_the_finder_publishes_docs_img_under_catalog_and_nothing_else(tmp_path):
@@ -578,7 +601,7 @@ def test_the_finder_skips_platform_apps_and_modules_without_images(tmp_path):
     assert list(AppImagesFinder(configs=configs).list(None)) == []
 
 
-# ── Symbolic links: never followed (review L8) ─────────────────────────────────────────────────
+# ── Symbolic links: never followed ─────────────────────────────────────────────────────────────
 
 
 def outside_files(tmp_path: Path) -> None:
@@ -673,7 +696,7 @@ def test_a_hidden_symbolic_link_is_neither_published_nor_reported(tmp_path):
     ]
 
 
-# ── Verticals (§4.7) ───────────────────────────────────────────────────────────────────────────
+# ── Verticals ──────────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -709,7 +732,7 @@ def test_an_unknown_vertical_has_no_template(vertical_modules):
         template_apps("bakery", vertical_modules)
 
 
-# ── The real modules: the check of CI (§4.8) ──────────────────────────────────────────────────
+# ── The real modules: the check of CI ─────────────────────────────────────────────────────────
 
 
 def test_the_real_modules_build_their_registry():

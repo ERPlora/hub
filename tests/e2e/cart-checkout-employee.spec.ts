@@ -1,6 +1,6 @@
 // Cart & Checkout as an employee (WORKBOOK «Quién la usa»: the employee only looks), in the three
 // viewports: Carts and Orders list what there is, with no «New cart» and no row action. The owner leaves a
-// cart and an order first, through the API. Captures: `APP-CART_CHECKOUT-CART_CHECKOUT-F12-employee-<width>`.
+// cart and an order first, through the API. Captures: `CART_CHECKOUT-F12-employee` at each width (`snap`).
 // Everything carries the session prefix «e2e-cc» and is removed before and after it.
 // flow: CART_CHECKOUT-F12
 import { expect, test } from '@playwright/test';

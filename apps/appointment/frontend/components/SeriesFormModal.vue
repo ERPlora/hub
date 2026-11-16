@@ -6,17 +6,20 @@
 // booked and skipped). «Edit repeating appointment»: the change applies from a date on («From») — the
 // panel says how many booked appointments it reaches and how many charged ones it leaves alone — and
 // «Save from this occurrence on» sends only what changed.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useT } from '../composables/useT';
-import { eligibleStaff, ownTerms, type ServiceFacts } from '../lib/pickers';
+import { ownTerms, type ServiceFacts } from '../lib/pickers';
 import type { Frequency, MaterializeOut, RecurringCreateIn, RecurringOut, RecurringUpdatedOut, RecurringUpdateIn } from '../operations';
 import SeriesScopeHint from './SeriesScopeHint.vue';
 import ServicesField from './ServicesField.vue';
+import StaffField from './StaffField.vue';
 
 const FREQUENCIES: readonly Frequency[] = ['daily', 'weekly', 'biweekly', 'monthly'];
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
@@ -38,6 +41,8 @@ const emit = defineEmits<{
 }>();
 const open = defineModel<boolean>('open', { default: false });
 
+const canDismiss = useUnsavedFormOnOpen('series-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, frequency: frequency.value, weekday: weekday.value, startDate: startDate.value, from: from.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, endDate: endDate.value, occurrences: occurrences.value }), open);
+
 const t = useT();
 const client = useLiveClient();
 const facts = new Map<string, ServiceFacts>();
@@ -52,6 +57,7 @@ const from = ref('');
 const time = ref('');
 const minutes = ref('');
 const minutesTouched = ref(false);
+const openedMinutes = ref('');
 const endDate = ref('');
 const occurrences = ref('');
 
@@ -62,7 +68,6 @@ const error = computed(() => (props.series ? update.error.value : create.error.v
 const editing = computed(() => props.series !== null);
 const weekly = computed(() => frequency.value === 'weekly' || frequency.value === 'biweekly');
 const serviceIds = computed(() => services.value.map((option) => option.id));
-const searchStaff = (query: string) => eligibleStaff(client, serviceIds.value, query);
 
 const ready = computed(
   () =>
@@ -88,6 +93,7 @@ function reset(): void {
     from.value = props.fromDate ?? (series.start_date > props.businessToday ? series.start_date : props.businessToday);
     time.value = hhmm(series.time);
     minutes.value = String(series.duration_minutes);
+    openedMinutes.value = minutes.value;
     endDate.value = series.end_date ?? '';
     occurrences.value = series.max_occurrences ? String(series.max_occurrences) : '';
     return;
@@ -102,6 +108,7 @@ function reset(): void {
   minutes.value = '';
   endDate.value = '';
   occurrences.value = '';
+  openedMinutes.value = '';
 }
 
 watch(
@@ -189,6 +196,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="series-form"
     :title="editing ? $t('appointment.series.form.titleEdit') : $t('appointment.series.form.titleNew')"
     :submit-label="editing ? $t('appointment.series.form.save') : $t('appointment.series.form.create')"
@@ -198,7 +206,9 @@ const text = (value: unknown): string => (value === null || value === undefined 
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="series-form">
+      <div
+        class="series-form"
+      >
         <p
           v-if="series"
           class="series-form__who"
@@ -213,19 +223,16 @@ const text = (value: unknown): string => (value === null || value === undefined 
           v-model="services"
           :facts="facts"
           testid="series-form"
+          name="services"
           :error-text="fieldErrors.services"
         />
-        <Combo
-          testid="series-form-staff"
-          :model-value="staff"
-          :search="searchStaff"
-          :label="t('appointment.form.staff')"
-          :placeholder="t('appointment.form.pickStaff')"
-          :empty-label="t('appointment.form.staffNone')"
+        <StaffField
+          v-model="staff"
+          :service-ids="serviceIds"
+          testid="series-form"
+          name="staff"
           :error-text="fieldErrors.staff"
-          :clearable="!ownStaff"
-          :disabled="!!ownStaff"
-          @update:model-value="staff = $event"
+          :own="!!ownStaff"
         />
         <ion-input
           v-if="series"
@@ -236,6 +243,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
           label-placement="floating"
           fill="outline"
           mode="md"
+          name="from_date"
           :error-text="fieldErrors.from_date"
           @ion-input="from = text($event.detail.value)"
         />
@@ -291,6 +299,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="start_date"
             :error-text="fieldErrors.start_date"
             @ion-input="startDate = text($event.detail.value)"
           />
@@ -302,6 +311,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="time"
             :error-text="fieldErrors.time"
             @ion-input="time = text($event.detail.value)"
           />
@@ -315,6 +325,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="duration_minutes"
             :error-text="fieldErrors.duration_minutes"
             @ion-input="(minutes = text($event.detail.value)), (minutesTouched = true)"
           />
@@ -326,6 +337,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="end_date"
             :error-text="fieldErrors.end_date"
             @ion-input="endDate = text($event.detail.value)"
           />
@@ -340,6 +352,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="max_occurrences"
             :error-text="fieldErrors.max_occurrences"
             @ion-input="occurrences = text($event.detail.value)"
           />

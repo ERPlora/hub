@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.verifactu.record.get","app":"verifactu","tool":"verifactu.record.get","role":"employee","language":"es","phrase":"¿qué estado y qué código de respuesta tiene el registro de la factura de prueba?","expect":"read","lookups":["verifactu.record.list"]},
+    {"id":"qa20261108.employee.es.verifactu.chain.validate","app":"verifactu","tool":"verifactu.chain.validate","role":"employee","language":"es","phrase":"comprueba que todas las huellas de la cadena fiscal de pruebas enlazan correctamente","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.verifactu.record.create","app":"verifactu","tool":"verifactu.record.create","role":"employee","language":"es","phrase":"crea el registro VeriFactu de la factura de prueba si todavía no está sellado","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.verifactu.certificate.remove","app":"verifactu","tool":"verifactu.certificate.remove","role":"employee","language":"es","phrase":"borra el certificado propio del negocio del Hub","expect":"refused"},
+    {"id":"qa20261108.employee.es.verifactu.chain.recover_from_aeat","app":"verifactu","tool":"verifactu.chain.recover_from_aeat","role":"employee","language":"es","phrase":"reconstruye la cadena fiscal desde lo que tenga la AEAT de pruebas este mes","expect":"refused"},
+    {"id":"qa20261108.employee.es.verifactu.record.reconcile","app":"verifactu","tool":"verifactu.record.reconcile","role":"employee","language":"es","phrase":"consulta a la AEAT de pruebas si ya tiene la factura de prueba y sácala de la cola","expect":"refused"}
+  ]
+}

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a96f2af5a216b788834f261af6dedfd06ce1171254a9c251cdf8e8acece87ea6 -->
+<!-- generated from WORKBOOK.md sha256:037989c4bfacce5b6f4ce89721e7453638f02196c0543feef22d6788a9669b96 -->
 
 ## What it is for and who it is for
 
@@ -22,6 +22,12 @@ Who uses it:
 - The **owner**, the **administrator** and the **manager** create categories, rules and aliases, set an end
   date on a rule and deactivate or restore it.
 - The **employee** only looks and calculates.
+- The **assistant** (by voice or by text, with the session of whoever speaks) does the same: "deactivate the beer
+  rule in Germany", "end the reduced rate on 31 December". Before an action it asks for confirmation with its card
+  (BASE-F97), which names each rule as the Rules list tells it apart, never by its identifier: by its category, a
+  component's label, its country (and its region) and its rate ("Rule: Craft beers · Spain · 10%"); and each
+  country by its name ("Country: Germany"), never by its code. What the person asking cannot see, or what no longer
+  exists, is left out.
 
 It does not decide the price, does not issue invoices or talk to the AEAT, and does not keep the business's
 country.
@@ -41,17 +47,26 @@ country.
 
 ## Before you start
 
-- When Taxes is turned on, the business gets **11 categories**, **18 aliases** and **the rates of Spain**
-  from the factory (TAX-F16). With that a Spanish business can sell without touching anything.
-- Turning on Inventory, Services, Sales, Invoicing, Menus and combos or Modifiers turns on Taxes with them,
-  and Taxes cannot be turned off while any of them is on.
-- **The business's country and tax region**: the country is the one of the business's ERPlora account (in
-  phase 1, Spain for everybody); the tax region —the whole country, the Canary Islands, Ceuta or Melilla— is
-  chosen in **Taxes → Settings** (TAX-F11). Sales, Invoicing, the screens and the assistant calculate with
-  both as long as no other country is asked for.
-- The factory rules are only Spain's. A business of another country (when the ERPlora account brings it)
-  will have to create its own (TAX-F04); neither the "Your taxes" notice nor the step of the Home (TAX-F17)
-  detect it yet, because they count the rules of any country.
+- **A business is born with Taxes on** (a demo too), without counting against the plan's app limit, and with its
+  factory catalogue: **11 categories**, **18 aliases** and **the rates of Spain** (TAX-F16). With that a Spanish
+  business can sell without touching anything (hub#997).
+- In a business of before that does not have it yet, turning on Inventory, Services, Sales, Invoicing, Menus and
+  combos or Modifiers turns on Taxes with them. Once on, Taxes is not turned off: neither by itself ("Taxes is
+  mandatory for businesses in Spain: it can't be turned off.") nor when the app it came with is turned off
+  (BASE-F25, hub#997).
+- **It is mandatory in every country**: without it nothing is charged, and **Apps** marks it "Mandatory in Spain"
+  (or in the business's country). While it is off (only in a business of before that never turned it on), "Finish
+  setting up your business" on the Home asks whoever runs the business to "Turn on Taxes" ("Important"), with "Set
+  up" leading to **Apps**; as soon as they turn it on, that step goes and "Your taxes" comes (BASE-F01, hub#997).
+- **The business's country and tax region**: the country is the one chosen when the business was signed up
+  on erplora.com, and it is not changed here (a business without a country, such as a demo, is in Spain); the
+  tax region —the whole country, or the Canary Islands, Ceuta or Melilla in Spain— is chosen in **Taxes →
+  Settings** (TAX-F11). Sales, Invoicing, the screens and the assistant calculate with both as long as no
+  other country is asked for.
+- The factory rules are only Spain's. A business of another country has them too, but they never apply to
+  it: until it creates its own in Rules (TAX-F04, TAX-F12), the till and the invoices charge nothing it
+  sells, and the "Your taxes" notice and the step of the Home (TAX-F17) tell it that its country brings no
+  factory rates.
 - **"Today" is Madrid time** in phase 1: Taxes does not use the business's time zone yet. The day a rate
   changes (TAX-F07) starts at midnight in Madrid; in the Canary Islands (TAX-F11), one hour before their
   midnight. When it uses the business's, "today" will be its own.
@@ -69,7 +84,7 @@ Initial setup, step by step:
 ## Screens
 
 Taxes opens from the **Taxes** menu and has four tabs in the bottom bar: **Categories**, **Rules**,
-**Aliases** and **Settings**. While no rate is in force, the first three carry the "Your taxes" notice at the
+**Aliases** and **Settings**. While no rate of the business's country is in force, the first three carry the "Your taxes" notice at the
 top for whoever can manage them, the same step the Home brings in "Finish setting up your business" (TAX-F17).
 All of them follow the permission of whoever looks: with view
 only, the notice "You can view the tax rules but not change them." shows, the **+** button disappears and,
@@ -102,8 +117,10 @@ filters for Alias, Category and Source and sorting by any column. A **+** button
 ### Settings
 "Your business's tax region": the business's "Country", read only ("It is the country of your ERPlora
 account."), and the "Tax region" dropdown with "Whole country (VAT)", "Canary Islands (IGIC)", "Ceuta
-(IPSI)" and "Melilla (IPSI)", with its explanation below, and "Save" ("Tax region saved."). Whoever only
-views taxes sees the region without being able to change it ("You can see the tax region but not change
+(IPSI)" and "Melilla (IPSI)", with its explanation below, and "Save" ("Tax region saved."). The regions are
+only Spain's: in a business of another country the dropdown only brings "Whole country (VAT)" and the
+explanation says "Portugal has no tax territories of its own: each category is charged with the rule of the
+whole country, which you create in Rules.", with the name of its country. Whoever only views taxes sees the region without being able to change it ("You can see the tax region but not change
 it."). It is the screen of TAX-F11.
 
 ## States of each screen
@@ -118,6 +135,12 @@ it."). It is the screen of TAX-F11.
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they arrive by another door, "You do not have permission". |
 
+## Unsaved changes on Android
+
+In "New tax category", "New category alias", "New tax rule" and "End this tax rule", the phone's Back button asks
+"Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes"
+closes the window without saving. With the window as it opened, Back closes it without asking (BASE-F05).
+
 ## Flows
 
 | ID | Flow | Status |
@@ -130,8 +153,6 @@ it."). It is the screen of TAX-F11.
 | TAX-F06 | Add an equivalence surcharge to a rate | done |
 | TAX-F07 | Change a rate from a date | done |
 | TAX-F08 | Deactivate and restore a rule | done |
-| TAX-F09 | Repair a rule that charges a rate where it should not | discarded |
-| TAX-F10 | Resolve overlapping rules | discarded |
 | TAX-F11 | Set up a business in the Canary Islands, Ceuta or Melilla | done |
 | TAX-F12 | Create several rules at once | done |
 | TAX-F13 | View the category aliases | done |
@@ -172,7 +193,7 @@ Out: the category, unique by key in the business; Taxes announces that there is 
 (`tax.category.created`). It brings no rule: until one is created (TAX-F04), a sale of that category is
 refused. Inventory also creates it when somebody chooses "Create" when importing a file (TAX-F15).
 If it fails: a key with another shape or an empty name show below their field; a key that already exists,
-"There is already a tax category with that key." below the Key. Nothing is saved.
+"There is already a tax category with that key." below the Key. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Nothing is saved.
 Involved: INVENTORY-F09
 
 ### TAX-F03 View and filter the rules
@@ -216,8 +237,8 @@ category…" (it is solved with TAX-F07 or TAX-F08). A country that does not exi
 country, a % outside 0–100, a "Valid to" before "Valid from" or a category that does not exist show below
 their field. A rule of the same country, region and category that starts the same day as another one
 already saved, even a deactivated one: "There is already a rule of this country, region and category from
-that day, perhaps deactivated: reactivate it or start this one another day.", in "Valid from". Nothing is
-saved.
+that day, perhaps deactivated: reactivate it or start this one another day.", in "Valid from". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+Nothing is saved.
 Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F05 Declare an exempt, not subject or reverse-charge operation
@@ -274,7 +295,7 @@ If it fails: an end before the start of the rule: "That rule cannot end before t
 that runs into another active rule of the same slot, the overlap notice. Two consecutive periods (one ends
 on 31/12, the other starts on 1/1) do not overlap. An end in the past leaves a gap without a rate: the sales
 of that category are refused until the next one is created.
-Involved: INVOICE-F01, INVOICE-F04, SALE-F01
+Involved: INVOICE-F01, SALE-F01
 
 ### TAX-F08 Deactivate and restore a rule
 Status: done
@@ -294,33 +315,6 @@ If it fails: a rule that no longer exists: "This tax rule no longer exists."; de
 deactivated or restoring one already active: "That rule is already deactivated." / "That rule is already
 active."; restoring one that now overlaps another active one, the overlap notice.
 Involved: SALE-F01
-
-### TAX-F09 Repair a rule that charges a rate where it should not
-Status: discarded — in the current product it served to fix rules saved before they were forbidden; here no door (screen, API, batch or assistant) lets a rule that charges no tax be created with a %, nor a component with a rate under it, so there is nothing to repair
-Actor: owner, administrator, manager
-Screen: Rules
-Steps:
-1. Whoever saves an exempt, not subject or reverse-charge rule with a % greater than 0 sees the refusal
-   below the % (TAX-F05).
-2. Whoever hangs a component with a rate from a root that charges no tax sees the refusal below the root
-   rule (TAX-F06).
-In: nothing.
-Out: nothing: the incoherent rule never gets saved.
-If it fails: does not apply.
-Involved: none
-
-### TAX-F10 Resolve overlapping rules
-Status: discarded — here no door lets two active rules of the same country, region and category be in force on the same day, not even if two people save at the same time: the overlap is solved before saving, with TAX-F07 or TAX-F08
-Actor: owner, administrator, manager
-Screen: Rules
-Steps:
-1. Whoever saves a rule that would overlap another active one of the same country, region and category sees
-   the refusal in "Valid from" (TAX-F04).
-2. They set an end date on the one in force (TAX-F07) or deactivate it (TAX-F08) and save the new one again.
-In: nothing.
-Out: nothing: the overlap never gets saved.
-If it fails: does not apply.
-Involved: none
 
 ### TAX-F11 Set up a business in the Canary Islands, Ceuta or Melilla
 Status: done
@@ -397,7 +391,7 @@ In: the outside text, the category and the source that the person chooses.
 Out: the alias, kept in lower case and without extra spaces, unique in the business (`tax.alias.created`).
 The next Inventory import understands it, however it is written.
 If it fails: an alias that already exists: "That alias already exists." below the Alias; a category that
-does not exist, below the Category. Nothing is saved.
+does not exist, below the Category. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888). Nothing is saved.
 Involved: INVENTORY-F09
 
 ### TAX-F15 Tell the Inventory importer which category a text is
@@ -421,8 +415,8 @@ Status: done
 Actor: system
 Screen: none
 Steps:
-1. The first time the business turns on Taxes (or when it is born with a vertical that brings it), the app
-   seeds the catalogue; nothing is done by hand.
+1. The business is born with Taxes on and the catalogue already there (hub#997); in a business of before, it
+   comes the first time it turns Taxes on. Nothing is done by hand.
 2. It is checked in Categories and Rules.
 In: nothing.
 Out: 11 system categories (`restaurant.food`, `restaurant.drink`, `restaurant.alcohol`,
@@ -443,22 +437,27 @@ Status: done
 Actor: owner, administrator, manager
 Screen: Home, Categories, Rules and Aliases
 Steps:
-1. On the **Home**, while no active root rule is in force today, "Finish setting up your business" brings
-   "Your taxes" ("Set up the VAT rates of the country you sell in so the till can price a sale."),
+1. On the **Home**, while no active root rule of the business's country is in force today, "Finish setting
+   up your business" brings "Your taxes" ("Set up the VAT rates of the country you sell in so the till can price a sale."),
    "Important", to whoever can manage taxes. "Set up" takes you to the **Rules** tab of Taxes.
 2. Open **Taxes**: meanwhile, at the top of Categories, Rules and Aliases the same "Your taxes" notice
-   shows, only for whoever can manage taxes.
+   shows, only for whoever can manage taxes. In a country Taxes brings no factory rules for (all but Spain)
+   it says instead "Portugal does not come with its tax rates ready: create in Rules the rate of each
+   category you sell so the till can price a sale.", with the name of its country.
 3. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+** (TAX-F04). In
    Rules the notice carries no button.
-4. As soon as an active root rule is in force today, the notice disappears by itself and the step of the
-   Home is "Done" without a reload.
-In: the rules of any country (neither the notice nor the step look at the business's yet).
+4. As soon as an active root rule of the business's country is in force today, the notice disappears by
+   itself and the step of the Home is "Done" without a reload.
+In: the rules of the business's country, the one chosen when it was signed up on erplora.com (Spain, without
+a country). Another country's do not count: a business in Portugal also has Spain's from the factory and
+they are no use to it.
 Out: how many rules apply today and whether taxes are set up. It does not block selling by itself. If the
 last rule in force ends (TAX-F07) or is deactivated (TAX-F08), the step of the Home goes back to pending by
 itself, and restoring it (TAX-F08) or creating another one (TAX-F04, TAX-F12) makes it "Done" again.
 Changing the tax region (TAX-F11) does not move it.
-If it fails: a single rule of any category is enough to consider it done. Today it counts the rules of any
-country and of any region: a Canary Islands business without any IGIC rule does not see the notice,
+If it fails: a single rule of the business's country, of any category, is enough to consider it done. It
+counts those of any region of the country: a Canary Islands business without any IGIC rule does not see the
+notice,
 although the till explains the reason when charging and the help of Settings says so (TAX-F11). An exempt or
 IGIC rule also counts: a business that only sells exempt services is properly set up.
 Involved: BASE-F01
@@ -472,16 +471,16 @@ Steps:
    amount already carries the tax are given.
 2. The base, the tax amount, the total, the combined rate, the qualification, the applied rule and the
    breakdown by component are obtained.
-In: amount in cents, category, country (at first, the business's with its tax region, TAX-F11), region and
-date (at first, today; in phase 1, today in Madrid). If a country is given, it calculates in that country
+In: amount in cents, category, country (at first, the business's with its tax region, TAX-F11: the one
+chosen when it was signed up on erplora.com, Spain without a country), region and date (at first, today; in phase 1, today in Madrid). If a country is given, it calculates in that country
 and in the region given, without the business's region.
 Out: only the answer; it saves nothing and announces nothing. Without the tax included, each component's
 tax is base × rate rounded to the cent, half up. With the tax included, the base is the amount ÷ (1 +
 combined rate) rounded and the tax is what is left, so what is charged does not move a cent (the last
 component absorbs the adjustment). It is the same calculation with which Sales closes the ticket and
 Invoicing squares the tax.
-If it fails: without an applicable rule, "No tax rule applies to this category in this country."; a guessed
-0 % is never charged, unless whoever asks requests it explicitly (and then, with the tax of their region:
+If it fails: without an applicable rule, "No tax rule applies to this category in this country.", also in a
+country without rules of its own: it is never charged with Spain's; a guessed 0 % is never charged, unless whoever asks requests it explicitly (and then, with the tax of their region:
 IGIC in the Canary Islands, IPSI in Ceuta and Melilla). Without an amount or without a category, below its
 field. If the rules cannot be read, the calculation stops without guessing.
 Involved: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
@@ -498,7 +497,8 @@ Steps:
    to choose them, by the name in the language of whoever looks and with their rate in force.
 In: what is already saved in Rules and Categories.
 Out: what the sale line freezes: category, combined rate, country, region and rule. A line with a category
-and without a rule is refused, it never falls to 0 %: the till says "… cannot be charged: no tax rule
+and without a rule of the business's country is refused (in a business of another country, Spain's rules
+never apply), it never falls to 0 %: the till says "… cannot be charged: no tax rule
 applies to its tax category … here." and the invoice, "No tax rule applies today to the tax category …"
 (TAX-F11). What to do with a line without a category is up to Sales.
 If it fails: the cashier does not charge with a guessed rate.
@@ -508,8 +508,8 @@ SALE-F07, SERVICE-F01
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or text, with the person's own
-session) and the API, with the same rules and the same permissions. A business's API key reaches less, the
-same as in the current product: seeing the categories, the rules and the aliases, reading a text as a
+session) and the API, with the same rules and the same permissions. A business's API key reaches less:
+seeing the categories, the rules and the aliases, reading a text as a
 category, and setting an end date on a rule or restoring it. Designed for voice: a
 category is named by its key, by its name (in Spanish or in English) or by an alias ("Restaurant — food",
 "food", `restaurant.food`), and a rule by its id or by its country, region and category ("the VAT one for
@@ -526,6 +526,7 @@ the last deactivated one).
 | How many root rules apply today in the business's country and whether taxes are set up (the notice and the step "Your taxes" of the Home) | view | F17 | `tax.rule.status` |
 | The root rules a component can hang from in a country, region and category: the same ones the creation accepts (also a root that starts in the future; one without tax, only for a component at 0 %) | view | F06 | `tax.rule.parent_candidates` |
 | The countries in which the business has rules (all, active or deactivated), for the Country filter | view | F03, F11 | `tax.rule.countries` |
+| A rule by its id, active or deactivated, with its name (category · country · rate): what the assistant's card reads to name it (BASE-F97); it is no tool of the assistant and has no route in the API | view | F06, F07, F08 | `tax.rule.get` |
 | The aliases, with search, filters (category, source) and pages | view | F13, F15 | `tax.alias.list` |
 | The category that matches an outside text, and why it matched | view | F15 | `tax.alias.resolve` |
 | The tax of an amount: base, tax, total, rate, qualification and breakdown | view | F18, F19 | `tax.rate.calculate` |
@@ -585,5 +586,4 @@ Nothing: Taxes depends on no app and reacts to no notice of others.
 | View categories, rules, aliases and the tax region, and calculate | yes | yes | yes | yes | `tax.view` |
 | Create categories, rules and aliases; set an end date, deactivate and restore rules; change the tax region | yes | yes | yes | no | `tax.manage` |
 
-The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee.
+The roles come from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

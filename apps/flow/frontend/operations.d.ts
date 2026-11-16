@@ -1,8 +1,8 @@
 // Types of the flow app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/flow/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3
-// generates them from `/api/openapi.json`. Keep it in step with schemas.py and with
-// `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters,
-// an automation's `id` (or its name, `flow`) travels in the input. Dates are ISO strings.
+// apps/flow/schemas.py. Written by hand, as `frontend/sdk-types.d.ts` is: nothing generates them from
+// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`. One input per
+// operation (ninja's parity): no path parameters, an automation's `id` (or its name, `flow`) travels in the input.
+// Dates are ISO strings.
 import type { Page } from '../../../frontend/sdk-types';
 import type { AssistantField } from '@erplora/ui/components';
 
@@ -384,6 +384,8 @@ export interface CatalogActionOut {
   app_name: string;
   description: string;
   fields: FieldOut[];
+  /** What a step of it leaves, by its path below the step: its fields, each object followed by what it holds
+   *  (`item`, `item.unit_price`), never inside a list; a read's `found` and `count`. */
   outputs: string[];
   /** Whether «Ask the assistant» may use it (absent: it may not). */
   assistant?: boolean;
@@ -391,9 +393,16 @@ export interface CatalogActionOut {
   ask_first?: boolean;
 }
 
+export interface CatalogAppOut {
+  app: string;
+  app_name: string;
+}
+
 export interface CatalogOut {
   events: CatalogEventOut[];
   actions: CatalogActionOut[];
+  /** The installed apps that are off in the business: what a saved automation may still name (hub#1054). */
+  off_apps: CatalogAppOut[];
 }
 
 export interface SampleIn {

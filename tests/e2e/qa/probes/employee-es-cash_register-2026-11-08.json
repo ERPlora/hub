@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.cash_register.register.list","app":"cash_register","tool":"cash_register.register.list","role":"employee","language":"es","phrase":"¿qué cajones puedo elegir para trabajar hoy?","expect":"read"},
+    {"id":"qa20261108.employee.es.cash_register.session.list","app":"cash_register","tool":"cash_register.session.list","role":"employee","language":"es","phrase":"enséñame los turnos recientes de caja y cuál sigue abierto","expect":"read"},
+    {"id":"qa20261108.employee.es.cash_register.session.close","app":"cash_register","tool":"cash_register.session.close","role":"employee","language":"es","phrase":"cierra la sesión S-261109-0001 con 170 € contados y la nota «cierre de empleado QA», mostrándome antes el resumen","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.cash_register.register.create","app":"cash_register","tool":"cash_register.register.create","role":"employee","language":"es","phrase":"crea un cajón nuevo llamado Terraza QA","expect":"refused"},
+    {"id":"qa20261108.employee.es.cash_register.register.update","app":"cash_register","tool":"cash_register.register.update","role":"employee","language":"es","phrase":"desactiva Barra QA para que nadie pueda abrir otro turno ahí","expect":"refused"},
+    {"id":"qa20261108.employee.es.cash_register.settings.update","app":"cash_register","tool":"cash_register.settings.update","role":"employee","language":"es","phrase":"permite que la caja quede en negativo y quita el arqueo obligatorio al cerrar","expect":"refused"}
+  ]
+}

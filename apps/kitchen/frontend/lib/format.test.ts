@@ -34,6 +34,11 @@ describe('formatQuantity', () => {
     expect(formatQuantity('0.500', 'es')).toBe('0,5');
     expect(formatQuantity('1.250', 'en')).toBe('1.25');
   });
+
+  // hub#974: the screen and the ticket write what the till sent as the till writes it.
+  it('writes a large order grouped from four digits on', () => {
+    expect([formatQuantity('1500.000', 'es'), formatQuantity(1500, 'en')]).toEqual(['1.500', '1,500']);
+  });
 });
 
 describe('formatMoney', () => {
@@ -54,9 +59,9 @@ describe('formatMoney', () => {
     expect(formatMoney(2450, 'en', { currency: 'HUF', decimals: 2 })).toBe('Ft\u00a024.50');
   });
 
-  it('until the business answers, an amount is a figure without a symbol, never in euros', () => {
-    expect(formatMoney(2450, 'es')).toBe('24,50');
-    expect(formatMoney(2450, 'en', undefined)).toBe('24.50');
+  it('until the business answers, an amount is a dash, never in euros', () => {
+    expect(formatMoney(2450, 'es')).toBe('—');
+    expect(formatMoney(2450, 'en', undefined)).toBe('—');
   });
 
   // hub#655: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
@@ -65,7 +70,7 @@ describe('formatMoney', () => {
     expect(formatMoney(123456789, 'es', EUR)).toBe('1.234.567,89\u00a0€');
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
     expect(formatMoney(1500, 'es', { currency: 'JPY', decimals: 0 })).toBe('1.500\u00a0¥');
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(formatMoney(99999, 'es', EUR)).toBe('999,99\u00a0€');
   });
 });

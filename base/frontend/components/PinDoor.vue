@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// The faces and the PIN pad of a shared till (BASE-G55, G60; Square's and Toast's passcode screens): a card per person
-// with a PIN, initials and name, never an email (gh:hub#2536); the chosen one's pad, entering at the last digit; the
-// arrow back to the faces. With one person the pad is already theirs. The page sends the entry and paints its refusal.
+// The faces and the PIN pad of a shared till: a card per person with a PIN, by initials and name and never by email.
+// With one person the pad is already theirs. The page sends the entry and paints its refusal.
 import { UserAvatar } from '@erplora/ui/components';
 import { computed, ref, watch } from 'vue';
 

@@ -1,16 +1,9 @@
-// Apps (BASE-G67…G74; the old hub's AppsPage): «My apps», «Add apps» and «Paid» over the live `base.app.list`, in
-// the address (`/apps`, `#all`, `#paid`); «Paid» and «Price» only while some app is sold apart (PLAN §32). «Open»
-// leads to the app's first screen; a paid app without its right says it needs a subscription and, for whoever runs
-// the business and only on the web, links to erplora.com's Store (buying is never inside the Hub). A failed read says so with «Retry» and keeps the rows; it is never «no apps».
-// Whoever runs the business turns an app on or off (PLAN-HUB §9): the dialog names what comes along or goes with it,
-// a refusal says why (another app needs it, the app itself, or the plan's limit, with «Upgrade plan») in a notice that
-// stays until it is closed or the next change (hub#2594), and the counter says how many of the plan's apps are on.
 import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sessionChanged } from '../lib/access';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId, tap } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, followPass, mountBase, OWNER, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
 import AppsPage from './AppsPage.vue';
 
@@ -45,6 +38,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    mandatory: false,
     ...fields,
   };
 }
@@ -55,7 +49,14 @@ const INVOICE = app('invoice', { name: 'Invoicing', requires: ['tax'], category:
 const REPORTS = app('reports', { name: 'Reports', path: null, category: 'organization', category_label: 'Organization' });
 const STOCK = app('stock', { name: 'Stock', premium: true, right: 'missing', state: 'blocked', path: null, category: 'catalog', category_label: 'Catalog and stock' });
 const PLANS = 'https://erplora.com/store/plans?business=h1';
-const LIST: AppList = { apps: [TAX, INVOICE, REPORTS, STOCK], store_url: STORE, plan_url: PLANS, max_apps: null, enabled: 3 };
+const LIST: AppList = {
+  apps: [TAX, INVOICE, REPORTS, STOCK],
+  country_name: 'Spain',
+  store_url: STORE,
+  plan_url: PLANS,
+  max_apps: null,
+  enabled: 3,
+};
 
 async function open(path = '/apps', options: Parameters<typeof mountBase>[1] = {}) {
   const m = await mountBase(AppsPage, { path, routes: ['/apps', '/tax/home', '/invoice/home'], ...options });
@@ -98,7 +99,7 @@ describe('AppsPage', () => {
     ]);
   });
 
-  it('«Open» goes to the app’s first screen, and an app with no screen for this person has none (BASE-G68)', async () => {
+  it('«Open» goes to the app’s first screen, and an app with no screen for this person has none', async () => {
     const m = await open();
     await m.result(m.call, 'base.app.list', LIST);
     expect(m.wrapper.find('[data-testid="apps-row-reports-open"]').exists()).toBe(false);
@@ -117,7 +118,7 @@ describe('AppsPage', () => {
     expect(m.router.currentRoute.value.path).toBe('/apps');
   });
 
-  it('«Add apps» (#all) lists every app with what it does, its price and what comes with it (BASE-G69, G70, G73)', async () => {
+  it('«Add apps» (#all) lists every app with what it does, its price and what comes with it', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
     expect(ids(m.wrapper)).toEqual(['tax', 'invoice', 'reports', 'stock']);
@@ -129,7 +130,7 @@ describe('AppsPage', () => {
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
   });
 
-  it('«Paid» (#paid) lists only what is bought apart; never a free app (hub#2655)', async () => {
+  it('«Paid» (#paid) lists only what is bought apart; never a free app', async () => {
     const m = await open('/apps#paid');
     await m.result(m.call, 'base.app.list', LIST);
     expect(ids(m.wrapper)).toEqual(['stock']);
@@ -156,7 +157,7 @@ describe('AppsPage', () => {
     ]);
   });
 
-  it('a paid app without its right links to erplora.com’s Store for whoever runs the business (BASE-G74)', async () => {
+  it('a paid app without its right links to erplora.com’s Store for whoever runs the business', async () => {
     const m = await open('/apps#all');
     await m.result(m.call, 'base.app.list', LIST);
     const buy = m.wrapper.find('[data-testid="apps-row"][data-id="stock"] [data-testid="apps-buy"]');
@@ -217,9 +218,9 @@ describe('AppsPage', () => {
     ]);
   });
 
-  // Every app in every plan (PLAN §32): with nothing sold apart, «Paid» and «Price» would only say «Free» again
+  // Every app in every plan: with nothing sold apart, «Paid» and «Price» would only say «Free» again
   // and again, so they are not there; the day an app is sold apart they come back on their own.
-  describe('with no app sold apart (PLAN §32)', () => {
+  describe('with no app sold apart', () => {
     const FREE_LIST: AppList = { ...LIST, apps: [TAX, INVOICE, REPORTS] };
     const tabIds = (m: Awaited<ReturnType<typeof open>>) =>
       (m.wrapper.getComponent(AppPage).props('tabs') as { id: string }[]).map((tab) => tab.id);
@@ -299,7 +300,7 @@ describe('AppsPage', () => {
     });
   });
 
-  describe('turning an app on or off (PLAN-HUB §9)', () => {
+  describe('turning an app on or off', () => {
     // sale came with customer; task was chosen; flow is off and needs nothing; booking (off) needs schedule (off).
     const SALE = app('sale', { name: 'Sales', requires: ['customer'] });
     const CUSTOMER = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
@@ -309,6 +310,7 @@ describe('AppsPage', () => {
     const BOOKING = app('booking', { name: 'Bookings', state: 'off', chosen: false, path: null, requires: ['schedule'] });
     const APPS: AppList = {
       apps: [SALE, CUSTOMER, TASK, FLOW, SCHEDULE, BOOKING, STOCK],
+      country_name: 'Spain',
       store_url: STORE,
       plan_url: PLANS,
       max_apps: 20,
@@ -317,8 +319,8 @@ describe('AppsPage', () => {
     const posted = (m: Awaited<ReturnType<typeof open>>) =>
       m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
     const refusal = (status: number, error: Record<string, unknown>) => () => Response.json({ error }, { status });
-    /** The refusal's notice: it stays on screen until it is closed or the next change (hub#2594: a toast went
-     *  before its long reason could be read). */
+    /** The refusal's notice: it stays on screen until it is closed or the next change, because a toast went before
+     *  its long reason could be read. */
     const refused = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-refused"]');
 
     it('«Turn off» asks with the app and what goes with it, turns it off and reads the menu again', async () => {
@@ -391,7 +393,7 @@ describe('AppsPage', () => {
       expect(toastError).not.toHaveBeenCalled();
     });
 
-    it('a refusal stays until it is closed, and the next change clears it (hub#2594)', async () => {
+    it('a refusal stays until it is closed, and the next change clears it', async () => {
       mocks.confirm.mockResolvedValue(true);
       let answer = refusal(409, { code: 'base.app_vetoed', message: 'Send the pending records first.', app: 'task' });
       const m = await open('/apps', { onApi: () => answer() });
@@ -464,24 +466,37 @@ describe('AppsPage', () => {
       expect(refused(m).exists()).toBe(false);
     });
 
-    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
-      const tab = { opener: {}, location: { href: 'about:blank' } };
-      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-      const url = 'http://localhost:8001/hub-pass/?pass=abc';
+    /** The Apps store at the plan's limit, its notice out, with `pass` as what signing the pass answers. */
+    async function atTheLimit(pass: () => Response) {
       const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
-      const m = await open('/apps#all', {
-        onApi: (call) => (call.url.includes('/saas-pass') ? Response.json({ url }) : limit()),
-      });
+      const m = await open('/apps#all', { onApi: (call) => (call.url.includes('/saas-pass') ? pass() : limit()) });
       await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
       await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
       await flush();
+      return m;
+    }
 
-      tap(m.wrapper.find('[data-testid="apps-limit-upgrade"]').element);
-      await flush();
+    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
+      const m = await atTheLimit(() => Response.json({ url: SIGNED }));
 
-      expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
-      expect(tab.location.href).toBe(url);
-      windowOpen.mockRestore();
+      expect(await followPass(m, m.wrapper.get('[data-testid="apps-limit-upgrade"]').element)).toEqual({ next: 'plan', to: SIGNED });
+    });
+
+    it('its «Upgrade plan» is the platform’s PlanUpgradeLink to the business’s plans, not a copy of its own', async () => {
+      const m = await atTheLimit(passRefused);
+      expect(placedUpgrade(m.wrapper.get('[data-testid="apps-limit"]'))).toEqual({
+        url: PLANS,
+        testid: 'apps-limit-upgrade',
+        says: 'Upgrade plan',
+      });
+    });
+
+    it('when the pass cannot be signed, its «Upgrade plan» opens the plans as usual', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const m = await atTheLimit(passRefused);
+
+      expect(await followPass(m, m.wrapper.get('[data-testid="apps-limit-upgrade"]').element)).toEqual({ next: 'plan', to: PLANS });
+      error.mockRestore();
     });
 
     it('in Spanish, and inside the installed app without the link', async () => {
@@ -571,6 +586,67 @@ describe('AppsPage', () => {
       });
     });
 
+    describe('what the business’s country requires on (hub#997)', () => {
+      const MANDATORY_HERE = 'Taxes is mandatory for businesses in Spain: it can’t be turned off.';
+      const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
+      const label = (m: Awaited<ReturnType<typeof open>>, id: string) => row(m, id).find('[data-testid="apps-mandatory"]');
+      const TAX_ON = app('tax', { name: 'Taxes', chosen: false, required_by: ['sale'], mandatory: true, refusal: MANDATORY_HERE });
+      const SALE_ = app('sale', { name: 'Sales', requires: ['customer', 'tax'] });
+      const CUSTOMER_ = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
+      const VERIFACTU_OFF = app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, mandatory: true });
+      const MINE: AppList = { ...APPS, apps: [SALE_, TAX_ON, CUSTOMER_, VERIFACTU_OFF] };
+
+      it('«My apps» says it is mandatory in the business’s country, offers no «Turn off» and says why', async () => {
+        const m = await open('/apps');
+        await m.result(m.call, 'base.app.list', MINE);
+
+        expect(label(m, 'tax').text()).toBe('Mandatory in Spain');
+        expect(row(m, 'tax').find('[data-testid="apps-state"]').text()).toBe('Active');
+        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').text()).toBe(MANDATORY_HERE);
+        expect(m.wrapper.find('[data-testid="apps-row-tax-toggle"]').exists()).toBe(false);
+        // Another app goes on as ever, with no label.
+        expect(label(m, 'sale').exists()).toBe(false);
+        expect(m.wrapper.find('[data-testid="apps-row-sale-toggle"]').text()).toContain('Turn off');
+      });
+
+      it('one off is labelled too in «Add apps», still «Off» and offered to turn on', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', MINE);
+
+        expect(label(m, 'verifactu').text()).toBe('Mandatory in Spain');
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Off');
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').text()).toContain('Turn on');
+      });
+
+      it('«Turn off» the app it came with never names it among what goes off with it', async () => {
+        mocks.confirm.mockResolvedValue(false);
+        const m = await open('/apps');
+        await m.result(m.call, 'base.app.list', MINE);
+
+        await m.wrapper.find('[data-testid="apps-row-sale-toggle"]').trigger('click');
+        await flush();
+
+        const asked = mocks.confirm.mock.calls[0][0];
+        expect(asked.message).toContain('Customers');
+        expect(asked.message).not.toContain('Taxes');
+      });
+
+      it('in Spanish, with the country by its Spanish name', async () => {
+        const m = await open('/apps', { locale: 'es' });
+        await m.result(m.call, 'base.app.list', { ...MINE, country_name: 'España' });
+
+        expect(label(m, 'tax').text()).toBe('Obligatoria en España');
+      });
+
+      it('whoever does not run the business reads the label too, not the reason', async () => {
+        const m = await open('/apps', { session: EMPLOYEE });
+        await m.result(m.call, 'base.app.list', MINE);
+
+        expect(label(m, 'tax').text()).toBe('Mandatory in Spain');
+        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').exists()).toBe(false);
+      });
+    });
+
     it('who does not run the business turns nothing on or off', async () => {
       const m = await open('/apps#all', { session: EMPLOYEE });
       await m.result(m.call, 'base.app.list', APPS);
@@ -590,29 +666,83 @@ describe('AppsPage', () => {
       expect(ids(m.wrapper)).toEqual(['sale', 'customer', 'task']);
     });
 
-    it('counts the chosen apps on against the plan’s limit, or says there is none', async () => {
-      const m = await open();
-      await m.result(m.call, 'base.app.list', APPS);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('2 of 20 apps turned on');
-      await m.result(m.call, 'base.app.list', { ...APPS, max_apps: null, enabled: 1 }, 2);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('1 app turned on · Unlimited');
-    });
+    describe('the counter: the apps on, as «My apps» lists them, and the plan’s chosen ones (hub#1286)', () => {
+      // Taxes is born on in every country (hub#997): on, never chosen, it takes nothing of the plan's limit.
+      const BORN = app('tax', { name: 'Taxes', chosen: false, mandatory: true });
+      const CHOSEN = app('task', { name: 'Tasks' });
+      const OFF = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
+      const listOf = (enabled: number, ...apps: AppRow[]): AppList => ({
+        apps,
+        country_name: 'Spain',
+        store_url: STORE,
+        plan_url: PLANS,
+        max_apps: 20,
+        enabled,
+      });
+      const counter = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-counter"]').text();
 
-    it('the counter in Spanish', async () => {
-      const m = await open('/apps', { locale: 'es' });
-      await m.result(m.call, 'base.app.list', APPS);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('2 de 20 apps activadas');
-      await m.result(m.call, 'base.app.list', { ...APPS, max_apps: null, enabled: 3 }, 2);
-      expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('3 apps activadas · Sin límite');
+      it('an app born on is turned on, and none of the plan’s', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
+        expect(counter(m)).toBe('1 app turned on · 0 of 20 in your plan');
+      });
+
+      it('an app the business chose is turned on and one of the plan’s', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF));
+        expect(counter(m)).toBe('2 apps turned on · 1 of 20 in your plan');
+      });
+
+      it('an app off, or paid without its right, is not turned on', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', listOf(0, OFF, STOCK));
+        expect(counter(m)).toBe('0 apps turned on · 0 of 20 in your plan');
+      });
+
+      it('counts what came along with another app, the way «My apps» lists it', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', APPS);
+        expect(counter(m)).toBe(`${ids(m.wrapper).length} apps turned on · 2 of 20 in your plan`);
+        expect(ids(m.wrapper)).toEqual(['sale', 'customer', 'task']);
+      });
+
+      it('an app still being set up, or that failed to be, is turned on', async () => {
+        const m = await open();
+        const creating = { ...OFF, state: 'creating' as const, chosen: true };
+        const failed = { ...CHOSEN, state: 'failed' as const };
+        await m.result(m.call, 'base.app.list', listOf(2, creating, failed));
+        expect(counter(m)).toBe('2 apps turned on · 2 of 20 in your plan');
+      });
+
+      it('without a limit, the apps turned on', async () => {
+        const m = await open();
+        await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null });
+        expect(counter(m)).toBe('1 app turned on · Unlimited');
+        await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 2);
+        expect(counter(m)).toBe('2 apps turned on · Unlimited');
+      });
+
+      it('in Spanish', async () => {
+        const m = await open('/apps', { locale: 'es' });
+        await m.result(m.call, 'base.app.list', listOf(0, BORN, OFF));
+        expect(counter(m)).toBe('1 app activada · 0 de 20 de tu plan');
+        await m.result(m.call, 'base.app.list', listOf(1, BORN, CHOSEN, OFF), 2);
+        expect(counter(m)).toBe('2 apps activadas · 1 de 20 de tu plan');
+        await m.result(m.call, 'base.app.list', { ...listOf(1, BORN, CHOSEN, OFF), max_apps: null }, 3);
+        expect(counter(m)).toBe('2 apps activadas · Sin límite');
+        // A business just born without a limit: Taxes alone, in the singular.
+        await m.result(m.call, 'base.app.list', { ...listOf(0, BORN, OFF), max_apps: null }, 4);
+        expect(counter(m)).toBe('1 app activada · Sin límite');
+      });
     });
   });
 
-  describe('an app whose tables the business’s database is still getting (S3)', () => {
+  describe('an app whose tables the business’s database is still getting', () => {
     const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
     const FLOW_CREATING = { ...FLOW, state: 'creating' as const, chosen: true };
     const FLOW_FAILED = { ...FLOW, state: 'failed' as const, chosen: true };
     const TASK = app('task', { name: 'Tasks' });
-    const listOf = (...apps: AppRow[]): AppList => ({ apps, store_url: STORE, plan_url: PLANS, max_apps: 20, enabled: 1 });
+    const listOf = (...apps: AppRow[]): AppList => ({ apps, country_name: 'Spain', store_url: STORE, plan_url: PLANS, max_apps: 20, enabled: 1 });
     const posted = (m: Awaited<ReturnType<typeof open>>) =>
       m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
     const pill = (m: Awaited<ReturnType<typeof open>>, id: string) =>

@@ -1,4 +1,4 @@
-"""VeriFactu does not go on outside Spain (VERIFACTU-F01, hub#694).
+"""VeriFactu does not go on outside Spain (VERIFACTU-F01).
 
 VeriFactu binds the taxpayers of Spain alone and, for a business registered elsewhere, seals and sends nothing
 (``test_outside_spain``). The platform's ``base.app.enable`` asks the app's ``can_enable`` (``base.activation.veto``):
@@ -6,6 +6,9 @@ outside Spain it is 409 ``base.app_vetoed`` with the reason in the reader's lang
 ``base.app.list`` says so beforehand. A business in Spain, or without a country (a demo, in ERPlora's market), turns it
 on. One already on outside Spain stays as it is and can go off (``test_app_disable``). Each hub reads its own business's
 country.
+
+A template of the catalogue never turns it on, in Spain either: VeriFactu binds the business to the AEAT until the end
+of the calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it on, from Apps.
 """
 
 import pytest
@@ -16,12 +19,13 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.verifactu.queries import VERIFACTU
-from apps.verifactu.tests.conftest import A, business_in
-from base import activation, events, services
-from base.catalog import template_apps
-from base.models import AppActivation
+from apps.verifactu.tests.conftest import HUB_DB, A, business_in
+from base import activation, blueprint, events, services
+from base.models import AppActivation, Membership
+from base.permissions import permissions_for
 from base.tenancy import context
 from base.tenancy.tests import hubs
+from base.tests.test_services_data import call, modules_on
 
 ONLY_IN_SPAIN = "VeriFactu is only for businesses in Spain."
 ONLY_IN_SPAIN_ES = "VeriFactu solo es para negocios de España."
@@ -36,7 +40,7 @@ def enable(context_: OperationContext | None = None, app: str = "verifactu") -> 
     return op(context_ or admin(), op.input.model_validate({"app": app})).model_dump(mode="json")
 
 
-def verifactu_off(host: str = "a") -> None:
+def verifactu_off(host: str = A.key) -> None:
     """Every app of ``host`` as a business that never turned VeriFactu nor what it needs on."""
     AppActivation.objects.filter(host=host).delete()
     AppActivation.objects.bulk_create(
@@ -45,13 +49,34 @@ def verifactu_off(host: str = "a") -> None:
     activation.forget(host)
 
 
+@pytest.fixture
+def born(make_user):
+    """The business ``A`` as it is born: every app off (no row), and its owner."""
+    AppActivation.objects.filter(host=A.key).delete()
+    activation.forget(A.key)
+    owner = make_user("carla", role=Membership.Role.OWNER)
+    return OperationContext(scope=A, actor=owner, permissions=permissions_for(owner, A), language="es")
+
+
+@pytest.fixture
+def load(django_capture_on_commit_callbacks):
+    """``base.blueprint.import`` as a request runs it: what runs after its COMMIT in the business's database (the cache
+    of the apps off forgotten) runs too, so what the test reads next sees the apps it turned on."""
+
+    def run(ctx, **data):
+        with django_capture_on_commit_callbacks(using=context.current_alias(), execute=True):
+            return call(ctx, "base.blueprint.import", **data)
+
+    return run
+
+
 def row_of(language: str = "en", scope: Scope = A) -> dict:
     op = get("base.app.list")
     document = op(admin(scope, language), op.input()).model_dump(mode="json")
     return {row["id"]: row for row in document["apps"]}["verifactu"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("country", ["PL", "FR", "PT"])
 def test_outside_spain_it_is_refused_with_the_reason_and_nothing_goes_on(country):
     business_in(country)
@@ -70,7 +95,7 @@ def test_outside_spain_it_is_refused_with_the_reason_and_nothing_goes_on(country
     assert apps.get_app_config("verifactu").can_enable(admin()) == ONLY_IN_SPAIN
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_reason_is_in_the_language_of_whoever_turns_it_on():
     business_in("PL")
     verifactu_off()
@@ -81,7 +106,7 @@ def test_the_reason_is_in_the_language_of_whoever_turns_it_on():
     assert refused.value.message == ONLY_IN_SPAIN_ES
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("country", ["ES", "es", ""])
 def test_in_spain_or_without_a_country_it_goes_on(country):
     business_in(country)
@@ -92,7 +117,7 @@ def test_in_spain_or_without_a_country_it_goes_on(country):
     assert activation.states_of(A)["verifactu"].on
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_outside_spain_the_list_says_it_is_not_available_with_the_reason():
     business_in("PL")
     verifactu_off()
@@ -103,7 +128,7 @@ def test_outside_spain_the_list_says_it_is_not_available_with_the_reason():
     assert row_of("es")["refusal"] == ONLY_IN_SPAIN_ES
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("country", ["ES", ""])
 def test_in_spain_the_list_offers_it(country):
     business_in(country)
@@ -114,7 +139,7 @@ def test_in_spain_the_list_offers_it(country):
     assert (row["state"], row["refusal"]) == ("off", None)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_outside_spain_what_verifactu_needs_goes_on_all_the_same():
     business_in("PL")
     verifactu_off()
@@ -123,7 +148,7 @@ def test_outside_spain_what_verifactu_needs_goes_on_all_the_same():
     assert not activation.states_of(A)["verifactu"].wanted
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_the_rest():
     """A blueprint turns on its apps through ``base.app.enable``: one that refuses stays off, the rest load."""
     business_in("PL")
@@ -137,33 +162,25 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
     assert not states["verifactu"].wanted
 
 
-@pytest.mark.django_db
-@pytest.mark.parametrize("vertical", ["hair_salon", "restaurant"])
-def test_a_vertical_template_outside_spain_loads_without_verifactu_and_says_why(vertical):
-    """A hub is born with every app off and a template turns its vertical's on through ``base.app.enable``: outside
-    Spain only VeriFactu stays off, with its reason; everything else the vertical brings goes on, what it needed too."""
-    listed = template_apps(vertical)
-    assert VERIFACTU in listed
-    business_in("PL")
-    verifactu_off()
-
-    refused = services._turn_on_listed(admin(), listed, set())
-
-    assert refused == {VERIFACTU: ONLY_IN_SPAIN}
-    states = activation.states_of(A)
-    assert not states[VERIFACTU].wanted
-    assert [app for app in listed if app != VERIFACTU and not states[app].on] == []
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("vertical", ["hair_salon", "restaurant"])
-def test_a_vertical_template_in_spain_turns_verifactu_on(vertical):
-    listed = template_apps(vertical)
+@HUB_DB
+@pytest.mark.parametrize("key", [seed.key for seed in blueprint.catalog()])
+def test_a_template_in_spain_leaves_verifactu_off_for_the_home_to_ask_and_turns_on_the_rest(born, load, key):
+    """The review does not announce it and the load leaves it off, so «Finish setting up your business» asks its owner
+    to turn it on; everything else the template lists goes on, what VeriFactu needs included."""
     business_in("ES")
-    verifactu_off()
 
-    assert services._turn_on_listed(admin(), listed, set()) == {}
-    assert activation.states_of(A)[VERIFACTU].on
+    review = call(born, "base.blueprint.inspect", template=key)
+    loaded = load(born, template=key)
+
+    on = modules_on(A)
+    turns_on = {app.id for app in review.apps if app.status == "turns_on"}
+    assert VERIFACTU not in {app.id for app in review.apps}
+    assert VERIFACTU not in on
+    assert not activation.states_of(A)[VERIFACTU].wanted
+    assert set(apps.get_app_config(VERIFACTU).requires) <= turns_on <= on
+    assert loaded.status == "complete"
+    checklist = {item.key: item.state for item in call(born, "base.setup.status").items}
+    assert checklist[f"base.mandatory.{VERIFACTU}"] == "pending"
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
@@ -179,5 +196,5 @@ def test_each_hub_reads_its_own_business_country(hub_a, hub_b, poland_and_spain)
     with context.use_hub(hub_b):
         verifactu_off(hub_b.slug)
         assert row_of(scope=of_b)["refusal"] is None
-        assert enable(admin(of_b))["state"] in ("on", "creating")
+        assert enable(admin(of_b))["state"] == "on"
         assert activation.states_of(of_b)["verifactu"].wanted

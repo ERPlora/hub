@@ -1,28 +1,42 @@
-"""A hub's database copied to the dumps bucket (round 2026-10-30 of PLAN-DB, decision 2 and proposals (f), (k), (m)).
+"""A hub's database copied to the dumps bucket.
 
 ``dump_hub`` runs ``pg_dump -Fc --no-owner --no-acl`` on the hub's own database as the migrator, on a direct connection
 to its writer (never PgBouncer), with its password in the subprocess's environment only; uploads it to
 ``<hex>/<AAAAMMDDTHHMMSSZ>-<kind>.dump`` and keeps a ``HubDump`` row in control. A hub without its own database is
 never dumped; without a bucket nothing is; a dump that fails or runs too long uploads nothing and says why, never
-the password. ``presigned_url`` gives a link of 15 minutes.
+the password. ``presigned_url`` gives a link of 15 minutes. ``stream_to_bucket`` (a move's copy) sends ``pg_dump``'s
+output straight to a key, never through a file: the object is there only when ``pg_dump`` ended well.
 
 Real databases (the session's ``hub_a`` and ``hub_b``, ``hubs.py``) and a real S3 server (moto's, ``s3.py``); the dump
 is read back with ``pg_restore``.
 """
 
 import datetime as dt
+import os
 import subprocess
+import sys
+import time
 import urllib.parse
 import urllib.request
 
 import pytest
+from botocore.exceptions import ClientError
 from django.utils import timezone
 from psycopg.conninfo import conninfo_to_dict
 
 from base.tenancy import dumps
 from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import make_cluster, make_hub, opened_at  # noqa: F401 (fixtures)
-from base.tenancy.tests.s3 import aws_test_credentials, body, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
+from base.tenancy.tests.s3 import (  # noqa: F401
+    aws_test_credentials,
+    body,
+    client,
+    dumps_bucket,
+    moto_s3,
+    no_dumps_bucket,
+    nothing_kept,
+    objects,
+)
 from control.models import Hub, HubDump
 
 pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback")]
@@ -222,7 +236,7 @@ def test_the_link_downloads_the_copy_as_a_file_named_after_the_business(hub_a, d
 
 
 def test_a_copy_is_stopped_when_the_worker_stops_and_nothing_is_kept(hub_a, dumps_bucket, moto_s3):
-    """The worker on its way out (PLAN-DB round 2026-10-31b, C8): pg_dump is killed and the work stays due."""
+    """The worker on its way out: pg_dump is killed and the work stays due."""
     with pytest.raises(dumps.DumpStopped):
         dumps.dump_hub(hub_a, kind=HubDump.Kind.RESET, now=AT, cancelled=lambda: True)
 
@@ -232,7 +246,7 @@ def test_a_copy_is_stopped_when_the_worker_stops_and_nothing_is_kept(hub_a, dump
 
 
 def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_a, dumps_bucket, moto_s3):
-    """pg_dump waiting on a table someone else locked (review of round 3): the stop is heard and pg_dump killed at
+    """pg_dump waiting on a table someone else locked: the stop is heard and pg_dump killed at
     once; without the kill the call would wait for the lock (released here after 8 s)."""
     import threading
     import time
@@ -261,7 +275,7 @@ def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_
     assert objects(moto_s3, dumps_bucket) == {}
 
 
-# ── Control's own copy, before the cut of S5 ──────────────────────────────────────────────────────────────────────
+# ── Control's own copy, before the businesses moved out ───────────────────────────────────────────────────────────
 
 
 def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(hub_databases, dumps_bucket, moto_s3, tmp_path):
@@ -281,3 +295,248 @@ def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(hub_da
 def test_without_a_bucket_control_is_not_copied(hub_databases, no_dumps_bucket):
     with pytest.raises(dumps.DumpsUnavailable):
         dumps.dump_control(kind=dumps.CUT, now=AT)
+
+
+# ── A move's copy: streamed to the bucket, never through a file ──────────────────────────────────────────────────────
+
+MOVE_KEY = "0f0f/20261031T101500Z-move.dump"
+#: S3's smallest part: what the tests stream in, so a copy of a few MiB goes up in several parts.
+SMALLEST_PART = 5 * 1024 * 1024
+#: A copy of three parts, every byte checked when it comes back.
+LARGE = b"PGDMP" + bytes(range(256)) * (48 * 1024)
+
+
+def a_pg_dump(tmp_path, monkeypatch, script: str) -> str:
+    """``pg_dump`` replaced by ``script`` (Python, its own program): what a real one does at its edges, on demand. The
+    path of the file it writes its pid to."""
+    program = tmp_path / "pg_dump"
+    pid = tmp_path / "pg_dump.pid"
+    started_line = f"open({str(pid)!r}, 'w').write(str(os.getpid()))"
+    program.write_text(f"#!{sys.executable}\nimport os, sys, time\n{started_line}\n{script}\n")
+    program.chmod(0o755)
+    monkeypatch.setattr(dumps, "pg_dump", lambda: str(program))
+    return str(pid)
+
+
+def started(pid_file: str) -> None:
+    """Wait until the replaced ``pg_dump`` is running (it wrote its pid)."""
+    deadline = time.monotonic() + 10
+    while not os.path.exists(pid_file) or not open(pid_file).read():
+        assert time.monotonic() < deadline, "the replaced pg_dump never started"
+        time.sleep(0.01)
+
+
+def gone(pid_file: str) -> bool:
+    """Whether the process that wrote ``pid_file`` is over (killed and waited for: no zombie left)."""
+    with open(pid_file) as written:
+        pid = int(written.read())
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
+def test_a_database_is_streamed_to_its_key_never_through_a_file(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    seen = []
+    real = subprocess.Popen
+
+    def watched(command, **kwargs):
+        seen.append((command, kwargs))
+        return real(command, **kwargs)
+
+    monkeypatch.setattr(dumps.subprocess, "Popen", watched)
+
+    sent = dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    [(command, kwargs)] = seen
+    monkeypatch.undo()
+    assert command[:4] == [dumps.pg_dump(), "--format=custom", "--no-owner", "--no-acl"]
+    assert not any(part.startswith("--file") for part in command) and kwargs["stdout"] == subprocess.PIPE
+    copy = body(moto_s3, dumps_bucket, MOVE_KEY)
+    assert objects(moto_s3, dumps_bucket) == {MOVE_KEY: sent} and copy.startswith(b"PGDMP")
+    assert "base_hub_identity" in restored(copy, tmp_path, "--list")
+    assert not HubDump.objects.exists()  # a move's copy is nobody's to download
+
+
+def test_a_copy_larger_than_a_part_goes_up_whole_in_parts(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(tmp_path, monkeypatch, "sys.stdout.buffer.write(b'PGDMP' + bytes(range(256)) * (48 * 1024))")
+
+    sent = dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert sent == len(LARGE)
+    assert body(moto_s3, dumps_bucket, MOVE_KEY) == LARGE
+    assert client(moto_s3).head_object(Bucket=dumps_bucket, Key=MOVE_KEY)["ETag"].endswith('-3"')
+
+
+@pytest.mark.parametrize("written", [10, 6 * 1024 * 1024], ids=["in-the-first-part", "after-a-part-went-up"])
+def test_a_dump_that_fails_midway_keeps_nothing_and_says_why(
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, written
+):
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(
+        tmp_path,
+        monkeypatch,
+        f"sys.stdout.buffer.write(b'PGDMP' + bytes({written})); sys.stdout.flush()\n"
+        "sys.stderr.write('pg_dump: error: the connection to the server was lost\\n'); sys.exit(1)",
+    )
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert "exit 1" in str(failed.value) and "the connection to the server was lost" in str(failed.value)
+    assert nothing_kept(moto_s3, dumps_bucket)
+
+
+def test_a_stream_that_fails_says_why_never_the_password(hub_a, dumps_bucket, moto_s3, settings):
+    settings.DB_MIGRATOR_PASSWORD = "wrong-secret-7a2d"
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert "password authentication failed" in str(failed.value)
+    assert "wrong-secret-7a2d" not in str(failed.value)
+    assert nothing_kept(moto_s3, dumps_bucket)
+
+
+def test_a_stream_that_runs_too_long_is_stopped_and_keeps_nothing(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    pid = a_pg_dump(tmp_path, monkeypatch, "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); time.sleep(60)")
+    started = time.monotonic()
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=0.5)
+
+    assert "took longer than 0.5 s" in str(failed.value)
+    assert time.monotonic() - started < 10 and gone(pid)
+    assert nothing_kept(moto_s3, dumps_bucket)
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        "time.sleep(60)",
+        # Its output closed but still running: the end of the copy waits for it the same way.
+        "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); os.close(1); time.sleep(60)",
+    ],
+    ids=["before-any-output", "its-output-closed"],
+)
+def test_a_stream_is_stopped_when_the_worker_stops_and_keeps_nothing(
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, script
+):
+    pid = a_pg_dump(tmp_path, monkeypatch, script)
+    asked = time.monotonic()
+
+    with pytest.raises(dumps.DumpStopped):
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, cancelled=lambda: time.monotonic() - asked > 0.5)
+
+    assert time.monotonic() - asked < 10 and gone(pid)
+    assert nothing_kept(moto_s3, dumps_bucket)
+
+
+def test_while_it_streams_its_heartbeat_beats_and_one_that_fails_stops_it(
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(dumps, "POLL_SECONDS", 0.0)
+    pid = a_pg_dump(tmp_path, monkeypatch, "time.sleep(60)")
+    beats = []
+
+    class LeaseLost(Exception):
+        pass
+
+    def lost():
+        started(pid)
+        beats.append(1)
+        raise LeaseLost("another worker holds it now")
+
+    with pytest.raises(LeaseLost):
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, heartbeat=lost)
+
+    assert beats == [1] and gone(pid)
+    assert nothing_kept(moto_s3, dumps_bucket)
+
+
+def test_its_heartbeat_waits_its_time_between_beats(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    monkeypatch.setattr(dumps, "POLL_SECONDS", 0.4)
+    monkeypatch.setattr(dumps, "STOP_CHECK_SECONDS", 0.05)
+    a_pg_dump(tmp_path, monkeypatch, "time.sleep(1.3); sys.stdout.buffer.write(b'PGDMP')")
+    beats = []
+
+    dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, heartbeat=lambda: beats.append(time.monotonic()))
+
+    assert 2 <= len(beats) <= 4, beats
+
+
+def test_without_a_bucket_nothing_is_streamed_and_pg_dump_never_starts(hub_a, no_dumps_bucket, monkeypatch, tmp_path):
+    pid = a_pg_dump(tmp_path, monkeypatch, "")
+
+    with pytest.raises(dumps.DumpsUnavailable):
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert not os.path.exists(pid)
+
+
+def test_a_bucket_that_refuses_the_stream_is_a_readable_failure(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    monkeypatch.setenv("HUB_DUMPS_BUCKET", "erplora-test-hub-dumps-not-there")
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert "could not be uploaded" in str(failed.value)
+
+
+def test_a_refused_upload_of_a_large_copy_stops_pg_dump_at_once(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    """The bucket refuses the first part while pg_dump still has more to give: it is killed, not waited for."""
+    monkeypatch.setenv("HUB_DUMPS_BUCKET", "erplora-test-hub-dumps-not-there")
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(
+        tmp_path, monkeypatch, "sys.stdout.buffer.write(bytes(6 * 1024 * 1024)); sys.stdout.flush(); time.sleep(60)"
+    )
+    asked = time.monotonic()
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    # Waited for, not killed, it would take its whole minute.
+    assert "could not be uploaded" in str(failed.value) and time.monotonic() - asked < 10
+
+
+def test_a_copy_of_exactly_two_parts_goes_up_in_two(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(tmp_path, monkeypatch, f"sys.stdout.buffer.write(bytes(range(256)) * (2 * {SMALLEST_PART} // 256))")
+
+    sent = dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert sent == 2 * SMALLEST_PART
+    assert client(moto_s3).head_object(Bucket=dumps_bucket, Key=MOVE_KEY)["ETag"].endswith('-2"')
+
+
+def test_an_abort_that_fails_keeps_the_reason_of_the_failure(
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, caplog
+):
+    monkeypatch.setattr(dumps, "STREAM_PART_BYTES", SMALLEST_PART)
+    a_pg_dump(
+        tmp_path,
+        monkeypatch,
+        "sys.stdout.buffer.write(bytes(6 * 1024 * 1024)); sys.stdout.flush()\n"
+        "sys.stderr.write('pg_dump: error: the connection to the server was lost\\n'); sys.exit(1)",
+    )
+    real = dumps.client
+
+    def refusing_aborts():
+        s3 = real()
+
+        def abort(**kwargs):
+            raise ClientError({"Error": {"Code": "AccessDenied", "Message": "not allowed"}}, "AbortMultipartUpload")
+
+        s3.abort_multipart_upload = abort
+        return s3
+
+    monkeypatch.setattr(dumps, "client", refusing_aborts)
+
+    with pytest.raises(dumps.DumpFailed) as failed:
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
+
+    assert "the connection to the server was lost" in str(failed.value)
+    assert "base.tenancy.dumps.abort_failed" in caplog.text
+    assert objects(moto_s3, dumps_bucket) == {}

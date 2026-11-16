@@ -1,7 +1,3 @@
-// «Switch user» (`/switch-user`, BASE-G60): over the screen in use, the faces of the till (live: a PIN given or taken
-// away shows at once, the old hub's HUB_SHELL-F04 trap), the PIN (or the badge) of whoever takes over, and back to the
-// same screen with a full reload as them (gh:hub#2538, hub#2539: nothing of who left stays mounted); the sale is kept
-// by its app. A refusal leaves whoever was in, in. «Cancel» changes nothing.
 import { ApiError } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

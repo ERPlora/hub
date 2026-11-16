@@ -3,9 +3,10 @@ and the assistant's contract of every operation (``ai`` and described input fiel
 
 from django.apps import apps
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import AI, MIN_ASKS, registry
 
 from apps.task import queries, services  # noqa: F401  (importing them registers the operations)
+from apps.task.tests.test_assistant_yes_for_its_card import CHECKS
 
 PERMISSIONS = [
     "task.view",
@@ -132,6 +133,14 @@ def test_every_operation_tells_the_assistant_what_it_does():
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
+            expected |= {"asks"}
+            assert {language: len(op.ai.get("asks", {}).get(language, ())) >= MIN_ASKS for language in ("en", "es")} == {
+                "en": True,
+                "es": True,
+            }, name
+        if name in CHECKS:  # the writes that take their record by its name check it before its card (hub#1219)
+            expected |= {"check"}
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name

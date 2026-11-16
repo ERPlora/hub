@@ -17,8 +17,8 @@ PERMISSIONS = [
     "customer.record_activity",
 ]
 
-#: Every operation of the app, with its permission. The two purchase commands are the system's only:
-#: their permission is declared by no app, so only the system context (``*``) holds it, as the
+#: Every operation of the app, with its permission. The purchase commands and the restore of a deleted card are the
+#: system's only: their permission is declared by no app, so only the system context (``*``) holds it, as the
 #: product's ``internal`` commands.
 OPERATIONS = {
     # queries
@@ -37,6 +37,11 @@ OPERATIONS = {
     "customer.consent.history": "customer.view",
     "customer.order.customer": "customer.view",
     "customer.order.list": "customer.view",
+    # what names a record on the assistant's card (hub#513)
+    "customer.group.detail": "customer.view",
+    "customer.tag.detail": "customer.view",
+    "customer.field.detail": "customer.view",
+    "customer.order.get": "customer.view",
     # commands
     "customer.customer.create": "customer.manage",
     "customer.customer.update": "customer.manage",
@@ -46,6 +51,8 @@ OPERATIONS = {
     "customer.customer.delete": "customer.delete",
     "customer.customer.merge": "customer.merge",
     "customer.customer.erase": "customer.erase",
+    "customer.customer.restore": "customer.restore",
+    "customer.customer.recover": "customer.restore",
     "customer.note.add": "customer.manage",
     "customer.activity.add": "customer.record_activity",
     "customer.consent.grant": "customer.manage",
@@ -79,7 +86,7 @@ HIGH_RISK = {
     "customer.tag.delete",
     "customer.field.delete",
 }
-#: Open to API keys, as in the product's module.json.
+#: Open to API keys.
 EXPOSED = {"customer.order.list", "customer.consent.state"}
 #: Health data (CUSTOMER-F32, GDPR art. 9): for the screen only, never a tool of the assistant.
 SCREEN_ONLY = {
@@ -88,11 +95,23 @@ SCREEN_ONLY = {
     "customer.health.withdraw",
     "customer.health.update",
 }
-#: What only the sale app's reactions run (``customer.record_purchase``, declared by no app): no person's tool.
+#: What only the system runs, by a permission declared by no app: no person's tool. The sale app's reactions
+#: (``customer.record_purchase``) and the restore of a deleted card, whose only door is the recovery from a separate
+#: copy (``customer.restore``, BASE-F114), as the card it makes again with what hung from it there (hub#1285).
 SYSTEM_ONLY = {
     "customer.purchase.record",
     "customer.purchase.void",
     "customer.purchase.refund",
+    "customer.customer.restore",
+    "customer.customer.recover",
+}
+#: What names a group, a tag, a custom field or an open order on the card of a write (hub#513): only the card reads
+#: them, the model finds those records in their lists.
+CARD_ONLY = {
+    "customer.group.detail",
+    "customer.tag.detail",
+    "customer.field.detail",
+    "customer.order.get",
 }
 
 
@@ -123,7 +142,7 @@ def test_customer_is_a_free_module_of_the_people_group():
 
 
 def test_customer_is_listed_in_the_store_for_both_verticals():
-    # Round 16 (PLAN §21): one line for the store, one paragraph, and the verticals it ships with.
+    # One line for the store, one paragraph, and the verticals it ships with.
     config = customer()
     with translation.override("en"):
         assert 0 < len(str(config.summary)) <= 120
@@ -164,9 +183,8 @@ def test_the_manager_keeps_the_products_manager_rights():
     }
 
 
-def test_the_employee_works_the_counter_with_the_old_cashier_rights():
-    # The old «cashier» role (view, add, change, link_order, add_note) is the employee's now:
-    # search, attach, quick add, edit the sheet and record consent at the counter.
+def test_the_employee_works_the_counter():
+    # The employee searches, attaches, quick-adds, edits the sheet and records consent at the counter.
     assert permissions_for_role([customer()], "hub_employee") == {
         "customer.view",
         "customer.manage",
@@ -199,20 +217,21 @@ def test_every_operation_and_its_permission():
 
 
 def test_the_system_only_permission_is_declared_by_no_app():
-    # Owner and admin get every declared permission: declaring it would let them record purchases.
+    # Owner and admin get every declared permission: declaring them would let them record purchases or restore cards.
     declared = {
         permission
         for config in apps.get_app_configs()
         for permission in getattr(config, "permissions", [])
     }
-    assert "customer.record_purchase" not in declared
+    assert {"customer.record_purchase", "customer.restore"}.isdisjoint(declared)
 
 
 def test_every_operation_tells_the_assistant_what_it_does():
     """Typed (``AI``), with what it does and how people ask for it in English and Spanish
-    (test_assistant_asks.py); the screen's health data and the sale's reactions are no tool (``INTERNAL``)."""
+    (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card are no
+    tool (``INTERNAL``)."""
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY | SYSTEM_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
             assert op.ai is INTERNAL, name
             continue
         assert isinstance(op.ai, AI), name
@@ -222,7 +241,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
 
 def test_commands_declare_their_risk_and_queries_do_not():
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY | SYSTEM_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
             continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"

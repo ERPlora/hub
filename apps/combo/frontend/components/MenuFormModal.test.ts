@@ -7,8 +7,14 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import type { ComboOut } from '../operations';
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, mountCombo, POLISH, settle } from '../__tests__/mount-combo';
 import MenuFormModal from './MenuFormModal.vue';
 
@@ -34,12 +40,12 @@ const MENU: ComboOut = {
   updated_at: '2026-10-15T10:00:00Z',
 };
 
-/** `answer`: what the business answers when the stream opens (`null`: it opens and the business does not answer
- *  yet); without it, the stream never opens. */
-async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en', answer?: Business | null) {
+/** `answer`: what the business answers when the stream opens, one in Spain, in euros, unless a test says another
+ *  (`null`: it opens and the business does not answer yet; «Save» waits for it, hub#918). */
+async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en', answer: Business | null = business()) {
   const m = await mountCombo(MenuFormModal, { props: { open: false, combo }, locale, business: answer });
-  if (answer !== undefined) await m.live();
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+  await m.live();
   await m.wrapper.setProps({ open: true });
   await settle();
   const field = (name: string) => m.inDoc(`combo-menu-form-${name}`) as Control;
@@ -55,7 +61,7 @@ describe('MenuFormModal: New menu', () => {
     expect([s.field('name').label, s.field('kitchen_name').label, s.field('price').label, s.field('supply_kind').label]).toEqual([
       'Name',
       'Kitchen name',
-      'Closed price',
+      'Closed price (EUR)',
       'How is it sold?',
     ]);
     expect(s.field('supply_kind').value).toBe('service');
@@ -149,7 +155,7 @@ describe('MenuFormModal: editing', () => {
   it('speaks Spanish', async () => {
     const s = await setup(MENU, 'es');
     expect(s.inDoc('combo-menu-form')?.getAttribute('aria-label')).toBe('Menú · Menu of the day');
-    expect([s.field('price').label, s.field('supply_kind').label]).toEqual(['Precio cerrado', '¿Cómo se vende?']);
+    expect([s.field('price').label, s.field('supply_kind').label]).toEqual(['Precio cerrado (EUR)', '¿Cómo se vende?']);
     expect(s.field('price').value).toBe('13,50');
   });
 });
@@ -199,14 +205,27 @@ describe('MenuFormModal: in the business’s currency', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', is_active: false } }]);
   });
 
-  it('what the person typed before the business answers stays as typed, and is read in its currency', async () => {
+  it('what the person typed before the business answers is never read without it: «Save» waits in grey, then «1500» is 1500 yen (hub#918)', async () => {
     const s = await setup(MENU, 'en', null);
     await ionValue(s.field('price'), '1500', 'ionInput');
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.field('price').value).toBe('1500');
     s.answer(200, { ...MENU, price: 1500, groups: [], sellable: true, blockers: [] });
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('price').value).toBe('1500');
     await click(s.save());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', price: 1500 } }]);
+  });
+
+  // hub#945 (COMBO-F02): a price typed with its currency's sign and left before the business answers is neither
+  // rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['¥1500', JAPANESE, 1500],
+    ['12,50 zł', POLISH, 1250],
+  ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, price) => {
+    const s = await setup(MENU, 'en', null);
+    await expectAmountLeftWaitsForMoney({ amount: () => s.field('price'), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(200, { ...MENU, price, groups: [], sellable: true, blockers: [] });
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', price } }]);
   });
 });
 
@@ -302,4 +321,56 @@ describe('MenuFormModal: photo', () => {
     expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')).toBeNull();
     expect(s.inDoc('combo-menu-form-image-preview')?.textContent?.trim()).toBe('KM');
   });
+});
+
+// hub#938 (COMBO-F02, F03): if the business's money cannot be read, the form says so with «Retry» instead of waiting in grey
+// without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('MenuFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountCombo(MenuFormModal, { props: { open: !late, combo: MENU }, business: null });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'combo-menu-form-submit', m.sent, opens);
+  });
+});
+
+describe('MenuFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup(MENU);
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('combo-menu-form'),
+      change: () => ionValue(s.field('name'), 'Kids menu', 'ionInput'),
+      restore: () => ionValue(s.field('name'), MENU.name, 'ionInput'),
+    });
+  });
+
+  it("the business's money answering after it opened rewrites the price, and that is no change", async () => {
+    const s = await setup(MENU, 'en', null);
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('combo-menu-form')!;
+    const before = s.field('price').value;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.result('base.business.get', business(JAPANESE));
+    await settle();
+    expect(s.field('price').value).not.toBe(before);
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+  });
+});
+
+describe('MenuFormModal: fields refused with the same words (hub#888)', () => {
+  // A new menu eaten in: Name, Kitchen name, Closed price, the VAT category (the picker) and Order paint a refusal,
+  // each under its own key.
+  const FIELD_OF: Record<string, string> = { tax_category_key: 'tax_category' };
+  itTellsTheCorrectedFieldApart(['name', 'kitchen_name', 'price', 'tax_category_key', 'sort_order'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Menu of the day', 'ionInput');
+    await ionValue(s.field('price'), '13,50', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'restaurant.food', label: 'Restaurant — food · 10%' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'price');
 });

@@ -17,7 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import atomic, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.combo import events
@@ -41,6 +41,7 @@ from apps.combo.schemas import (
     ComboImageUploadIn,
     ComboIn,
     ComboPatchIn,
+    ComboRecoverIn,
     ComboRefIn,
     DeletedOut,
     DroppedOut,
@@ -48,6 +49,7 @@ from apps.combo.schemas import (
     GroupIn,
     GroupOut,
     GroupPatchIn,
+    GroupRecoverIn,
     GroupRefIn,
     GroupReorderIn,
     OptionBulkIn,
@@ -86,7 +88,8 @@ REORDER_MISMATCH = _(
     "The new order has to list every one of them, once, and nothing else."
 )
 
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
+#: Run only by the platform (events.py, and the recovery from a separate copy): no role holds it, so no person and no
+#: API key reaches it.
 SYSTEM = "combo.system"
 
 
@@ -227,6 +230,7 @@ def _reordered(rows, wanted: list[UUID]) -> None:
 @operation(
     "combo.combo.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboIn,
     output=ComboDetailOut,
@@ -236,6 +240,16 @@ def _reordered(rows, wanted: list[UUID]) -> None:
         "restaurant.food»). Eaten in needs its tax category; to take away it is split per dish. Then add its "
         "courses and choices.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a vegan menu at 12.50 to eat in",
+                "set up a new takeaway combo at 9",
+            ),
+            "es": (
+                "crea un menú vegano a 12,50 para comer aquí",
+                "da de alta un combo para llevar a 9",
+            ),
+        },
     },
 )
 def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
@@ -254,6 +268,7 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
 @operation(
     "combo.combo.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboPatchIn,
     output=ComboDetailOut,
@@ -261,9 +276,20 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
     ai={
         "description": "Change a menu: name, kitchen name, closed price, how it is sold, tax category, order, or "
         "put it on sale / withdraw it from the till. Only the fields sent change. Changing how it is sold or its "
-        "tax category changes how it is billed: confirm it with the person.",
+        "tax category changes how it is billed.",
         # Per operation, not per field: it may change how the menu is billed (supply_kind, tax_category_key).
         "risk": "high",
+        "check": "combo.combo.get",
+        "asks": {
+            "en": (
+                "bring the vegan menu down to 11.90",
+                "take the summer menu off sale for now",
+            ),
+            "es": (
+                "rebaja el menú vegano a 11,90",
+                "quita de la venta el menú de verano por ahora",
+            ),
+        },
     },
 )
 def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
@@ -300,6 +326,7 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
 @operation(
     "combo.combo.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboRefIn,
     output=DeletedOut,
@@ -308,6 +335,17 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
         "description": "Withdraw a menu for good, with its courses and choices. Tickets already issued keep "
         "their copy. To stop selling it for a while, set it off sale instead.",
         "risk": "high",
+        "check": "combo.combo.get",
+        "asks": {
+            "en": (
+                "delete the summer menu for good",
+                "get rid of the Christmas menu, we won't sell it again",
+            ),
+            "es": (
+                "retira para siempre el menú de verano",
+                "elimina el menú de Navidad, ya no lo vamos a vender",
+            ),
+        },
     },
 )
 def delete_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
@@ -322,7 +360,29 @@ def delete_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
     return {"id": combo_id}
 
 
-# --- The menu's image (COMBO-F14; round 2026-10-30, base.images) -------------------------------------
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114, COMBO-F15), for a
+# menu the business no longer has at all (withdrawing one deletes it with its courses and choices).
+@operation(
+    "combo.combo.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ComboRecoverIn,
+    output=ComboDetailOut,
+    ai=INTERNAL,
+)
+def recover_combo(ctx: OperationContext, data: ComboRecoverIn) -> dict:
+    """A menu of a separate copy made again by ``combo.combo.create``, with the image of the library it showed there
+    set as ``combo.combo.set_image`` sets it (a photo of its own does not come back: ``base.images.from_copy``). It
+    keeps which of the copy's it is made again for (``stands_for``), so its courses come back to it."""
+    made = create_combo(ctx, ComboIn.model_validate(data.model_dump(include=set(ComboIn.model_fields))))
+    Combo.objects.filter(pk=made.id).update(stands_for=data.stands_for)
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_combo(made.id, None), image)
+    return load_detail(made.id, ctx.scope)
+
+
+# --- The menu's image (COMBO-F14, base.images) -------------------------------------------------------
 
 #: Where a menu's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "combo/combos/"
@@ -331,6 +391,7 @@ PHOTOS = "combo/combos/"
 @operation(
     "combo.combo.set_image",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=ComboImageIn,
     output=ComboDetailOut,
@@ -340,6 +401,17 @@ PHOTOS = "combo/combos/"
         "or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from combo.combo.suggest_image or "
         "base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "check": "combo.combo.get",
+        "asks": {
+            "en": (
+                "put a photo on the tasting menu",
+                "use the paella drawing as the summer menu's picture",
+            ),
+            "es": (
+                "ponle foto al menú degustación",
+                "usa el dibujo de la paella como imagen del menú de verano",
+            ),
+        },
     },
 )
 def set_image(ctx: OperationContext, data: ComboImageIn) -> dict:
@@ -400,6 +472,7 @@ def _name_free(combo_id: UUID, name: str, exclude: UUID | None = None) -> None:
 @operation(
     "combo.group.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupIn,
     output=GroupOut,
@@ -408,6 +481,16 @@ def _name_free(combo_id: UUID, name: str, exclude: UUID | None = None) -> None:
         "description": "Add a course to a menu («add Starters to the menu of the day, pick 1»): it goes last. "
         "min_choices 1 or more makes it compulsory; max_choices 0 is no limit.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add a Desserts course to the vegan menu, pick one",
+                "the kids' menu needs a Drinks course",
+            ),
+            "es": (
+                "añade el plato Postres al menú vegano, a elegir uno",
+                "el menú infantil necesita un plato de bebidas",
+            ),
+        },
     },
 )
 def create_group(ctx: OperationContext, data: GroupIn) -> dict:
@@ -430,9 +513,29 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     return _group_out(group.id)
 
 
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114, COMBO-F15), for a
+# course its menu no longer has (removing one deletes it with its choices).
+@operation(
+    "combo.group.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=GroupRecoverIn,
+    output=GroupOut,
+    ai=INTERNAL,
+)
+def recover_group(ctx: OperationContext, data: GroupRecoverIn) -> dict:
+    """A course of a separate copy added again by ``combo.group.create``, last in its menu. It keeps which of the
+    copy's it is made again for (``stands_for``), so its choices come back to it."""
+    made = create_group(ctx, GroupIn.model_validate(data.model_dump(include=set(GroupIn.model_fields))))
+    ChoiceGroup.objects.filter(pk=made.id).update(stands_for=data.stands_for)
+    return made
+
+
 @operation(
     "combo.group.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupPatchIn,
     output=GroupOut,
@@ -441,6 +544,18 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
         "description": "Change a course: its name, minimum and maximum picks, or whether a choice may repeat. "
         "Only the fields sent change; it keeps its place.",
         "risk": "normal",
+        # The course as the write will find it, before its card: the yes holds to it (hub#1231).
+        "check": "combo.group.get",
+        "asks": {
+            "en": (
+                "let them pick two starters instead of one",
+                "make the drinks course optional for kids",
+            ),
+            "es": (
+                "que se puedan elegir dos entrantes en vez de uno",
+                "haz opcional el plato de bebida del infantil",
+            ),
+        },
     },
 )
 def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
@@ -475,6 +590,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
 @operation(
     "combo.group.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupRefIn,
     output=DeletedOut,
@@ -482,6 +598,17 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
     ai={
         "description": "Remove a course from its menu, with its choices.",
         "risk": "high",
+        "check": "combo.group.get",
+        "asks": {
+            "en": (
+                "remove the Desserts course from the vegan menu",
+                "the kids' menu no longer has a drinks course",
+            ),
+            "es": (
+                "quita los postres del menú vegano",
+                "el menú infantil ya no lleva plato de bebida",
+            ),
+        },
     },
 )
 def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
@@ -495,6 +622,7 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
 @operation(
     "combo.group.reorder",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=GroupReorderIn,
     output=ComboDetailOut,
@@ -503,6 +631,17 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
         "description": "Put the courses of a menu in a new order (the order the till asks them in): give every "
         "course id, in order.",
         "risk": "normal",
+        "check": "combo.combo.get",
+        "asks": {
+            "en": (
+                "reorder the courses of the kids' menu: starter, main, dessert",
+                "the dessert course should come before the main one",
+            ),
+            "es": (
+                "ordena los platos del menú infantil: entrante, segundo y postre",
+                "en el menú vegano, que el postre vaya antes que el segundo",
+            ),
+        },
     },
 )
 def reorder_groups(ctx: OperationContext, data: GroupReorderIn) -> dict:
@@ -529,6 +668,7 @@ def _product_free(
 @operation(
     "combo.option.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionIn,
     output=OptionOut,
@@ -537,6 +677,16 @@ def _product_free(
         "description": "Offer a product as a choice of a course («put the lentils in Starters of the menu of the "
         "day», «hake in Mains with 2 euros supplement»): it goes last. The supplement adds to the closed price.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add the salad as a starter in the vegan menu",
+                "offer the steak as a main with 3 extra",
+            ),
+            "es": (
+                "incorpora la ensalada a los entrantes del menú vegano",
+                "que se pueda elegir entrecot de segundo con 3 de suplemento",
+            ),
+        },
     },
 )
 def create_option(ctx: OperationContext, data: OptionIn) -> dict:
@@ -563,6 +713,7 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
 @operation(
     "combo.option.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionBulkIn,
     output=GroupOut,
@@ -571,6 +722,16 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
         "description": "Offer several products at once in a course, without supplement, in the order given; all "
         "or nothing.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add soup, salad and gazpacho as starters all at once",
+                "put several desserts in the kids' menu in one go",
+            ),
+            "es": (
+                "añade de golpe sopa, ensalada y gazpacho de entrante, en este orden y todos sin suplemento",
+                "mete varios postres a la vez en el menú infantil",
+            ),
+        },
     },
 )
 def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
@@ -600,6 +761,7 @@ def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
 @operation(
     "combo.option.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionPatchIn,
     output=OptionOut,
@@ -608,6 +770,18 @@ def bulk_create_options(ctx: OperationContext, data: OptionBulkIn) -> dict:
         "description": "Change a choice: its supplement, mark it sold out («no flan today in the menu of the "
         "day»: is_available false) or back on offer, or replace its product. It keeps its place.",
         "risk": "normal",
+        # The choice as the write will find it, before its card: the yes holds to it (hub#1231).
+        "check": "combo.option.get",
+        "asks": {
+            "en": (
+                "the custard is sold out in the kids' menu",
+                "make the steak supplement 4 in the vegan menu",
+            ),
+            "es": (
+                "se han acabado las natillas del menú infantil",
+                "el entrecot del menú vegano pasa a llevar 4 de suplemento",
+            ),
+        },
     },
 )
 def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
@@ -650,11 +824,26 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
 @operation(
     "combo.option.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionRefIn,
     output=DeletedOut,
     expose_api=True,
-    ai={"description": "Remove a choice from its course.", "risk": "high"},
+    ai={
+        "description": "Remove a choice from its course.",
+        "risk": "high",
+        "check": "combo.option.get",
+        "asks": {
+            "en": (
+                "take the gazpacho off the starters of the vegan menu",
+                "we no longer offer soup in the kids' menu",
+            ),
+            "es": (
+                "quita el gazpacho de los entrantes del menú vegano",
+                "ya no damos sopa en el menú infantil",
+            ),
+        },
+    },
 )
 def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
     option = find_option(
@@ -675,6 +864,7 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
 @operation(
     "combo.option.reorder",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="combo.manage",
     input=OptionReorderIn,
     output=GroupOut,
@@ -683,6 +873,16 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
         "description": "Put the choices of a course in a new order (the order the till shows them in): give every "
         "choice id, in order.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "put the salad first among the starters of the vegan menu",
+                "sort the desserts of the kids' menu: ice cream, custard, fruit",
+            ),
+            "es": (
+                "que la ensalada salga la primera entre los entrantes del menú vegano",
+                "ordena los postres del menú infantil: helado, natillas y fruta",
+            ),
+        },
     },
 )
 def reorder_options(ctx: OperationContext, data: OptionReorderIn) -> dict:

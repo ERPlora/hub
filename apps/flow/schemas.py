@@ -9,7 +9,7 @@ used by voice («activate the welcome automation»).
 What a step names (an action, a read, an event) is checked against the apps that are active in
 ``services.py``: a schema knows the shape, not the business.
 
-Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+Each id a write takes is marked with the read that names its record (``names``, base/assistant/cards.py ``REFERS``,
 checked at start by ``base.E009``): the assistant's card says which automation, draft, run or question, as the person
 who confirms reads it, never by the id — an automation and a draft by their name, a run by its automation and when it
 started (``label``, as the History says it), a question by what it asks.
@@ -432,7 +432,7 @@ DraftStep = Annotated[
 
 
 def _condition_reads(condition: dict) -> list[str]:
-    # The data it looks at and the data it compares with (hub#1712).
+    # The data it looks at and the data it compares with.
     return [*condition, *document.references(list(condition.values()))]
 
 
@@ -508,7 +508,9 @@ Steps = Annotated[
 
 
 class FlowRefIn(In):
-    id: UUID | None = Field(None, description=D_FLOW_ID, json_schema_extra=AN_AUTOMATION)
+    id: UUID | None = Field(
+        None, title=gettext_noop("Automation"), description=D_FLOW_ID, json_schema_extra=AN_AUTOMATION
+    )
     flow: Reference | None = Field(None, validate_default=True, description=D_FLOW)
 
     @field_validator("flow")
@@ -565,8 +567,23 @@ class EnabledIn(FlowRefIn):
     enabled: bool = Field(description="true: turn it on; false: pause it.")
 
 
+class OperationRefIn(In):
+    operation: str = Field(max_length=96, description="The operation to name, by its registered name.")
+
+
+class OperationNameOut(Schema):
+    operation: str
+    label: str
+
+
 class GrantIn(FlowRefIn):
-    operations: list[Annotated[str, StringConstraints(max_length=96)]] = Field(
+    operations: list[
+        Annotated[
+            str,
+            StringConstraints(max_length=96),
+            Field(json_schema_extra=names("flow.operation.get", by="operation", name=("label",))),
+        ]
+    ] = Field(
         max_length=100,
         title=gettext_noop("Permissions"),
         description="The whole list of actions and reads it may run, by name; what is not here is withdrawn.",
@@ -606,7 +623,11 @@ class StatusIn(In):
 
 
 class RunRefIn(In):
-    id: UUID = Field(description="The run's id (its reference in the history).", json_schema_extra=A_RUN)
+    id: UUID = Field(
+        title=gettext_noop("Automation run"),
+        description="The run's id (its reference in the history).",
+        json_schema_extra=A_RUN,
+    )
 
 
 class RecordCallIn(In):
@@ -715,8 +736,18 @@ class ReactIn(In):
         "",
         max_length=128,
         title=gettext_noop("Actor"),
-        description="Who caused it (`flow_run:<id>` when a run did).",
+        description="Who caused it (`flow_run:<id>` when a run did; `copy_recovery:<id>` when a recovery from a "
+        "separate copy did, which starts no automation).",
     )
+
+
+class CustomerErasedIn(Schema):
+    """Customers' notice of an erased card (``customer.customer.erased``, CUSTOMER-F16), as the relay hands it over:
+    what this app reads of it (the rest is ignored)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: UUID = Field(description="The customer's card whose personal data were erased.")
 
 
 class DueIn(In):
@@ -756,7 +787,11 @@ class QuestionListIn(In):
 
 
 class QuestionRefIn(In):
-    id: UUID = Field(description="The question's id, from `flow.question.list`.", json_schema_extra=A_QUESTION)
+    id: UUID = Field(
+        title=gettext_noop("Question"),
+        description="The question's id, from `flow.question.list`.",
+        json_schema_extra=A_QUESTION,
+    )
 
 
 class AnswerIn(QuestionRefIn):
@@ -901,16 +936,27 @@ class CatalogActionOut(Schema):
     app_name: str
     description: str
     fields: list[FieldOut]
-    outputs: list[str]
+    outputs: list[str] = Field(
+        description="What a step of it leaves for the later ones, by its path below the step (`steps.<id>.<path>`): "
+        "its fields, each object among them followed by what it holds (`item`, `item.unit_price`), never what is inside "
+        "a list; and a read's `found` and `count`."
+    )
     #: Whether «Ask the assistant» may use it (its ``ai=`` offers it to the assistant).
     assistant: bool = False
     #: Whether it needs a person's yes first: only an «Ask the assistant» step with «Ask me first» may use it.
     ask_first: bool = False
 
 
+class CatalogAppOut(Schema):
+    app: str
+    app_name: str
+
+
 class CatalogOut(Schema):
     events: list[CatalogEventOut]
     actions: list[CatalogActionOut]
+    #: The installed apps that are off in the business: what a saved automation may still name (hub#1054).
+    off_apps: list[CatalogAppOut]
 
 
 class SampleOut(Schema):
@@ -983,6 +1029,10 @@ class ReactOut(Schema):
 
 class DueOut(Schema):
     count: int
+
+
+class ChangedOut(Schema):
+    changed: int = Field(description="How many runs the reaction cancelled or made forget what their steps read.")
 
 
 class ClaimAssistantOut(Schema):

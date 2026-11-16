@@ -1,8 +1,7 @@
-"""``POST /api/error-report``: the errors the screen reports by itself (BASE-G95, G13, G50; HUB_SHELL-F149).
+"""``POST /api/error-report``: the errors the screen reports by itself (BASE-F47).
 
-PLAN-SAAS §1.1 (round 2026-10-15b, PLAN-HUB «Embudo de errores»): each report is one structured log line that
-CloudWatch counts and alarms on; no table and no issue. Only a session of the hub sends them, a caller cannot flood the
-log, and a report that cannot be read is refused without a line.
+Each report is one structured log line that CloudWatch counts and alarms on; no table and no issue. Only a session of
+the hub sends them, a caller cannot flood the log, and a report that cannot be read is refused without a line.
 """
 
 import json

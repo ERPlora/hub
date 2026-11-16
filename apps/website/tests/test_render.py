@@ -51,6 +51,7 @@ def render(
     today=None,
     reviews=DEFAULT,
     currency="EUR",
+    canonical="",
 ) -> str:
     # A business in Spain (its prices in euros) unless a test says otherwise.
     return render_site(
@@ -64,6 +65,7 @@ def render(
         preview=preview,
         today=today,
         reviews=google_reviews() if reviews is DEFAULT else reviews,
+        canonical=canonical,
     )
 
 
@@ -316,6 +318,25 @@ def test_the_preview_is_marked_and_kept_out_of_search_engines():
     assert "data-ep-preview" not in public and "noindex" not in public
 
 
+#: The address a page names as its main one, as ``public_home`` gives it (hub#818).
+MAIN = "https://www.minegocio.es/"
+CANONICAL = re.compile(r'<link rel="canonical" href="([^"]*)">')
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_page_names_its_main_address_once_in_its_head(template):
+    html = render(template, canonical=MAIN)
+    head, body = html.split("</head>", 1)
+    assert CANONICAL.findall(head) == [MAIN]
+    assert 'rel="canonical"' not in body
+
+
+def test_a_page_given_no_main_address_names_none():
+    # The editor's preview is no address of the business: it is kept out of search engines instead.
+    assert 'rel="canonical"' not in render(preview=True)
+    assert 'rel="canonical"' not in render()
+
+
 def test_an_empty_draft_still_renders_with_the_hubs_name_and_log_in():
     html = render(content={})
     assert sections(html) == ["topbar", "hero", "footer"]
@@ -371,7 +392,7 @@ def calls_to_action(html: str) -> list[tuple[str, str, str]]:
 
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_the_hero_offers_two_pills_whatsapp_or_contact_and_find_us(template):
-    # Ioan's redesign (2026-10-22): the header invites to write (WhatsApp, else the contact section) and to come.
+    # The header invites to write (WhatsApp, else the contact section) and to come.
     ctas = calls_to_action(render(template))
     assert [(href, label) for _classes, href, label in ctas] == [
         ("https://wa.me/34600123456", "Chat on WhatsApp"),
@@ -650,7 +671,7 @@ def test_the_opening_hours_are_a_flush_list_with_today_marked(template):
     assert 'aria-current="date"' in rows[0][0] and "bg-primary-subtle" in rows[0][0]
     assert re.search(r'<span class="badge rounded-pill[^"]*">Today</span>', rows[0][1])
     assert "Today" not in rows[1][1]
-    # On a phone the times wrap under the day; a day's name never breaks («Wednesda y», 2026-10-22).
+    # On a phone the times wrap under the day; a day's name never breaks («Wednesda y»).
     assert all("flex-wrap" in attrs for attrs, _body in rows)
     assert re.search(r'<span class="text-nowrap">Monday ', rows[0][1]) and '<span class="text-nowrap">Sunday</span>' in rows[1][1]
     assert "aria-current" not in section_of(render(template, today="tue"), "contact")
@@ -697,7 +718,7 @@ def footer_of(html: str) -> str:
 
 @pytest.mark.parametrize("template", TEMPLATES)
 def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
-    # Regression (2026-10-22): the demo's footer showed a lone «h», which was the owner's text; the line is the text
+    # Regression: the demo's footer showed a lone «h», which was the owner's text; the line is the text
     # as written, in its own element, and with no text there is no line at all (no empty element left behind).
     footer = footer_of(render(template, content=full_content(footer={"text": "Pepe Bistro S.L. · CIF B12345678"})))
     lines = re.findall(r"<(\w+)\b[^>]*\bdata-ep-footer-text\b[^>]*>([^<]*)</\1>", footer)
@@ -712,7 +733,7 @@ def test_the_footer_shows_its_line_only_when_the_owner_wrote_one(template):
 @pytest.mark.parametrize("template", TEMPLATES)
 @pytest.mark.parametrize("name", ["Pepe's Bistro", ""])
 def test_the_footer_signs_with_erploras_credit_and_link_never_the_business_name(template, name):
-    # Ioan (2026-10-22): the copyright line is the platform's credit, the same on every hub's site, linked to
+    # The copyright line is the platform's credit, the same on every hub's site, linked to
     # erplora.com and not editable by the owner; the business's name and legal line stay in their own place.
     footer = footer_of(render(template, content=full_content(topbar={"name": name})))
     lines = re.findall(r"<(p|div|small|span)\b[^>]*>((?:(?!</\1>).)*©(?:(?!</\1>).)*)</\1>", footer, re.S)

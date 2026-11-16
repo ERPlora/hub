@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e34817c97e71f03aee3695d05efbc32973969441d4e0436a76777dbc6b13e517 -->
+<!-- generated from WORKBOOK.md sha256:445f7a278f1b7b84574ff69079e27be9588e00f522c8e7679d5607430a56581d -->
 
 ## What it is for and who it is for
 
@@ -63,7 +63,7 @@ but not the quantity left on the till, which does not exist here. Also:
 - **The item's photo on the till's tile and, without a photo, its initials over a colour**: Square (the
   item's image or, without one, its colour and its abbreviation), Loyverse (image, or colour and shape)
   and Shopify POS (the product's image on the grid). The photo is chosen from ERPlora's library or
-  uploaded from the product's card, and it travels in the business's backup, as in the current product.
+  uploaded from the product's card, and it travels in the business's backup.
 
 ## Before you start
 
@@ -113,7 +113,9 @@ Missing tax category", whole while the row has room (also at 1280 px with the si
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
 "Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
-"Sold out"); 50 per page; table or card view.
+"Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
+is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
+quantity…"), and does not filter; 50 per page; table or card view.
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
@@ -168,8 +170,9 @@ window.
 Three windows in a row:
 
 1. "Check the import": a drop-down per column of the file ("Do not import" or the field; Name and
-   SKU carry an asterisk), "First {n} rows of {total}", the summary "{ready} row(s) ready · {failed}
-   with problems" with up to 10 reasons, and "Import {n} product(s)" and "Cancel".
+   SKU carry an asterisk), "First {n} rows of {total}", the summary "{ready} rows ready · {failed}
+   with problems" with up to 10 reasons, and "Import {n} products" and "Cancel"; with a single row
+   or product, in the singular ("First row of {total}", "1 row ready", "Import 1 product").
 2. If needed, "CSV tax categories": a block per tax text not recognised (or "Rows with no tax
    category") with "Pick" / "Create" / "Skip", and "Confirm & import".
 3. While it creates, above the table: "Importing {done}/{total}…" with "Stop". At the end, "Import
@@ -212,6 +215,14 @@ settings could not be loaded." with "Retry", never the factory values as if they
 | App inactive | "This app is not active in this business" instead of the figures and the table. |
 | No permission | What it cannot do does not appear (neither **+**, nor import or export, nor the stock actions, nor the switch: "Yes"/"No"); Settings does not show and its address says "This page does not exist"; if it loses the permission with Settings open, the fields lock with "You do not have permission to change these settings. Ask an administrator if you need it.". |
 
+## Unsaved changes on Android
+
+In the category and stock movement windows (receive, count and write-off), the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); creating and editing a product ask the same (INVENTORY-F01, INVENTORY-F02).
+When creating and editing a product, "Cancel" ("Cancel editing"), the panel's "×", Escape and tapping outside the panel ask the
+same, in the browser too (hub#1023).
+
 ## Flows
 
 | ID | Flow | Status |
@@ -226,6 +237,7 @@ settings could not be loaded." with "Retry", never the factory values as if they
 | INVENTORY-F07 | Delete a category | done |
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
+| INVENTORY-F34 | Recover a deleted product | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -277,21 +289,33 @@ Steps:
 5. If there are categories, search in "Categories" for the ones that group the product on the till
    and pick them one by one: each one shows below the field, with its button to remove it.
 6. Tap "Save" ("Saving…"). The panel closes and the product shows in the table with Status "Yes".
+7. With something typed or chosen and not saved (the photo too), neither "Cancel", nor the panel's "×", nor
+   Escape, nor tapping outside the panel, nor the phone's back button in the Android app close it: they ask
+   "Discard changes?" ("What you typed in this window has not been saved."). "Keep editing", or back again,
+   leaves the panel with what was typed; "Discard changes" closes it without saving anything and without
+   asking again. With the panel as it opened, any of them closes it without asking (hub#1015, hub#1023).
 In: the tax categories and their type, from Taxes; the units of measure and the product categories,
 from Inventory.
 Out: the product, active and linked to the ticked categories, in a single step: either it is saved
 whole or nothing is saved. If initial stock was given, it stays in **Movements** as "Initial".
 Inventory tells the other apps there is a new product: Sales offers it on the till's grid and the
-setup step "Your catalog" is done (INVENTORY-F28).
-If it fails: "Save" is off while Name, SKU or tax category are missing. With no tax categories it says
+setup step "Your catalog" is done (INVENTORY-F28). Through the assistant or the API it can be created
+already inactive, out of the till until it is activated (INVENTORY-F03), as one that was inactive comes
+back when it is recovered from a separate copy (BASE-F114).
+If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
+yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
+as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
-"This amount can be read in two ways…". A quantity that does not fit the unit: "The quantity does not
+"This amount can be read in two ways…"; a negative one: "This amount cannot be negative.". A quantity that does not fit the unit: "The quantity does not
 respect the step allowed for this unit". A SKU another live product already has: "That SKU already
 exists in the catalog"; a repeated EAN-13: "Another product of the catalog already has that EAN-13". A
 tax category that is no longer in Taxes is refused, also if it arrives through the assistant or the
 API. Every refusal shows inside the panel and nothing is saved.
-Involved: SALE-F01, TAX-F01, TAX-F19
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F114 (the ERPlora staff bring back from a separate copy
+the products the business no longer has at all, each by this same creation; a deleted one comes back the same,
+INVENTORY-F34)
 
 ### INVENTORY-F02 Edit a product
 Status: done
@@ -303,7 +327,9 @@ Steps:
 2. Change what is needed. The SKU is locked ("The SKU is the product's identity: it is not edited").
    The stock is not edited here: it is received (INVENTORY-F13) or counted (INVENTORY-F14). The "Type"
    and the "Initial stock" do not show.
-3. Tap "Save changes". "Cancel editing" or closing the panel leaves it as it was.
+3. Tap "Save changes". With a change not saved, "Cancel editing", the "×", Escape, tapping outside the
+   panel and, in the Android app, the back button ask first, as when creating (INVENTORY-F01, step 7), and
+   "Discard changes" leaves it as it was; with no change, they close the panel.
 4. The row shows the new data.
 In: the product as it is saved; the tax categories, from Taxes; the units and the product
 categories.
@@ -314,7 +340,7 @@ If it fails: the same refusals as creating (INVENTORY-F01), inside the panel, an
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.".
-Involved: SALE-F01, TAX-F01, TAX-F19
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F03 Turn a product on and off
 Status: done
@@ -347,7 +373,8 @@ are free for another product. Its movements stay in **Movements** with its name.
 the product is gone. It does not check whether it has stock or is on an open bill: Sales refuses, when
 charging, the line of a product that is no longer in the catalog.
 If it fails: "The product could not be deleted" (or the reason) above the table.
-Involved: SALE-F01
+Involved: SALE-F01, BASE-F114, INVENTORY-F34 (from a separate copy, the ERPlora staff give the deleted product
+back: the same one, with its stock and its movements)
 
 ### INVENTORY-F05 Review the products that cannot be sold for lack of VAT
 Status: done
@@ -393,14 +420,27 @@ Actor: administrator, manager
 Screen: Categories
 Steps:
 1. In **Categories**, tap "Delete" on the row.
-2. The "Delete category" window says "<name> — N product(s) will lose this category (unlinked;
-   products are kept)". N counts the active products.
+2. The "Delete category" window says "<name> — N products will lose this category (unlinked;
+   products are kept)"; with one, "<name> — 1 product will lose this category (unlinked; the product
+   is kept)". N counts the active products.
 3. Tap "Delete and unlink" (or "Cancel").
 In: the chosen category.
 Out: the category is deleted and all its products, active or not, unlinked in the same step; the
 products stay. The till stops grouping them under it.
+A category deleted by mistake is recovered by the ERPlora staff from a separate copy (BASE-F114): it comes back as a
+new one, with its name, slug, description, icon, colour, order and tax category, before the products, and with what it
+had inside in the copy: the products the business deleted and still holds (the same ones, INVENTORY-F34), those it no
+longer has (created again) and, last, those the business keeps live, which go back into it without losing any other
+category. Recoveries counts those links apart ("Product links to categories"). A category the business keeps, even
+renamed or with products taken out of it since, is the same one: it is neither repeated nor filled; nor is one it made
+again with its name (case and spaces aside): its own is used, as it is, and only the products created again go into it.
+A deleted product that comes back (INVENTORY-F34) does not go into the one the business made again by hand. The
+category that comes back also gets back its modifier groups, if Modifiers is recovered too (MODIFIER-F10); the one the
+business made again by hand keeps those it linked to it.
+If the recovery is asked again from a copy made before the category it brought back, that category still counts as
+brought back: the live products the business took out of it since go back into it.
 If it fails: "The category could not be deleted" (or the reason) above the table.
-Involved: KITCHEN-F04, SALE-F01
+Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Group products into categories for the till
 Status: done
@@ -433,9 +473,9 @@ Steps:
    English and with or without accents ("Name", "Code", "Price", "VAT"…). Change it or set "Do not
    import". Name, SKU, Price, Cost, Stock, Threshold, EAN-13, Description, Unit and Tax category can be
    imported; Name and SKU are required.
-3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} row(s) ready
-   · {failed} with problems", with the line and the reason of the first ten.
-4. Tap "Import {n} product(s)" (or "Cancel", which leaves no trace).
+3. Look at the "First {n} rows of {total}" and at the rehearsal of the whole file: "{ready} rows ready
+   · {failed} with problems" ("1 row ready" with one), with the line and the reason of the first ten.
+4. Tap "Import {n} products" ("Import 1 product" with one; or "Cancel", which leaves no trace).
 5. If some tax text is not recognised, or there are rows with no tax column ("Rows with no tax
    category"), "CSV tax categories" shows. For each one: "Pick" a category, "Create" one (Key and Name)
    or "Skip". Tap "Confirm & import". What is chosen for a text is saved in Taxes and the next import
@@ -499,7 +539,7 @@ If it fails: with no products, the file carries only the header. Without permiss
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
 would run as a formula (it starts with =, +, -, @…) comes out with an apostrophe in front, which the
 import removes.
-Involved: none
+Involved: BASE-F112 (inside the app)
 
 ### INVENTORY-F12 Load the menu of a sector template
 Status: done
@@ -549,7 +589,12 @@ Out: the stock goes up and the "Reception" movement stays with quantity, balance
 one, the delivery note. If a cost was typed, it becomes the product's cost. It applies even if the item
 has no stock control. If an item with control goes above its threshold, it tells of the crossing
 (INVENTORY-F18). Inventory tells that the stock changed.
-If it fails: "Record receipt" is off without a quantity. "The quantity does not respect the step allowed
+If it fails: "Record receipt" is off without a quantity, and while the business has not yet said its
+currency: the cost is read in it, and without it "1500" yen would be saved as 150,000; until then, leaving the
+cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency
+cannot be read, the window says so ("The business's currency could not be read", with the reason) and
+offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up (hub#946). The
+count and the write-off read no amounts: they do not wait for it. "The quantity does not respect the step allowed
 for this unit", an unreadable cost ("This is not an amount…") or the reason of any other refusal show
 inside the window. A service is not received: it has no button, and through the assistant or the API it
 is refused with "A service has no stock.". A goods receipt with a line without a product, with a product
@@ -623,7 +668,8 @@ it, although this screen does not show it.
 If it fails: a sale whose number Inventory did not get to note down leaves the Reference cell empty. A
 ticket that Invoicing numbers later (for example, without the business's details when charging) is read
 and searched by the sale's number. Loading error: the table's notice with "Retry".
-Involved: INVOICE-F20, SALE-F28
+Involved: INVOICE-F20, SALE-F28, INVENTORY-F34 (the movements of a deleted product that is recovered are still
+its own: the history is not split in two)
 
 ### INVENTORY-F17 See the dashboard and the low-stock products
 Status: done
@@ -683,11 +729,16 @@ Steps:
 4. "Low stock threshold" (out of the box, 10, in whole units): the threshold a product created without
    its own starts with (it only happens through the assistant or the API: the form and the CSV always
    send one). Changing it does not touch the products that already exist.
-5. Tap "Save": "Settings saved.".
+5. Tap "Save" (off until you change something): only what you changed is sent and "Settings saved."
+   shows above the button.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the business's saved settings (one per business); if they were never saved, the factory ones apply.
 Out: the settings, which apply from the next movement. They only tell the open screens (the Dashboard and
 the lists refresh); no other app reacts.
-If it fails: "The settings could not be saved.". If, with the tab open, another person without the
+If it fails: "The settings could not be saved." and the reason below the field (an empty threshold or one
+with decimals: "Enter a whole number."). As in the form windows, the notice goes as soon as something is
+changed and a field's reason as soon as that field is corrected; both come back if the next try is
+refused too. A refusal that names no field stays until the next try (hub#871). If, with the tab open, another person without the
 permission comes in (shift change), the fields lock, "Save" disappears and "You do not have permission
 to change these settings. Ask an administrator if you need it." shows.
 Involved: SALE-F01
@@ -926,8 +977,8 @@ Steps:
    language (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
    "Fitness" and "Spa and wellness" narrow by sector; they come 60 at a time with "Load more".
 3. Tap an image: the window closes and the form shows it in "Photo", with "Change" and "Remove photo".
-4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel
-   discards it.
+4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
+   "Discard changes?" first and, with "Discard changes", discards it (INVENTORY-F01, step 7).
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
    shows up to five candidate images by their title and asks which one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
@@ -937,8 +988,10 @@ Out: the item with its library image. The business does not keep a copy of the i
 is, so it does not use space of its plan. Inventory tells of the change (`inventory.product.updated`) and
 the till shows it without reloading (INVENTORY-F32). Choosing another one replaces it; if the previous
 one was an own photo (INVENTORY-F31), it is deleted from the business's folder. "Remove photo" leaves the
-item with its initials. The candidates come from `inventory.product.suggest_image`, the search is
-`base.catalog_image.search` and the photo is set or removed by `inventory.product.set_image`.
+item with its initials. Deleting the item leaves it its library image (only an own photo is deleted), and if the
+ERPlora staff recover it from a separate copy it comes back with the one it had (INVENTORY-F34, BASE-F114). The
+candidates come from `inventory.product.suggest_image`, the search is `base.catalog_image.search` and the photo is set
+or removed by `inventory.product.set_image`.
 If it fails: if the library does not answer, "The image library could not be loaded." with "Retry", and
 the product can still be saved without a photo. No results: "No image matches your search. Try another
 word or upload a photo.". The assistant that finds no candidates says so and proposes uploading a photo
@@ -947,7 +1000,7 @@ from the card. An image the library no longer has is refused when the photo is s
 another one." with "Retry", and the item keeps the photo it had (through the assistant or the API
 nothing is saved). Whoever cannot change products does not see "Photo", and the app also refuses it
 through the assistant or the API.
-Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Upload the item's own photo
 Status: done
@@ -1024,6 +1077,38 @@ WebP of up to 2 MB makes the file unreadable ("The file holds a photo that is no
 2 MB, so it cannot be read.").
 Involved: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
+### INVENTORY-F34 Recover a deleted product
+Status: done
+Actor: the ERPlora staff, when the business asks (in the business no screen undoes a deletion)
+Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
+Steps:
+1. The business deleted one or several products by mistake (INVENTORY-F04) and asks to get them back.
+2. The ERPlora staff make a separate copy of the business from an earlier moment and recover the products from it
+   (BASE-F114, steps 6 to 11).
+3. Each product the business deleted and still holds comes back to **Products**, to the till and to the sale
+   catalog: THE SAME product, with its SKU, its EAN-13, its categories that are still live and the one that comes back
+   with the recovery if the business deleted it afterwards (INVENTORY-F07), its tax category, its stock and its image
+   of the library, and in **Movements** its whole history (initial, receptions, sales, counts and write-offs) is still its own.
+   It comes back active and on sale, as unarchiving does in Odoo or Square: if it was deactivated or marked as sold
+   out before it was deleted, that is done again by hand (INVENTORY-F03, INVENTORY-F29). Recoveries counts it among
+   the restored Products.
+In: the deleted product, by its identifier, and the image it had in the copy.
+Out: the product live again, active and on sale, with none of its other data changed (but for the image of the
+library it gets back if it had none), and the product-recovered notice (`inventory.product.restored`), with the
+product as it comes back.
+If it fails: it does not come back if the business has already made another product with its SKU or its EAN-13 since
+it deleted it: the one it made stays, and the recovery neither counts nor creates it. A product the business no longer
+has at all is created again (INVENTORY-F01), with no stock, with the image of the library it had in the copy. On a
+live product it does not fail: it answers well and announces again. Its own photo does not come back: it was erased
+when it was deleted (INVENTORY-F31). The image of the library does, because deleting leaves it; one deleted before
+deleting left it, which was left without any, gets back the one it had in the copy, unless the library no longer has
+it. Its discount rules in Price Lists are switched back on by
+themselves (PRICING-F14) and its prices in the price lists come back if Price Lists is recovered too (PRICING-F15),
+its modifier groups, if Modifiers is recovered too (MODIFIER-F10), and its choices in the menus, if Menus is recovered
+too (COMBO-F15).
+Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
+PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+
 ## What the verticals share
 
 The restaurant uses Inventory for the menu and the hair salon for the products for sale, with the same
@@ -1053,7 +1138,12 @@ tap" or "type to confirm", according to the risk).
 Through the assistant (also by voice) and through the API, a product is named by its SKU or by its name,
 and a category by its name, as well as by its identifier: "write off 2 bottles of red wine" is enough. If
 the name matches several, Inventory does not choose: it says which ones they are and asks which one.
-Every list can be searched and goes in pages of up to 100.
+Every list can be searched and goes in pages of up to 100. Before an action, the assistant asks for confirmation with
+its card (BASE-F97), which names each record as the screens name it, never by its identifier: the product by its name
+("Product: Red wine"), the category by its name ("Category: Drinks"), a product's categories one by one ("Categories:
+Drinks, Wines") and each line of a goods receipt with its product and its quantity ("Receive in Inventory: Red wine ·
+6, Beer · 2.5"). What the person asking cannot see,
+or what no longer exists, is left out.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -1065,6 +1155,7 @@ Every list can be searched and goes in pages of up to 100.
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |
+| One category by its id or its name: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view categories | F06, F07, F08 | `inventory.category.get` |
 | The ledger of movements: date, product, type, quantity, balance, reason, reference and who made it | view stock | F16 | `inventory.movement.list` |
 | The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
 | The units of measure with their step | view products | F26 | `inventory.unit.list` |
@@ -1079,15 +1170,17 @@ Every list can be searched and goes in pages of up to 100.
 | Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09 | `inventory.product.bulk_create` |
 | Changes a product: data, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F20 | `inventory.product.update` |
 | Deletes a product | delete products | type to confirm | F04 | `inventory.product.delete` |
+| Gives a deleted product back to the catalog, as it was (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F34 | `inventory.product.restore` |
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
 | Sets a product's photo, from the library, or removes it | change products | one tap | F30 | `inventory.product.set_image` |
 | Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31 | `inventory.product.upload_image` |
-| Adds a product to a category | change products | one tap | F08 | `inventory.product_category.add` |
+| Adds a product to a category (also the platform, when recovering a deleted category from a separate copy with the products the business keeps) | change products | one tap | F08, F07 | `inventory.product_category.add` |
 | Removes a product from a category | change products | one tap | F08 | `inventory.product_category.remove` |
 | Creates a category | create categories | one tap | F06 | `inventory.category.create` |
 | Creates many categories at once, with a report per row | create categories | one tap | F10 | `inventory.category.bulk_create` |
 | Changes a category | change categories | one tap | F06 | `inventory.category.update` |
 | Deletes a category and unlinks its products | delete categories | type to confirm | F07 | `inventory.category.delete` |
+| Gives a deleted category back, as a new one, with the deleted products it had (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F07, F34 | `inventory.category.recover` |
 | Exports products or categories to CSV | export products | one tap | F11 | `inventory.product.export`, `inventory.category.export` |
 | Records a goods receipt (one or several products, cost and delivery note) | move stock | one tap | F13 | `inventory.stock.receive` |
 | Applies a count: the balance becomes what was counted, with a reason | move stock | one tap | F14 | `inventory.stock.count` |
@@ -1102,6 +1195,7 @@ Every list can be searched and goes in pages of up to 100.
 | New product | Created on screen, import, template, assistant or API | The product and its categories | Flows; Home's panels | `inventory.product.created` |
 | Product changed | Change, turn on or off, mark sold out or put back on sale | The product as it is left, also whether it is sold out | Flows; Home's panels; the till, Kitchen and Menus | `inventory.product.updated` |
 | Product deleted | Delete | Which one it was (SKU and name) | Flows; Home's panels | `inventory.product.deleted` |
+| Product recovered | Recover a deleted product (also its repetition) | The product as it comes back | Flows; Home's panels | `inventory.product.restored` |
 | Product added to a category | Creation, change or a single link | Product and category | Flows | `inventory.product.categorized` |
 | Product removed from a category | Change, a single link or a deleted category | Product and category | Flows | `inventory.product.uncategorized` |
 | Stock changed | Any movement: initial, goods receipt, count, write-off, sale, void | Product, quantity, balance and type of movement | Dashboard and Home's panels | `inventory.stock.changed` |
@@ -1155,5 +1249,7 @@ ticket or invoice is given by Sales, not by Invoicing.
 | Manage settings | yes | yes | no | no | `inventory.manage_settings` |
 
 These are each profile's factory permissions; the administrator can change them in Roles. The
-administrator can do everything. The app checks them at every door (screen, assistant and API), not only
+administrator can do everything. No profile gives a deleted product or category back: the system does it when the
+ERPlora staff recover from a separate copy (INVENTORY-F07, INVENTORY-F34, `inventory.system`, which no role holds
+either). The app checks them at every door (screen, assistant and API), not only
 on the screen.

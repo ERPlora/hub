@@ -16,9 +16,9 @@ from apps.cash_register.models import (
     SessionCounter,
     Settings,
 )
-from apps.cash_register.tests.conftest import ctx_for, open_session, run
+from apps.cash_register.tests.conftest import HUB_DB, ctx_for, open_session, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:
@@ -430,7 +430,7 @@ def test_with_the_auto_close_off_nothing_closes():
 
 
 def test_the_auto_close_says_a_session_closed_once_and_nothing_when_nothing_was_due():
-    # cash_register#145, hub#2612: the task runs every 5 minutes and used to announce «drawer closed» on
+    # The task runs every 5 minutes and used to announce «drawer closed» on
     # every pass. Only a pass that closes a session says so, once per session.
     settings(auto_close_enabled=True, auto_close_time="04:00")
     assert run("cash_register.session.auto_close").closed == []
@@ -503,7 +503,7 @@ def test_who_opened_and_closed_is_written_as_a_person_reads_it(make_user):
 
     from apps.cash_register.tests.conftest import A
 
-    user = make_user("saas:0199e4f0-aaaa", host="a")
+    user = make_user("saas:0199e4f0-aaaa")
     user.first_name, user.email = "", "ana@example.com"
     user.save()
     ctx = OperationContext(scope=A, actor=user, permissions=ctx_for().permissions)

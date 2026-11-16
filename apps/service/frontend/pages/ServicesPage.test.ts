@@ -130,7 +130,7 @@ describe('ServicesPage', () => {
     expect(s.prop('rowClickable')).toBe(false);
   });
 
-  it("wears the old module's icons: the briefcase on its cards and its empty list, «Archive» its archive box", async () => {
+  it('wears its icons: the briefcase on its cards and its empty list, «Archive» its archive box', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([
@@ -189,7 +189,7 @@ describe('ServicesPage', () => {
   describe('the upcoming appointments of the service being archived', () => {
     const COUNT = '/api/appointment/appointments/count_for_service';
     const WITH_AGENDA = { ...OWNER, permissions: [...OWNER.permissions, 'appointment.view_own_appointment'] };
-    const LINE = '2 upcoming appointment(s) still use this service. They keep their booking, price and length; only new bookings stop.';
+    const LINE = '2 upcoming appointments still use this service. They keep their booking, price and length; only new bookings stop.';
 
     async function archiving(session = WITH_AGENDA, answers: Record<string, [number, unknown]> = {}) {
       const s = await setup({ session });
@@ -207,16 +207,20 @@ describe('ServicesPage', () => {
       expect(s.dialog().props('consequences')).toEqual([LINE]);
     });
 
-    it('in Spanish', async () => {
-      const s = await setup({ session: WITH_AGENDA, locale: 'es' });
+    // hub#1147: one appointment is said in the singular and two in the plural, never «appointment(s)».
+    it.each([
+      { locale: 'en' as const, count: 1, line: '1 upcoming appointment still uses this service. It keeps its booking, price and length; only new bookings stop.' },
+      { locale: 'en' as const, count: 2, line: LINE },
+      { locale: 'es' as const, count: 1, line: '1 cita próxima sigue usando este servicio. Conserva su reserva, precio y duración; solo dejan de admitirse reservas nuevas.' },
+      { locale: 'es' as const, count: 2, line: '2 citas próximas siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.' },
+    ])('with $count upcoming ($locale): «$line»', async ({ locale, count, line }) => {
+      const s = await setup({ session: WITH_AGENDA, locale });
       await s.show(page(ROWS));
-      s.answerBy({ [COUNT]: [200, { count: 1, earliest: null }] });
+      s.answerBy({ [COUNT]: [200, { count, earliest: null }] });
       s.table().vm.$emit('action', { actionId: 'archive', row: ROWS[0] });
       await flush();
       await flush();
-      expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([
-        '1 cita(s) próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de admitirse reservas nuevas.',
-      ]);
+      expect(s.wrapper.findComponent(ConfirmDialog).props('consequences')).toEqual([line]);
     });
 
     it('says nothing when none uses it', async () => {
@@ -294,10 +298,12 @@ describe('ServicesPage', () => {
       expect(s.cells(0)[4]).toBe('¥1,500');
     });
 
-    it('paints a figure without a symbol until the business answers', async () => {
+    it('paints a dash until the business answers, then the amount in yen', async () => {
       const s = await setup({ business: null });
       await s.show(page(ROWS));
-      expect(s.cells(0)[4]).toBe('22.50');
+      expect(s.cells(0)[4]).toBe('—');
+      await s.result('base.business.get', business(JAPANESE));
+      expect(s.cells(0)[4]).toBe('¥2,250');
     });
 
     it('reads the price filter in the business currency’s minor units: «1500» is 1500 yen', async () => {
@@ -329,7 +335,7 @@ describe('ServicesPage', () => {
   });
 });
 
-describe('ServicesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ServicesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

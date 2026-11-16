@@ -51,7 +51,7 @@ REASON_REQUIRED = _("Say why the order failed: the reason stays on the order.")
 SAY_WHICH_CART = _("Say which cart: its id, its session code, or its customer's email or name.")
 SAY_WHICH_ORDER = _("Say which order: its id, or its number.")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a cart by its session code, as the Carts list and «Delete the cart …?» say it; a line by its
 # product; an order by its number, as the Orders list.
 A_CART = names("cart_checkout.cart.get", by="cart_id", name=("session_token",))
@@ -261,7 +261,10 @@ class CartOut(Schema):
     customer_name: str = Field(description="Its customer's name; may be empty.")
     status: CartStatus = Field(description="Where it is; an active cart past its expiry reads as expired.")
     total_items: Decimal = Field(description="The sum of its lines' quantities.")
-    total_amount: int = Field(description="The sum of its lines' totals, in minor units of its currency.")
+    total_amount: int = Field(
+        description="The sum of its lines' totals, in minor units of its currency.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="Its currency (ISO 4217), kept from its creation: never rewritten.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     expires_at: dt.datetime | None = Field(description="When it expires; empty: never.")
@@ -288,8 +291,14 @@ class ItemOut(Schema):
     product_name: str = Field(description="The product's name, as the caller gave it.")
     sku: str = Field(description="Its SKU; may be empty.")
     quantity: Decimal = Field(description="How many units.")
-    unit_price: int = Field(description="The price of one unit, in minor units of the cart's currency.")
-    line_total: int = Field(description="Quantity × price, rounded to the minor unit (half up).")
+    unit_price: int = Field(
+        description="The price of one unit, in minor units of the cart's currency.", json_schema_extra={"money": True}
+    )
+    line_total: int = Field(
+        description="Quantity × price, rounded to the minor unit (half up).", json_schema_extra={"money": True}
+    )
+    currency: str = Field(description="Its cart's currency (ISO 4217), the one its price and its total are in.")
+    currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     variant_attributes: dict[str, Any] = Field(description="Its variant (size, colour…).")
     created_at: dt.datetime = Field(description="When it was added.")
     updated_at: dt.datetime = Field(description="When it last changed.")
@@ -459,7 +468,10 @@ class OrderOut(Schema):
     shipping_method: str = Field(description="How it is shipped; may be empty.")
     payment_method: str = Field(description="How the customer pays; may be empty.")
     status: OrderStatus = Field(description="Where it is: initiated, paid, failed or completed.")
-    total_amount: int = Field(description="The cart's total when it was initiated, in minor units of its currency.")
+    total_amount: int = Field(
+        description="The cart's total when it was initiated, in minor units of its currency.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="Its currency (ISO 4217): its cart's, never rewritten.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     notes: str = Field(description="Its notes.")

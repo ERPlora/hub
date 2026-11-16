@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1944551ee9337ab6f59daece75a1bb3e8731a39b180505548a9268fcc4c2cc16 -->
+<!-- generated from WORKBOOK.md sha256:688b67c3424e740ecf6dc41c72e83eaf4e8a4187d9e5931e9e6a8f79dc946b6e -->
 
 ## What it is for and who it is for
 
@@ -39,7 +39,7 @@ on it.
   issues no tax document; it covers service lines, not amounts; the expiry counts from the purchase; what
   was sold keeps the terms it was sold with; giving or correcting is a separate movement with a reason;
   only a voucher that has not been used is voided.
-- Decisions of the current product that rule here: ADR-0386 (a voucher covers lines; a gift card,
+- Decisions that rule here: ADR-0386 (a voucher covers lines; a gift card,
   amounts), ADR-0390 (ownership is born when it is sold, the clock starts at the purchase and it is not
   transferred) and ADR-0085 (VAT is linked through the tax category of Taxes).
 
@@ -64,7 +64,7 @@ Amounts (the price of a service and that of each professional, the closed price 
 voucher, what was paid for a voucher) are in **the business's currency**, its country's, the one **Settings →
 Business** shows (euros in Spain, złoty in Poland, yen in Japan), with its decimals (the yen has none), written
 with a comma or a point: "1500" is a price of 1500 yen in Japan and of €1,500.00 in Spain, and Sales charges it
-the same. While the business has not answered, an amount shows as a figure without a symbol, never in euros. The
+the same. While the business has not answered, an amount shows as "—", never in euros or with guessed decimals. The
 examples in this document are from a business in Spain, in euros.
 
 ## Screens
@@ -92,7 +92,7 @@ list) and **Tax category** (with no empty option; the one from the Settings come
 **Edit** and **Archive**; in the archived view, **Restore**. **Archive** asks to confirm: "Archive
 service" — "<name> — it will no longer be offered or bookable. Its history and the appointments already
 booked are kept." and, if Appointments has upcoming appointments with it, "{count} upcoming
-appointment(s) still use this service. They keep their booking, price and length; only new bookings
+appointments still use this service. They keep their booking, price and length; only new bookings
 stop.".
 
 The service photo (SERVICE-F34 and F35): for whoever may edit services, the form has "Photo", with the
@@ -107,7 +107,7 @@ Table with the search box "Search category…" and columns **Name, Parent catego
 category** ("No parent (root)" or another) and **Order**, with **Create category** / **Save changes**.
 Per row: **Edit** and **Delete**; **Delete** asks to confirm: "Delete category" — "<name> — the category
 disappears; the services in it are kept, without a category." and, if it has services, "{count}
-service(s) will be left without a category.".
+services will be left without a category." (with one, "1 service will be left without a category.").
 
 ### Packages
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
@@ -122,7 +122,7 @@ empty to price it as the sum of its lines minus the discount."), **Validity (day
 **Service** and, below, **Sessions** and "Remove line"; **Add service**; **Create package** button. When
 editing, instead of the lines it shows "The services included cannot be changed once created: delete
 this package and create a new one.". Per row: **Edit, Movements, Sold vouchers** and **Delete** (with
-"Delete package": "<name> — the package and its {count} line(s) leave the catalogue and can no longer be
+"Delete package": "<name> — the package and its {count} lines (or "its line") leave the catalogue and can no longer be
 sold; vouchers already sold can still be spent, and you find them filtering Status by Deleted.").
 
 Sheets that open on top, all with **Close**, "Loading…" while they arrive, their empty state, their error
@@ -130,14 +130,22 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
 
 - **Voucher movements**: each session and each adjustment of that voucher, of every customer, the most
   recent first, with its label (**Held**, **Delivered**, **Released**, **Expired**, **Given back**,
-  **Courtesy**, **Correction**), the service, the date, "Customer: <name>", who and the reason. Empty:
-  "This voucher has not been used yet.".
+  **Courtesy**, **Correction**), the service, the date, "Customer: <name>", on a session spent saying who
+  did it "Professional: <name>", who and the reason. Empty: "This voucher has not been used yet.".
 - **Sold vouchers**: one row per purchase, with **Active** or **Voided**, the customer, the date, the
   amount, "{used} used · {remaining} left" (or "· no limit"), "Expires …" or "Never expires" and what
   was given or corrected afterwards; on a voided one, "Voided by {who} on {when}" and the reason.
-  **Adjust** and **Void** buttons where they apply. Empty: "Nobody has bought this voucher yet.".
+  **Spend a session** (on a voucher neither voided nor expired and with a session left, or with no limit),
+  **Adjust** and **Void** buttons where they apply and for whoever may.
+  Empty: "Nobody has bought this voucher yet.".
+  - **Spend a session** opens its dialog: "Mark one session of <customer>'s "<voucher>" voucher as delivered,
+    outside the till.", the balance "{n} sessions left · {after} after this one" ("1 session left · 0 after this
+    one"; "No session limit" on one without a limit), **Service** ("Choose the service", only those the voucher
+    covers; with a single one, already chosen), **Professional** (Staff's team; "Who did it: what the session is
+    worth counts in their production in Sales. Optional."), **Note** and the **Cancel** and **Spend session**
+    buttons. While it checks the voucher, "Checking the voucher…".
 - **Vouchers with no customer**: the live vouchers whose card was deleted or anonymised, with
-  "{remaining} session(s) left", "No session limit" or "Fully used", the voucher, the amount, "Customer
+  "{count} sessions left" ("1 session left"), "No session limit" or "Fully used", the voucher, the amount, "Customer
   deleted on {when}", "Expired" if it is and "Customer reference: <identifier>". Empty: "No voucher has
   lost its customer.".
 
@@ -159,6 +167,12 @@ Saved: "Settings saved.".
 | No permission | What they cannot do does not show; if they arrive by another door, "You do not have permission". |
 
 Amounts, durations and dates show in the format of the language of whoever is looking.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
@@ -184,7 +198,7 @@ Amounts, durations and dates show in the format of the language of whoever is lo
 | SERVICE-F18 | Give sessions, extend the expiry or correct the balance | done |
 | SERVICE-F19 | See a voucher's movements | done |
 | SERVICE-F20 | A voucher expires | done |
-| SERVICE-F21 | Spend a session outside the checkout | done (assistant and API) |
+| SERVICE-F21 | Spend a session outside the checkout | done |
 | SERVICE-F22 | Pay a line with a voucher | done (with Sales, SALE-F27) |
 | SERVICE-F23 | Release the session if the line or the check goes away | done |
 | SERVICE-F24 | Mark the sessions as spent when charging | done (not granting the vouchers sold on the receipt: see "What is left out") |
@@ -212,7 +226,12 @@ Steps:
 3. Type the Name, choose the Pricing (**Fixed price** comes chosen), the Price and the Duration (min).
    Choose a Category or leave "No category".
 4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
-   Settings comes chosen if there is one). Without it **Create service** cannot be tapped.
+   Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
+   business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
+   saved as 150,000); until then, leaving the price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and
+   as soon as the currency arrives they are read in it (hub#945).
+   If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+   reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create service** lights up (hub#938).
 5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
 Out: the service on offer and bookable (`service.service.created`); from that moment the agenda and the
@@ -227,8 +246,9 @@ not an amount. Type a figure, for example 12.50.", also with another currency's 
 business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
-Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept.
-Involved: TAX-F01, BASE-F01
+Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept. The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+Involved: TAX-F01, BASE-F01, BASE-F114 (the ERPlora staff get back from a separate copy the services that were lost,
+each by this same creation)
 
 ### SERVICE-F02 Edit a service
 Status: done
@@ -264,14 +284,15 @@ Involved: SALE-F09
 
 ### SERVICE-F04 Archive a service
 Status: done
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Services
 Steps:
 1. In the service's row tap **Archive**.
 2. Read "Archive service": "<name> — it will no longer be offered or bookable. Its history and the
    appointments already booked are kept." and, if Appointments is active and has upcoming appointments
-   with that service, "{count} upcoming appointment(s) still use this service. They keep their booking,
-   price and length; only new bookings stop.".
+   with that service, "{count} upcoming appointments still use this service. They keep their booking,
+   price and length; only new bookings stop." (with one, "1 upcoming appointment still uses this service. It
+   keeps …").
 3. Tap **Archive** (or **Cancel**). The row disappears from the list.
 In: the service and, if Appointments is active and whoever archives sees appointments, how many pending or
 confirmed appointments use it from now on.
@@ -285,7 +306,7 @@ Involved: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 See and restore the archived services
 Status: done
-Actor: manager
+Actor: manager, assistant
 Screen: Services
 Steps:
 1. In **Filters**, choose **Archived** in Status and tap **Apply**: the table shows only the archived ones.
@@ -331,8 +352,9 @@ If it fails: a name another live category already has (ignoring case and extra s
 field: "There is already a category with that name. Pick another name.". A category cannot be its own
 parent nor hang from one of its children: "A category cannot hang from itself or from one of its
 subcategories.". A deleted parent: "That parent category is not available: it does not exist in this
-business or it has been deleted.".
-Involved: SERVICE-F01, SERVICE-F08
+business or it has been deleted.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
+Involved: SERVICE-F01, SERVICE-F08, BASE-F114 (the ERPlora staff recover from a separate copy the categories the
+business no longer has, each by this same creation)
 
 ### SERVICE-F08 Delete a category
 Status: done
@@ -347,7 +369,14 @@ Out: the category deleted, not erased (`service.category.deleted`); its name bec
 are left **without a category** and its subcategories move to hang from its parent (or become roots).
 If it fails: in the confirmation, the reason (for example, "That category does not exist in this
 business.").
-Involved: SERVICE-F07, SERVICE-F02
+Involved: SERVICE-F07, SERVICE-F02, BASE-F114 (from a separate copy, the deleted category comes back as a new one,
+with the lost services inside it and with what the business kept where deleting it left it: its services without a
+category and its subcategories where it hung, which Recoveries counts apart ("Service links to categories",
+"Subcategory links to categories"). What the business moved since stays where it is, and Recoveries says so in the
+category's notes; what it changed without moving it while the category came back also stays as the business left
+it, and Recoveries counts it "not created" with its reason. If it is asked again, the category is the business's
+already and is not filled: what the business took out of it since stays out; if the recovery that brought it back
+failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
 Status: done (Sales does it, SALE-F38)
@@ -387,6 +416,7 @@ Steps:
 1. Open **Services → Settings**.
 2. Change the fields and tap **Save**.
 3. "Settings saved." shows.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the saved settings (or the factory ones).
 Out: the settings (`service.settings.updated`). The duration, the buffer (before and after), the online
 booking and the default tax category are taken by every new service that does not give them (form,
@@ -418,7 +448,12 @@ uses up one of its "Uses".
 If it fails: with no service at all, "Add at least one service: a package with no lines cannot be
 redeemed."; a repeated service, an archived one or one that does not exist; an unreadable or negative
 amount, below its field; a name another live voucher already has, "There is already a package with that
-name. Pick another name.".
+name. Pick another name.". The reason of a field goes as soon as that field is corrected, even if another one says
+the same, and the one of the lines as a whole (a repeated service), below them, as soon as a line is changed, added or removed (hub#888). "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
+the business has not yet said its currency, because the closed price and the discount are read in it
+(without it, "1500" yen would be saved as 150,000); until then, leaving the closed price or the discount keeps it as
+typed, without inventing decimals for it or judging it: "¥9500" or "7,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938).
 Involved: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Edit or delete a voucher
@@ -448,7 +483,9 @@ Screen: assistant
 Steps:
 1. Ask the assistant to grant the voucher to the customer (by her name or her phone), with the amount
    charged and the sale that charged it. If that sale charged several lines, also which of them.
-2. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
+2. The assistant's confirmation card names the voucher, the customer, the sale by its number
+   ("20261014-0007") and the line by what it charges; confirm it.
+3. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
 In: the voucher of the catalogue, live and active, and the customer (Customers).
 Out: a sold voucher with the owner, the date, the amount and the "Uses" and the "Validity" of the
 catalogue frozen; the expiry counts from that moment (`service.grant.granted`). No tax document comes
@@ -481,7 +518,7 @@ Involved: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 See who has bought a voucher
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
@@ -489,10 +526,11 @@ Steps:
 3. **Load more** brings the next page; **Close** goes back to the table.
 In: the purchases of that voucher and the name of each customer (Customers); for a deleted card, its
 identifier.
-Out: nothing; read only. **Adjust** and **Void** show where they apply and for whoever may.
+Out: nothing; read only. **Spend a session** (SERVICE-F21), **Adjust** and **Void** show where they apply and
+for whoever may.
 If it fails: empty, "Nobody has bought this voucher yet."; if it cannot be read, "Could not load the sold
 vouchers" with the reason.
-Involved: SERVICE-F17, SERVICE-F18
+Involved: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Void a voucher sold by mistake
 Status: done
@@ -522,7 +560,7 @@ Steps:
 1. In **Sold vouchers** tap **Adjust** on a live purchase with a session limit or an expiry.
 2. Choose **Add sessions** or **Remove sessions** and how many (up to 100; removing, up to the ones it has
    left), and/or "Days to extend" (up to 366).
-3. Type the Reason and check "After the adjustment: {remaining} session(s) left · expires {when}".
+3. Type the Reason and check "After the adjustment: {count} sessions left · expires {when}" ("1 session left").
 4. Tap **Adjust**.
 In: the purchase, the quantities and the reason.
 Out: a separate movement with who, when, how much and why (`service.grant.adjusted`), which shows in
@@ -531,18 +569,20 @@ used-up voucher. The sessions already delivered keep their value; the ones left 
 price (SERVICE-F24).
 If it fails: "Say why this voucher is being adjusted…", "Add or remove at least one session, or add at
 least one day.", "You cannot take away more sessions than the customer has left.", "That voucher has no
-session limit…", "That voucher never expires…" or "That voucher was already voided.".
+session limit…", "That voucher never expires…" or "That voucher was already voided.". The reason of a field goes as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Movements**.
 2. Each delivered session and each adjustment shows, the most recent first (see "Screens"); **Load
    more** brings the next ones, each movement only once even if several carry the same time.
-In: the sessions and the adjustments of that voucher.
+3. A session spent saying who did it (SERVICE-F21) names her beside the customer, "Professional: Ana
+   López"; if her name changes in Staff, the row says it at once.
+In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff).
 Out: nothing; read only.
 If it fails: empty, "This voucher has not been used yet."; if it cannot be read, "Could not load the
 movements" with the reason.
@@ -564,22 +604,48 @@ expired.".
 Involved: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Spend a session outside the checkout
-Status: done (assistant and API)
+Status: done
 Actor: employee, manager, assistant
-Screen: assistant
+Screen: Packages, assistant
 Steps:
-1. If you want, ask the assistant first whether a session of that voucher could be spent and why not.
-2. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
-   service was done and link it to the appointment or the sale.
-In: the purchase of the voucher; the service, the appointment and the sale, as a reference.
+1. In **Packages**, in the voucher's row tap **Sold vouchers** and, on the customer's purchase, **Spend a
+   session**. The button shows on a voucher neither voided nor expired and with a session left (or with no limit):
+   on an expired or used-up one the row already says so, and **Adjust** (SERVICE-F18) gives it days or sessions back.
+2. The dialog checks when it opens, and each time you change the service, whether it can be spent: if not, it says
+   why ("This session cannot be spent" and the reason) and **Spend session** cannot be tapped; if so, it shows the
+   balance, "3 sessions left · 2 after this one".
+3. Choose the **Service** that was done (among those the voucher covers; with a single one it is already chosen),
+   if you want the **Professional** who did it and a **Note**, and tap **Spend session**. The dialog closes and the
+   row's balance drops at once. With something chosen or typed, **Cancel**, the "×", Escape or a tap outside ask
+   "Discard changes?" first.
+4. With the assistant: if you want, ask it first whether a session of that voucher could be spent and why not.
+5. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
+   service was done, which professional did it ("Ana did it") and link it to the appointment or the sale.
+6. The assistant's confirmation card names the voucher, the service and the professional and, if you link them, the
+   appointment as Appointments' cards say it ("Lucía Pérez · Tuesday, Nov. 3, 2026 · 10:00 · Ana López") and the sale
+   by its number; confirm it.
+In: the purchase of the voucher; the service and the professional of Staff's team who did it; the
+appointment and the sale, as a reference.
 Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses" and takes
-its share of the price (SERVICE-F24). It does not say who did it, so it counts in nobody's production
-(hub#770). It issues no tax document.
+its share of the price (SERVICE-F24). If it says who did it, the session keeps it and what it is worth counts in
+that professional's production in Sales, on the business day it is spent, and with it in their commission
+(SALE-F28, STAFF-F21), just like the one spent at the checkout. A session of an unlimited voucher has nothing to
+divide by: it is worth what that professional charges for the service (their own price or the service's), like
+the checkout's line; without the service said, it adds nothing. Without saying who did it, it counts in nobody's
+production. Without Sales in the business, the session is spent all the same and keeps who did it, but there is
+no production to count it in. It issues no tax document.
 If it fails: "This voucher was voided: it can no longer be used.", "This voucher has no sessions left.",
 "This voucher has expired.", "This voucher does not cover that service. A voucher of haircuts pays for
-haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". Two tills that
+haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". In the dialog, the reason
+shows before spending, under "This session cannot be spent" ("This voucher was voided: it can no longer be used.",
+"This voucher has expired.", "This voucher has no sessions left." or "This voucher does not cover that service.":
+seen by whoever had the sheet open when another till spent the last session or the voucher expired);
+if it cannot be checked, "The voucher could not be checked" with the reason, and on spending the server decides;
+its refusal stays in the dialog without losing what was chosen. A professional who is
+not on the team (or has already left), "That staff member does not exist in this business."; a name that fits
+several, "There are several staff members called "…": …. Say which one.". Nothing is spent. Two tills that
 spend the last session at the same time go in line and the second one gets the real reason.
-Involved: SERVICE-F19, SERVICE-F20
+Involved: SERVICE-F16, SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pay a line with a voucher
 Status: done (with Sales, SALE-F27)
@@ -738,12 +804,16 @@ Steps:
 3. If its personal data was erased (GDPR), Services empties the free texts of its vouchers: the note of
    the purchase, the reason of a void, the reason of each adjustment and the note and the return reason
    of each session.
-In: the deleted or anonymised card (Customers; when anonymising it announces `customer.customer.erased`).
+4. If ERPlora's staff recover a deleted card from the separate copy (CUSTOMER-F33), its vouchers leave
+   **Vouchers with no customer** and go back to her name at once, also on an open screen; sessions and balances do
+   not change. An anonymised card never comes back.
+In: the deleted or anonymised card (Customers; when anonymising it announces `customer.customer.erased`; when it is
+recovered, `customer.customer.restored`).
 Out: the voucher keeps the reference of the card, which is what matches it with the sale that paid for
 it; sessions, amounts and movements do not change. When anonymising, the free texts emptied
 (`service.grant.erased`). The voided ones do not show in the list.
 If it fails: repeating the notice changes nothing.
-Involved: CUSTOMER-F07, CUSTOMER-F16
+Involved: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescue the vouchers with no customer
 Status: done (the list; a voucher is not moved to another card)
@@ -778,10 +848,16 @@ the professionals of a service and to take their own duration and price, and Sal
 price (SALE-F38). Assigning the same person again (assistant or API) changes their minutes and their
 price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
-several (the list to choose from) or the amount unreadable or negative. While the list arrives it shows
+several (the list to choose from) or the amount unreadable or negative. **Assign** is off while the
+business has not yet said its currency: the own price is read in it, and without it "1500" yen would be
+saved as 150,000 (leaving the own price keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it (hub#945)); if it cannot be read, "Editing service" says so at the top ("The business's currency
+could not be read", with the reason) and offers "Retry"; as soon as it arrives, **Assign** lights up
+(hub#946). While the list arrives it shows
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
 "Retry", never "Nobody assigned yet".
-Involved: STAFF-F01, SALE-F38
+Involved: STAFF-F01, SALE-F38, BASE-F114 (from a separate copy, a service brought back comes back assigned, by this
+same operation, to whoever performed it and the business still has on its staff; whoever it does not, Recoveries names
+with why)
 
 ### SERVICE-F32 Change or remove a professional from a service
 Status: done
@@ -799,7 +875,8 @@ Steps:
 In: the assignment.
 Out: the change (`service.assignment.updated`, `service.assignment.removed`). A person leaving in Staff
 removes them from every service they performed.
-If it fails: "That assignment does not exist in this business.".
+If it fails: "That assignment does not exist in this business.". **Save** waits, off, for the business's
+currency, like **Assign** (SERVICE-F31): the own price is read in it (hub#946).
 Involved: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Know who can perform a service
@@ -847,7 +924,7 @@ says "The service has been saved, but the photo has not: That image is no longer
 another one." with "Retry", and the service keeps the photo it had (through the assistant or the API
 nothing is saved). Whoever may not edit services does not see "Photo", and the app refuses it through the
 assistant or the API too.
-Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Upload the service's own photo
 Status: done
@@ -884,7 +961,11 @@ voucher are named by their id or by their name; a professional, by their name; a
 her phone. If a name fits several, it says which and asks to choose (409
 `service.service_ambiguous`, `service.category_ambiguous`, `service.package_ambiguous`,
 `staff.ambiguous_member`, `customer.customer_ambiguous`). Before changing anything, the assistant asks for
-confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id.
+confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id; also what
+belongs to Sales or Appointments: the sale by its number, its line and the check's line by what they charge, the
+appointment as Appointments' cards say it and the refund or the void that gives sessions back by its sale ("Refund of
+sale 20261014-0007", "Void of sale 20261014-0007"). With Sales or Appointments off, or if whoever asks may not see it,
+that datum does not show, never its id.
 
 ### What it offers: queries (they read and change nothing)
 
@@ -904,6 +985,7 @@ confirmation with its card (BASE-F97), which names each record as the screens na
 | An assignment by its id: the service, the professional and their own minutes and price, with the `label` the assistant's card (BASE-F97) names it by | view services | F32 | `service.assignment.get` |
 | A sold voucher by its id: the voucher, the customer, the day it was sold and its balance, with its `label` | view voucher balances | F17, F18, F21, F22 | `service.grant.get` |
 | A session of a sold voucher by its id: the voucher, the customer, the service and its status, with its `label` | view voucher balances | F23, F24, F26, F27 | `service.session.get` |
+| The name of a sale, a line of a sale or of the check, an appointment or the refund or void that gives sessions back, by its id, read in Sales or Appointments as whoever asks: only for the assistant's card, no tool; Sales or Appointments off, 409 `service.sales_unavailable` or `service.appointments_unavailable` | view voucher balances | F14, F21, F22, F24, F26, F27 | `service.record.get` |
 | The sold vouchers, of a voucher or of a customer, with their balance | view voucher balances | F15, F16 | `service.grant.list` |
 | The vouchers with no customer | view vouchers with no customer | F30 | `service.grant.list_orphans` |
 | Whether a sold voucher can be voided and why not | void vouchers | F17 | `service.grant.void_check` |
@@ -940,7 +1022,7 @@ be followed live.
 | Grants a voucher to a customer and tells Sales which line paid for it | grant vouchers | F14 | `service.grant.create` |
 | Voids an unused sold voucher | void vouchers | F17 | `service.grant.void` |
 | Gives or takes sessions, or extends the expiry | adjust vouchers | F18 | `service.grant.adjust` |
-| Spends a session | spend sessions | F21 | `service.grant.redeem` |
+| Spends a session and, if who did it is said, tells Sales to count what it is worth in their production | spend sessions | F21 | `service.grant.redeem` |
 | Holds a session of a voucher for a line of the check (Sales calls it) | spend sessions | F22 | `service.session.hold` |
 | Releases a held session (Sales calls it) | spend sessions | F23 | `service.session.release` |
 | Marks as spent the held sessions of a charged sale (Sales calls it) | spend sessions | F24 | `service.session.settle` |
@@ -1003,13 +1085,23 @@ with the session of whoever sells, as it does with Inventory.
   - when voiding the sale, `service.session.return` with all its sessions (`reference` = the sale) and,
     when refunding it, with those of the lines that go back (`reference` = the refund).
   To paint the slot, the checkout reads `service.grant.tender_options` (`customer_id`, `service_id`).
-- **The line that sold a voucher (F14, F17)**: the one thing Services asks of Sales, also by name and with the
-  session of whoever grants. `service.grant.create`, with an amount and a sale, calls `sale.sale.voucher_sold`
+- **The line that sold a voucher (F14, F17)**: one of the two things Services asks of Sales, also by name and with
+  the session of whoever grants. `service.grant.create`, with an amount and a sale, calls `sale.sale.voucher_sold`
   (`sale_id`, `line_id`, `amount`) and keeps in `sale_line_id` the line it answers; `service.grant.void` calls
   `sale.sale.voucher_unsold` (`line_id`, `amount`). Without Sales in the business there is no figure to keep it
   out of: it is not called, the voucher keeps no line and its sessions do not count.
+- **The session spent outside the checkout with its professional (F21)**: the other one. `service.grant.redeem` with
+  `member_id` or `member` calls `sale.voucher_session.record` (`session_id`, `staff_id`, `value`) with the session of
+  whoever spends it (its Sales permission, "Build the check", is held by all four roles) and in the same transaction.
+  `value` is the session's or, on an unlimited voucher, that professional's price for the service. Sales keeps it
+  apart, because there is no line, and adds it to the production (SALE-F28): a session of the checkout never comes
+  this way, so none counts twice. Without Sales in the business it is not called.
   Services keeps the sale and the check's line as opaque identifiers (`sale_id`,
   `order_line_id`): Sales is not a requirement of Services nor Services of Sales.
+- **What the assistant's card names of Sales and Appointments**: `service.record.get` calls by their name, with the
+  session of whoever asks, `sale.sale.get` (the sale's number), `sale.record.get` (a line of the sale with
+  `sale_line_id`, one of the check with `line_id` and a refund with `refund_id`, "Refund of sale …") and
+  `appointment.appointment.get` (the appointment's `label`). A `reference` that is no refund is the sale voided.
 
 ### Who can do what
 
@@ -1036,5 +1128,4 @@ with the session of whoever sells, as it does with Inventory.
 | Give sessions back when voiding or refunding a sale | yes | yes | yes | no | `service.return_session` |
 | Settings | yes | yes | no | no | `service.manage_settings` |
 
-The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); the
-cashier of the current product is an employee: what they had (view, spend and grant) the employee has.
+The roles arrive from the SaaS with a prefix (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).

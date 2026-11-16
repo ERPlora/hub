@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SettingsOut } from '../operations';
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, errorFrame, flush, ionChecked, ionValue, MANAGER, type MountOptions, mountOnlineBooking, page, settle } from '../__tests__/mount-online-booking';
 import SettingsPage from './SettingsPage.vue';
 
@@ -83,6 +84,10 @@ describe('SettingsPage', () => {
     ]);
     await settle();
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('slot_interval'), '30', 'ionInput');
+    await pressEnter(s.inDoc('ob-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ slot_interval: 30 });
   });
 
   it('puts a refusal under its field, keeping what was typed', async () => {
@@ -94,6 +99,48 @@ describe('SettingsPage', () => {
     expect(s.field('primary_color').errorText).toBe('Write the colour as #RRGGBB (for example #6366f1).');
     expect(s.field('primary_color').value).toBe('blue');
     expect(s.field('save-error')?.textContent).toContain('Could not save');
+    expect(s.field('save-error')?.textContent).toContain('Invalid payload');
+  });
+
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
+    const REFUSAL = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Invalid payload',
+        fields: {
+          primary_color: 'Write the colour as #RRGGBB (for example #6366f1).',
+          min_booking_notice: 'Ensure this value is less than or equal to 10080.',
+        },
+      },
+    };
+
+    /** Saves a colour that is no colour and a notice of a year, and the server refuses both fields. */
+    async function refused() {
+      const s = await setup();
+      await s.show(SETTINGS);
+      s.answer(422, REFUSAL);
+      await ionValue(s.field('primary_color'), 'blue', 'ionInput');
+      await ionValue(s.field('min_booking_notice'), '525600', 'ionInput');
+      await click(s.field('save'));
+      /** Whether the red notice is on screen. */
+      const notice = () => s.field('save-error') !== null;
+      const says = (name: string) => s.field(name).errorText ?? '';
+      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
+      return { ...s, notice, says, marked };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('primary_color'), s.says('min_booking_notice')]).toEqual([
+        'Write the colour as #RRGGBB (for example #6366f1).',
+        'Ensure this value is less than or equal to 10080.',
+      ]);
+      await ionValue(s.field('primary_color'), '#112233', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('primary_color'), s.marked('primary_color')]).toEqual(['', false]);
+      expect([s.says('min_booking_notice'), s.marked('min_booking_notice')]).toEqual(['Ensure this value is less than or equal to 10080.', true]);
+    });
   });
 
   it('lists the services with their online booking switch, saved at once in Services', async () => {

@@ -128,7 +128,7 @@ async def option_reorder(request, data: OptionReorderIn):
     return await run_operation(request, services.reorder_options, data)
 
 
-# The menu's image (COMBO-F14; round 2026-10-30, base.images)
+# The menu's image (COMBO-F14, base.images)
 
 
 @bind(router, "combo.combo.set_image", "/combo/combos/image")

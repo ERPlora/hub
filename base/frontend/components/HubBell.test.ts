@@ -1,6 +1,3 @@
-// The bell at the end of the topbar (BASE-G137, hub#1678): `base.bell.counters`, live — it no longer asks every
-// 30 s —; its badge sums the counters above zero; opened, one row per counter («Failed events (2)») that leads to
-// its screen when this hub has it. A failed read keeps the last counters.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BellCounter } from '../operations';
@@ -100,9 +97,9 @@ describe('HubBell', () => {
 });
 
 describe('HubBell does not poll', () => {
-  // The old hub's bell asked the server every 30 s; this one is told by the live query, and asks again only when a
-  // counter says so (`refresh_every`, below). Fake timers run the page's clock five minutes ahead: with no counter
-  // asking, nothing else must have asked the server, nor reopened the stream.
+  // The bell is told by the live query and asks again only when a counter says so (`refresh_every`, below). Fake
+  // timers run the page's clock five minutes ahead: with no counter asking, nothing else must have asked the server,
+  // nor reopened the stream.
   it('asks nothing more once subscribed, however long the page stays open', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'] });
@@ -124,7 +121,7 @@ describe('HubBell does not poll', () => {
 });
 
 describe('HubBell reads again by the clock when a counter asks', () => {
-  // FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE: a counter whose figure moves as time passes (a job waiting a
+  // A counter whose figure moves as time passes (a job waiting a
   // minute with no device alive) has no event to re-run the live query; `refresh_every` says how often the bell reads
   // `base.bell.counters` again. The fake timers are the test's only: real ones come back in `finally`.
   const BELL = '/api/home/bell';

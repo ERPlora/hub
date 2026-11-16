@@ -1,12 +1,11 @@
-// flow: PAYMENT-F02 (FIX-HUB-PAYMENT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/payment/WORKBOOK.md «Pagos», PAYMENT-F02 and
-// F06; the old payments#35 and #38)
+// flow: PAYMENT-F02 (apps/payment/WORKBOOK.md «Pagos», PAYMENT-F02 and F06)
 // Payments records, shows and filters in the business's currency: its country's, as erplora.com registered it
 // (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: «New
 // payment» says «Amount (PLN)», «13,50 €» is not an amount there, «12,50 zł» is recorded as 1250 grosze in PLN and the
 // list paints it in złoty beside an older payment that keeps its euros (a record is never rewritten); the amount filter
-// (a number field) reads in złoty: from 12.50 keeps it and from 12.51 drops it; in 390, 834 and 1440 (captures
-// `FIX-HUB-PAYMENT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`). Back in Spain, «New payment» says «Amount (EUR)». What
-// the run creates is deleted after it and `a`'s registration put back, also when a test fails.
+// (a number field) reads in złoty: from 12.50 keeps it and from 12.51 drops it; in 390, 834 and 1440. Back in Spain,
+// «New payment» says «Amount (EUR)». What the run creates is deleted after it and `a`'s registration put back, also
+// when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
@@ -108,7 +107,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: PAYMENT-F02 a business in Poland records, shows and filters its payments in złoty in 390, 834 and 1440`, async ({ browser }) => {
+test(`PAYMENT-F02 a business in Poland records, shows and filters its payments in złoty in 390, 834 and 1440`, async ({ browser }) => {
   await registerBusinessIn(original, 'PL');
   const { context, page } = await signedIn(browser);
   try {
@@ -166,7 +165,7 @@ test(`${KEY}: PAYMENT-F02 a business in Poland records, shows and filters its pa
   }
 });
 
-test(`${KEY}: PAYMENT-F02 back in Spain «New payment» says «Amount (EUR)» and records in euros`, async ({ browser }) => {
+test(`PAYMENT-F02 back in Spain «New payment» says «Amount (EUR)» and records in euros`, async ({ browser }) => {
   await registerBusinessIn(original, 'ES');
   const { context, page } = await signedIn(browser);
   try {

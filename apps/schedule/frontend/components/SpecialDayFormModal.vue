@@ -10,6 +10,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { blankRows, type IntervalRow, payloadOf, rowsOf } from '../lib/intervals';
 import type { SpecialDayOut } from '../operations';
@@ -83,11 +85,18 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen(
+  'schedule-special-day-form',
+  () => ({ date: date.value, name: name.value, closed: closed.value, rows: rows.value, recurring: recurring.value, notes: notes.value }),
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="schedule-special-day-form"
     :title="title"
     :submit-label="editing ? $t('schedule.save') : $t('schedule.specialDays.form.submit')"
@@ -100,6 +109,7 @@ async function save(): Promise<void> {
       <div class="schedule-exception-form">
         <ion-input
           data-testid="schedule-special-day-form-date"
+          name="date"
           type="date"
           :value="date"
           :label="$t('schedule.specialDays.form.date')"
@@ -112,6 +122,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="schedule-special-day-form-name"
+          name="name"
           :value="name"
           :label="$t('schedule.specialDays.form.name')"
           :placeholder="$t('schedule.specialDays.form.namePlaceholder')"
@@ -157,6 +168,7 @@ async function save(): Promise<void> {
         </ion-checkbox>
         <ion-input
           data-testid="schedule-special-day-form-notes"
+          name="notes"
           :value="notes"
           :label="$t('schedule.specialDays.form.notes')"
           label-placement="floating"

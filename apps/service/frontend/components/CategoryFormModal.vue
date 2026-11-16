@@ -9,6 +9,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { searchServiceCategories } from '../lib/pickers';
 import type { CategoryOut, CategoryPatchIn } from '../operations';
@@ -19,6 +21,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+const canDismiss = useUnsavedFormOnOpen('service-category-form', () => form.value, open);
 
 interface Form {
   name: string;
@@ -88,6 +92,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="service-category-form"
     :title="title"
     :submit-label="category ? $t('service.categories.form.save') : $t('service.categories.form.create')"
@@ -97,9 +102,12 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="service-category-form">
+      <div
+        class="service-category-form"
+      >
         <ion-input
           data-testid="service-category-form-name"
+          name="name"
           :value="form.name"
           :label="$t('service.categories.form.name')"
           label-placement="floating"
@@ -112,6 +120,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="service-category-form-parent"
+          name="parent_id"
           :model-value="form.parent"
           :search="searchParents"
           :label="$t('service.categories.form.parent')"
@@ -121,6 +130,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="service-category-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

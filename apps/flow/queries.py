@@ -3,8 +3,8 @@
 - **The catalog** (``catalog_events``, ``catalog_operations``): what the active apps declare, never a
   name made up here. Events are each app's ``events.ALL``; actions and reads are its registered
   operations whose permission the app declares (a person can be granted it: platform-only reactions
-  are left out). ``active_apps`` is the phase-1 seam: every installed module but this one, as
-  ``base.session.me``; phase 2 reads the SaaS's picture there.
+  are left out). ``active_apps`` asks ``base.relay.active_apps`` for the business's active apps, the same
+  activation and entitlement check the relay and the operation gate use.
 - **Values** (``map_params``): a step's params for what the run knows (``document.resolve``), leaving out
   what came out empty, so an optional field keeps its default. What a person reads (``PERSON_PARAMS``, a question's
   texts) says each datum in words (``words_for``); what goes to a machine, as the code keeps it.
@@ -31,14 +31,16 @@ from django.utils import timezone, translation
 from babel.dates import format_date, format_time, get_datetime_format
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
+from live.assistant import MONEY, description, risk
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.meta import LiveAppConfig, module_configs
 from live.models import OutboxEvent
-from live.operations import Operation, operation, registry
+from live.operations import INTERNAL, Operation, operation, registry
 
 from apps.flow import document, recipes, vault
 from base import assistant as hub_assistant
+from base import relay
 from base.business import babel_locale, currency_decimals, money_text
 from base.home import ISO_HOUR, moment
 from base.operations import business_currency
@@ -53,6 +55,8 @@ from apps.flow.schemas import (
     FlowListIn,
     FlowOut,
     FlowRefIn,
+    OperationNameOut,
+    OperationRefIn,
     Page,
     QuestionListIn,
     QuestionOut,
@@ -99,6 +103,13 @@ ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
 UNKNOWN_EVENT = _("That does not happen in this business: «%(name)s».")
 UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
+#: Off is not «does not exist» (hub#1054): what is missing is of an app the business turned off, and it comes back on.
+OFF_EVENT = _(
+    "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another event."
+)
+OFF_ACTION = _(
+    "«%(name)s» is from %(app)s, which is off in this business: turn it on in Apps, or choose another action."
+)
 NOT_AN_ACTION = _("«%(name)s» only reads: use «Look something up».")
 NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
 HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
@@ -126,17 +137,36 @@ AMBIGUOUS_SHOWN = 5
 # --- The catalog ------------------------------------------------------------------------------------
 
 
-def active_apps() -> dict[str, LiveAppConfig]:
-    """The modules active in this business, but this one (phase 1: every installed module)."""
-    return {
-        config.label: config for config in module_configs() if config.label != "flow"
-    }
+def installed_apps() -> dict[str, LiveAppConfig]:
+    """Every installed module but this one, on or off: whose recipes still fix what was built from them."""
+    return {config.label: config for config in module_configs() if config.label != "flow"}
 
 
-def catalog_events() -> dict[str, LiveAppConfig]:
+def off_apps(scope: Scope) -> dict[str, LiveAppConfig]:
+    """The installed modules that are not on in ``scope``'s business (turned off, or without the right to them): what
+    an automation built before still names, and the editor says why it is missing."""
+    active = active_apps(scope)
+    return {label: config for label, config in installed_apps().items() if label not in active}
+
+
+def _app_name(label: str) -> str:
+    return str(installed_apps()[label].verbose_name)
+
+
+def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
+    """The modules active in ``scope``'s business, but this one, as the platform's relay resolves them."""
+    active = relay.active_apps(scope)
+    return {label: config for label, config in installed_apps().items() if label in active}
+
+
+def catalog_events(scope: Scope) -> dict[str, LiveAppConfig]:
     """``{event name: its app}``: the ``events.ALL`` of every active app."""
+    return _events_of(active_apps(scope))
+
+
+def _events_of(apps: dict[str, LiveAppConfig]) -> dict[str, LiveAppConfig]:
     found: dict[str, LiveAppConfig] = {}
-    for label, config in active_apps().items():
+    for label, config in apps.items():
         module_name = f"{config.name}.events"
         if find_spec(module_name) is None:
             continue
@@ -146,10 +176,13 @@ def catalog_events() -> dict[str, LiveAppConfig]:
     return found
 
 
-def grantable_operations() -> dict[str, Operation]:
+def grantable_operations(scope: Scope) -> dict[str, Operation]:
     """``{operation name: operation}`` of the active apps whose permission the app declares: what a
     person can be granted (the platform-only reactions are left out)."""
-    apps = active_apps()
+    return _grantable_of(active_apps(scope))
+
+
+def _grantable_of(apps: dict[str, LiveAppConfig]) -> dict[str, Operation]:
     granted: dict[str, Operation] = {}
     for name, op in registry.items():
         config = apps.get(op.app_label)
@@ -162,7 +195,7 @@ def needs_a_person(op: Operation) -> bool:
     """An action the assistant confirms before running (``ai.risk == "high"``: voiding, refunding,
     erasing, sending to the tax agency…) or one done in person (``ai.in_person``: seating a party at the
     door): never for an automation, which acts with nobody in front."""
-    return hub_assistant.risk(op) == "high" or in_person(op)
+    return risk(op) == "high" or in_person(op)
 
 
 def in_person(op: Operation) -> bool:
@@ -184,14 +217,18 @@ def yes_permission(op: Operation) -> str | None:
     return declared or op.permission
 
 
-def catalog_operations() -> dict[str, Operation]:
+def catalog_operations(scope: Scope) -> dict[str, Operation]:
     """What an automation may be granted and run: the grantable operations that do not need a person."""
-    return {name: op for name, op in grantable_operations().items() if not needs_a_person(op)}
+    return {name: op for name, op in grantable_operations(scope).items() if not needs_a_person(op)}
 
 
-def ask_first_catalog() -> dict[str, Operation]:
+def ask_first_catalog(scope: Scope) -> dict[str, Operation]:
     """What an «Ask the assistant» step that asks first may be granted and offered: the catalog and ``ASK_FIRST``."""
-    return {name: op for name, op in grantable_operations().items() if not needs_a_person(op) or asks_first(op)}
+    return {
+        name: op
+        for name, op in grantable_operations(scope).items()
+        if not needs_a_person(op) or asks_first(op)
+    }
 
 
 def asked_first(steps: list[dict]) -> set[str]:
@@ -204,10 +241,10 @@ def asked_first(steps: list[dict]) -> set[str]:
     }
 
 
-def read_permissions(op: Operation) -> frozenset[str]:
+def read_permissions(scope: Scope, op: Operation) -> frozenset[str]:
     """The reads of ``op``'s app (its declared ``<app>.view…`` permissions): what a step may also need to
     answer with what it did, never to change anything else."""
-    config = active_apps().get(op.app_label)
+    config = active_apps(scope).get(op.app_label)
     declared = config.permissions if config is not None else []
     return frozenset(permission for permission in declared if permission.split(".", 1)[-1].startswith("view"))
 
@@ -256,17 +293,48 @@ def action_fields(op: Operation) -> list[dict]:
     return fields
 
 
-def action_outputs(op: Operation) -> list[str]:
-    """What a step of ``op`` leaves for the next ones: its output's fields (a list's first row's), and
-    ``found`` and ``count`` for a read."""
-    schema = op.output.model_json_schema()
-    defs = schema.get("$defs", {})
+def step_fields(op: Operation) -> dict[str, dict]:
+    """The fields a step of ``op`` leaves for the next ones (``steps.<id>.<field>``), by name, with their schema: its
+    output's, a list's first row's."""
+    return _step_fields(op, op.output.model_json_schema())
+
+
+def _step_fields(op: Operation, schema: dict) -> dict[str, dict]:
+    """``step_fields`` from ``schema``, ``op``'s output's already built."""
     properties = schema.get("properties", {})
     if op.kind == "query" and "rows" in properties:
-        properties = _resolve_ref(properties["rows"].get("items", {}), defs).get(
-            "properties", {}
-        )
-    names = list(properties)
+        return _resolve_ref(properties["rows"].get("items", {}), schema.get("$defs", {})).get("properties", {})
+    return properties
+
+
+def step_data(op: Operation) -> dict[str, dict]:
+    """Every datum a step of ``op`` leaves that a path names (``steps.<id>.<path>``), by its path below the step, with
+    its schema: the fields ``step_fields`` gives and, at any depth, those of an object among them — the line a step
+    adds to a cart (``item.unit_price``), the invoice of a sale (``invoice.total_amount``) —; never inside a list,
+    which no path names."""
+    schema = op.output.model_json_schema()
+    defs = schema.get("$defs", {})
+    found: dict[str, dict] = {}
+
+    def walk(fields: dict, prefix: str, seen: frozenset[str]) -> None:
+        for name, prop in fields.items():
+            path = f"{prefix}{name}"
+            found[path] = prop
+            for branch in (prop, *prop.get("anyOf", [])):
+                ref = branch.get("$ref")
+                inner = _resolve_ref(branch, defs).get("properties")
+                if inner and ref not in seen:
+                    walk(inner, f"{path}.", seen | {ref} if ref else seen)
+
+    walk(_step_fields(op, schema), "", frozenset())
+    return found
+
+
+def action_outputs(op: Operation) -> list[str]:
+    """What a step of ``op`` leaves for the next ones, by the path the engine resolves below the step (``step_data``):
+    its output's fields (a list's first row's), each object among them followed by what it holds (``item``,
+    ``item.unit_price``), never inside a list; and ``found`` and ``count`` for a read."""
+    names = list(step_data(op))
     if op.kind == "query":
         names += [name for name in ("found", "count") if name not in names]
     return names
@@ -279,6 +347,16 @@ def action_outputs(op: Operation) -> list[str]:
     input=CatalogIn,
     output=CatalogOut,
     ai={
+        "asks": {
+            "en": (
+                "what can my automations react to, and what can they do?",
+                "which events and actions can I use in an automation?",
+            ),
+            "es": (
+                "¿qué eventos y acciones puedo usar en una automatización?",
+                "¿a qué puede reaccionar una automatización en mi negocio?",
+            ),
+        },
         "description": "What an automation can start on and do in this business: the events of the active apps "
         "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for. "
         "One with `ask_first` only goes in an «Ask the assistant» step with «Ask me first»."
@@ -288,30 +366,34 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
     with translation.override(ctx.language):
         events = [
             {"name": name, "app": config.label, "app_name": str(config.verbose_name)}
-            for name, config in catalog_events().items()
+            for name, config in catalog_events(ctx.scope).items()
         ]
-        apps = active_apps()
+        apps = active_apps(ctx.scope)
         actions = [
             {
                 "name": name,
                 "kind": op.kind,
                 "app": op.app_label,
                 "app_name": str(apps[op.app_label].verbose_name),
-                "description": hub_assistant.description(op),
+                "description": description(op),
                 "fields": action_fields(op),
                 "outputs": action_outputs(op),
-                "assistant": hub_assistant.is_tool(op),
+                "assistant": hub_assistant.tools.is_tool(op),
                 "ask_first": asks_first(op),
             }
-            for name, op in ask_first_catalog().items()
+            for name, op in ask_first_catalog(ctx.scope).items()
         ]
+        off = [{"app": label, "app_name": str(config.verbose_name)} for label, config in off_apps(ctx.scope).items()]
     return {
         "events": sorted(events, key=lambda event: (event["app"], event["name"])),
         "actions": sorted(actions, key=lambda action: (action["app"], action["name"])),
+        "off_apps": sorted(off, key=lambda app: app["app"]),
     }
 
 
-def operation_problem(name: str, kind: str | None = None, *, asking: bool = False) -> tuple[str, str] | None:
+def operation_problem(  # noqa: PLR0911
+    scope: Scope, name: str, kind: str | None = None, *, asking: bool = False
+) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
     ``kind``, when given; for a step that asks first, ``asking``), or ``None`` when it may. A call's origin
     (``http:https://host``) is checked as an address."""
@@ -320,8 +402,11 @@ def operation_problem(name: str, kind: str | None = None, *, asking: bool = Fals
         if document.origin(address) != address:
             return "invalid_payload", str(BAD_HTTP_GRANT) % {"name": name}
         return None
-    op = grantable_operations().get(name)
+    op = grantable_operations(scope).get(name)
     if op is None:
+        off = _grantable_of(installed_apps()).get(name)
+        if off is not None:
+            return "invalid_payload", str(OFF_ACTION) % {"name": name, "app": _app_name(off.app_label)}
         return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
     if needs_a_person(op) and not (asking and asks_first(op)):
         message = ASK_FIRST_ONLY if kind is None and asks_first(op) else HIGH_RISK
@@ -376,7 +461,7 @@ def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps:
         op = registry.get(tool)
         if op is None or not filled:
             continue
-        said = {field["name"]: field for field in hub_assistant.card(op, filled, ctx.language, ctx)["fields"]}
+        said = {field["name"]: field for field in hub_assistant.cards.card(op, filled, ctx.language, ctx)["fields"]}
         for field in said.values():
             if field["kind"] == "money" and currency and "money" not in field:
                 field["money"] = {"currency": currency, "decimals": currency_decimals(currency)}
@@ -386,11 +471,11 @@ def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps:
     return rows
 
 
-def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
+def pinned_problem(scope: Scope, tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
     """Why the fixed data of an «Ask the assistant» step cannot be saved (the first reason), or ``None``: each is of a
     tool the step may use, names a datum that tool asks for and has a value."""
     for name, fixed in pinned.items():
-        op = grantable_operations().get(name)
+        op = grantable_operations(scope).get(name)
         if name not in tools or op is None:
             return str(PINNED_NOT_A_TOOL) % {"name": name}
         inputs = {field["name"] for field in action_fields(op)}
@@ -402,14 +487,19 @@ def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str |
     return None
 
 
-def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
+def catalog_problems(scope: Scope, trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:  # noqa: C901, PLR0912
     """What a document names that this business does not have, by field (``trigger.event``,
     ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
     person in front, ``invalid_payload`` otherwise."""
     problems: dict[str, str] = {}
     code = "invalid_payload"
-    if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events():
-        problems["trigger.event"] = str(UNKNOWN_EVENT) % {"name": trigger.event}
+    if trigger is not None and trigger.kind == "event" and trigger.event not in catalog_events(scope):
+        off = _events_of(installed_apps()).get(trigger.event)
+        problems["trigger.event"] = (
+            str(OFF_EVENT) % {"name": trigger.event, "app": str(off.verbose_name)}
+            if off is not None
+            else str(UNKNOWN_EVENT) % {"name": trigger.event}
+        )
     kept = None
     for index, step in enumerate(steps):
         if step.kind == "http":
@@ -426,20 +516,20 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
             continue
         if step.kind == "assistant":
             for name in step.tools:
-                problem = operation_problem(name, asking=step.mode == "ask")
-                if problem is None and not hub_assistant.is_tool(grantable_operations()[name]):
+                problem = operation_problem(scope, name, asking=step.mode == "ask")
+                if problem is None and not hub_assistant.tools.is_tool(grantable_operations(scope)[name]):
                     problem = ("invalid_payload", str(NOT_FOR_THE_ASSISTANT) % {"name": name})
                 if problem is not None:
                     problem_code, problems[f"steps.{index}.tools"] = problem
                     code = HIGH_RISK_CODE if problem_code == HIGH_RISK_CODE else code
                     break
-            problem = pinned_problem(step.tools, step.pinned or {})
+            problem = pinned_problem(scope, step.tools, step.pinned or {})
             if problem is not None:
                 problems[f"steps.{index}.pinned"] = problem
             continue
         if step.kind not in ("command", "query"):
             continue
-        problem = operation_problem(step.operation, step.kind)
+        problem = operation_problem(scope, step.operation, step.kind)
         if problem is not None:
             problem_code, problems[f"steps.{index}.operation"] = problem
             if problem_code == HIGH_RISK_CODE:
@@ -564,6 +654,18 @@ _FLOW_SORTS = {"name": (Lower("name"),)}
     input=FlowListIn,
     output=Page[FlowOut],
     ai={
+        "asks": {
+            "en": (
+                "what automations do I have?",
+                "which automations are switched on?",
+                "show me my automations and how their last run went",
+            ),
+            "es": (
+                "¿qué automatizaciones tengo?",
+                "¿cuáles de mis automatizaciones están encendidas?",
+                "enséñame las automatizaciones y cómo acabó la última vez",
+            ),
+        },
         "description": "The automations of this business («what automations do I have?»), each with what starts it, "
         "whether it is on, the permissions it still lacks and how its last run ended; search by name, event "
         "or action."
@@ -598,6 +700,16 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     input=FlowRefIn,
     output=FlowOut,
     ai={
+        "asks": {
+            "en": (
+                "what does the welcome automation do, and when does it start?",
+                "what permissions is the birthday automation missing?",
+            ),
+            "es": (
+                "¿qué hace la automatización de bienvenida, paso a paso?",
+                "dime los pasos y los permisos de la automatización de cumpleaños",
+            ),
+        },
         "description": "One automation by its id or its name («the welcome automation»): its trigger, its steps, "
         "the permissions it needs and the ones it lacks, and its last run."
     },
@@ -613,6 +725,16 @@ def flow_detail(ctx: OperationContext, data: FlowRefIn) -> dict:
     input=StatusIn,
     output=StatusOut,
     ai={
+        "asks": {
+            "en": (
+                "is there already an automation that listens to completed sales?",
+                "do I already have an automation for new appointments?",
+            ),
+            "es": (
+                "¿ya hay alguna automatización que escuche las ventas cobradas?",
+                "¿ya tengo montada alguna automatización para las citas nuevas?",
+            ),
+        },
         "description": "Is it already set up here? For one event and one action: how many automations start with "
         "the event and may run the action, how many of those are on, and how many listen to the event with "
         "no permission granted yet. Three numbers, no names."
@@ -646,6 +768,16 @@ def recipe_flow(ref: str, *, lock: bool = False) -> Flow | None:
     input=RecipeListIn,
     output=RecipeListOut,
     ai={
+        "asks": {
+            "en": (
+                "which ready-made automations can I turn on?",
+                "show me the recipes the apps bring",
+            ),
+            "es": (
+                "¿qué recetas de automatización traen mis apps?",
+                "enséñame las automatizaciones listas para usar",
+            ),
+        },
         "description": "The ready-made automations the active apps bring («fill the gap when a customer cancels»), "
         "with what each one does, the permissions it asks for and why, and, when it was turned on here, its "
         "automation, whether it is on, whether its app brings a newer version and what a repair would add; "
@@ -653,7 +785,7 @@ def recipe_flow(ref: str, *, lock: bool = False) -> Flow | None:
     },
 )
 def list_recipes(ctx: OperationContext, data: RecipeListIn) -> dict:
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(ctx.scope)
     mine = {flow.recipe: flow for flow in live_flows().exclude(recipe="")}
     rows = []
     with translation.override(ctx.language):
@@ -751,6 +883,7 @@ SECRETS_KEY_GONE = _(
 )
 CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
 CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
+CANCELLED_ERASED = _("Cancelled: the customer's personal data were erased.")
 ANSWERED_NO = _("Cancelled: %(who)s answered no to «%(title)s».")
 NOBODY_ANSWERED = _("Cancelled: nobody answered «%(title)s» in time.")
 ASSISTANT_ROUNDS = _("The assistant took its %(n)s turns without finishing, so it stopped.")
@@ -793,6 +926,7 @@ REASONS = {
     "flow.secrets_key_missing": SECRETS_KEY_GONE,
     "flow.paused": CANCELLED_PAUSED,
     "flow.deleted": CANCELLED_DELETED,
+    "flow.customer_erased": CANCELLED_ERASED,
     "flow.question_rejected": ANSWERED_NO,
     "flow.question_expired": NOBODY_ANSWERED,
     "flow.assistant_too_many_rounds": ASSISTANT_ROUNDS,
@@ -821,7 +955,23 @@ def action_label(op: Operation, language: str) -> str:
         return curated
     _app, entity, verb = ([*op.name.split(".", 2), "", ""])[:3]
     verb_word = words["verbs"].get(verb) or verb.replace("_", " ")
-    return f"{verb_word} · {hub_assistant.app_name(op)} ({entity.replace('_', ' ')})"
+    return f"{verb_word} · {hub_assistant.cards.app_name(op)} ({entity.replace('_', ' ')})"
+
+
+@operation(
+    "flow.operation.get",
+    kind="query",
+    permission=VIEW,
+    input=OperationRefIn,
+    output=OperationNameOut,
+    ai=INTERNAL,
+)
+def operation_name(ctx: OperationContext, data: OperationRefIn) -> dict:
+    """The label of a permission on a grant's card, as the History names that operation; no route and no assistant tool."""
+    op = registry.get(data.operation)
+    if op is None:
+        raise NotFound(str(UNKNOWN_ACTION) % {"name": data.operation})
+    return {"operation": op.name, "label": action_label(op, ctx.language)}
 
 
 def say(reason: dict, said: str = "") -> str:
@@ -950,6 +1100,17 @@ def run_row(run: FlowRun) -> dict[str, Any]:
     input=RunListIn,
     output=RunPageOut,
     ai={
+        "asks": {
+            "en": (
+                "what did the welcome automation do this week?",
+                "why did the birthday automation fail?",
+            ),
+            "es": (
+                "¿qué ha hecho la automatización de bienvenida esta semana?",
+                "¿por qué falló la automatización de cumpleaños?",
+                "¿qué ejecuciones de la automatización de recordatorios han fallado?",
+            ),
+        },
         "description": "What an automation did, the newest first: each run's status (finished well, stopped by a "
         "condition, stopped by an error, waiting, cancelled), each step and the reason of a failure; and how "
         "many runs failed («why did the welcome automation fail?»)."
@@ -988,6 +1149,16 @@ def run_label(run: FlowRun, language: str) -> str:
     input=RunRefIn,
     output=RunDetailOut,
     ai={
+        "asks": {
+            "en": (
+                "open that run and tell me which step failed",
+                "show me the details of this morning's run",
+            ),
+            "es": (
+                "¿en qué paso se paró esa ejecución y por qué?",
+                "dame el detalle de la ejecución de esta mañana",
+            ),
+        },
         "description": "One run by its id (its reference in the History): how it ended or where it waits, each step, "
         "the reason of a failure and whether it can be resumed; named by its automation and when it started."
     },
@@ -1020,6 +1191,16 @@ def draft_row(draft: Draft) -> dict[str, Any]:
     input=DraftListIn,
     output=Page[DraftOut],
     ai={
+        "asks": {
+            "en": (
+                "which drafts did the assistant leave me?",
+                "are there automation drafts waiting for me?",
+            ),
+            "es": (
+                "¿qué borradores me ha dejado el asistente?",
+                "¿hay borradores de automatizaciones pendientes?",
+            ),
+        },
         "description": "The automations the assistant proposed that are waiting for a person, the newest first."
     },
 )
@@ -1042,6 +1223,16 @@ def list_drafts(ctx: OperationContext, data: DraftListIn) -> dict:
     input=DraftRefIn,
     output=DraftOut,
     ai={
+        "asks": {
+            "en": (
+                "show me the draft you proposed",
+                "what doubts does the draft automation have?",
+            ),
+            "es": (
+                "enséñame el borrador que me propusiste",
+                "¿qué dudas tiene el borrador de la automatización?",
+            ),
+        },
         "description": "One draft the assistant proposed, by its id: its name, its steps, what it could not work out "
         "and whether it still waits, was used or was discarded."
     },
@@ -1086,6 +1277,16 @@ def sample_of(ctx: OperationContext, name: str) -> dict[str, Any]:
     input=SampleIn,
     output=SampleOut,
     ai={
+        "asks": {
+            "en": (
+                "what data does the sale event bring?",
+                "give me a real sample of the appointment confirmed event",
+            ),
+            "es": (
+                "¿qué datos trae el evento de una venta cobrada?",
+                "¿qué trae de verdad el evento de una cita confirmada?",
+            ),
+        },
         "description": "The last time an event really happened in this business, with what it brought."
     },
 )
@@ -1101,26 +1302,64 @@ YES = pgettext_lazy("datum", "Yes")
 NO = pgettext_lazy("datum", "No")
 
 
-def _is_money(name: str, prop: dict) -> bool:
-    """An amount in cents, as its schema declares it: the rule of the assistant's card (base/assistant.py)."""
-    return name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower()
+#: The mark of an amount in a currency of its own, not the one its step answers: the name of the datum beside it, a text
+#: its step leaves, that gives that currency (ISO 4217) — a charge preview's legal limits, in the euros the law writes
+#: them in whatever the business charges in (``json_schema_extra={"money": True, "currency_in": "limits_currency"}``,
+#: hub#926), as a payment's amount travels with its currency.
+CURRENCY_IN = "currency_in"
 
 
-def _money_paths(steps: list[dict]) -> frozenset[str]:
-    """The paths (``steps.<id>.<field>``) of the amounts in cents the steps' actions and reads declare they leave: their
-    output's schema (a read's first row). An event declares none."""
-    found: set[str] = set()
+def _is_money(prop: dict) -> bool:
+    """An amount, as its schema marks it (``json_schema_extra={"money": True}``): the mark the assistant's card reads
+    (``live.assistant.MONEY``, BASE-F97). Neither a name in ``_cents`` nor the words of a description («in cents») make
+    one (hub#498)."""
+    return prop.get(MONEY) is True
+
+
+#: The datum of a step's answer that gives the currency of its amounts (a payment in dollars), as BASE-F98 reads it.
+ANSWERED_CURRENCY = "currency"
+
+
+def _money_currencies(steps: list[dict]) -> dict[str, tuple[str | None, ...]]:
+    """The amounts the steps' actions and reads mark in what they leave (``step_data``: their output's schema, a
+    read's first row, and the objects inside), by path (``steps.<id>.<field>``, ``steps.<id>.item.unit_price``), each
+    with the paths of the data that give its currency, nearest first (``_currency_data``). An event declares none."""
+    found: dict[str, tuple[str | None, ...]] = {}
     for step in steps:
         op = registry.get(str(step.get("operation") or "")) if step.get("kind") in ("command", "query") else None
         if op is None:
             continue
-        schema = op.output.model_json_schema()
-        defs = schema.get("$defs", {})
-        props = schema.get("properties", {})
-        if op.kind == "query" and "rows" in props:
-            props = _resolve_ref(props["rows"].get("items", {}), defs).get("properties", {})
-        found |= {f"steps.{step.get('id')}.{name}" for name, prop in props.items() if _is_money(name, prop)}
-    return frozenset(found)
+        for name, prop in step_data(op).items():
+            if _is_money(prop):
+                path = f"steps.{step.get('id')}.{name}"
+                found[path] = _currency_data(path, prop)
+    return found
+
+
+def _currency_data(path: str, prop: dict) -> tuple[str | None, ...]:
+    """The paths of the data that give the currency of the amount at ``path``, nearest first: the one its mark names
+    beside it (``CURRENCY_IN``), alone; else the ``ANSWERED_CURRENCY`` of the object that holds it (a cart's line in
+    dollars), then of each one around it up to its step's answer, and ``None`` last: the business's — as the
+    assistant's card says an amount nested in an object (BASE-F97)."""
+    holders = path.split(".")[:-1]
+    if own := prop.get(CURRENCY_IN):
+        return (".".join([*holders, own]),)
+    around = (".".join([*holders[:depth], ANSWERED_CURRENCY]) for depth in range(len(holders), 1, -1))
+    return (*around, None)
+
+
+def _money_paths(steps: list[dict]) -> frozenset[str]:
+    """The paths (``steps.<id>.<field>``, ``steps.<id>.item.unit_price``) of the amounts the steps' actions and reads
+    mark in what they leave."""
+    return frozenset(_money_currencies(steps))
+
+
+def _answered_currency(data: dict, datum: str) -> str | None:
+    """The currency the datum at ``datum`` answers in ``data`` — a ``currency`` (a payment in dollars, an invoice in the
+    one it was issued in), as the assistant's card says an amount of a read (BASE-F98), or the one an amount's mark
+    names (``CURRENCY_IN``) —; ``None`` when there is none."""
+    currency = document.lookup(datum, data)[1]
+    return currency if isinstance(currency, str) and currency else None
 
 
 #: The hour JSON gives (``21:30:00``); one without its seconds (``21:00``) is how an app writes it for a person.
@@ -1147,14 +1386,22 @@ def _moment_words(text: str, language: str) -> str | None:
     return format_time(when.replace(tzinfo=None), "short", locale=locale)
 
 
-def words_for(steps: list[dict], language: str, scope: Scope) -> document.Say:
+def words_for(steps: list[dict], language: str, scope: Scope, data: dict | None = None) -> document.Say:
     """How a text a person reads — a question (FLOW-F28), a message to a customer (FLOW-F31) — says each datum it
     inserts, as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», an ISO day, hour or instant as
-    ``language`` writes it at the business's hour, and an amount the step that left it declares in cents in the
-    business's currency; anything else as it is. An event declares no schema: a number it brings is never guessed as
+    ``language`` writes it at the business's hour, and an amount the schema of the step that left it marks as money —
+    on its answer or inside an object of it — in the currency the object that holds it answers in ``data``, else its
+    step, else the business (``_currency_data``) — one in a currency of its own (``CURRENCY_IN``), only in the one its
+    datum gives —; anything else as it is. An event declares no schema: a number it brings is never guessed as
     money."""
-    money = _money_paths(steps)
-    currency = functools.cache(lambda: _currency(scope))
+    money = _money_currencies(steps)
+    business = functools.cache(lambda: _currency(scope))
+
+    def currency(path: str) -> str | None:
+        for datum in money[path]:
+            if code := (business() if datum is None else _answered_currency(data or {}, datum)):
+                return code
+        return None
 
     def say(path: str, value: Any) -> str:
         if isinstance(value, bool):
@@ -1162,8 +1409,8 @@ def words_for(steps: list[dict], language: str, scope: Scope) -> document.Say:
                 return str(YES if value else NO)
         if isinstance(value, str):
             return _moment_words(value, language) or value
-        if isinstance(value, int) and path in money and currency():
-            return money_text(value, currency(), language=language)
+        if isinstance(value, int) and path in money and (code := currency(path)):
+            return money_text(value, code, language=language)
         return str(value)
 
     return say
@@ -1272,12 +1519,22 @@ def _try_call(step: Any, values: dict, grants: list[str], unknown_steps: set[str
     input=TestIn,
     output=TestOut,
     ai={
+        "asks": {
+            "en": (
+                "try the welcome automation without doing anything for real",
+                "test the birthday automation without it doing anything for real",
+            ),
+            "es": (
+                "prueba la automatización de bienvenida sin que haga nada de verdad",
+                "simula qué haría la automatización de cumpleaños con la última venta",
+            ),
+        },
         "description": "Try an automation without effects: walk its steps against the last time its event really "
         "happened here and say, step by step, what it would do, what would come out empty, what the action "
         "would refuse, where a condition would stop it and what it is not allowed yet. Executes nothing."
     },
 )
-def try_flow(ctx: OperationContext, data: TestIn) -> dict:
+def try_flow(ctx: OperationContext, data: TestIn) -> dict:  # noqa: C901, PLR0912, PLR0915
     grants = resolve_flow(data.id, None).grants if data.id is not None else []
     try:
         tried = TestDocumentIn.model_validate_json(data.document)
@@ -1297,9 +1554,9 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         else []
     )
     stopped = bool(trigger_failed)
-    operations = catalog_operations()
+    operations = catalog_operations(ctx.scope)
     # What a person would read is said as the person trying it reads it (who saves it, in their language).
-    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope)
+    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values)
     unknown_steps: set[str] = set()
     steps = []
     for step in tried.steps:
@@ -1364,7 +1621,7 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
             step.params, values, unknown_steps, say=say, person=PERSON_PARAMS.get(step.operation, ())
         )
         out |= {"params": mapped, "empty": empty, "unknown": unknown}
-        grantable = grantable_operations().get(step.operation)
+        grantable = grantable_operations(ctx.scope).get(step.operation)
         if grantable is not None and needs_a_person(grantable):
             steps.append(out | {"outcome": "high_risk"})
         elif op is None or op.kind != step.kind:
@@ -1410,7 +1667,7 @@ def proposal_held(run: FlowRun) -> dict | None:
     return (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
 
 
-def proposal_of(question: Question) -> tuple[Operation, dict] | None:
+def proposal_of(scope: Scope, question: Question) -> tuple[Operation, dict] | None:
     """The change the assistant wants that ``question`` waits on — its action and what a yes would send, with what its
     step fixes today put in (FLOW-F36: also a change proposed before its app fixed it) —, or ``None``: an «Ask someone
     first» question, or a change whose action is gone, has none (``proposal_held``)."""
@@ -1449,14 +1706,14 @@ def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
         "action": "",
         "fields": [],
     }
-    proposal = proposal_of(question)
+    proposal = proposal_of(ctx.scope, question)
     if proposal is None:
         return row
     op, arguments = proposal
     with translation.override(ctx.language):
-        title = str(ASSISTANT_WANTS) % {"app": hub_assistant.app_name(op)}
+        title = str(ASSISTANT_WANTS) % {"app": hub_assistant.cards.app_name(op)}
         action = action_label(op, ctx.language)
-    fields = hub_assistant.card(op, arguments, ctx.language, ctx)["fields"]
+    fields = hub_assistant.cards.card(op, arguments, ctx.language, ctx)["fields"]
     return row | {"title": title[:300], "action": action, "fields": fields}
 
 
@@ -1467,6 +1724,16 @@ def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
     input=QuestionListIn,
     output=QuestionPageOut,
     ai={
+        "asks": {
+            "en": (
+                "what questions are the automations waiting for me to answer?",
+                "is any automation waiting for my answer?",
+            ),
+            "es": (
+                "¿qué preguntas de las automatizaciones tengo pendientes?",
+                "¿alguna automatización espera mi respuesta?",
+            ),
+        },
         "description": "«Waiting for your answer»: the questions automations asked and are waiting on that this person may "
         "answer (their role's, or all of them for whoever runs the business), the soonest to expire first, "
         "up to 100."
@@ -1489,6 +1756,16 @@ def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
     input=QuestionRefIn,
     output=QuestionOut,
     ai={
+        "asks": {
+            "en": (
+                "show me that automation's question",
+                "what exactly is the automation asking me?",
+            ),
+            "es": (
+                "¿qué me pregunta exactamente la automatización?",
+                "enséñame la pregunta que está esperando",
+            ),
+        },
         "description": "One question an automation asked and is waiting on, by its id, as «Waiting for your answer» "
         "shows it: what it asks, its details, the change of the assistant it waits on, if any, and until when. Only "
         "the role it was asked of, or whoever runs the business."
@@ -1527,6 +1804,16 @@ def secret_row(secret: Secret) -> dict[str, Any]:
     input=SecretListIn,
     output=SecretPageOut,
     ai={
+        "asks": {
+            "en": (
+                "which secrets can my automations use?",
+                "what secret names are saved for automations?",
+            ),
+            "es": (
+                "¿qué secretos tienen guardados las automatizaciones?",
+                "dime los nombres de los secretos de las automatizaciones",
+            ),
+        },
         "description": "The NAMES of the secrets the automations' calls to other systems can use (never their "
         "values, which nothing gives back), and whether this server can keep secrets."
     },

@@ -1,27 +1,27 @@
 <script setup lang="ts">
 // PAYMENT-F02 «Registrar un pago»: «New payment» with the old panel's Method (the active ones, live),
 // Date (today), Amount, Beneficiary and Concept, plus the Beneficiary IBAN and the Supplier invoice,
-// and «Record payment» (`payment.payment.create`). The methods read has three states, told apart (the
-// old payments#24): loading (the picker waits), could not be read (a notice with Retry), none yet (a
+// and «Record payment» (`payment.payment.create`). The methods read has three states, told apart:
+// loading (the picker waits), could not be read (a notice with Retry), none yet (a
 // notice with «Go to Methods»). The amount is read as a person writes it (`parseMoney`), in the business's currency
-// and with its decimals (the field says which: «Amount (PLN)»); the server records the payment in that currency
-// (the old payments#35). Until the business answers, «Record payment» waits: what was typed is read in its currency
-// then, never guessed (hub#325). One that is not an amount, or is 0, is refused under the field before asking the
-// server. The server's refusals stay
-// in the form, under their field, with what was typed (the old pm#513). The attempt key is born with
+// and with its decimals (the field says which: «Amount (PLN)»); the server records the payment in that currency.
+// Until the business answers, «Record payment» waits: what was typed is read in its currency
+// then, never guessed (hub#325); if that read fails, the window says so with «Retry» (hub#938). One that is not an
+// amount, or is 0, is refused under the field before asking the server. The server's refusals stay
+// in the form, under their field, with what was typed. The attempt key is born with
 // each opening and travels on every send of it: a retry after a lost answer records one payment, never
-// two (the old payments#8); the next «New payment» is another attempt.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+// two; the next «New payment» is another attempt.
+import { FormModal, InlineFeedback, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useT } from '../composables/useT';
 import { localDay, useBusinessMoney } from '../lib/format';
-import { parseMoney } from '../lib/money';
 import type { PaymentOut } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ created: [payment: PaymentOut] }>();
@@ -83,7 +83,7 @@ function amountError(fieldErrors: Readonly<Record<string, string>>): string | un
 async function save(): Promise<void> {
   tried.value = true;
   if (!money.value) return; // The business has not answered: its currency's decimals are unknown.
-  const read = parseMoney(form.value.amount, money.value);
+  const read = parseMoney(form.value.amount, { money: money.value });
   if (!read.ok) return; // The field says why.
   if (read.cents === null || read.cents <= 0) {
     notPositive.value = true;
@@ -113,11 +113,14 @@ function goToMethods(): void {
   open.value = false;
   void router.push('/payment/methods');
 }
+
+const canDismiss = useUnsavedFormOnOpen('payment-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-form"
     :title="$t('payment.payments.form.title')"
     :submit-label="$t('payment.payments.form.submit')"
@@ -128,6 +131,7 @@ function goToMethods(): void {
   >
     <template #default="{ fieldErrors }">
       <div class="payment-form">
+        <BusinessMoneyError />
         <InlineFeedback
           v-if="failed"
           tone="danger"
@@ -164,6 +168,7 @@ function goToMethods(): void {
         </InlineFeedback>
         <ion-select
           data-testid="payment-form-method"
+          name="method_id"
           :value="form.methodId"
           :label="$t('payment.payments.form.method')"
           :placeholder="loading ? $t('payment.loading') : $t('payment.payments.form.methodPlaceholder')"
@@ -186,6 +191,7 @@ function goToMethods(): void {
         </ion-select>
         <ion-input
           data-testid="payment-form-date"
+          name="payment_date"
           type="date"
           :value="form.date"
           :label="$t('payment.payments.form.date')"
@@ -199,7 +205,9 @@ function goToMethods(): void {
         />
         <MoneyInput
           testid="payment-form-amount"
+          name="amount"
           :model-value="form.amount"
+          :money="money"
           :label="money ? t('payment.payments.form.amountIn', { currency: money.currency }) : t('payment.payments.form.amount')"
           :error-text="amountError(fieldErrors)"
           :show-error="tried"
@@ -207,6 +215,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-beneficiary"
+          name="beneficiary_name"
           :value="form.beneficiary"
           :label="$t('payment.payments.form.beneficiary')"
           label-placement="floating"
@@ -219,6 +228,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-concept"
+          name="concept"
           :value="form.concept"
           :label="$t('payment.payments.form.concept')"
           label-placement="floating"
@@ -231,6 +241,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-iban"
+          name="beneficiary_iban"
           :value="form.iban"
           :label="$t('payment.payments.form.iban')"
           label-placement="floating"
@@ -244,6 +255,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-invoice"
+          name="supplier_invoice_ref"
           :value="form.invoice"
           :label="$t('payment.payments.form.invoice')"
           label-placement="floating"

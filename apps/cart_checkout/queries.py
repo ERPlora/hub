@@ -174,7 +174,7 @@ def find_cart(
 
 def find_item(item_id: UUID, *, lock: bool = False) -> CartItem:
     """A line of a cart that is not deleted."""
-    found = CartItem.objects.filter(pk=item_id, cart__deleted_at__isnull=True)
+    found = CartItem.objects.select_related("cart").filter(pk=item_id, cart__deleted_at__isnull=True)
     item = (found.select_for_update(of=("self",)) if lock else found).first()
     if item is None:
         raise NotFound(str(ITEM_NOT_FOUND), code="cart_checkout.item_not_found")
@@ -215,6 +215,7 @@ def cart_row(cart: Cart) -> dict:
 
 
 def item_row(item: CartItem) -> dict:
+    """A line as the operations give it, with its cart's currency: the one its price and its total are in."""
     return {
         "id": item.id,
         "cart_id": item.cart_id,
@@ -224,6 +225,8 @@ def item_row(item: CartItem) -> dict:
         "quantity": item.quantity,
         "unit_price": item.unit_price,
         "line_total": item.line_total,
+        "currency": item.cart.currency,
+        "currency_decimals": currency_decimals(item.cart.currency),
         "variant_attributes": item.variant_attributes,
         "created_at": item.created_at,
         "updated_at": item.updated_at,
@@ -296,6 +299,18 @@ def _containing(**fragments) -> dict:
     output=CartPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the open shopping carts",
+                "which online baskets were abandoned this week?",
+                "list the customers' carts that became orders",
+            ),
+            "es": (
+                "¿qué carritos de la tienda online siguen abiertos?",
+                "enséñame las cestas abandonadas de esta semana",
+                "lista los carritos de compra que acabaron en pedido",
+            ),
+        },
         "description": "List the shopping carts of the internal cart notebook (not the till's tickets) with their "
         "session code, customer's email and name, status (active, abandoned, converted, expired), items and "
         "total in minor units. Search by code, email or name.",
@@ -347,6 +362,18 @@ def list_carts(ctx: OperationContext, params: CartListIn) -> dict:
     output=CartDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what's in Carmen's shopping cart and how much is it?",
+                "show me the whole basket of session sess_a1b2c3",
+                "open the cart of nuria@example.com, every line of it",
+            ),
+            "es": (
+                "¿qué lleva el carrito de Carmen y cuánto suma?",
+                "enséñame entera la cesta de la sesión sess_a1b2c3",
+                "dame el carrito de nuria@example.com con todo lo que lleva",
+            ),
+        },
         "description": "Get one shopping cart with all its lines (product, quantity, unit price, line total), "
         "named by its session code, by its customer's email or name, or by its id.",
         "risk": "normal",
@@ -368,6 +395,18 @@ def get_cart(ctx: OperationContext, data: CartRefIn) -> dict:
     output=ItemPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which products are in Carmen's web basket?",
+                "list the lines of cart sess_a1b2c3 with their prices",
+                "which products did Nuria leave in her cart?",
+            ),
+            "es": (
+                "¿qué productos hay en la cesta web de Carmen?",
+                "lista las líneas del carrito sess_a1b2c3 con sus precios",
+                "¿cuántas unidades de cada producto lleva el carrito de Nuria?",
+            ),
+        },
         "description": "List the lines of one shopping cart (named by its session code or id): product reference "
         "and name, SKU, quantity, unit price and line total in minor units.",
         "risk": "normal",
@@ -375,7 +414,7 @@ def get_cart(ctx: OperationContext, data: CartRefIn) -> dict:
 )
 def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     cart = find_cart(params.cart_id, params.session_token)
-    items = CartItem.objects.filter(cart=cart)
+    items = cart.items.all()  # Its lines know their cart (its currency): no read of it per line.
     if params.search and params.search.strip():
         text = params.search.strip()
         items = items.filter(
@@ -406,6 +445,16 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     output=ItemOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "at what price was the shampoo kept in Carmen's cart?",
+                "show me one line of the web basket with its quantity",
+            ),
+            "es": (
+                "¿a qué precio quedó guardado el champú en el carrito de Carmen?",
+                "enséñame una línea de la cesta web con su cantidad",
+            ),
+        },
         "description": "Get one line of a shopping cart by its id, with its quantity and the unit price kept on it.",
         "risk": "normal",
     },
@@ -425,6 +474,16 @@ def get_item(ctx: OperationContext, data: ItemRefIn) -> dict:
     output=OrderPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which online purchases are waiting to be paid?",
+                "list what the online shop sold this week",
+            ),
+            "es": (
+                "¿qué pedidos web siguen pendientes?",
+                "lista los pedidos de la tienda online de esta semana",
+            ),
+        },
         "description": "List the orders made from shopping carts with their number (OS-YYYYMMDD-NNNN), email, "
         "status (initiated, paid, failed, completed), payment method and total in minor units. They are not "
         "the till's sales and nothing in them is fiscal.",
@@ -476,6 +535,16 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     output=OrderOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what status is OS-20261014-0003 in?",
+                "give me the shipping address of what Carmen bought online",
+            ),
+            "es": (
+                "¿en qué estado está OS-20261014-0003?",
+                "dame la dirección de envío de la compra online de Carmen",
+            ),
+        },
         "description": "Get one order with everything it has (addresses, shipping and payment methods, dates, "
         "notes, why it failed), named by its number (OS-20261014-0003) or its id.",
         "risk": "normal",

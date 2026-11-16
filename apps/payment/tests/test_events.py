@@ -11,6 +11,10 @@ from live.operations import NAME_RE
 
 from apps.payment import events
 
+from .conftest import HUB_DB, A
+
+pytestmark = HUB_DB
+
 #: A fact in the past: «-ed», or «sent» (irregular, the old module's own word).
 PAST_FACT = re.compile(r"^payment\.(payment|method)\.([a-z_]+ed|sent)$")
 
@@ -66,8 +70,8 @@ def test_it_listens_to_nobody():
 
 def test_automations_offer_every_event_as_a_trigger():
     """What the app declares is what an automation can start with (PAYMENT-F07; the old module declared
-    nothing, so its events never reached the catalogue: payments#16)."""
+    nothing, so its events never reached the catalogue)."""
     from apps.flow.queries import catalog_events
 
-    offered = {name for name, config in catalog_events().items() if config.label == "payment"}
+    offered = {name for name, config in catalog_events(A).items() if config.label == "payment"}
     assert offered == set(declared().values())

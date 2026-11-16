@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Taxes → Settings (TAX-F11, pm#629 VF-17; the WORKBOOK's «Ajustes»): «Your business's tax region». The
+// Taxes → Settings (TAX-F11; the WORKBOOK's «Ajustes»): «Your business's tax region». The
 // country is the business's (`tax.settings.get`, read only: it is the one of its ERPlora account); «Tax
 // region» picks one of its territories with taxes of their own — the Canary Islands (IGIC), Ceuta or Melilla
 // (IPSI) — or the whole country (VAT), and «Save» keeps it. From then on every sale and invoice charges the
@@ -13,7 +13,7 @@ import { IonButton, IonNote, IonSelect, IonSelectOption, IonSpinner } from '@ion
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { countryLabel } from '../lib/countries';
+import { countryLabel, countryName } from '../lib/countries';
 import { taxTabs } from '../tabs';
 
 /** The i18n key of each region with taxes of its own; a code without one reads as itself. */
@@ -57,6 +57,12 @@ const regions = computed(() =>
   })),
 );
 const regionError = computed(() => saveError.value?.fields?.region_code);
+// Only Spain has territories with taxes of their own: elsewhere the help says there are none (hub#996).
+const regionHelp = computed(() =>
+  regions.value.length || !settings.value
+    ? t('tax.settings.regionHelp')
+    : t('tax.settings.noRegionsHelp', { country: countryName(settings.value.country_code, locale.value) }),
+);
 
 async function save(): Promise<void> {
   if (chosen.value === undefined || locked.value || !dirty.value) return;
@@ -169,7 +175,7 @@ async function save(): Promise<void> {
             </ion-select-option>
           </ion-select>
           <ion-note data-testid="tax-settings-region-help">
-            {{ $t('tax.settings.regionHelp') }}
+            {{ regionHelp }}
           </ion-note>
         </div>
 

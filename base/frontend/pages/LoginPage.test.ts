@@ -1,6 +1,3 @@
-// «Access» (`/login`, BASE-G52, G55, G56, G57, G58): the door of a browser without a session. On a shared device of the
-// hub of a business that asks, the PIN pad (faces, PIN, badge) and «Account»; elsewhere only «Enter with your account»
-// (erplora.com's sign-in for this hub). What happened (the session ended, another device's entry ended it) on top.
 import { ApiError } from '@erplora/ui/sdk';
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -122,7 +119,7 @@ describe('LoginPage — the PIN pad of a shared till', () => {
   });
 });
 
-describe('LoginPage — a link with a fragment (BASE-G52)', () => {
+describe('LoginPage — a link with a fragment', () => {
   it('a right PIN goes back to the tab the link named', async () => {
     access.enterWith.mockResolvedValue('/settings#data');
     const { wrapper, press } = await login([PIN_DOOR], '/login?next=%2Fsettings#data');
@@ -186,8 +183,8 @@ describe('LoginPage — what happened', () => {
     expect(notice.get('[data-testid="access-upgrade"]').attributes('href')).toBe('https://erplora.example/store/plans');
   });
 
-  // «Upgrade plan» sells, and everything that sells is web only (surface.ts; BASE-F11): in the installed app, where
-  // the link opened nothing (gh:hub#439), the notice says why without it.
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the notice says why
+  // without it.
   it('«Upgrade plan» sells: never on the app surfaces, where the notice still says why', async () => {
     applySurface('mobile');
     try {

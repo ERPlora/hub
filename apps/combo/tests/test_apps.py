@@ -6,6 +6,7 @@ from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_
 from live.operations import INTERNAL, registry
 
 from apps.combo import queries, services  # noqa: F401  (importing them registers the operations)
+from base import assistant
 
 PERMISSIONS = ["combo.view", "combo.manage"]
 QUERIES = {
@@ -15,11 +16,12 @@ QUERIES = {
     "combo.combo.resolve",
     # The menu's image (COMBO-F14).
     "combo.combo.suggest_image",
-    # What names a dish on the assistant's card (hub#561): the model reads them with their menu.
+    # What names a dish (hub#561) and a course (hub#669) on the assistant's card: the model reads them with their menu.
     "combo.option.get",
+    "combo.group.get",
 }
 #: The reads that are no assistant tool.
-INTERNAL_READS = {"combo.option.get"}
+INTERNAL_READS = {"combo.option.get", "combo.group.get"}
 COMMANDS = {
     "combo.combo.create",
     "combo.combo.update",
@@ -36,7 +38,14 @@ COMMANDS = {
     "combo.option.drop_product",
     "combo.combo.set_image",
     "combo.combo.upload_image",
+    # A menu, and a course, made again from a separate copy (BASE-F114, COMBO-F15).
+    "combo.combo.recover",
+    "combo.group.recover",
 }
+#: What only the platform runs: the reaction to Inventory's deletion and the recovery from a separate copy.
+SYSTEM_ONLY = {"combo.option.drop_product", "combo.combo.recover", "combo.group.recover"}
+#: What only the recovery from a separate copy runs: no tool.
+RECOVERY_ONLY = {"combo.combo.recover", "combo.group.recover"}
 # What the assistant confirms before running: whatever deletes, and a menu's change, which may change how
 # it is billed (eaten in or to take away, its VAT category): the risk is per operation, not per field.
 HIGH_RISK = {
@@ -45,6 +54,24 @@ HIGH_RISK = {
     "combo.group.delete",
     "combo.option.delete",
     "combo.option.drop_product",
+}
+#: The writes of the assistant whose record is the menu, said by its id or by its name: each one checks it with the
+#: menu's read before its card (hub#1217), so a name two menus fit or none has draws no card.
+CHECKED_BY_THE_MENU = {
+    "combo.combo.delete",
+    "combo.combo.set_image",
+    "combo.combo.update",
+    "combo.group.reorder",
+}
+#: The writes of the assistant whose record is a course, or a choice, said by its id or by its name inside its menu:
+#: each one checks it with that record's own read (hub#1231) — the menu's would read a course's id as a menu's.
+CHECKED_BY_THE_COURSE = {"combo.group.delete", "combo.group.update"}
+CHECKED_BY_THE_CHOICE = {"combo.option.delete", "combo.option.update"}
+#: The read each write checks its record with before its card.
+CHECKS = {
+    **dict.fromkeys(CHECKED_BY_THE_MENU, "combo.combo.get"),
+    **dict.fromkeys(CHECKED_BY_THE_COURSE, "combo.group.get"),
+    **dict.fromkeys(CHECKED_BY_THE_CHOICE, "combo.option.get"),
 }
 
 
@@ -134,13 +161,20 @@ def test_the_operations_of_the_app():
 
 def test_every_operation_tells_the_assistant_what_it_does():
     operations = combo_operations()
-    assert {name for name, op in operations.items() if op.ai is INTERNAL} == INTERNAL_READS
+    assert {name for name, op in operations.items() if op.ai is INTERNAL} == INTERNAL_READS | RECOVERY_ONLY
     for name, op in operations.items():
-        if name in INTERNAL_READS:
+        if name in INTERNAL_READS | RECOVERY_ONLY:
             continue
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        # What a person types to ask for it (``asks``, hub#1091): combo is listed in LIVE_ASSISTANT_ASKS_REQUIRED. The
+        # upload of the form's own photo and the reaction to Inventory's deletion declare ``ai`` and are no tool.
+        if assistant.tools.is_tool(op):
+            expected.add("asks")
+        if name in CHECKS:
+            expected.add("check")
+            assert op.ai["check"] == CHECKS[name], name
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
@@ -164,20 +198,19 @@ def test_every_input_field_is_described_for_the_assistant():
 
 def test_every_operation_but_the_reaction_is_open_to_api_keys():
     exposed = {name for name, op in combo_operations().items() if op.expose_api}
-    assert exposed == (QUERIES | COMMANDS) - {"combo.option.drop_product"} - INTERNAL_READS
+    assert exposed == (QUERIES | COMMANDS) - SYSTEM_ONLY - INTERNAL_READS
 
 
 def test_reading_needs_view_and_writing_needs_manage():
     for name, op in combo_operations().items():
-        if name == "combo.option.drop_product":
+        if name in SYSTEM_ONLY:
             continue
         assert op.permission == (
             "combo.view" if op.kind == "query" else "combo.manage"
         ), name
 
 
-def test_the_reaction_is_run_only_by_the_platform():
-    # No role holds the system permission: no person and no API key reaches the reaction.
-    op = registry["combo.option.drop_product"]
-    assert op.permission == "combo.system"
+def test_the_reaction_and_the_recovery_are_run_only_by_the_platform():
+    # No role holds the system permission: no person and no API key reaches them.
+    assert {name: registry[name].permission for name in SYSTEM_ONLY} == dict.fromkeys(SYSTEM_ONLY, "combo.system")
     assert "combo.system" not in combo_app().permissions

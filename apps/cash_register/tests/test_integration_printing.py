@@ -13,6 +13,7 @@ from live.operations import registry
 
 from apps.cash_register.models import Session
 from apps.cash_register.tests.conftest import (
+    HUB_DB,
     charge,
     ctx_for,
     open_session,
@@ -20,7 +21,7 @@ from apps.cash_register.tests.conftest import (
 )
 from apps.printing.models import PrintJob
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def print_report(session, ctx=None):

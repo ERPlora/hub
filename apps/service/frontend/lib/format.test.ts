@@ -1,10 +1,10 @@
 // How the service screens paint money, rates and dates, with the page language's own format (Intl): minor
 // units in the business's currency (flow service-business-currency: its country's, with the decimals the
-// server counts it in, never the browser's Intl; a figure without a symbol until it answers, never the euro by
+// server counts it in, never the browser's Intl; a dash until it answers, never the euro by
 // default), a discount in basis points as the language writes a percentage, and a day.
 import { describe, expect, it } from 'vitest';
 
-import { decimalMark, formatDate, formatMoney, formatPercentBp, type Money, moneyDecimals, percentFieldText, readPercentBp } from './format';
+import { formatDate, formatMoney, formatPercentBp, type Money, percentFieldText, readPercentBp, sessionsAndDays } from './format';
 
 const plain = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -28,7 +28,7 @@ describe('formatMoney', () => {
     expect(formatMoney(123456789, 'es', EUR)).toMatch(/^1\.234\.567,89\s€$/);
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
     expect(formatMoney(1500, 'es', JPY)).toMatch(/^1\.500\s¥$/);
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(formatMoney(99999, 'es', EUR)).toMatch(/^999,99\s€$/);
   });
 
@@ -42,22 +42,9 @@ describe('formatMoney', () => {
     expect(plain(formatMoney(1350, 'es', HUF))).toBe('13,50 Ft');
   });
 
-  it('is a figure without a symbol until the business answers: never a euro by default', () => {
-    expect(formatMoney(2250, 'es')).toBe('22,50');
-    expect(formatMoney(2250, 'en')).toBe('22.50');
-  });
-});
-
-describe('moneyDecimals', () => {
-  it('is the business currency’s, two while it is unknown', () => {
-    expect([moneyDecimals(PLN), moneyDecimals(JPY), moneyDecimals(undefined)]).toEqual([2, 0, 2]);
-  });
-});
-
-describe('decimalMark', () => {
-  it('is the comma in Spanish and the point in English', () => {
-    expect(decimalMark('es')).toBe(',');
-    expect(decimalMark('en')).toBe('.');
+  it('is a dash until the business answers: never a euro by default', () => {
+    expect(formatMoney(2250, 'es')).toBe('—');
+    expect(formatMoney(2250, 'en')).toBe('—');
   });
 });
 
@@ -88,5 +75,21 @@ describe('formatDate', () => {
     expect(formatDate('2026-10-13T10:00:00Z', 'es', 'UTC')).toBe('13 oct 2026');
     expect(formatDate('2026-10-13T10:00:00Z', 'en', 'UTC')).toBe('Oct 13, 2026');
     expect(formatDate(null, 'en')).toBe('');
+  });
+});
+
+// hub#1147: what a courtesy or a correction moved, each count with vue-i18n's own singular or plural, never «(s)».
+describe('sessionsAndDays', () => {
+  const said: Record<string, string> = {
+    'service.counts.sessions|1': '1 session',
+    'service.counts.sessions|2': '2 sessions',
+    'service.counts.days|1': '1 day',
+    'service.counts.days|30': '30 days',
+  };
+  const t = (key: string, named?: Record<string, unknown>) => said[`${key}|${String(named?.count)}`] ?? `?${key}`;
+
+  it('asks the catalogue for each count by `count`, so each one picks its own form', () => {
+    expect(sessionsAndDays(t, 1, 30)).toEqual({ sessions: '1 session', days: '30 days' });
+    expect(sessionsAndDays(t, 2, 1)).toEqual({ sessions: '2 sessions', days: '1 day' });
   });
 });

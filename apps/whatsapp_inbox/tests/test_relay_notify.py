@@ -16,13 +16,10 @@ number; any other change of status (cancelled, no-show…) tells nobody.
 
 import datetime as dt
 import json
-import threading
 
 import httpx
 import pytest
 import respx
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -32,14 +29,12 @@ from apps.customer.models import Customer
 from apps.flow.models import FlowRun
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import B, NOW, card, connect, ctx_for, receive, run, system, template
-from base import catalog, worker
-from base.catalog import RegisterResult
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, A, B, card, connect, ctx_for, receive, run, template
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB_COMMITTED
 
 SEND = "http://saas.test/internal/whatsapp/send"
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 REF = "whatsapp_inbox/appointment_confirmed"
 ANA = "+34600111222"
 #: The approved Utility template the recipe goes with after the customer's 24 hours.
@@ -52,47 +47,26 @@ FRIDAY = (NOW + dt.timedelta(days=1)).date()
 
 
 @pytest.fixture
-def tick(monkeypatch, django_capture_on_commit_callbacks):
-    """One turn of the worker's real loop, without the SaaS's catalogue and, inside the test's transaction,
-    without releasing its connection; what the run leaves for after its COMMIT (the delivery) runs too."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def run_once() -> None:
-        stop = threading.Event()
-        now = timezone.now()
-
-        def wait(seconds: float) -> bool:
-            stop.set()
-            return True
-
-        with django_capture_on_commit_callbacks(execute=True):
-            assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now + dt.timedelta(seconds=1)) == 0
-
-    return run_once
-
-
-@pytest.fixture
 def door():
     with respx.mock(assert_all_called=False) as mock:
         yield mock.post(SEND).mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
 
 
-def salon(phone: str = "600111222", *, minutes_ago: int = 10, templates=(CONFIRMED,), **channel):
-    """The owner's business: its number connected, Lucía's conversation (her last message ``minutes_ago``), her card
-    made by Customers, a pending appointment of hers with Ana and the inbox's automation turned on."""
-    connect(templates=list(templates), **channel)
-    receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=minutes_ago)).isoformat())
-    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": phone}, ctx_for("hub_owner"))
-    run("flow.recipe.enable", {"recipe": REF}, ctx_for("hub_owner"))
+def salon(phone: str = "600111222", *, minutes_ago: int = 10, templates=(CONFIRMED,), scope=A, **channel):
+    """The owner's business ``scope``: its number connected, Lucía's conversation (her last message ``minutes_ago``),
+    her card made by Customers, a pending appointment of hers with Ana and the inbox's automation turned on."""
+    connect(templates=list(templates), scope=scope, **channel)
+    receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=minutes_ago)).isoformat(), scope=scope)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": phone}, ctx_for("hub_owner", scope=scope))
+    run("flow.recipe.enable", {"recipe": REF}, ctx_for("hub_owner", scope=scope))
     cut = make_service("Haircut", price=2000, duration=30)
     ana = make_member("Ana", "López")
     return make_appointment(Customer.objects.get(pk=card.id), ana, [cut], at(MONDAY, "10:00"), status="pending")
 
 
-def confirm(appointment, scope=None) -> None:
+def confirm(appointment, scope=A) -> None:
     op = get("appointment.appointment.confirm")
-    ctx = appointment_ctx("hub_admin", **({"scope": scope} if scope else {}))
+    ctx = appointment_ctx("hub_admin", scope=scope)
     op(ctx, op.input.model_validate({"id": str(appointment.id)}))
 
 
@@ -101,6 +75,15 @@ def outbound() -> list[Message]:
     UUIDv7 key breaks the tie (Postgres returns tied rows in any order)."""
     rows = Message.objects.filter(direction="outbound").select_related("conversation")
     return list(rows.order_by("created_at", "id"))
+
+
+def sent_as(scope, door) -> None:
+    """The one message left from the Hub through ``scope``'s own number, and its «sent» event is ``scope``'s."""
+    [message] = outbound()
+    assert message.origin == "hub"
+    assert json.loads(door.calls.last.request.content)["hub"] == scope.key
+    sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
+    assert (sent.scope_kind, sent.scope_key) == (scope.kind, scope.key)
 
 
 def test_confirming_tells_the_customer_once_in_her_conversation_through_erplora(tick, door):
@@ -114,7 +97,7 @@ def test_confirming_tells_the_customer_once_in_her_conversation_through_erplora(
     run_row = FlowRun.objects.get()
     assert (run_row.event_name, run_row.status) == ("appointment.appointment.confirmed", "succeeded")
     [message] = outbound()
-    assert (message.conversation.phone, message.kind, message.status, message.host) == (ANA, "text", "sent", "a")
+    assert (message.conversation.phone, message.kind, message.status) == (ANA, "text", "sent")
     assert message.body.startswith("Confirmed! We are expecting you on Monday, ")
     assert message.body.endswith(" at 10:00 for your Haircut with Ana López.")
     assert [json.loads(call.request.content)["to"] for call in door.calls] == [ANA]
@@ -151,21 +134,15 @@ def test_with_the_month_spent_nothing_leaves_and_the_history_says_why(tick, door
     assert not outbound() and door.call_count == 0
 
 
-def test_another_business_tells_its_customer_through_its_own_number(tick, door):
-    appointment = salon()
-    system(
-        "whatsapp_inbox.channel.sync",
+def test_another_business_tells_its_customer_through_its_own_number(tick, door, hub_b):
+    salon()
+    with use_hub(hub_b):
         # A plan with messages: since hub#158 a limit of 0 means the plan includes none, not «no cap».
-        {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150, "monthly_usage": 0, "templates": [CONFIRMED]},
-        B,
-    )
-    confirm(appointment, scope=B)
+        confirm(salon(scope=B, phone_number="+34910000001", monthly_limit=150, monthly_usage=0), scope=B)
     tick()
-    [message] = outbound()
-    assert message.host == "b"
-    assert json.loads(door.calls.last.request.content)["hub"] == "b"
-    sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
-    assert (sent.scope_kind, sent.scope_key) == (B.kind, B.key)
+    assert not outbound()
+    with use_hub(hub_b):
+        sent_as(B, door)
 
 
 # ── WHATSAPP_INBOX-F26 / RESERVATION-F19: the restaurant confirms the table ─────────────────────────────
@@ -178,19 +155,20 @@ def restaurant_clock(monkeypatch):
 
 
 def restaurant(
-    *, minutes_ago: int = 10, templates=(TABLE_CONFIRMED,), auto_confirm: bool = False, language: str = "en", **channel
+    *, minutes_ago: int = 10, templates=(TABLE_CONFIRMED,), auto_confirm: bool = False, language: str = "en", scope=A,
+    **channel,
 ):
-    """The owner's restaurant: its number connected, Lucía's conversation (her last message ``minutes_ago``), its
-    lunch and dinner every day, «Confirmar solas las reservas nuevas» as given and the inbox's table notice turned on by
-    the owner in ``language``."""
-    connect(templates=list(templates), **channel)
-    receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=minutes_ago)).isoformat())
+    """The owner's restaurant ``scope``: its number connected, Lucía's conversation (her last message ``minutes_ago``),
+    its lunch and dinner every day, «Confirmar solas las reservas nuevas» as given and the inbox's table notice turned
+    on by the owner in ``language``."""
+    connect(templates=list(templates), scope=scope, **channel)
+    receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=minutes_ago)).isoformat(), scope=scope)
     open_week()
     set_rules(auto_confirm=auto_confirm)
-    run("flow.recipe.enable", {"recipe": RESERVATION_REF}, ctx_for("hub_owner", language=language))
+    run("flow.recipe.enable", {"recipe": RESERVATION_REF}, ctx_for("hub_owner", scope=scope, language=language))
 
 
-def book(phone: str = "600111222", **data):
+def book(phone: str = "600111222", scope=A, **data):
     """Reservas' real booking for Friday at 21:00, four guests: the phone finds or makes the card (Customers)."""
     payload = {
         "guest_name": "Lucía Pérez",
@@ -200,7 +178,7 @@ def book(phone: str = "600111222", **data):
         "party_size": 4,
         **data,
     }
-    return run("reservation.reservation.create", payload, ctx_for("hub_admin"))
+    return run("reservation.reservation.create", payload, ctx_for("hub_admin", scope=scope))
 
 
 def act(name: str, reservation_id, scope=None, **data) -> None:
@@ -229,7 +207,7 @@ def test_confirming_a_reservation_tells_the_guest_once_in_her_conversation(resta
     [run_row] = table_runs()
     assert run_row.status == "succeeded"
     [message] = outbound()
-    assert (message.conversation.phone, message.kind, message.status, message.host) == (ANA, "text", "sent", "a")
+    assert (message.conversation.phone, message.kind, message.status) == (ANA, "text", "sent")
     assert message.body == "Confirmed! We are expecting you on Friday, Oct. 16, 2026 at 21:00, table for 4."
     assert [json.loads(call.request.content)["to"] for call in door.calls] == [ANA]
 
@@ -326,7 +304,7 @@ def test_a_local_number_typed_with_her_card_chosen_tells_her_once(restaurant_clo
 
 
 def test_a_guest_of_another_country_with_the_same_digits_is_never_taken_for_the_local_one(restaurant_clock, tick, door):
-    # erplora-old/whatsapp_inbox#199: +33 600 111 222 (France) and 600 111 222 (Spain) share their national digits.
+    # +33 600 111 222 (France) and 600 111 222 (Spain) share their national digits.
     restaurant()
     receive("wamid.FR", phone="33600111222", sent_at=(NOW - dt.timedelta(minutes=5)).isoformat())
     french = book(guest_name="Camille Martin", guest_phone="+33 6 00 11 12 22")
@@ -374,19 +352,13 @@ def test_without_a_phone_on_the_reservation_it_stops_before_it_looks(restaurant_
     assert not outbound() and door.call_count == 0
 
 
-def test_another_restaurant_tells_its_guest_through_its_own_number(restaurant_clock, tick, door):
+def test_another_restaurant_tells_its_guest_through_its_own_number(restaurant_clock, tick, door, hub_b):
     restaurant()
-    reservation = book()
-    system(
-        "whatsapp_inbox.channel.sync",
-        {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150,
-         "monthly_usage": 0, "templates": [TABLE_CONFIRMED]},
-        B,
-    )
-    act("reservation.reservation.confirm", reservation.id, scope=B)
+    book()
+    with use_hub(hub_b):
+        restaurant(scope=B, phone_number="+34910000001", monthly_limit=150, monthly_usage=0)
+        act("reservation.reservation.confirm", book(scope=B).id, scope=B)
     tick()
-    [message] = outbound()
-    assert message.host == "b"
-    assert json.loads(door.calls.last.request.content)["hub"] == "b"
-    sent = OutboxEvent.objects.get(name="whatsapp_inbox.message.sent")
-    assert (sent.scope_kind, sent.scope_key) == (B.kind, B.key)
+    assert not outbound()
+    with use_hub(hub_b):
+        sent_as(B, door)

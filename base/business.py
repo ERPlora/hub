@@ -1,4 +1,4 @@
-"""The business's own data as the Hub shows it (APP-BASE-6): its clock, its currency and the names of what the SaaS
+"""The business's own data as the Hub shows it: its clock, its currency and the names of what the SaaS
 registered.
 
 The SaaS owns the business's name, country, time zone and language (CLAUDE.md, «Contrato SaaS ↔ Hub»): it pushes them
@@ -31,6 +31,9 @@ from base.tenancy.context import current_hub
 
 #: The currency of a business without a country (a demo): ERPlora's market.
 DEFAULT_CURRENCY = "EUR"
+#: ERPlora's market (ISO 3166-1 alpha-2): the country of a business without one (a demo, ERPlora's own hub without its
+#: row) for every rule by country (:func:`country_or_market`).
+MARKET_COUNTRY = "ES"
 #: Changes of currency newer than the CLDR that Babel ships: country → (currency, since). Bulgaria adopted the euro on
 #: 1 January 2026; Babel 2.18 still gives the lev with no end.
 ADOPTED_SINCE: dict[str, tuple[str, dt.date]] = {"BG": ("EUR", dt.date(2026, 1, 1))}
@@ -59,6 +62,13 @@ def zone_name(zone: dt.tzinfo | None = None) -> str:
     return getattr(zone, "key", str(zone))
 
 
+def country_or_market(country: str) -> str:
+    """The country (ISO 3166-1 alpha-2, upper-case) a business with ``country`` is in for every rule by country: its
+    own, or ERPlora's market (:data:`MARKET_COUNTRY`, Spain) without one, as a demo is (hub#682). The one reading of
+    it: the Home's national steps (``base.home.applies_to_country``) and VeriFactu's «only in Spain» ask it here."""
+    return country.strip().upper() or MARKET_COUNTRY
+
+
 def currency_of(country: str, *, today: dt.date | None = None) -> str:
     """The currency ``country`` (ISO 3166-1 alpha-2) pays in today; the euro without one CLDR knows."""
     if len(country) != 2:
@@ -81,7 +91,7 @@ def money_text(cents: int | Decimal, currency: str, *, language: str | None = No
     money, the same as the browser (``Intl.NumberFormat``): «PLN 15.50», «€15.50», «15,50 PLN», «¥1,500».
 
     CLDR's pattern for ``language`` (the active one by default) with CLDR's currency spacing, which Babel skips (flow
-    money-text). The thousands are grouped as every screen paints them (hub#1090), but with ``grouped=False``, for an
+    money-text). The thousands are grouped as every screen paints them, but with ``grouped=False``, for an
     export its import reads back. A fraction of a minor unit (a unit price without VAT, 0.8264 €) keeps its decimals.
     """
     cents = Decimal(cents)

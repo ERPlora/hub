@@ -1,11 +1,8 @@
 <script setup lang="ts">
-// «Import report» (BASE-G106; the old hub's ImportPanel report) and the last import that did not go in whole
-// (BASE-G107, `unfinished`): how it went, app by app and part by part, in words and tone — a status this screen does
-// not know is «Failed» with its own text, never a success —, what went wrong (an app of the blueprint the load could
-// not turn on says why: the plan's limit, no right to it), what was left out on purpose, and
-// «Retry what is missing» when the server says it can; when it cannot because the file came by hand or the template's
-// version is gone, the button stays off with why. What waits for an app being set up comes in by itself (hub#609): the
-// report says so and offers nothing to press. «See the templates» and «Go to Home» leave the report.
+// How an import went, app by app and part by part; also the last import that did not go in whole (`unfinished`). A
+// status this screen does not know is painted as «Failed» with its own text, never as a success. «Retry what is
+// missing» is offered only when the server says it can; what waits for an app being set up comes in by itself, so
+// there is nothing to press for it.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';

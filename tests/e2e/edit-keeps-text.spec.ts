@@ -1,4 +1,4 @@
-// PoC §8.3 and DEMO-F02: the note of the detail has local state. While tab 1 writes (unsaved), tab 2
+// DEMO-F02: the note of the detail has local state. While tab 1 writes (unsaved), tab 2
 // adds a line (tab 1 shows it and keeps its text and focus) and then saves another note: tab 1 still
 // keeps its text and focus and warns «Updated elsewhere».
 import { expect, test } from '@playwright/test';

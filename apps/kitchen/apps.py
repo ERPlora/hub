@@ -3,7 +3,11 @@ pass, and the kitchen's history (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, DeviceNotice, LiveAppConfig, Nav
+
+#: A round is told as soon as Sales fires it; saving it or creating one by hand refreshes the same row.
+NOTICE_EVENTS = ["kitchen.ticket.received", "kitchen.ticket.created", "sale.order.fired"]
+NOTICE_BODY = ["{dish_names}", _("Waiter: {waiter}")]
 
 
 class KitchenConfig(LiveAppConfig):
@@ -11,11 +15,11 @@ class KitchenConfig(LiveAppConfig):
     label = "kitchen"
     kind = "app"
     verbose_name = _("Kitchen")
-    # Registered in the shell (ION_ICONS); the old `restaurant-outline` waits in UI-REQUESTS.md.
+    # Registered in the shell (ION_ICONS); `restaurant-outline` waits in UI-REQUESTS.md.
     icon = "ion:ticket-outline"
     category = Category.RESTAURANT
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "The kitchen display: every round the till sends, dish by dish, per station and to the pass."
     )
@@ -32,6 +36,30 @@ class KitchenConfig(LiveAppConfig):
     # station of its product or its category of Inventory (foreign keys of the routing).
     requires = ["sale", "inventory"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The kitchen's ticket is its «comanda»
+    # (kitchen.ticket, as its screens say): «la comanda», «qué comandas», «las comandas de…», named by its phrases and
+    # never by the word, which live keeps for a table's order, and a «comandas» said in passing («sin alterar las
+    # comandas ya enviadas») names no kitchen ticket. A kitchen's «estación», and its «puesto» named by its phrases («el
+    # puesto», never «tenemos puesto…»), is its station (kitchen.station), what goes «urgente» or in a hurry («prisa») a
+    # rush (kitchen.ticket.set_rush), the «enrutado» the routing (kitchen.routing), a dish marked «como listo» or «como
+    # hecho» bumped (kitchen.item.bump) and one sent back «a pendientes» or «a preparación» recalled (kitchen.*.recall).
+    assistant_synonyms = (
+        (
+            "ticket", "la comanda", "una comanda", "unas comandas", "esta comanda", "esa comanda", "su comanda",
+            "sus comandas", "que comanda", "que comandas", "cuantas comandas", "otra comanda", "alguna comanda",
+            "cada comanda", "comanda manual", "comandas manuales", "las comandas de",
+        ),
+        ("estacion", "estaciones", "station", "stations", "el puesto", "al puesto", "del puesto", "un puesto",
+         "los puestos", "que puesto", "que puestos", "cada puesto", "por puesto"),
+        ("urgente", "urgentes", "urgencia", "prisa", "rush", "urgent"),
+        ("enrutado", "enrutados", "enrutar", "enruta", "enrutamiento", "routing", "route", "routes"),
+        # the «regla» that sends a product or a family to a station is its routing (``kitchen.routing``): live reads
+        # «regla» as any rule («rule», as Taxes' and Pricing's), and the QA says it of the routing.
+        ("regla", "routing"),
+        ("bump", "como listo", "como listos", "como lista", "como listas", "como hecho", "como hechos", "como hecha",
+         "como hechas"),
+        ("recall", "a pendientes", "a pendiente", "a preparacion", "a preparar"),
+    )
     permissions = [
         "kitchen.view_ticket",
         "kitchen.add_ticket",
@@ -43,7 +71,7 @@ class KitchenConfig(LiveAppConfig):
         "kitchen.change_settings",
         "kitchen.view_log",
     ]
-    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier
+    # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier
     # and the cook are employees: they move states; the manager also cancels, deletes, runs the
     # stations and saves the settings.
     role_permissions = {
@@ -58,12 +86,24 @@ class KitchenConfig(LiveAppConfig):
             "kitchen.view_log",
         ],
     }
-    # Positional (id, label, icon, path). Registered icons only: the old `tv`, `clipboard-outline` and
+    # Positional (id, label, icon, path). Registered icons only: `tv`, `clipboard-outline` and
     # `flame-outline` wait in UI-REQUESTS.md. The same icons as the tabbar (frontend/tabs.ts), which
-    # adds Settings for whoever may save them, as the old shell did.
+    # adds Settings for whoever may save them.
     navigation = [
         Nav("display", _("Display"), "ion:desktop-outline", "/kitchen/display"),
         Nav("tickets", _("Tickets"), "ion:list-outline", "/kitchen/tickets"),
         Nav("stations", _("Stations"), "ion:layers-outline", "/kitchen/stations"),
         Nav("history", pgettext_lazy("kitchen menu", "History"), "ion:time-outline", "/kitchen/history"),
+    ]
+    # KITCHEN-F05/F16: every new ticket tells the installed device; a tap opens the kitchen display.
+    notices = [
+        DeviceNotice(
+            key="received",
+            operation="kitchen.ticket.notices",
+            title=[_("New kitchen ticket · {label}"), _("New kitchen ticket · {number}")],
+            body=NOTICE_BODY,
+            route="/kitchen/display",
+            permission="kitchen.view_ticket",
+            refresh_on=NOTICE_EVENTS,
+        )
     ]

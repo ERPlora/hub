@@ -1,4 +1,4 @@
-"""«Only if…» and «if it fails, carry on» on each step (WORKBOOK FLOW-F25; old hub HUB-F97).
+"""«Only if…» and «if it fails, carry on» on each step (WORKBOOK FLOW-F25).
 
 Any step but «Only continue if…» may carry ``run_if``: when it does not hold the step is skipped, says so
 in the history and the run goes on (later steps read ``steps.<id>.skipped``). An action or a read may
@@ -17,9 +17,9 @@ from apps.customer.models import Customer
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 
-from .conftest import TASK_STEP, make_flow, run
+from .conftest import HUB_DB, TASK_STEP, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)

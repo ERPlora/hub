@@ -10,61 +10,35 @@ nothing is called by hand. A repeated delivery changes nothing, and what happens
   station under the menu's kitchen name, on the card and on paper; a menu short of a course never gets there.
 - COMBO-F13: Inventory deletes a product (``inventory.product.delete``) and its choices leave every menu
   (``combo.option.drop_product``); until the tick they are marked «no longer in the catalogue» and never offered.
+
+The worker's real loop serves each business in its own database and releases its connections once it has served it:
+what these tests write is committed.
 """
 
 import json
-import threading
 from decimal import Decimal
-from importlib import import_module
 
-import psycopg
 import pytest
-from django.apps import apps as global_apps
-from django.db import connections
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.errors import Conflict
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.combo.models import ChoiceOption
 from apps.inventory.models import Product, StockMovement
 from apps.kitchen.models import Ticket
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, FOOD, ctx_for
+from .conftest import FOOD, HUB_DB_COMMITTED, A, B, ctx_for
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+pytestmark = HUB_DB_COMMITTED
 
 
 def run(name: str, data: dict, scope=A):
     """Run the operation ``name`` as an admin of ``scope``: Inventory's and Menus' own, with their permissions."""
     op = get(name)
     return op(ctx_for("hub_admin", scope=scope), op.input.model_validate(data))
-
-
-def one_tick() -> None:
-    """One tick of the worker's real loop."""
-    stop = threading.Event()
-
-    def wait(_seconds: float) -> bool:
-        stop.set()
-        return True
-
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
-
-
-@pytest.fixture
-def tick(db, monkeypatch):
-    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
-    the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return one_tick
 
 
 def delivery_to(app: str, name: str) -> tuple[str, int]:
@@ -245,7 +219,7 @@ def charge(key: str, options: dict, *skus: str, quantity: str = "1", scope=A):
 
 
 def test_combo_f10_three_menus_lower_three_portions_of_each_dish_through_the_relay(tick, till_menu):
-    """inventory#69: the menu has no stock of its own; each dish picked moves, times the menus and the times
+    """The menu has no stock of its own; each dish picked moves, times the menus and the times
     it was picked (two coffees in each), and the service moves nothing."""
     sale = charge("f10-three", till_menu, "LEN", "STK", "COF", "COF", "TIP", quantity="3")
     (line,) = sale.lines
@@ -319,7 +293,7 @@ def kitchen_paper() -> dict[str, list[dict]]:
 
 
 def test_combo_f11_a_menu_fired_reaches_each_station_under_its_kitchen_name_through_the_relay(tick, till_menu):
-    """sales#522 and hub#1156: the kitchen gets the dishes the table chose, each at its own station, under the
+    """The kitchen gets the dishes the table chose, each at its own station, under the
     menu's kitchen name, on the card and on paper; the service is never cooked."""
     station("Cold")
     station("Grill")
@@ -366,7 +340,7 @@ def test_combo_f11_a_menu_fired_reaches_each_station_under_its_kitchen_name_thro
 
 
 def test_combo_f11_a_menu_short_of_a_required_course_never_reaches_the_kitchen(tick, till_menu):
-    """sales#535: a menu without its main course is refused by Menus when it is ordered, so the check has
+    """A menu without its main course is refused by Menus when it is ordered, so the check has
     nothing to fire and the kitchen never gets half a menu."""
     order = run("sale.order.open", {"label": "Table 4"})
     with pytest.raises(Conflict) as refused:
@@ -388,50 +362,29 @@ def test_combo_f11_a_menu_short_of_a_required_course_never_reaches_the_kitchen(t
 # ── Two hubs, on committed data ──────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def committed(transactional_db):
-    """A flushed database with Taxes' factory catalogue planted again, as its migrations do (a transactional
-    test that ran before flushed it)."""
-    with connections["default"].schema_editor() as editor:
-        for module in ("apps.tax.migrations.0002_factory_catalogue", "apps.tax.migrations.0005_retail_alcohol"):
-            import_module(module).plant(global_apps, editor)
-
-
-@pytest.fixture
-def listen(committed, db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def heard(session, timeout: float = 0.5) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-def test_combo_f13_a_product_deleted_in_hub_b_leaves_b_menus_and_is_heard_in_b_only(listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+def test_combo_f13_a_product_deleted_in_hub_b_leaves_b_menus_and_is_heard_in_b_only(tick, hub_b, factory_data_b, listen):
     on_a, on_b = listen(A), listen(B)
     product("Flan", "FLA-A", A)
     menu("Menu A", "FLA-A", scope=A)
-    tart = product("Tart", "TRT-B", B)
-    menu("Menu B", "TRT-B", scope=B)
+    with use_hub(hub_b):
+        tart = product("Tart", "TRT-B", B)
+        menu("Menu B", "TRT-B", scope=B)
     heard(on_a), heard(on_b)  # the creations' own notices
 
-    run("inventory.product.delete", {"id": str(tart.id)}, B)
+    with use_hub(hub_b):
+        run("inventory.product.delete", {"id": str(tart.id)}, B)
     heard(on_b)  # the deletion's own notice
-    one_tick()
+    tick()
 
-    assert statuses("Menu B", B) == []
+    with use_hub(hub_b):
+        assert statuses("Menu B", B) == []
     assert "combo.option.deleted" in heard(on_b)
     assert heard(on_a) == set()
     assert statuses("Menu A", A) == [("Flan", "offered")]
-    (reaction,) = OutboxEvent.objects.filter(name="combo.option.deleted", payload__product_id=str(tart.id))
+    with use_hub(hub_b):
+        (reaction,) = OutboxEvent.objects.filter(name="combo.option.deleted", payload__product_id=str(tart.id))
     assert (reaction.scope_kind, reaction.scope_key) == (B.kind, B.key)

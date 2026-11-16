@@ -4,6 +4,7 @@
 // hand.
 import { describe, expect, it } from 'vitest';
 
+import { itGroupsThousandsAndDashesAMissingAmount } from '../../../../base/frontend/__tests__/money-format';
 import { centsFromAmount, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, moneyOf, plain, typedRate } from './format';
 
 // An invoice's money: its currency and the decimals the server counts it in (`currency_decimals`).
@@ -25,7 +26,7 @@ describe('formatUnitPrice', () => {
     expect(formatUnitPrice(null, 'en', EUR)).toBe('—');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
+  it('groups the thousands from four digits on, in Spanish too', () => {
     expect(plain(formatUnitPrice('123456.00', 'es', EUR))).toBe('1.234,56 €');
     expect(plain(formatUnitPrice('123456.78', 'es', EUR))).toBe('1.234,5678 €');
     expect(plain(formatUnitPrice('1234567.00', 'es', EUR))).toBe('12.345,67 €');
@@ -41,20 +42,7 @@ describe('formatMoney', () => {
     expect(spaced(formatMoney(-1210, 'es', EUR))).toBe('-12,10 €');
   });
 
-  it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
-    // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
-    // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
-    expect(spaced(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
-    expect(spaced(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
-    expect(spaced(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
-    expect(formatMoney(1234567, 'en', EUR)).toBe('€12,345.67');
-  });
-
-  it('a missing amount is a dash, never «NaN», and a broken language falls back to English', () => {
-    expect(formatMoney(null, 'en', EUR)).toBe('—');
-    expect(formatMoney(undefined, 'es', EUR)).toBe('—');
-    expect(formatMoney(100, 'not a tag!', EUR)).toBe('€1.00');
-  });
+  itGroupsThousandsAndDashesAMissingAmount(formatMoney, plain);
 });
 
 describe('formatPercent', () => {
@@ -70,6 +58,12 @@ describe('formatQuantity', () => {
     expect(formatQuantity('2.000', 'en')).toBe('2');
     expect(formatQuantity('0.532', 'es')).toBe('0,532');
     expect(formatQuantity('-1.000', 'en')).toBe('-1');
+  });
+
+  // hub#974: an invoice line writes its quantity as the till, the stock and the assistant's card do.
+  it('groups the thousands from four digits on, as every screen of the Hub', () => {
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+    expect(formatQuantity('-12500.000', 'en')).toBe('-12,500');
   });
 });
 
@@ -157,9 +151,9 @@ describe('money of the invoice’s currency (flow business-currency)', () => {
     expect(plain(formatMoney(123450, 'en', moneyOf({ currency: 'HUF', currency_decimals: 2 })))).toBe('Ft 1,234.50');
   });
 
-  it('without a currency a figure has no symbol, never the euro', () => {
-    expect(plain(formatMoney(12100, 'es'))).toBe('121,00');
-    expect(plain(formatMoney(123456, 'en'))).toBe('1,234.56');
+  it('without a currency an amount is a dash, never the euro', () => {
+    expect(plain(formatMoney(12100, 'es'))).toBe('—');
+    expect(plain(formatMoney(123456, 'en'))).toBe('—');
     expect(plain(formatUnitPrice('82.64', 'en'))).toBe('0.8264');
   });
 });

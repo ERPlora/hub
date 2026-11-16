@@ -1,15 +1,13 @@
 """Every visible text of the invoice app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
-from live.operations import get, registry
+from live.operations import get
 
 from apps.invoice import platform, queries, schemas, services
 from apps.invoice.models import (
@@ -20,9 +18,18 @@ from apps.invoice.models import (
     InvoiceType,
     Issuer,
 )
-from apps.invoice.tests.conftest import ctx_for, run
+from apps.invoice.tests.conftest import A, HUB_DB, ctx_for, run
 from base import assistant
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 APP = Path(apps.get_app_config("invoice").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -30,35 +37,14 @@ TEMPLATE = APP / "templates" / "invoice" / "invoice.html"
 SCREENS = json.loads((APP / "frontend" / "locale" / "es.json").read_text(encoding="utf-8"))["invoice"]
 
 
-def messages_of(module) -> list:
-    """Every lazy text a module keeps at its top level (its error messages, its labels)."""
-    lazies = [
-        value
-        for name, value in vars(module).items()
-        if name.isupper() and type(value).__name__ == "__proxy__"
-    ]
-    for name, value in vars(module).items():
-        if name.isupper() and isinstance(value, dict):
-            lazies += [
-                item for item in value.values() if type(item).__name__ == "__proxy__"
-            ]
-    return lazies
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, Home, admin, choices, errors, paper)."""
     config = apps.get_app_config("invoice")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        # The Home's steps (FIX-INVOICE-SETUP-HOOKS): base paints them in the reader's language.
+        *config_texts(config),
+        # The Home's steps: base paints them in the reader's language.
         *(text for step in config.setup for text in (step.title, step.description)),
-        *messages_of(queries),
-        *messages_of(schemas),
-        *messages_of(services),
-        *messages_of(platform),
+        *module_texts(queries, schemas, services, platform),
         *(label for _english, label in FACTORY_SERIES_NAMES.values()),
         *(
             v.message
@@ -71,58 +57,28 @@ def visible_texts() -> set[str]:
         *Invoice.RectificationKind.labels,
         *Issuer.Source.labels,
     ]
-    for model in (InvoiceSeries, Issuer, Invoice, InvoiceLine):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += model_texts((InvoiceSeries, Issuer, Invoice, InvoiceLine))
     template = TEMPLATE.read_text(encoding="utf-8")
     with translation.override("en"):
         return (
-            {str(text) for text in lazies}
+            {catalogue_key(text) for text in lazies}
             | set(re.findall(r'{% translate "([^"]+)" %}', template))
-            | schema_titles()
+            | operation_titles("invoice")
         )
 
 
-def schema_titles() -> set[str]:
-    """The titles invoice's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
-    titles = set()
-    for op in registry.values():
-        if op.app_label == "invoice":
-            for name, prop in op.input.model_json_schema().get("properties", {}).items():
-                title = prop.get("title")
-                if title and title != name.title().replace("_", " "):
-                    titles.add(title)
-    return titles
-
-
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    # A text with its own context (the invoice's statuses) counts by its English source.
-    catalog = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - catalog == set()
+    """Each text of Facturación by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
+    back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=150, with_context=9) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts():
@@ -137,9 +93,9 @@ def test_spanish_texts():
         assert str(queries.DOC_SIMPLIFIED) == "Factura simplificada"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = client.post(
         "/api/invoice/invoices",
         json.dumps(
@@ -155,7 +111,7 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
             }
         ),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=f"{A.key}.localhost",
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409
@@ -164,7 +120,6 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
 
 # Django joins every app's Spanish catalogue and the first that translates a message wins, so a text invoice says
 # with its own words reads another app's when that app comes earlier (base/tests/test_locale_modules.py).
-# FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP.
 
 
 def test_a_series_an_issuer_and_an_invoice_say_their_own_words_in_spanish():
@@ -199,7 +154,7 @@ def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_th
     def card(name: str) -> dict[str, str]:
         op = get(name)
         arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
-        return {field["name"]: field["label"] for field in assistant.card(op, arguments, "es")["fields"]}
+        return {field["name"]: field["label"] for field in assistant.cards.card(op, arguments, "es")["fields"]}
 
     for name in ("invoice.series.create", "invoice.series.update"):
         assert card(name)["is_active"] == SCREENS["series"]["form"]["active"] == "Activa", name
@@ -211,7 +166,7 @@ def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_th
         ) == ("NIF", "Domicilio"), name
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_printed_breakdown_says_exempt_and_not_subject_as_the_invoice_screen_does(issuer):
     """The A4 paper's breakdown (INVOICE-F18) in Spanish: an exempt line «Exento» and one not subject «No sujeto», as
     the invoice's screen says them, never taxes' «Exenta» and «No sujeta»."""

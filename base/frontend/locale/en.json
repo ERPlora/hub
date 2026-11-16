@@ -146,6 +146,7 @@
       "open": "Open",
       "buy": "Upgrade plan",
       "buyWhere": "Subscribed to on erplora.com, from your ERPlora account.",
+      "mandatory": "Mandatory in {country}",
       "entity": {
         "one": "app",
         "many": "apps"
@@ -192,8 +193,8 @@
         "body": "You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off. | You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off."
       },
       "counter": {
-        "limited": "{enabled} of {max} apps turned on",
-        "unlimited": "1 app turned on · Unlimited | {enabled} apps turned on · Unlimited"
+        "limited": "1 app turned on · {chosen} of {max} in your plan | {on} apps turned on · {chosen} of {max} in your plan",
+        "unlimited": "1 app turned on · Unlimited | {on} apps turned on · Unlimited"
       }
     },
     "appBlocked": {
@@ -709,7 +710,9 @@
         "languageHelp": "Saved for you. If you choose none, the business’s language is used.",
         "businessLanguage": "Use the business’s language",
         "appearance": "Appearance",
-        "appearanceHelp": "Choose the mode and the palette you prefer.",
+        "appearanceHelp": "Choose the mode, palette and interface size you prefer.",
+        "scale": "Interface size",
+        "scaleHelp": "Scale the whole interface from 80% to 120%. Your choice is saved and applies on every device.",
         "palette": "Theme palette",
         "palettes": {
           "erplora": "ERPlora",
@@ -1171,7 +1174,28 @@
         },
         "pdfPages": "Showing the first {shown} of {total} pages. Download the file to read it all.",
         "textCut": "Showing the beginning of the file. Download it to read it all.",
-        "tableCut": "Showing the first {shown} rows. Download the file to see them all."
+        "tableCut": "Showing the first {shown} rows. Download the file to see them all.",
+        "damaged": {
+          "heading": "The file could not be read",
+          "body": "It may be damaged or saved in another format. Download it to open it with an app on your device."
+        },
+        "tooLarge": {
+          "heading": "Too large to preview",
+          "body": "The preview opens files of up to {size}. Download it to open it with an app on your device."
+        },
+        "sheets": "Sheets",
+        "sheetEmpty": "This sheet is empty.",
+        "documentEmpty": "This document has no text.",
+        "yes": "TRUE",
+        "no": "FALSE",
+        "json": {
+          "oneItem": "1 item",
+          "items": "{count} items",
+          "oneField": "1 field",
+          "fields": "{count} fields",
+          "more": "{count} more. Download the file to see them all.",
+          "broken": "This file is not valid JSON: it is shown as it is."
+        }
       },
       "refusal": {
         "invalidName": "That name is not valid. Use a name without slashes or lone dots.",
@@ -1465,6 +1489,15 @@
       "notSaved": "The photo could not be saved. Try again.",
       "retry": "Retry"
     },
+    "download": {
+      "savedTo": "Saved to {path}",
+      "refusal": {
+        "unreachable": "This app cannot save files on a phone or tablet. Open your business in a browser to download it.",
+        "unlinked": "The file could not be saved: this app is linked to another business.",
+        "outdated": "This version of the ERPlora app cannot save files. Update it to download.",
+        "failed": "The file could not be downloaded."
+      }
+    },
     "print": {
       "refusal": {
         "refused": "the document is empty or too large to print",
@@ -1472,6 +1505,21 @@
         "unlinked": "this app is linked to another business",
         "outdated": "this version of the ERPlora app cannot print; update it"
       }
+    },
+    "money": {
+      "unreadable": "The business's currency could not be read",
+      "retry": "Retry",
+      "filter": {
+        "notAmount": "This is not an amount. Type a figure, for example {amount}.",
+        "negative": "This amount cannot be negative.",
+        "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
+      }
+    },
+    "unsavedChanges": {
+      "title": "Discard changes?",
+      "message": "What you typed in this window has not been saved.",
+      "keep": "Keep editing",
+      "discard": "Discard changes"
     }
   }
 }

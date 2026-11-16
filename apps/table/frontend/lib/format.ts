@@ -5,7 +5,7 @@
 // charged in (a record is never rewritten), the lines of an open check in the business's (`useBusinessMoney`,
 // the platform's: its country's), with the decimals the server counts, never the browser's Intl (which gives
 // the forint none), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every
-// screen writes them. Until the business answers an amount is a figure without a symbol, never the euro by default.
+// screen writes them. Until the business answers an amount is a dash, never the euro by default nor guessed decimals.
 import { formatMoney as writeMoney } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
@@ -83,7 +83,7 @@ export function clockTime(iso: string | null | undefined, now: Date, locale: str
   return dateFormat(locale, timeZone, options).format(date);
 }
 
-/** Minor units in `money`, in `locale` («1.042,50 zł», «€22.50», «¥1,250»; «22,50» while it is unknown); nothing
+/** Minor units in `money`, in `locale` («1.042,50 zł», «€22.50», «¥1,250»; «—» while it is unknown); nothing
  *  charged is '—', never zero. */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   return cents === null || cents === undefined ? '—' : writeMoney(cents, locale, money);

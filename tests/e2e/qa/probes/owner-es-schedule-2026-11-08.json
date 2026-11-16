@@ -1,0 +1,21 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"owner.es.schedule.business.is_open","app":"schedule","tool":"schedule.business.is_open","role":"owner","language":"es","phrase":"¿está abierto el negocio ahora mismo y qué regla horaria lo decide?","expect":"read"},
+    {"id":"owner.es.schedule.hours.for_range","app":"schedule","tool":"schedule.hours.for_range","role":"owner","language":"es","phrase":"dime los horarios de apertura de cada día de esta semana y de dónde sale cada uno","expect":"read"},
+    {"id":"owner.es.schedule.override.list","app":"schedule","tool":"schedule.override.list","role":"owner","language":"es","phrase":"¿qué cambios temporales de horario tengo, incluido Cambio QA?","expect":"read"},
+    {"id":"owner.es.schedule.settings.get","app":"schedule","tool":"schedule.settings.get","role":"owner","language":"es","phrase":"¿qué día empieza la semana en mi calendario y qué zona horaria usa el negocio?","expect":"read"},
+    {"id":"owner.es.schedule.special_day.list","app":"schedule","tool":"schedule.special_day.list","role":"owner","language":"es","phrase":"lista los festivos y días con horario especial, con sus intervalos","expect":"read"},
+    {"id":"owner.es.schedule.week.get","app":"schedule","tool":"schedule.week.get","role":"owner","language":"es","phrase":"enséñame mi semana habitual de apertura, con cierres y turnos partidos","expect":"read"},
+    {"id":"owner.es.schedule.override.create","app":"schedule","tool":"schedule.override.create","role":"owner","language":"es","phrase":"cierra el negocio del 23 al 24 de noviembre por obras y llama al cambio Cambio QA 2","expect":"card","decide":"confirm"},
+    {"id":"owner.es.schedule.special_day.create","app":"schedule","tool":"schedule.special_day.create","role":"owner","language":"es","phrase":"marca cada 24 de diciembre como Festivo QA, cerrado todo el día","expect":"card","decide":"confirm"},
+    {"id":"owner.es.schedule.special_day.bulk_create","app":"schedule","tool":"schedule.special_day.bulk_create","role":"owner","language":"es","phrase":"añade de una vez Constitución QA el 7 de enero de 2027 y Laborable QA el 8 de enero de 2027, ambos cerrados","expect":"card","decide":"confirm"},
+    {"id":"owner.es.schedule.override.delete","app":"schedule","tool":"schedule.override.delete","role":"owner","language":"es","phrase":"elimina el cambio temporal Cambio QA y vuelve al horario habitual esos días","expect":"card","decide":"cancel"},
+    {"id":"owner.es.schedule.override.update","app":"schedule","tool":"schedule.override.update","role":"owner","language":"es","phrase":"corrige Cambio QA para que termine el 21 de noviembre y siga cerrado por obras","expect":"card","decide":"cancel"},
+    {"id":"owner.es.schedule.settings.update","app":"schedule","tool":"schedule.settings.update","role":"owner","language":"es","phrase":"haz que la semana del calendario empiece en domingo, sin tocar ninguna hora","expect":"card","decide":"cancel"},
+    {"id":"owner.es.schedule.special_day.delete","app":"schedule","tool":"schedule.special_day.delete","role":"owner","language":"es","phrase":"borra Festivo QA y deja ese 24 de diciembre con el horario normal","expect":"card","decide":"cancel"},
+    {"id":"owner.es.schedule.special_day.update","app":"schedule","tool":"schedule.special_day.update","role":"owner","language":"es","phrase":"cambia Festivo QA para abrir de 09:00 a 13:00 en vez de cerrar","expect":"card","decide":"cancel"},
+    {"id":"owner.es.schedule.week.confirm","app":"schedule","tool":"schedule.week.confirm","role":"owner","language":"es","phrase":"da por revisada y confirmada la semana habitual tal como está guardada","expect":"card","decide":"cancel"},
+    {"id":"owner.es.schedule.week.set_day","app":"schedule","tool":"schedule.week.set_day","role":"owner","language":"es","phrase":"los martes abre de 09:00 a 14:00 y de 17:00 a 20:00, sustituyendo el horario anterior de ese día","expect":"card","decide":"cancel"}
+  ]
+}

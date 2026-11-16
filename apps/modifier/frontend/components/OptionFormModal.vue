@@ -4,19 +4,20 @@
 // «Supplement» until the business answers; signed: negative is a discount; empty or 0, free), «Own tax category»
 // (searched in Taxes; empty = the dish's), «Chosen by default» and Order; Edit opens «Editing option —
 // {name}» and sends only what changed with `modifier.option.update` (an emptied tax category sends
-// `''`, the dish's again). A supplement that is not an amount is never sent; the server's refusals (a
+// `''`, the dish's again). «Create» / «Save» wait in grey until the business has answered its money (the supplement
+// is read in it; hub#918). A supplement that is not an amount is never sent; the server's refusals (a
 // taken name, too many defaults, an own line worth nothing) stay under their field.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchTaxCategories } from '../lib/pickers';
 import type { GroupOut, OptionIn, OptionOut, OptionPatchIn } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   /** The group the option belongs to. */
@@ -122,7 +123,11 @@ function patch(option: OptionOut, cents: number): OptionPatchIn {
 
 async function save(): Promise<void> {
   tried.value = true;
-  const read = parseMoney(form.value.price, money.value);
+  // No supplement is read before the business answers its money: «150» would be read with two decimals, whatever its
+  // currency counts (in yen, 15000; hub#918).
+  const business = money.value;
+  if (!business) return;
+  const read = parseMoney(form.value.price, { money: business, signed: true });
   if (!read.ok) return; // The field says why.
   const cents = read.cents ?? 0;
   try {
@@ -133,23 +138,36 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// An untouched supplement follows the business's money when it answers after the window opened: that is no change.
+const canDismiss = useUnsavedFormOnOpen(
+  'modifier-option-form',
+  () => {
+    const stored = props.option ? moneyFieldText(props.option.price_delta, locale.value, money.value) : '';
+    return { ...form.value, price: form.value.price === stored ? null : form.value.price };
+  },
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-option-form"
     :title="title"
     :submit-label="option ? $t('modifier.options.form.save') : $t('modifier.options.form.create')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim()"
+    :submit-disabled="!money || !form.name.trim()"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
       <div class="modifier-form">
+        <BusinessMoneyError />
         <ion-input
           data-testid="modifier-option-form-name"
+          name="name"
           :value="form.name"
           :label="$t('modifier.options.form.name')"
           label-placement="floating"
@@ -162,6 +180,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="modifier-option-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('modifier.options.form.kitchenName')"
           label-placement="floating"
@@ -174,7 +193,9 @@ async function save(): Promise<void> {
         />
         <MoneyInput
           v-model="form.price"
+          signed
           testid="modifier-option-form-price_delta"
+          name="price_delta"
           :label="money ? $t('modifier.options.form.priceIn', { currency: money.currency }) : $t('modifier.options.form.price')"
           :money="money"
           :helper-text="$t('modifier.options.form.priceHint')"
@@ -183,6 +204,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="modifier-option-form-tax_category_key"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTax"
           :label="$t('modifier.options.form.tax')"
@@ -193,6 +215,7 @@ async function save(): Promise<void> {
         />
         <ion-toggle
           data-testid="modifier-option-form-is_default"
+          name="is_default"
           :checked="form.isDefault"
           label-placement="end"
           justify="start"
@@ -209,6 +232,7 @@ async function save(): Promise<void> {
         </p>
         <ion-input
           data-testid="modifier-option-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

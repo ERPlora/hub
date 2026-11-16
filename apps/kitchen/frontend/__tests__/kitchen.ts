@@ -163,6 +163,7 @@ export function entry(id: string, fields: Partial<LogOut> = {}): LogOut {
     item_name: '',
     station_name: '',
     actor: '',
+    by_platform: true,
     notes: '',
     created_at: ago(5),
     ...fields,

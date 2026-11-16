@@ -1,5 +1,4 @@
-"""«Ask someone first» (WORKBOOK FLOW-F28, F29 and F30; old hub HUB-F96, HUB-F100, HUB-F101; the old module's
-flows-f18 and flows-f24).
+"""«Ask someone first» (WORKBOOK FLOW-F28, F29 and F30).
 
 A run that reaches the step leaves its question — title and details filled in at that moment — in «Waiting
 for you» and waits. Only the role it was asked of answers it (whoever runs the business always can); a yes
@@ -20,9 +19,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 
-from .conftest import A, TASK_STEP, ctx_for, make_flow, run
+from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -216,7 +215,7 @@ def test_a_question_past_its_time_is_too_late_even_before_the_sweep(clock):
 
 
 def test_a_paused_automation_refuses_a_yes_in_the_person_s_language_and_keeps_the_question(clock):
-    # flows#166: the old tray said why in English.
+    # The old tray said why in English.
     clock(NOON)
     flow, _, question = _asked()
     run("flow.flow.set_enabled", {"id": str(flow.id), "enabled": False})

@@ -6,11 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
-> verde (servidor y páginas). Parte del `WORKFLOW.md` del módulo Bandeja de WhatsApp del producto
-> actual (`modules-workspace/modules/whatsapp_inbox`, `origin/main` `5ea1588`, v2.1.113) y de la app
-> `whatsapp_inbox` del SaaS actual (`saas`, `origin/develop`). Los números de flujo se conservan
-> (otras apps los citan); los nuevos empiezan en F32. F14–F26 (respuestas automáticas y reservas por
-> WhatsApp) vienen de `workflow/respuestas-automaticas.md` del mismo módulo.
+> verde (servidor y páginas).
 
 ## Para qué sirve y para quién
 
@@ -56,11 +52,10 @@ aparece en la conversación como mensaje del negocio (coexistencia de Meta).
 estados (abierta, pendiente, cerrada) donde un mensaje nuevo del cliente reabre la conversación
 (Zendesk), asignación a quien puede leer la bandeja con «Asignármela» que no pisa a otro (Shopify,
 Chakra), notas internas en el hilo (Fresha, Intercom, Front), la regla de Meta de las 24 horas
-hecha cumplir en el servidor y las plantillas gestionadas en la propia app (Odoo, WATI, Respond.io y el
-producto actual).
-**Por qué las demás no:** contestar solo desde el móvil (el producto actual) obliga a coger el
+hecha cumplir en el servidor y las plantillas gestionadas en la propia app (Odoo, WATI y Respond.io).
+**Por qué las demás no:** contestar solo desde el móvil obliga a coger el
 teléfono y deja la bandeja en solo lectura; dos estados (Shopify) no distinguen «espero al cliente»
-de «está hecho»; asignar tecleando un identificador (el producto actual) no lo usa nadie; mandar a
+de «está hecho»; asignar tecleando un identificador no lo usa nadie; mandar a
 WhatsApp Manager a crear las plantillas saca al dueño de la app para lo que hace a diario.
 
 ## Antes de empezar
@@ -155,6 +150,12 @@ categoría de una plantilla que ha rechazado.»).
 | Ajustes | indicador | «Sin plantillas.» | el motivo + **Reintentar** | igual que la bandeja |
 | Plantilla (hoja) | el botón final ocupado mientras guarda | — | el motivo debajo de su campo, o arriba el que da el Hub | solo propietario y administrador la abren |
 
+## Cambios sin guardar en Android
+
+En «Nueva plantilla», «Editar plantilla» y «Enviar una plantilla», el botón atrás del móvil pregunta «¿Descartar
+los cambios?» cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar
+cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado | Vertical |
@@ -199,7 +200,6 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F38 | Saber a qué pregunta contesta lo que toca la clienta | hecho | comun |
 
 ### WHATSAPP_INBOX-F01 Conectar el número de WhatsApp del negocio
-<!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -225,7 +225,6 @@ conectar ningún número. Si erplora.com no confirma, en un momento **Tu número
 Implicados: erplora.com (la cuenta de WhatsApp Business del negocio), Meta
 
 ### WHATSAPP_INBOX-F02 Desconectar o volver a conectar el número
-<!-- origen: old-hub:HUB_SHELL-F171 old-hub:HUB_SHELL-F172 old-saas:SAAS_WHATSAPP_INBOX-F03 old-saas:SAAS_WHATSAPP_INBOX-F04 old-hub:HUB-F262 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f02 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Bandeja de entrada
@@ -247,7 +246,6 @@ sale («Hay que reconectar el número en Ajustes para enviar.») y un mensaje qu
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F07 old-saas:SAAS_WHATSAPP_INBOX-F10 fi:modules/whatsapp_inbox#command-sql-multi-stmt-whatsapp_inbox-messages-ingest old-hub:HUB-F263 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f03 wf:whatsapp-cita#rec_wa_cita-f02 wf:whatsapp-mesa#rec_wa_mesa-f02 -->
 Estado: hecho
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
@@ -268,7 +266,6 @@ es un número no se guarda.
 Implicados: erplora.com, Clientes (reconoce a la clienta, F04)
 
 ### WHATSAPP_INBOX-F04 Reconocer a la clienta por su número
-<!-- origen: wf:whatsapp-cita#rec_wa_cita-f03 wf:whatsapp-mesa#rec_wa_mesa-f03 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f04 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna
@@ -280,15 +277,17 @@ Pasos:
 3. El número se compara como número: escrito con espacios, con el prefijo del país o con «00» delante
    es la misma persona en un negocio de España, y un número extranjero que conserva su cero (un fijo de
    Italia) también; los mismos dígitos con el prefijo de otro país son otra persona.
+4. Cuando el personal de ERPlora recupera desde la copia aparte una ficha que el negocio eliminó (vuelve la
+   misma ficha, CUSTOMER-F33), las conversaciones de su número que siguen sin ficha se unen otra vez a ella en
+   unos segundos, sin esperar a que la clienta vuelva a escribir.
 Entra: el número de la conversación y las fichas con ese número.
 Sale: la conversación sabe de qué ficha es. Solo rellena un vínculo vacío: el que puso una persona se
 respeta. Una ficha eliminada cuenta como vacío: su conversación queda sin ficha y otra ficha viva del
-mismo número la reclama.
+mismo número la reclama; si la ficha vuelve desde la copia aparte y ninguna otra la reclamó, es suya otra vez.
 Si falla: si dos fichas tienen el mismo número, no se une a ninguna y el mensaje sigue guardado.
-Implicados: Clientes
+Implicados: Clientes, CUSTOMER-F33
 
 ### WHATSAPP_INBOX-F05 Leer una conversación
-<!-- origen: fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-get fi:modules/whatsapp_inbox#query-whatsapp_inbox-conversations-list fi:modules/whatsapp_inbox#query-whatsapp_inbox-messages-list old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f05 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -309,7 +308,6 @@ dice (nunca «0 conversaciones»).
 Implicados: Clientes (el nombre de la ficha)
 
 ### WHATSAPP_INBOX-F06 Ver una foto, una nota de voz o un documento
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F15 old-hub:HUB-F267 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f06 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -331,7 +329,6 @@ el adjunto**; si erplora.com ya no lo guarda, la pestaña lo dice.
 Implicados: erplora.com (guarda los adjuntos)
 
 ### WHATSAPP_INBOX-F07 Asignar una conversación a alguien del equipo
-<!-- origen: fi:modules/whatsapp_inbox#command-sql-declarativo-whatsapp_inbox-conversations-assign old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f07 -->
 Estado: hecho
 Actor: empleado (a sí mismo), responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -349,7 +346,6 @@ asignarla a otro («Solo puedes asignarte conversaciones a ti»). El responsable
 Implicados: el equipo del negocio (las personas con acceso a la bandeja)
 
 ### WHATSAPP_INBOX-F08 Contestar desde la app de WhatsApp Business del móvil
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F08 old-hub:HUB-F264 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f08 -->
 Estado: hecho
 Actor: propietario
 Pantalla: Bandeja de entrada
@@ -363,7 +359,6 @@ Si falla: si no llega, el hilo no lo enseña; el móvil lo sigue teniendo.
 Implicados: erplora.com, la app WhatsApp Business del móvil
 
 ### WHATSAPP_INBOX-F09 Ver quién espera respuesta
-<!-- origen: old-hub:HUB_SHELL-F61 old-hub:HUB_SHELL-F64 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f09 wf:whatsapp-cita#rec_wa_cita-f09 wf:whatsapp-mesa#rec_wa_mesa-f09 -->
 Estado: hecho
 Actor: todos
 Pantalla: Bandeja de entrada
@@ -384,7 +379,6 @@ Si falla: el motivo con **Reintentar**.
 Implicados: la campana de la barra superior, los avisos de la app instalada
 
 ### WHATSAPP_INBOX-F10 Borrar los datos de un número sin ficha
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F21 old-hub:HUB-F251 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f10 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Bandeja de entrada
@@ -407,7 +401,6 @@ cada 5 minutos; pulsarlo dos veces no borra nada más.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F11 Borrar los datos de una clienta desde su ficha
-<!-- origen: old-hub:HUB-F250 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f11 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se borra desde la ficha, en Clientes)
@@ -420,7 +413,6 @@ Si falla: el aviso se reintenta; repetirlo no cambia nada.
 Implicados: Clientes, erplora.com
 
 ### WHATSAPP_INBOX-F12 Unir dos fichas de la misma clienta
-<!-- origen: old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f12 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se une desde Clientes)
@@ -433,7 +425,6 @@ Si falla: el aviso se reintenta; repetirlo no cambia nada.
 Implicados: Clientes
 
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
-<!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
 Estado: hecho
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
@@ -466,7 +457,6 @@ entrar con la cuenta y sigue hasta los planes.
 Implicados: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -499,7 +489,6 @@ Implicados: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F33, FLOW-F34, 
 WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F22, WHATSAPP_INBOX-F23
 
 ### WHATSAPP_INBOX-F15 Activar «Reservar mesa»
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f15 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -532,7 +521,6 @@ Implicados: RESERVATION-F17, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F3
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F16 Decidir si las reservas por WhatsApp se confirman solas
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f16 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -556,7 +544,6 @@ Implicados: APPOINTMENT-F18, APPOINTMENT-F19, RESERVATION-F04, WHATSAPP_INBOX-F1
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F17 Desactivar una respuesta automática
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f17 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -572,7 +559,6 @@ Si falla: la tarjeta dice el motivo y se vuelve a pintar con lo que de verdad si
 Implicados: FLOW-F34, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F18 Actualizar una respuesta automática a su versión mejorada
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f18 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -590,7 +576,6 @@ Inténtalo otra vez.»; el aviso sigue mientras quede algo sin actualizar.
 Implicados: FLOW-F35, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F19 Elegir el hueco escribiendo en vez de tocando
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f19 -->
 Estado: hecho
 Actor: cliente
 Pantalla: WhatsApp: chat del cliente
@@ -608,7 +593,6 @@ Si falla: sin lista de las últimas 24 horas, o si lo escrito no señala una sol
 Implicados: APPOINTMENT-F02, RESERVATION-F05, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F38
 
 ### WHATSAPP_INBOX-F20 Cuando el asistente no puede contestar
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f20 -->
 Estado: hecho
 Actor: sistema
 Pantalla: WhatsApp: chat del cliente; Bandeja de entrada
@@ -629,7 +613,6 @@ Si falla: si la marca no se puede poner, la disculpa sale igual y el mensaje sig
 Implicados: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F21 La clienta pide cita por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f21 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -659,7 +642,6 @@ Implicados: APPOINTMENT-F02, APPOINTMENT-F18, CUSTOMER-F10, CUSTOMER-F26, FLOW-F
 WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 La clienta anula o mueve su cita por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f22 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -680,7 +662,6 @@ se mueve nada, no recibe respuesta y la conversación queda con «Necesita atenc
 Implicados: APPOINTMENT-F04, APPOINTMENT-F06, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F23 La clienta recibe el aviso cuando el salón confirma
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f23 -->
 Estado: hecho
 Actor: propietario, responsable, cliente
 Pantalla: Automatizaciones; WhatsApp: chat del cliente
@@ -713,7 +694,6 @@ Implicados: APPOINTMENT-F03, APPOINTMENT-F18, CUSTOMER-F11, FLOW-F31, FLOW-F33, 
 WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F24 El cliente pide mesa por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f24 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -743,7 +723,6 @@ Implicados: RESERVATION-F05, RESERVATION-F14, RESERVATION-F17, CUSTOMER-F10, FLO
 WHATSAPP_INBOX-F16, WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F25 El cliente anula o cambia su mesa por WhatsApp
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f25 -->
 Estado: hecho
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
@@ -766,7 +745,6 @@ anula nada, no recibe respuesta y la conversación queda con «Necesita atenció
 Implicados: RESERVATION-F09, RESERVATION-F18, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F20, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F26 El cliente recibe el aviso cuando el restaurante confirma
-<!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f26 -->
 Estado: hecho
 Actor: propietario, responsable, cliente
 Pantalla: Automatizaciones; Reservas; WhatsApp: chat del cliente
@@ -799,7 +777,6 @@ Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, FLOW-F33, WHATSAPP_INBOX
 WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -814,7 +791,6 @@ la última que mandó.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
 Estado: hecho
 Actor: sistema
 Pantalla: Ajustes
@@ -834,7 +810,6 @@ Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de
 Implicados: erplora.com, WhatsApp Manager
 
 ### WHATSAPP_INBOX-F29 Crear una plantilla y mandarla a revisión
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f29 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
@@ -878,7 +853,6 @@ el mes gastado se puede crear igual.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F30 Editar una plantilla
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f30 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
@@ -903,7 +877,6 @@ demás, como en F29.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F31 Borrar una plantilla
-<!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f31 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
@@ -923,7 +896,6 @@ se puede crear.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F32 Contestar desde la bandeja
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F12 old-hub:HUB-F266 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -944,11 +916,10 @@ erplora.com no tiene conectado el número del negocio, lo dice el Hub con sus pa
 conectado: conecta el número en Ajustes para enviar.»), nunca como motivo de Meta.
 Si erplora.com no contesta, no confirma o pide ir más despacio, la burbuja dice «No enviado» con
 **Reintentar**, que lo entrega otra vez con la misma clave: nunca sale dos veces. Sale siempre por el número
-del negocio que lo envió, aunque lo reintente otro desde la bandeja compartida de la fase 1.
+del negocio, lo reintente quien lo reintente.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Enviar una plantilla
-<!-- origen: old-hub:HUB-F266 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -970,7 +941,8 @@ estrecho, que nunca crea una conversación: solo escribe a la que ya existe con 
 salvo que lleve su prefijo.
 Entra: la plantilla (nombre e idioma), sus variables, el archivo de su cabecera (si lleva foto, vídeo o
 documento: el suyo o el elegido), una clave del mensaje y la conversación o el número. Una automatización
-solo envía las que no piden nada más que sus variables: las de cabecera con archivo, con el suyo.
+envía las mismas que la bandeja sabe rellenar: la de cabecera con archivo sale con el que eligió su paso **Enviar
+un mensaje** (FLOW-F32) o, si no eligió ninguno, con el suyo; sin ninguno de los dos no sale.
 Sale: el mensaje guardado y entregado como en F32; aviso `whatsapp_inbox.message.sent`.
 Si falla: una plantilla de **Marketing** solo se envía a una clienta con ficha y con el consentimiento
 de marketing por WhatsApp dado en Clientes («Esta clienta no ha dado su consentimiento para recibir
@@ -987,7 +959,6 @@ resto, como en F32.
 Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
-<!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F09 -->
 Estado: hecho
 Actor: todos
 Pantalla: Bandeja de entrada
@@ -1007,7 +978,6 @@ Si falla: un estado de un mensaje que el Hub no conoce se ignora sin error.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F35 Cambiar el estado de una conversación
-<!-- origen: nuevo (Zendesk, Fresha y Shopify Inbox: abierta, pendiente y cerrada; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -1021,7 +991,6 @@ Si falla: el motivo dentro del panel; el estado no cambia.
 Implicados: ninguna otra app
 
 ### WHATSAPP_INBOX-F36 Dejar una nota interna
-<!-- origen: nuevo (Fresha, Intercom y Front: notas internas en el hilo; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -1035,7 +1004,6 @@ Si falla: el motivo en el panel; el empleado no borra la nota de otra persona.
 Implicados: ninguna otra app
 
 ### WHATSAPP_INBOX-F37 Unir la conversación a una ficha o crear la ficha
-<!-- origen: nuevo (Square, Fresha y Shopify Inbox: la conversación lleva a la ficha del cliente; ver «Referencia adoptada») -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario
 Pantalla: Bandeja de entrada
@@ -1051,7 +1019,6 @@ Si falla: los motivos de Clientes (por ejemplo, un número que no es válido).
 Implicados: Clientes
 
 ### WHATSAPP_INBOX-F38 Saber a qué pregunta contesta lo que toca la clienta
-<!-- origen: old-hub:HUB-F265 -->
 Estado: hecho
 Actor: cliente, sistema
 Pantalla: Bandeja de entrada
@@ -1085,6 +1052,8 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación |
 | `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta |
 | `whatsapp_inbox.template_sample.detail` | El archivo de una cabecera por su id, como lo devolvió al guardarlo (nombre, foto, vídeo o documento y tamaño); solo el del negocio que pregunta |
+| `whatsapp_inbox.note.get` | Una nota interna por su id, con su texto: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API |
+| `whatsapp_inbox.template.get` | Una plantilla del negocio por su id con su nombre y su idioma («recordatorio (es)»), también una borrada aquí que Meta aún tiene: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API |
 | `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes |
 | `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación |
 
@@ -1138,7 +1107,8 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 - **Clientes** (obligatoria): `customer.customer.created` y `customer.customer.updated` unen las
   conversaciones sin ficha de ese número (F04); `customer.customer.merged` las pasa a la ficha que
   queda (F12); `customer.customer.deleted` las deja sin ficha y otra ficha viva del número las reclama;
-  `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
+  `customer.customer.restored` (la ficha eliminada que vuelve desde la copia aparte, CUSTOMER-F33) las une otra
+  vez, como una ficha nueva (F04); `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
   marketing por WhatsApp; crea fichas solo con `customer.customer.create`.
 
 ### Quién la usa
@@ -1150,7 +1120,16 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
   `message.received`, lee el mensaje con `message.get` y marca la conversación con `conversation.flag` (F20).
 - El **asistente**: todas las operaciones, con referencias humanas («responde a Ana», «asigna la
   conversación de Ana a Luis», «envía la plantilla recordatorio al número que te dicto», «crea una
-  plantilla de recordatorio»).
+  plantilla de recordatorio»), salvo las dos lecturas de su tarjeta (`note.get`, `template.get`). Antes de
+  cambiar nada pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las
+  pantallas, nunca por su id: la conversación como la llama la bandeja («Conversación: Ana López»), la ficha
+  que se le une, el mensaje que se reintenta y la nota que se borra por su texto, y la plantilla por su
+  nombre y su idioma («Plantilla: recordatorio (es)»). Lo que quien pregunta no puede ver no sale. Cada
+  herramienta sabe cómo se la pide una persona, en inglés y en español: «abre el último mensaje de Ana», «reintenta
+  la plantilla que no llegó a Meta» o «¿a qué personas puedo asignar este WhatsApp?» llegan a su operación (antes, abrir
+  un mensaje concreto, reintentar un mensaje o una plantilla, enviar, cambiar una plantilla y ver a quién se asigna
+  una conversación no le llegaban y decía que no podía). Para el asistente, una «plantilla» y un «mensaje» son los
+  de esta bandeja.
 
 ### Quién puede qué
 
@@ -1172,19 +1151,17 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`; 0 = el
   plan no incluye ninguno, nunca sin límite, y antes de la primera foto, `synced_at` vacío, no se supone
   tope: `Channel.cap_reached`) y la
-  `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). **Fase 1
-  sin tenencia:** las tablas son compartidas, así que la fila lleva el negocio en `host` (la primera etiqueta
-  de su host, como `base.Membership`; única) y cada operación lee y escribe solo la del `Scope` de su
-  contexto: la foto de `b` nunca pisa el número de `a` (desde la migración `0005`, reversible). En la fase
-  2 vive una sola en la BD de cada hub. Solo la escribe lo que dice erplora.com: su foto y su respuesta al
-  conectar o desconectar desde Ajustes.
+  `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). Cada negocio
+  tiene su BD (desde el corte S5, hub#602) y una sola fila en ella: dos primeras fotos a la vez crean una y la otra
+  la encuentra. Solo la escribe lo que dice erplora.com: su foto y su respuesta al conectar o desconectar desde
+  Ajustes.
 - `Conversation`: número E.164 (`phone`, único entre las no borradas), nombre de WhatsApp y su forma
   para buscar (`contact_search`: sin mayúsculas, tildes, emojis ni espacios de más), ficha
   (`customer`, FK a `customer.Customer`; una ficha eliminada cuenta como ninguna), asignada
   (`assigned_to`, FK al usuario), estado, sin leer, último mensaje (hora, extracto, tipo, dirección),
   último mensaje del cliente (`last_inbound_at`: la ventana de 24 h), `erased_at`, y el borrado en
   erplora.com (`erase_status`: vacío, `pending`, `done`; `erase_phone`: el número que erplora.com tiene
-  que olvidar, solo hasta que lo confirma; `erase_host`: el negocio que lo borró, desde la migración `0007`) y la
+  que olvidar, solo hasta que lo confirma) y la
   marca «Necesita atención» (`needs_attention`, migración `0009`): la pone `conversation.flag` y la quitan una
   respuesta de una persona (`message.send` o el eco del móvil) y `conversation.set_status`, nunca `message.notify`.
 - `Message`: dirección (`inbound`, `outbound`), origen (`customer`, `phone_app`, `hub`), procedencia
@@ -1193,16 +1170,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `delivered` → `read`, o `failed`) con el código del último intento o de Meta (`error_code`) y, solo en un
   rechazo que el Hub no nombra, el motivo tal como llegó (`error_message`; ver «Un motivo se dice…»),
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
-  obligatoria), el negocio que lo envió desde el Hub (`host`, fase 1, desde la migración `0007`; vacío en lo que
-  llega), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
-  (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id` (la opción
-  tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
+  obligatoria), plantilla usada y sus variables, quién lo envió, hora en que
+  se dijo, objeto de Meta (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id`
+  (la opción tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
   `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
   mensaje.
 - `Note`: texto, autor y hora.
-- `Template` (de cada negocio): el negocio en `host` (fase 1, como `Channel`; desde la migración `0006`,
-  reversible: las copias de antes quedan sin negocio, solo en el admin, y la foto de cada negocio trae de Meta
-  las suyas), nombre + idioma (únicos por negocio entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
+- `Template` (de cada negocio, en su BD): nombre + idioma (únicos entre las no borradas), categoría, estado en Meta
+  (`DRAFT` mientras
   Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
   (`header_format`: vacío, `TEXT`, `IMAGE`, `VIDEO`, `DOCUMENT` o `LOCATION`; `header`; `header_sample`, el
   archivo elegido aquí, que se queda vacío si la lista de Meta trae otro tipo de cabecera), cuerpo,
@@ -1217,9 +1192,10 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   (`models.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
   de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual», sin elegir
   nada (la de cabecera con archivo, solo con el suyo), y `fillable` «la bandeja la envía» (pidiendo el archivo si no
-  tiene); desde FLOW-F32, el paso «Enviar un mensaje» de una automatización ofrece las `fillable` y la de cabecera con
-  archivo sale con el suyo o con el elegido en el paso (contradicción señalada por CLOSE-FLOW, PLAN-HUB §64).
-- `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
+  tiene); el paso «Enviar un mensaje» de una automatización (FLOW-F31, F32) ofrece las `fillable`, no solo las
+  `sendable`, y la de cabecera con archivo sale con el elegido en el paso o con el suyo (`message.notify` toma
+  `template.header_sample` como `message.send`; sin ninguno, 422 en `header_sample`).
+- `TemplateSample` (de cada negocio, en su BD): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
   `sha256`, tipo, tamaño y nombre. `/p/media/` lo sirve solo a una sesión del hub (`members_media` de `apps.py`; un
@@ -1237,6 +1213,12 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 
 Mensajes recibidos y enviados: el admin los enseña en **solo lectura** (son lo que llevó WhatsApp; se
 corrigen borrando los datos de la conversación, nunca editando), con borrado para el staff.
+
+- **Columnas `host` que quedan en la BD**: los modelos no las tienen (migraciones `0011` y `0012`), pero las columnas,
+  sus datos y las dos guardas únicas que las nombran (`whatsapp_inbox_channel_one_per_host` y
+  `whatsapp_inbox_template_live_host_name_language_unique`) siguen en la BD; el código las deja vacías, así que siguen
+  guardando una fila de canal y una plantilla viva por nombre e idioma. Rehacer esas guardas sin `host` y borrar las
+  columnas es hub#1132.
 
 ### Reglas que no se rompen
 
@@ -1258,22 +1240,17 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - **Cada entrega corre en un hilo propio del proceso** (`base.outbound`: 4 a la vez, hasta 1000 en cola),
   en el contexto de BD de la operación que la pidió (su `use_hub`), nunca en
   el bucle que hizo el COMMIT: ni la petición, ni el relay del outbox de todos los hubs, ni las tareas
-  programadas del worker esperan a erplora.com (hasta 20 s por llamada) (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY,
-  `tests/test_outbound.py`). Un trabajo que se pierde (cola llena, el worker que se para en un despliegue)
+  programadas del worker esperan a erplora.com (hasta 20 s por llamada) (`tests/test_outbound.py`). Un trabajo que se pierde (cola llena, el worker que se para en un despliegue)
   lo recupera el barrido, que lo entrega con la misma clave. La tarea del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
   `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. El
   worker la corre en cada negocio que sirve, en su BD y con su ámbito (`base.worker._serve_hub`): retoma lo de ese
-  negocio, y cada mensaje, plantilla o borrado se entrega a erplora.com como el de su negocio
-  (`Message.host`, `Template.host`, `Conversation.erase_host`), con su contenido; un mensaje o un borrado de
-  número anterior a la migración `0007`, sin negocio guardado, sale con el ámbito de esa pasada, el de ese
-  negocio. «Reintentar» (`message.retry`) y volver a borrar un
-  número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila; sin negocio
-  guardado (anterior a `0007`), con el de quien lo pide. La entrega dice a `base.outbound` de qué negocio es el
-  trabajo (`scope=`, en `_after_commit_as`) y su hilo trabaja en el contexto de BD activo
-  (`base.tenancy.context.current_for`): una BD de hub solo guarda lo suyo, y una operación de otro negocio allí se
-  rechaza (`HubContextMismatch`), así que ningún trabajo llega a la BD de otro hub. El barrido pasa por el mismo
-  camino, dentro del `use_hub` de cada negocio (`tests/test_resume_per_business.py`).
+  negocio y lo entrega a erplora.com como ese negocio, con su contenido. «Reintentar» (`message.retry`) y volver a
+  borrar un número ya borrado (`conversation.erase` por su id) entregan igual, como el negocio de quien lo pide. El
+  hilo de la entrega trabaja en el contexto de BD de la operación que la pidió (`base.outbound`): una BD de hub solo
+  guarda lo suyo, y una operación de otro negocio allí se rechaza (`HubContextMismatch`), así que ningún trabajo llega
+  a la BD de otro hub. El barrido pasa por el mismo camino, dentro del `use_hub` de cada negocio
+  (`tests/test_resume_per_business.py`).
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
@@ -1327,7 +1304,20 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   (`header_sample`) por el nombre con que se eligió, con la lectura `template_sample.detail` (marca `refers`
   de `A_SAMPLE` en `schemas.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
   automatización sin persona delante, lo deja fuera, nunca por su id
-  (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED; `tests/test_integration_assistant.py`).
+  (`tests/test_integration_assistant.py`).
+- **La misma tarjeta nombra el registro que toca cada escritura** (hub#571) con las marcas `refers` de
+  `schemas.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
+  `ConversationRefIn` y de `SendIn`) por su `display_name` con `conversation.detail`; la ficha que se une
+  (`A_CUSTOMER`) con `customer.customer.detail` de Clientes, que es requisito; el mensaje que se reintenta
+  (`A_MESSAGE`) con `message.get`, por su texto, si no su pie, su archivo o su plantilla; la nota que se
+  borra (`A_NOTE`) con `note.get`, y la plantilla que se cambia, se borra o se reintenta (`A_TEMPLATE`) con
+  `template.get`, como la lista Ajustes (también una borrada aquí que Meta aún tiene). `note.get` y
+  `template.get` son lecturas internas (`ai=INTERNAL`, sin API): el modelo encuentra notas y plantillas en
+  sus listas. Cada `id` lleva su título (Conversación, Mensaje, Nota, Plantilla). Lo que no existe, es de
+  una conversación borrada, de otro negocio, o lo que quien pregunta no puede leer se queda fuera, nunca por
+  su id (`tests/test_assistant_card_records.py`). El tipo de un botón de plantilla (`buttons[].type`) no
+  tiene etiqueta: vive en el JSON de `Template.buttons`, sin campo de modelo que la dé, y la tarjeta dice
+  los botones por cuántos son, nunca por su código.
 - La ventana de 24 h se cuenta desde el último mensaje **del cliente** (`last_inbound_at`), en el
   servidor; fuera de ella, `message.send` con texto da 409 `whatsapp_inbox.window_closed`. Sin
   `SAAS_INTERNAL_URL`, sin número conectado o con el mes gastado no se guarda nada (409
@@ -1358,6 +1348,18 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - Zona horaria: las horas de la bandeja, en la del negocio (`useBusinessZone`, hub#779); el mes del tope es el de
   erplora.com, que lo cuenta en UTC y rechaza por él (`usage_month`): el Hub lo lee en ese mismo reloj
   (`clock.allowance_month`, hub#771), porque en el del negocio llamaría gastado o nuevo a un mes horas antes que él.
+- **Las 32 herramientas del asistente dicen sus `asks`** en `en` y `es` (hub#1108): `whatsapp_inbox` está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta entre
+  las diez primeras, rol a rol. `tests/test_assistant_asks.py` mide con las frases reales de la QA de la capa 2
+  (`tests/e2e/qa/probes/owner-es-whatsapp_inbox-2026-11-08.json`), nunca con los propios `asks`: cada una entre las 20
+  primeras de las 40 que se ofrecen. Además, cada herramienta tiene una frase propia (`OWN_WORDS`, ni ask ni sonda) que
+  solo entra entre las diez primeras con sus `asks`: neutralizarlos en una sola herramienta hace caer su caso, y los
+  asks que esta app obligó a reescribir (las plantillas de negocio de `base` y la carga de Personal) guardan dos puestos
+  de margen. Su `assistant_synonyms` (en `apps.py`) lleva «plantilla» = template y «mensaje» = message (en inglés ya se leían así):
+  sin ellos, `template.retry` quedaba el 81.º y una petición de plantilla nueva perdía frente a cualquier alta del Hub.
+  Trampas al escribir `asks`: «contesta» comparte raíz con «conteo» (recuento de Caja), «listo» se leía como `list`,
+  «recordatorio» suma a los `record` de VeriFactu y Control horario, y un nombre de persona suma en cada sonda que lo
+  diga (por eso Nuria, Jorge, Elena y Raúl, que no dice ninguna).
 
 ### Retención (RGPD)
 
@@ -1375,8 +1377,8 @@ antigüedad en la fase 1: si se decide un plazo, será un ajuste con su tarea.
 **Firma** de toda llamada, en los dos sentidos (la de todo `/internal`, `base.auth.sign`): cabeceras
 `X-Erplora-Timestamp` (segundos Unix) y `X-Erplora-Signature` = HMAC-SHA256 en hexadecimal de
 `f"{timestamp}.{cuerpo}"` con `INTERNAL_SHARED_SECRET`; quien recibe rechaza (401) una firma mala o una
-marca de tiempo a más de 300 s. Cuerpo JSON UTF-8. `hub` = el slug del negocio en la fase 1 (el
-`Hub.id` en la fase 2). Ejemplo de cabeceras:
+marca de tiempo a más de 300 s. Cuerpo JSON UTF-8. `hub` = el slug del negocio (el Hub lo busca en su registro,
+`base.registry.hub_by_slug`). Ejemplo de cabeceras:
 
 ```http
 POST /internal/whatsapp/inbound HTTP/1.1
@@ -1386,9 +1388,9 @@ X-Erplora-Signature: 5f0c…e91a   # hex(HMAC_SHA256(secret, "1760518800." + cue
 ```
 
 **Cuatro puertas que monta `base`** (erplora.com → Hub; cada una ejecuta una operación de sistema). Están
-montadas desde hub#127 (`base/internal.py`), probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP
-firmado con la bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama desde saas#63,
-probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
+montadas en `base/internal.py`, probadas en `base/tests/test_internal_whatsapp.py` y, por HTTP firmado con la
+bandeja abierta, en `tests/e2e/whatsapp-internal.spec.ts`; erplora.com las llama, probado de punta a punta con su
+número de pruebas en `tests/e2e/whatsapp-inbox-erplora.spec.ts`:
 
 1. `POST /internal/whatsapp/inbound` → `whatsapp_inbox.message.receive`. Un mensaje del cliente o el eco
    de lo que el dueño escribió en el móvil, en vivo o del historial:
@@ -1448,7 +1450,7 @@ probado de punta a punta con su número de pruebas en `tests/e2e/whatsapp-inbox-
 
 **Las puertas que sirve el SaaS** (el Hub → erplora.com; `apps/whatsapp_inbox/gateway.py`, `httpx`, 5 s
 para conectar y 15 s para leer; siempre después del COMMIT, nunca dentro de una transacción). Existen en
-erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/internal.py`; su WORKBOOK,
+erplora.com, con su webhook de Meta (`saas/whatsapp/internal.py`; su WORKBOOK,
 «Contrato con el Hub», añade las 10–12):
 
 5. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/send`, con `Idempotency-Key: <client_message_id>`:
@@ -1575,7 +1577,7 @@ clic, `window.open` de `https://www.facebook.com/<graph_version>/dialog/oauth?cl
 Mientras corre, Meta manda a esta página por `postMessage`, desde `https://*.facebook.com`, la sesión
 (`WA_EMBEDDED_SIGNUP`: `FINISH*` con `waba_id`, `phone_number_id`, `business_id`; `CANCEL` o `ERROR` con su
 motivo); al terminar lleva el navegador a `redirect_uri` con `?code=…&state=…` (o `error`). **La vuelta en
-erplora.com** (hecha en saas#71; `PLAN-SAAS.md` §19, ronda 2026-10-30, «Alta embebida sin el SDK de Facebook»):
+erplora.com** (`PLAN-SAAS.md` §19, «Alta embebida sin el SDK de Facebook»):
 `GET /whatsapp/return`, pública, sin sesión ni BD, con COOP `unsafe-none` solo en esa vista, que hace
 `window.opener.postMessage({"type": "erplora.whatsapp.signup", "state", "code" | "error", "error_description"},
 "https://<slug>.erplora.com")` con el `slug` del `state` (ni reservados ni demos) y se cierra; y el canje del código
@@ -1587,14 +1589,14 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 
 ### Contrato con `base`
 
-- Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB; hecho desde hub#127,
-  `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (fase 1:
-  `Scope("host", hub)`; fase 2: `use_hub`), comprueba que la app está activa (si no, 404 `app_inactive`) y
+- Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB;
+  `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (su slug: entra en su
+  BD con `use_hub` y corre como `Scope("host", hub)`), comprueba que la app está activa (si no, 404 `app_inactive`) y
   ejecuta la operación con `system_context(scope)`, devolviendo su salida o el sobre de errores con su
   estado HTTP (422 para un cuerpo que no vale).
 - Al recibir la foto de estado con la clave `whatsapp` (puerta 4), se la pasa a
-  `whatsapp_inbox.channel.sync` con la versión de la foto (hecho desde hub#127).
-- El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
+  `whatsapp_inbox.channel.sync` con la versión de la foto.
+- El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased/restored` a
   `apps.whatsapp_inbox.events.react` (`base/relay.py`); el worker ejecuta la tarea `resume_deliveries` de
   `apps.py` en cada negocio que sirve (`base.worker._serve_hub`), y el trabajo diferido de esta app corre en el
   hub de la operación que lo pidió (`base.outbound`).
@@ -1603,11 +1605,11 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   «esperando respuesta» (`AWAITING_REPLY` de `queries.py`: abierta y con el último mensaje del cliente o
   `needs_attention`); se refresca con `AWAITING_REPLY_EVENTS` de `events.py`, que incluye
   `conversation.flagged`.
-- Los avisos del dispositivo (`notices` de `apps.py`, hub#2303) leen `whatsapp_inbox.conversation.notices`: una
+- Los avisos del dispositivo (`notices` de `apps.py`) leen `whatsapp_inbox.conversation.notices`: una
   fila por conversación esperando respuesta con `at` = el último mensaje del cliente (`last_inbound_at`), así que
   el dispositivo, que cuenta cada par (`id`, `at`) una vez, avisa de nuevo cuando el cliente vuelve a escribir.
   Con ellos, quien puede leer la bandeja figura en `sources` de `base.notice.list` y la app instalada le pide
-  permiso para avisar aunque el negocio solo use WhatsApp (hub#2306).
+  permiso para avisar aunque el negocio solo use WhatsApp.
 - Las fotos y las notas de voz del hilo (F06) se cargan de erplora.com: la CSP del Hub permite su origen en
   `img-src` y `media-src` (`config/settings.py`, hub#147), y erplora.com las sirve a quien tiene su sesión
   (`<slug>.erplora.com` y `erplora.com` son un mismo sitio, así que la cookie viaja).
@@ -1672,10 +1674,9 @@ menciona la ficha, el teléfono con que reservar ni `on_behalf_of`. Lo prueban
 `tests/test_relay_auto_replies.py::test_the_answer_never_books_or_waitlists_on_another_guest_s_card_whatever_the_assistant_sends`,
 `tests/test_relay_auto_replies.py::test_the_answer_books_and_waitlists_only_with_the_number_that_writes_whatever_the_assistant_sends`
 y `tests/test_recipes.py::test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf`.
-La tarjeta de Ajustes enciende la respuesta y su aviso (F26). La receta cambió de huella al añadir la anulación, otra
-vez al fijar la ficha y otra al darle la lista ofrecida (F19): quien ya la tenía encendida la ve como versión nueva en Automatizaciones y la actualiza con F18
-(lo mismo que **Restaurar la de fábrica**, FLOW-F35); hasta entonces sigue con el encargo viejo, que pide la ficha al
-modelo.
+La tarjeta de Ajustes enciende la respuesta y su aviso (F26). Un negocio que la
+encendió con una versión anterior la ve como versión nueva en Automatizaciones y la actualiza con F18 (lo mismo que
+**Restaurar la de fábrica**, FLOW-F35); hasta entonces sigue con la anterior.
 
 Lo que falta, fuera de esta app:
 
@@ -1703,58 +1704,19 @@ tarjeta de Ajustes restaura el mutuo excluyente de cuando había dos (`rival`): 
 aviso, y si algo falla se deshace. Lo probado está en `tests/test_recipes.py` y `tests/test_relay_auto_replies.py` (tras
 el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointment-whatsapp.spec.ts`.
 
-### Contradicciones escritas, sin resolver
+### Decisiones de los planes
 
-- F24: el producto actual no creaba ficha a quien pedía mesa por WhatsApp («su ficha si ya existe (no se
-  crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
-  (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; la respuesta de
-  citas también la crea (F21, CUSTOMER-F26).
-- Modo compartido de la tenencia (PLAN-DB, S1; hoy, todos los negocios de producción): las conversaciones de `a` y
-  `b` comparten tablas (solo los avisos vivos van por hub), como en todas las apps; un negocio con BD propia (los que
-  nacen desde la tenencia S2a, hub#471) no comparte nada. El número y las plantillas ya no: `Channel` y `Template` son
-  de cada negocio (ver «Modelo»), porque la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
-  «Borradas en WhatsApp Manager» las plantillas de `a`; y el mensaje que sale del Hub y el número que se
-  pide olvidar guardan su negocio, porque el worker los retomaba con el suyo y «Reintentar» o volver a
-  borrar desde otro negocio los entregaban con el de quien lo pedía.
-
-Resueltas en los planes, y fuera de esta lista:
-
-- «WhatsApp sale del SaaS y el Hub llama a Meta»: la derogan las rondas 2026-10-21 de `PLAN-SAAS.md` §1.1 y de
-  `PLAN-HUB.md` §8 (APP-WHATSAPP, saas#63): WhatsApp se queda en erplora.com como única pasarela con Meta y el Hub
-  habla con él por `/internal` (puertas 1–12 de «Contrato con el SaaS»); la ronda 2026-10-30 de `PLAN-SAAS.md` §19
-  (cierre de `whatsapp`, saas#157) lo da por cerrado. El Hub nunca llama a Meta.
-- Dónde se crean las plantillas: en el Hub (Ajustes), y erplora.com solo las registra en Meta (puertas 8 y 9), por la
-  ronda 2026-10-21 de `PLAN-SAAS.md` §1.1 (APP-WHATSAPP_INBOX-1, hub#118; mercado: Odoo, WATI, Respond.io, Twilio,
-  Gupshup, AiSensy, Interakt y Zoko).
-- El cupo de WhatsApp lo cuenta y lo frena erplora.com, y el Hub solo enseña sus cifras: `PLAN-SAAS.md` §19 (ronda
-  2026-10-30), que resuelve para WhatsApp el «el Hub cuenta» de `PLAN-HUB.md` §8 (2026-10-15).
-- El aviso al 80 % del cupo (`PLAN-HUB.md` §8, 2026-10-15; señalado en `PLAN-SAAS.md` §19): se queda. F13 avisa desde el
-  80 % en la bandeja y en Ajustes, con las cifras de erplora.com, como el asistente (BASE-F104); decidido al migrar con
-  el mercado (WATI, respond.io, Gupshup, Zoko, Twilio, Odoo, Fresha y ActiveCampaign avisan antes de agotar el saldo o
-  el cupo; aquí el tope corta los envíos, sin paquetes ni exceso).
-
-### Cambios frente al producto actual
-
-| Producto actual | Aquí | Motivo |
-|---|---|---|
-| El Hub **sondea** a erplora.com (`/api/v1/hub/device/whatsapp/inbox`, `statuses`) | erplora.com **empuja** al Hub por `/internal` | Contrato SaaS ↔ Hub (el SaaS empuja tras el commit; PLAN-SAAS §2) |
-| La bandeja no contesta («Desde esta pantalla no se contesta») | Se contesta desde el Hub (F32, F33) | Mercado (ver «Referencia adoptada») |
-| Estados `active`/`closed`, solo el borrado cierra | Abierta / pendiente / cerrada, a mano; un mensaje nuevo reabre | Mercado (Zendesk, Fresha, Shopify) |
-| Asignar tecleando el identificador, solo el administrador | Selector del equipo + «Asignármela»; el responsable asigna | Mercado (Shopify, Chakra); el producto actual lo marcaba «parcial» |
-| Sin notas | Notas internas (F36) | Mercado (Fresha, Intercom, Front) |
-| «Necesita atención» lo ponían las recetas | Igual: la pone la respuesta automática cuando no puede contestar (F20), sale junto al nombre en la bandeja y la campana **Clientes de WhatsApp esperando respuesta** la cuenta | — |
-| La respuesta automática reservaba sola (paso `ai` con `policy: auto`) | El asistente propone y la reserva o el cambio esperan tu «Aprobar» en **Esperan tu respuesta** («Que me lo pregunte») | Lo que contesta va a un desconocido: el dueño ve antes cada cambio; mercado (Fresha, Booksy y Square confirman las citas que pide un cliente por mensaje) |
-| La app instalada avisaba cuando subía el contador de la campana (hub#2303) | Un aviso del dispositivo por cada mensaje de un cliente que queda sin contestar | Mercado (WhatsApp Business, Shopify Inbox, Square, Fresha avisan de cada mensaje); un aviso por subida del contador callaría al cliente que vuelve a escribir tras cerrarse sin respuesta |
-| Fotos y audio dentro del hilo, descargados por una puerta del Hub | Fotos y notas de voz dentro del hilo, servidas por erplora.com; vídeos y documentos con **Abrir el adjunto** | El Hub no guarda ni pasa archivos: erplora.com los sirve con la sesión de la persona y la CSP del Hub permite su origen (ver «Contrato con `base`») |
-| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31): el archivo de la cabecera se guarda en los archivos del negocio y erplora.com lo sube a Meta como muestra; la bandeja envía la plantilla con su archivo o el elegido (F33) | Mercado: WATI, respond.io, Twilio y WhatsApp Manager piden el archivo al enviar |
-| Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
-| `templates.list` y ajustes solo para el administrador | Elegir plantilla para enviar: quien contesta; Ajustes: propietario y administrador | Quien contesta necesita las plantillas |
+- WhatsApp se queda en erplora.com como única pasarela con Meta y el Hub habla con él por `/internal` (puertas 1–12
+  de «Contrato con el SaaS»): el Hub nunca llama a Meta (`PLAN-SAAS.md` §1.1 y §19, `PLAN-HUB.md` §8).
+- Las plantillas se crean en el Hub (Ajustes), y erplora.com solo las registra en Meta (puertas 8 y 9)
+  (`PLAN-SAAS.md` §1.1; mercado: Odoo, WATI, Respond.io, Twilio, Gupshup, AiSensy, Interakt y Zoko).
+- El cupo de WhatsApp lo cuenta y lo frena erplora.com, y el Hub solo enseña sus cifras (`PLAN-SAAS.md` §19).
+- El aviso al 80 % del cupo: F13 avisa desde el 80 % en la bandeja y en Ajustes, con las cifras de erplora.com, como
+  el asistente (BASE-F104); WATI, respond.io, Gupshup, Zoko, Twilio, Odoo, Fresha y ActiveCampaign avisan antes de
+  agotar el saldo o el cupo; aquí el tope corta los envíos, sin paquetes ni exceso.
 
 ### Lo que queda fuera
 
-- **Una traducción al español marcada «fuzzy» sale en inglés y el test de traducciones no lo ve**, hub#569.
-- **Tres textos salen en español con la palabra de Clientes o Facturación**, hub#570.
-- **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#571.
 - **Los iconos de WhatsApp, Enviar y los adjuntos, y el hilo de chat compartido**: siguen pedidos a `@erplora/ui`
   ([`UI-REQUESTS.md`](UI-REQUESTS.md)).
 - **Relacionada, de otras apps**: el Inicio no dice de un vistazo si WhatsApp funciona (hub#573, BASE-F02): pide

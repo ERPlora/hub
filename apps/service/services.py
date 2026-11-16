@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
-from live.operations import UnknownOperation, atomic, operation
+from live.operations import INTERNAL, UnknownOperation, atomic, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
@@ -44,6 +44,7 @@ from apps.service.queries import (
     ASSIGNMENT_NOT_FOUND,
     PACKAGE_NOT_FOUND,
     SESSION_NOT_FOUND,
+    SYSTEM,
     balance,
     current_settings,
     find_category,
@@ -58,6 +59,7 @@ from apps.service.queries import (
     load_grant,
     load_package,
     load_service,
+    left_by_deleting,
     lock_grant,
     redeem_refusal,
     session_value,
@@ -77,6 +79,8 @@ from apps.service.schemas import (
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
+    CategoryRecoveredOut,
+    CategoryRecoverIn,
     CategoryRefIn,
     DeletedOut,
     ExpiredOut,
@@ -98,8 +102,11 @@ from apps.service.schemas import (
     ServiceIn,
     ServiceImageIn,
     ServiceImageUploadIn,
+    ServiceLinkIn,
     ServiceOut,
     ServicePatchIn,
+    ServiceRecoveredOut,
+    ServiceRecoverIn,
     ServiceRefIn,
     ServicesOut,
     SessionOut,
@@ -108,15 +115,17 @@ from apps.service.schemas import (
     SettingsIn,
     SettingsOut,
     SettleIn,
+    SubcategoryLinkIn,
     NoIn,
     VoidIn,
 )
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries import live_members, resolve_member
 from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
 from base.operations import call
+from base.recovery import LeftOut, carries_on
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -141,6 +150,22 @@ GRANT_UNLIMITED = _(
 GRANT_NO_EXPIRY = _("That voucher never expires: there is no expiry to extend.")
 GRANT_BELOW_USED = _("You cannot take away more sessions than the customer has left.")
 CUSTOMER_UNAVAILABLE = _("That customer's card does not exist in this business.")
+#: Who a service made again from a separate copy came back without, said by their id (``service.service.recover``).
+MEMBER_TERMINATED_LEFT = _("came back without the professional %(member)s: terminated in Staff")
+MEMBER_GONE_LEFT = _("came back without the professional %(member)s: no longer in Staff")
+#: What a category made again from a separate copy came back without, said by its id (``service.category.recover``).
+SERVICE_MOVED_LEFT = _("came back without the service %(service)s: moved to another category since")
+SUBCATEGORY_MOVED_LEFT = _("came back without the subcategory %(category)s: moved elsewhere since")
+SUBCATEGORY_LOOP_LEFT = _(
+    "came back without the subcategory %(category)s: it would hang from one of its own subcategories"
+)
+#: Why one the business changed since the category came back, even without moving it, stays as it left it.
+SERVICE_CHANGED_LEFT = _("came back without the service %(service)s: changed by the business meanwhile")
+SUBCATEGORY_CHANGED_LEFT = _("came back without the subcategory %(category)s: changed by the business meanwhile")
+#: Why nothing the business kept goes back into a category a recovery brought back before this one.
+CATEGORY_BROUGHT_EARLIER = _(
+    "the category %(category)s came back in an earlier recovery: what goes in it is the business's to decide"
+)
 #: Why a session cannot be spent (queries.redeem_refusal) → its code and its message.
 REDEEM_REFUSALS = {
     "voided": (
@@ -176,9 +201,6 @@ SESSION_NOT_SETTLED = _("That session was never charged, so there is nothing to 
 SESSION_ALREADY_RETURNED = _("That session was already given back by another refund.")
 #: How long a session held at the till waits to be charged (SERVICE-F25).
 HOLD_DURATION = dt.timedelta(days=1)
-
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
-SYSTEM = "service.system"
 
 # The plain fields of a service an edit may change (the others need a lookup or may be emptied).
 SERVICE_PLAIN = (
@@ -347,6 +369,7 @@ def _announce_created(ctx: OperationContext, service: Service) -> None:
 @operation(
     "service.service.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.add_service",
     input=ServiceIn,
     output=ServiceOut,
@@ -355,6 +378,13 @@ def _announce_created(ctx: OperationContext, service: Service) -> None:
         "description": "Create a service of the catalog with its price, duration and tax category (the settings' "
         "default when not said); what it does not say takes the settings.",
         "risk": "normal",
+        "asks": {
+            "en": ("add a new service: men's haircut, 30 minutes, 15 euros", "create a keratin treatment at 90 euros"),
+            "es": (
+                "da de alta el servicio de corte de caballero a 15 €",
+                "crea un servicio de alisado de keratina de 90 minutos",
+            ),
+        },
     },
 )
 def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
@@ -369,6 +399,7 @@ def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
 @operation(
     "service.service.bulk_create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServiceBulkIn,
     output=ServicesOut,
@@ -377,6 +408,13 @@ def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
         "description": "Create up to 500 services at once, all of them or none: a line that cannot be created says "
         "why under its own field and nothing is created.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "add these three services at once: cut, colour and blow-dry",
+                "create the whole list of beauty services in one go",
+            ),
+            "es": ("da de alta de golpe corte, tinte y peinado", "crea de una vez todos estos servicios de estética"),
+        },
     },
 )
 def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
@@ -407,6 +445,7 @@ def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
 @operation(
     "service.service.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServicePatchIn,
     output=ServiceOut,
@@ -415,6 +454,10 @@ def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
         "description": "Change a service (named by its id or its name): only the fields sent change; null empties "
         "its category or its minimum and maximum prices. Its tax category can be changed, never emptied.",
         "risk": "normal",
+        "asks": {
+            "en": ("raise the colour service to 45 euros", "the manicure now lasts 50 minutes"),
+            "es": ("sube el tinte a 45 €", "cambia la duración de la manicura a 50 minutos"),
+        },
     },
 )
 def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
@@ -457,6 +500,7 @@ def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
 @operation(
     "service.service.archive",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.delete_service",
     input=ServiceRefIn,
     output=ServiceOut,
@@ -465,6 +509,10 @@ def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
         "description": "Archive a service: it is no longer offered nor bookable; its history, the appointments "
         "already booked and the vouchers that include it are kept. Archiving it again changes nothing.",
         "risk": "high",
+        "asks": {
+            "en": ("we no longer do perms, archive them", "stop offering the beard trim"),
+            "es": ("ya no hacemos permanentes, archívalo", "deja de ofrecer el arreglo de barba"),
+        },
     },
 )
 def archive_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
@@ -479,6 +527,7 @@ def archive_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
 @operation(
     "service.service.restore",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServiceRefIn,
     output=ServiceOut,
@@ -486,6 +535,13 @@ def archive_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     ai={
         "description": "Restore an archived service (named by its id or its name): it is offered and bookable again.",
         "risk": "normal",
+        "asks": {
+            "en": ("bring back the perm service", "restore the archived beard trim"),
+            "es": (
+                "recupera el masaje relajante para venderlo otra vez",
+                "restaura el servicio de mechas que archivamos",
+            ),
+        },
     },
 )
 def restore_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
@@ -497,7 +553,7 @@ def restore_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     return load_service(service.id, ctx.scope)
 
 
-# ── The service's image (SERVICE-F34, F35; round 2026-10-30, base.images) ─────────────────────────────────────
+# ── The service's image (SERVICE-F34, F35; base.images) ───────────────────────────────────────────────────────
 
 #: Where a service's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
 PHOTOS = "service/services/"
@@ -506,6 +562,7 @@ PHOTOS = "service/services/"
 @operation(
     "service.service.set_image",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=ServiceImageIn,
     output=ServiceOut,
@@ -515,6 +572,10 @@ PHOTOS = "service/services/"
         "its id or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from service.service.suggest_image or "
         "base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "asks": {
+            "en": ("put the second picture on the manicure service", "use that drawing as the beard trim's photo"),
+            "es": ("ponle al tinte la foto que me has propuesto", "usa la segunda imagen para el servicio de manicura"),
+        },
     },
 )
 def set_image(ctx: OperationContext, data: ServiceImageIn) -> dict:
@@ -611,6 +672,7 @@ def lock_tree() -> dict:
 @operation(
     "service.category.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.add_category",
     input=CategoryIn,
     output=CategoryOut,
@@ -618,6 +680,10 @@ def lock_tree() -> dict:
     ai={
         "description": "Create a service category, optionally inside another one; its name is unique.",
         "risk": "normal",
+        "asks": {
+            "en": ("create a nails category for the services", "add a Colour service category"),
+            "es": ("crea la categoría Uñas para los servicios", "añade una familia de servicios llamada Color"),
+        },
     },
 )
 def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
@@ -646,6 +712,7 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
 @operation(
     "service.category.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_category",
     input=CategoryPatchIn,
     output=CategoryOut,
@@ -654,6 +721,13 @@ def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
         "description": "Change a service category (named by its id or its name): only the fields sent change; "
         "parent_id null makes it a root category.",
         "risk": "normal",
+        "asks": {
+            "en": ("rename the nails category to Hands and feet", "move the colour category inside Hair"),
+            "es": (
+                "cambia el nombre de la categoría Uñas a Manos y pies",
+                "mete la categoría de color dentro de Peluquería",
+            ),
+        },
     },
 )
 def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
@@ -696,6 +770,7 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
 @operation(
     "service.category.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.delete_category",
     input=CategoryRefIn,
     output=DeletedOut,
@@ -704,6 +779,13 @@ def update_category(ctx: OperationContext, data: CategoryPatchIn) -> dict:
         "description": "Delete a service category: its services stay, without a category, and its subcategories "
         "move up to its parent; its name is free again.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "delete the nails category, its services can stay without one",
+                "remove the Others service category",
+            ),
+            "es": ("elimina la categoría Uñas", "borra la familia de servicios Varios"),
+        },
     },
 )
 def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
@@ -722,12 +804,114 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
     return {"id": category.id}
 
 
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114), for a category
+# the business no longer has at all.
+@operation(
+    "service.category.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=CategoryRecoverIn,
+    output=CategoryRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
+    """A category of a separate copy the business no longer has, made again by ``service.category.create``. What it
+    had inside it there and the business keeps where deleting it left it (SERVICE-F08) goes back into it afterwards,
+    each by its own link, counted apart (``service.service.return_to_category``, ``service.category.return_to_parent``).
+    What the business moved since stays where it is, and the output says the category came back without it, and why
+    (``left_out``)."""
+    parent_of = lock_tree()
+    made = create_category(ctx, CategoryIn.model_validate(data.model_dump(include=set(CategoryIn.model_fields))))
+    parent_of[made.id] = made.parent_id
+    left_in = left_by_deleting(data.stands_for)
+    moved = Service.objects.filter(pk__in=data.service_ids, category__isnull=False).order_by("id")
+    left_out = [
+        LeftOut(code="service.service_moved", message=SERVICE_MOVED_LEFT % {"service": pk})
+        for pk in moved.values_list("pk", flat=True)
+    ]
+    for child in Category.objects.filter(pk__in=data.subcategory_ids, is_deleted=False).order_by("id"):
+        if child.parent_id != left_in:
+            message, code = SUBCATEGORY_MOVED_LEFT, "service.subcategory_moved"
+        elif parent_problem(child.pk, made.id, parent_of):
+            message, code = SUBCATEGORY_LOOP_LEFT, "service.subcategory_loop"
+        else:
+            continue
+        left_out.append(LeftOut(code=code, message=message % {"category": child.pk}))
+    return load_category(made.id) | {"left_out": left_out}
+
+
+def _brought_back_now(ctx: OperationContext, category: Category) -> Category:
+    """``category``, made again by the recovery that runs or by one it carries on (``base.recovery.carries_on``): one
+    any other recovery brought back is the business's own, and nothing it kept goes back into it."""
+    if category.created_by != _actor(ctx) and not carries_on(category.created_by):
+        raise Conflict(str(CATEGORY_BROUGHT_EARLIER % {"category": category.pk}), code="service.category_brought_earlier")
+    return category
+
+
+# Not an assistant tool and no route: like the category's recover, its one door is the recovery from a separate copy.
+@operation(
+    "service.service.return_to_category",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ServiceLinkIn,
+    output=ServiceOut,
+    ai=INTERNAL,
+)
+def return_service_to_category(ctx: OperationContext, data: ServiceLinkIn) -> dict:
+    """A service the business kept without a category since it deleted the one it was in, put back into the category
+    the running recovery made again for that one, as the screen changes it. One moved since stays where the business put
+    it (``service.service_moved``). The category is held before the service, as an edit does."""
+    category = _brought_back_now(ctx, find_category(data.category_id, None, hold=True))
+    service = find_service(data.service_id, None, lock=True)
+    if service.category_id is not None:
+        raise Conflict(str(SERVICE_MOVED_LEFT % {"service": service.pk}), code="service.service_moved")
+    if service.updated_at > category.created_at:
+        raise Conflict(str(SERVICE_CHANGED_LEFT % {"service": service.pk}), code="service.service_changed")
+    _apply(service, {"category_id": category.id}, ctx)
+    service.save()
+    record_event(ctx, events.SERVICE_UPDATED, {"id": str(service.id)})
+    return load_service(service.id, ctx.scope)
+
+
+# Not an assistant tool and no route: like the category's recover, its one door is the recovery from a separate copy.
+@operation(
+    "service.category.return_to_parent",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=SubcategoryLinkIn,
+    output=CategoryOut,
+    ai=INTERNAL,
+)
+def return_subcategory_to_parent(ctx: OperationContext, data: SubcategoryLinkIn) -> dict:
+    """A subcategory the business kept where deleting its parent left it, hung again from the category the running
+    recovery made again for that parent, as a move of the screen. One moved since stays where the business put it
+    (``service.subcategory_moved``), and so does one that would hang from one of its own subcategories
+    (``service.subcategory_loop``). The whole tree is held first, as a move does."""
+    parent_of = lock_tree()
+    parent = _brought_back_now(ctx, find_category(data.parent_id, None))
+    child = find_category(data.category_id, None)
+    if child.parent_id != left_by_deleting(data.stands_for):
+        raise Conflict(str(SUBCATEGORY_MOVED_LEFT % {"category": child.pk}), code="service.subcategory_moved")
+    if parent_problem(child.pk, parent.pk, parent_of):
+        raise Conflict(str(SUBCATEGORY_LOOP_LEFT % {"category": child.pk}), code="service.subcategory_loop")
+    if child.updated_at > parent.created_at:
+        raise Conflict(str(SUBCATEGORY_CHANGED_LEFT % {"category": child.pk}), code="service.subcategory_changed")
+    _apply(child, {"parent_id": parent.id}, ctx)
+    child.save()
+    record_event(ctx, events.CATEGORY_UPDATED, {"id": str(child.id)})
+    return load_category(child.id)
+
+
 # ── Settings (SERVICE-F11) ────────────────────────────────────────────────────────────────────
 
 
 @operation(
     "service.settings.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.manage_settings",
     input=SettingsIn,
     output=SettingsOut,
@@ -736,6 +920,16 @@ def delete_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
         "description": "Save the service settings: only the fields sent change. The duration, buffer, online booking "
         "and tax category are what a new service takes when it does not say them.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "change the services settings: 45 minutes by default",
+                "leave ten minutes between services by default",
+            ),
+            "es": (
+                "que los servicios nuevos duren una hora por defecto",
+                "en los ajustes de servicios, pon diez minutos de margen",
+            ),
+        },
     },
 )
 def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
@@ -790,6 +984,7 @@ def _assignment_payload(assignment: Assignment) -> dict:
 @operation(
     "service.assignment.assign",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=AssignIn,
     output=AssignmentOut,
@@ -798,6 +993,13 @@ def _assignment_payload(assignment: Assignment) -> dict:
         "description": "Assign a professional of Staff (by name) to a service (by name), with their own duration and "
         "price if they have them; assigning them again changes those.",
         "risk": "normal",
+        "asks": {
+            "en": ("Sonia does manicures too now, at her own price", "give Raquel the colour, 40 minutes at 50 euros"),
+            "es": (
+                "asigna el tinte a Raquel con un precio propio de 50 €",
+                "asígnale las manicuras también a Sonia, con 40 minutos",
+            ),
+        },
     },
 )
 def assign(ctx: OperationContext, data: AssignIn) -> dict:
@@ -847,14 +1049,23 @@ def _locked_assignment(assignment_id) -> Assignment:
 @operation(
     "service.assignment.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=AssignmentPatchIn,
     output=AssignmentOut,
     expose_api=True,
     ai={
         "description": "Change who performs a service: their own duration or price (null = the service's), their main "
-        "service, or switch the assignment on or off.",
+        "service, or switch the assignment on or off. The assignment's id comes from service.assignment.list (by the "
+        "service's or the professional's name).",
         "risk": "normal",
+        "asks": {
+            "en": ("Raquel takes 40 minutes for highlights now", "make the manicure Sonia's main service"),
+            "es": (
+                "súbele a Raquel su precio propio del tinte a 55 €",
+                "Sonia tiene la manicura como su servicio principal, márcalo",
+            ),
+        },
     },
 )
 def update_assignment(ctx: OperationContext, data: AssignmentPatchIn) -> dict:
@@ -884,13 +1095,22 @@ def update_assignment(ctx: OperationContext, data: AssignmentPatchIn) -> dict:
 @operation(
     "service.assignment.remove",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_service",
     input=AssignmentRefIn,
     output=DeletedOut,
     expose_api=True,
     ai={
-        "description": "Remove a professional from a service: they no longer perform it.",
+        "description": "Remove a professional from a service: they no longer perform it. The assignment's id comes "
+        "from service.assignment.list (by the service's or the professional's name).",
         "risk": "normal",
+        "asks": {
+            "en": ("Sonia no longer does pedicures", "take Raquel off the colour service"),
+            "es": (
+                "Sonia ya no hace pedicuras, quítala de esa asignación",
+                "quita a la estilista Raquel de los cortes, ya no los hace",
+            ),
+        },
     },
 )
 def remove_assignment(ctx: OperationContext, data: AssignmentRefIn) -> dict:
@@ -922,6 +1142,60 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
         assignment.delete()
         record_event(ctx, events.ASSIGNMENT_REMOVED, payload)
     return {"removed": len(assignments)}
+
+
+# Not an assistant tool and no route: its one door is the recovery from a separate copy (BASE-F114), for a service the
+# business no longer has at all.
+@operation(
+    "service.service.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=ServiceRecoverIn,
+    output=ServiceRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_service(ctx: OperationContext, data: ServiceRecoverIn) -> dict:
+    """A service of a separate copy the business no longer has, made again with who performed it there, all
+    or nothing, each by the operation its screen uses: the service by ``service.service.create``; each professional the
+    business still has by ``service.assignment.assign`` (SERVICE-F31), with their own minutes and price. One who left
+    (terminated) or whom the business no longer has is not assigned: Staff no longer books them, and the output says it
+    came back without them, and why (``left_out``). It is their main service only if the business gave them none since
+    (the business's choice stays), and it comes back switched off, by ``service.assignment.update``, if it was. Its
+    image of the library comes back as ``service.service.set_image`` sets it (SERVICE-F34); a photo of its own does not
+    (``base.images.from_copy``). It keeps which of the copy's it is made again for (``stands_for``), for the apps whose
+    records hang from that one (``queries.services_standing_for``)."""
+    made = create_service(ctx, ServiceIn.model_validate(data.model_dump(include=set(ServiceIn.model_fields))))
+    Service.objects.filter(pk=made.id).update(stands_for=data.stands_for)
+    if image := images.from_copy(ctx, data.image):
+        _change_image(ctx, find_service(made.id, None), image)
+    asked = [one.member_id for one in data.assignments]
+    staying = set(live_members().filter(pk__in=asked).values_list("pk", flat=True))
+    known = set(Member.objects.filter(pk__in=asked).values_list("pk", flat=True))
+    with_main = set(
+        Assignment.objects.filter(member_id__in=asked, is_primary=True).values_list("member_id", flat=True)
+    )
+    for one in [one for one in data.assignments if one.member_id in staying]:
+        assigned = assign(
+            ctx,
+            AssignIn(
+                service_id=made.id,
+                member_id=one.member_id,
+                custom_duration=one.custom_duration,
+                custom_price=one.custom_price,
+                is_primary=one.is_primary and one.member_id not in with_main,
+            ),
+        )
+        if not one.is_active:
+            update_assignment(ctx, AssignmentPatchIn(id=assigned.id, is_active=False))
+    left_out = [
+        LeftOut(code="service.member_terminated", message=MEMBER_TERMINATED_LEFT % {"member": member})
+        if member in known
+        else LeftOut(code="service.member_not_in_business", message=MEMBER_GONE_LEFT % {"member": member})
+        for member in asked
+        if member not in staying
+    ]
+    return load_service(made.id, ctx.scope) | {"left_out": left_out}
 
 
 # ── Packages (SERVICE-F12, F13) ───────────────────────────────────────────────────────────────
@@ -968,6 +1242,7 @@ def _line_services(data: PackageIn) -> list[Service]:
 @operation(
     "service.package.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.add_package",
     input=PackageIn,
     output=PackageOut,
@@ -977,6 +1252,13 @@ def _line_services(data: PackageIn) -> list[Service]:
         "uses in all (none = unlimited), its validity in days from the purchase (none = never expires), its "
         "discount and its closed price.",
         "risk": "normal",
+        "asks": {
+            "en": ("create a voucher of five massages for 200 euros", "add a ten-session laser pack valid for a year"),
+            "es": (
+                "crea un bono de cinco masajes por 200 €",
+                "da de alta un bono de diez sesiones de láser que caduque al año",
+            ),
+        },
     },
 )
 def create_package(ctx: OperationContext, data: PackageIn) -> dict:
@@ -1014,6 +1296,7 @@ def create_package(ctx: OperationContext, data: PackageIn) -> dict:
 @operation(
     "service.package.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.change_package",
     input=PackagePatchIn,
     output=PackageOut,
@@ -1023,6 +1306,10 @@ def create_package(ctx: OperationContext, data: PackageIn) -> dict:
         "null removes its closed price, validity or uses limit. Its lines never change, and the vouchers already "
         "sold keep their terms.",
         "risk": "normal",
+        "asks": {
+            "en": ("raise the massage voucher to 220 euros", "make the laser pack valid for 18 months"),
+            "es": ("sube el bono de masajes a 220 €", "cambia la validez del bono de láser a 400 días"),
+        },
     },
 )
 def update_package(ctx: OperationContext, data: PackagePatchIn) -> dict:
@@ -1055,6 +1342,7 @@ def update_package(ctx: OperationContext, data: PackagePatchIn) -> dict:
 @operation(
     "service.package.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.delete_package",
     input=PackageRefIn,
     output=DeletedOut,
@@ -1063,6 +1351,10 @@ def update_package(ctx: OperationContext, data: PackagePatchIn) -> dict:
         "description": "Delete a voucher from the catalog: it can no longer be sold; the ones already sold are still "
         "spent, adjusted and voided as before.",
         "risk": "high",
+        "asks": {
+            "en": ("stop selling the massage voucher", "delete the manicure pack"),
+            "es": ("deja de vender el bono de masajes", "elimina el bono de manicuras"),
+        },
     },
 )
 def delete_package(ctx: OperationContext, data: PackageRefIn) -> dict:
@@ -1097,6 +1389,7 @@ def _tell_sales(ctx: OperationContext, name: str, data: dict) -> Any:
 @operation(
     "service.grant.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.grant_package",
     input=GrantIn,
     output=GrantOut,
@@ -1107,13 +1400,17 @@ def _tell_sales(ctx: OperationContext, name: str, data: dict) -> Any:
         "and its expiry counts from the purchase. If it was charged at the till, say the sale: without it, its "
         "sessions count for nobody's commission.",
         "risk": "normal",
+        "asks": {
+            "en": ("sell Inés the five-massage voucher", "Pilar has bought the laser pack, give it to her"),
+            "es": ("véndele a Inés el bono de cinco masajes", "Pilar ha comprado el bono de láser, dáselo"),
+        },
     },
 )
 def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
     package = find_package(data.package_id, data.package, hold=True)
     if not package.is_active:
         raise NotFound(str(PACKAGE_NOT_FOUND), code="service.package_not_found")
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     # A voucher given away charged nothing: no line has anything to leave out.
     sold_on = (
         _tell_sales(
@@ -1145,14 +1442,23 @@ def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
 @operation(
     "service.grant.void",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.void_grant",
     input=VoidIn,
     output=GrantOut,
     expose_api=True,
     ai={
         "description": "Void a voucher sold by mistake, with the reason: only one never used. It can no longer be "
-        "spent and stays as a trail; no money moves (a refund is done in Sales).",
+        "spent and stays as a trail; no money moves (a refund is done in Sales). The voucher's id comes from "
+        "service.grant.list (by its owner's name or phone, or its package).",
         "risk": "high",
+        "asks": {
+            "en": ("void Inés's voucher, it was sold by mistake", "void the voucher we just sold to Pilar"),
+            "es": (
+                "el bono de láser de Inés fue una equivocación, anúlalo",
+                "anula el bono que acabamos de venderle a Pilar",
+            ),
+        },
     },
 )
 def void_grant(ctx: OperationContext, data: VoidIn) -> dict:
@@ -1180,14 +1486,20 @@ def void_grant(ctx: OperationContext, data: VoidIn) -> dict:
 @operation(
     "service.grant.adjust",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.adjust_grant",
     input=AdjustIn,
     output=GrantOut,
     expose_api=True,
     ai={
         "description": "Adjust a voucher sold, with the reason: give sessions or a later expiry as a courtesy, or take "
-        "sessions to correct its balance (never more than are left). It stays as a movement.",
+        "sessions to correct its balance (never more than are left). It stays as a movement. The voucher's id comes "
+        "from service.grant.list (by its owner's name or phone, or its package).",
         "risk": "high",
+        "asks": {
+            "en": ("give Inés two free sessions on her voucher", "extend Pilar's voucher by a month"),
+            "es": ("regálale dos sesiones a Inés en su bono", "alarga un mes la caducidad del bono de Pilar"),
+        },
     },
 )
 def adjust_grant(ctx: OperationContext, data: AdjustIn) -> dict:
@@ -1224,14 +1536,24 @@ def adjust_grant(ctx: OperationContext, data: AdjustIn) -> dict:
 @operation(
     "service.grant.redeem",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="service.redeem_package",
     input=RedeemIn,
     output=RedemptionOut,
     expose_api=True,
     ai={
-        "description": "Spend one session of a voucher sold (outside the till), optionally on a service it covers and "
-        "linked to an appointment or a sale. Refused when voided, expired or without sessions left.",
+        "description": "Spend one session of a voucher sold (outside the till), optionally on a service it covers, "
+        "saying the professional who did it (its value counts in their production and commission; without one it "
+        "counts for nobody), and linked to an appointment or a sale. Refused when voided, expired or without sessions "
+        "left. The voucher's id comes from service.grant.list (by its owner's name or phone, or its package).",
         "risk": "normal",
+        "asks": {
+            "en": ("use one session of Inés's massage voucher", "mark a session of Pilar's voucher as spent"),
+            "es": (
+                "gasta una sesión del bono de masajes de Inés",
+                "Paloma ha venido a su masaje, réstale una sesión del bono",
+            ),
+        },
     },
 )
 def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
@@ -1240,6 +1562,7 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
         if (data.service_id or data.service)
         else None
     )
+    member = resolve_member(data.member_id, data.member) if (data.member_id or data.member) else None
     lock_grant(data.id)
     grant = find_grant(data.id)
     state = balance(grant)
@@ -1250,12 +1573,19 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
     session = Redemption.objects.create(
         grant=grant,
         service=service,
+        member=member,
         appointment_id=data.appointment_id,
         sale_id=data.sale_id,
         note=data.note,
         actor=_actor(ctx),
         value=session_value(grant.id),
     )
+    if member is not None:
+        _tell_sales(
+            ctx,
+            "sale.voucher_session.record",
+            {"session_id": session.id, "staff_id": member.id, "value": _worth(session, service, member)},
+        )
     record_event(
         ctx,
         events.GRANT_REDEEMED,
@@ -1270,9 +1600,27 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
         "grant_id": grant.id,
         "service_id": service.id if service else None,
         "service_name": service.name if service else None,
+        "member_id": member.id if member else None,
+        "member_name": member.full_name if member else None,
         "redeemed_at": session.redeemed_at,
         "remaining": None if state.remaining is None else state.remaining - 1,
     }
+
+
+def _worth(session: Redemption, service: Service | None, member: Member) -> int:
+    """What a session spent outside the till is worth to who did it (SALE-F28): its value (SERVICE-F24). An unlimited
+    voucher has no sessions to divide its price by: as the till counts it, at the price of its line, the price the
+    professional charges for the service (their own, else the service's); without the service said, nothing."""
+    if session.value is not None:
+        return session.value
+    if service is None:
+        return 0
+    own = (
+        Assignment.objects.filter(service=service, member=member, is_active=True)
+        .values_list("custom_price", flat=True)
+        .first()
+    )
+    return service.price if own is None else own
 
 
 @operation(
@@ -1383,6 +1731,16 @@ def _owner_name(session: Redemption) -> str:
         "of that voucher for that line for one day (it counts as used). To pay a line with a voucher, use "
         "sale.order.apply_voucher, which calls this.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "hold a session of Inés's voucher for her manicure",
+                "keep a session of Pilar's voucher on hold for her colour",
+            ),
+            "es": (
+                "aparta una sesión del bono de Inés para su manicura",
+                "deja retenida una sesión del bono de Pilar para su tinte",
+            ),
+        },
     },
 )
 def hold_session(ctx: OperationContext, data: HoldIn) -> dict:
@@ -1433,8 +1791,16 @@ def hold_session(ctx: OperationContext, data: HoldIn) -> dict:
     ai={
         "description": "Sales' step when a line paid with a voucher is undone, removed or voided, or its check voided: the "
         "session held for it goes back to the voucher at once. Releasing one already released or expired changes "
-        "nothing; a session already charged is refused (giving it back is a refund).",
+        "nothing; a session already charged is refused (giving it back is a refund). The id of the session a line "
+        "holds is that line's voucher_session_id, from sale.order.get.",
         "risk": "normal",
+        "asks": {
+            "en": ("release the session held for Inés's manicure", "free the session Pilar's voucher had on hold"),
+            "es": (
+                "suelta la sesión retenida del bono de Inés",
+                "libera la sesión que tenía apartada el bono de Pilar",
+            ),
+        },
     },
 )
 def release_session(ctx: OperationContext, data: SessionRefIn) -> dict:
@@ -1475,6 +1841,16 @@ def _owner_matches(session: Redemption, customer_id) -> bool:
         "passed, it was released) or the sale's customer does not own the voucher. Repeating it for the same sale "
         "changes nothing.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "the sale is charged: deliver its held voucher sessions",
+                "settle the voucher sessions of the sale we just charged",
+            ),
+            "es": (
+                "ya está cobrada: da por gastadas las sesiones retenidas de esa venta",
+                "las sesiones de bono de la venta cobrada, márcalas como consumidas",
+            ),
+        },
     },
 )
 def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
@@ -1529,7 +1905,7 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
 )
 def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
     # Locked in id order, as every other step of a session takes them; one notice per session, saying which
-    # session of which voucher (hub#2681), and none when nothing lapsed.
+    # session of which voucher, and none when nothing lapsed.
     lapsed = list(
         Redemption.objects.select_for_update()
         .filter(status=HELD, hold_until__lte=timezone.now())
@@ -1558,6 +1934,16 @@ def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
         "back) return to their vouchers, even an expired one, with the document and the reason. The same document "
         "again gives nothing back twice; a session given back by another document is refused.",
         "risk": "high",
+        "asks": {
+            "en": (
+                "the sale was refunded: give the voucher sessions back",
+                "put the sessions of the voided sale back on their vouchers",
+            ),
+            "es": (
+                "se ha devuelto la venta: reintegra las sesiones a sus bonos",
+                "la venta del masaje se anuló, que la sesión vuelva al bono",
+            ),
+        },
     },
 )
 def return_sessions(ctx: OperationContext, data: ReturnIn) -> dict:

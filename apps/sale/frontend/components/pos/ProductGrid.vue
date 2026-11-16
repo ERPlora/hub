@@ -6,11 +6,12 @@
 // scrolls inside its column, so the cart's footer never leaves the screen. The `lead` slot goes first in the
 // grid (the menus of Menus in «All», SALE-F12).
 import { HubIcon } from '@erplora/ui/shell';
-import { IonSpinner } from '@ionic/vue';
+import { IonButton, IonSpinner } from '@ionic/vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import { useLocale } from '../../composables/useT';
 import { currencySign, useBusinessMoney } from '../../lib/format';
+import PosItemTile from './PosItemTile.vue';
 import ProductTile from './ProductTile.vue';
 
 defineProps<{
@@ -50,32 +51,26 @@ const business = useBusinessMoney();
     >
       {{ emptyText ?? $t('sale.pos.noProducts') }}
     </p>
-    <button
-      type="button"
-      class="pos-open"
-      data-testid="pos-open-price-tile"
-      @click="emit('openPrice')"
-    >
-      <span
-        class="pos-open__thumb"
-        aria-hidden="true"
-      >
-        <HubIcon name="ion:pricetag-outline" />
-      </span>
-      <span class="pos-open__info">
-        <span class="pos-tile__name">{{ $t('sale.pos.openPrice') }}</span>
-        <span class="pos-tile__price">{{ $t('sale.pos.openPriceTag', { sign: currencySign(locale, business) || '¤' }) }}</span>
-      </span>
-    </button>
-    <button
+    <PosItemTile
+      testid="pos-open-price-tile"
+      :name="$t('sale.pos.openPrice')"
+      :price="$t('sale.pos.openPriceTag', { sign: currencySign(locale, business) || '¤' })"
+      icon="ion:pricetag-outline"
+      @pick="emit('openPrice')"
+    />
+    <ion-button
       v-if="hasMore"
-      type="button"
+      fill="outline"
       class="pos-grid__more"
       data-testid="pos-grid-more"
       @click="emit('loadMore')"
     >
+      <HubIcon
+        slot="start"
+        name="ion:chevron-down-outline"
+      />
       {{ $t('sale.pos.loadMore') }}
-    </button>
+    </ion-button>
   </div>
 </template>
 
@@ -102,62 +97,9 @@ const business = useBusinessMoney();
 .pos-grid__more {
   grid-column: 1 / -1;
   min-height: 3rem;
-  font: inherit;
-  font-weight: 600;
-  color: var(--ion-color-primary, #0091ce);
-  background: transparent;
-  border: 1px dashed var(--ion-border-color, #e6e3db);
-  border-radius: 12px;
-  cursor: pointer;
-}
-.pos-open {
-  display: flex;
-  flex-direction: column;
-  min-height: 8.4rem;
   margin: 0;
-  padding: 0;
-  overflow: hidden;
-  font: inherit;
-  text-align: left;
-  color: var(--ion-text-color, #1c1b18);
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 14px;
-  cursor: pointer;
-}
-.pos-open:hover {
-  border-color: var(--ion-color-primary, #0091ce);
-}
-.pos-open:active {
-  transform: scale(0.98);
-}
-.pos-open__thumb {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 4.85rem;
-  font-size: 2rem;
-  color: var(--ion-color-primary, #0091ce);
-  background: color-mix(in srgb, var(--ion-color-primary, #0091ce) 12%, transparent);
-}
-.pos-open__info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.5rem 0.6rem 0.65rem;
-}
-.pos-tile__name {
-  overflow: hidden;
-  font-size: 0.86rem;
   font-weight: 600;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.pos-tile__price {
-  align-self: flex-end;
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--ion-color-primary, #0091ce);
+  --border-style: dashed;
 }
 @media (min-width: 821px) and (max-width: 1100px) {
   .pos-grid {
@@ -169,9 +111,6 @@ const business = useBusinessMoney();
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     padding-bottom: 5.2rem;
-  }
-  .pos-open {
-    min-height: 8rem;
   }
 }
 @media (max-width: 340px) {

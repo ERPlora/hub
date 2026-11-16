@@ -2,7 +2,7 @@
 
 Django ships its Spanish catalogues with holes: a message new in a release keeps ``msgstr ""`` until its translators
 reach it, and the admin of ``hubs.erplora.com`` shows it in English (6.1.2: «Run» on the actions of every list and
-«- Select an option -» in its select; APP-ACCOUNTS-6). This reads every Spanish catalogue of Django that the admin
+«- Select an option -» in its select). This reads every Spanish catalogue of Django that the admin
 uses and asks that each empty entry comes out translated anyway: the platform's catalogue (``base/locale/es``; Django
 leaves out an empty entry, so ``base`` fills the hole whatever the order of ``INSTALLED_APPS``) covers it. An upgrade
 of Django that opens a new hole fails here, naming the message to translate; so does a ``makemessages`` of ``base``

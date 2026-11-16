@@ -23,10 +23,11 @@ acción `test` de `frontend/pages/PrintersPage.vue`, `frontend/components/Settin
   ya trae `paper_width` (58 u 80) en la respuesta de `printing.job.claim`; se pide que `erplora_print` lo
   tome (o un `columns` en `data`: 32 en 58 mm, 48 en 80 mm) para que una impresora de 80 mm use su ancho.
   Mientras tanto, «Nueva impresora» lo dice bajo «Ancho de papel».
-- **Buscar en una red sin salida a internet** (PRINTING-F02): app#17.
 
 ## Ya resuelto (fuera de la lista)
 
+- **Buscar en una red sin salida a internet** (PRINTING-F02): desde la 1.1.34 la app barre también la red de cada
+  dirección privada del dispositivo (app#17, cerrada por ERPlora/app#19); falta probarlo en un dispositivo.
 - **El cliente de `/ws/print`** que recoge y confirma los trabajos: `print-channel.ts` del SDK y
   `device-printer.ts` y `print-host.ts` del shell de `@erplora/ui`, montados por `frontend/components/PrintHost.vue`
   (PRINTING-F18; WORKBOOK, «Contrato con la plataforma», punto 7).

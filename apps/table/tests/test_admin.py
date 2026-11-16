@@ -1,4 +1,4 @@
-"""Django admin of the table app: full CRUD for support (round 12, PLAN §17).
+"""Django admin of the table app: full CRUD, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it adds, changes and deletes every table of
 the app so support can repair; it does not go through the operations' rules and leaves no event. What the
@@ -27,7 +27,7 @@ from apps.table.models import (
     Zone,
 )
 
-from .conftest import make_hold, make_session, make_table, make_zone
+from .conftest import HUB_DB, make_hold, make_session, make_table, make_zone
 
 MODELS = {
     Zone: ZoneAdmin,
@@ -63,6 +63,7 @@ def test_every_model_is_registered_and_the_trail_is_an_inline_of_its_check():
     assert SessionMoveInline.model is SessionMove
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -85,14 +86,13 @@ def test_ids_and_timestamps_are_read_only():
     assert {"id", "updated_at"} <= set(TableSettingsAdmin.readonly_fields)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff):
     zone = make_zone("Terrace")
     table = make_table("T4", zone=zone)
     session = make_session(table, waiter_name="Luis")
     make_hold(table, label="Pedro")
     TableSettings.objects.create()
-    client.force_login(superuser)
     for path, text in (
         ("/admin/table/zone/", b"Terrace"),
         (f"/admin/table/zone/{zone.pk}/change/", b"Terrace"),
@@ -104,14 +104,13 @@ def test_changelists_and_change_pages_render(client, superuser):
         ("/admin/table/tablesettings/", b"60"),
         ("/admin/table/table/add/", b"capacity"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_support_can_repair_a_table_through_the_admin(client, superuser):
+@HUB_DB
+def test_support_can_repair_a_table_through_the_admin(hub_staff):
     table = make_table("4", zone=make_zone())
-    client.force_login(superuser)
     data = {
         "zone": str(table.zone_id),
         "number": "4A",
@@ -126,7 +125,7 @@ def test_support_can_repair_a_table_through_the_admin(client, superuser):
         "updated_by": "",
         "is_active": "on",
     }
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/table/table/{table.pk}/change/", data, HTTP_HOST="hubs.localhost"
     )
     assert response.status_code == 302

@@ -1,5 +1,4 @@
-"""The plan's limits on a hub's database, per process (PLAN-DB §5 «Límite por plan»; plan 2026-10-22-fase-2-tenencia
-§3 S4 and §2, guardrail 12).
+"""The plan's limits on a hub's database, per process.
 
 Each hub with a database of its own gets, in each process, as many transactions at once as its plan says
 (``max_db_connections`` of the SaaS's photo, ``Hub.state["plan"]``) and every one of them carries the plan's
@@ -92,7 +91,7 @@ def test_a_photo_with_no_usable_plan_is_on_free_s_so_a_bigger_plan_would_help(se
         ({"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}, limits.PlanLimits(1, 5)),
         (STARTER, limits.PlanLimits(3, 15)),
         (STANDARD, limits.PlanLimits(6, 15)),
-        # What PgBouncer gives each database is the ceiling, 6 by default: a Pro's 12 are 6 here (PLAN-HUB §66).
+        # What PgBouncer gives each database is the ceiling, 6 by default: a Pro's 12 are 6 here.
         ({"slug": "pro", "max_db_connections": 12, "statement_timeout_seconds": 15}, limits.PlanLimits(6, 15)),
     ],
     ids=["free", "starter", "standard", "pro"],

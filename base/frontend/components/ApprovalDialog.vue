@@ -1,11 +1,8 @@
 <script setup lang="ts">
-// «An approval is needed» (BASE-G136; the old hub's HUB_SHELL-F51; Square's and Toast's manager override), opened by
-// `withApproval` (lib/approval.ts) over the screen where the action was refused: what is approved in the app's words,
-// «Who approves it?» with the people of the business who may do it themselves and have a PIN (live
-// `base.approval.approvers`), on the till's faces and PIN pad (APP-BASE-3's PinDoor), or their badge swiped at any
-// moment (APP-BASE-3's reader). An approval closes the dialog with the pass and says «Approved by <name>»; a refusal
-// stays here, told from its code; «Cancel» closes it with none, and the app tells the original refusal. From a tablet up
-// the dialog is as tall as its whole pad (the styles at the end), never Ionic's fixed card, which cut its last row.
+// A manager's override, opened by `withApproval` (lib/approval.ts) over the screen whose action was refused: someone
+// who may do it approves with their PIN or by swiping their badge at any moment. «Cancel» closes it with no pass, and
+// the app then shows the original refusal. From a tablet up the dialog is as tall as its whole pad (see the styles):
+// Ionic's fixed-size card cut off the pad's last row.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';

@@ -16,9 +16,6 @@
       "retry": "Reintentar"
     },
     "money": {
-      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
-      "negative": "Este importe no puede ser negativo.",
-      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
       "notPositive": "El importe de un pago tiene que ser mayor que 0."
     },
     "status": {

@@ -35,6 +35,7 @@ from django.utils.timesince import timesince
 from django.utils.translation import gettext, ngettext, pgettext
 from live.markdown import render_markdown
 
+from apps.website.choices import DAY_LABELS
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
 from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
 from base.business import money_text, zone_of
@@ -68,18 +69,10 @@ def _eyebrows() -> dict[str, str]:
 
 
 def _day_names() -> dict[str, str]:
-    return {
-        "mon": pgettext("website", "Monday"),
-        "tue": pgettext("website", "Tuesday"),
-        "wed": pgettext("website", "Wednesday"),
-        "thu": pgettext("website", "Thursday"),
-        "fri": pgettext("website", "Friday"),
-        "sat": pgettext("website", "Saturday"),
-        "sun": pgettext("website", "Sunday"),
-    }
+    return {day: str(label) for day, label in DAY_LABELS}
 
 
-def render_site(
+def render_site(  # noqa: PLR0913
     template: str,
     theme: dict,
     content: dict,
@@ -93,6 +86,7 @@ def render_site(
     today: str | None = None,
     reviews: dict | None = None,
     hub_address: str = "",
+    canonical: str = "",
 ) -> str:
     """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
 
@@ -101,6 +95,8 @@ def render_site(
     ``reviews`` is Google's answer for the reviews section's place (``apps.website.reviews``), or ``None``.
     ``hub_address`` is the business's own address (``https://<slug>.<domain>/``) when the page is painted for its own
     domain (``public_home``), where neither ``/auth`` nor ``/api`` is: «Log in» goes there and nothing refreshes.
+    ``canonical`` is the page's main address, which its head tells search engines (``rel="canonical"``,
+    ``public_home``, hub#818); without one, as in the preview, it names none.
     ``request`` is accepted for symmetry with Django's renderers and never used: the HTML must not depend on who
     asked. Raises ``ValueError`` for an unknown template or an invalid theme or content.
     """
@@ -118,6 +114,7 @@ def render_site(
             "preview": preview,
             "login_url": f"{hub_address}{LOGIN_PATH}" if hub_address else f"/{LOGIN_PATH}",
             "static": bool(hub_address),
+            "canonical": canonical,
             "theme": _theme(valid_theme),
             "site_name": site_name,
             # The letter on the header's gradient when there is no cover.
@@ -260,7 +257,7 @@ def _variables(colours: dict[str, str]) -> dict[str, str]:
     return variables
 
 
-def _body(
+def _body(  # noqa: PLR0913, PLR0917
     content: Content,
     catalog: dict | None,
     currency: str,

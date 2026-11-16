@@ -1,22 +1,18 @@
-"""The drawer counts in the business's currency (flow business-currency): its country's, as ``base.business.get``
-reads it from this hub's registry (APP-BASE-6), never a euro fixed in the app nor a call to erplora.com. A business in
-Poland counts zlotys with their notes and coins; one in Spain, euros; each hub its own. An API key holds only the
-permission of the operation it opened, and still gets the business's currency."""
+"""The drawer counts in the business's currency (flow business-currency): its country's, as ``base.business.get`` reads
+it from this hub's registry, never a euro fixed in the app nor a call to erplora.com. A business in Poland counts zlotys
+with their notes and coins; one in Spain, euros; each hub its own. An API key holds only the permission of the operation
+it opened, and still gets the business's currency."""
 
 import pytest
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import InvalidPayload
 
-from apps.cash_register.tests.conftest import A, B, ctx_for, open_session, run
+from apps.cash_register.tests.conftest import HUB_DB, A, B, ctx_for, open_session, run
 from apps.printing.models import PrintJob
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
+pytestmark = HUB_DB
 
 
 def test_a_business_in_poland_counts_in_zlotys_with_their_notes_and_coins():
@@ -39,11 +35,12 @@ def test_an_api_key_with_only_its_operation_s_permission_gets_the_business_s_cur
     assert run("cash_register.currency.get", {}, key).currency == "PLN"
 
 
-def test_each_hub_counts_in_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
+def test_each_hub_counts_in_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
     assert run("cash_register.currency.get").currency == "PLN"
-    assert run("cash_register.currency.get", {}, ctx_for(scope=B)).currency == "EUR"
+    with use_hub(hub_b):
+        assert run("cash_register.currency.get", {}, ctx_for(scope=B)).currency == "EUR"
 
 
 def test_a_count_takes_the_zloty_s_coins_and_refuses_the_euro_s_notes():
@@ -67,22 +64,26 @@ def test_the_printed_report_takes_the_decimals_of_the_business_s_currency():
 
 
 @pytest.mark.parametrize(("country", "currency", "decimals", "three_ones"), [("PL", "PLN", 2, 300), ("JP", "JPY", 0, 3)])
-def test_erploras_own_hub_counts_in_the_currency_of_its_issuer_s_country(settings, country, currency, decimals, three_ones):
-    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub) and every module is on
-    # in it (base.activation.is_platform): its drawer counts and prints in the currency of its issuer's country, as its
-    # sales and invoices do (hub#286), never a 404 because there is no business to read.
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def test_erploras_own_hub_counts_in_the_currency_of_its_issuer_s_country(
+    settings, hub_b, country, currency, decimals, three_ones
+):
+    # ERPlora's own hub (here business B's: a registry row with a database of its own, as any business) has no
+    # business on erplora.com, so no country of its own, and every module is on in it (base.activation.is_platform):
+    # its drawer counts and prints in the currency of its issuer's country, as its sales and invoices do (hub#286),
+    # never a 404 because there is no business to read.
+    settings.PLATFORM_HUB_SLUG = hub_b.slug
     settings.PLATFORM_ISSUER_COUNTRY = country
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    read = run("cash_register.currency.get", {}, platform)
-    assert (read.currency, read.decimals) == (currency, decimals)
-    run(
-        "printing.printer.create",
-        {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"},
-        platform,
-    )
-    session = run("cash_register.session.open", {"opening_balance": 10000}, platform)
-    count = run("cash_register.count.add", {"type": "closing", "denominations": {"coins": {"1": 3}}}, platform)
-    assert count.total == three_ones
-    printed = run("cash_register.session.print", {"session_id": str(session.id)}, platform)
-    assert PrintJob.objects.get(pk=printed.job_id).document["decimals"] == decimals
+    platform = ctx_for(scope=B)
+    with use_hub(hub_b):
+        read = run("cash_register.currency.get", {}, platform)
+        assert (read.currency, read.decimals) == (currency, decimals)
+        run(
+            "printing.printer.create",
+            {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"},
+            platform,
+        )
+        session = run("cash_register.session.open", {"opening_balance": 10000}, platform)
+        count = run("cash_register.count.add", {"type": "closing", "denominations": {"coins": {"1": 3}}}, platform)
+        assert count.total == three_ones
+        printed = run("cash_register.session.print", {"session_id": str(session.id)}, platform)
+        assert PrintJob.objects.get(pk=printed.job_id).document["decimals"] == decimals

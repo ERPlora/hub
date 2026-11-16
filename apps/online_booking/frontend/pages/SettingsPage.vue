@@ -1,18 +1,19 @@
 <script setup lang="ts">
 // Online booking → Settings (WORKBOOK «Ajustes»; ONLINE_BOOKING-F07), only for whoever may save them. The values
 // come live (`online_booking.settings.get`: the factory ones until the business saves, and the diary's booking
-// rules); a change saved elsewhere repaints every field the person has not touched, and «Save» sends only the
-// fields touched and changed (`online_booking.settings.update`: the page's and the diary's, all or nothing).
-// Below, the offered services with their «Online booking» switch, saved at once in Services.
-import { EmptyState, InlineFeedback } from '@erplora/ui/components';
+// rules). The form is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere repaints
+// every field the person has not touched, «Save» sends only the fields touched and changed
+// (`online_booking.settings.update`: the page's and the diary's, all or nothing), and a refusal says itself as
+// a FormModal does. Below, the offered services with their «Online booking» switch, saved at once in Services.
+import { EmptyState, InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
+import { computed, ref } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
-import type { SettingsIn, SettingsOut } from '../operations';
+import type { SettingsOut } from '../operations';
 import { onlineBookingTabs } from '../tabs';
 
 const TEXTS = ['page_title', 'primary_color', 'logo_url'] as const;
@@ -28,19 +29,18 @@ const STRINGS = [...TEXTS, ...LONG_TEXTS] as const;
 const SERVICE_WINDOW = 100;
 
 type Form = Record<(typeof STRINGS)[number] | (typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean>;
-type Field = keyof Form;
 
 const session = useSession();
 const t = useT();
 const canManage = computed(() => session.can('online_booking.manage_settings'));
 
 const { data, status, error } = useLive('online_booking.settings.get', {});
-const { run, pending, error: saveError } = useCommand('online_booking.settings.update');
-
-const form = ref<Form | null>(null);
-const original = ref<Form | null>(null);
-const touched = ref<ReadonlySet<Field>>(new Set());
-const saved = ref(false);
+const settingsForm = useSettingsForm(
+  data,
+  useCommand('online_booking.settings.update'),
+  { toForm, numbers: NUMBERS },
+);
+const { form, fieldErrors, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -50,60 +50,8 @@ function toForm(settings: SettingsOut): Form {
   };
 }
 
-const changes = computed<SettingsIn>(() => {
-  const now = form.value;
-  const was = original.value;
-  if (!now || !was) return {};
-  const out: Record<string, unknown> = {};
-  for (const key of touched.value) {
-    const value = now[key];
-    const text = typeof value === 'string' ? value.trim() : value;
-    if (text === was[key]) continue;
-    out[key] = (NUMBERS as readonly string[]).includes(key) && typeof text === 'string' && /^\d+$/.test(text) ? Number(text) : text;
-  }
-  return out as SettingsIn;
-});
-const dirty = computed(() => Object.keys(changes.value).length > 0);
-
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(
-          (Object.keys(fresh) as Field[]).map((key) => [key, touched.value.has(key) ? current[key] : fresh[key]]),
-        ) as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set<K extends Field>(field: K, value: Form[K]): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-}
-
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-
-async function save(): Promise<void> {
-  if (!dirty.value || pending.value) return;
-  try {
-    const answer = await run(changes.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
-}
 
 // Services booked online (Services' own list and switch).
 const serviceSearch = ref('');
@@ -165,7 +113,8 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
         v-else-if="form"
         class="ob-settings"
         data-testid="ob-settings"
-        @submit.prevent="save"
+        novalidate
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="ob-settings__title">
           {{ $t('online_booking.settings.title') }}
@@ -211,22 +160,15 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
           :class="invalid(fieldErrors[field])"
           @ion-input="set(field, text($event.detail.value))"
         />
-        <ion-input
+        <SettingsNumberField
           v-for="field in PAGE_NUMBERS"
           :key="field"
-          :data-testid="`ob-settings-${field}`"
-          type="number"
-          inputmode="numeric"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`ob-settings-${field}`"
+          :label="t(`online_booking.settings.fields.${field}`)"
           min="1"
           max="50"
-          :value="form[field]"
-          :label="t(`online_booking.settings.fields.${field}`)"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
         />
         <ion-toggle
           v-for="field in PAGE_SWITCHES.filter((name) => name !== 'is_enabled')"
@@ -246,22 +188,15 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
         <p class="ob-settings__help">
           {{ $t('online_booking.settings.sections.rulesHelp') }}
         </p>
-        <ion-input
+        <SettingsNumberField
           v-for="field in RULE_NUMBERS"
           :key="field"
-          :data-testid="`ob-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`ob-settings-${field}`"
           :label="t(`online_booking.settings.fields.${field}`)"
           :helper-text="field === 'max_advance_booking' ? t('online_booking.settings.fields.max_advance_booking_help') : undefined"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          min="0"
         />
         <ion-toggle
           v-for="field in RULE_SWITCHES"
@@ -275,29 +210,13 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
           {{ t(`online_booking.settings.fields.${field}`) }}
         </ion-toggle>
 
-        <InlineFeedback
-          v-if="saveError"
-          tone="danger"
-          data-testid="ob-settings-save-error"
-          :heading="$t('online_booking.settings.saveError')"
-        >
-          {{ saveError.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="ob-settings-saved"
-        >
-          {{ $t('online_booking.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="ob-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('online_booking.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="ob-settings"
+          :save-label="$t('online_booking.settings.save')"
+          :saved-label="$t('online_booking.settings.saved')"
+          :error-heading="$t('online_booking.settings.saveError')"
+        />
       </form>
 
       <section
@@ -390,10 +309,6 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
   gap: 14px;
   max-width: 560px;
   margin-bottom: 24px;
-}
-/* The switch's long label wraps (ion-toggle keeps it on one line): the same defect Attendance had (hub#94). */
-.ob-settings ion-toggle::part(label) {
-  white-space: normal;
 }
 .ob-settings__title {
   font-size: 1.1rem;

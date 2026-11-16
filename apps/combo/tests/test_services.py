@@ -16,6 +16,7 @@ from .conftest import (
     A,
     DRINK,
     FOOD,
+    HUB_DB,
     ctx_for,
     make_combo,
     make_group,
@@ -24,7 +25,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:
@@ -556,7 +557,7 @@ def test_choices_of_two_menus_do_not_mix():
 
 
 def test_a_product_priced_per_several_units_is_not_a_portion():
-    # «0,37 € per 100 ud»: one pick would weigh a hundredth of what the catalogue says (review 9).
+    # «0,37 € per 100 ud»: one pick would weigh a hundredth of what the catalogue says.
     from decimal import Decimal
 
     course = make_group(make_combo())

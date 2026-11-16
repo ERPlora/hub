@@ -9,6 +9,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { LEAVE_TYPES } from '../lib/enums';
 import { asCombo, memberSearch } from '../lib/pickers';
@@ -20,6 +22,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+const canDismiss = useUnsavedFormOnOpen('staff-time-off-form', () => form.value, open);
 
 interface TimeOffForm {
   member_id: string;
@@ -99,6 +103,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-time-off-form"
     :title="title"
     :pending="pending"
@@ -107,10 +112,13 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-time-off-form">
+      <div
+        class="staff-time-off-form"
+      >
         <Combo
           v-if="forAnyone"
           testid="staff-time-off-form-member_id"
+          name="member_id"
           :model-value="memberChoice"
           :label="$t('staff.timeOff.form.member')"
           :search="findMembers"
@@ -121,6 +129,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="staff-time-off-form-leave_type"
+          name="leave_type"
           :value="form.leave_type"
           :label="$t('staff.timeOff.form.type')"
           label-placement="floating"
@@ -142,6 +151,7 @@ async function save(): Promise<void> {
         <div class="staff-time-off-form__pair">
           <ion-input
             data-testid="staff-time-off-form-start_date"
+            name="start_date"
             type="date"
             :value="form.start_date"
             :label="$t('staff.timeOff.form.startDate')"
@@ -154,6 +164,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-time-off-form-end_date"
+            name="end_date"
             type="date"
             :value="form.end_date"
             :label="$t('staff.timeOff.form.endDate')"
@@ -180,6 +191,7 @@ async function save(): Promise<void> {
         >
           <ion-input
             data-testid="staff-time-off-form-start_time"
+            name="start_time"
             type="time"
             :value="form.start_time"
             :label="$t('staff.timeOff.form.startTime')"
@@ -192,6 +204,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-time-off-form-end_time"
+            name="end_time"
             type="time"
             :value="form.end_time"
             :label="$t('staff.timeOff.form.endTime')"
@@ -205,6 +218,7 @@ async function save(): Promise<void> {
         </div>
         <ion-textarea
           data-testid="staff-time-off-form-reason"
+          name="reason"
           :value="form.reason"
           :label="$t('staff.timeOff.form.reason')"
           label-placement="floating"

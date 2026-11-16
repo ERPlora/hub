@@ -1,9 +1,9 @@
-// The print host's channel, /ws/print, in Chrome (PLAN-HUB §5; base/ws_print.py). It answered 500: Django
+// The print host's channel, /ws/print, in Chrome (base/ws_print.py). It answered 500: Django
 // serves HTTP only. A page of the hub, signed in, opens the WebSocket the way the device's print host does,
 // says hello with the printer it reaches (a device new here: the owner's session sets it up instead of being
 // refused, PRINTING-F18), is woken when a job is queued (by the API, after its COMMIT), claims it and confirms it
 // printed. No screen changes: there are no screenshots.
-// flow: ninguno — FIX base
+// flow: none — the platform's print channel.
 // What is made here is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -37,7 +37,7 @@ async function sendFrame(page: Page, frame: Frame): Promise<void> {
   await page.evaluate((f) => (window as unknown as { printSocket: WebSocket }).printSocket.send(JSON.stringify(f)), frame);
 }
 
-test('ninguno — FIX base: the device opens /ws/print, is woken by a new job, takes it and confirms it', async ({ page, context }) => {
+test('the device opens /ws/print, is woken by a new job, takes it and confirms it', async ({ page, context }) => {
   await login(page, A, '/printing/printers');
   // A label printer: no app queues labels on its own, so the oldest waiting job of its role is this spec's.
   const printer = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {

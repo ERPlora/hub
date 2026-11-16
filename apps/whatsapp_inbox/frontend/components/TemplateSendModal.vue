@@ -12,6 +12,8 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonItem, IonLabel, IonRadio, IonRadioGroup, IonSpinner } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { acceptsSample, fileToBase64, formatSize, SAMPLE_RULES } from '../lib/files';
 import { renderTemplate } from '../lib/thread';
@@ -119,11 +121,18 @@ async function send(): Promise<void> {
 watch(open, (isOpen) => {
   if (!isOpen) reset();
 });
+
+const canDismiss = useUnsavedFormOnOpen(
+  'whatsapp-inbox-template-form',
+  () => ({ template: chosenId.value, values: values.value, sample: sample.value?.id ?? null }),
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="whatsapp-inbox-template-form"
     :title="t('whatsapp_inbox.templates.sendTitle')"
     :submit-label="t('whatsapp_inbox.templates.send')"

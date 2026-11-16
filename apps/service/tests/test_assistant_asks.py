@@ -1,0 +1,425 @@
+"""What layer 1 of the assistant's QA does not say of Services: how many tools it offers, that the owner's requests of
+the real-model QA, in the owner's own words, are offered their existing operation, that a record a tool takes by its id
+says which read finds it, and that what Services' tools say to be asked for takes no place from the operations of Sales
+and Appointments a request is for.
+
+Every ask of every tool of service bringing its tool among the first ten, role by role, in both languages, is
+``base/tests/test_assistant_asks.py``'s (service is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over
+the asks and the guard that no ask copies a probe of layer 2.
+"""
+
+import dataclasses
+import json
+import re
+from pathlib import Path
+
+import pytest
+from django.conf import settings
+from live import assistant as shared
+from live.operations import AI, Operation, registry
+
+from apps.invoice.tests.conftest import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+from apps.invoice.tests.conftest import in_hubs
+from apps.service.tests.conftest import HUB_DB
+from base import assistant
+from base.models import Membership
+from base.tests.test_assistant_asks import assert_its_words_name
+from base.tests.test_assistant_asks import assert_offered_with_room
+from base.tests.test_assistant_asks import assert_reported_are_owner_probes, comparable, offered_place, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
+from base.tests.test_assistant_asks import reported_test
+
+PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
+
+#: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-service-2026-11-08.json``) as the owner said them,
+#: and nothing of the tools' ``asks``: before Services said its asks, six of these tools were not among the ones a turn
+#: offers (``MAX_TOOLS``) and the rest came 7th to 16th, so the model answered it had no tool, asked for ids or chose a
+#: tool of another app (Online booking's settings to restore a service, a role to take a professional off a service).
+REPORTED = [
+    ("service.grant.get", "abre el Bono QA vendido a Ana QA con fecha, saldo y sesiones usadas"),
+    ("service.package.list", "¿qué bonos vendo, con precio cerrado, sesiones incluidas y días de validez?"),
+    ("service.session.get", "abre la sesión de Bono QA que está retenida para una línea del TPV y dime su estado"),
+    (
+        "service.assignment.assign",
+        "asigna Corte QA a Camarera Ventas QA, con 30 minutos y 12 € como condiciones propias",
+    ),
+    (
+        "service.grant.redeem",
+        "gasta una sesión del Bono extra QA de Ana QA en un Corte QA fuera del TPV, vinculada a su próxima cita",
+    ),
+    ("service.assignment.remove", "quita a Camarera Ventas QA de Corte QA para que deje de hacerlo"),
+    (
+        "service.assignment.update",
+        "cambia la asignación de Camarera Ventas QA a Corte QA: 45 minutos y 14 €, como servicio principal",
+    ),
+    ("service.grant.void", "anula el Bono QA nuevo de Ana QA porque se vendió por error, sin tocar dinero"),
+    ("service.service.restore", "restaura Masaje QA para volver a venderlo y reservarlo"),
+    (
+        "service.session.hold",
+        "reserva una sesión del Bono QA de Ana QA para la línea Corte QA de Cuenta bonos QA durante hoy",
+    ),
+    (
+        "service.session.release",
+        "libera la sesión retenida del Corte QA de Cuenta bono retirada QA para devolverla al bono",
+    ),
+]
+
+#: Every probe of layer 2 of Services, the owner's real phrases of the QA: the eleven above and the ones the model got
+#: right.
+PROBES = json.loads((PROBES_DIR / "owner-es-service-2026-11-08.json").read_text(encoding="utf-8"))["probes"]
+
+#: The tools whose probe of layer 2 comes 7th or better (measured on this branch): three places short of the first ten
+#: the asks themselves come within (``base/tests/test_assistant_asks.py``), so three tools of the apps that say their
+#: asks later may climb past each before it leaves the first ten; the rest only keep ``WITH_ROOM``.
+FIRST_TEN = frozenset({
+    "service.assignment.assign", "service.assignment.list", "service.assignment.update", "service.category.create",
+    "service.category.delete", "service.category.list", "service.category.update", "service.grant.adjust",
+    "service.grant.adjust_check", "service.grant.create", "service.grant.list", "service.grant.list_orphans",
+    "service.grant.redeem", "service.grant.redeem_check", "service.grant.tender_options", "service.grant.void",
+    "service.grant.void_check", "service.movement.list", "service.package.create", "service.package.delete",
+    "service.package.get", "service.package.update", "service.service.archive", "service.service.bulk_create",
+    "service.service.create", "service.service.list", "service.service.list_for_sale", "service.service.set_image",
+    "service.service.suggest_image", "service.service.update", "service.session.release", "service.session.settle",
+    "service.settings.get",
+})
+
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool of Services: it is
+#: the tool's own asks that bring it among the first ten (measured on this branch: without them it is not), so the asks
+#: of any tool that stop reading as people speak fail here, tool by tool. The probes alone leave 23 of the 46 unwatched:
+#: their tools come by their name, their verb or the Hub's groups.
+OWN_WORDS = [
+    ("service.service.list", "dime todo lo que ofrecemos"),
+    ("service.service.get", "¿cuánto dura la manicura?"),
+    ("service.service.suggest_image", "¿qué dibujo de la biblioteca va con el masaje?"),
+    ("service.service.list_for_sale", "¿qué hay ahora mismo a la venta?"),
+    ("service.catalog.status", "¿cuántos servicios nos quedan sin su IVA puesto?"),
+    ("service.category.list", "¿en qué familias tenemos repartidos los servicios?"),
+    ("service.category.get", "¿qué hay dentro de la categoría de pestañas?"),
+    ("service.settings.get", "¿cuánto margen dejamos por defecto?"),
+    ("service.settings.update", "quiero que por defecto haya quince minutos de margen"),
+    ("service.assignment.list", "¿qué hace Raquel?"),
+    ("service.assignment.get", "¿cuánto le lleva a Raquel un tinte?"),
+    ("service.assignment.eligible", "¿hay alguien que pueda hacer pedicura?"),
+    ("service.assignment.assign", "Raquel también va a hacer manicuras"),
+    ("service.assignment.update", "ponle a Sonia la pedicura como lo principal"),
+    ("service.assignment.remove", "quita a Raquel de las pedicuras"),
+    ("service.package.list", "¿qué bonos tenemos para elegir?"),
+    ("service.package.get", "¿qué trae el bono de láser?"),
+    ("service.package.create", "quiero un bono de 8 sesiones de láser que caduque en un año"),
+    ("service.package.update", "el bono de láser ahora vale 450 €"),
+    ("service.package.delete", "el bono de pedicuras ya no se vende"),
+    ("service.grant.list", "¿qué ha comprado Inés?"),
+    ("service.grant.get", "¿cuánto saldo le queda a Pilar en su bono?"),
+    ("service.grant.list_orphans", "¿quedan bonos de clientas que ya no existen?"),
+    ("service.grant.void_check", "¿se puede deshacer todavía el bono de Pilar?"),
+    ("service.grant.adjust_check", "¿hasta dónde puedo estirar el bono de Pilar?"),
+    ("service.grant.redeem_check", "¿qué impide gastar el bono de Pilar?"),
+    ("service.grant.tender_options", "¿con qué bonos puede venir Pilar al masaje?"),
+    ("service.grant.create", "Inés se lleva el bono de láser"),
+    ("service.grant.redeem", "Pilar ha gastado una sesión de su bono de pedicuras"),
+    ("service.grant.void", "el bono de Pilar se vendió por equivocación"),
+    ("service.grant.adjust", "dale a Pilar dos semanas más de bono"),
+    ("service.movement.list", "¿quién ha tocado el bono de láser?"),
+    ("service.session.get", "¿qué pasó con la sesión retenida de Inés?"),
+    ("service.session.hold", "guárdale a Pilar una sesión del bono para el tinte"),
+    ("service.session.release", "Pilar no viene, deja libre su sesión"),
+    ("service.session.return", "han devuelto la venta del láser, que vuelvan las sesiones"),
+    ("service.session.settle", "cobrada la venta, gasta ya las sesiones apartadas"),
+    ("service.service.create", "da de alta el alisado de keratina a 90 €"),
+    ("service.service.bulk_create", "crea todos estos de una vez: cejas, pestañas y uñas"),
+    ("service.service.update", "la manicura pasa a costar 30 €"),
+    ("service.service.archive", "la permanente ya no la ofrecemos"),
+    ("service.service.restore", "recupera la permanente que archivamos"),
+    ("service.service.set_image", "quédate con la segunda que me has propuesto para el tinte"),
+    ("service.category.create", "agrupa los de uñas en uno nuevo llamado Manos"),
+    ("service.category.update", "mueve Uñas dentro de Estética"),
+    ("service.category.delete", "Varios sobra"),
+]
+#: How far down the tools a turn offers an ask brings its own (``base/tests/test_assistant_asks.py``).
+TOP = 10
+#: The asks of other apps that Services' asks and groups move down (measured on this branch against the same tree
+#: without them: none below the eighth, in any role): each keeps ``ROOM`` places free below the first ten for the next
+#: app that says its own.
+ROOM = 2
+MOVED = [
+    ("base.file.read", "es", "¿cuánto pesa ese archivo?"),
+    ("base.file.upload", "es", "archiva el documento que te adjunto"),
+    ("base.file.upload", "es", "guarda este PDF en los archivos"),
+    ("inventory.category.update", "es", "renombra la categoría Bebidas a Refrescos"),
+    ("sale.order.remove_voucher", "es", "al final no uses el bono en el corte"),
+    ("sale.payment_method.create", "en", "we take meal vouchers now"),
+    ("staff.member.detail", "es", "¿qué datos tiene la ficha de Lucía?"),
+    ("table.zone.update", "en", "take the terrace out of service, it's raining"),
+]
+
+#: The tools that take a record by its id alone, and the read that finds that id by what a person names it with (the
+#: customer who owns a voucher, the service and the professional of an assignment, the line of a check a session pays):
+#: its description says that read, so the model looks the record up instead of asking the person for an id they never
+#: see («pide el id del bono», «pide el id de la sesión»).
+FOUND_BY = {
+    "service.grant.get": "service.grant.list",
+    "service.grant.void": "service.grant.list",
+    "service.grant.void_check": "service.grant.list",
+    "service.grant.adjust": "service.grant.list",
+    "service.grant.adjust_check": "service.grant.list",
+    "service.grant.redeem": "service.grant.list",
+    "service.grant.redeem_check": "service.grant.list",
+    "service.session.get": "sale.order.get",
+    "service.session.release": "sale.order.get",
+    "service.assignment.get": "service.assignment.list",
+    "service.assignment.remove": "service.assignment.list",
+    "service.assignment.update": "service.assignment.list",
+}
+
+
+def neighbour_probes() -> list[dict]:
+    """The probes of layer 2 of the owner, in Spanish, of Appointments and of Sales' checks: the requests whose words
+    («el bono», «la sesión», «la profesional», «el servicio») are Services' too."""
+    return [
+        probe
+        for path in sorted(PROBES_DIR.glob("owner-es-*.json"))
+        for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
+        if probe["tool"].startswith(("appointment.", "sale.order."))
+    ]
+
+
+def without_services_asks(tools: dict[str, Operation]) -> dict[str, Operation]:
+    """``tools`` with Services' tools saying no asks: how a turn ranked them before Services said its own."""
+    return {
+        name: dataclasses.replace(op, ai={key: value for key, value in op.ai.items() if key != "asks"})
+        if op.app_label == "service"
+        else op
+        for name, op in tools.items()
+    }
+
+
+def test_services_offers_at_least_46_tools():
+    """Services' tools are at least 46 (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.tools.is_tool(op)}
+    assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
+    assert len(tools) >= 46
+
+
+def test_the_reported_requests_are_the_probes_of_layer_2():
+    assert_reported_are_owner_probes(REPORTED)
+
+
+test_the_reported_service_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
+
+
+#: The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new ask
+#: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
+test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "service"))
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(
+    "probe", [probe for probe in PROBES if probe["tool"] in FIRST_TEN], ids=lambda probe: probe["id"]
+)
+def test_the_probes_that_come_close_stay_among_the_first_ten(catalog_of, probe):
+    """What its own asks give each of these tools: without them, more than half of them would fall behind the tenth
+    (the session's release 17th, the voucher's redemption 17th, the service settings 19th)."""
+    found = offered_place(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"])
+    assert found is not None and found <= 10, found
+
+
+def test_the_close_probes_are_probes_of_services():
+    assert FIRST_TEN <= {probe["tool"] for probe in PROBES}  # positive control: no name of the list is mistyped
+
+
+test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Services that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("service.assignment.assign", "Sonia will do colour too now, at 50 euros"),
+    ("service.assignment.eligible", "anyone able to do a pedicure, and at what price?"),
+    ("service.assignment.get", "what time and price does Raquel have for the beard trim?"),
+    ("service.assignment.list", "what does Sonia do in the salon?"),
+    ("service.assignment.remove", "take Sonia off colour"),
+    ("service.assignment.update", "Sonia's main one should be the pedicure now"),
+    ("service.catalog.status", "how is the catalogue doing, can everything be charged yet?"),
+    ("service.category.create", "we need a Colour category among the services"),
+    ("service.category.delete", "drop the nails one; what's in it can stay without"),
+    ("service.category.get", "what's under the nails one?"),
+    ("service.category.list", "how are our services split up?"),
+    ("service.category.update", "Nails should go inside Hair"),
+    ("service.grant.adjust", "give Pilar two more weeks on hers"),
+    ("service.grant.adjust_check", "could Marta's get a later expiry?"),
+    ("service.grant.create", "Inés is taking the five-massage one"),
+    ("service.grant.get", "details of Marta's, with its balance"),
+    ("service.grant.list", "what has Inés bought?"),
+    ("service.grant.list_orphans", "any left whose customer was erased?"),
+    ("service.grant.redeem", "mark one of Pilar's massage sessions as spent"),
+    ("service.grant.redeem_check", "what stops Pilar's from being used?"),
+    ("service.grant.tender_options", "what can Pilar use to pay for her massage?"),
+    ("service.grant.void", "Pilar's was sold by mistake"),
+    ("service.grant.void_check", "too late to undo Pilar's?"),
+    ("service.movement.list", "what happened with the laser one?"),
+    ("service.package.create", "five massages for 180 euros, valid a year"),
+    ("service.package.delete", "we'll stop selling the massage pack"),
+    ("service.package.get", "details of the massage pack, please"),
+    ("service.package.list", "which ones do we offer to choose from?"),
+    ("service.package.update", "the massage one goes up to 230 euros"),
+    ("service.service.archive", "we don't offer the perm any longer"),
+    ("service.service.bulk_create", "create all of these at once: brows, lashes and nails"),
+    ("service.service.create", "add a men's haircut at 14 euros"),
+    ("service.service.get", "how long does the manicure take?"),
+    ("service.service.list", "which services do we offer today?"),
+    ("service.service.list_for_sale", "what's for sale right now?"),
+    ("service.service.restore", "we're doing beard trims again, bring them back"),
+    ("service.service.set_image", "put the second one on the beard trim"),
+    ("service.service.suggest_image", "suggest a drawing for the beard trim"),
+    ("service.service.update", "the manicure now costs 30 euros"),
+    ("service.session.get", "Marta's session: still held, or what happened?"),
+    ("service.session.hold", "keep one of Marta's sessions for her colour"),
+    ("service.session.release", "free the one held for Marta's manicure"),
+    ("service.session.return", "the laser sale was refunded, put the sessions back"),
+    ("service.session.settle", "we just charged the sale, deliver whatever is held"),
+    ("service.settings.get", "how much buffer do we leave by default?"),
+    ("service.settings.update", "I want fifteen minutes between them by default"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("service", OWN_WORDS_EN)
+
+
+def test_every_tool_of_services_has_its_own_words():
+    tools = {name for name, op in registry.items() if op.app_label == "service" and assistant.tools.is_tool(op)}
+    assert [name for name, _ in OWN_WORDS] == list(dict.fromkeys(name for name, _ in OWN_WORDS))  # one each
+    assert {name for name, _ in OWN_WORDS} == tools
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize(("name", "language", "ask"), MOVED)
+def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, name, language, ask):
+    assert ask in shared.asks_of(registry[name])[language]  # positive control: it is still that tool's ask
+    places = {}
+    for role in Membership.Role:
+        tools = catalog_of(role, language)
+        if name in tools:
+            places[role] = offered_place(tools, name, ask, language)
+    assert places  # positive control: some role holds the tool
+    assert {role: found for role, found in places.items() if found is None or found > TOP - ROOM} == {}
+
+
+@pytest.mark.parametrize(("name", "read"), sorted(FOUND_BY.items()))
+def test_a_record_taken_by_its_id_says_which_read_finds_it(name, read):
+    op = registry[name]
+    assert list(op.input.model_fields)[0] in {"id", "ids"}  # positive control: it takes the record by its id
+    assert assistant.tools.is_tool(registry[read]) and registry[read].kind == "query"
+    assert read in op.ai["description"], name
+
+
+def test_the_hub_reads_a_bono_as_a_voucher_of_services_and_an_asignacion_as_an_assignment():
+    """Services' own words (its ``assistant_synonyms``): «el bono» names Services' voucher, the one of the catalogue and
+    the one sold (``service.package``, ``service.grant``), and «la asignación», or what one «asigna», a professional's
+    assignment to a service (``service.assignment``); without the Hub's groups, none of them does (positive control)."""
+    grant, package, assignment = shared.stem("grant"), shared.stem("package"), shared.stem("assignment")
+    assert_its_words_name(
+        "service",
+        [
+            ("anula el bono de Marta", grant),
+            ("¿qué bonos ofrecemos?", package),
+            ("asigna los peinados a Lucas", assignment),
+            ("cambia la asignación de Lucas", assignment),
+        ],
+    )
+
+
+#: Requests in the owner's words that are neither an ask nor a probe of layer 2: each brings its tool among the first
+#: ten only because the Hub reads «bono» as Services' voucher and «asigna» as an assignment.
+BY_THE_GROUPS = [
+    ("service.assignment.assign", "asigna los cortes de caballero a Marta, con 25 minutos"),
+    ("service.assignment.update", "cambia la asignación de Lucas a los peinados: ahora tarda media hora"),
+    ("service.package.list", "¿qué bonos hay para comprar?"),
+]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), BY_THE_GROUPS)
+def test_the_groups_of_services_bring_a_new_request_to_its_tool(catalog_of, name, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert comparable(phrase) not in probe_phrases()
+    assert_offered_with_room(tools, name, phrase, room=10)
+
+    assert name not in offered_to(tools, phrase, synonyms=without_services_groups())[:10]
+
+
+#: Services' own records that the words of a check or an appointment («el bono», «la sesión», «asigna») are of too:
+#: its vouchers (of the catalogue, sold, and their movements), their sessions and its professionals' assignments.
+VOUCHERS_SESSIONS_ASSIGNMENTS = (
+    "service.package.",
+    "service.grant.",
+    "service.movement.",
+    "service.session.",
+    "service.assignment.",
+)
+#: A request that names an assignment itself («las citas que no tengan nadie asignado», as «asigna» does): Services'
+#: assignments are what it names, so they may come ahead of its tool by the Hub's group (measured on this branch: the
+#: diary's lanes, 8th → 9th, behind ``service.assignment.list``); by Services' asks, never.
+NAMES_AN_ASSIGNMENT = re.compile(r"\basign", re.IGNORECASE)
+
+
+def without_services_groups() -> tuple[tuple[str, ...], ...]:
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the groups Services says: «bono» and «asignación»."""
+    every = assistant.relevance.synonyms()
+    kept = tuple(group for group in every if not {"bono", "asignacion"} & set(group))
+    assert len(every) - len(kept) == 2  # positive control: both of Services' groups are there
+    return kept
+
+
+def passed_by(offered: list[str], name: str) -> set[str] | None:
+    """Services' vouchers, sessions and assignments ahead of ``name`` in ``offered``; ``None`` when it is not
+    offered."""
+    if name not in offered:
+        return None
+    return {other for other in offered[: offered.index(name)] if other.startswith(VOUCHERS_SESSIONS_ASSIGNMENTS)}
+
+
+def lost_places(before: list[str], now: list[str], name: str) -> set[str] | None:
+    """What of Services passes ``name`` now that did not before; ``None`` when it is no longer offered at all."""
+    then, after = passed_by(before, name), passed_by(now, name)
+    if then is None:
+        return set()
+    return None if after is None else after - then
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
+    """Each request of Appointments and of Sales' checks of layer 2 that a turn offers its tool for keeps it ahead of
+    the same vouchers, sessions and assignments of Services whether their tools say their asks or not: none climbs past
+    it by its asks (paying a line with a voucher is ``sale.order.apply_voucher``'s, not a session's)."""
+    probes = neighbour_probes()
+    assert len(probes) > 40  # positive control: the probes of Appointments and of Sales' checks are read
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    before = without_services_asks(tools)
+    assert not any(shared.asks_of(op) for op in before.values() if op.app_label == "service")
+    assert any(shared.asks_of(op) for op in tools.values() if op.app_label == "service")
+    lost = {}
+    for probe in probes:
+        name, phrase = probe["tool"], probe["phrase"]
+        if (passed := lost_places(offered_to(before, phrase), offered_to(tools, phrase), name)) != set():
+            lost[probe["id"]] = passed
+    assert lost == {}
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+def test_services_groups_take_no_place_from_sales_nor_appointments(catalog_of):
+    """The same requests, with and without the Hub's groups of Services («bono», «asignación»): none loses its place to
+    a voucher, a session or an assignment of Services, unless the request names an assignment itself."""
+    probes = neighbour_probes()
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    without = without_services_groups()
+    lost, named = {}, []
+    for probe in probes:
+        name, phrase = probe["tool"], probe["phrase"]
+        if (passed := lost_places(offered_to(tools, phrase, synonyms=without), offered_to(tools, phrase), name)
+) != set():
+            if NAMES_AN_ASSIGNMENT.search(phrase) and passed:
+                named.append(probe["id"])
+                continue
+            lost[probe["id"]] = passed
+    assert lost == {}
+    assert set(named) <= {"owner.es.appointment.agenda.lanes"}  # the one measured: a new one is a choice to look at

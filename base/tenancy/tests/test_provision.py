@@ -1,4 +1,4 @@
-"""A hub's database made at sign-up and a demo's dropped when it ends (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6).
+"""A hub's database made at sign-up and a demo's dropped when it ends.
 
 ``base.tenancy.provision`` takes a hub ``requested`` through ``creating`` (its database cloned from its vertical's
 template on its cluster, private, with its identity), ``migrating`` (the clone brought to the code's leaf, its
@@ -17,18 +17,26 @@ import datetime as dt
 import logging
 import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from psycopg import sql
 from django.db import connections as django_connections
+from django.apps import apps as django_apps
 from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 from live.models import OutboxEvent
 
-from base import services
+from live.context import OperationContext, Scope
+from live.operations import get as get_operation
+
+from base import activation, services
+from base.activation import Activation
 from base.models import AppActivation, Location
+from base.schemas import SetupStatusIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
@@ -65,7 +73,7 @@ def nothing_checked_yet(monkeypatch):
 def told(monkeypatch):
     """The SaaS's ``ready`` notices (``services.report_ready``), recorded instead of sent."""
     heard: list[uuid.UUID] = []
-    monkeypatch.setattr(services, "report_ready", heard.append)
+    monkeypatch.setattr(services.provisioning, "report_ready", heard.append)
     return heard
 
 
@@ -119,6 +127,27 @@ def fresh(hub: Hub) -> Hub:
     return Hub.objects.select_related("cluster").get(pk=hub.pk)
 
 
+def worked_on(monkeypatch) -> list:
+    """The hubs a pass over ``hub_due`` works on, as it counts them: each demo it dropped and each preparation that
+    ended. Compared with what ``provision.run_due`` returns, never a fixed total: the pass also works on whatever else
+    its process left due."""
+    seen = []
+    drop, prepare = provision._drop, provision._prepare
+
+    def dropped(hub_id, now):
+        if result := drop(hub_id, now):
+            seen.append(hub_id)
+        return result
+
+    def prepared(hub_id, **kwargs):
+        prepare(hub_id, **kwargs)
+        seen.append(hub_id)
+
+    monkeypatch.setattr(provision, "_drop", dropped)
+    monkeypatch.setattr(provision, "_prepare", prepared)
+    return seen
+
+
 def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(registry, hub_databases, told):
     hub = registry.hub()
 
@@ -137,7 +166,7 @@ def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(re
 
 
 def test_a_preparation_leaves_no_connection_open_to_the_database_it_made(registry, told):
-    """Review of hub#471 (I1): each hub's migrator connection and its own are closed when its preparation ends, not at
+    """Each hub's migrator connection and its own are closed when its preparation ends, not at
     the end of the worker's pass (twenty hubs a pass would hold twenty, and a demo's DROP would have to force them)."""
     hub = registry.hub()
 
@@ -160,24 +189,33 @@ def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeyp
     hubs.assert_nobody_on(hub.db_name)
 
 
-def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
-    hub = registry.hub()
-    provision.provision(hub)
+@contextmanager
+def control_hears() -> Iterator[list[str]]:
+    """The statements control's own connection runs meanwhile."""
     heard: list[str] = []
 
     def record(execute, sql, params, many, context):
         heard.append(sql)
         return execute(sql, params, many, context)
 
-    with django_connections["default"].execute_wrapper(record), use_hub(fresh(hub)) as active:
+    with django_connections["default"].execute_wrapper(record):
+        yield heard
+
+
+def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
+    hub = registry.hub()
+    provision.provision(hub)
+
+    with control_hears() as heard, use_hub(fresh(hub)) as active:
         assert active.alias == tenancy_connections.hub_alias(hub)
         Location.objects.count()
         AppActivation.objects.count()
 
     assert not [sql for sql in heard if "base_location" in sql or "base_appactivation" in sql]
-    # Born with every app off (PLAN §33): its template carries no app turned on.
+    # Its template carries no app turned on: it is born with only what its country requires that the platform turns
+    # on by itself (Taxes), every other app off.
     with use_hub(fresh(hub)):
-        assert AppActivation.objects.count() == 0
+        assert set(AppActivation.objects.filter(state="on").values_list("app", flat=True)) == {"tax"}
 
 
 def test_a_hub_already_ready_is_left_as_it_is(registry, monkeypatch, told):
@@ -257,7 +295,7 @@ def test_a_missing_template_leaves_it_failed_with_a_readable_error_and_its_retry
 
 
 def test_each_failure_waits_longer_one_five_fifteen_minutes_then_every_hour():
-    assert [services.retry_delay(attempts) for attempts in range(1, 7)] == [
+    assert [services.provisioning.retry_delay(attempts) for attempts in range(1, 7)] == [
         dt.timedelta(minutes=1),
         dt.timedelta(minutes=5),
         dt.timedelta(minutes=15),
@@ -342,12 +380,27 @@ def test_a_hub_on_its_way_to_a_cluster_takes_its_place_there(registry, told):
     assert hub.last_error.startswith("no_cluster_available: ")
 
 
+def test_a_hub_going_to_a_cluster_in_its_night_takes_its_place_there(registry, told):
+    # A move asked for the business's night holds its place until the worker starts it: a new hub placed there
+    # meanwhile would have it refused at night for a full cluster.
+    full = registry.cluster("full", max_hubs=1)
+    tonight = timezone.now() + dt.timedelta(hours=12)
+    registry.hub(status=Hub.Status.READY, db_name="", move_scheduled_to=full, move_scheduled_for=tonight)
+    hub = registry.hub()
+
+    assert provision.provision(hub) is False
+
+    hub = fresh(hub)
+    assert (hub.status, hub.cluster) == ("failed", None)
+    assert hub.last_error.startswith("no_cluster_available: ")
+
+
 def test_a_purged_hub_frees_its_place_on_a_cluster(registry, told):
     small = registry.cluster("small", max_hubs=1)
     registry.hub(status=Hub.Status.PURGED, db_name="", cluster=small)
     hub = registry.hub()
 
-    services.place_hub(hub.pk)
+    services.provisioning.place_hub(hub.pk)
 
     assert fresh(hub).cluster == small
 
@@ -360,7 +413,7 @@ def test_a_demo_is_born_with_its_database_and_dropped_alone_when_it_ends(registr
     Hub.objects.filter(pk=demo.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
     before = databases()
 
-    assert services.reap_demos() == 1
+    services.demos.reap_demos()
 
     demo = fresh(demo)
     assert (demo.status, demo.purged_at is not None) == ("purged", True)
@@ -380,7 +433,7 @@ def test_a_demos_database_is_dropped_outside_any_transaction_of_control_and_befo
 
     monkeypatch.setattr(ops, "drop_database", spied)
 
-    assert services.reap_demos() == 1
+    services.demos.reap_demos()
 
     assert seen == [(demo.db_name, False, "dropping")]
     assert fresh(demo).status == "purged"
@@ -394,7 +447,7 @@ def test_a_demo_that_ends_goes_with_its_files_and_every_other_keeps_theirs(regis
     kept = keep_files(live_demo) | keep_files(business)
     Hub.objects.filter(pk=ended.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
 
-    assert services.reap_demos() == 1
+    services.demos.reap_demos()
 
     assert (fresh(ended).status, fresh(live_demo).status, fresh(business).status) == ("purged", "ready", "ready")
     assert set(objects(moto_s3, hub_files_bucket)) == kept
@@ -408,7 +461,7 @@ def test_a_demos_files_go_right_after_its_database_outside_any_transaction_and_b
     Hub.objects.filter(pk=demo.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
     seen = spy_on_the_purge(monkeypatch, lambda: fresh(demo).status)
 
-    assert services.reap_demos() == 1
+    services.demos.reap_demos()
 
     assert seen == ["drop", ("files", demo.pk, False, "dropping")]
     assert fresh(demo).status == "purged"
@@ -424,19 +477,19 @@ def test_a_store_that_fails_leaves_the_demo_dropping_noted_and_tried_again_never
     settings.STORAGES = {**settings.STORAGES, "hub_files": hub_files_entry(moto_s3, "erplora-test-no-such-bucket")}
     now = timezone.now()
 
-    assert services.reap_demos(now) == 0, "a purge that left files behind is not done"
+    services.demos.reap_demos(now)
 
     failed = fresh(demo)
-    assert (failed.status, failed.purged_at) == ("dropping", None)
+    assert (failed.status, failed.purged_at) == ("dropping", None), "a purge that left files behind is not done"
     assert failed.last_error.startswith("drop_failed: HubFilesNotDeleted: ")
     assert failed.attempts == 1
     assert failed.next_attempt_at > now
     assert HubDue.objects.get(pk=demo.pk).due_at == failed.next_attempt_at, "its turn waits for its next attempt"
-    assert failed.db_name not in databases(), "PLAN-DB §6: the database went first"
+    assert failed.db_name not in databases(), "the database went first"
     assert "base.demo.purge_failed" in caplog.text
 
     settings.STORAGES = {**settings.STORAGES, "hub_files": hub_files_entry(moto_s3, hub_files_bucket)}
-    assert provision.run_due(failed.next_attempt_at + dt.timedelta(seconds=1)) == 1
+    provision.run_due(failed.next_attempt_at + dt.timedelta(seconds=1))
 
     purged = fresh(demo)
     assert purged.status == "purged"
@@ -454,20 +507,23 @@ def test_a_demos_database_that_is_not_dropped_keeps_its_files(registry, monkeypa
 
     monkeypatch.setattr(ops, "drop_database", refused)
 
-    assert services.reap_demos() == 0
+    services.demos.reap_demos()
 
     assert fresh(demo).status == "dropping"
     assert set(objects(moto_s3, hub_files_bucket)) == kept
 
 
-def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, told):
+def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, monkeypatch, told):
     demo = registry.hub(demo=True, status=Hub.Status.CREATING, expires_at=timezone.now() - dt.timedelta(minutes=1))
     HubDue.mark_due(demo)
+    seen = worked_on(monkeypatch)
 
-    assert provision.run_due() == 1
+    worked = provision.run_due()
 
     assert fresh(demo).status == "purged" and demo.db_name not in databases()
     assert not HubDue.objects.filter(pk=demo.pk).exists()
+    # A drop is work it counts, as a preparation is.
+    assert demo.pk in seen and worked == len(seen)
 
 
 def test_the_due_pass_prepares_what_is_due_and_leaves_what_waits_for_its_retry(registry, told):
@@ -477,9 +533,10 @@ def test_the_due_pass_prepares_what_is_due_and_leaves_what_waits_for_its_retry(r
     HubDue.mark_due(due)
     HubDue.mark_due(waiting, later)
 
-    assert provision.run_due() == 1
+    provision.run_due()
 
-    assert fresh(due).status == "ready" and fresh(waiting).status == "failed"
+    assert fresh(due).status == "ready"
+    assert (fresh(waiting).status, fresh(waiting).attempts) == ("failed", 1)
     assert HubDue.objects.get(pk=waiting.pk).due_at == later
     assert not HubDue.objects.filter(pk=due.pk).exists()
 
@@ -497,6 +554,52 @@ def test_a_failed_hub_made_due_early_for_something_else_waits_for_its_retry(regi
     assert HubDue.objects.get(pk=hub.pk).due_at == later
 
 
+def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_after_the_freeze_is_lifted(
+    registry, monkeypatch, told
+):
+    """The staff freezes the platform for a database upgrade; a
+    business that signs up meanwhile is kept waiting, its database not made, and the worker makes it on its own on the
+    first tick after the freeze is lifted. Every other pass of the tick is left out: their own tests are
+    ``base/tests/test_worker.py``'s."""
+    from live.context import system_context
+
+    from base import catalog, worker
+    from base.catalog import RegisterResult
+    from base.registry import REGISTRY_SCOPE
+    from control.schemas import FreezeIn
+    from control.services import freeze_set
+
+    platform = system_context(REGISTRY_SCOPE)
+    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(0, 0, 0, True))
+    for name in ("_relay", "_hubs", "_activations", "_reap"):
+        monkeypatch.setattr(worker, name, lambda now: None)
+    hub = registry.hub()
+    HubDue.mark_due(hub)
+    with use_control():
+        freeze_set(platform, FreezeIn(frozen=True, reason="Aurora upgrade"))
+    seen: list[str] = []
+    stop = threading.Event()
+
+    def wait(seconds: float) -> bool:
+        seen.append(fresh(hub).status)
+        if len(seen) == 1:
+            with use_control():
+                freeze_set(platform, FreezeIn(frozen=False))
+        else:
+            stop.set()
+        return stop.is_set()
+
+    try:
+        assert worker.run(stop, tick_seconds=0, wait=wait) == 0
+    finally:
+        with use_control():
+            freeze_set(platform, FreezeIn(frozen=False))
+
+    assert seen == ["requested", "ready"]
+    assert hub.db_name in databases()
+    assert told == [hub.pk]
+
+
 def test_its_seeding_runs_inside_its_own_database(registry, monkeypatch, told):
     hub = registry.hub()
     seeded = []
@@ -506,7 +609,7 @@ def test_its_seeding_runs_inside_its_own_database(registry, monkeypatch, told):
 
         seeded.append((row.pk, current().alias))
 
-    monkeypatch.setattr(services, "apply_kept_photo", seed)
+    monkeypatch.setattr(services.photo, "apply_kept_photo", seed)
 
     provision.provision(hub)
 
@@ -527,12 +630,12 @@ def test_the_people_of_the_photo_kept_while_it_was_prepared_are_in_its_database_
         assert (ana.name, ana.email, ana.is_active) == ("Ana", "ana@example.com", True)
         # A preparation that goes on again (a retry) leaves out who the photo no longer lists.
         HubUser.objects.create(username=f"saas:{gone}", name="Gone", is_active=True)
-        services.apply_kept_photo(fresh(hub))
+        services.photo.apply_kept_photo(fresh(hub))
         assert not HubUser.objects.get(username=f"saas:{gone}").is_active
 
 
 def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_ready(registry, told):
-    """Review of round 4 (2): the photo the SaaS sends between the seeding's read and ``ready`` is applied too; the
+    """The photo the SaaS sends between the seeding's read and ``ready`` is applied too; the
     SaaS never sends it again (its version is not newer than the one the row keeps)."""
     from live.context import system_context
 
@@ -547,7 +650,7 @@ def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_r
     def photo_meanwhile(row):
         # The SaaS's photo, through its own door, while the seeding still runs: the hub is not ready, so it is kept.
         with use_control():
-            services.hub_state_apply(
+            services.hub_registry.hub_state_apply(
                 system_context(REGISTRY_SCOPE),
                 HubStateIn(id=row.id, version=7, members=members, photo={"members": members}),
             )
@@ -563,7 +666,7 @@ def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_r
 def test_a_photo_that_keeps_changing_while_it_is_seeded_leaves_it_failed_and_tried_again(registry, monkeypatch, told):
     hub = registry.hub()
     asked = []
-    monkeypatch.setattr(services, "provision_ready", lambda *args, **kwargs: asked.append(kwargs) or None)
+    monkeypatch.setattr(services.provisioning, "provision_ready", lambda *args, **kwargs: asked.append(kwargs) or None)
 
     before = timezone.now()
     assert provision.provision(hub) is False
@@ -572,7 +675,7 @@ def test_a_photo_that_keeps_changing_while_it_is_seeded_leaves_it_failed_and_tri
     assert len(asked) == provision.SEED_ROUNDS
     assert hub.status == "failed" and hub.last_error.startswith("photo_moving: ")
     # Tried again after its wait, like any failed preparation: its next attempt and its due time are the same.
-    assert hub.attempts == 1 and hub.next_attempt_at >= before + services.retry_delay(1)
+    assert hub.attempts == 1 and hub.next_attempt_at >= before + services.provisioning.retry_delay(1)
     assert HubDue.objects.get(pk=hub.pk).due_at == hub.next_attempt_at
 
 
@@ -614,8 +717,8 @@ def test_a_lease_lost_while_its_schema_is_migrated_stops_it_there_without_failin
 
 
 def test_each_step_of_a_preparation_is_logged_with_how_long_it_took(registry, told, caplog, monkeypatch):
-    """Verification of hub#471 in pre: only ready/failed were logged, and each step's time had to be guessed. Each
-    line says its own step's time, not the time since the start, and names the hub by its slug, as ``ready`` does."""
+    """Each line says its own step's time, not the time since the start, and names the hub by its slug, as ``ready``
+    does."""
     import re
 
     hub = registry.hub()
@@ -637,7 +740,7 @@ def test_a_hub_held_by_another_worker_is_not_taken(registry, told):
     HubDue.mark_due(hub, now)
     HubDue.objects.filter(pk=hub.pk).update(lease_until=now + dt.timedelta(seconds=60))
 
-    assert provision.run_due(now) == 0
+    provision.run_due(now)
     assert provision.provision(hub, now=now) is False
 
     assert fresh(hub).status == "requested" and hub.db_name not in databases()
@@ -655,20 +758,20 @@ def test_a_hub_without_a_name_for_its_database_fails_readably_and_nothing_reache
     assert told == []
 
 
-# ── The lease is its holder's (review of hub#471, I2) ──────────────────────────────────────────────────────────────
+# ── The lease is its holder's ───────────────────────────────────────────────────────────────────────────────────────
 
 
 def test_a_lease_another_worker_took_over_once_it_expired_is_never_touched_by_its_first_holder(registry, told):
     hub = registry.hub()
     now = timezone.now()
-    assert services.claim_hub(hub.pk, now, provision.LEASE, owner="worker-1") is not None
+    assert services.provisioning.claim_hub(hub.pk, now, provision.LEASE, owner="worker-1") is not None
     later = now + provision.LEASE + dt.timedelta(seconds=1)
-    assert services.claim_hub(hub.pk, later, provision.LEASE, owner="worker-2") is not None
+    assert services.provisioning.claim_hub(hub.pk, later, provision.LEASE, owner="worker-2") is not None
 
-    with pytest.raises(services.ProvisioningStopped, match="lease"):
-        services.provision_step(hub.pk, Hub.Status.CREATING, later, provision.LEASE, owner="worker-1")
-    assert services.provision_failed(hub.pk, later, "too late", owner="worker-1") is None
-    services.release_hub(hub.pk, later, owner="worker-1")
+    with pytest.raises(services.provisioning.ProvisioningStopped, match="lease"):
+        services.provisioning.provision_step(hub.pk, Hub.Status.CREATING, later, provision.LEASE, owner="worker-1")
+    assert services.provisioning.provision_failed(hub.pk, later, "too late", owner="worker-1") is None
+    services.provisioning.release_hub(hub.pk, later, owner="worker-1")
 
     due = HubDue.objects.get(pk=hub.pk)
     assert (due.lease_owner, due.lease_until) == ("worker-2", later + provision.LEASE)
@@ -678,10 +781,10 @@ def test_a_lease_another_worker_took_over_once_it_expired_is_never_touched_by_it
 def test_a_lease_is_never_taken_while_its_holder_keeps_it(registry, told):
     hub = registry.hub()
     now = timezone.now()
-    services.claim_hub(hub.pk, now, provision.LEASE, owner="worker-1")
+    services.provisioning.claim_hub(hub.pk, now, provision.LEASE, owner="worker-1")
 
-    assert services.claim_hub(hub.pk, now + dt.timedelta(seconds=30), provision.LEASE, owner="worker-2") is None
-    assert services.claim_next_due_hub(now + dt.timedelta(seconds=30), provision.LEASE, owner="worker-2") is None
+    assert services.provisioning.claim_hub(hub.pk, now + dt.timedelta(seconds=30), provision.LEASE, owner="worker-2") is None
+    assert services.provisioning.claim_next_due_hub(now + dt.timedelta(seconds=30), provision.LEASE, owner="worker-2") is None
 
 
 def test_the_due_pass_leases_one_hub_at_a_time_right_before_it_works_on_it(registry, monkeypatch, told):
@@ -697,10 +800,14 @@ def test_the_due_pass_leases_one_hub_at_a_time_right_before_it_works_on_it(regis
 
     monkeypatch.setattr(provision, "_prepare", prepare)
 
-    assert provision.run_due(now) == 2
+    worked = provision.run_due(now)
 
+    # Theirs, in their turn, and how many it worked on: whatever else its process left due is worked on too.
+    ours = [entry for entry in seen if entry[0] in (first.pk, second.pk)]
+    assert [hub_id for hub_id, _ in ours] == [first.pk, second.pk]
+    assert worked == len(seen)
     # While the first is worked on, the second is nobody's yet: its lease starts when its turn comes.
-    assert seen[0] == (first.pk, "")
+    assert ours[0] == (first.pk, "")
 
 
 # ── More apps than the template's, and a/b's own databases once every app can have one (seed_local_hubs) ────────────
@@ -744,18 +851,20 @@ def test_a_hub_may_get_more_apps_than_its_template_and_a_seed_inside_its_databas
 
 
 def _only_its_templates_apps_are_there(hub: Hub) -> None:
-    """S3: a new hub has its template's tables and nothing more, every app off; an app's tables are made the first time
-    it is turned on (``base.app.enable`` → the worker's ``ensure_schema``)."""
+    """A new hub has its template's tables and those of the apps it is born with on (Taxes), nothing more,
+    every other app off; an app's tables are made the first time it is turned on (``base.app.enable`` → the worker's
+    ``ensure_schema``)."""
     hub = fresh(hub)
     assert hub.status == "ready"
-    assert set(hub.schema_apps) == {"base", "live"}
+    assert set(hub.schema_apps) == {"base", "live", "tax"}
     tables = hubs.table_names(hub.db_name)
-    assert not {table for table in tables if table.startswith(("sale_", "customer_", "tax_"))}
+    assert {table for table in tables if table.startswith("tax_")}
+    assert not {table for table in tables if table.startswith(("sale_", "customer_"))}
     with use_hub(hub):
-        assert not AppActivation.objects.filter(state="on").exists()
+        assert set(AppActivation.objects.filter(state="on").values_list("app", flat=True)) == {"tax"}
 
 
-def test_a_new_hub_gets_only_its_templates_tables_every_app_off(registry, small_template, told):
+def test_a_new_hub_gets_only_its_templates_tables_and_those_of_what_it_is_born_with(registry, small_template, told):
     hub = registry.hub(vertical="small")
     assert not {table for table in hubs.table_names(small_template) if table.startswith("sale_")}
 
@@ -768,42 +877,130 @@ def test_the_due_pass_gives_a_new_business_only_its_templates_tables(registry, s
     hub = registry.hub(vertical="small")
     HubDue.mark_due(hub)
 
-    assert provision.run_due() == 1
+    provision.run_due()
 
     _only_its_templates_apps_are_there(hub)
 
 
-@pytest.fixture
-def full_template(django_db_blocker, hub_databases):
-    """``<control>_template_full``: built as ``migrate_hubs`` builds the platform's (``migrator.templates()[0].apps``)."""
-    control = hub_databases.control
-    name = names.template_db_name(control, "full")
-    with django_db_blocker.unblock():
-        with hubs._maintenance() as conn:
-            hubs._drop(conn, name, control)
-            conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(name, control=control)))
-        ddl = tenancy_connections.register_ddl_alias(name)
-        try:
-            migrator.migrate_apps(ddl, migrator.templates()[0].apps)
-        finally:
-            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
-    yield name
-    with hubs._maintenance() as conn:
-        hubs._drop(conn, name, control)
+# ── What a business is born with ────────────────────────────────────────────────────────────────────────────────────
+# Its seeding turns on, by itself, the apps the business's country requires that say the platform may (Taxes, in every
+# country), none chosen: they take nothing of the plan's limit. Never VeriFactu, mandatory in Spain: it binds the
+# business to the AEAT, so the Home asks its owner to turn it on. Every other app is off.
 
 
-def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_template, monkeypatch, told):
-    """Review of hub#471 in pre: ~63 s of migrations per sign-up on Fargate. The templates carry every portable app
-    (``migrator.templates``), so a hub made from one migrates nothing: its sign-up is the clone."""
-    hub = registry.hub(vertical="full")
-    applied = []
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda row, **kwargs: applied.append(real(row, **kwargs)) or applied[-1])
+def admin(hub: Hub, language: str = "en") -> OperationContext:
+    return OperationContext(scope=Scope("host", hub.slug), actor="ana", permissions=frozenset({"*"}), language=language)
+
+
+def born_with(hub: Hub) -> tuple[dict[str, Activation], dict[str, dict]]:
+    """The apps of ``hub`` once born, and what «Finish setting up your business» asks its owner, read in its database."""
+    with use_hub(fresh(hub)):
+        states = activation.states_of(Scope("host", hub.slug))
+        document = get_operation("base.setup.status")(admin(hub), SetupStatusIn()).model_dump(mode="json")
+    return states, {item["key"]: item for item in document["items"]}
+
+
+@pytest.mark.parametrize(
+    ("country", "verifactu_asked", "rules"),
+    [("ES", True, "done"), ("", True, "done"), ("PT", False, "pending")],
+)
+def test_a_business_is_born_with_taxes_on_for_its_country_and_never_with_verifactu(
+    registry, told, country, verifactu_asked, rules
+):
+    """Taxes is on and not chosen from its sign-up, with its country's rules: Spain's (a business without a country, a
+    demo, is in Spain) price at once, one of Portugal is told it has none yet (TAX-F17). VeriFactu stays off: in Spain
+    the Home asks its owner to turn it on; elsewhere, nothing."""
+    hub = registry.hub(country=country)
 
     assert provision.provision(hub) is True
 
-    assert applied == [[]]
-    assert set(migrator.portable_apps()) <= set(fresh(hub).schema_apps)
+    states, asked = born_with(hub)
+    assert states["tax"] == Activation("on", False)
+    assert states["verifactu"] == Activation("off", False)
+    assert {label for label, row in states.items() if row.wanted} == {"tax"}
+    assert activation.chosen_on(states) == 0
+    assert "base.mandatory.tax" not in asked
+    # With only what it is born with on, its till has nothing to sell yet: «Your apps» still asks for one.
+    assert asked["base.apps"]["state"] == "pending"
+    assert asked["tax.rules"]["state"] == rules
+    assert ("base.mandatory.verifactu" in asked) is verifactu_asked
+    if verifactu_asked:
+        assert asked["base.mandatory.verifactu"]["state"] == "pending"
+
+
+def test_two_businesses_are_born_each_with_its_apps_in_its_own_database_and_none_in_control(registry, told):
+    """A business of Spain and one of Portugal, each with its rows in its own database; the second sign-up leaves the
+    first's as they were, and control hears none of their apps."""
+    spain, portugal = registry.hub(country="ES"), registry.hub(country="PT")
+
+    with control_hears() as heard:
+        assert provision.provision(spain) is True
+        with use_hub(fresh(spain)):
+            first = set(AppActivation.objects.values_list("host", "app", "state", "chosen", "changed_at"))
+        assert provision.provision(portugal) is True
+
+    assert not [sql for sql in heard if "base_appactivation" in sql]
+    with use_hub(fresh(spain)):
+        assert set(AppActivation.objects.values_list("host", "app", "state", "chosen", "changed_at")) == first
+    with use_hub(fresh(portugal)):
+        assert set(AppActivation.objects.values_list("host", flat=True)) == {portugal.slug}
+        assert set(AppActivation.objects.filter(state="on").values_list("app", flat=True)) == {"tax"}
+    assert {host for host, *_ in first} == {spain.slug}
+
+
+def test_a_demo_is_born_as_a_business_of_spain_with_taxes_on_and_verifactu_off(registry, told):
+    hub = registry.hub(demo=True)
+
+    assert provision.provision(hub) is True
+
+    states, asked = born_with(hub)
+    assert {label for label, row in states.items() if row.wanted} == {"tax"}
+    assert asked["base.mandatory.verifactu"]["state"] == "pending"
+
+
+def test_an_app_mandatory_in_one_country_that_the_platform_turns_on_is_on_only_in_a_business_of_it(
+    registry, small_template, told, monkeypatch
+):
+    """Base names no app: what it turns on at sign-up, with its tables, is what each app declares, for the business's own
+    country (a straw declaration on Tasks, mandatory in Portugal only; a template without its tables)."""
+    monkeypatch.setattr(
+        django_apps.get_app_config("task"), "mandatory", {"countries": ["PT"], "platform_turns_on": True}, raising=False
+    )
+    portugal, spain = registry.hub(country="PT", vertical="small"), registry.hub(country="ES", vertical="small")
+
+    assert provision.provision(portugal) is True
+    assert provision.provision(spain) is True
+
+    assert born_with(portugal)[0]["task"] == Activation("on", False)
+    assert born_with(spain)[0]["task"] == Activation("off", False)
+    assert "task" in fresh(portugal).schema_apps and "task" not in fresh(spain).schema_apps
+
+
+def test_what_its_seeding_read_of_its_apps_is_not_kept_once_it_is_born_with_them(registry, told):
+    """Read while it is seeded (its apps all off then), what is kept of them is forgotten once it is born with Taxes on:
+    Taxes answers from its first request, never refused for a minute as off."""
+    hub = registry.hub(country="ES")
+    read: list[frozenset[str]] = []
+
+    def seed(row):
+        read.append(activation.off_apps(Scope("host", row.slug)))
+
+    assert provision.provision(hub, seed=seed) is True
+
+    assert "tax" in read[0]
+    with use_hub(fresh(hub)):
+        assert "tax" not in activation.off_apps(Scope("host", hub.slug))
+
+
+def test_a_seeding_that_writes_its_apps_keeps_them_as_it_wrote_them(registry, told):
+    """The local hubs a and b are born with every app on (``seed_local_hubs``): their seeding writes their apps, and
+    what a business is born with adds nothing to them."""
+    hub = registry.hub()
+
+    assert provision.provision(hub, seed=services.hub_registry.turn_every_app_on) is True
+
+    states, _ = born_with(hub)
+    assert states == activation.every_on(activation.module_graph())
 
 
 @pytest.fixture
@@ -826,8 +1023,8 @@ def full_template(django_db_blocker, hub_databases):
 
 
 def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_template, monkeypatch, told):
-    """Review of hub#471 in pre: ~63 s of migrations per sign-up on Fargate. The templates carry every portable app
-    (``migrator.templates``), so a hub made from one migrates nothing: its sign-up is the clone."""
+    """The templates carry every portable app (``migrator.templates``), so a hub made from one migrates nothing: its
+    sign-up is the clone, never a minute of migrations on Fargate."""
     hub = registry.hub(vertical="full")
     applied = []
     real = migrator.ensure_schema
@@ -841,7 +1038,7 @@ def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_
 
 @pytest.fixture
 def every_app_portable():
-    """Every app a and b turn on can live in a hub's own database (since W10, hub#474)."""
+    """Every app a and b turn on can live in a hub's own database."""
     assert migrator.hub_apps() == frozenset(migrator.portable_apps())
 
 
@@ -918,10 +1115,10 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
     assert told == []  # the local hubs are no business of the SaaS's
 
 
-# ── Guardrail (round 2026-10-30, proposal (c)): no new hub is ever born sharing control's database ──────────────────
+# ── Guardrail: no new hub is ever born sharing control's database ───────────────────────────────────────────────────
 
-#: The ``Hub.objects.create`` calls of ``base/services.py`` that may leave ``db_name`` empty, each with its reason.
-#: None since S5: phase 1's shared database is gone, every hub is born with its own (the local ones included).
+#: The ``Hub.objects.create`` calls of ``base/services/`` that may leave ``db_name`` empty, each with its reason.
+#: None: the old shared database is gone, every hub is born with its own (the local ones included).
 SHARED_HUB_CREATES: dict[str, str] = {}
 
 
@@ -975,11 +1172,11 @@ def test_the_scanner_sees_a_hub_made_with_and_without_its_database():
 
 
 def test_every_hub_the_services_make_names_its_own_database_but_the_listed_ones():
-    found = hub_creates((HUB_DIR / "base" / "services.py").read_text())
+    found = [one for module in (HUB_DIR / "base" / "services").glob("*.py") for one in hub_creates(module.read_text())]
 
     assert {"hub_register", "demo_create", "hub_seed_local"} <= {function for function, _named in found}
     offenders = sorted({function for function, named in found if not named} - set(SHARED_HUB_CREATES))
     assert offenders == [], (
-        "A new hub is born with its own database (round 2026-10-30 of PLAN-DB, decision 1): name its db_name "
+        "A new hub is born with its own database: name its db_name "
         f"(base.tenancy.names) or list the call in SHARED_HUB_CREATES with its reason: {offenders}"
     )

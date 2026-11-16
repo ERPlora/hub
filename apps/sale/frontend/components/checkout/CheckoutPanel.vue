@@ -23,7 +23,7 @@ import { type ChargeBlock, chargeBlock } from '../../lib/checkout/blocks';
 import { chargeableMethods } from '../../lib/checkout/methods';
 import { recipientComplete, recipientFrom, recipientPayload } from '../../lib/checkout/recipient';
 import { recipientIssue } from '../../lib/checkout/taxId';
-import { formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import type { DocumentType, PaymentMethodOut, PreviewIn, SaleOut } from '../../operations';
 import CheckoutFoot from './CheckoutFoot.vue';
 import CheckoutSide from './CheckoutSide.vue';
@@ -75,7 +75,10 @@ const whole = useLive('sale.checkout.preview', () => ({ order_id: props.orderId 
 const methodPage = useLive('sale.payment_method.list', { limit: METHODS_PAGE });
 const settings = useLive('sale.pos_settings.get', {});
 
-const reads = [preview, whole, methodPage, settings];
+/** The read behind `business` (the SDK shares the subscription): the total waits for it, so its failure is said too. */
+const businessRead = useLive('base.business.get', {});
+
+const reads = [preview, whole, methodPage, settings, businessRead];
 const readError = computed(() => reads.map((read) => read.error.value).find(Boolean) ?? null);
 const reconnecting = computed(() => reads.some((read) => read.status.value === 'reconnecting'));
 
@@ -89,8 +92,9 @@ function retry(): void {
 /** A read failed: its error replaces what was loading, never both (and «Retry» brings the loading back). */
 const failed = computed(() => !!readError.value && !retrying.value);
 
-/** The amount to charge; `undefined` until the server has worked it out. */
-const total = computed(() => (preview.status.value === 'loading' ? undefined : preview.data.value?.total));
+/** The amount to charge; `undefined` until the server has worked it out and the business has said its money (hub#921:
+ *  nothing is typed or charged before it, nor the total painted with two decimals that the yen does not have). */
+const total = computed(() => (preview.status.value === 'loading' || !business.value ? undefined : preview.data.value?.total));
 const cashLimit = computed(() => preview.data.value?.cash_limit ?? null);
 /** What the cash limit looks at: the whole operation, also when this is one part of a check. */
 const operationTotal = computed(() => (total.value === undefined ? undefined : (preview.data.value?.operation_total ?? total.value)));
@@ -107,7 +111,7 @@ const partialText = computed(() => {
 });
 
 // ── What the person chooses and types ─────────────────────────────────────────────────────────
-const tender = useTender({ total, methods, cashLimit, operationTotal, decimals: () => moneyDecimals(business.value) });
+const tender = useTender({ total, methods, cashLimit, operationTotal, money: business });
 
 const recipient = ref(recipientFrom(props.customer));
 const complete = computed(() => recipientComplete(recipient.value));
@@ -190,11 +194,13 @@ const recipientErrors = computed(() => {
 watch(recipientErrors, (errors) => errors && (sideOpen.value = true));
 
 function confirm(): void {
+  const payments = tender.payments();
+  if (!payments) return;
   void checkout.charge({
     order_id: props.orderId,
     ...(partial.value ? { line_ids: [...lineIds.value] } : {}),
     order_version: preview.data.value?.order_version ?? openedVersion,
-    payments: tender.payments(),
+    payments,
     document_type: documentType.value,
     ...(props.customer ? { customer_id: props.customer.customer_id } : {}),
     ...recipientPayload(recipient.value),

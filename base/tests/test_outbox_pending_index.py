@@ -142,10 +142,10 @@ def control_from_scratch(django_db_setup):
 @pytest.fixture
 def control_without_the_index(control_from_scratch):
     """That database as ``base/0023`` finds it on a new installation: no index, an empty outbox, not applied yet."""
+    migrate(control_from_scratch, "base", BEFORE)
     with hubs._maintenance(control_from_scratch) as conn:
         conn.execute(sql.SQL("DROP INDEX IF EXISTS {}").format(sql.Identifier(INDEX)))
         conn.execute("TRUNCATE live_outboxevent CASCADE")
-        conn.execute("DELETE FROM django_migrations WHERE app = 'base' AND name = %s", [MIGRATION])
     return control_from_scratch
 
 

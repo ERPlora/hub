@@ -1,14 +1,18 @@
-# hub-next
+# hub (`ERPlora/hub`)
 
 ## Desarrollo local
 
 ```bash
 git submodule update --init          # packages/live y packages/ui (ERPlora/live, ERPlora/ui)
+git config merge.workbook-translation.driver \
+  'uv run --no-sync python manage.py merge_workbook_translation %O %A %B %P || git merge-file -L ours -L base -L theirs %A %O %B'  # una vez por clon: lo comparten sus worktrees
 printf 'DEBUG=True\n' > .env         # sin DEBUG, el hub arranca como producción
 uv sync && pnpm install
 uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # deja `a` y `b` en el registro
 uv run python manage.py runserver    # Django en a.localhost:8000 y Vite (`pnpm run dev`)
 uv run pytest -q                     # Postgres de compose.yaml (`docker compose up -d`)
+uv run lint-imports                  # cada app importa solo lo que requiere; contratos en pyproject.toml (la suite lo corre)
+uv run complexipy                    # complejidad cognitiva ≤ 15; lo de antes, congelado en complexipy-snapshot.json (la suite lo corre)
 ```
 
 `DEBUG` está apagado si no se define: sin `DEBUG=True` en `.env` (o en el entorno), los ajustes
@@ -20,10 +24,37 @@ sube al repo.
 a un segundo checkout le basta `VITE_DEV_PORT=5203` en su `.env`. `pnpm run dev` o la e2e sueltos solo la leen
 del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/settings_pytest.py`).
 
+## El humo de navegador (`@smoke`)
+
+```bash
+bash .github/scripts/smoke-e2e.sh    # los tests @smoke del commit en el que estás; rojo si uno falla o si pasan del tope
+```
+
+Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
+suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
+citas, el alta de un negocio y la demo. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada
+nocturna»): sus worktrees, sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
+
+- **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
+  `pnpm e2e --list --grep @smoke` los lista.
+- **Qué código**: el último commit del checkout desde el que se lanza, subido o no; lo que no está en un commit no entra.
+  El SaaS va en su `origin/main`.
+- **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
+  cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
+- **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
+  pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
+  `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
+  registros de los dos `runserver` y `test-results/`).
+- **Salida**: 0 en verde; 1 en rojo (un test, el tope o un paso previo, como las dependencias o una BD); 2 con
+  argumentos, porque no lleva ninguno; 3 si ya corre otro humo en esa carpeta.
+- **Entrar en el humo**: un test se marca solo después de pasar 3 veces seguidas con este comando. Uno que falla sin
+  nada roto frenaría todos los cambios: se queda fuera y, si es un fallo de verdad, va a su issue.
+- Hoy no frena ninguna fusión: se corre a mano.
+
 ## Registro de hubs y `/internal`
 
-El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` de
-erplora-next): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
+El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `knowledge/raw/plans/2026-10-17-demo-hubs-fase-1.md`,
+ERPlora/knowledge): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
 **410** si el hub terminó (cancelado, purgado o una demo pasada su `expires_at`; página con la vuelta a ERPlora) y
 **503** con `Retry-After` si aún se prepara. La API, y toda llamada que no pide una página, recibe el sobre
 (`base.hub_gone`, `base.hub_preparing`). En local, `seed_local_hubs` (solo con `DEBUG`, idempotente) deja `a` y `b`;
@@ -62,12 +93,42 @@ En las tres, en este orden: sin `hub`, 422 `internal.payload_invalid`; el negoci
 la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reintenta), leída en la BD del propio negocio
 (ya dentro de su hub: el host por el que entra el SaaS no abre ninguno); si esa BD falla ahora, 503
 `base.hub_unavailable`, con su línea en el log (`base.hub_unreachable`, o `base.hub_unavailable` si la BD dice ser de
-otro hub), y erplora.com también reintenta; un cuerpo fuera de contrato, 422 con `fields`; y el sobre de cualquier otra
-negativa de la operación, tal cual.
+otro hub), y erplora.com también reintenta; un corte de la base dentro de la operación, su 503 de `live.database_cut`
+(`database_unavailable` o `database_outcome_unknown`) con `Retry-After` y sin esperar (BASE-F111), y erplora.com
+reintenta igual; un cuerpo fuera de contrato, 422 con `fields`; y el sobre de cualquier otra negativa de la operación,
+tal cual.
 
-## Tenencia: una BD por hub (fase 1, tajadas S1–S3)
+## Un corte de la base de datos (BASE-F111)
 
-Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-DB y CLAUDE.md «Tenencia del Hub».
+Un reinicio del escritor, un mantenimiento de AWS o el cambio de Blue/Green cortan la base unos segundos (PLAN-DB, ronda
+2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings.py`; qué es un
+corte y qué se repite, en el README de `packages/live`):
+
+- **Espera** hasta `DB_CUT_WAIT_SECONDS` (20 s por defecto, muy por debajo de los 120 s del balanceador) y repite sola una
+  lectura, lo que no llegó a empezar (abrir la base del negocio, leer quién pregunta) y un comando `repeatable=True` cortado
+  antes de su COMMIT. La espera es fuera de la transacción: no retiene la plaza del plan del negocio (`base.tenancy.limits`).
+- **`repeatable=True`** solo lo lleva un comando que no toca nada más que su base: Demo y los comandos locales revisados
+  de todas las apps. Nunca uno que cobra, numera, genera un QR, envía a la AEAT, manda un correo o un WhatsApp, llama a
+  un tercero o escribe fuera de su transacción (caché, sesiones, control o el almacén de ficheros). La lista de
+  exclusiones y una ruta real por app están en `base/tests/test_database_cut.py`, que además obliga a revisar cada
+  comando nuevo expuesto por una ruta; otra prueba del mismo fichero recorre el código de cada comando repetible, y lo
+  que llama, y falla si antes del COMMIT numera (también los tickets de Cocina al guardar las rondas pendientes),
+  guarda un fichero con nombre nuevo, cuenta un intento en la caché o llama a otro sistema.
+- **Pasado el tope, o si no se puede repetir:** 503 con `Retry-After`, nunca un 500 (`base.database_cut.server_error`, el
+  `handler500`): el sobre para la API, y para el navegador `base/database_cut.html`, que se recarga sola. Al abrir la
+  base del negocio, el 503 es el de siempre, `base.hub_unavailable`, pero después de esperar.
+- **Páginas de puerta:** todas (preparando, de baja, en mudanza, suspendido, volver a entrar, demasiados intentos, el salto
+  a la entrada y el corte) extienden un solo layout, `base/gate.html`, con la marca en `base/_gate_brand.html`; cada una
+  dice solo su título, su cabecera y su texto (`base/tests/test_gate_pages.py` lo exige).
+- **Sin espera:** `/internal/` (el SaaS reintenta por su cuenta) y `/readyz`. El pool de control lleva `check`: nunca
+  entrega una conexión que el servidor cortó mientras esperaba en él.
+- En la suite, el tope es 1 s (`config/settings_pytest.py`); `base/tests/test_database_cut.py` corta de verdad, con
+  `pg_terminate_backend` y la base del negocio en solo lectura.
+
+## Tenencia: una BD por hub (fase 1, tajadas S1–S5)
+
+Plan `knowledge/raw/plans/2026-10-22-fase-2-tenencia.md` (ERPlora/knowledge); reglas en PLAN-DB y en `ARCHITECTURE.md` §3 «Tenencia
+del Hub» de erplora-next.
 
 - **Dos clases de BD.** La de control (`default`) guarda el registro (`control/`: `Hub`, `DemoCode`, `Cluster`,
   `HubDue`; `Hub` y `DemoCode` conservan sus tablas `base_hub` y `base_democode`), Django (admin, auth, contenttypes,
@@ -76,15 +137,16 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   y sus entregas) sigue al contexto: las operaciones del registro (`base.hub.*`, `base.demo.*`) lo escriben en control.
 - **Sin modo compartido (S5).** Todo negocio y toda demo nacen con `db_name` (`<control>_<hex>`,
   `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test (`base/tenancy/tests/test_provision.py`)
-  impide crear un hub en `base/services.py` sin ella, también `a`/`b`: `seed_local_hubs` les da su BD (clonada de
+  impide crear un hub en `base/services/` sin ella, también `a`/`b`: `seed_local_hubs` les da su BD (clonada de
   `<control>_template`, con las tablas de todas las apps y todas encendidas) y se niega si alguna app no puede vivir en
   una (`migrator.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
   `base.hub_maintenance` y el worker lo nombra al arrancar (`ERROR base.worker.hub_without_database`) sin tocarlo, hasta
-  que **`manage.py cut_shared_hubs`** le da su BD (`base/tenancy/cut.py`): `--copy-all <slug>` (una vez, un negocio:
+  que **`manage.py cut_shared_hubs`** le da su BD (`base/tenancy/cut.py`; ya se corrió en prod, PLAN-DB ronda
+  2026-11-01c): `--copy-all <slug>` (una vez, un negocio:
   todas las filas de las tablas de hub que quedan en control), `--recreate <slug>` (de su plantilla y la foto del SaaS,
   nada copiado) o `--skip <slug>` (un cancelado, sin BD: si vuelve, `base.hub.restore` le hace una de cero);
   `--dry-run` dice el plan, y antes del primer corte copia control al bucket de volcados (`<control>/<hora>-cut.dump`;
-  sin bucket, solo con `--no-dump`). Runbook: `docs/runbooks/cut-shared-hubs.md` (ERPlora/docs). `migrate` ya no crea
+  sin bucket, solo con `--no-dump`). Runbook: `knowledge/wiki/runbooks/cut-shared-hubs.md` (ERPlora/knowledge). `migrate` ya no crea
   tablas de hub en control (`TenantRouter.allow_migrate`); las que quedan allí de la fase 1 no se tocan.
 - **Alta** (`base/tenancy/provision.py`, S2a). `PUT /internal/hubs/{id}` y `POST /internal/demos` dejan el hub
   `requested` y debido en `control.HubDue`; el worker (o `provision(hub)`) toma su arriendo (`SELECT … FOR UPDATE SKIP
@@ -99,7 +161,7 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
   Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
   la fila sin entrar en ella (`registry.database_is_made`). Cada paso escribe
-  control en una transacción corta (`base/services.py`, «The provisioning's writes in control») y se puede repetir. Un
+  control en una transacción corta (`base/services/provisioning.py`) y se puede repetir. Un
   fallo deja `failed` con `attempts`, `last_error` (`<código>: <motivo>`: `no_cluster_available`, `template_missing`,
   `clone_failed`, `schema_failed`, `photo_moving`, `unexpected`) y `next_attempt_at` (1 min, 5 min, 15 min y luego cada hora). La
   puerta del host responde 503 en todos esos estados. `CREATE`/`DROP DATABASE` van por `base/tenancy/ops.py`: conexión
@@ -114,7 +176,9 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   `use_control()` (el registro, las demos, el outbox de control, el admin sin negocio elegido y `manage.py shell` sin
   `--hub`). El hub de plataforma es una fila más con su BD (`create_platform_hub --execute` la hace). Sin contexto, un modelo o una operación de hub lanza
   `HubContextMissing`: nunca cae a `default`. Una operación de un hub dentro del contexto de otro,
-  `HubContextMismatch`.
+  `HubContextMismatch`; también un objeto cargado de la BD de un hub y usado dentro del contexto de otro (guardarlo,
+  borrarlo, refrescarlo o seguir sus relaciones), antes de mandar SQL: nunca escribe ni lee en la BD de su hub. Sin
+  contexto (un `RunPython`) o en su propio hub, por su alias o por su `…__ddl` (la misma BD), va donde se cargó.
 - **Enrutado** (`base/tenancy/router.py`, detrás de `SharedRouter`): control → `default`; hub → el alias del contexto.
   El alias de un hub con BD propia es `hub_<hex>`, registrado en caliente copiando `hub_template` (PgBouncer en modo
   transacción: sin pool, `CONN_MAX_AGE` 0, sin cursores de servidor ni sentencias preparadas) sin mutar
@@ -134,10 +198,10 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   personas del negocio son suyas, `base.HubUser`); si una volviera a enlazar un modelo de control, `add=` la rechazaría
   (`AppNotPortable`) y las plantillas la dejarían fuera, y el lint «(h)» de `tests/test_guardrails.py` lo impide antes.
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):
-  `<control>_template`, solo la plataforma, y una `<control>_template_<vertical>` por vertical de `base/catalog.py`,
-  clonada de la anterior, con las tablas de las apps de su vertical (`template_apps`) y todo apagado (ninguna
-  `AppActivation`). La de la plataforma la crea **solo** `bootstrap_databases` (roles, `vector`, privilegios por
-  defecto, sin acceso para PUBLIC); si falta en un servidor, `migrate_hubs` para con `TemplateMissing` («run
+  `<control>_template`, con la plataforma y todas las apps portables (`migrator.templates`, PLAN-DB ronda 2026-11-01),
+  y una `<control>_template_<vertical>` por vertical de `base/catalog.py`, clonada de la anterior (las apps de su
+  vertical, `template_apps`, ya están en ella) y todo apagado (ninguna `AppActivation`). La de la plataforma la crea
+  **solo** `bootstrap_databases` (roles, `vector`, privilegios por defecto, sin acceso para PUBLIC); si falta en un servidor, `migrate_hubs` para con `TemplateMissing` («run
   db-bootstrap there»). La de una vertical que falta se clona (reintenta mientras otro tenga abierta la de la
   plataforma, 55006) y recibe los mismos permisos de BD que su origen, porque el clon no copia los `GRANT`; en cada
   pasada se igualan otra vez. Una cuya lista cambió se pone al día, nunca se rehace ni pierde tablas. En local,
@@ -169,44 +233,19 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
-  Los tests escritos antes de la tenencia caen en un respaldo solo de la suite (`base/tenancy/tests/legacy.py`, fixture
-  de sesión `legacy_fallback`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`, solo en
-  `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas en el
-  ámbito del negocio `a` y el relay de sus avisos; los de la tenencia y los de cada puerta de entrada lo apagan
-  (`no_test_fallback`), como en producción.
-
-
-### Activar una app crea sus tablas (tajada S3)
-
-Un negocio y una demo nacen con las tablas de su plantilla (`<control>_template[_<vertical>]`: la plataforma y las apps de
-su vertical) y todas las apps apagadas (PLAN §33); el alta es el clon. Las tablas de cualquier otra app se crean **la
-primera vez que el negocio la enciende** (PLAN-DB §7, spec 2026-10-11 «tablas al activar»), nunca en el alta ni en
-`migrate_hubs`, y nunca se borran:
-
-- **Encender** (`base.app.enable`, Apps o un blueprint) en un hub con BD propia: si su BD ya tiene las tablas de la app
-  y de lo que necesita (`Hub.schema_apps`, lo que confirmó el migrador), queda `on` al momento (200); si no, todo lo que
-  enciende queda `creating` en un solo plan, la ruta responde **202** con `state: "creating"`, se anota
-  `base.app.activation_requested` y, tras el COMMIT, se llama al worker (`HubDue.mark_due`). Cada fila guarda la última
-  migración de la app en el código que la pidió (`AppActivation.target`).
-- **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados (`hub_due` vencido y
-  libre); en cada uno, lo debido (`creating`, o `failed` cuyo próximo intento llegó) se crea con
-  `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
-  (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos cambian sin recargar) o lo deja `failed` con
-  `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada hora; `base.app.activation_failed`), y mueve
-  la llamada del hub a lo siguiente que espera (o la quita). Esquema ocupado por otra ejecución: +30 s. Una petición de un
-  código más nuevo que el del worker (o la app o lo que necesita ya en una migración que su código no conoce): se deja a
-  un worker de ese código, +60 s, y a los 10 minutos queda `failed` con `code_behind` (tras un rollback no llega
-  ninguno). El pase de `hub_due` no toca la llamada de un hub listo. Una llamada perdida la encuentra el pase por los
-  hubs servidos: cada 10 minutos los que tuvieron una visita en 7 días y una vez al día el resto.
-- **Apps** pinta «Activándose…» (y la pantalla de la app dice que se abre en un momento) y, si falló, «No se ha podido
-  activar» con **«Reintentar»** (`base.app.retry`, 202); «Desactivar» en las tres. La sesión (`base.session.me`) da `activating`.
-  Mientras no está `on` sus operaciones responden 404 `app_inactive`, el relevo no le entrega nada y sus tareas no
-  corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
-  enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
-  («Reintentar» del informe trae lo que faltó).
-- Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
-  momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
-  encendidas (`provision(apps=…)`).
+  Los tests escritos antes de la tenencia que aún no se han pasado a una BD por negocio caen en un respaldo solo de la
+  suite (`base/tenancy/tests/legacy.py`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`,
+  solo en `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas
+  en el ámbito del negocio `a` y el relay de sus avisos. El respaldo se enciende solo para los tests que nombra
+  `.legacy-fallback-allow`, una línea `<fichero>::<test>` por test (`base/tenancy/tests/legacy_allow.py`); cualquier otro
+  test corre como producción y, si se apoya en el respaldo, falla (`HubContextMissing`, `HubWithoutDatabase`). La lista
+  solo encoge: no gana líneas frente a `origin/main` (una línea sí puede moverse con su test a otro fichero) y la de un
+  test que ya no existe sale (`tests/test_guardrails_legacy_fallback.py`); y una pasada que corre todos los casos de un
+  test de la lista, todos en verde, sin que se apoye ni una vez en el respaldo, cae y dice qué línea quitar. La CI
+  reparte los casos de un test entre varios trabajos y ninguno los corre todos: cada trabajo guarda lo que vio
+  (`--legacy-fallback-report`) y el trabajo `legacy-fallback` lo junta (`python -m base.tenancy.tests.legacy_allow`) y
+  cae igual. Pasarlos a
+  una BD por negocio y borrar la lista con el respaldo es hub#611.
 
 
 ### Activar una app crea sus tablas (tajada S3)
@@ -237,8 +276,8 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
   corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
   enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
   («Reintentar» del informe trae lo que faltó).
-- Un hub que aún comparte la BD de la fase 1 (`db_name=""`) enciende al momento, como hasta ahora (propuesta (i) de
-  la ronda 2026-10-30, hasta el corte de S5). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
+- Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
+  momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
   encendidas (`provision(apps=…)`).
 
 
@@ -257,7 +296,9 @@ PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m)
   `base.reset_in_progress`; sin BD propia, 409 `base.reset_shared_database` como antes.
 - **La baja**: `base.hub.cancel` de un negocio con su BD propia terminada lo deja debido y el worker lo copia una vez
   (`offboarding`); si falla, reintenta a 1 min, 5 min, 15 min y luego cada hora (`attempts`, `last_error`,
-  `next_attempt_at`). La BD se conserva: el `DROP` del día 90, con su segunda copia, no está en esta tajada.
+  `next_attempt_at`). La BD se conserva 90 días; pasados, el worker hace su copia final y la borra
+  (`DROP DATABASE … WITH (FORCE)`, `base/tenancy/offboarding.py`, BASE-F109, hub#599), salvo la de un negocio con
+  documentos fiscales, que se guarda hasta que exista el archivo fiscal (hub#738).
 - **La copia** (`dump_hub`): `pg_dump -Fc --no-owner --no-acl` de esa BD como el migrador, por conexión directa al
   escritor de su cluster (`migrator_conninfo`, nunca PgBouncer), con la contraseña en `PGPASSWORD` y nunca en la orden
   ni en un error, acotado a 15 min (el arriendo se renueva mientras corre) y a un fichero temporal; solo si termina
@@ -405,15 +446,17 @@ la caché, igual que `/readyz` (la web pública, en cambio, falla con ella). Las
 (`config/settings_pytest.py`, aunque haya `VALKEY_URL`) y la vacían en cada test (`conftest.py`), porque todas llaman
 desde la misma IP.
 
-El PIN para cambiar de empleado y las API keys (`erpk_live`) aún no existen en el Hub (fase 2); cuando lleguen,
-cuentan con el mismo `AttemptLimit`.
+El PIN y la placa para entrar o cambiar de empleado y las API keys (`erpk_live`) también cuentan con `AttemptLimit`:
+un PIN o una placa rechazados, 5 por persona o tarjeta en 5 min y 20 por dirección en 15 min; elegir el propio PIN, 30
+por hora, también los aceptados (`base/access.py`); dar una placa, 30 por hora por quien la da (`base/people.py`); un
+token que nadie emitió, 30 por dirección en 5 min (`base/api_keys.py`).
 
 ## Despliegue: `main` → prod, `pre` → pre
 
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora
 que prod, con su propio clúster de ECS (`erplora-pre`; prod corre en `erplora-prod`), sus propios
 servicios (`hub-pre`, `worker-pre`), BD `pre_*` y repositorio de ECR (`erplora/hub-pre`). Se apaga
-sola cada tarde (plan `docs/plans/2026-10-14-entorno-pre.md` de erplora-next).
+sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/knowledge).
 
 1. Cada push a una rama de trabajo corre `test / test` (`ci.yml`).
 2. Si `pre` avanzó, se integra `origin/pre` en la rama y se vuelve a empujar.
@@ -445,7 +488,7 @@ Control guarda el usuario de la sesión (`auth.User`, la copia `saas:<id>` de la
 (`Membership`); la BD del hub guarda a la persona del negocio, `base.HubUser`: `username` (`saas:<id>`, `demo:<slug>`),
 `account_id` (la cuenta de erplora.com; ninguna para el dueño de una demo), nombre, correo, `is_active` y su alta. Nunca
 se borra: quien se va conserva su nombre en lo que firmó y deja de estar activo. Se crea o se pone al día en cada
-entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.ensure_hub_user`), en la primera escritura de quien
+entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.sessions.ensure_hub_user`), en la primera escritura de quien
 aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`; la de un negocio cuya BD aún se prepara, en
 su siembra). Las
 apps enlazan a ella, nunca a `settings.AUTH_USER_MODEL` (lint «(h)»): `staff` (registro y aprobación de ausencias),

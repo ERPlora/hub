@@ -1,4 +1,4 @@
-"""VeriFactu is only for businesses in Spain (VERIFACTU-F01, F13; FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
+"""VeriFactu is only for businesses in Spain (VERIFACTU-F01, F13).
 
 RD 1007/2023 and Orden HAC/1177/2024 bind the taxpayers of Spain (the Canary Islands, Ceuta and Melilla included: a
 region of ES, not another country). A business erplora.com registered in another country (``base.Hub.country``, as
@@ -16,28 +16,22 @@ A business without a country (a demo) is in ERPlora's market, Spain: it files as
 import base64
 
 import pytest
-from live.context import OperationContext, Scope, system_context
+from live.context import OperationContext, system_context
 from live.errors import AppInactive
 from live.operations import get
 
 from apps.invoice.models import Invoice
 from apps.verifactu import queries
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import A, B, ISSUER, RECIPIENT, ctx_for, deliver, manual, run
+from apps.verifactu.tests.conftest import HUB_DB, ISSUER, RECIPIENT, A, B, business_in, ctx_for, deliver, manual, run
 from base import activation
 from base.models import Hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 ONLY_IN_SPAIN = "VeriFactu is only for businesses in Spain."
 NOT_SENT = "this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT"
 CUT = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
-PLATFORM = Scope("host", "erplora")
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
 
 
 def ticket(ctx=None):
@@ -92,39 +86,42 @@ def test_a_business_in_spain_or_without_a_country_still_seals_its_record(issuer,
     assert Record.objects.get(invoice_id=invoice.id).status == Record.Status.PENDING
 
 
-def test_each_hub_reads_its_own_business_s_country(issuer):
-    business_in("PL", "a")
-    business_in("ES", "b")
-    run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
-    in_poland, in_spain = ticket(), ticket(ctx_for(scope=B))
+def test_each_hub_reads_its_own_business_s_country(issuer, in_business_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
+    in_poland = ticket()
+    with in_business_b():
+        run("invoice.issuer.update", ISSUER, ctx_for(scope=B))
+        in_spain = ticket(ctx_for(scope=B))
+        sealed_in_b = list(Record.objects.values_list("invoice_id", flat=True))
     assert (in_poland.verifactu_status, in_spain.verifactu_status) == ("unavailable", "sealed")
-    assert list(Record.objects.values_list("invoice_id", flat=True)) == [in_spain.id]
+    assert sealed_in_b == [in_spain.id]
+    assert not Record.objects.exists()
 
 
-def test_erploras_own_hub_reads_its_country_from_the_platform_too(db, settings, monkeypatch):
-    # FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY: ``base.business.get`` answers ERPlora's own hub (hub#329),
-    # so VeriFactu asks it there as anywhere else, never a second source of the same country that drifts in silence if
-    # the platform moves where its hub's country comes from (here, an answer other than ``PLATFORM_ISSUER_COUNTRY``).
-    settings.PLATFORM_HUB_SLUG = PLATFORM.key
+def test_erploras_own_hub_reads_its_country_from_the_platform_too(settings, monkeypatch):
+    # ``base.business.get`` answers ERPlora's own hub (hub#329), so VeriFactu asks it there as anywhere else, never a
+    # second source of the same country that drifts in silence if the platform moves where its hub's country comes from
+    # (here, an answer other than ``PLATFORM_ISSUER_COUNTRY``). ERPlora's own hub is here the business ``A``.
+    settings.PLATFORM_HUB_SLUG = A.key
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
-    assert not queries.outside_spain(PLATFORM)
+    assert not queries.outside_spain(A)
 
     business = get(queries.BUSINESS)
     answer = business.fn
     monkeypatch.setattr(business, "fn", lambda ctx, data: {**answer(ctx, data), "country": "PL"})
 
-    assert queries.business_country(PLATFORM) == "PL"
-    assert queries.outside_spain(PLATFORM)
+    assert queries.business_country(A) == "PL"
+    assert queries.outside_spain(A)
 
 
-def test_a_scope_with_no_registry_row_is_in_spain(db):
-    # FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY (reviewer): a scope erplora.com never registered (no
-    # ``base.Hub`` row, so ``base.business.get`` answers ``NotFound``) is in ERPlora's market, Spain: ``""``, not a
-    # country of its own, so VeriFactu seals and sends for it as for a demo.
-    nowhere = Scope("host", "nowhere")
-    assert not Hub.objects.filter(slug=nowhere.key).exists()
-    assert queries.business_country(nowhere) == ""
-    assert not queries.outside_spain(nowhere)
+def test_a_scope_with_no_registry_row_is_in_spain(hub_a):
+    # A scope with no registry row (here the business ``A``'s, gone from erplora.com's registry: ``base.business.get``
+    # answers ``NotFound``) is in ERPlora's market, Spain: ``""``, not a country of its own, so VeriFactu seals and
+    # sends for it as for a demo.
+    Hub.objects.filter(pk=hub_a.pk).delete()
+    assert queries.business_country(A) == ""
+    assert not queries.outside_spain(A)
 
 
 # (c) The queue

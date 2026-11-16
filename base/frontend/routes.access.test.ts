@@ -1,6 +1,3 @@
-// base's routes of the way in (APP-BASE-3): «Access» and «Create your PIN» paint their own frame, the first without a
-// session (where Django's `way_in` sends a browser without one); «Switch user» over the session it replaces; «My
-// profile» and Settings in the chrome. Each loads its page on demand.
 import type { RouteComponent, RouteRecordRaw } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 

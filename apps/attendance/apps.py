@@ -13,12 +13,11 @@ class AttendanceConfig(LiveAppConfig):
     label = "attendance"
     kind = "app"
     verbose_name = _("Time clock")
-    # `ion:time-outline` is the Schedules app's on the apps page; the fingerprint the market uses waits
-    # in UI-REQUESTS.md.
+    # Not `ion:time-outline`: that is the Schedules app's icon on the apps page.
     icon = "ion:finger-print-outline"
     category = Category.PEOPLE
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The public store's texts, which register_apps writes to shared.app.
     summary = _(
         "Clock in and out with one tap, breaks, corrections with a reason and the legal working-day record."
     )
@@ -35,7 +34,7 @@ class AttendanceConfig(LiveAppConfig):
     # A working day belongs to a staff record (staff.Member).
     requires = ["staff"]
     default_auto_field = "django.db.models.BigAutoField"
-    # The old module's four permissions (module.json), plus clocking someone else (ATTENDANCE-F12).
+    # Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
     permissions = [
         "attendance.clock",
         "attendance.view_all",
@@ -51,7 +50,7 @@ class AttendanceConfig(LiveAppConfig):
         "hub_employee": ["attendance.clock"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. The old module's two entries with their old icons.
+    # `icon =` as the module's own icon.
     navigation = [
         Nav(
             "clock",
@@ -66,9 +65,8 @@ class AttendanceConfig(LiveAppConfig):
             "/attendance/records",
         ),
     ]
-    # The Home's panel (PLAN-HUB round 2026-10-21): the old module's one `widgets` (it had no `setup` nor `bell`),
-    # «Clocked in now» (ATTENDANCE-F11), on the count of what Records lists, in every business. A KPI says its name
-    # once, in its title (gh:hub#1105).
+    # The Home's panel «Clocked in now» (ATTENDANCE-F11), on the count of what Records lists, in every business.
+    # A KPI says its name once, in its title.
     widgets = [
         Widget(
             key="clocked_in_now",
@@ -84,9 +82,8 @@ class AttendanceConfig(LiveAppConfig):
             options={"format": "number"},
         )
     ]
-    # ATTENDANCE-F05: the worker runs it as the system every quarter of an hour (cron in UTC; phase 1 on
-    # its one scope, phase 2 on every hub); clocking in applies it to the person too, so a forgotten day
-    # never blocks the next one.
+    # ATTENDANCE-F05: the worker runs it as the system every quarter of an hour (cron in UTC); clocking in
+    # applies it to the person too, so a forgotten day never blocks the next one.
     scheduled_tasks = [
         {
             "name": "review_stale",

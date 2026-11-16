@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6fcd335b94ab3104547fdd7945bfb643a2b76614e19a000f827f262451169956 -->
+<!-- generated from WORKBOOK.md sha256:46bd0aecd4813b9d240d10ee86f5e4cdfade2a8f77731cf7ed672f2667f881f6 -->
 
 ## What it is for and who it is for
 
@@ -92,6 +92,12 @@ everyone else sees it read-only with "Only a manager or an administrator can cha
 On all three pages: "Reconnecting…" while the live connection recovers (what is painted stays), "This
 app is not active in this business" if it is turned off and "You do not have permission" if the role
 does not reach.
+
+## Unsaved changes on Android
+
+In the "Correct working day" window, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); a time rewritten by itself in the business's time zone is no change.
 
 ## Flows
 
@@ -189,7 +195,7 @@ Involved: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 
 ### ATTENDANCE-F04 Set the workplace location and when a forgotten working day is reviewed
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Settings
 Steps:
 1. Open Time clock → "Settings".
@@ -201,6 +207,7 @@ Steps:
    in and you see the accuracy read. You can also type them by hand.
 4. In "Flag for review after (hours)" put from 1 to 24 hours (12 if you leave it).
 5. Tap "Save" and you see "Settings saved.". Only what changed is sent.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: nothing from other apps; without saved settings, the default values show.
 Out: the settings that Clock in (ATTENDANCE-F03) and the working-day review (ATTENDANCE-F05) read; the
 settings changed notice.
@@ -211,7 +218,12 @@ with the location denied, "Use my current location" keeps what was typed and war
 "Location access is denied. Allow location in this browser to read the workplace position, or type the
 coordinates." (in the installed app, which has no browser, "Location access is denied. Allow location in
 your device settings to read the workplace position, or type the coordinates."); whoever is not a
-manager sees the settings read-only.
+manager sees the settings read-only. As in the form windows, the notice goes as soon as something is changed
+and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
+takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
+until the next try (hub#854). Tapping "Save" with nothing to send is a try too: it says "Settings saved." and
+takes away the red notice and the fields' reasons of the last refusal, which do not come back until the next
+refusal (hub#894).
 Involved: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Flag for review a working day nobody closed
@@ -287,8 +299,9 @@ working day of this person." (touching is not overlapping: a working day can sta
 previous one ended); "That person already has another open working day: this one cannot be reopened.";
 a future time, "The time cannot be in the future."; without a reason, "Write a reason of at least 3
 characters.". If the business's time zone cannot be read, "The business's time zone could not be read, so this
-correction cannot be saved yet. Reload the page to try again.", with the button off. A refused correction
-changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
+correction cannot be saved yet. Reload the page to try again.", with the button off. Each reason of a field
+shows under it and goes away as soon as that field is corrected, even if another one says the same
+(hub#888). A refused correction changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
 Involved: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 See who changed a working day, when and why
@@ -321,7 +334,7 @@ Out: the file downloaded on the device; nothing is saved in the Hub.
 If it fails: a month without working days downloads only the header and warns "There are no working days
 for this filter: the file only has the header."; if the download fails, "The CSV could not be exported.
 Try again.".
-Involved: ATTENDANCE-F06, ATTENDANCE-F07
+Involved: ATTENDANCE-F06, ATTENDANCE-F07, BASE-F112 (inside the app)
 
 ### ATTENDANCE-F11 See who is clocked in now
 Status: done (server, screen and Home panel)

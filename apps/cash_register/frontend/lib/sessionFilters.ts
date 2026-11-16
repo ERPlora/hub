@@ -1,11 +1,12 @@
 // The filters of the sessions list (CASH_REGISTER Pantallas · Caja: status, number and the four amounts),
 // as the table's funnel holds them (by name, as typed, in the business's money; a filter not in use is
-// absent) and as `cash_register.session.list` takes them (cents). Only the difference takes a minus (a
-// short drawer). An amount it cannot read does not filter: the table says it under its field.
+// absent) and as `cash_register.session.list` takes them (cents), read as every amount filter of the Hub
+// (`filterCents`, hub#1196). Only the difference takes a minus (a short drawer). An amount it cannot read does not
+// filter: the table says it under its field (the page, with `amountFilterErrors` on `AMOUNT_FILTERS`, `SIGNED`).
 import type { DataTableFilters } from '@erplora/ui/components';
 
 import type { SessionListIn, SessionStatus } from '../operations';
-import { type Money, moneyDecimals, readMoney } from './money';
+import { filterCents, type Money } from './money';
 
 export const SESSION_STATUSES: readonly SessionStatus[] = ['open', 'closed'];
 
@@ -19,24 +20,12 @@ export const AMOUNT_RANGES = {
 
 type AmountFilter = (typeof AMOUNT_RANGES)[keyof typeof AMOUNT_RANGES][number];
 
-const AMOUNT_FILTERS: readonly AmountFilter[] = Object.values(AMOUNT_RANGES).flat();
+/** The eight amount ends, in the business's money as typed. */
+export const AMOUNT_FILTERS: readonly AmountFilter[] = Object.values(AMOUNT_RANGES).flat();
+/** The ends that take a minus: the difference's (a short drawer). */
+export const SIGNED: readonly AmountFilter[] = AMOUNT_RANGES.difference;
 
 const filled = (text: string | undefined): text is string => (text ?? '').trim() !== '';
-
-/** An amount filter as cents of the business's `money`; `undefined` when it is no amount (a minus only for the
- *  difference). */
-function cents(name: AmountFilter, text: string, money?: Money): number | undefined {
-  const trimmed = text.trim();
-  const negative = name.startsWith('difference') && /^[-−]/.test(trimmed);
-  const read = readMoney(negative ? trimmed.slice(1) : trimmed, moneyDecimals(money), money?.currency);
-  if (!read.ok || read.cents === null) return undefined;
-  return negative ? -read.cents : read.cents;
-}
-
-/** The amounts typed that are not amounts: the table says it under each. */
-export function unreadableAmounts(values: DataTableFilters, money?: Money): string[] {
-  return AMOUNT_FILTERS.filter((name) => filled(values[name]) && cents(name, values[name], money) === undefined);
-}
 
 /** The filters as `cash_register.session.list` takes them. */
 export function filterParams(values: DataTableFilters, money?: Money): Partial<SessionListIn> {
@@ -46,7 +35,7 @@ export function filterParams(values: DataTableFilters, money?: Money): Partial<S
   for (const name of AMOUNT_FILTERS) {
     const text = values[name];
     if (!filled(text)) continue;
-    const amount = cents(name, text, money);
+    const amount = filterCents(text, money, { signed: SIGNED.includes(name) });
     if (amount !== undefined) out[name] = amount;
   }
   return out;

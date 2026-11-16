@@ -9,11 +9,26 @@ from django.utils import timezone, translation
 
 from config import testing
 
+# The suite's fallback, on only for the tests .legacy-fallback-allow names (base/tenancy/tests/legacy_allow.py).
+pytest_plugins = ["base.tenancy.tests.legacy_allow"]
+
 ENTRY = "frontend/main.ts"
 
 
 # Fails the test that leaves a database connection with a session setting changed (config/testing.py).
 session_settings_left_as_found = pytest.fixture(autouse=True)(testing.session_settings_left_as_found)
+
+# Fails the test that leaves a database connection with its own ensure_connection, which hides pytest-django's block
+# from the tests without the database after it, once its fixtures are torn down (config/testing.py, hub#822).
+pytest_runtest_teardown = testing.database_block_left_as_found
+
+
+@pytest.fixture(scope="session")
+def django_db_modify_db_settings(django_db_modify_db_settings):
+    """The settings of the session's test database as pytest-django leaves them, and no pool made before them: one made
+    on the developer's database would take every later connection there (hub#1332;
+    ``testing.close_pools_made_before_the_test_database``)."""
+    testing.close_pools_made_before_the_test_database()
 
 
 @pytest.fixture(scope="session")
@@ -65,7 +80,7 @@ def local_hubs(request):
     every app on (``base.activation.every_on``), as the developer's database has them after ``seed_local_hubs``.
 
     The host gate (``base.middleware``) answers 404 to a slug without a row, so a test on ``a.localhost`` needs it.
-    A hub is born with every app off (round 2026-10-27): a test of a new hub creates its own row, and one about how a
+    A hub is born with every app off: a test of a new hub creates its own row, and one about how a
     hub is born clears ``a``'s rows. A test without the database gets nothing (and a test without it that asks
     ``a.localhost`` for a hub's page fails: it must say ``django_db``).
     """
@@ -74,15 +89,19 @@ def local_hubs(request):
         return
     request.getfixturevalue("transactional_db" if "transactional_db" in request.fixturenames else "db")
     from base.models import Hub
+    from base.tenancy.tests.legacy import use_legacy
 
-    for slug in LOCAL_HUBS:
-        Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
-        _every_app_on(slug)
+    # Written in the fallback's tables explicitly: a test that only finds them there does not lean on the fallback.
+    with use_legacy():
+        for slug in LOCAL_HUBS:
+            Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
+            _every_app_on(slug)
 
 
 def _every_app_on(slug):
     """Write down every app on in the business ``slug``, its roots chosen, unless it has rows already: what the
-    migration ``base.0017`` left every hub of before round 2026-10-27, and ``seed_local_hubs`` the local ones."""
+    migration ``base.0017`` left every hub that existed before apps were born off, and ``seed_local_hubs`` the
+    local ones."""
     from base import activation
     from base.models import AppActivation
 
@@ -96,8 +115,8 @@ def _every_app_on(slug):
 
 @pytest.fixture
 def every_app_on():
-    """``every_app_on(slug)``: a business the test creates, with every app on as a hub of before round 2026-10-27
-    (a new one is born with every app off). Writes the rows, no event: it was so before the test."""
+    """``every_app_on(slug)``: a business the test creates, with every app on, as a hub that existed before apps
+    were born off (a new one is born with every app off). Writes the rows, no event: it was so before the test."""
     return _every_app_on
 
 
@@ -157,7 +176,7 @@ def outbound_pool(request, monkeypatch):
 class _NoSlowPasses:
     """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
     on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's
-    tests left broke the next tests, W8 2026-10-31). Their own tests call ``worker._data``/``_usage`` directly."""
+    tests left broke the next tests). Their own tests call ``worker._data``/``_usage`` directly."""
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -181,41 +200,28 @@ def worker_slow_passes(request, monkeypatch):
         monkeypatch.setattr(worker, "Background", _NoSlowPasses)
 
 
-# ── Phase 2's tenancy (plan docs/plans/2026-10-22-fase-2-tenencia.md, S1) ─────────────────────────────────────────
-
-
-@pytest.fixture(autouse=True, scope="session")
-def legacy_fallback():
-    """The tests written before the tenancy run without a context of their own, every business of theirs on control's
-    test database (``base/tenancy/tests/legacy.py``).
-
-    In production a hub's model or operation without ``use_hub`` fails (``HubContextMissing``) and a business without
-    its own database is not served (S5). The suite's older tests call operations and the ORM directly, in their own
-    threads too, for the local hubs ``a`` and ``b`` (``db_name=""``): here they fall back on control's test database,
-    which also holds the tables of the hubs' apps (``LegacyTablesRouter``). The tenancy's own tests turn it off
-    (``no_test_fallback``) and so do the ones of every way in (requests, the live executor, the print socket,
-    ``/internal``, the worker, the commands), which must open their context themselves.
-    """
-    from base.tenancy import context
-    from base.tenancy.tests.legacy import LEGACY
-
-    context._test_fallback = LEGACY
-    yield
-    context._test_fallback = None
+# ── The tenancy: a control database and one database per hub ───────────────────────────────────────────────────────
 
 
 @pytest.fixture(autouse=True)
 def legacy_worker(request, monkeypatch):
-    """The worker's loop serves only the hubs with their own database (S5). A test written before the tenancy that runs
-    it on its businesses (on control's test database) gets a pass of its own instead of the one over control's outbox:
-    their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test that runs as
-    production (``no_test_fallback``) nor for the worker's own (``production_worker``)."""
-    if "no_test_fallback" in request.fixturenames or request.node.get_closest_marker("production_worker"):
+    """The worker's loop serves only the hubs with their own database. A test that still leans on the suite's fallback
+    and runs it on its businesses (on control's test database) gets a pass of its own instead of the one over control's
+    outbox: their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test
+    that runs as production (not listed in ``.legacy-fallback-allow``, or ``no_test_fallback``) nor for the worker's
+    own (``production_worker``)."""
+    from base.tenancy import context
+
+    if (
+        context._test_fallback is None
+        or "no_test_fallback" in request.fixturenames
+        or request.node.get_closest_marker("production_worker")
+    ):
         return
     from base import worker
-    from base.tenancy.tests import legacy
+    from base.tenancy.tests import legacy_allow
 
-    monkeypatch.setattr(worker, "_relay", legacy.worker_pass)
+    monkeypatch.setattr(worker, "_relay", legacy_allow.worker_pass)
 
 
 @pytest.fixture
@@ -271,16 +277,19 @@ def hub_databases(django_db_setup, django_db_blocker):
         hubs.drop(built)
 
 
-def _hub_with_its_database(request, hub_id, slug, db_name):
-    """The row in control of a hub whose database the session made, with every app on in it (``every_app_on``); the
-    test names it in its ``django_db`` (``databases=hubs.HUB_DATABASES``), whose transaction rolls both back. A
-    ``transaction=True`` test commits in the hub's database: its rows are deleted after it."""
+def _hub_with_its_database(request, hub_databases, hub_id, slug, db_name):
+    """The row in control of a hub whose database the session made, as its sign-up leaves it (the apps its database
+    has, ``Hub.schema_apps``), with every app on in it (``every_app_on``); the test names it in its ``django_db``
+    (``databases=hubs.HUB_DATABASES``), whose transaction rolls both back. A ``transaction=True`` test commits in the
+    hub's database: its rows are deleted after it."""
     from base.tenancy import identity
     from base.tenancy.context import use_hub
     from base.tenancy.tests import hubs
     from control.models import Hub
 
-    hub = Hub.objects.create(id=hub_id, slug=slug, status=Hub.Status.READY, db_name=db_name)
+    hub = Hub.objects.create(
+        id=hub_id, slug=slug, status=Hub.Status.READY, db_name=db_name, schema_apps=hub_databases.schema_apps[db_name]
+    )
     verified = set(identity._verified)
     with use_hub(hub):
         _every_app_on(slug)
@@ -294,10 +303,10 @@ def _hub_with_its_database(request, hub_id, slug, db_name):
 
 @pytest.fixture
 def hub_a(request, hub_databases):
-    """The hub ``tenant-a``, ready, with its own database (``hub_databases.a``): what a hub of phase 2 is."""
+    """The hub ``tenant-a``, ready, with its own database (``hub_databases.a``), as every hub is."""
     from base.tenancy.tests import hubs
 
-    yield from _hub_with_its_database(request, hubs.HUB_A_ID, "tenant-a", hub_databases.a)
+    yield from _hub_with_its_database(request, hub_databases, hubs.HUB_A_ID, "tenant-a", hub_databases.a)
 
 
 @pytest.fixture
@@ -305,7 +314,27 @@ def hub_b(request, hub_databases):
     """The hub ``tenant-b``, ready, with its own database (``hub_databases.b``)."""
     from base.tenancy.tests import hubs
 
-    yield from _hub_with_its_database(request, hubs.HUB_B_ID, "tenant-b", hub_databases.b)
+    yield from _hub_with_its_database(request, hub_databases, hubs.HUB_B_ID, "tenant-b", hub_databases.b)
+
+
+def pytest_collection_modifyitems(items):
+    """A test whose ``django_db`` mark names a hub's alias (``hubs.HUB_DATABASES``) gets ``hub_databases``, which
+    registers those aliases, set up before pytest-django's ``_django_db_marker`` makes the test case out of the mark.
+
+    Without it, a test that asks for neither ``hub_a``, ``hub_b`` nor ``hub_databases`` only passed after another test
+    of its process had made them: run alone, pytest-django refused an alias missing from the settings (hub#1007)."""
+    from pytest_django.fixtures import validate_django_db
+
+    from base.tenancy.tests import hubs
+
+    aliases = {hubs.HUB_A_ALIAS, hubs.HUB_B_ALIAS}
+    for item in items:
+        marker = item.get_closest_marker("django_db")
+        if marker is None or "hub_databases" in item.fixturenames:
+            continue
+        _transaction, _reset_sequences, databases, *_ = validate_django_db(marker)
+        if databases and databases != "__all__" and aliases & set(databases):
+            item.fixturenames.insert(item.fixturenames.index("_django_db_marker"), "hub_databases")
 
 
 @pytest.fixture(autouse=True)

@@ -1,4 +1,4 @@
-"""``base.business.get``: Settings › Business (APP-BASE-6; BASE-G97, G98, G99, and the old ``/api/hub/context``, G43).
+"""``base.business.get``: Settings › Business, and what the old ``/api/hub/context`` gave.
 
 The business as the SaaS registered it (``PUT /internal/hubs/{id}``: its name, country, time zone and language), with
 the currency its country pays in, each named in the person's language, and where on erplora.com an owner or an
@@ -122,7 +122,7 @@ ERPLORA = Scope("host", "erplora")
 
 
 def test_erplora_s_own_hub_answers_erplora_s_business_from_its_issuer(settings):
-    """Phase 1: ERPlora's own hub has no registry row (``create_platform_hub``), yet its business is ERPlora itself,
+    """ERPlora's own hub has no registry row (``create_platform_hub``), yet its business is ERPlora itself,
     the issuer of its invoices: its legal name and country, that country's currency, and the deployment's zone and
     language. Nothing of it is changed on erplora.com, so no address to change it."""
     settings.LANGUAGE_CODE, settings.TIME_ZONE = "en", "Europe/Madrid"
@@ -147,7 +147,7 @@ def test_erplora_s_own_hub_answers_erplora_s_business_from_its_issuer(settings):
 
 def test_erplora_s_own_hub_follows_its_issuer_s_country_and_not_a_registry_row(settings):
     """Its currency is always the one its invoices and its apps charge in (``business_currency``): the issuer's
-    country's, even once phase 2 gives it a registry row."""
+    country's, even if it gets a registry row."""
     settings.PLATFORM_ISSUER_LEGAL_NAME, settings.PLATFORM_ISSUER_COUNTRY = "ERPlora Ltd", "GB"
     first = business(ERPLORA, language="en")
     Hub.objects.create(slug="erplora", status="ready", name="Another name", country="JP")

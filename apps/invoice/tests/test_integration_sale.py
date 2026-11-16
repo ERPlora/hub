@@ -14,13 +14,13 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import A, ISSUER, ctx_for, deliver, run
+from apps.invoice.tests.conftest import A, HUB_DB, ISSUER, ctx_for, deliver, run
 from apps.sale import events as sale_events
 from apps.sale.models import Sale, SaleLine
 from apps.tax.models import TaxRule
 from apps.verifactu.models import Record
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
@@ -705,7 +705,7 @@ def test_the_issued_notice_says_where_the_document_comes_from(issuer, shelf, cha
 
 
 
-# A sale line whose rule is gone (TAX-F11, pm#629 VF-17): declared with the tax family of the territory the line
+# A sale line whose rule is gone (TAX-F11): declared with the tax family of the territory the line
 # was charged in, as the line froze it, never a fixed VAT; nor the business's territory of today.
 
 

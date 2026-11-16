@@ -47,12 +47,34 @@ fresh: true })`). Lo cubre `helpers-login-hub-session.spec.ts`.
 Esa sesión es **una sola** en el servidor para todos los contextos que la reutilizan, también los de specs
 distintas: salir del hub en uno la termina en todos (el siguiente login salta otra vez), y lo que una spec deje
 guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la misma cuenta, o la del cambio de
-empleado por PIN cuando llegue (fase 2) si no rota la clave de sesión, pide `fresh: true` para tener la suya.
+empleado por PIN si no rota la clave de sesión, pide `fresh: true` para tener la suya.
 
-Cada paso espera una sexta parte del tiempo del test (30 s con los 180 s de `playwright.config.ts`; más con
-`test.slow()` o `test.setTimeout`) y, si no llega, falla diciendo cuál y cuánto esperó. «code rejected» solo
-sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
-the code within … ms».
+Cada paso del login se espera **todo el tiempo del test**, nunca una parte: la shell del hub (la barra de arriba,
+`topbar-apps`), al entrar y al final, y cada paso del SaaS (su página de acceso o la vuelta, su respuesta al inicio de
+sesión, la pantalla del código, su respuesta al código y la vuelta al hub). Con la máquina cargada la SPA tardó más de
+30 s en montar la shell (hub#1342) y el SaaS lo mismo en contestar un paso (hub#1370), sin nada roto. Lo que dice que
+no va a llegar cae en el acto y dice por qué:
+
+- en el hub, la página lanza un error (el arranque murió), un script suyo no carga (falla o contesta un error) o su
+  documento contesta un error que no se recarga solo (un 500, el 503 en texto de un hub ocupado). Las páginas 503 del
+  negocio que se prepara, en mantenimiento o con la BD cortada traen `Retry-After` y se recargan solas: no cortan;
+- en el SaaS, su documento contesta un error o un script suyo falla en la red (un error que lanza su página no cuenta,
+  ni un script al que su Vite contesta un error mientras reoptimiza y recarga la página);
+- la página se va a una dirección que no es este hub ni el SaaS (la página de error de Chrome, por ejemplo);
+- el SaaS manda la página a su página de error (`/login/error?code=…`: `not_a_member`, `too_many`, `invalid_hub`…),
+  donde rechaza el inicio de sesión o el salto al hub y de donde no sale sola;
+- la **respuesta del propio SaaS**: al inicio de sesión, un 401 pide el código y un 2xx entra; al código, un 2xx lo
+  acepta. Un 4xx es el SaaS rechazándolo y un 5xx el SaaS fallando, con lo que dijo (`errors` de allauth): «code
+  rejected, the SaaS answered 400 (…): «Incorrect code.»» solo sale cuando el SaaS contesta que el código no vale, nunca
+  por lo que pinte la página. Una petición sin respuesta (conexión cortada o rechazada) dice «the SaaS did not answer the
+  code (net::…)», aunque la página del SaaS diga «We could not sign you in»;
+- el SaaS pide el código y no hay correo con él: lo escribe **antes** de contestar el inicio de sesión, así que se lee
+  una vez, cuando la pantalla del código ya está.
+
+Un fallo de red (`net::…`) se reintenta una vez, como una conexión rechazada. Un paso que no llega sin nada de eso
+choca con el tope del propio test, y Playwright nombra esa espera: `locator.waitFor` de `topbar-apps` para la shell,
+`page.waitForResponse` desde `signInWithCode` (la línea del código o la del inicio de sesión) para una respuesta del
+SaaS que no llega.
 
 ## Contar los streams de una página
 
@@ -127,7 +149,16 @@ Reglas que el e2e hace cumplir:
   acabar la ejecución: desde S2a (ronda 2026-10-30 de PLAN-DB) un negocio o una demo que se dan de alta durante la
   ejecución quedan `requested` hasta que el worker hace su BD. Solo hace eso (y borra las demos que acaban): ni releva
   el outbox ni corre tareas, que las specs juegan ellas mismas (`manage.py shell --hub a`); un worker que releva a la vez
-  se les adelanta. Si el worker no dice «waiting for work» en 60 s, o sale antes, la ejecución para con lo que dijo.
+  se les adelanta. Si el worker sale antes de decir «waiting for work», o ni siquiera arranca, la ejecución para en el
+  acto con lo que dijo; si sigue vivo sin decirlo, para a los 5 minutos (con la máquina cargada, solo importar Django le
+  llevó unos 3, hub#759).
+- Los negocios de la pila van con los límites de Gratis (una transacción a la vez, `base.tenancy.limits`): con la máquina
+  cargada, la página que una spec acaba de abrir puede ocupar ese hueco más de lo que espera el servidor, y el Hub contesta
+  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`hub-api.ts`, el camino de
+  todos los ayudantes al API del Hub: `turnOn`, `manualFlow`, `createProduct`, los `post` de las specs…) repite la misma
+  petición tras el `Retry-After` del servidor (1 s), hasta 6 intentos, y deja una línea por intento en la salida; si sigue
+  ocupado, falla con `HubStillBusy` diciendo la ruta, los intentos y la respuesta. Cualquier otra respuesta, también otro
+  503, es de quien llama. El tope del plan no se toca (hub#795).
 - Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
   `b`), que crea `manage.py demo_seed` del SaaS (en la receta, por medio de `whatsapp_hub_seed.py`, abajo). `global-setup.ts`
   las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`, por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir
@@ -149,7 +180,12 @@ Lo que no puede comprobar el e2e, y lo pide la receta:
   cae con «429 · Too many attempts» en el login o en la 11.ª alta de la hora (10 por hora y dirección). Cada cuenta
   conserva su propio límite, y el freno de saltos al hub (`HUB_LOGIN_RATELIMIT`, arriba) no cambia. El e2e no lo puede
   comprobar: la marca vive en el entorno del proceso del SaaS, el SaaS no la dice por ninguna ruta y probarla gastaría
-  los intentos que protege.
+  los intentos que protege. Con ella va **`DEMO_SPAWN_RATELIMIT=100/h`**, el tope de demos nuevas por dirección, que
+  la marca no toca: el SaaS deja 3 por hora (`config/settings.py` del SaaS; producción se queda así) y cada pasada de
+  `demo.spec.ts` abre dos desde `127.0.0.1`, así que la segunda pasada de la hora se quedaba esperando la demo y caía
+  con la espera agotada (hub#1048). Sin Valkey, la cuenta vive en la memoria de ese `runserver` y solo se borra al
+  reiniciarlo. Si falta, `demo.spec.ts` cae diciendo `state=throttled` y esta variable; `demo-door.test.ts` exige que
+  todo `runserver` del SaaS de este README la lleve.
 - **Una pila por checkout**: dos Vite del mismo checkout comparten `node_modules/.vite` y se rompen el uno al
   otro al optimizar dependencias (la página se queda en blanco). Cada pila sale de su worktree.
 - **Las cuentas de demo, sembradas con los ids que el Hub dio a `a` y `b`**: el SaaS empuja la foto de un negocio a
@@ -181,7 +217,7 @@ env DB_NAME=saas_e2e_8031 HUB_INTERNAL_URL=http://127.0.0.1:8030 uv run python t
   $(docker compose exec -T postgres psql -U hub -d hub_e2e_8030 -At -c "select id from base_hub where slug in ('a', 'b') order by slug")
 env DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' HUB_INTERNAL_URL=http://localhost:8030 \
-  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8031   # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
 # 3. El Hub de la pila y la e2e, desde su worktree (en otra terminal, con COMPOSE_FILE y las variables de 1 exportadas)
 cd <hub-wt>
@@ -195,9 +231,47 @@ node tests/e2e/database.ts --drop
 `$(…)` da los dos ids, primero el de `a`, como dos palabras (en bash y en zsh); la misma orden, ya con la BD y el puerto de
 la pila, la escribe `global-setup.ts` si la ejecución arranca sin las cuentas.
 
+## La pasada nocturna (`.github/scripts/nightly-e2e.sh`)
+
+Cada noche, en el Mac, corre todas las specs sobre el `origin/main` recién traído y mantiene **una sola issue**
+(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `e2e-report.sh`): una noche en rojo la abre o la
+comenta, y la primera noche en verde la cierra. No es un check: una noche roja no para ninguna PR ni ningún despliegue. Va
+en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los planes, solo `aws` usa Actions; el SaaS hace lo
+mismo con su pasada.
+
+- **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub (o del commit que diga
+  `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en
+  `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
+  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, y el proveedor falso del asistente); los dos
+  `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
+  (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con ese patrón (`--grep` de
+  Playwright). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera. El humo de navegador
+  (`.github/scripts/smoke-e2e.sh`, README del Hub) es esta misma pila con `@smoke`, el commit en el que estás y su tope.
+- **Pase lo que pase**, al acabar para lo que escucha en los puertos de la pila (también un `runserver` que una spec
+  reinició), borra las dos BD y quita los worktrees; al empezar, borra lo que dejó una noche cortada. Un paso previo a las
+  specs que falla (las dependencias, una BD, la siembra, los servidores que no contestan) también es una noche roja, y la
+  issue lo nombra.
+- **Lo que deja**: `~/.erplora/hub-nightly-e2e/runs/<noche>/`, con `night.log`, los registros de los dos `runserver` y
+  `test-results/` (el `results.json`, las trazas y las capturas de cada fallo). Guarda las 7 últimas (`NIGHTLY_KEEP_RUNS`).
+- **Una noche a la vez**: si otra sigue viva, sale con 3 sin tocar nada.
+- **Pararla**: `kill <pid>` (el de `~/.erplora/hub-nightly-e2e/lock/pid`) o Ctrl-C. Durante las specs para en el acto y
+  limpia; en un paso anterior (dependencias, BD) limpia cuando ese paso termina. Tras un `kill -9` o un apagón no limpia
+  nadie: lo hace la noche siguiente al empezar. `NIGHTLY_DIR` no puede ser una carpeta cuyo `hub/` o `saas/` sea un
+  checkout: la noche borra esas dos carpetas a la fuerza, y se niega.
+- **Programarla**, una vez y desde el checkout principal del Hub (un worktree desaparece con su rama, y se niega):
+  `bash .github/scripts/nightly-e2e.sh install-launchd [--at HH:MM]`, a las 02:17 si no se dice otra hora. El agente de
+  launchd guarda el `PATH` de quien lo instala (uv, pnpm, node, docker y gh, con la sesión de GitHub abierta) y corre el
+  script de ese checkout, que la flota pone al día. `uninstall-launchd` lo quita. Con el Mac dormido, launchd la lanza al
+  despertar; con el Mac apagado, esa noche no hay pasada y nada lo dice.
+- **A mano**: `bash .github/scripts/nightly-e2e.sh --no-publish [--spec tests/e2e/<spec>]…` hace lo mismo sin escribir en
+  GitHub. Su pila va en el `9770`, por debajo de los puertos que la flota da a sus workers (`10000 + 10 × issue` en el
+  SaaS y `20000 + 10 × issue` en el Hub): en uno de esos, la noche pararía los servidores y borraría la BD del worker de
+  esa issue. Otros puertos, con `NIGHTLY_HUB_PORT` (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy
+  de Meta en +9; sus BD, con esos números).
+
 ## La demo (`demo.spec.ts`)
 
-Recorre la demo de punta a punta (plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
+Recorre la demo de punta a punta (plan `knowledge/raw/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
 `/demo/` del SaaS → «Try the demo» → `demo-<hex>.localhost:<puerto>` con la shell y la sesión «Demo» → crea un ítem
 → `manage.py demo_expire <slug>` (por `execFileSync`, desde este checkout y con el `DB_NAME` de la ejecución) → 410
 «This demo has ended» → su enlace → `/demo/?state=expired` del SaaS → otra demo. Pide dos cosas que el resto de
@@ -207,6 +281,29 @@ specs no piden:
   su `HUB_INTERNAL_URL` en el Hub de esta pila (la receta de arriba la lleva): el SaaS crea la demo
   llamando él mismo a `/internal/demos`; apuntado a otro puerto, la crea en otro Hub y esta ejecución no la ve.
 - El mismo `INTERNAL_SHARED_SECRET` en los dos (en local, el valor por defecto de ambos).
+
+Y, como toda spec, el SaaS arrancado como dice la receta, también con `DEMO_SPAWN_RATELIMIT=100/h` (arriba, «Sus límites
+por dirección subidos»): cada pasada abre dos demos desde `127.0.0.1` y, con el tope de 3 por hora del SaaS, la segunda
+pasada de la hora no encuentra su demo. Cuando la puerta contesta a «Try the demo» con `/demo/?state=<resultado>` en vez
+de abrir la demo (`throttled`, `full`, `unavailable`…), la spec cae al momento diciendo ese resultado
+(`demo-door.ts`) y, con `throttled`, esa variable.
+
+La spec espera a que la demo esté lista **sin reloj propio** (hub#1061): con la máquina cargada muy por encima de sus
+núcleos una demo tardó 15,3 s sin nada roto y la espera de 15 s que tenía la tiraba. Si la puerta se cansa antes (sus
+30 s, `?state=not_ready`, PUBLIC-F29 del SaaS) y el Hub la sigue preparando, la spec pulsa «Try again» como haría el
+visitante y vuelve a esperar a la misma demo; si el Hub no pudo prepararla (`failed` en el registro), cae al momento con
+su `last_error`. Una demo que no se abre nunca la corta el tope del test (`playwright.config.ts`); también una shell
+que no arranca. Una shell solo lenta ya no la caza esta spec: en esta pila la sirve Vite en desarrollo, así que su
+tiempo es el de la máquina, y los 15 s nunca fueron para ella. Aquella espera vigilaba dos cosas, y cada una se
+comprueba ahora como un hecho, tarde lo que tarde:
+
+- **El tick de 5 s del worker** (el objetivo de 5 s de PLAN-DB §6): el worker coge la demo en su siguiente pasada y
+  nunca espera más de 5 s entre dos. Lo comprueba `base/tests/test_worker.py`
+  (`test_with_its_own_tick_it_takes_a_new_demo_within_five_seconds`), sobre las esperas que pide su bucle, sin
+  reloj de pared.
+- **El alta por clon**: la BD de cada demo es el **clon de su plantilla**, sin ninguna migración aplicada en el alta
+  (cada fila de su `django_migrations` es de la plantilla, con la misma hora; `demo-born.ts`). Un alta que vuelva a
+  crear las tablas en vez de clonar cae ahí, aunque sea rápida.
 
 ```bash
 CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportadas
@@ -221,7 +318,11 @@ Prueba el asistente del Hub (BASE-F92…F106) con sus dependencias de verdad: el
 la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor falso
 `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que la propia spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni
-escribe una clave real. Pide tres cosas al SaaS de la pila:
+escribe una clave real. Responde en el idioma que pide el mensaje de sistema del Hub («Answer in English» o «Answer in
+Spanish»: el de la persona o, en una automatización, el de quien la guardó), como un modelo de verdad; sin él, en inglés.
+Cada texto suyo se exporta en los dos idiomas (`DONE.en` y `DONE.es`, `NOT_DONE`, `GREETING`…), así que una spec con
+la interfaz en inglés espera `NOT_DONE.en` tras «Cancelar» y una en español, `NOT_DONE.es` (hub#1025). Pide tres cosas
+al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
@@ -237,7 +338,8 @@ escribe una clave real. Pide tres cosas al SaaS de la pila:
 env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-local \
   HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
-  EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True uv run python manage.py runserver 127.0.0.1:8871
+  EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
+  uv run python manage.py runserver 127.0.0.1:8871
 # La spec, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
 CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 ```
@@ -261,7 +363,7 @@ variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.
 
 ## La QA del asistente con el modelo real (`qa/assistant-battery.spec.ts`)
 
-La batería de QA del asistente del Hub (`docs/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
+La batería de QA del asistente del Hub (`knowledge/raw/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
 C35 a C37) con el **modelo de verdad** y el **índice de documentación de verdad**: una prueba por punto. Se salta sin
 `QA_REAL_PROVIDER=1`, así que la suite y la CI nunca la corren (gasta tokens de verdad, unos 20 turnos). Pide una pila
 propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
@@ -296,7 +398,7 @@ QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep 
 
 ## Las sondas del asistente: capa 2 con el modelo real (`qa/assistant-probes.spec.ts`)
 
-La capa 2 de la QA del asistente (`docs/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
+La capa 2 de la QA del asistente (`knowledge/raw/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
 **sonda** es una frase natural **nueva** para una herramienta, escrita como la teclearía una persona de un rol en un
 idioma, y lo que el turno tiene que hacer. Nunca es una de las `asks` de la herramienta (eso ya lo mide la capa 1 en cada
 PR): mide que el asistente generaliza. Las sondas viven en `qa/probes/*.json` (esquema `qa/probes.schema.json`; el corpus
@@ -403,7 +505,7 @@ env $(node <hub-wt>/tests/e2e/whatsapp-graph.ts 8030 http://localhost:8031) \
   DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 ASSISTANT_SERVICE_PROVIDER=e2e-local \
   HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' \
-  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8031
 # Las specs, desde <hub-wt>, con las variables de «Varias ejecuciones a la vez» exportadas y el checkout del SaaS:
 export E2E_SAAS_DIR=<saas-wt>

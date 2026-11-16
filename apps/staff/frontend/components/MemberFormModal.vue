@@ -9,14 +9,18 @@
 // The server judges: its 422 goes under each field, a 409 on top; the dialog keeps what was typed.
 // The hourly rate is typed in the business's currency (its country's, with the decimals the server counts:
 // staff-business-currency), its symbol at the end of the field; until the business answers, two decimals and no
-// symbol. If it answers with the dialog open, the rate as loaded is rewritten in its decimals and what was
-// typed is read in it when saving.
+// symbol, and Save waits in grey (the rate is read in its money; hub#921); if that read fails, the dialog says so with «Retry»
+// (hub#938). If it answers with the dialog open, the rate
+// as loaded is rewritten in its decimals and what was typed is read in it when saving.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { keepTouched, useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { MEMBER_STATUSES } from '../lib/enums';
 import { currencySymbol, moneyText, useBusinessMoney } from '../lib/format';
@@ -30,6 +34,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+const canDismiss = useUnsavedForm('staff-member-form', () => open.value ? form.value : original.value, () => original.value);
 
 const t = useT();
 const locale = useLocale();
@@ -98,10 +104,15 @@ async function loadRecord(member: MemberOut, ticket: number): Promise<void> {
     if (ticket !== opening) return;
     loadedRate = pay?.rows[0]?.hourly_rate ?? null;
     const loaded = formFromRecord(record, pay?.rows[0] ?? null, locale.value, money.value);
+    // The fields took what was typed while the record was on its way: it stays, and the record fills only the
+    // fields the person has not touched. Save sends what differs from the record.
+    const shown = original.value;
+    const typed = form.value;
+    const touched = (field: keyof MemberForm) => typed[field] !== shown[field];
     original.value = loaded;
-    form.value = { ...loaded };
-    roleLabel.value = record.role_name ?? '';
-    if (loaded.user_id) void nameAccount(loaded.user_id, ticket);
+    form.value = keepTouched(loaded, shown, typed);
+    if (!touched('role_id')) roleLabel.value = record.role_name ?? '';
+    if (loaded.user_id && !touched('user_id')) void nameAccount(loaded.user_id, ticket);
   } catch (failure) {
     if (ticket === opening) loadError.value = failure instanceof ApiError ? failure.message : t('staff.members.form.loadError');
   } finally {
@@ -180,7 +191,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
-  const options = { pay: canPay.value, money: money.value };
+  // No rate is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const currency = money.value;
+  if (!currency) return;
+  const options = { pay: canPay.value, money: currency };
   try {
     if (props.member) await update.run(patchPayload(props.member.id, original.value, form.value, options));
     else await creation.run(createPayload(form.value, options));
@@ -194,14 +209,16 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="staff-member-form"
     :title="title"
     :pending="pending"
     :error="error"
-    :submit-disabled="!complete || loading || !!loadError"
+    :submit-disabled="!money || !complete || loading || !!loadError"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
+      <BusinessMoneyError />
       <InlineFeedback
         v-if="loadError"
         tone="danger"
@@ -222,6 +239,7 @@ async function save(): Promise<void> {
       >
         <ion-input
           data-testid="staff-member-form-first_name"
+          name="first_name"
           data-field
           :value="form.first_name"
           :label="$t('staff.members.form.firstName')"
@@ -236,6 +254,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-last_name"
+          name="last_name"
           data-field
           :value="form.last_name"
           :label="$t('staff.members.form.lastName')"
@@ -250,6 +269,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-email"
+          name="email"
           data-field
           type="email"
           :value="form.email"
@@ -264,6 +284,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-phone"
+          name="phone"
           data-field
           type="tel"
           :value="form.phone"
@@ -278,6 +299,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-employee_number"
+          name="employee_number"
           data-field
           :value="form.employee_number"
           :label="$t('staff.members.form.employeeNumber')"
@@ -291,6 +313,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="staff-member-form-role_id"
+          name="role_id"
           data-field
           :model-value="roleChoice"
           :label="$t('staff.members.form.role')"
@@ -302,6 +325,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="staff-member-form-user_id"
+          name="user_id"
           data-field
           :model-value="userChoice"
           :label="$t('staff.members.form.hubUser')"
@@ -322,6 +346,7 @@ async function save(): Promise<void> {
           <ion-select
             v-if="editing"
             data-testid="staff-member-form-status"
+            name="status"
             data-field
             :value="form.status"
             :label="$t('staff.members.form.status')"
@@ -353,6 +378,7 @@ async function save(): Promise<void> {
           </ion-toggle>
           <ion-input
             data-testid="staff-member-form-booking_buffer"
+            name="booking_buffer"
             data-field
             type="number"
             inputmode="numeric"
@@ -369,6 +395,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-member-form-hire_date"
+            name="hire_date"
             data-field
             type="date"
             :value="form.hire_date"
@@ -382,6 +409,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-member-form-color"
+            name="color"
             data-field
             :value="form.color"
             :label="$t('staff.members.form.color')"
@@ -407,6 +435,7 @@ async function save(): Promise<void> {
           </ion-input>
           <ion-input
             data-testid="staff-member-form-specialties"
+            name="specialties"
             data-field
             :value="form.specialties"
             :label="$t('staff.members.form.specialties')"
@@ -419,6 +448,7 @@ async function save(): Promise<void> {
           />
           <ion-textarea
             data-testid="staff-member-form-bio"
+            name="bio"
             data-field
             class="staff-form__wide"
             :value="form.bio"
@@ -440,6 +470,7 @@ async function save(): Promise<void> {
         >
           <ion-input
             data-testid="staff-member-form-hourly_rate"
+            name="hourly_rate"
             data-field
             inputmode="decimal"
             :value="form.hourly_rate"
@@ -462,6 +493,7 @@ async function save(): Promise<void> {
           </ion-input>
           <ion-input
             data-testid="staff-member-form-commission_rate"
+            name="commission_rate"
             data-field
             type="number"
             inputmode="decimal"
@@ -479,6 +511,7 @@ async function save(): Promise<void> {
           />
           <ion-textarea
             data-testid="staff-member-form-notes"
+            name="notes"
             data-field
             class="staff-form__wide"
             :value="form.notes"

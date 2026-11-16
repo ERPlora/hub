@@ -1,7 +1,6 @@
-// PoC §8.1 (second half): a write in business `b` never reaches the open screens of `a`, and the
-// other way round. Since S2a (round 2026-10-30 of PLAN-DB) each business has its own database, so a
-// reload does not show them either: b's row is in b's database and nowhere in a's (phase 1 shared the
-// rows, and only the live notice was per business).
+// A write in business `b` never reaches the open screens of `a`, and the other way round. Each
+// business has its own database, so a reload does not show them either: b's row is in b's database
+// and nowhere in a's.
 import { type Page, expect, test } from '@playwright/test';
 
 import { A, B, createViaPage, hostPage, listReady, psql, record, row, rowNames, shot, uniqueName, watchForRow } from './helpers';
@@ -25,7 +24,7 @@ async function writeAndWatch(writer: Page, other: Page, name: string) {
   return { before: before.length, after: after.length, samples, sameRows: JSON.stringify(before) === JSON.stringify(after), leaked: leaked !== undefined };
 }
 
-test('a write in b does not reach a within 2 s, and the other way round', async ({ browser }) => {
+test('a write in b does not reach a within 2 s, and the other way round @smoke', async ({ browser }) => {
   const a = await hostPage(browser, A);
   const b = await hostPage(browser, B);
   await listReady(a.page);

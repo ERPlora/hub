@@ -3,12 +3,14 @@
 // transfer unless chosen) and Account, with «Create method» (`payment.method.create`); a row opens
 // «Editing method — {name}» with «Save», which sends only what changed (`payment.method.update`). The
 // list masks the account, so editing reads the whole method first (`payment.method.get`): the form
-// shows, compares and never sends back the masked text. Refusals stay in the dialog, under their
-// field, with what was typed.
+// shows, compares and never sends back the masked text. Name and Type can be typed while it is read; when it
+// arrives it fills only the fields not touched. Refusals stay in the dialog, under their field, with what was typed.
 import { FormModal } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
+
+import { keepTouched, useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
 import type { MethodOut, MethodPatchIn, MethodType } from '../operations';
@@ -47,7 +49,8 @@ function fromMethod(method: MethodOut | null): Form {
   return method ? { name: method.name, type: method.method_type, account: method.bank_account_ref } : { name: '', type: 'transfer', account: '' };
 }
 
-/** Reads the whole method being edited (the list masks its account) and fills the form with it. */
+/** Reads the whole method being edited (the list masks its account) and fills the form with it, keeping what was
+ *  typed meanwhile. */
 async function loadWhole(id: string): Promise<void> {
   loading.value = true;
   try {
@@ -58,8 +61,12 @@ async function loadWhole(id: string): Promise<void> {
       loadError.value = new ApiError(200, 'unexpected_response', t('payment.methods.form.loadError'));
       return;
     }
+    // Name and Type took what was typed while the method was on its way: it stays, and the method fills only the
+    // fields the person has not touched. Save sends what differs from the method.
+    const shown = original.value;
+    const typed = form.value;
     whole.value = method;
-    form.value = fromMethod(method);
+    form.value = keepTouched(fromMethod(method), shown, typed);
   } catch (failure) {
     loadError.value = failure as ApiError;
   } finally {
@@ -106,11 +113,16 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+/** As it opened: the method as the list shows it (account blank) until its whole account has been read. */
+const original = computed(() => fromMethod(props.method && (whole.value ?? { ...props.method, bank_account_ref: '' })));
+const canDismiss = useUnsavedForm('payment-method-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="payment-method-form"
     :title="title"
     :submit-label="method ? $t('payment.methods.form.save') : $t('payment.methods.form.create')"
@@ -123,6 +135,7 @@ async function save(): Promise<void> {
       <div class="payment-method-form">
         <ion-input
           data-testid="payment-method-form-name"
+          name="name"
           :value="form.name"
           :label="$t('payment.methods.form.name')"
           label-placement="floating"
@@ -135,6 +148,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="payment-method-form-type"
+          name="method_type"
           :value="form.type"
           :label="$t('payment.methods.form.type')"
           label-placement="floating"
@@ -154,6 +168,7 @@ async function save(): Promise<void> {
         </ion-select>
         <ion-input
           data-testid="payment-method-form-account"
+          name="bank_account_ref"
           :value="form.account"
           :disabled="loading"
           :label="$t('payment.methods.form.account')"

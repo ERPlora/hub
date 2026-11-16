@@ -7,7 +7,7 @@ customer by their name or phone, a slot by its weekday and start, a waitlist ent
 input refuses a field it does not declare; an edit changes only the fields it sends. A reservation's day
 and time are the business's wall clock (``2026-10-15``, ``21:00``).
 
-Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+Each id a write takes is marked with the read that names its record (``names``, base/assistant/cards.py ``REFERS``,
 checked at start by ``base.E009``): the assistant's card says which reservation, entry, slot, blocked date,
 customer or table, as the person who confirms reads it, never by the id. Reservation's own records by the
 ``label`` its reads by id answer (as the book's dialogs say them), a customer by the name of their card
@@ -144,7 +144,8 @@ AN_ENTRY = names("reservation.waitlist.get", name=("label",))
 A_SLOT = names("reservation.time_slot.get", name=("label",))
 A_BLOCK = names("reservation.blocked_date.get", name=("label",))
 A_CUSTOMER = names("customer.customer.detail")
-A_TABLE = names("table.table.get", name=("number",))
+#: A table with its zone («5 (Terraza)»), as Tables names it: its number repeats across zones (hub#550).
+A_TABLE = names("table.table.get", name=("label",))
 D_LABEL = "The words it is named by, in the caller's language, as the book's screens say it: «{example}»."
 D_TABLE = "The table's number, e.g. «5», when its id is not known."
 D_ZONE = "The table's zone, when the same number is in several zones."
@@ -247,7 +248,10 @@ class ReservationListIn(PageIn):
 
 class ReservationRefIn(In):
     id: UUID | None = Field(
-        None, description="The reservation's id.", json_schema_extra=A_RESERVATION
+        None,
+        title=gettext_noop("Reservation"),
+        description="The reservation's id.",
+        json_schema_extra=A_RESERVATION,
     )
     guest: Said | None = Field(
         None,
@@ -562,7 +566,10 @@ class TimeSlotIn(In):
 
 class TimeSlotRefIn(In):
     id: UUID | None = Field(
-        None, description="The slot's id.", json_schema_extra=A_SLOT
+        None,
+        title=gettext_noop("Time slot"),
+        description="The slot's id.",
+        json_schema_extra=A_SLOT,
     )
     day_of_week: Weekday | None = Field(
         None, description="Its weekday, when the id is not known."
@@ -649,7 +656,10 @@ class BlockedDateIn(In):
 
 class BlockedDateRefIn(In):
     id: UUID | None = Field(
-        None, description="The blocked date's id.", json_schema_extra=A_BLOCK
+        None,
+        title=gettext_noop("Blocked date"),
+        description="The blocked date's id.",
+        json_schema_extra=A_BLOCK,
     )
     date: dt.date | None = Field(
         None, description="Its day, YYYY-MM-DD, when the id is not known."
@@ -729,7 +739,10 @@ class WaitlistIn(In):
 
 class WaitlistRefIn(In):
     id: UUID | None = Field(
-        None, description="The entry's id.", json_schema_extra=AN_ENTRY
+        None,
+        title=gettext_noop("Waitlist entry"),
+        description="The entry's id.",
+        json_schema_extra=AN_ENTRY,
     )
     guest: Said | None = Field(
         None,

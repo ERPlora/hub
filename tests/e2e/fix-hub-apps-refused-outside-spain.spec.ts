@@ -3,11 +3,11 @@
 // VeriFactu already on stays as it is and can go off, with what it needs; once off, «Add apps» says «No disponible» with
 // the reason and offers no «Activar», and the server refuses it when asked directly, changing nothing. Back in Spain it
 // is «Desactivada» with its «Activar» again, it goes on, and from then on Apps says it never goes off (hub#618). In
-// English too, at 1440. Captures `FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN-{pl-on,pl-off,es-off,es-on}-<width>` and
-// `…-pl-off-en-1440`. `a`'s rows and its registration are put back after each test.
+// English too, at 1440. Each step leaves a capture. `a`'s rows and its registration are put back after each test.
 // flow: VERIFACTU-F01 VERIFACTU-F32 BASE-F25
 import { expect, type Page, test } from '@playwright/test';
 
+import { appRowsCopy } from './app-rows-helpers';
 import {
   A,
   api,
@@ -33,7 +33,7 @@ const ONLY_IN_SPAIN_ES = 'VeriFactu solo es para negocios de España.';
 const ONLY_IN_SPAIN_EN = 'VeriFactu is only for businesses in Spain.';
 const NEVER_OFF_ES = 'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.';
 /** The copy the run keeps of `a`'s rows. */
-const ROWS = 'e2e_apps_refused_outside_spain_rows';
+const appRows = appRowsCopy('e2e_apps_refused_outside_spain_rows');
 
 let registration: Registration;
 
@@ -56,16 +56,12 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(() => {
   registration = registrationOf('a');
   expect(stored(), 'VeriFactu on in a (seed_local_hubs: every app on)').toMatch(/^on:/);
-  psql(`drop table if exists ${ROWS}; create table ${ROWS} as select * from base_appactivation where host = 'a'`);
+  appRows.keep();
 });
 
 test.afterEach(async () => {
   await registerBusinessIn(registration, registration.country);
-  psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
-});
-
-test.afterAll(() => {
-  psql(`drop table if exists ${ROWS}`);
+  appRows.putBack();
 });
 
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {

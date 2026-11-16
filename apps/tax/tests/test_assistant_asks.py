@@ -1,0 +1,187 @@
+"""What layer 1 of the assistant's QA does not say of Taxes: how many tools it offers, what an employee is never
+offered, and that the requests of the real-model QA, in the person's own words, are offered their existing operation.
+
+Every ask of every tool of tax bringing its tool among the first ten, role by role, in both languages, is
+``base/tests/test_assistant_asks.py``'s (tax is listed in ``LIVE_ASSISTANT_ASKS_REQUIRED``), as ``live.E020`` over the
+asks and the guard that no ask copies a probe of layer 2.
+"""
+
+import json
+from pathlib import Path
+
+import pytest
+from django.conf import settings
+from live.operations import AI, registry
+
+from base import assistant
+from base.models import Membership
+from base.tests.test_assistant_asks import assert_offered_with_room, comparable, offered_to
+from base.tests.test_assistant_asks import probe_phrases
+from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
+
+from .conftest import HUB_DB, in_hubs
+
+#: Taxes' assistant tools: its reads (the calculator, categories, rules, aliases and the business's tax region) and
+#: its writes (categories, aliases, rules one by one or in a batch, their end, deactivation and reactivation, and the
+#: region). ``tax.rule.get`` is ``INTERNAL``: it only names a rule on a confirmation card.
+TOOLS = {
+    "tax.rate.calculate",
+    "tax.category.list",
+    "tax.category.get",
+    "tax.rule.list",
+    "tax.rule.status",
+    "tax.rule.parent_candidates",
+    "tax.rule.countries",
+    "tax.alias.list",
+    "tax.alias.resolve",
+    "tax.settings.get",
+    "tax.category.create",
+    "tax.alias.create",
+    "tax.rule.create",
+    "tax.rule.bulk_create",
+    "tax.rule.end",
+    "tax.rule.deactivate",
+    "tax.rule.activate",
+    "tax.settings.update",
+}
+#: What decides what is charged and declared (``tax.manage``): who runs the business and a manager hold it, an
+#: employee only reads and calculates (``TaxConfig.role_permissions``).
+THE_WRITES = {name for name in TOOLS if registry[name].kind == "command"}
+
+#: The requests of the real-model QA (``tests/e2e/qa/probes/owner-es-tax-2026-11-08.json``) as the owner said them, and
+#: nothing of the tools' ``asks``: before Taxes said its asks, none of these tools was among the ones a turn offers
+#: (``MAX_TOOLS``), so the model sent the owner to the screen, looked for an automation or said it could not change a
+#: rule.
+REPORTED = [
+    ("tax.rule.deactivate", "desactiva temporalmente la regla española de product.qa sin perder su porcentaje ni sus fechas"),
+    ("tax.rule.activate", "vuelve a activar la regla española de product.qa que acabo de desactivar"),
+    ("tax.rule.end", "haz que la regla española de product.qa deje de aplicarse después del 31/12/2026 inclusive"),
+]
+
+#: Every probe of layer 2 of Taxes, the owner's and the employee's real phrases of the QA: the three above and the
+#: ones the model got right.
+PROBES = [
+    probe
+    for path in sorted((Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes").glob("*-es-tax-*.json"))
+    for probe in json.loads(path.read_text(encoding="utf-8"))["probes"]
+]
+ROLES = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}
+#: What the model reached for instead of the reported requests to bring a rule back or to switch it off: an app's
+#: switch, as «de product.qa» names Products. live reads «regla» as the rule a command switches, so the rule's tool is
+#: offered ahead of it.
+CHOSEN_INSTEAD = [
+    ("tax.rule.activate", "base.app.enable"),
+    ("tax.rule.deactivate", "base.app.disable"),
+]
+#: What a person says in words of their own, neither an ask nor a probe of layer 2, one for each tool: it is their asks
+#: that bring the tool among the first ten, and without them it is not there, so asks that stop reading as people speak
+#: fail. None shares more than two stems with any one ask of its tool.
+OWN_WORDS = [
+    ("tax.rate.calculate", "de 60 € en libros, ¿qué parte se va en IVA?"),
+    ("tax.category.list", "¿qué tipos de IVA puedo dar a un producto?"),
+    ("tax.category.get", "¿existe ya algo para el calzado entre las categorías de impuestos?"),
+    ("tax.rule.list", "¿a cuánto tengo el tipo del calzado y desde cuándo?"),
+    ("tax.rule.status", "¿el negocio tiene ya impuestos en vigor para arrancar?"),
+    ("tax.rule.parent_candidates", "¿qué reglas sirven de padre para el recargo del calzado?"),
+    ("tax.rule.countries", "¿para qué países están puestos los impuestos?"),
+    ("tax.alias.list", "¿qué alias guardé para leer los ficheros de productos?"),
+    ("tax.alias.resolve", "el texto «IGIC 7», ¿a qué categoría corresponde?"),
+    ("tax.settings.get", "¿llevamos IGIC en la tienda?"),
+    ("tax.category.create", "haz una categoría para el calzado con su IVA"),
+    ("tax.alias.create", "guarda el alias «menú diario» para la comida"),
+    ("tax.rule.create", "el pan va al 4 %: dale su regla de IVA"),
+    ("tax.rule.bulk_create", "mete de golpe los tipos de IVA de Francia de 2026"),
+    ("tax.rule.end", "el tipo del calzado se acaba en julio: dale a su regla su último día"),
+    ("tax.rule.deactivate", "deja en suspenso el IVA del calzado"),
+    ("tax.rule.activate", "recupera el IVA del calzado"),
+    ("tax.settings.update", "nos mudamos a Ceuta: que los impuestos sean los de allí"),
+]
+
+
+def test_tax_offers_its_eighteen_tools():
+    """Taxes' assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
+    tools = {name for name, op in registry.items() if op.app_label == "tax" and assistant.tools.is_tool(op)}
+    assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
+    assert tools == TOOLS
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+def test_an_employee_is_never_offered_what_decides_what_is_charged(catalog_of):
+    for role in (Membership.Role.OWNER, Membership.Role.ADMIN, Membership.Role.MANAGER):
+        assert {name for name in catalog_of(role, "es") if name.startswith("tax.")} == TOOLS, role
+    employee = {name for name in catalog_of(Membership.Role.EMPLOYEE, "es") if name.startswith("tax.")}
+    assert employee == TOOLS - THE_WRITES
+    assert "tax.rate.calculate" in employee  # positive control: an employee reads and calculates
+
+
+def test_the_reported_requests_are_the_probes_of_layer_2():
+    phrases = probe_phrases()
+    assert [phrases.get(comparable(phrase)) for _, phrase in REPORTED] == [
+        f"qa20261108.owner.es.{name}" for name, _ in REPORTED
+    ]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "phrase"), REPORTED)
+def test_the_reported_tax_request_offers_its_existing_operation(catalog_of, name, phrase):
+    assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
+def test_every_probe_of_taxes_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
+    """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Taxes that a
+    new ask elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it. What the
+    employee may not run (``expect: refused``) is not in their catalogue at all."""
+    assert (probe["app"], probe["language"]) == ("tax", "es")
+    tools = catalog_of(ROLES[probe["role"]], probe["language"])
+    name, phrase = probe["tool"], probe["phrase"]
+    if probe["expect"] == "refused":
+        assert name in TOOLS and name not in tools
+        return
+    assert_offered_with_room(tools, name, phrase)
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
+def test_the_reported_request_offers_its_tool_before_the_switch_of_an_app(catalog_of, name, instead):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    offered = offered_to(tools, dict(REPORTED)[name])
+
+    assert instead in tools  # positive control: what comes ahead is a tool of the owner too
+    assert name in offered, offered[:10]
+    assert instead not in offered or offered.index(name) < offered.index(instead), offered[:10]
+
+
+def test_every_tool_of_taxes_has_its_own_words():
+    assert [name for name, _ in OWN_WORDS] == list(dict.fromkeys(name for name, _ in OWN_WORDS))  # one each
+    assert {name for name, _ in OWN_WORDS} == TOOLS
+
+
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
+
+
+#: What the owner says in English in words of their own for each tool of Taxes that needs one, neither
+#: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
+OWN_WORDS_EN = [
+    ("tax.alias.create", "teach it that «menú diario» means food"),
+    ("tax.alias.list", "what words does it know from a spreadsheet?"),
+    ("tax.alias.resolve", "what would «reduced 10» mean?"),
+    ("tax.category.create", "make one for footwear, called Footwear, with its VAT"),
+    ("tax.category.get", "what's the Spanish name of the food one?"),
+    ("tax.category.list", "which VAT can a product have today?"),
+    ("tax.rate.calculate", "a 60 € book: work out its VAT at the reduced rate"),
+    ("tax.rule.activate", "bring the 10 % on books back"),
+    ("tax.rule.bulk_create", "several at once: books 4, food 10, general 21"),
+    ("tax.rule.countries", "which countries are the taxes set up for?"),
+    ("tax.rule.create", "bread is 4 % in Spain from January"),
+    ("tax.rule.deactivate", "put the footwear VAT on hold for a while"),
+    ("tax.rule.end", "footwear's rate stops in July: give it its last day"),
+    ("tax.rule.list", "which ones apply in Spain?"),
+    ("tax.rule.parent_candidates", "for books, what can it hang under?"),
+    ("tax.rule.status", "does the till have what it needs to start selling?"),
+    ("tax.settings.get", "which territory do we operate in?"),
+    ("tax.settings.update", "go back to the national one, nothing special"),
+]
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
+test_each_tool_has_its_own_english_words = english_coverage_test("tax", OWN_WORDS_EN)

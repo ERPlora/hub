@@ -16,9 +16,9 @@ from live.operations import get
 
 from apps.service.models import Redemption
 
-from .conftest import A, ctx_for
+from .conftest import HUB_DB, A, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name: str, data: dict, role: str = "hub_admin"):

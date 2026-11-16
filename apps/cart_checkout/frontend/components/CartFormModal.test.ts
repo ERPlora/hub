@@ -1,10 +1,11 @@
 // CART_CHECKOUT-F01 «Crear un carrito»: «New cart» asks for Session (required: «Save» stays off without
 // it), Email and Name, with the old panel's placeholders, and sends `cart_checkout.cart.create` without a
-// currency (the server gives the business's one: the old cart_checkout#32 sent a literal EUR). A session
+// currency (the server gives the business's one: the old module sent a literal EUR). A session
 // another cart has (409) or an email that is not one (422) goes under its field, and what was typed stays
 // (the old form-error-in-panel: the refusal travels with the form, never under it).
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, ionValue, mountCartCheckout, settle } from '../__tests__/mount-cart-checkout';
 import CartFormModal from './CartFormModal.vue';
 
@@ -108,5 +109,32 @@ describe('CartFormModal', () => {
     expect([s.field('session').label, s.field('email').label, s.field('name').label]).toEqual(['Sesión', 'Email', 'Nombre']);
     expect([s.field('email').placeholder, s.field('name').placeholder]).toEqual(['cliente@ejemplo.com', 'Ana García']);
     expect(s.save().textContent).toContain('Guardar');
+  });
+});
+
+describe('CartFormModal: fields refused with the same words (hub#888)', () => {
+  /** Each field of the window by the key the server refuses it under. */
+  const TESTID: Record<string, string> = { session_token: 'session', customer_email: 'email', customer_name: 'name' };
+  itTellsTheCorrectedFieldApart(
+    Object.keys(TESTID),
+    async (locale, refusal) => {
+      const s = await setup(locale);
+      await ionValue(s.field('session'), 'sess_x9', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
+    },
+    'customer_email',
+  );
+});
+
+describe('CartFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('cart-checkout-cart-form'),
+      change: () => ionValue(s.field('email'), 'ana@example.com', 'ionInput'),
+      restore: () => ionValue(s.field('email'), '', 'ionInput'),
+    });
   });
 });

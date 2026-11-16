@@ -1,51 +1,21 @@
 """The inbox's reactions to Customers, end to end through the worker's real outbox relay (WHATSAPP_INBOX-F04,
-F11, F12, F37; ``base/relay.py``, which delivers in phase 1 since hub#105).
+F11, F12, F37; ``base/relay.py``).
 
 Customers' own operations write the cards and record their events; the worker's loop takes them and runs the
 inbox's reaction as the system, once. Nothing is called by hand: before the tick nothing has changed, after it
 the conversation follows the card. erplora.com's erasure door is the only thing ``respx`` stands in for.
 """
 
-import datetime as dt
-import threading
-
 import httpx
-import pytest
 import respx
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 
 from apps.whatsapp_inbox.models import Conversation
-from apps.whatsapp_inbox.tests.conftest import ctx_for, receive, run
-from base import catalog, worker
-from base.catalog import RegisterResult
+from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, ctx_for, receive, run, system
 from base.models import EventDelivery
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB_COMMITTED
 
 ERASE = "http://saas.test/internal/whatsapp/erase"
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
-
-
-@pytest.fixture
-def tick(monkeypatch, django_capture_on_commit_callbacks):
-    """One turn of the worker's real loop, without the SaaS's catalogue and, inside the test's transaction,
-    without releasing its connection; what the reactions leave for after their COMMIT runs too."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    now = timezone.now()
-
-    def run_once() -> None:
-        stop = threading.Event()
-
-        def wait(seconds: float) -> bool:
-            stop.set()
-            return True
-
-        with django_capture_on_commit_callbacks(execute=True):
-            assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now + dt.timedelta(seconds=1)) == 0
-
-    return run_once
 
 
 def owner():
@@ -126,6 +96,21 @@ def test_deleting_her_card_lets_another_card_of_her_number_claim_the_conversatio
     tick()
     assert conversation().customer_id == second.id
 
+
+def test_her_card_recovered_from_the_separate_copy_takes_her_conversation_back_through_the_relay(tick):
+    """hub#1324: deleting her card let the conversation go; the same card back (CUSTOMER-F33) claims it, once."""
+    receive("wamid.1")
+    ana = card()
+    tick()
+    run("customer.customer.delete", {"id": str(ana.id)}, owner())
+    tick()
+    assert conversation().customer_id is None
+    system("customer.customer.restore", {"id": str(ana.id)})
+    assert conversation().customer_id is None  # nothing in line: the relay does it
+    tick()
+    assert conversation().customer_id == ana.id
+    tick()  # again: nothing changes
+    assert conversation().customer_id == ana.id
 
 def test_a_card_made_from_the_conversation_is_joined_once_and_the_relay_changes_nothing(tick):
     """F37: «Create card» joins it in its own transaction; the card's creation, relayed, finds it joined."""

@@ -1,28 +1,34 @@
 """Fixtures of the staff tests: contexts per role and scope, users with a role on a host, model
-builders for the data a test starts from, a raw DSN, and the Hub admin's «Delete» of a record from another
-session (``deleted_on_screen``, for the apps that keep something about a person)."""
+builders for the data a test starts from and a raw DSN.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it."""
 
 import datetime as dt
-import threading
-import time
-from collections.abc import Callable
-from contextlib import contextmanager
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connection, connections
-from django.test import Client
+from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from psycopg.conninfo import make_conninfo
 
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import night_elsewhere
 from apps.staff.models import Member, Role, Schedule, ScheduleDay, TimeOff
 from base.models import Membership
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases (the platform staff with business A chosen in the Hub
+#: admin, business A at night in another zone or on a plan with room for several sessions) and the assistant's catalogue
+#: of a person of business A, that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "hub_staff", "in_business_a", "night_elsewhere",
+    "plan_with_room",
+]
 
 
 def ctx_for(
@@ -54,7 +60,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
         first_name: str = "",
     ):
@@ -118,59 +124,3 @@ def make_time_off(member: Member, start: str, end: str | None = None, hours: tup
     return TimeOff.objects.create(
         member=member, start_date=dt.date.fromisoformat(start), end_date=dt.date.fromisoformat(end or start), **times, **fields
     )
-
-
-#: The most the session raced waits for the Hub admin's «Delete» to be waiting for it.
-WAIT_LIMIT = 10
-
-
-def _waited_for() -> bool:
-    """Whether another session waits for a lock this one holds."""
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT pg_stat_clear_snapshot()")
-        cursor.execute(
-            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pg_backend_pid() = ANY (pg_blocking_pids(pid)))"
-        )
-        return cursor.fetchone()[0]
-
-
-@contextmanager
-def deleted_on_screen(member: Member, how: str, after: Callable[[str], bool]):
-    """The platform staff delete ``member`` in the Hub admin, from its delete page (``page``) or with the
-    list's «Delete selected» (``list``), in another session started right before the first statement of
-    this one for which ``after`` holds; this one goes on once the deletion waits for the record it holds.
-    Yields the answers they got (a 500 is the error raised)."""
-    staff = get_user_model().objects.create_superuser(username="root", password="pw", email="root@example.com")
-    client = Client()
-    client.force_login(staff)
-    if how == "page":
-        url, data = f"/admin/staff/member/{member.pk}/delete/", {"post": "yes"}
-    else:
-        url, data = "/admin/staff/member/", {"action": "delete_selected", "_selected_action": [str(member.pk)], "post": "yes"}
-    answers: list = []
-
-    def deletion():
-        try:
-            answers.append(client.post(url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
-        except Exception as error:  # a 500, reported to the test
-            answers.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and after(sql):
-            thread.start()
-            deadline = time.monotonic() + WAIT_LIMIT
-            while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
-                time.sleep(0.02)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield answers
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "the deletion never started"

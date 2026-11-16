@@ -5,8 +5,7 @@ Money is in minor units of the business's currency, its country's (cents in euro
 integers, never negative); a percentage discount in basis points (1050 = 10.50 %).
 A service is archived and a category or a package deleted logically: what points at them keeps
 pointing. A voucher sold (``Grant``) freezes its terms; its balance is computed when read, from its
-sessions (``Redemption``) and its adjustments (``GrantAdjustment``), never stored. Phase 1 has no
-tenancy: every scope shares these tables; phase 2 moves them to each hub's database.
+sessions (``Redemption``) and its adjustments (``GrantAdjustment``), never stored.
 """
 
 from collections.abc import Mapping
@@ -18,6 +17,7 @@ from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 ACTOR_MAX_LENGTH = 128
@@ -197,10 +197,13 @@ class Service(UUIDModel):
     sku = models.CharField(_("SKU"), max_length=64, blank=True)
     barcode = models.CharField(_("barcode"), max_length=64, blank=True)
     notes = models.TextField(_("notes"), blank=True)
-    # Its image (SERVICE-F34, F35; round 2026-10-30, base.images): one of the shared library («catalog:<folder>/<name>»)
-    # or a photo of its own («file:service/services/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till
-    # shows its initials. Never a URL. ``db_default``: a process still on the previous code inserts without it.
+    # Its image (SERVICE-F34, F35; base.images): one of the shared library («catalog:<folder>/<name>») or a photo of its
+    # own («file:service/services/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till shows its initials.
+    # Never a URL. ``db_default``: a process still on the previous code inserts without it.
     image = models.CharField(_("image"), max_length=200, blank=True, default="", db_default="")
+    # The id, in a separate copy of the business, of the service a recovery made this one again for (BASE-F114): a
+    # service has no code of its own, so it is how an app whose records hang from the copy's finds this one.
+    stands_for = models.UUIDField(_("copy's service it stands for"), null=True, blank=True, editable=False)
     # Without a live one it cannot be charged (it needs tax setup); tax.TaxCategory is never deleted.
     tax_category = models.ForeignKey(
         "tax.TaxCategory",
@@ -446,7 +449,8 @@ class Grant(UUIDModel):
     note = models.CharField(_("note"), max_length=500, blank=True)
     voided_at = models.DateTimeField(_("voided at"), null=True, blank=True)
     voided_by = models.CharField(
-        _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        # Its own context: the voucher sold is masculine («anulado por»), a sale of Sales is not.
+        pgettext_lazy("service", "voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
     void_reason = models.CharField(_("void reason"), max_length=500, blank=True)
     created_by = models.CharField(
@@ -552,6 +556,16 @@ class Redemption(UUIDModel):
         blank=True,
         related_name="+",
         verbose_name=_("service"),
+    )
+    # The professional of Staff who did it, when it was said (SERVICE-F21): a session spent outside the till counts in
+    # her production (SALE-F28). One of the till is said on its line, in Sales.
+    member = models.ForeignKey(
+        "staff.Member",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("professional"),
     )
     # Opaque ids of the Appointments and Sales apps (not requirements).
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)

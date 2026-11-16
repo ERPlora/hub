@@ -6,6 +6,9 @@ Sales, their lines and their rounds, and the products and categories of Inventor
 own apps' operations, never by hand: the integration with ``sale`` and ``inventory`` is tested as it
 runs (no mocks). The builders import the models lazily, so the tests of apps.py still collect while
 models.py does not exist.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
 """
 
 import datetime as dt
@@ -16,8 +19,17 @@ from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+from apps.flow.tests.test_relay import worker_loop
+from apps.invoice.tests.conftest import catalog_of, in_hubs
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, factory_data_b, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+
+#: The marks, scopes and fixtures of the businesses' own databases, the assistant's catalogue of a person of business
+#: A and the worker's real pass over every business, that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "factory_data", "factory_data_b", "hub_staff",
+    "in_business_a", "in_hubs", "plan_with_room", "worker_loop",
+]
 
 #: A fixed instant: 13:00 in Madrid (11:00 UTC, summer time) on 2026-10-14.
 NOON = dt.datetime(2026, 10, 14, 11, 0, tzinfo=dt.UTC)
@@ -75,7 +87,7 @@ def english():
 
 
 @pytest.fixture(autouse=True)
-def receives_everything(request):
+def receives_everything(request, in_business_a):
     """The kitchen receives what was fired since its tables exist (``receiving_since``, set by its
     migration at the real time): a test with a pinned clock moves that moment back so its rounds count."""
     marker = request.node.get_closest_marker("django_db")
@@ -99,7 +111,7 @@ def receives_everything(request):
 
 @pytest.fixture
 def make_user(db):
-    def make(username: str = "ana", *, host: str | None = "a", role: str = "hub_admin"):
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = "hub_admin"):
         from django.contrib.auth import get_user_model
 
         from base.models import Membership
@@ -241,34 +253,9 @@ def now() -> dt.datetime:
 
 
 @pytest.fixture
-def relay(monkeypatch, db):
-    """One tick of the worker's real loop (``base.worker.run``): the outbox relay hands each new event to
-    the reactions of the apps (``events.py``), as production does. Without the SaaS (``register_apps``)
-    and, inside the test's transaction, without releasing the connections (that would close its own)."""
-    import threading
-
-    from django.db.backends.base.base import BaseDatabaseWrapper
-
-    from base import catalog, worker
-    from base.catalog import RegisterResult
-
-    monkeypatch.setattr(
-        catalog,
-        "register_apps",
-        lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True),
-    )
-    monkeypatch.setattr(
-        BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None
-    )
-
-    def tick() -> None:
-        stop = threading.Event()
-
-        def wait(seconds: float) -> bool:
-            stop.set()
-            return True
-
-        moment = timezone.now()
-        assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: moment) == 0
-
-    return tick
+def relay(worker_loop, factory_data):
+    """One tick of the worker's real loop (``base.worker.run``) over every business in its own database: the outbox
+    relay hands each new event to the reactions of the apps (``events.py``), as production does. The loop releases a
+    business's connections once it has served it, so a test that uses it is committed (``HUB_DB_COMMITTED``), with the
+    factory data a sale needs planted again in business A."""
+    return worker_loop

@@ -4,27 +4,32 @@
 // Price, «Cost (<currency>)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Type»,
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
 // «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
-// the server, TaxCategorySelect and ProductCategoriesField), saved in one go. Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
+// the server, TaxCategorySelect and ProductCategoriesField), saved in one go. «Save» waits in grey until the business
+// has answered its money (the price and the cost are read in it; hub#918), and says so with «Retry» if that read fails
+// (hub#938). Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
 // the person typed them; a refusal stays in the dialog, each message under its field. «Photo» (INVENTORY-F30/F31, for
 // who may change products): a library image or a photo of its own, sent once the product is saved (`set_image`,
 // `upload_image`, «Uploading photo…»); if the product saved and the photo did not, the dialog says so with «Retry»
-// (only the photo goes again) and the product keeps the photo it had.
-import { FormModal, InlineFeedback } from '@erplora/ui/components';
+// (only the photo goes again) and the product keeps the photo it had. With something typed and not saved, every way out
+// of the dialog — «Cancel» («Cancel editing»), its «×», Escape, a tap outside and, on the installed app, Android's Back —
+// asks «Discard changes?» («Keep editing» / «Discard changes») instead of closing it (hub#1015, hub#1023:
+// `useUnsavedChanges` of base, its question as the FormModal's `canDismiss`); as it opened, they close it at once.
+import { FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
-import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
+import { draftOf, type ImageDraft, imageStep, useImageSave } from '../../../../base/frontend/lib/item-image';
+import { useUnsavedChanges } from '../../../../base/frontend/lib/unsaved-changes';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
-import { useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
+import { type Money, useBusinessMoney } from '../lib/format';
 import { readQuantity } from '../lib/quantity';
-import MoneyInput from './MoneyInput.vue';
 import ProductCategoriesField from './ProductCategoriesField.vue';
 import QuantityInput from './QuantityInput.vue';
 import TaxCategorySelect from './TaxCategorySelect.vue';
@@ -143,7 +148,7 @@ const title = computed(() =>
 );
 /** No tax category, or still the one Taxes deactivated (a «Not configured» product keeps it until changed). */
 const taxMissing = computed(() => !form.value.tax || (!!props.product?.needs_tax_setup && form.value.tax === original.value.tax));
-const complete = computed(() => !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
+const complete = computed(() => !!business.value && !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
 const tracksNow = computed(() => form.value.track ?? (props.product ? props.product.tracks_stock : props.hubTracksStock));
 const step = computed(() => props.units.find((unit) => unit.code === form.value.unit)?.increment);
 /** Each unit by the name the API gives it, which already carries its code («Unit (ud)»). */
@@ -151,16 +156,28 @@ const unitOptions = computed(() =>
   props.units.length ? props.units.map((unit) => ({ code: unit.code, label: unit.name })) : [{ code: form.value.unit, label: form.value.unit }],
 );
 
+/** Something typed or chosen, the photo included, that is not saved: every way out (Cancel, ×, Escape, a tap outside,
+ *  Android's Back) asks before it throws that away (hub#1015, hub#1023); as it opened, they close it. Read against what
+ *  it opened with, which follows the business's currency (the watch above), so a price only rewritten in it is not a
+ *  change. */
+const unsaved = computed(() => {
+  const now = form.value;
+  const was = original.value;
+  const changed = (Object.keys(now) as (keyof Fields)[]).some((key) => String(now[key]) !== String(was[key]));
+  return changed || imageStep(props.product?.image ?? '', image.value).kind !== 'none';
+});
+const canDismiss = useUnsavedChanges(useTemplateRef<HTMLElement>('fields'), unsaved);
+
 function set<K extends keyof Fields>(key: K, value: Fields[K]): void {
   form.value = { ...form.value, [key]: value };
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
-/** The fields read as the API takes them, or `null` when an amount or a quantity cannot be read. */
-function read() {
-  const price = parseMoney(form.value.price, business.value);
-  const cost = parseMoney(form.value.cost, business.value);
+/** The fields read as the API takes them, in the business's `money`, or `null` when an amount or a quantity cannot be read. */
+function read(money: Money) {
+  const price = parseMoney(form.value.price, { money });
+  const cost = parseMoney(form.value.cost, { money });
   const initial = readQuantity(form.value.initialStock);
   const threshold = readQuantity(form.value.threshold);
   if (!price.ok || !cost.ok || !initial.ok || !threshold.ok) return null;
@@ -174,7 +191,11 @@ async function savePhoto(id: string): Promise<void> {
 
 async function save(): Promise<void> {
   tried.value = true;
-  const values = read();
+  // No amount is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#918).
+  const money = business.value;
+  if (!money) return;
+  const values = read(money);
   if (!values || !complete.value) return;
   const now = form.value;
   let saved: { id: string };
@@ -235,9 +256,14 @@ function retryPhoto(): void {
     :pending="pending"
     :error="error"
     :submit-disabled="!complete || !!photo.failure.value"
+    :can-dismiss="canDismiss"
     @submit="save"
   >
-    <div class="product-form">
+    <div
+      ref="fields"
+      class="product-form"
+    >
+      <BusinessMoneyError />
       <InlineFeedback
         v-if="photo.failure.value"
         tone="warning"
@@ -285,6 +311,7 @@ function retryPhoto(): void {
       <MoneyInput
         v-model="form.price"
         testid="inventory-product-price"
+        :money="business"
         :label="$t('inventory.form.price')"
         :error-text="fields.price"
         :show-error="tried"
@@ -292,6 +319,7 @@ function retryPhoto(): void {
       <MoneyInput
         v-model="form.cost"
         testid="inventory-product-cost"
+        :money="business"
         :label="business ? $t('inventory.form.costIn', { currency: business.currency }) : $t('inventory.form.cost')"
         :error-text="fields.cost"
         :show-error="tried"

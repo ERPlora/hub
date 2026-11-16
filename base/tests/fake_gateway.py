@@ -1,4 +1,4 @@
-"""erplora.com's AI gateway on ``127.0.0.1``, for the tests of the Hub's assistant (``base/assistant.py``).
+"""erplora.com's AI gateway on ``127.0.0.1``, for the tests of the Hub's assistant (``base/assistant/gateway.py``).
 
 The Hub talks to it with its real network code (``httpx``, signed as every ``/internal`` call): nothing of ours is
 patched. A test scripts what each door answers (``FakeGateway.reply``) in the gateway's own contract
@@ -11,12 +11,13 @@ import json
 import threading
 import time
 from dataclasses import dataclass, field
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from typing import Any
 
 import pytest
 
 from base import signing
+from base.tests.quiet_server import QuietServer
 
 #: The shared secret of ``/internal`` in these tests.
 SECRET = "test-internal-secret"
@@ -51,8 +52,7 @@ class FakeGateway:
         self._replies: dict[str, list[Reply]] = {}
         self.requests: list[Seen] = []
         self._lock = threading.Lock()
-        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
-        self._server.daemon_threads = True
+        self._server = QuietServer(("127.0.0.1", 0), self._handler())
         self._thread = threading.Thread(target=self._server.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True)
 
     @property

@@ -16,7 +16,7 @@ class SaleConfig(LiveAppConfig):
     icon = "ion:cart-outline"
     category = Category.SALES
     premium = False
-    # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
+    # The app store's texts, which register_apps writes to shared.app.
     summary = _(
         "The till: build the check, charge it in cash, by card or split, and void or refund a sale."
     )
@@ -30,9 +30,17 @@ class SaleConfig(LiveAppConfig):
     )
     verticals = ["hair_salon", "restaurant"]
     # Every line is priced with tax's rules and a sale keeps its customer's card (foreign keys).
-    # Inventory is optional (PLAN §20.5): its products are read through its own operations.
+    # Inventory is optional: its products are read through its own operations.
     requires = ["tax", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «cuenta», a check or a tab is a table's
+    # open check (sale.order), never the person's account (what it is in erplora.com's panel); a ticket or a receipt is
+    # a sale's, as the till's screens say («Tiques hoy», «Tique medio», the «Tique» it prints), never the kitchen's,
+    # which is its «comanda».
+    assistant_synonyms = (
+        ("cuenta", "check", "tab", "order"),
+        ("ticket", "tique", "recibo", "receipt", "sale"),
+    )
     permissions = [
         "sale.view_sale",
         "sale.add_sale",
@@ -59,8 +67,8 @@ class SaleConfig(LiveAppConfig):
             "sale.view_paymentmethod",
         ],
     }
-    # What a manager approves on the spot with their PIN on the cashier's own device (BASE-F84; the old hub's
-    # HUB_SHELL-F51; Square, Toast, Lightspeed and Shopify's manager override), in the words the dialog «An approval
+    # What a manager approves on the spot with their PIN on the cashier's own device (BASE-F84;
+    # Square, Toast, Lightspeed and Shopify's manager override), in the words the dialog «An approval
     # is needed» says: every command of the till whose permission the employee lacks. Who holds it is never asked.
     approvals = {
         "sale.sale.void": _("Void a sale"),
@@ -72,10 +80,10 @@ class SaleConfig(LiveAppConfig):
         "sale.order.add_open_line": _("Sell at an open price"),
         "sale.order.void_ordered": _("Delete an open check with something on it"),
     }
-    # The same, with how much is approved, from the figures of that very request (BASE-F84; sales#398, hub#2180: the
-    # manager read «above the maximum» and approved blind): the first sentence whose every hole fills, an amount in the
-    # business's currency; none fills (a zero, an empty figure, a check's own discount at its charge), the words above.
-    # Void, refund, void an item and delete a check have no figure on the first level of their input.
+    # The same, with how much is approved, from the figures of that very request (BASE-F84), so the manager never
+    # approves blind on «above the maximum»: the first sentence whose every hole fills, an amount in the business's
+    # currency; none fills (a zero, an empty figure, a check's own discount at its charge), the words above. Void,
+    # refund, void an item and delete a check have no figure on the first level of their input.
     approval_figures = {
         "sale.order.set_line_discount_over_limit": [_("Discount a line by {discount_percent, percent}")],
         "sale.order.set_discount_over_limit": [
@@ -106,10 +114,9 @@ class SaleConfig(LiveAppConfig):
         Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
     ]
-    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's four panels of the dashboard, on the
-    # queries Sales' own screen reads, each refreshed by the events live.py re-runs its query on. Registered
-    # icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps of
-    # «Finish setting up your business» nor counters of the bell: the old module had none.
+    # The Home's panels, on the queries Sales' own screen reads, each refreshed by the events live.py re-runs its query
+    # on. Registered icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps
+    # of «Finish setting up your business» nor counters of the bell: the old module had none.
     widgets = [
         Widget(
             key="today",
@@ -165,8 +172,8 @@ class SaleConfig(LiveAppConfig):
     ]
 
     def fiscal_documents_kept(self) -> bool:
-        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
-        left: Its sales here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
+        its sales here are documents nothing archives yet, so the database stays."""
         from apps.sale import queries  # the models are not loaded yet when this module is
 
         return queries.keeps_fiscal_documents()

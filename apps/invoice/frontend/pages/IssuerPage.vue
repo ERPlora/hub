@@ -3,9 +3,10 @@
 // issuer — Legal name, Tax ID (a Spanish NIF or CIF is checked by the server), Address, Postal code, City,
 // Province and Country —, followed live: «Without the issuer no invoice can be issued.» until it is
 // complete, and «Received from your ERPlora account on <date>.» when the SaaS sent it. The owner and the
-// admin save it (`invoice.issuer.update`) and are told so; a refusal goes under its field; anyone else only
-// looks. What is typed is never overwritten by a new result while it differs from what was saved.
-import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
+// admin save it (`invoice.issuer.update`) and are told so; a refusal goes under its field until that field
+// is changed; anyone else only looks. What is typed is never overwritten by a new result while it differs
+// from what was saved.
+import { formatDateTime, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
@@ -67,11 +68,12 @@ watch(
 const blocked = computed(() => blockingError(error.value));
 const loadError = computed(() => (status.value === 'error' && !blocked.value ? error.value?.message ?? '' : null));
 const refused = computed(() => refusal(save.error.value, t('invoice.issuer.failed')));
-const fieldErrors = computed(() => (refused.value?.fields ?? {}) as Record<string, string>);
+const { refusedFields, fieldErrors, changed } = useRefusal(refused);
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 function set(field: Field, value: unknown): void {
   form.value = { ...form.value, [field]: String(value ?? '') };
+  changed(field);
 }
 
 async function submit(): Promise<void> {
@@ -142,7 +144,7 @@ async function submit(): Promise<void> {
         @submit.prevent="submit"
       >
         <InlineFeedback
-          v-if="refused && !Object.keys(fieldErrors).length"
+          v-if="refused && !Object.keys(refusedFields).length"
           tone="danger"
           data-testid="invoice-issuer-error"
         >

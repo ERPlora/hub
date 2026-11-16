@@ -1,8 +1,8 @@
 // Types of the service app's operations for the SDK (`useLive`, `useCommand`, `client.api.call`), from
-// apps/service/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: money in whole minor units of the business's currency, minutes as integers, dates and moments ISO 8601.
+// apps/service/schemas.py. Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`.
+// Keep it in step with schemas.py and `frontend/generated/operations.json`. One input per operation (ninja's parity):
+// no path parameters, an id travels in the input. On the wire: money in whole minor units of the business's currency,
+// minutes as integers, dates and moments ISO 8601.
 import type { CatalogImage } from '../../../base/frontend/operations';
 import type { Page } from '../../../frontend/sdk-types';
 
@@ -525,6 +525,9 @@ export interface AdjustCheckOut {
 export interface RedeemIn extends ByIdIn {
   service_id?: string | null;
   service?: string | null;
+  /** The professional (Staff) who did it: its value counts in their production (SALE-F28). */
+  member_id?: string | null;
+  member?: string | null;
   appointment_id?: string | null;
   sale_id?: string | null;
   note?: string;
@@ -547,6 +550,8 @@ export interface RedemptionOut {
   grant_id: string;
   service_id: string | null;
   service_name: string | null;
+  member_id: string | null;
+  member_name: string | null;
   redeemed_at: string;
   remaining: number | null;
 }
@@ -620,6 +625,9 @@ export interface MovementOut {
   customer_name: string | null;
   service_id: string | null;
   service_name: string | null;
+  /** The professional who did a session (hub#1236); null = nobody said, and on an adjustment. */
+  member_id: string | null;
+  member_name: string | null;
   sale_id: string | null;
   appointment_id: string | null;
   note: string;

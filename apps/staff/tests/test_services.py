@@ -13,11 +13,10 @@ from decimal import Decimal
 
 import psycopg
 import pytest
-from django.db import connection, transaction
 from django.utils import timezone
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 from live.outbox import channel_for
 
 from apps.staff import events, services
@@ -55,15 +54,10 @@ from apps.staff.schemas import (
     TimeOffRequestIn,
 )
 
-from .conftest import (
-    A,
-    B,
-    ctx_for,
-    make_member,
-    make_role,
-    make_schedule,
-    make_time_off,
-)
+from base.tenancy.context import use_hub
+from base.tenancy.tests.concurrency import in_a_thread
+
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_member, make_role, make_schedule, make_time_off
 
 WAIT = 1.0
 QUIET = 0.3
@@ -232,7 +226,7 @@ def test_declarations(name, permission, input, output, expose_api):
 
 # staff.member.create (STAFF-F01, STAFF-F03)
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_create_returns_the_record_and_records_created():
@@ -265,7 +259,7 @@ def test_create_returns_the_record_and_records_created():
         Decimal("12.50"),
         "Reviews in March",
     )
-    assert outbox() == [(events.MEMBER_CREATED, "a", {"id": str(member.id)})]
+    assert outbox() == [(events.MEMBER_CREATED, A.key, {"id": str(member.id)})]
     assert OutboxEvent.objects.get().actor == "tester"
 
 
@@ -298,12 +292,12 @@ def test_an_unknown_role_name_is_refused_on_its_field():
 
 
 def test_a_user_with_access_to_the_business_is_linked(make_user):
-    account = make_user("ana", host="a", role="hub_employee")
+    account = make_user("ana", host=A.key, role="hub_employee")
     assert create(user_id=account.person.id).user_id == account.person.id
 
 
 def test_a_user_without_access_to_this_business_is_refused(make_user):
-    stranger = make_user("bea", host="b")
+    stranger = make_user("bea", host=B.key)
     for user_id in (stranger.person.id, uuid.uuid4()):
         with pytest.raises(InvalidPayload) as excinfo:
             create(user_id=user_id)
@@ -315,7 +309,7 @@ def test_a_user_without_access_to_this_business_is_refused(make_user):
 
 def test_a_person_who_left_the_business_is_refused_though_their_membership_lingers(make_user):
     # The photo marks whoever is no longer in the business (base.hub_user.sync): their record no longer hangs from them.
-    account = make_user("ana", host="a", role="hub_employee")
+    account = make_user("ana", host=A.key, role="hub_employee")
     account.person.is_active = False
     account.person.save()
 
@@ -469,7 +463,7 @@ def test_update_changes_only_what_was_sent_and_clears_with_null():
         "a@b.es",
     )
     assert (detail.role_id, detail.hire_date) == (None, None)
-    assert outbox() == [(events.MEMBER_UPDATED, "a", {"id": str(member.id)})]
+    assert outbox() == [(events.MEMBER_UPDATED, A.key, {"id": str(member.id)})]
 
 
 def test_null_keeps_a_field_that_cannot_be_empty_and_an_unsent_role_stays():
@@ -584,7 +578,7 @@ def test_deactivate_takes_the_record_out_of_the_agenda():
         "inactive",
         False,
     )
-    assert outbox() == [(events.MEMBER_DEACTIVATED, "a", {"id": str(member.id)})]
+    assert outbox() == [(events.MEMBER_DEACTIVATED, A.key, {"id": str(member.id)})]
 
 
 def test_deactivate_twice_is_refused():
@@ -659,7 +653,7 @@ def test_terminate_with_date_and_reason():
         False,
     )
     # The event never carries the reason.
-    assert outbox() == [(events.MEMBER_TERMINATED, "a", {"id": str(member.id)})]
+    assert outbox() == [(events.MEMBER_TERMINATED, A.key, {"id": str(member.id)})]
 
 
 def test_terminate_without_a_date_stamps_the_business_day(frozen_now):
@@ -704,7 +698,7 @@ def test_create_a_role():
         0,
         True,
     )
-    assert outbox() == [(events.ROLE_CREATED, "a", {"id": str(role.id)})]
+    assert outbox() == [(events.ROLE_CREATED, A.key, {"id": str(role.id)})]
 
 
 def test_a_role_name_is_not_repeated():
@@ -727,7 +721,7 @@ def test_update_and_retire_a_role():
         False,
         1,
     )
-    assert outbox() == [(events.ROLE_UPDATED, "a", {"id": str(role.id)})]
+    assert outbox() == [(events.ROLE_UPDATED, A.key, {"id": str(role.id)})]
 
 
 def test_role_update_rules():
@@ -776,7 +770,7 @@ def test_create_a_schedule_with_its_week():
     assert outbox() == [
         (
             events.SCHEDULE_CREATED,
-            "a",
+            A.key,
             {"id": str(schedule.id), "member_id": str(member.id)},
         )
     ]
@@ -833,7 +827,7 @@ def test_update_replaces_the_week_and_keeps_what_was_not_sent():
     assert outbox() == [
         (
             events.SCHEDULE_UPDATED,
-            "a",
+            A.key,
             {"id": str(schedule.id), "member_id": str(member.id)},
         )
     ]
@@ -945,7 +939,7 @@ def test_register_a_pending_time_off():
     )
     # The event never carries the reason.
     assert outbox() == [
-        (events.TIME_OFF_CREATED, "a", {"id": str(row.id), "member_id": str(member.id)})
+        (events.TIME_OFF_CREATED, A.key, {"id": str(row.id), "member_id": str(member.id)})
     ]
 
 
@@ -1035,7 +1029,7 @@ def test_an_employee_asks_for_their_own_time_off(make_user):
     assert outbox() == [
         (
             events.TIME_OFF_CREATED,
-            "a",
+            A.key,
             {"id": str(leave.id), "member_id": str(member.id)},
         )
     ]
@@ -1080,7 +1074,7 @@ def test_approve_stamps_who_and_when(make_user):
     assert outbox() == [
         (
             events.TIME_OFF_APPROVED,
-            "a",
+            A.key,
             {"id": str(leave.id), "member_id": str(member.id)},
         )
     ]
@@ -1136,7 +1130,7 @@ def test_approving_over_another_approved_absence_is_refused():
 
 
 def test_whoever_approves_before_their_person_exists_signs_it_all_the_same(django_user_model):
-    # A session opened before the business's database knew them: their first write makes their person (W10).
+    # A session opened before the business's database knew them: their first write makes their person.
     boss = django_user_model.objects.create_user(username="saas:9", first_name="Marta")
     leave = make_time_off(make_member(), "2026-10-12")
 
@@ -1197,7 +1191,7 @@ def test_the_first_save_creates_the_settings_with_the_defaults_for_the_rest():
         "default_break_duration": 30,
     }
     assert StaffSettings.objects.count() == 1
-    assert outbox() == [(events.SETTINGS_UPDATED, "a", {})]
+    assert outbox() == [(events.SETTINGS_UPDATED, A.key, {})]
 
 
 def test_hours_are_stored_without_seconds_and_a_second_save_updates_the_same_row():
@@ -1306,13 +1300,11 @@ def received(session, timeout=WAIT, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-
-    member_id = get("staff.member.create")(
-        ctx_for(scope=B), MemberIn(first_name="Ana", last_name="López")
-    ).id
+    with use_hub(hub_b):
+        get("staff.member.create")(ctx_for(scope=B), MemberIn(first_name="Ana", last_name="López"))
 
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.MEMBER_CREATED]})
@@ -1320,25 +1312,24 @@ def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen):
     assert received(on_a, timeout=QUIET) == []
 
     # Positive control: the same listener of A does hear a command run in A.
-    get("staff.member.update")(ctx_for(scope=A), MemberPatchIn(id=member_id, phone="1"))
+    get("staff.member.update")(ctx_for(scope=A), MemberPatchIn(id=make_member().id, phone="1"))
     assert received(on_a, stop_after=1) == [
         (channel_for(A), {"events": [events.MEMBER_UPDATED]})
     ]
     assert received(on_b, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_refused_command_notifies_nobody(listen):
-    member = Member.objects.create(
-        first_name="Ana", last_name="López", status=Member.Status.INACTIVE
-    )
-    on_b = listen(B)
-    with pytest.raises(Conflict):
-        get("staff.member.deactivate")(ctx_for(scope=B), MemberRefIn(id=member.id))
+@HUB_DB_COMMITTED
+def test_a_refused_command_notifies_nobody(listen, hub_b):
+    with use_hub(hub_b):
+        member = Member.objects.create(first_name="Ana", last_name="López", status=Member.Status.INACTIVE)
+        on_b = listen(B)
+        with pytest.raises(Conflict):
+            get("staff.member.deactivate")(ctx_for(scope=B), MemberRefIn(id=member.id))
     assert received(on_b, timeout=QUIET) == []
 
 
-# staff.member.bulk_create: the row's own problems, and the pay permission (review of 2026-10-14)
+# staff.member.bulk_create: the row's own problems, and the pay permission
 
 
 def test_a_badly_written_date_skips_only_its_row():
@@ -1363,6 +1354,7 @@ def test_pay_in_a_batch_needs_the_pay_permission():
 
 
 def _in_thread(target):
+    """``target`` in a session of its own of the business at work; ``outcome`` says its result or its error."""
     outcome = {}
 
     def body():
@@ -1370,10 +1362,8 @@ def _in_thread(target):
             outcome["result"] = target()
         except Exception as error:  # the outcome is asserted by the test
             outcome["error"] = error
-        finally:
-            connection.close()
 
-    thread = threading.Thread(target=body)
+    thread = in_a_thread(body, [None])
     thread.start()
     return thread, outcome
 
@@ -1382,12 +1372,13 @@ def _race(first, second):
     """Run ``first`` in a transaction kept open until ``second`` (another thread) is blocked on it.
 
     Returns the outcomes of both. ``second`` must wait (a lock), never decide blind on what ``first``
-    has not committed yet.
+    has not committed yet. Its tests run on a plan with room for both sessions (``plan_with_room``): on Free's,
+    ``second`` would wait for its turn to open a transaction, never for the lock.
     """
     done, release = threading.Event(), threading.Event()
 
     def held():
-        with transaction.atomic():
+        with atomic():
             result = first()
             done.set()
             release.wait(5)
@@ -1411,7 +1402,8 @@ def _register_in(member, start, end=None):
     return lambda: get("staff.time_off.create")(ctx_for(), data)
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_two_overlapping_requests_at_once_keep_one():
     member = make_member()
     outcome = _race(_register_in(member, "2026-10-12", "2026-10-14"), _register_in(member, "2026-10-14"))
@@ -1419,7 +1411,8 @@ def test_two_overlapping_requests_at_once_keep_one():
     assert TimeOff.objects.count() == 1
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_two_overlapping_requests_of_my_own_at_once_keep_one(make_user):
     me = make_user("ana", role="hub_employee")
     make_member(user=me.person)
@@ -1434,7 +1427,8 @@ def test_two_overlapping_requests_of_my_own_at_once_keep_one(make_user):
     assert TimeOff.objects.count() == 1
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_two_overlapping_approvals_at_once_keep_one():
     member = make_member()
     # Possible with old data: two pending requests over the same days.
@@ -1450,7 +1444,8 @@ def test_two_overlapping_approvals_at_once_keep_one():
     assert list(TimeOff.objects.order_by("start_date").values_list("status", flat=True)) == ["approved", "pending"]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_an_employee_cannot_cancel_a_request_approved_while_they_were_cancelling(make_user):
     # STAFF-F19: an employee withdraws only a PENDING request of their own, judged on the locked row.
     me = make_user("ana", role="hub_employee")
@@ -1466,7 +1461,8 @@ def test_an_employee_cannot_cancel_a_request_approved_while_they_were_cancelling
     assert leave.status == "approved"
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_a_record_terminated_while_approving_is_not_found():
     member = make_member()
     leave = make_time_off(member, "2026-10-12")
@@ -1481,7 +1477,8 @@ def test_a_record_terminated_while_approving_is_not_found():
     assert leave.status == "pending"
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 @pytest.mark.parametrize(
     "command",
     [

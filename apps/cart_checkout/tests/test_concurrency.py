@@ -7,52 +7,29 @@ a step; the other one waits for it and is refused with the real reason. A cart's
 sum of its lines.
 """
 
-import threading
 import uuid
 from decimal import Decimal
 
 import psycopg
 import pytest
-from django.db import connection
+from django.db import connections
 from django.db.models import Sum
 from django.utils import timezone
 from live.errors import OperationError
 from live.operations import get
 
 from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, in_a_thread
 
-from .conftest import ctx_for, make_cart, make_item, make_order
+from .conftest import HUB_DB_COMMITTED, ctx_for, make_cart, make_item, make_order
 
-pytestmark = pytest.mark.django_db(transaction=True)
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def run(name, data):
     op = get(name)
     return op(ctx_for("hub_admin"), op.input.model_validate(data))
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def codes(results) -> list[str]:
@@ -109,27 +86,24 @@ def test_the_first_orders_of_a_day_at_once_create_its_counter_once_and_never_rep
     assert list(OrderCounter.objects.values_list("day", "last")) == [(timezone.localdate(), 10)]
 
 
-def test_an_order_waits_for_the_day_counter_another_one_is_creating_and_takes_the_next_number(db_dsn):
+def test_an_order_waits_for_the_day_counter_another_one_is_creating_and_takes_the_next_number():
     # Deterministic: another session has inserted the day's counter row (its first order, number 1) and
     # not committed yet. This order's INSERT … ON CONFLICT DO NOTHING waits for that COMMIT, skips, and its
     # UPDATE … RETURNING gives 2. A check-then-create counter would see no row, insert, and fail with an
     # IntegrityError once the other session commits.
     cart = make_cart("sess_wait", customer_email="ana@example.com", total_amount=100)
     make_item(cart, unit_price=100)
-    other = psycopg.connect(db_dsn)
+    business = connections[current_alias()].get_connection_params()
+    other = psycopg.connect(**business)
     try:
         other.execute(
             "INSERT INTO cart_checkout_ordercounter (id, day, last) VALUES (%s, %s, 1)",
             (uuid.uuid7(), timezone.localdate()),
         )
-        result: list = []
-        worker = threading.Thread(
-            target=lambda: result.extend(
-                at_once(lambda: run("cart_checkout.checkout.initiate", {"cart_id": str(cart.id)}))
-            )
-        )
+        result: list = [None]
+        worker = in_a_thread(lambda: run("cart_checkout.checkout.initiate", {"cart_id": str(cart.id)}), result)
         worker.start()
-        watcher = psycopg.connect(db_dsn, autocommit=True)
+        watcher = psycopg.connect(**business, autocommit=True)
         try:
             for _ in range(200):  # until the order is waiting on the other session's row (≤ 10 s)
                 waiting = watcher.execute(

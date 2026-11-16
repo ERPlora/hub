@@ -1,6 +1,6 @@
-// The form of «Ask the assistant» (WORKBOOK FLOW-F37; old hub HUB-F95): what it is asked (with data inserted), the
-// reads and actions it may use — only the ones the assistant can use, each a permission of the automation —, whether
-// a change waits for a yes («Ask me first») or it makes it on its own, and its most turns. Refusals show by field.
+// The form of «Ask the assistant» (WORKBOOK FLOW-F37): what it is asked (with data inserted), the reads and actions it
+// may use — only the ones the assistant can use, each a permission of the automation —, whether a change waits for a
+// yes («Ask me first») or it makes it on its own, and its most turns. Refusals show by field.
 import { describe, expect, it } from 'vitest';
 
 import type { CatalogOut, FixedByAppOut, Step } from '../operations';
@@ -14,6 +14,7 @@ const action = (name: string, kind: 'command' | 'query', assistant: boolean, ask
   name, kind, app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: [], assistant, ask_first,
 });
 const CATALOG: CatalogOut = {
+  off_apps: [],
   events: [],
   actions: [
     action('task.task.list', 'query', true),
@@ -33,6 +34,24 @@ async function setup(step: Step = STEP, errors: Record<string, string> = {}) {
 }
 
 describe('AssistantStepPanel', () => {
+  it('a tool of an app that is off says so under the tools, in its language, until the app is on again (hub#1054)', async () => {
+    const step = { ...STEP, tools: ['task.task.list', 'appointment.appointment.cancel'] } as Step;
+    const off = { ...CATALOG, off_apps: [{ app: 'appointment', app_name: 'Appointments' }] };
+    const s = await mountFlow(AssistantStepPanel, { props: { step, index: 0, steps: [step], catalog: off, errors: {}, pick: async () => '' } });
+    expect(s.find('flow-assistant-tools-off-s1').text()).toBe(
+      '«Cancel an appointment» is from Appointments, which is off in this business: turn it on in Apps, or remove it.',
+    );
+    const es = await mountFlow(AssistantStepPanel, {
+      locale: 'es',
+      props: { step, index: 0, steps: [step], catalog: { ...CATALOG, off_apps: [{ app: 'appointment', app_name: 'Citas' }] }, errors: {}, pick: async () => '' },
+    });
+    expect(es.find('flow-assistant-tools-off-s1').text()).toBe(
+      '«Anular una cita» es de Citas, que está apagada en este negocio: enciéndela en Apps o quítala.',
+    );
+    await s.wrapper.setProps({ catalog: CATALOG });
+    expect(s.find('flow-assistant-tools-off-s1').exists()).toBe(false);
+  });
+
   it('writes what it is asked, a datum alone as text', async () => {
     const s = await setup();
     s.box.vm.$emit('update:modelValue', 'input.name');
@@ -97,11 +116,12 @@ describe('AssistantStepPanel', () => {
   });
 });
 
-// Fixed data (FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF): a datum a tool always gets,
-// filled in when it runs, that the assistant never sees nor changes — «On behalf of the customer» = their card.
+// Fixed data: a datum a tool always gets, filled in when it runs, that the assistant never sees nor changes —
+// «On behalf of the customer» = their card.
 describe('AssistantStepPanel fixed data', () => {
   const field = (name: string, required = false) => ({ name, type: 'string', required, description: '', choices: [] });
   const BOOKING: CatalogOut = {
+    off_apps: [],
     events: [],
     actions: [
       { ...action('reservation.reservation.cancel', 'command', true, true), app: 'reservation', app_name: 'Reservations', fields: [field('id'), field('reason'), field('on_behalf_of')] },

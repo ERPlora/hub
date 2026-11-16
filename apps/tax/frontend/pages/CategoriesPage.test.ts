@@ -76,7 +76,7 @@ describe('CategoriesPage: the live list', () => {
     const s = await setup();
     expect(s.params()).toEqual([{ sort: 'key', dir: 'asc', limit: 50, offset: 0 }]);
     expect(s.find('tax-categories-loading').exists()).toBe(true);
-    // pm#611: while it loads, the list never counts «0 categor…» under the spinner.
+    // While it loads, the list never counts «0 categor…» under the spinner.
     expect(s.wrapper.text()).not.toMatch(/\b0 categor(y|ies)\b/);
     await s.show(PAGE);
     expect(s.find('tax-categories-loading').exists()).toBe(false);
@@ -166,7 +166,6 @@ describe('CategoriesPage: the live list', () => {
 
 describe('CategoriesPage: the filters (Key, Name, Description, Origin)', () => {
   it('are the filters of their columns behind the table funnel, Origin as System or Custom', async () => {
-    // flow: ninguno — FIX DataTable parte 2b-1 (PLAN-MIGRATIONS §13: filtros como en la vieja)
     const s = await setup();
     await s.show(PAGE);
     expect(s.prop('filterable')).toBe(true);
@@ -344,7 +343,7 @@ describe('CategoriesPage: the rest', () => {
   });
 });
 
-describe('CategoriesPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('CategoriesPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

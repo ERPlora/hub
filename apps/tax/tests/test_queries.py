@@ -9,10 +9,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, connections
 from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import get
+from live.operations import current_alias, get
 
 from apps.tax import queries, schemas
 from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
@@ -40,9 +40,9 @@ from apps.tax.schemas import (
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import ctx_for
+from .conftest import HUB_DB, ctx_for
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TODAY = date(2026, 6, 27)
 
@@ -103,8 +103,8 @@ def test_declarations(name, input, output, expose_api):
         output,
         expose_api,
     )
-    # The assistant sees every read; a read carries no risk.
-    assert isinstance(op.ai, dict) and op.ai["description"].strip() and set(op.ai) == {"description"}
+    # The assistant sees every read, with what a person says to ask for it (hub#1094); a read carries no risk.
+    assert isinstance(op.ai, dict) and op.ai["description"].strip() and set(op.ai) == {"asks", "description"}
 
 
 def test_an_employee_reads_and_a_role_without_tax_does_not(no_seed):
@@ -114,7 +114,7 @@ def test_an_employee_reads_and_a_role_without_tax_does_not(no_seed):
         run("tax.category.list", CategoryListIn(), role="nobody")
 
 
-# Money: whole cents, exact decimals, half up (ADR-0123 of the current product)
+# Money: whole cents, exact decimals, half up
 
 
 @pytest.mark.parametrize(
@@ -470,9 +470,9 @@ def test_the_date_defaults_to_the_business_today(no_seed):
 
 
 def test_when_the_rules_cannot_be_read_the_calculation_stops(no_seed):
-    # taxes#82: an outage is not «no rate», and allow_missing_rate must not turn it into 0 %.
+    # An outage is not «no rate», and allow_missing_rate must not turn it into 0 %.
     rule(category(), "21")
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         cursor.execute("ALTER TABLE tax_taxrule RENAME TO tax_taxrule_hidden")
     try:
         for allow in (False, True):
@@ -484,7 +484,7 @@ def test_when_the_rules_cannot_be_read_the_calculation_stops(no_seed):
                     date=TODAY,
                 )
     finally:
-        with connection.cursor() as cursor:
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute("ALTER TABLE tax_taxrule_hidden RENAME TO tax_taxrule")
     assert (
         calculate(amount=10_000, tax_category_key="product.generic", date=TODAY).tax
@@ -567,7 +567,7 @@ def test_the_search_finds_the_stored_and_the_translated_texts(no_seed):
 
 
 def test_the_column_filters_read_what_the_column_shows(no_seed):
-    # taxes#44: the description column shows the translated text; its filter reads that text.
+    # The description column shows the translated text; its filter reads that text.
     category("service.health", "Service — healthcare (VAT exempt)", system=True, description="Assistance by medics")
     category("product.books", "Libros", description="Solo papel")
     keys = lambda **where: [r.key for r in categories(language="es", **where).rows]  # noqa: E731
@@ -762,18 +762,21 @@ def test_the_seeded_spanish_baseline_configures_a_spanish_business():
         "country_code": "ES",
         "matching_rules": 11,
         "configured": True,
+        "factory_rules": True,
     }
-    # Without a stated country, every active root rule counts: no false «you are missing your taxes».
+    # Without a stated country, the business's (hub#996): Spain, for one without a country registered.
     assert status().model_dump() == {
-        "country_code": None,
+        "country_code": "ES",
         "matching_rules": 11,
         "configured": True,
+        "factory_rules": True,
     }
-    # A French business carrying only the Spanish rules is not configured.
+    # A French business carrying only the Spanish rules is not configured, and France brings no rules of its own.
     assert status(country_code="fr").model_dump() == {
         "country_code": "FR",
         "matching_rules": 0,
         "configured": False,
+        "factory_rules": False,
     }
 
 
@@ -796,9 +799,11 @@ def test_what_counts_as_configured(no_seed):
     # A country without a rule in force is not configured: the till could not price a sale there.
     portugal = status(country_code="PT")
     assert (portugal.matching_rules, portugal.configured) == (0, False)
-    # Without the business's country, any country's rule counts.
-    anywhere = status()
-    assert (anywhere.matching_rules, anywhere.configured) == (3, True)
+    # Without a stated country, the business's own (Spain here, with no country registered): another country's
+    # rule never counts (hub#996).
+    rule(category("product.z"), "23", country="PT")
+    business = status()
+    assert (business.country_code, business.matching_rules, business.configured) == ("ES", 3, True)
 
 
 def test_nothing_in_force_is_not_configured(no_seed):
@@ -923,7 +928,7 @@ def _tied_rules():
     ],
 )
 def test_ties_read_backwards_in_a_descending_list(no_seed, operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows. Each list breaks a tie by its natural key, then the id."""
     listed = listed_with(run, operation, column, schema=schema, by_dir=True)
     assert_reads_backwards(listed, tied())
@@ -1094,7 +1099,7 @@ def test_the_seeded_business_sells_in_spain():
 
 
 def test_only_tax_resolves_a_rule():
-    # hub#295: the rule of a line was resolved in three places and one charged what another declared.
+    # The rule of a line was resolved in three places and one charged what another declared.
     # Sales and Invoicing call resolve_tax / calculate_tax; no other app looks rules up by itself (a
     # frozen rule read back by its id is not a lookup).
     import re
@@ -1112,7 +1117,7 @@ def test_only_tax_resolves_a_rule():
     assert offenders == []
 
 
-# The business's jurisdiction (TAX-F11, pm#629 VF-17): its country and the region it keeps in Taxes. Every
+# The business's jurisdiction (TAX-F11): its country and the region it keeps in Taxes. Every
 # calculation that names no country reads it: sales and invoice call these functions without one.
 
 

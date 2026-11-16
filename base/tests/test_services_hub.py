@@ -1,9 +1,9 @@
-"""The registry's operations (plan 2026-10-17, §1.5): what ``/internal/hubs/{id}`` runs, as the platform only.
+"""The registry's operations: what ``/internal/hubs/{id}`` runs, as the platform only.
 
 ``base.hub.register`` (``PUT``), ``base.hub.state_apply`` (``PUT …/state``), ``base.hub.cancel`` (``DELETE``),
 ``base.hub.restore`` (``POST …/restore``) and the query ``base.hub.get`` (``GET``). A sign-up is ``requested`` with a
-database of its own that the worker makes (round 2026-10-30 of PLAN-DB, S2a; ``base/tenancy/tests/test_provision.py``),
-and the SaaS hears ``ready`` from it (``report_ready``).
+database of its own that the worker makes (``base/tenancy/tests/test_provision.py``), and the SaaS hears ``ready``
+from it (``report_ready``).
 """
 
 import datetime as dt
@@ -23,7 +23,8 @@ from base import registry, signing
 from base.models import Hub
 from base.queries import hub_get, hubs_by_slugs
 from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubsBySlugIn, HubStateIn
-from base.services import hub_cancel, hub_register, hub_restore, hub_state_apply, report_ready
+from base.services.hub_registry import hub_cancel, hub_register, hub_restore, hub_state_apply
+from base.services.provisioning import report_ready
 from base.tenancy import names
 from base.tenancy.connections import control_name
 from base.tests.conftest import SECRET
@@ -180,19 +181,19 @@ class TestRegister:
 class TestReportReady:
     def test_a_saas_that_is_away_is_logged_and_never_raises(self, fake_saas, caplog):
         fake_saas(raises=OSError("connection refused"))
-        with caplog.at_level(logging.WARNING, logger="base.services"):
+        with caplog.at_level(logging.WARNING, logger="base.services.provisioning"):
             report_ready(HUB_ID)
         assert f"hub={HUB_ID}" in caplog.text and "connection refused" in caplog.text
 
     def test_a_refusal_of_the_saas_is_logged(self, fake_saas, caplog):
         fake_saas(status=409, body={"error": {"code": "hubs.not_preparing", "message": "Already active."}})
-        with caplog.at_level(logging.WARNING, logger="base.services"):
+        with caplog.at_level(logging.WARNING, logger="base.services.provisioning"):
             report_ready(HUB_ID)
         assert "409" in caplog.text
 
     def test_a_heard_ready_is_logged_as_info(self, fake_saas, caplog):
         fake_saas(body={"id": str(HUB_ID), "status": "active"})
-        with caplog.at_level(logging.INFO, logger="base.services"):
+        with caplog.at_level(logging.INFO, logger="base.services.provisioning"):
             report_ready(HUB_ID)
         assert "base.hub.ready_reported" in caplog.text
 
@@ -200,7 +201,7 @@ class TestReportReady:
 class TestStateApply:
     @pytest.fixture
     def hub(self, every_app_on):
-        """``acme`` with VeriFactu on (a new business is born with every app off, round 2026-10-27)."""
+        """``acme`` with VeriFactu on (a new business is born with every app off)."""
         hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
         every_app_on("acme")
         return hub

@@ -4,20 +4,12 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { embedHubHome as embed, forgetHubHome } from '../__tests__/hub-home';
 import { usePlanLink } from './plan-link';
 
 const PLAN_URL = 'http://localhost:8001/store/plans?business=0199a1b2-0000-7000-8000-000000000001';
 
-function embed(block: object | null) {
-  document.head.innerHTML = block
-    ? `<script id="hub-home" type="application/json">${JSON.stringify(block)}</script>`
-    : '';
-}
-
-afterEach(() => {
-  applySurface('web');
-  document.head.innerHTML = '';
-});
+afterEach(forgetHubHome);
 
 describe('usePlanLink', () => {
   it('on the web with the address embedded, offers it', () => {

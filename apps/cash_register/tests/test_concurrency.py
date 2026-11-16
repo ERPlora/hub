@@ -5,56 +5,15 @@ once close it once (the other is told it is closed); a cash-out racing the close
 (and is in the frozen expected) or is refused, never written into a closed shift.
 """
 
-import threading
-
 import pytest
-from django.db import connection
-from live.errors import OperationError
 
 from apps.cash_register.models import Movement, Session, SessionCounter
-from apps.cash_register.tests.conftest import run
+from apps.cash_register.tests.conftest import HUB_DB_COMMITTED, run
+from base.tenancy.tests.concurrency import at_once
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-@pytest.fixture(autouse=True)
-def factory_data(transactional_db):
-    """A transactional test starts from a flushed database: sale's factory payment methods are planted
-    again, as its migration does (idempotent)."""
-    from importlib import import_module
-
-    from django.apps import apps as registry
-
-    with connection.schema_editor() as editor:
-        import_module("apps.sale.migrations.0002_factory_payment_methods").plant(
-            registry, editor
-        )
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Committed, each session in its own thread, on a plan with room for both at once: on Free's one transaction at a time
+#: the second would queue for its turn and never meet the first at the row's lock.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("factory_data", "plan_with_room")]
 
 
 def codes(results) -> list:

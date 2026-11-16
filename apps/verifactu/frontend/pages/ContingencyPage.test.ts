@@ -120,7 +120,7 @@ describe('ContingencyPage', () => {
   });
 });
 
-describe('ContingencyPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
+describe('ContingencyPage: the list fills the page', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);

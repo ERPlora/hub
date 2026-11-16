@@ -16,6 +16,7 @@ from apps.kitchen.schemas import (
     ItemBumpIn,
     ItemRecallIn,
     LogListIn,
+    NoticesIn,
     RoutingClearIn,
     RoutingListIn,
     RoutingSetIn,
@@ -64,6 +65,11 @@ async def ticket_get(request, params: Query[TicketRefIn]):
 @bind(router, "kitchen.ticket.by_order", "/kitchen/tickets/by_order")
 async def ticket_by_order(request, params: Query[ByOrderIn]):
     return await run_operation(request, queries.tickets_of_order, params)
+
+
+@bind(router, "kitchen.ticket.notices", "/kitchen/tickets/notices")
+async def ticket_notices(request, params: Query[NoticesIn]):
+    return await run_operation(request, queries.notices, params)
 
 
 @bind(router, "kitchen.ticket.create", "/kitchen/tickets", status=201)

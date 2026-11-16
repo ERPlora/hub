@@ -11,12 +11,14 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../../base/frontend/lib/unsaved-changes';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { refusal } from '../../lib/refusal';
 import { taxLabel } from '../../lib/taxLabel';
 import type { DepartmentOut } from '../../operations';
 import TaxCategoryPicker from '../TaxCategoryPicker.vue';
+import PositionField from './PositionField.vue';
 
 const props = defineProps<{
   /** The department to edit; `null` adds a new one. */
@@ -24,6 +26,7 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
 
 const t = useT();
 const taxName = useTaxName();
@@ -95,11 +98,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('sale-department-form', () => ({ name: name.value, taxKey: taxKey.value, order: order.value }), open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="sale-department-form"
     :title="editing ? $t('sale.departments.form.editTitle') : $t('sale.departments.form.createTitle')"
     :submit-label="editing ? $t('sale.departments.form.save') : $t('sale.departments.form.add')"
@@ -119,6 +125,7 @@ async function save(): Promise<void> {
           fill="outline"
           mode="md"
           :maxlength="60"
+          name="name"
           :error-text="fieldErrors.name"
           :class="invalid(fieldErrors.name)"
           @ion-input="name = String($event.detail.value ?? '')"
@@ -130,22 +137,15 @@ async function save(): Promise<void> {
           :placeholder="$t('sale.departments.form.taxPlaceholder', { tax: taxName })"
           testid="sale-department-form-tax"
           :chosen-label="currentTax"
+          name="tax_category_key"
           :error-text="taxMissing ? $t('sale.departments.taxCategoryMissing', { tax: taxName }) : fieldErrors.tax_category_key"
         />
-        <ion-input
+        <PositionField
+          v-model="order"
           data-testid="sale-department-form-order"
-          :value="order"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          step="1"
+          name="sort_order"
           :label="$t('sale.departments.columns.sortOrder')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           :error-text="fieldErrors.sort_order"
-          :class="invalid(fieldErrors.sort_order)"
-          @ion-input="order = String($event.detail.value ?? '')"
         />
       </div>
     </template>

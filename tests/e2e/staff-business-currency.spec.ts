@@ -1,11 +1,9 @@
-// flow: staff-business-currency (FIX-HUB-STAFF-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY; apps/staff/WORKBOOK.md «Personal»,
-// «Comisiones», STAFF-F01, F02 and F21)
+// flow: staff-business-currency (apps/staff/WORKBOOK.md «Personal», «Comisiones», STAFF-F01, F02 and F21)
 // Staff paints and reads money in the business's currency: its country's, as erplora.com registered it
 // (`PUT /internal/hubs/{id}`, signed the way the SaaS sends it), never a fixed euro. Hub `a` moves to Poland: a
 // professional's «Rate/h» reads in złoty in the directory and in their record (the field ends in «zł»), and
-// Commissions reads what was sold and earned in złoty, with no «€», in 390, 834 and 1440 (captures
-// `FIX-HUB-STAFF-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`, `…-form-<width>` and `…-commissions-<width>`); a rate
-// typed as «13,75» is saved as 1375 groszy. Back in Spain, the same screens read in euros (`…-es-1440`). What the run
+// Commissions reads what was sold and earned in złoty, with no «€», in 390, 834 and 1440; a rate typed as «13,75» is
+// saved as 1375 groszy. Back in Spain, the same screens read in euros. What the run
 // creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -85,7 +83,7 @@ test.afterAll(async () => {
   cleanUp();
 });
 
-test(`${KEY}: staff-business-currency a business in Poland reads the rate and the commissions in złoty in 390, 834 and 1440`, async ({
+test(`staff-business-currency a business in Poland reads the rate and the commissions in złoty in 390, 834 and 1440`, async ({
   page,
   context,
 }) => {
@@ -137,7 +135,7 @@ test(`${KEY}: staff-business-currency a business in Poland reads the rate and th
   psql(`update staff_member set hourly_rate = 1250 where id = '${ana.id}'`);
 });
 
-test(`${KEY}: staff-business-currency back in Spain the rate and the commissions are in euros`, async ({ page }) => {
+test(`staff-business-currency back in Spain the rate and the commissions are in euros`, async ({ page }) => {
   await registerBusinessIn(original, 'ES');
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/staff/members');

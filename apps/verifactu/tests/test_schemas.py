@@ -130,8 +130,7 @@ def test_the_route_is_erplora_or_own():
 
 
 def test_the_photo_no_longer_carries_the_certificate():
-    """The certificate is uploaded in the Hub (Ioan, 2026-10-15): an older photo that still names it is read
-    without it."""
+    """The certificate is uploaded in the Hub: an older photo that still names it is read without it."""
     assert "own_certificate" not in schemas.ConfigSyncIn.model_fields
     data = schemas.ConfigSyncIn.model_validate(
         {"version": 1, "own_certificate": {"loaded": True, "holder": "ANA"}}
@@ -164,8 +163,8 @@ def test_the_accounts_photo():
 
 
 def test_the_photo_s_retired_live_option_is_neither_read_nor_refused():
-    # PLAN §30 (round 2026-10-22b): ``live_paid`` is no condition any more. The SaaS sends it until the Hub's
-    # retirement is out (expand/contract): refusing it would stop every photo; reading it, keep a plan gate.
+    # ``live_paid`` is no condition any more. The SaaS sends it until the Hub's retirement is out (expand/contract):
+    # refusing it would stop every photo; reading it, keep a plan gate.
     data = schemas.ConfigSyncIn.model_validate({"version": 1, "live_paid": "maybe"})
     assert "live_paid" not in data.model_dump()
 

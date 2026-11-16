@@ -5,10 +5,7 @@ Estado de la app: completa (2026-10-21)
 
 > Manual de usuario y especificación de la app `online_booking`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor y
-> páginas). Parte del `WORKFLOW.md` del módulo Reservas online del producto actual
-> (`modules-workspace/modules/online_booking`, `origin/main` `3000878`, v1.1.23). Los números de flujo se
-> conservan (`ONLINE_BOOKING-Fnn`). Lo que cambia frente al producto actual lo dice «Cambios frente al
-> producto actual», al final.
+> páginas).
 
 ## Para qué sirve y para quién
 
@@ -28,6 +25,11 @@ Quién la usa:
 - El **propietario** y el **administrador**: además las borran y configuran la página de reservas.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «confirma la reserva
   de Ana de mañana», «¿qué reservas online hay pendientes?», «cancela la reserva APT-20261016-0003».
+  Antes de una acción pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombra la
+  agenda, nunca por su identificador: la reserva por su clienta, su día, su hora y su profesional («Reserva:
+  Lucía Pérez · martes, 5 de marzo de 2030 · 10:00 · Ana López»), como la bandeja en «¿Cancelar la reserva
+  de …?»; los servicios y el profesional de una reserva de la página, por su nombre. Lo que quien pregunta
+  no puede ver, o lo que ya no existe, no sale.
 
 ## Referencia adoptada
 
@@ -57,7 +59,7 @@ app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Reservas (bandeja)
 Tabla de 50 filas por página con buscador («Buscar nº, cliente, teléfono, servicio…») y filtros por columna
-detrás del botón de filtros de la barra, como en el producto actual: Nº, Cliente, Servicio, Profesional, Fecha
+detrás del botón de filtros de la barra: Nº, Cliente, Servicio, Profesional, Fecha
 (un día) y Estado. Columnas: **Nº** (`APT-…`), **Cliente** (con su
 teléfono), **Servicio**, **Profesional**, **Fecha**, **Hora**, **Estado** y **Reservada** (cuándo la pidió).
 Las más recientes primero; se ordena por columna. Lista o tarjetas.
@@ -120,9 +122,8 @@ Fechas y horas salen en el reloj del negocio y con el formato del idioma de quie
 | ONLINE_BOOKING-F12 | Borrar los datos de una clienta (RGPD) | hecho |
 
 ### ONLINE_BOOKING-F01 La clienta reserva desde la página de reservas
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f01 -->
 Estado: hecho (operaciones y vista previa; la página pública es de `base`)
-Actor: clienta (sin sesión)
+Actor: clienta (sin sesión); propietario o administrador, con la vista previa o con el asistente
 Pantalla: página pública de reservas (`base`); en desarrollo, la vista previa
 Pasos:
 1. Abre la página del negocio: título, mensaje de bienvenida, logo y color de los Ajustes.
@@ -146,8 +147,9 @@ la ficha de la clienta **enlazada por su teléfono** o creada si no existe (`cus
 origen «web»), y el aviso `online_booking.booking.created`. Si la ficha no tiene email, el que escribió
 queda como contacto de la cita (la ficha no se toca). Con «Sin preferencia», la cita es del primer
 profesional (por orden de nombre) que tiene libre esa hora. Nada de lo que responde la página dice el nombre
-de la ficha de ese móvil. Quien abra la vista previa desde dentro (propietario o administrador) reserva con
-las mismas reglas que la clienta: nunca con las excepciones del mostrador.
+de la ficha de ese móvil. Quien reserva desde dentro (propietario o administrador), con la vista previa o
+pidiéndoselo al asistente («resérvale por internet, como lo haría la clienta…»: su tarjeta es la
+confirmación), reserva con las mismas reglas que la clienta: nunca con las excepciones del mostrador.
 Si falla: no se escribe nada. La página apagada («Este negocio no acepta reservas online ahora mismo.»); un
 servicio que no se reserva online; elegir profesional cuando el negocio no lo permite; la hora ya no está
 libre o no cumple las reglas (el motivo de Citas); el móvil que no es un número válido; falta el email
@@ -156,11 +158,13 @@ desde el mismo dispositivo («…Inténtalo más tarde o llama al negocio.») o 
 negocio («…Inténtalo dentro de unos minutos.»), o más
 reservas online próximas con el mismo móvil de las que permiten los Ajustes (3 de fábrica: «Este móvil ya
 tiene reservas próximas…», sin decir cuántas). Dos clientas que reservan a la vez la misma hora del mismo
-profesional: entra una y la otra recibe «Esa hora ya no está libre».
+profesional: entra una y la otra recibe «Esa hora ya no está libre». En la vista previa, como en las ventanas de
+formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo;
+los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente
+intento (hub#854).
 Implicados: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirmar una reserva
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-confirm-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f02 qa:modules/online_booking/online-booking -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -175,7 +179,6 @@ reservas, se dicen cuáles y se pide el número.
 Implicados: APPOINTMENT-F03
 
 ### ONLINE_BOOKING-F03 Completar una reserva
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-complete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f03 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -188,7 +191,6 @@ Si falla: «Esta cita no se puede completar en su estado actual.»
 Implicados: APPOINTMENT-F08, APPOINTMENT-F17
 
 ### ONLINE_BOOKING-F04 Marcar que no se presentó
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-no_show-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f04 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -202,7 +204,6 @@ marcar como no presentada en su estado actual.»
 Implicados: APPOINTMENT-F09
 
 ### ONLINE_BOOKING-F05 Cancelar una reserva
-<!-- origen: qa:modules/online_booking/online-booking fi:modules/online_booking#command-online_booking-bookings-cancel-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f05 -->
 Estado: hecho
 Actor: responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -217,12 +218,12 @@ Si falla: «Esta cita ya no se puede cancelar en su estado actual.»; dentro del
 Implicados: APPOINTMENT-F05
 
 ### ONLINE_BOOKING-F06 Borrar una reserva
-<!-- origen: fi:modules/online_booking#command-online_booking-bookings-delete-sql-transaccional old:online_booking/WORKFLOW.md#online_booking-f06 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Reservas
 Pasos:
-1. Pulsa **Borrar** y confirma «¿Borrar la reserva APT-…? Es mejor cancelarla, que conserva su historial.».
+1. Pulsa **Borrar** y confirma «¿Borrar la reserva APT-…? Es mejor cancelarla, que conserva su historial.»
+   (o pídeselo al asistente: su tarjeta es la confirmación).
 2. La reserva desaparece de la bandeja y de la agenda (borrado lógico: el dato no se pierde).
 Entra: una reserva online que no está en curso, completada ni cobrada.
 Sale: `appointment.appointment.deleted`.
@@ -230,13 +231,13 @@ Si falla: una cita en curso, completada o cobrada no se borra («Esta cita no se
 Implicados: APPOINTMENT-F11
 
 ### ONLINE_BOOKING-F07 Configurar la página de reservas
-<!-- origen: fi:modules/online_booking#command-online_booking-settings-upsert-sql-transaccional fi:modules/online_booking#query-online_booking-settings-get old:online_booking/WORKFLOW.md#online_booking-f07 -->
 Estado: hecho
-Actor: propietario, administrador
+Actor: propietario, administrador, asistente
 Pantalla: Ajustes
 Pasos:
 1. Cambia los campos de **Página pública** y de **Reglas de reserva** y pulsa **Guardar**: «Configuración
    guardada.». Se guarda solo lo que cambia, todo junto o nada.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 2. En **Servicios reservables online**, toca el interruptor de un servicio: se guarda al momento en
    Servicios.
 Entra: los ajustes guardados (o los de fábrica: página apagada, email no obligatorio, 3 reservas próximas por
@@ -244,11 +245,12 @@ móvil, elegir profesional y notas permitidos) y las reglas de Citas.
 Sale: `online_booking.settings.updated` (si cambia algo de la página) y `appointment.settings.updated` (si
 cambia una regla); el interruptor de un servicio, `service.service.updated`.
 Si falla: un color que no es `#RRGGBB`, una URL que no es `http(s)://…`, un número fuera de rango o un texto
-demasiado largo, debajo de su campo; no se guarda nada.
+demasiado largo, debajo de su campo; no se guarda nada. Como en las ventanas de formulario, el aviso se quita
+en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
 Implicados: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 Ver y buscar las reservas
-<!-- origen: qa:modules/online_booking/online-booking fi:modules/online_booking#navigation-ui-bookings fi:modules/online_booking#query-online_booking-bookings-get fi:modules/online_booking#query-online_booking-bookings-list old:online_booking/WORKFLOW.md#online_booking-f08 -->
 Estado: hecho
 Actor: empleado (las de su agenda), responsable, propietario, administrador, asistente
 Pantalla: Reservas
@@ -263,7 +265,6 @@ Si falla: «No se pudieron cargar las reservas» con **Reintentar**.
 Implicados: APPOINTMENT-F27
 
 ### ONLINE_BOOKING-F09 Seguir a la clienta cuando se fusionan dos fichas
-<!-- origen: old:online_booking/WORKFLOW.md#online_booking-f09 -->
 Estado: hecho (lo hace Citas; la bandeja lo refleja)
 Actor: sistema
 Pantalla: ninguna (se ve en Reservas)
@@ -278,7 +279,6 @@ Si falla: Citas no se queda a medias y el relay lo reintenta solo.
 Implicados: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 La clienta ve su reserva con su enlace
-<!-- origen: nuevo (el enlace personal de la confirmación, como Square, Treatwell, SimplyBook.me y Acuity) -->
 Estado: hecho (operación; la página es de `base`)
 Actor: clienta (sin sesión)
 Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
@@ -294,7 +294,6 @@ no es válido.».
 Implicados: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 La clienta cancela su reserva con su enlace
-<!-- origen: nuevo (cancelar desde el enlace de la confirmación dentro de la política del negocio, como Square, Treatwell, SimplyBook.me y Acuity) -->
 Estado: hecho (operación; la página es de `base`)
 Actor: clienta (sin sesión)
 Pantalla: la página de su reserva (`base`); en desarrollo, la vista previa
@@ -310,7 +309,6 @@ puede cancelar online con N horas de antelación…»; una ya cancelada o comple
 Implicados: APPOINTMENT-F06, APPOINTMENT-F19
 
 ### ONLINE_BOOKING-F12 Borrar los datos de una clienta (RGPD)
-<!-- origen: old-hub:HUB-F250 -->
 Estado: hecho
 Actor: sistema
 Pantalla: ninguna (se ve en Reservas)
@@ -328,7 +326,8 @@ Implicados: APPOINTMENT-F24, CUSTOMER-F16
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien habla) y la
 API, con las mismas reglas y permisos. Una reserva se nombra por su id, su número (`APT-…`) o **como lo dice
 una persona**: la clienta (nombre, teléfono o email) y el día («la de Ana de mañana»); sin día, su próxima
-reserva online. Si vale para varias, se dicen cuáles y se pide el número.
+reserva online. Si vale para varias, se dicen cuáles y se pide el número. Por voz, las de la página se piden
+como «la reserva de internet de Olga» o «lo que tengo en la bandeja».
 
 ### Lo que ofrece: consultas
 
@@ -351,7 +350,8 @@ reserva online. Si vale para varias, se dicen cuáles y se pide el número.
 | Guarda la configuración (y las reglas de Citas) | ajustes (+ ajustes de Citas para las reglas) | F07 | `online_booking.settings.update` |
 | Reserva y cancela desde la página (públicas) | `online_booking.public` | F01, F11 | `online_booking.public.book`, `.cancel` |
 
-No-show, cancelar y borrar son de **riesgo alto** para el asistente: pide confirmación antes. Las acciones de
+No-show, cancelar y borrar son de **riesgo alto** para el asistente: su tarjeta pide la confirmación antes de
+hacerlo, sin preguntarlo antes en el chat (BASE-F97). Las acciones de
 la bandeja las hace Citas con el permiso de quien actúa: hace falta el de esta app **y** el de Citas.
 
 ### Lo que avisa
@@ -395,7 +395,10 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   `appointment.availability.slots` y `customer.customer.create`. El interruptor de un servicio en Ajustes
   lo guarda la página con `service.service.update`, con el permiso de quien lo toca.
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila; sin ella, los de fábrica) y `Booking` (una por cita
-  reservada desde la página: la cita, el hash del enlace y la huella del visitante).
+  reservada desde la página: la cita, el hash del enlace y la huella del visitante). Cada negocio tiene su propia
+  BD, así que la fila única de `Settings` (y las `Booking`) es la de ese negocio; solo el respaldo de los tests
+  escritos antes de la tenencia (`base/tenancy/tests/legacy.py`) guarda `a` y `b` en la misma BD y les hace
+  compartirla.
 - **Operaciones públicas**: permiso `online_booking.public` (contrato arriba). Para lo que piden a otras
   apps usan `delegated(ctx)`: el mismo contexto con los permisos justos de Citas, Clientes, Servicios,
   Horarios y Personal (como `appointment.queries.reader`), y como actor «online booking» cuando no hay
@@ -416,15 +419,23 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
 - **Reloj**: el de Citas (`apps.appointment.queries.now`, `business_zone`); los tests lo fijan.
-- Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`, ya en la fase 1);
+- Las reacciones (`events.py`) las entrega el relay del outbox del worker (`base/relay.py`);
   `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
   Sus dos avisos no los escucha ninguna app salvo Automatizaciones, que se apunta a todos (`"*"` en
   `apps/flow/events.py`); lo que hace con ellos es de FLOW-F21, que sigue `parcial`.
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#673): nombra el registro que una escritura señala
+  por su id con las marcas `refers` de Citas (`AN_APPOINTMENT`, `A_SERVICE`, `A_MEMBER` de
+  `apps/appointment/schemas.py`), leídas como quien pregunta: la reserva (el `id` de `BookingRefIn`, en
+  confirmar, completar, no presentada, cancelar y borrar) por su `label` con `appointment.appointment.get`,
+  titulada «Reserva» como la lista; cada servicio de `service_ids` por su nombre con `service.service.get`, y
+  el profesional (`staff_id`) por su nombre completo con `staff.member.detail`, en `public.book`. Sin el
+  permiso de ver la agenda, o con la reserva borrada o de otro negocio, la tarjeta la deja fuera. Ninguna
+  escritura lleva listas cerradas.
 
 ### Contrato con la página pública (para `base`)
 
-La página sin sesión (`/p/<slug>/book`, plantillas de Django en el dominio de la web pública, pendiente del
-bloque de la web pública) **no es de esta app**: la sirve `base`. Esta app le da las operaciones:
+La página sin sesión (`/p/<slug>/book` en el host del hub, plantillas de Django, pendiente del bloque de la web
+pública) **no es de esta app**: la sirve `base`. Esta app le da las operaciones:
 
 | Qué | Operación | Entrada → salida |
 |---|---|---|
@@ -435,7 +446,7 @@ bloque de la web pública) **no es de esta app**: la sirve `base`. Esta app le d
 | Ver la reserva | `online_booking.public.booking` | `token` → número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |
 | Cancelar | `online_booking.public.cancel` | `token`, motivo → la reserva cancelada |
 
-Cómo las expone la plataforma (fase 2, bloque 7 «puerta pública `/p/`»):
+Cómo las expone la plataforma (la puerta pública `/p/` de `base`):
 
 - **Contexto**: `base` llama a la operación en el propio proceso, sin ruta ninja anónima, con
   `OperationContext(scope=<hub del Host>, actor=None, permissions={"online_booking.public"}, request=<la
@@ -484,20 +495,9 @@ Cómo las expone la plataforma (fase 2, bloque 7 «puerta pública `/p/`»):
 - **Mover la reserva desde el enlace**: Citas ya lo permite en nombre de la clienta
   (`appointment.appointment.reschedule`); la página lo ofrecerá con su bloque.
 - **Avisos a la clienta** (confirmación, recordatorio, cancelación por email o WhatsApp), **depósito o cargo
-  por no presentarse**, **lista de espera** y **calendario externo**: fuera del MVP, como en el producto actual.
-- **Margen entre citas** (el «Buffer entre reservas» del producto actual, que nadie leía): los márgenes
+  por no presentarse**, **lista de espera** y **calendario externo**: fuera del MVP.
+- **Margen entre citas**: los márgenes
   antes y después de cada servicio son de Servicios y Citas aún no los aplica.
-
-## Contradicciones señaladas (no resueltas aquí)
-
-- **Dónde vive la página pública**: el encargo y este documento la ponen en `/p/<slug>/book` del host del hub;
-  `CLAUDE.md` («Frontend y admin») dice «Web/carta pública por hub (pendiente): plantillas en un dominio
-  aparte». Lo decide el bloque de la web pública; el contrato de operaciones vale para los dos.
-- **Tablas compartidas en la fase 1**: sin tenencia todavía, la fila única de `Settings` (y `Booking`) la
-  comparten todos los ámbitos de la plataforma; es el estado de la fase 1, no del módulo: en la fase 2 cada
-  hub la tiene en su BD.
-
-Las dos siguen escritas, sin elegir, en la ronda 2026-10-21 (CLOSE-ONLINE_BOOKING) de `PLAN-HUB.md`.
 
 ## Lo que NO hace, a propósito
 
@@ -505,58 +505,11 @@ Las dos siguen escritas, sin elegir, en la ronda 2026-10-21 (CLOSE-ONLINE_BOOKIN
 - No reserva para la clienta desde dentro: eso es «Añadir cita» de la agenda (APPOINTMENT-F01).
 - No retiene un hueco mientras la clienta decide.
 - No cambia una ficha de Clientes que ya existe desde la página.
-
-## Cambios frente al producto actual
-
-| Producto actual | Ahora | Motivo |
-|---|---|---|
-| Libro de reservas propio (`BK-00001`, estados propios) | La reserva es una cita de Citas (`APT-…`) | El mercado: la reserva online ocupa el hueco en la agenda desde el primer momento; sin doble reserva |
-| F01 «Tomar una reserva a mano» (texto libre) | La clienta reserva sola desde la página; desde dentro se reserva en la agenda | Lo de dentro ya es «Añadir cita» de Citas; dos formularios para lo mismo es un camino de más |
-| Sin comprobar el hueco | Las horas libres y la reserva las juzga Citas | No existía; era la principal carencia del producto actual |
-| `bookings.create/confirm/cancel/complete/no_show/delete` | `booking.confirm/cancel/complete/no_show/delete` (sobre la cita) y `public.book` | Mismas acciones; el alta la hace la clienta |
-| No-show en cualquier momento | Solo pasada la hora | Regla de Citas (decisión de mercado de Citas) |
-| El empleado veía todas las reservas | Ve las de su agenda | Regla de Citas: el empleado ve su propia agenda |
-| `settings_missing` (sin fila no se reserva) | Interruptor «Página pública activada» | Lo mismo, dicho claro; los ajustes salen con valores de fábrica |
-| Antelación mínima (horas) / máxima (días) / «Duración de slot» propias | Las de Citas: minutos, días e «Intervalo entre huecos» | Una sola regla para la agenda, WhatsApp y la página |
-| «Teléfono obligatorio» | El móvil siempre es obligatorio | Es como se reconoce a la clienta (Clientes) y lo que pide todo el mercado |
-| «Email obligatorio» encendido de fábrica | Apagado de fábrica | En las herramientas de salón el email es opcional (Square, Timely, Mangomint) |
-| Sin límite de reservas por persona | «Reservas próximas por móvil» (3 de fábrica) y límites por dispositivo y negocio | Antiabuso del mercado (SimplyBook.me, Cal.com, Calendly) |
-| «Buffer entre reservas» | No se porta | Nadie lo leía; el margen es de cada servicio (Servicios) |
-| `_on_customer_merged` | Lo hace Citas (APPOINTMENT-F23) | Esta app no guarda la ficha |
-| No escuchaba el borrado RGPD | Revoca los enlaces y olvida la huella | RGPD |
-| Avisos `online_booking.booking.confirmed/cancelled/…` | Los de Citas | El hecho ocurre en la cita |
-
-## Paridad con el producto actual
-
-### Órdenes y consultas (`module.json`: 9 órdenes, 3 consultas)
-
-| Producto actual | Ahora | Nota |
-|---|---|---|
-| `online_booking.bookings.create` (+ `_booking_create`) | `online_booking.public.book` (la clienta) · `appointment.appointment.create` (el equipo, en la agenda) | Comprueba el hueco; ficha por móvil |
-| `online_booking.bookings.confirm` | `online_booking.booking.confirm` → `appointment.appointment.confirm` | Por número o por clienta y día |
-| `online_booking.bookings.cancel` | `online_booking.booking.cancel` (con motivo) → `appointment.appointment.cancel` | Riesgo alto para el asistente |
-| `online_booking.bookings.complete` | `online_booking.booking.complete` → `appointment.appointment.complete` | |
-| `online_booking.bookings.no_show` | `online_booking.booking.no_show` → `appointment.appointment.mark_no_show` | Solo pasada la hora; riesgo alto |
-| `online_booking.bookings.delete` | `online_booking.booking.delete` → `appointment.appointment.delete` | Borrado lógico; riesgo alto |
-| `online_booking.settings.upsert` | `online_booking.settings.update` (+ `appointment.settings.update` para las reglas) | Solo lo enviado, todo o nada |
-| `online_booking._on_customer_merged` | `appointment.customer.reassign` (Citas) | Esta app no guarda la ficha |
-| `online_booking.bookings.list` | `online_booking.booking.list` | Búsqueda, filtros por columna, orden, ≤ 100 |
-| `online_booking.bookings.get` | `online_booking.booking.get` | Por id, número o clienta y día |
-| `online_booking.settings.get` | `online_booking.settings.get` | Con las reglas de Citas |
-| — | `online_booking.public.page`, `.services`, `.slots`, `.booking`, `.cancel`; `online_booking.customer.erase` | Nuevas: la página pública y el RGPD |
-
-### Pantallas (`ui/`: `erp-online-booking-list`, `erp-online-booking-settings`)
-
-| Producto actual | Ahora | Nota |
-|---|---|---|
-| Reservas: tabla de 50 con buscador, filtros Ref/Cliente/Servicio/Personal/Fecha/Hora/Estado y acciones Confirmar/Completar/No-show/Cancelar/Borrar | `BookingsPage.vue`: lo mismo (Fecha de un día; la Hora se busca en la tabla), columna «Reservada», teléfono bajo el nombre, acciones en gris por estado, diálogo de cancelar con motivo y confirmación de borrar | Sin «Hora» como filtro propio: el filtro de día y el orden por fecha bastan (la columna sigue) |
-| El «+» con el panel de alta (Cliente, Servicio, Personal, Fecha, Hora, Min.) | No está: la reserva del equipo es «Añadir cita» de la agenda | Ver «Cambios frente al producto actual» |
-| Ajustes: los 15 campos y «Guardar» / «Configuración guardada.» | `SettingsPage.vue`: los campos de la página, las reglas de Citas y los servicios online; mismos textos | Sin «Duración de slot» ni «Buffer» propios (reglas de Citas / márgenes de Servicios) ni «Teléfono obligatorio» (siempre) |
-| — | `PreviewPage.vue` (solo desarrollo) | El recorrido de la página pública |
+- No guarda la ficha de la clienta: al unir dos fichas, Citas pasa sus citas a la que queda (APPOINTMENT-F23).
 
 ## Decisiones de mercado (2026-10-15)
 
-Las dudas del porte, resueltas con la skill `market-decision` (al menos 8 referencias cada una; (F) página
+Las dudas de diseño, resueltas con la skill `market-decision` (al menos 8 referencias cada una; (F) página
 leída, (S) solo el extracto del buscador).
 
 | Duda | Gana | Referencias |
@@ -567,7 +520,3 @@ leída, (S) solo el extracto del buscador).
 | ¿Cómo gestiona su reserva la clienta sin cuenta? | **Enlace secreto en la confirmación** que enseña la cita y la cancela; el corte en horas lo aplica el servidor y, pasado, «contacta con el negocio» | Square (F) community.squareup.com/t5/Using-Square/How-do-clients-cancel-their-own-appointments/m-p/21338 y squareup.com/gb/en/appointments/features/cancellation-policy · Treatwell (F) treatwell.es/en/info/booking-terms-and-conditions · SimplyBook.me (F) help.simplybook.me/wiki/Cancellation_Policy_custom_feature · Acuity (F) acuityscheduling.com/learn/how-clients-book-with-acuity · Odoo (F) odoo.com/documentation/19.0/applications/productivity/appointments.html · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/set-scheduling-policies · Fresha (S) fresha.com/help-center/knowledge-base/calendar/102184-manage-online-bookings-settings · Calendly (F, sin corte: queja en su foro) calendly.com/help/how-to-add-a-cancellation-policy |
 | «Sin preferencia» de profesional | **Estándar**; se asigna al **primer profesional libre por un orden fijo del equipo** (determinista, se puede probar); el negocio puede ocultar la elección | Fresha (F) fresha.com/help-center/knowledge-base/calendar/102178-set-up-new-appointment-assignment · Square (F) squareup.com/help/us/en/article/5351-manage-your-square-appointments-account-settings · Mangomint (F) mangomint.com/learn/adjusting-staff-selection-options-in-online-booking · SimplyBook.me (F) help.simplybook.me/wiki/Any_Employee_Selector_custom_feature · Timely (S) help.gettimely.com/hc/en-gb/articles/1500002268342 · Acuity (S) help.acuityscheduling.com/hc/articles/16676903042829 · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/define-service-offerings · Odoo (F) odoo.com/documentation/18.0/applications/productivity/appointments.html · Calendly (S) help.calendly.com/hc/en-us/articles/4402432846999 |
 | ¿Dónde viven antelaciones, intervalo y confirmación automática? | **En los ajustes de reserva online del negocio, un solo bloque**, que solo ata al canal de la clienta (la agenda interna no). Aquí son las reglas de Citas (que ya solo atan a la clienta y valen también para WhatsApp) y se editan desde los Ajustes de esta app | Square (F) squareup.com/help/us/en/article/5351-manage-your-square-appointments-account-settings · Fresha (S) fresha.com/help-center/knowledge-base/calendar/102184-manage-online-bookings-settings · Phorest (S) phorest.helpjuice.com/305579-your-checklist-for-going-live-with-online-bookings-gb · Vagaro (F) vagaro.com/learn/the-quickstart-guide-to-vagaro · Timely (S) help.gettimely.com/hc/en-gb/articles/33525019868183 · Microsoft Bookings (F) learn.microsoft.com/en-us/microsoft-365/bookings/set-scheduling-policies · Odoo (F) odoo.com/documentation/19.0/applications/productivity/appointments.html · Google Calendar (F) support.google.com/calendar/answer/10729749 · Calendly (S) help.calendly.com/hc/en-us/articles/1500004754122 |
-
-La duda abierta del módulo viejo («si debe seguir instalable mientras no exista la página pública, o
-retirarse o fusionarse con Citas») queda resuelta por la primera fila: la reserva es una cita y esta app es
-su puerta pública y su bandeja; no hay nada que fusionar.

@@ -6,71 +6,51 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.cart_checkout import admin as cart_admin
 from apps.cart_checkout import queries, schemas, services
 from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    po_messages,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("cart_checkout").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Cart, CartItem, Order, OrderCounter)
 
 
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``."""
-    return [value for value in vars(module).values() if type(value).__name__ == "__proxy__"]
-
-
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
-    its schemas."""
+    """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages) — its English, with
+    its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("cart_checkout")
-    lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
-    lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas) + lazy_constants(cart_admin)
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies = [*config_texts(config)]
+    lazies += module_texts(queries, services, schemas, cart_admin)
+    lazies += model_texts(MODELS)
     lazies += list(Cart.Status.labels) + list(Order.Status.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles cart_checkout's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones cart_checkout wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "cart_checkout"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("cart_checkout")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
+    context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#652)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=60, with_context=18) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
@@ -78,7 +58,7 @@ def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
     Spanish, so cart_checkout's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("cart_checkout")
     assert {"Customer", "Cart line", "Order"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
@@ -86,9 +66,17 @@ def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
         }
 
 
-def said_in_spanish(key: str) -> str:
-    """How the Hub says a catalogue entry in Spanish: every app's catalogue merged, the first one to have it winning."""
+#: A number that picks each form of Spanish's plural (``n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2``).
+FORM_NUMBER = {0: 1, 1: 1_000_000, 2: 2}
+
+
+def said_in_spanish(key: str | tuple[str, int], plurals: dict[str, str]) -> str:
+    """How the Hub says a catalogue entry in Spanish: every app's catalogue merged, the first one to have it winning.
+    A form of a plural entry, keyed ``(msgid, n)`` (hub#1147), is said by ``ngettext`` with a number that picks it."""
     with translation.override("es"):
+        if isinstance(key, tuple):
+            msgid, form = key
+            return translation.ngettext(msgid, plurals[msgid], FORM_NUMBER[form])
         if "\x04" in key:
             context, msgid = key.split("\x04", 1)
             return translation.pgettext(context, msgid)
@@ -101,7 +89,10 @@ def test_no_other_apps_catalogue_says_a_text_of_cart_checkout_its_own_way():
     other app's way — in the admin and on every card that names a datum by its model."""
     entries = po_entries(LOCALE / "django.po")
     assert len(entries) > 60  # positive control: the catalogue was read
-    shadowed = {key: said_in_spanish(key) for key, (msgstr, _) in entries.items() if said_in_spanish(key) != msgstr}
+    plurals = {message.id[0]: message.id[1] for message in po_messages(LOCALE / "django.po") if message.pluralizable}
+    assert {("%(count)d cart", 0), ("%(count)d order", 2)} <= entries.keys()  # its plural entries are checked too
+    said = {key: said_in_spanish(key, plurals) for key in entries}
+    shadowed = {key: said[key] for key, (msgstr, _) in entries.items() if said[key] != msgstr}
     assert shadowed == {}
 
 

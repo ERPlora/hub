@@ -65,7 +65,7 @@ DISCOUNT_RULE = gettext_noop("Discount rule")
 PRICE_LIST = gettext_noop("Price list")
 PRICE = gettext_noop("Price")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a list and a rule by their name, as the Price lists screen; a price by its article and its
 # list, as its dialogs; a product by Inventory's read; a category, a customer group or a service (Services is no
 # requirement) by the read of what a price or a rule points at in another app. Whoever changes prices reads them all.
@@ -385,16 +385,19 @@ class PriceItemOut(Schema):
     name: str = Field(description="The article's name.")
     sku: str | None = Field(description="The product's SKU; null for a service.")
     unit: str | None = Field(description="The product's unit (ud, kg…); null for a service.")
-    base_price: int | None = Field(description="The catalog's price in cents (Inventory); null for a service.")
+    base_price: int | None = Field(
+        description="The catalog's price in cents (Inventory); null for a service.",
+        json_schema_extra={"money": True},
+    )
     min_quantity: Decimal = Field(description=D_MIN_QUANTITY)
-    price: int = Field(description=D_PRICE)
+    price: int = Field(description=D_PRICE, json_schema_extra={"money": True})
+    currency: str = Field(description="The currency of its list, the one its price is in (ISO 4217).")
     updated_at: dt.datetime = Field(description="Its last change.")
 
 
 class PriceItemDetailOut(PriceItemOut):
-    """One price as the list shows it, with the currency of its list: the one its price is in."""
+    """One price as the list shows it, and how it is named outside its list."""
 
-    currency: str = Field(description="The currency of its list, the one its price is in (ISO 4217).")
     label: str = Field(
         description="How it is named outside its list, in the reader's language: its article, its list and, from a "
         "quantity on, that quantity (e.g. «Shampoo · VIP prices · from 10»)."
@@ -528,7 +531,7 @@ def _given(value: Any) -> bool:
     return value not in (None, [], "")
 
 
-def rule_problems(values: dict[str, Any]) -> dict[str, str]:
+def rule_problems(values: dict[str, Any]) -> dict[str, str]:  # noqa: C901
     """What is wrong in a rule as it would be saved (``{field: message}``; empty = coherent).
 
     Each type wants its value and nothing of another type's; each scope its target and no other one;
@@ -575,7 +578,13 @@ class RuleOut(Schema):
     name: str = Field(description=D_NAME)
     rule_type: RuleType = Field(description=D_RULE_TYPE)
     percent: Decimal | None = Field(description="percent: the percent taken off the line.")
-    amount: int | None = Field(description="fixed: cents taken off each unit of the price sold (each kg of an article priced per kg).")
+    amount: int | None = Field(
+        description="fixed: cents taken off each unit of the price sold (each kg of an article priced per kg).",
+        json_schema_extra={"money": True},
+    )
+    currency: str = Field(
+        description="The currency its amount per unit is in (ISO 4217): the business's, as a rule belongs to no list."
+    )
     buy_quantity: int | None = Field(description="buy_x_get_y: the units that are paid.")
     get_quantity: int | None = Field(description="buy_x_get_y: the units that are free.")
     tiers: list[TierOut] = Field(description="tiered: the tiers by rising quantity.")
@@ -625,20 +634,29 @@ class ResolveOut(Schema):
     name: str = Field(description="The article's name.")
     quantity: Decimal = Field(description="The quantity of the line.")
     date: dt.date = Field(description="The business day the dates were read on.")
-    base_price: int = Field(description="The catalog's price in cents.")
-    unit_price: int = Field(description="The price the line takes, in cents: the list's, or the catalog's.")
+    base_price: int = Field(description="The catalog's price in cents.", json_schema_extra={"money": True})
+    unit_price: int = Field(
+        description="The price the line takes, in cents: the list's, or the catalog's.",
+        json_schema_extra={"money": True},
+    )
     price_list_id: UUID | None = Field(description="The list the price comes from; null = the catalog's.")
     price_list_code: str | None = Field(description="That list's code.")
     price_list_name: str | None = Field(description="That list's name.")
     tax_included: bool | None = Field(description="Whether that list's prices carry the tax; null = as the business sells.")
     currency: str = Field(description="The currency of the price.")
-    line_amount: int = Field(description="Price × quantity (in the unit of the price), in cents, half up.")
-    discount: int = Field(description="Cents the rule takes off the line; 0 without rule.")
+    line_amount: int = Field(
+        description="Price × quantity (in the unit of the price), in cents, half up.",
+        json_schema_extra={"money": True},
+    )
+    discount: int = Field(
+        description="Cents the rule takes off the line; 0 without rule.",
+        json_schema_extra={"money": True},
+    )
     rule_id: UUID | None = Field(description="The rule that gives the discount; null = none.")
     rule_code: str | None = Field(description="That rule's code.")
     rule_name: str | None = Field(description="That rule's name.")
     rule_type: RuleType | None = Field(description="That rule's type.")
-    total: int = Field(description="The line after the discount, in cents.")
+    total: int = Field(description="The line after the discount, in cents.", json_schema_extra={"money": True})
 
 
 # What a price or a rule points at in another app (the assistant's card names it by this read)

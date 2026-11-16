@@ -48,6 +48,7 @@ describe('OpenChecksPopover: the list', () => {
     await m.result(OP, page(ROWS));
     expect(m.find('pos-parked-o1').exists()).toBe(false);
     const titled = m.find('pos-parked-o2');
+    expect(titled.element.tagName.toLowerCase()).toBe('ion-button');
     expect(titled.find('.pos-checks__name').text()).toBe('Ana — terrace');
     expect(plain(titled.find('.pos-checks__meta').text())).toBe('8:30 · 12,50 €');
     const untitled = m.find('pos-parked-o3');

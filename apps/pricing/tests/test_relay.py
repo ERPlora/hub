@@ -10,23 +10,18 @@ and the notices are heard in B only.
 
 import datetime as dt
 import json
-import threading
 from zoneinfo import ZoneInfo
 
-import psycopg
-import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
-from base import catalog, worker
-from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
 from .conftest import (
+    HUB_DB_COMMITTED,
     A,
     B,
     TODAY,
@@ -42,7 +37,10 @@ from .conftest import (
     make_service,
 )
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+#: Every test ends in one or more ticks of the worker's real loop, which serves each business in its own database and
+#: commits there.
+pytestmark = HUB_DB_COMMITTED
+
 NOON = dt.datetime.combine(TODAY, dt.time(12), ZoneInfo("Europe/Madrid")).isoformat()
 
 
@@ -50,27 +48,6 @@ def run(name: str, data: dict, scope=A):
     """Run the operation ``name`` as the owner of ``scope``: the other apps' own, with their permissions."""
     op = get(name)
     return op(ctx_for("hub_owner", scope=scope), op.input.model_validate(data))
-
-
-def one_tick() -> None:
-    """One tick of the worker's real loop."""
-    stop = threading.Event()
-
-    def wait(_seconds: float) -> bool:
-        stop.set()
-        return True
-
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
-
-
-@pytest.fixture
-def tick(db, monkeypatch):
-    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
-    the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return one_tick
 
 
 def delivery_to_pricing(name: str) -> tuple[str, int]:
@@ -96,7 +73,7 @@ def rule_active(code: str) -> bool:
 # ── Inventory deletes a product ───────────────────────────────────────────────────────────────────
 
 
-def test_a_product_deleted_in_inventory_leaves_every_list_and_switches_off_its_rules_through_the_relay(tick):
+def test_a_product_deleted_in_inventory_leaves_every_list_and_switches_off_its_rules_through_the_relay(worker_loop):
     shampoo, conditioner = make_product("Shampoo", "SH-1", price=1500), make_product("Conditioner", "CO-1")
     vip, retail = make_list("VIP"), make_list("RETAIL")
     one = make_item(vip, shampoo, price=1200)
@@ -110,7 +87,7 @@ def test_a_product_deleted_in_inventory_leaves_every_list_and_switches_off_its_r
     # Inventory's command only records its event: the prices wait for the relay.
     assert PriceItem.objects.filter(product=shampoo).count() == 3
 
-    tick()
+    worker_loop()
 
     assert delivery_to_pricing("inventory.product.deleted") == ("delivered", 1)
     assert not PriceItem.objects.filter(product=shampoo).exists()
@@ -132,10 +109,34 @@ def test_a_product_deleted_in_inventory_leaves_every_list_and_switches_off_its_r
     assert [row.id for row in page.rows] == [kept.id]
 
 
+def test_a_product_back_from_the_separate_copy_gets_its_rules_on_again_through_the_relay(worker_loop):
+    from live.context import system_context
+
+    shampoo = make_product("Shampoo", "SH-1")
+    make_rule("SH10", applies_to="product", product=shampoo)
+    make_rule("SHOFF", applies_to="product", product=shampoo, is_active=False)
+    run("inventory.product.delete", {"id": str(shampoo.id)})
+    worker_loop()
+    assert rule_active("SH10") is False
+    # What the recovery from a separate copy runs (INVENTORY-F34): the same product, live again.
+    restore = get("inventory.product.restore")
+    restore(system_context(A), restore.input.model_validate({"id": str(shampoo.id)}))
+    assert rule_active("SH10") is False
+
+    worker_loop()
+
+    assert delivery_to_pricing("inventory.product.restored") == ("delivered", 1)
+    # The one its deletion switched off is on again; the one that was off before stays off.
+    assert (rule_active("SH10"), rule_active("SHOFF")) == (True, False)
+    assert notices("pricing.rule.activated") == [{"id": str(DiscountRule.objects.get(code="SH10").id)}]
+    worker_loop()
+    assert len(notices("pricing.rule.activated")) == 1
+
+
 # ── Inventory deletes a category ──────────────────────────────────────────────────────────────────
 
 
-def test_a_category_deleted_in_inventory_switches_off_its_rules_through_the_relay(tick):
+def test_a_category_deleted_in_inventory_switches_off_its_rules_through_the_relay(worker_loop):
     hair, nails = make_category("Hair care"), make_category("Nails")
     categorize(make_product("Shampoo", "SH-1"), hair)
     make_rule("HAIR10", applies_to="category", category=hair)
@@ -145,7 +146,7 @@ def test_a_category_deleted_in_inventory_switches_off_its_rules_through_the_rela
     run("inventory.category.delete", {"id": str(hair.id)})
     assert rule_active("HAIR10") is True
 
-    tick()
+    worker_loop()
 
     assert delivery_to_pricing("inventory.category.deleted") == ("delivered", 1)
     assert rule_active("HAIR10") is False
@@ -158,7 +159,7 @@ def test_a_category_deleted_in_inventory_switches_off_its_rules_through_the_rela
 # ── Customers deletes a group ─────────────────────────────────────────────────────────────────────
 
 
-def test_a_group_deleted_in_customers_leaves_its_lists_without_group_and_its_rules_off_through_the_relay(tick):
+def test_a_group_deleted_in_customers_leaves_its_lists_without_group_and_its_rules_off_through_the_relay(worker_loop):
     vip, staff = make_group("VIP"), make_group("Staff")
     lucia = make_customer("Lucía Pérez", groups=[vip])
     shampoo = make_product("Shampoo", "SH-1", price=1500)
@@ -174,7 +175,7 @@ def test_a_group_deleted_in_customers_leaves_its_lists_without_group_and_its_rul
 
     run("customer.group.delete", {"id": str(vip.id)})
 
-    tick()
+    worker_loop()
 
     assert delivery_to_pricing("customer.group.deleted") == ("delivered", 1)
     vip_list.refresh_from_db()
@@ -194,7 +195,7 @@ def test_a_group_deleted_in_customers_leaves_its_lists_without_group_and_its_rul
 # ── Services renames a service ────────────────────────────────────────────────────────────────────
 
 
-def test_a_service_renamed_in_services_is_renamed_in_its_prices_and_rules_through_the_relay(tick):
+def test_a_service_renamed_in_services_is_renamed_in_its_prices_and_rules_through_the_relay(worker_loop):
     haircut, colour = make_service("Haircut"), make_service("Colour")
     salon = make_list("SALON")
     cut_item = make_item(salon, None, service_id=haircut.id, service_name="Haircut")
@@ -205,7 +206,7 @@ def test_a_service_renamed_in_services_is_renamed_in_its_prices_and_rules_throug
     cut_item.refresh_from_db()
     assert cut_item.service_name == "Haircut"
 
-    tick()
+    worker_loop()
 
     assert delivery_to_pricing("service.service.updated") == ("delivered", 1)
     cut_item.refresh_from_db()
@@ -217,13 +218,13 @@ def test_a_service_renamed_in_services_is_renamed_in_its_prices_and_rules_throug
     assert notices("pricing.rule.updated") == [{"id": str(rule.id)}]
 
 
-def test_a_service_changed_without_a_new_name_changes_nothing_in_price_lists(tick):
+def test_a_service_changed_without_a_new_name_changes_nothing_in_price_lists(worker_loop):
     haircut = make_service("Haircut")
     make_item(make_list("SALON"), None, service_id=haircut.id, service_name="Haircut")
     make_rule("CUT10", applies_to="service", service_id=haircut.id, service_name="Haircut")
 
     run("service.service.update", {"id": str(haircut.id), "price": 2000})
-    tick()
+    worker_loop()
 
     assert delivery_to_pricing("service.service.updated") == ("delivered", 1)
     assert pricing_notices() == 0
@@ -232,7 +233,7 @@ def test_a_service_changed_without_a_new_name_changes_nothing_in_price_lists(tic
 # ── Once ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(tick):
+def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(worker_loop):
     shampoo = make_product("Shampoo", "SH-1")
     hair = make_category("Hair care")
     vip = make_group("VIP")
@@ -247,7 +248,7 @@ def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(tick
     run("inventory.category.delete", {"id": str(hair.id)})
     run("customer.group.delete", {"id": str(vip.id)})
     run("service.service.update", {"id": str(haircut.id), "name": "Ladies' cut"})
-    tick()
+    worker_loop()
     reacted = pricing_notices()
     state = (
         sorted(PriceItem.objects.values_list("id", "service_name")),
@@ -257,7 +258,7 @@ def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(tick
     heard = ["inventory.product.deleted", "inventory.category.deleted", "customer.group.deleted", "service.service.updated"]
     assert reacted == 7  # 1 price removed, 3 rules off, 1 list without group, 1 price and 1 rule renamed
 
-    tick()
+    worker_loop()
     assert [delivery_to_pricing(name) for name in heard] == [("delivered", 1)] * 4
 
     # The same notices handed to Price Lists again, as if their delivery had been lost: the relay runs them once more.
@@ -266,7 +267,7 @@ def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(tick
         EventDelivery.objects.filter(event_id=event.id, app_label="pricing").update(
             status=EventDelivery.Status.PENDING, delivered_at=None, next_attempt_at=timezone.now()
         )
-    tick()
+    worker_loop()
 
     assert [delivery_to_pricing(name) for name in heard] == [("delivered", 2)] * 4
     assert pricing_notices() == reacted
@@ -280,46 +281,32 @@ def test_a_second_tick_or_the_same_notices_handed_over_again_change_nothing(tick
 # ── Two hubs, on committed data ───────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def listen(transactional_db, db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def heard(session, timeout: float = 0.5) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-def test_a_product_deleted_in_hub_b_leaves_b_lists_only_and_is_heard_in_b_only(listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+def test_a_product_deleted_in_hub_b_leaves_b_lists_only_and_is_heard_in_b_only(listen, worker_loop, hub_b):
     on_a, on_b = listen(A), listen(B)
-    a_product, b_product = make_product("Shampoo A", "SH-A"), make_product("Shampoo B", "SH-B")
+    a_product = make_product("Shampoo A", "SH-A")
     a_item = make_item(make_list("ALIST"), a_product)
-    b_item = make_item(make_list("BLIST"), b_product)
-
-    run("inventory.product.delete", {"id": str(b_product.id)}, B)
+    with use_hub(hub_b):
+        b_product = make_product("Shampoo B", "SH-B")
+        b_item = make_item(make_list("BLIST"), b_product)
+        run("inventory.product.delete", {"id": str(b_product.id)}, B)
     heard(on_b)  # the deletion's own notice
-    one_tick()
+    worker_loop()
 
-    assert not PriceItem.objects.filter(id=b_item.id).exists()
+    with use_hub(hub_b):
+        assert not PriceItem.objects.filter(id=b_item.id).exists()
+        reaction = OutboxEvent.objects.get(name="pricing.price_item.removed", payload__id=str(b_item.id))
+        assert (reaction.scope_kind, reaction.scope_key) == (B.kind, B.key)
     assert "pricing.price_item.removed" in heard(on_b)
     assert heard(on_a) == set()
     assert PriceItem.objects.filter(id=a_item.id).exists()
-    reaction = OutboxEvent.objects.get(name="pricing.price_item.removed", payload__id=str(b_item.id))
-    assert (reaction.scope_kind, reaction.scope_key) == (B.kind, B.key)
     # The positive control: a product deleted in hub A leaves A's list, heard in A.
     run("inventory.product.delete", {"id": str(a_product.id)}, A)
     heard(on_a)
-    one_tick()
+    worker_loop()
     assert not PriceItem.objects.filter(id=a_item.id).exists()
     assert "pricing.price_item.removed" in heard(on_a)
     assert heard(on_b) == set()

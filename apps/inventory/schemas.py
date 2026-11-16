@@ -18,6 +18,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
 from base.images import MAX_UPLOAD_BASE64
+from base.recovery import ImageInCopyIn
 from base.schemas import CatalogImageOut, names
 
 T = TypeVar("T")
@@ -36,6 +37,10 @@ CATEGORIES = gettext_noop("Categories")
 FILE_ROWS = gettext_noop("File rows")
 #: The category form's own name for its tax category.
 TAX_RATE = gettext_noop("Tax rate")
+# What the assistant's card calls the record a write acts on by its id (its Spanish in this app's catalog), as the
+# screens call one («Delete product», «New category»), never «Record».
+T_PRODUCT = gettext_noop("Product")
+T_CATEGORY = gettext_noop("Category")
 
 UnitCode = Literal["ud", "kg", "g", "t", "l", "ml", "min", "h"]
 ProductType = Literal["physical", "service"]
@@ -121,6 +126,11 @@ Said = _text(200, 1)
 #: A raw CSV cell, as typed in the file.
 Cell = _text(500)
 
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
+# asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
+A_PRODUCT = names("inventory.product.get")
+A_CATEGORY = names("inventory.category.get")
+
 
 # Pages: every list is paginated, limit ≤ 100.
 
@@ -145,7 +155,7 @@ class Page(Schema, Generic[T]):
 
 
 class ProductRefIn(Schema):
-    id: UUID | None = Field(None, description="The product's id.")
+    id: UUID | None = Field(None, title=T_PRODUCT, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None,
         description="The product's SKU or name, when its id is not known (e.g. said aloud).",
@@ -165,14 +175,13 @@ class ProductSoldOutIn(ProductRefIn):
     )
 
 
-# The product's image (round 2026-10-30, base.images): one of the shared library or a photo of its own.
+# The product's image (base.images): one of the shared library or a photo of its own.
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ProductImageIn(ProductRefIn):
-    id: UUID | None = Field(None, description="The product's id.", json_schema_extra=names("inventory.product.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the product shows: an image of the shared library by its reference, "
@@ -192,8 +201,20 @@ class ProductImageSuggestIn(ProductRefIn):
     limit: int = Field(5, ge=1, le=20, description="How many images to propose (1 to 20).")
 
 
+class ProductIdIn(Schema):
+    """A product by its id alone: the one a deleted product keeps (INVENTORY-F34), the same in a separate copy of the
+    business and in the business."""
+
+    id: UUID = Field(title=T_PRODUCT, description="The product's id.")
+
+
+class ProductRestoreIn(ProductIdIn, ImageInCopyIn):
+    """A deleted product of a separate copy the business still holds, by its id, and the image it showed there: one
+    deleted before deleting kept the image of the library gets it back."""
+
+
 class CategoryRefIn(Schema):
-    id: UUID | None = Field(None, description="The category's id.")
+    id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name or slug, when its id is not known."
     )
@@ -208,7 +229,7 @@ class CategoryRefIn(Schema):
 class _ProductLineRef(Schema):
     """A product named by ``product_id`` or by its SKU or name (``product``)."""
 
-    product_id: UUID | None = Field(None, description="The product's id.")
+    product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None,
         description="The product's SKU or name, when its id is not known (e.g. said aloud).",
@@ -426,12 +447,20 @@ class ProductIn(Schema):
         None,
         description="Whether its stock is tracked; null follows the business's setting.",
     )
-    category_ids: list[UUID] = Field(
+    category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] = Field(
         default_factory=list,
         max_length=MAX_BATCH,
         title=CATEGORIES,
         description="Categories that group it in the till.",
     )
+    is_active: bool = Field(
+        True, description="Whether it is on sale; one created inactive stays out of the till until it is activated."
+    )
+
+
+class ProductRecoverIn(ProductIn, ImageInCopyIn):
+    """A product of a separate copy the business no longer holds: what ``inventory.product.create`` takes and the image
+    it showed there (the business makes its own id)."""
 
 
 class ProductPatchIn(ProductRefIn):
@@ -470,7 +499,7 @@ class ProductPatchIn(ProductRefIn):
     track_stock: bool | None = Field(
         None, description="Track (true) or stop tracking (false) its stock."
     )
-    category_ids: list[UUID] | None = Field(
+    category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] | None = Field(
         None,
         max_length=MAX_BATCH,
         title=CATEGORIES,
@@ -520,7 +549,7 @@ class ProductImportIn(Schema):
 
 
 class ProductCategoryIn(_ProductLineRef):
-    category_id: UUID | None = Field(None, description="The category's id.")
+    category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name or slug, when its id is not known."
     )
@@ -550,6 +579,14 @@ class CategoryIn(Schema):
     )
     tax_category_key: TaxKey | None = Field(
         None, title=TAX_RATE, description="Key of a tax category (Taxes app), optional."
+    )
+
+
+class CategoryRecoverIn(CategoryIn):
+    product_ids: list[UUID] = Field(
+        default_factory=list,
+        max_length=10_000,
+        description="Deleted products to put back in it, so that they come back inside it when restored.",
     )
 
 
@@ -700,9 +737,9 @@ class ProductOut(Schema):
     description: str = Field(description="Description.")
     product_type: ProductType = Field(description="physical or service.")
     price: int = Field(
-        description="Price in cents, per price_quantity of pricing_unit."
+        description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
-    cost: int = Field(description="Cost in cents.")
+    cost: int = Field(description="Cost in cents.", json_schema_extra={"money": True})
     stock: Decimal = Field(description="Current stock, in its unit.")
     low_stock_threshold: Decimal = Field(description="Low-stock threshold.")
     unit: UnitCode = Field(description="Unit of measure.")
@@ -754,9 +791,9 @@ class SaleProductOut(Schema):
     sku: str = Field(description="SKU.")
     product_type: ProductType = Field(description="physical or service.")
     price: int = Field(
-        description="Price in cents, per price_quantity of pricing_unit."
+        description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
-    cost: int = Field(description="Cost in cents.")
+    cost: int = Field(description="Cost in cents.", json_schema_extra={"money": True})
     tax_category_id: UUID | None = Field(description="Its tax category.")
     tax_category_key: str | None = Field(description="Key of its tax category.")
     needs_tax_setup: bool = Field(
@@ -838,7 +875,7 @@ class MovementOut(Schema):
         description="The reference as a person reads it: for a sale, void or refund, the number of its ticket or "
         "invoice (or the sale's own number), empty when Inventory never learnt it; else the reference itself."
     )
-    unit_cost: int | None = Field(description="Cost per unit in cents (receptions).")
+    unit_cost: int | None = Field(description="Cost per unit in cents (receptions).", json_schema_extra={"money": True})
     actor: str = Field(description="Who made it.")
     created_at: datetime = Field(description="When.")
 
@@ -855,7 +892,7 @@ class SummaryOut(Schema):
         description="Of them, without a cost: the value is partial."
     )
     stock_value: int = Field(
-        description="Σ cost × stock of the ones in stock, in cents."
+        description="Σ cost × stock of the ones in stock, in cents.", json_schema_extra={"money": True}
     )
     active_products: int = Field(description="Every active product, services included.")
 

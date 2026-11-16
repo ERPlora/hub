@@ -2,19 +2,24 @@
 // The foot of the check: the «Ticket discount» row when the check has one (its percentage and what it
 // takes off, as the server's preview says), «Total» — the preview's, a dash while it is on its way —,
 // the ticket-discount button (only where discounts are allowed), the printer («Print bill») and
-// «Charge · <total>». An empty check can do none of it. When something is missing (a required
-// customer), Charge looks blocked and says why, but still takes the tap: the page answers it.
+// «Charge · <total>»; while the business has not said its money, every amount is a dash, as while the total is on its
+// way (hub#936). A valuation refusal is said in the server's words, never left as an unexplained dash.
+// An empty check can do none of it. When something is missing (a required customer), Charge looks
+// blocked and says why, but still takes the tap: the page answers it.
+import { InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatPercent, useBusinessMoney } from '../../lib/format';
+import { formatMoney, formatPercent, signedMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{
   hasLines: boolean;
   /** The preview's total; `undefined` while it is on its way. */
   total: number | undefined;
+  /** Why the server could not value the check; `null` when its preview is valid or pending. */
+  previewError?: string | null;
   /** The check's ticket discount: percentage and fixed amount. */
   discountPercent: string;
   discountAmount: number;
@@ -40,13 +45,20 @@ const discountLabel = computed(() => {
 
 <template>
   <div class="pos-foot">
+    <InlineFeedback
+      v-if="previewError"
+      tone="danger"
+      data-testid="pos-preview-error"
+    >
+      {{ previewError }}
+    </InlineFeedback>
     <div
       v-if="hasDiscount"
       class="pos-foot__discount"
       data-testid="pos-ticket-discount-row"
     >
       <span>{{ discountLabel }}</span>
-      <span>−{{ formatMoney(ticketDiscount, locale, business) }}</span>
+      <span>{{ signedMoney('−', ticketDiscount, locale, business) }}</span>
     </div>
     <div class="pos-foot__total">
       <span>{{ $t('sale.pos.total') }}</span>
@@ -105,7 +117,8 @@ const discountLabel = computed(() => {
 <style scoped>
 .pos-foot {
   padding: 0.62rem 0.72rem 0.7rem;
-  border-top: 1px solid var(--ion-border-color, #e6e3db);
+  background: var(--ion-card-background);
+  border-top: 1px solid var(--ep-border);
 }
 .pos-foot__discount {
   display: flex;
@@ -124,6 +137,7 @@ const discountLabel = computed(() => {
 }
 .pos-foot__total b {
   font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
   color: var(--ion-text-color, #1c1b18);
 }
 .pos-foot__actions {
@@ -133,7 +147,7 @@ const discountLabel = computed(() => {
 .pos-foot__square {
   flex: none;
   width: 3.25rem;
-  min-height: 3rem;
+  min-height: var(--ep-touch-min);
   margin: 0;
 }
 .pos-foot__square--warning {
@@ -142,11 +156,13 @@ const discountLabel = computed(() => {
 }
 .pos-charge {
   flex: 1;
-  min-height: 3rem;
+  min-height: var(--ep-touch-min);
   margin: 0;
   font-size: 0.98rem;
   font-weight: 700;
   text-transform: none;
+  --border-radius: 12px;
+  --box-shadow: var(--ep-shadow-sm);
 }
 .pos-charge--blocked {
   --background: var(--ion-color-medium, #92949c);

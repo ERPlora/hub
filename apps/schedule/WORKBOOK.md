@@ -6,9 +6,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `schedule`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
-> y páginas). Parte del `WORKFLOW.md` del módulo Horarios del producto actual
-> (`modules-workspace/modules/schedules`, `origin/main` `57d3f3f`, v2.0.48). Hace lo mismo, se verá
-> igual y conserva toda su funcionalidad salvo lo que dice «Cambios frente al producto actual», al final.
+> y páginas).
 
 ## Para qué sirve y para quién
 
@@ -62,10 +60,10 @@ ya hace.
 
 Por eso, de lo que el encargo pedía mirar, **todo lo «por persona» queda cubierto por Personal**:
 horario semanal de cada profesional (STAFF-F13 a F15), sus ausencias (STAFF-F17 a F20, F24) y su
-disponibilidad (`staff.availability.for_member`, STAFF-F16). El módulo viejo de Horarios tampoco lo
-tenía. Horarios no conoce a nadie del equipo y no depende de Personal.
+disponibilidad (`staff.availability.for_member`, STAFF-F16). Horarios no conoce a nadie
+del equipo y no depende de Personal.
 
-Del producto actual se conservan (su contraste de mercado ya estaba hecho y registrado en su código):
+Se adopta del mercado:
 
 - **Google Business Profile**: varios tramos por día, «abierto 24 horas» como 00:00–00:00 y horario
   especial por fecha.
@@ -79,8 +77,7 @@ Y se decide aquí (mismo contraste):
 - **Un tramo pertenece al día en que abre** (Google Business Profile): un 22:00–02:00 del sábado sigue
   abierto el domingo a la 01:00, venga de la semana, de un día especial o de un cambio temporal, aunque
   el domingo sea un día cerrado.
-- **Un día especial y un cambio temporal se corrigen** (Google, Fresha, Square los editan); ya no hay
-  que borrarlos y crearlos otra vez.
+- **Un día especial y un cambio temporal se corrigen** (Google, Fresha, Square los editan).
 
 ## Antes de empezar
 
@@ -145,10 +142,17 @@ poder cambiarlo y sin **Guardar**.
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado; la semana no se pinta hasta tener también los ajustes (si no, se ordenaría mal). |
 | Vacío | «Sin días especiales.» o «Sin cambios temporales.»; con búsqueda o filtro, «Sin resultados». La semana siempre tiene siete filas. |
-| Error | El aviso de la tabla con «Reintentar», que dice cuál no cargó («No se ha podido cargar el horario.», «No se han podido cargar los días especiales.», «No se han podido cargar los cambios temporales.» o «No se han podido cargar los ajustes.») y después la causa. Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila (eliminar, confirmar la semana, guardar los ajustes), encima de la tabla o del formulario. Con los ajustes sin leer no se enseña **Semana empieza**, para no guardar un valor que no se ha leído. |
+| Error | El aviso de la tabla con «Reintentar», que dice cuál no cargó («No se ha podido cargar el horario.», «No se han podido cargar los días especiales.», «No se han podido cargar los cambios temporales.» o «No se han podido cargar los ajustes.») y después la causa. Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado, y cada campo rechazado (fecha, nombre, motivo, notas) dice su motivo debajo y lo pierde en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); el de una acción de fila (eliminar, confirmar la semana, guardar los ajustes), encima de la tabla o del formulario. Con los ajustes sin leer no se enseña **Semana empieza**, para no guardar un valor que no se ha leído. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
+
+## Cambios sin guardar en Android
+
+En «Editar horario» de un día, «Nuevo día especial», «Nuevo cambio temporal» y su corrección («Editar · …»), el
+botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar: «Seguir
+editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió,
+atrás la cierra sin preguntar (BASE-F05).
 
 ## Flujos
 
@@ -160,16 +164,15 @@ poder cambiarlo y sin **Guardar**.
 | SCHEDULE-F04 | Añadir un día especial | hecho (servidor y pantalla) |
 | SCHEDULE-F05 | Añadir un cambio temporal | hecho (servidor y pantalla) |
 | SCHEDULE-F06 | Borrar un día especial o un cambio temporal | hecho (servidor y pantalla) |
-| SCHEDULE-F07 | Cargar varios días especiales de golpe | hecho (asistente y API, como el producto actual) |
+| SCHEDULE-F07 | Cargar varios días especiales de golpe | hecho (asistente y API) |
 | SCHEDULE-F08 | Elegir con qué día empieza la semana | hecho (servidor y pantalla) |
 | SCHEDULE-F09 | Ver la zona horaria con la que se lee el horario | hecho (servidor y pantalla) |
-| SCHEDULE-F10 | Preguntar si el negocio está abierto en un momento | hecho (asistente y API, como el producto actual) |
+| SCHEDULE-F10 | Preguntar si el negocio está abierto en un momento | hecho (asistente y API) |
 | SCHEDULE-F11 | Dar el horario de unos días a Citas | hecho (lo leen Citas y Reservas) |
 | SCHEDULE-F12 | Partir de una semana por defecto al activar | hecho (al crear las tablas) |
 | SCHEDULE-F13 | Corregir un día especial o un cambio temporal | hecho (servidor y pantalla) |
 
 ### SCHEDULE-F01 Ver el horario de la semana
-<!-- origen: fi:modules/schedules#query-schedules-business_hours-list old:schedules/WORKFLOW.md#schedules-f01 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Horario
@@ -185,7 +188,6 @@ horario.
 Implicados: ninguno
 
 ### SCHEDULE-F02 Fijar el horario de un día
-<!-- origen: qa:modules/schedules/schedule-and-availability-per-professional qa:verticals/beauty/01-services-professionals-and-schedules fi:modules/schedules#command-schedules-business_hours-set-handler-wasm-set_business_hours old:schedules/WORKFLOW.md#schedules-f02 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Horario
@@ -208,7 +210,6 @@ cerrado».
 Implicados: Citas y Reservas (leen el horario en la reserva siguiente)
 
 ### SCHEDULE-F03 Confirmar la semana por defecto
-<!-- origen: old-hub:HUB_SHELL-F31 old:schedules/WORKFLOW.md#schedules-f03 wf:peluqueria-dia#rec_peluqueria-f02 gh:schedules#42 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Inicio, Horario
@@ -234,7 +235,6 @@ ningún día guardado (no se llega desde la pantalla: el aviso solo sale cuando 
 Implicados: BASE-F01
 
 ### SCHEDULE-F04 Añadir un día especial
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 fi:modules/schedules#command-schedules-special_days-create-handler-wasm-create_special_day fi:modules/schedules#query-schedules-special_days-list old:schedules/WORKFLOW.md#schedules-f04 qa:modules/schedules/absences-and-holidays -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -256,7 +256,6 @@ solo espacios, bajo el nombre. Una fecha que tuvo un día especial borrado se pu
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F05 Añadir un cambio temporal
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 qa:modules/schedules/absences-and-holidays fi:modules/schedules#command-schedules-overrides-create-handler-wasm-create_override fi:modules/schedules#query-schedules-overrides-list old:schedules/WORKFLOW.md#schedules-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -277,7 +276,6 @@ tramos de SCHEDULE-F02.
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F06 Borrar un día especial o un cambio temporal
-<!-- origen: fi:modules/schedules#command-schedules-overrides-delete-sql-transaccional fi:modules/schedules#command-schedules-special_days-delete-sql-transaccional old:schedules/WORKFLOW.md#schedules-f06 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -297,8 +295,7 @@ id, su nombre o su fecha.» o «Di qué cambio temporal: su id, su motivo o una 
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F07 Cargar varios días especiales de golpe
-<!-- origen: fi:modules/schedules#command-schedules-bulk_create_special_days-handler-wasm-bulk_create_special_days old:schedules/WORKFLOW.md#schedules-f07 -->
-Estado: hecho (asistente y API, como el producto actual)
+Estado: hecho (asistente y API)
 Actor: asistente, API
 Pantalla: asistente
 Pasos:
@@ -315,7 +312,6 @@ crear nada.
 Implicados: ninguno
 
 ### SCHEDULE-F08 Elegir con qué día empieza la semana
-<!-- origen: fi:modules/schedules#command-schedules-settings-save-sql-transaccional fi:modules/schedules#query-schedules-settings-get old:schedules/WORKFLOW.md#schedules-f08 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Ajustes
@@ -331,7 +327,6 @@ Si falla: un valor fuera de 1–7 sale debajo del campo y no se guarda nada.
 Implicados: ninguno
 
 ### SCHEDULE-F09 Ver la zona horaria con la que se lee el horario
-<!-- origen: old-hub:HUB_SHELL-F157 wf:peluqueria-dia#rec_peluqueria-f02 old:schedules/WORKFLOW.md#schedules-f09 -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
 Pantalla: Ajustes
@@ -346,8 +341,7 @@ Si falla: nada que fallar; la zona siempre la da el servidor.
 Implicados: ninguno
 
 ### SCHEDULE-F10 Preguntar si el negocio está abierto en un momento
-<!-- origen: fi:modules/schedules#command-schedules-is_open-handler-wasm-is_open-solo-lectura old:schedules/WORKFLOW.md#schedules-f10 -->
-Estado: hecho (asistente y API, como el producto actual)
+Estado: hecho (asistente y API)
 Actor: asistente, API
 Pantalla: ninguna
 Pasos:
@@ -370,7 +364,6 @@ Si falla: un momento que no es una fecha y hora reales: «Esa fecha y hora no so
 Implicados: ninguno
 
 ### SCHEDULE-F11 Dar el horario de unos días a Citas
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f06 old:schedules/WORKFLOW.md#schedules-f11 -->
 Estado: hecho (lo leen Citas y Reservas)
 Actor: sistema (Citas y Reservas), asistente
 Pantalla: ninguna
@@ -389,7 +382,6 @@ días de una vez.» o, con una fecha fuera de 1900–2200, «Elige una fecha ent
 Implicados: Citas, Reservas
 
 ### SCHEDULE-F12 Partir de una semana por defecto al activar
-<!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 old-hub:HUB-F22 old:schedules/WORKFLOW.md#schedules-f12 -->
 Estado: hecho (al crear las tablas)
 Actor: sistema
 Pantalla: ninguna
@@ -406,7 +398,6 @@ Si falla: no hay pantalla; si no hubiera semana, Citas vería `no_hours`.
 Implicados: ninguno
 
 ### SCHEDULE-F13 Corregir un día especial o un cambio temporal
-<!-- origen: old:schedules/WORKFLOW.md#schedules-f04 old:schedules/WORKFLOW.md#schedules-f05 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
@@ -428,9 +419,12 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 la API, con las mismas reglas y los mismos permisos. Un día de la semana se nombra por su número (0 =
 lunes) o por su nombre («lunes», «monday»); un día especial, por su id, su nombre o su fecha; un cambio
 temporal, por su id, su motivo o una fecha que cubra. Si un nombre vale para varios, se dice cuáles y se
-pide que elija (`schedule.ambiguous_reference`).
+pide que elija (`schedule.ambiguous_reference`). Antes de corregir o borrar un día especial o un cambio temporal, el
+asistente pide confirmar con su tarjeta (BASE-F97), que nombra el registro como lo nombran las pantallas, nunca por su
+id: el día especial por su nombre («Día especial: Navidad») y el cambio temporal por su motivo («Cambio temporal: Horario
+de verano»). Lo que quien pregunta no puede ver no sale.
 
-### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
+### Lo que ofrece: consultas (leen, no cambian nada; todas, salvo las dos de la tarjeta del asistente, se pueden seguir en vivo)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
@@ -440,6 +434,8 @@ pide que elija (`schedule.ambiguous_reference`).
 | Los ajustes y la zona horaria del negocio, y si la semana está confirmada (el paso «Confirma tu horario» del Inicio) | ver | F03, F08, F09 | `schedule.settings.get` |
 | ¿Está abierto en un momento? | ver | F10 | `schedule.business.is_open` |
 | El horario de cada día de un rango | ver | F11 | `schedule.hours.for_range` |
+| Un día especial por su id, con sus tramos: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06, F13 | `schedule.special_day.get` |
+| Un cambio temporal por su id, con sus tramos: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06, F13 | `schedule.override.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -518,7 +514,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   Impuestos aún es el de `TIME_ZONE` (hub#772).
 - **Librerías**: ninguna nueva. La zona y el cambio de hora son `zoneinfo` y `datetime` de la biblioteca
   estándar (Python 3.14 lee RFC 3339 con `datetime.fromisoformat`). No hay calendario de festivos
-  precargado (el módulo viejo tampoco lo tenía), así que `holidays` no hace falta.
+  precargado, así que `holidays` no hace falta.
 - **Contrato para Citas** (`schedule.hours.for_range`, `date_from`, `date_to`, hasta 366 días): por día,
   `date`, `source` (`special_day`, `override`, `weekly` o `none`), `rule_id`, `name` (nombre del día
   especial o motivo del cambio, si lo hay), `is_closed`, `intervals` (los tramos tal como se guardaron,
@@ -526,8 +522,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   sin zona; `end` es del día siguiente si el tramo pasa de medianoche y 00:00–00:00 va de 00:00 a 00:00
   del día siguiente); y arriba `timezone`. Una cita de `start` a `end` cabe si existe un `span` (de su día
   o de la víspera) con `span.start ≤ start` y `end ≤ span.end`. Citas lo cruza con
-  `staff.availability.for_member` (Personal) y decide qué hace con `source = none` (el producto actual
-  dejaba reservar cuando no había ninguna fila semanal). El aviso de cualquier cambio de Horarios
+  `staff.availability.for_member` (Personal) y decide qué hace con `source = none`. El aviso de cualquier cambio de Horarios
   re-ejecuta la consulta en vivo.
 - **Quién llama a qué**: Citas y Reservas (las dos con `schedule` en sus `requires`) importan de
   `queries.py` `hours_for_range` y `day_label`, y Reservas también `get_week` (solo obedece la semana
@@ -539,8 +534,8 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   de la semana delante («martes, 5 de marzo de 2030»; `translation.override` + `formats.date_format`).
   Vive aquí porque Citas y Reservas lo necesitan y Horarios es requisito de las dos; no es una operación ni
   tiene ruta.
-- **Listas**: `base.ordering.list_order` ordena por la columna y desempata por `id` en la misma dirección (`desc` → `-id`,
-  regla hub#2355 del producto actual), así que la fila tocada no salta y las páginas no repiten ni pierden
+- **Listas**: `base.ordering.list_order` ordena por la columna y desempata por `id` en la misma dirección (`desc` → `-id`),
+  así que la fila tocada no salta y las páginas no repiten ni pierden
   filas.
 - **«¿Abierto?» sin `when` depende del reloj**: es «ahora» en el momento de ejecutarse. Seguida en vivo,
   se re-ejecuta con un aviso de Horarios o en la pasada de seguridad de cada 300 s, así que puede llegar
@@ -555,42 +550,52 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   de 366 días, con un día sin fecha real o sin nombre, o con más de 100 tramos en un día.
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high` en
   borrar un día especial o un cambio temporal, que no se deshace) y todo campo de entrada lleva
-  `description`; las mismas descripciones salen en el OpenAPI.
-- El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17), con
+  `description`; las mismas descripciones salen en el OpenAPI. Las dos excepciones son `schedule.special_day.get` y
+  `schedule.override.get`, lecturas internas (`ai=INTERNAL`, sin API): el modelo encuentra los días especiales y los
+  cambios temporales en sus listas. Cada una de las 16 herramientas dice además sus `asks`, las frases en `en` y `es`
+  con que una persona la pide (`live.E020`: Horarios está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1096), con palabras
+  propias de Horarios (festivo, fiesta local, vacaciones, obras, horario de verano, zona horaria) y sin las de cualquier
+  app («día», «hora», «semana» solo donde son la cosa pedida), para no quitar puesto a las herramientas de otras apps.
+  Así cerrar por obras, cargar festivos de una vez o corregir un cambio temporal o un día especial desde el chat
+  (SCHEDULE-F05, F07 y F13) llegan a su operación y no a los bloqueos de Citas: las frases reales de la QA del asistente
+  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno y por
+  delante de todo `appointment.blocked_time.*`, y una frase propia por herramienta solo llega entre las 10 primeras con
+  sus `asks` (`tests/test_assistant_asks.py`).
+- La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
+  con las marcas `refers` de `schemas.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
+  `OverrideRefIn`), leídas como quien pregunta: el día especial por su `name` con `schedule.special_day.get` y el
+  cambio temporal por su `reason` con `schedule.override.get`, como el diálogo «Eliminar» de las pantallas. Ese `id`
+  lleva su título («Día especial», «Cambio temporal»), nunca «Registro». Sin persona detrás, sin `schedule.view`, con
+  un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id
+  (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. Horarios no tiene listas cerradas en
+  sus escrituras.
+- El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17), con
   los tramos como líneas de su día; ids y fechas de auditoría, de solo lectura. Una escritura cruda del
   admin no deja aviso.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo.
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD: los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`).
 - La semana por defecto la planta la migración `0002_default_week` (con su vuelta atrás, que solo quita
   la semana si sigue sin confirmar).
-- **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SCHEDULE-SETUP-HOOKS): `ScheduleConfig.setup` declara el
-  `setup` del módulo viejo (`module.json`, schedules#42): clave `schedule.hours`, sobre `schedule.settings.get`,
-  hecho con `hours_confirmed` (el `confirmed_hours` del viejo), orden 101, sin `required` (nivel «Recomendado»),
+- **El paso del Inicio**: `ScheduleConfig.setup` declara el `setup`: clave `schedule.hours`, sobre
+  `schedule.settings.get`, hecho con `hours_confirmed`, orden 101, sin `required` (nivel «Recomendado»),
   permiso `schedule.change`, ruta `/schedule/hours` y `refresh_on` `schedule.week.updated`, el único aviso de las
   dos escrituras que ponen la marca (guardar un día y confirmar). La marca no se quita nunca (no hay operación que
-  borre un día de la semana), así que el paso no vuelve a pendiente. Sin paneles ni campana: el módulo viejo no
-  los declaraba. Pruebas: `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
+  borre un día de la semana), así que el paso no vuelve a pendiente. Sin paneles ni campana. Pruebas: `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
 
 ## Lo que queda fuera
 
-- **La semana de la peluquería** que plantaba el catálogo de arranque del producto actual (lunes a
-  viernes 09:30–20:00 con descanso de 14:00 a 16:00, sábado 09:30–14:00): es de los catálogos de
-  arranque, que no están portados.
-- **Calendario de festivos del país precargado**: el producto actual no lo tenía; cada día especial lo
-  escribe el negocio o el asistente (SCHEDULE-F07).
+- **La semana de la peluquería** (lunes a viernes 09:30–20:00 con descanso de 14:00 a 16:00, sábado
+  09:30–14:00): es de los catálogos de arranque, que no la plantan.
+- **Calendario de festivos del país precargado**: cada día especial lo escribe el negocio o el asistente (SCHEDULE-F07).
 - **Fechas y horas en el orden del idioma del Hub** escritas a mano (`dd/mm/aaaa`, «2:30 pm», «1430»): los
   campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga `TimeField` y `DateField`
-  (`UI-REQUESTS.md`; los piden también Personal, Citas, Asistencia y Reservas online), propuesto para `## 6`
-  de `MIGRATION.md` como `schedule:ui-time-date-fields`.
+  (`UI-REQUESTS.md`; los piden también Personal, Citas, Asistencia y Reservas online).
 - **«Abrir ajustes del hub»** desde Ajustes: el Hub aún no tiene ajustes de zona horaria a los que ir (la
   zona la manda el SaaS al dar de alta el hub; ver «Zona horaria» en «Para quien lo mantiene»).
-- **El asistente (chat y voz) y las llaves de API del negocio** son de la plataforma, que aún no los tiene:
-  Horarios ya declara cada operación para el asistente, con su descripción, y abre a las llaves la semana,
-  las listas, «¿abierto?» y el horario de un rango; mientras tanto, SCHEDULE-F07 y SCHEDULE-F10 se piden
-  por la API con la sesión.
-- **El icono de estrella** de la pestaña **Días especiales** (el del producto actual): `@erplora/ui` aún no lo
-  tiene y se usa el de calendario (`UI-REQUESTS.md`; Servicios pide la misma estrella en
-  `FIX-UI-SHELL-ICONS-SERVICE-TASK`), propuesto para `## 6` de `MIGRATION.md` como `schedule:ui-icons`.
+- **El icono de estrella** de la pestaña **Días especiales**: `ion:star-outline` está registrado en `@erplora/ui`
+  (lo usa Servicios), pero la pestaña y el menú siguen con el de calendario hasta que la app lo use
+  (`UI-REQUESTS.md`).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -616,38 +621,4 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - No tiene varias plantillas de horario ni horario por sede: un Hub es un negocio.
 - No pinta la web pública: la web del negocio (`website`) lleva su propio horario y no lo importa de
   Horarios (su WORKBOOK, «Lo que NO hace, a propósito»), así que hoy el horario se escribe en dos sitios
-  (contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`).
-
-## Cambios frente al producto actual
-
-- **Un día especial y un cambio temporal se corrigen** (SCHEDULE-F13), y **su borrado es de verdad**: la
-  fecha queda libre, así que ya no falla crear otro en la misma fecha ni el lote da por creado un día
-  que no se crea (eran los «parcial» de SCHEDULES-F04, F06 y F07).
-- **Un tramo pertenece al día en que abre**, venga de la regla que venga: el 22:00–02:00 de un día
-  especial o de un cambio temporal sigue abierto pasada la medianoche (antes solo hasta las 24:00), y la
-  madrugada del día siguiente cuenta aunque ese día tenga su propio día especial. Antes la cola de la
-  víspera salía de la semana aunque la víspera la cerrara un festivo.
-- **La carga de golpe** acepta tramos como el alta de uno (antes solo un par apertura–cierre sin pasar
-  de medianoche) y un día con horas sin `is_closed: false` es cerrado, como al crear uno; una lista con un
-  día sin nombre se rechaza entera, como antes, y ahora también con un día sin fecha real (antes se saltaba
-  solo ese día): la lista se corrige de una vez, antes de crear nada.
-- **¿Abierto?** es una consulta (antes una orden con lecturas precargadas) y su `source` de la semana se
-  llama `weekly` (antes `business_hours`). El código `on_break` desaparece: era el descanso antiguo de una
-  fila de antes de los tramos, que aquí no existe; tampoco el par apertura–cierre de reserva de las
-  excepciones sin tramos.
-- **«Semana confirmada»** es una marca de los ajustes, que pone quien guarda un día o confirma, en vez de
-  mirar quién firmó cada fila; confirmar no reescribe la semana. Su aviso amarillo dice «las citas fuera de
-  él se rechazan» (antes «las reservas…»): con la semana sin confirmar, Reservas no la aplica (CLOSE-SCHEDULE,
-  hub#172).
-- **Ajustes**: el aviso solo sale si algo cambia (antes siempre); la tabla gira con cualquier día de
-  inicio, no solo lunes o domingo; la zona horaria se enseña sin el botón «Abrir ajustes del hub»;
-  **Guardar** dice «Guardado» (antes no decía nada), y el empleado ve los ajustes sin poder guardarlos
-  (antes el Hub le pedía el PIN de un responsable).
-- **Los rechazos de datos** (horas, tramos, fechas, nombre vacío) salen bajo su campo (422); los choques
-  con otro dato (fecha ocupada, cambios que se pisan) son 409 con su código y también bajo su campo.
-- **Días especiales** se ordenan por fecha por defecto (antes por nombre), y **cambios temporales** por
-  fecha de inicio (antes por alta).
-- Las listas paginan con hasta 100 por página.
-- Los permisos se llaman `schedule.view`, `schedule.add`, `schedule.change`, `schedule.delete` y
-  `schedule.manage_settings` (antes `schedules.view_schedule`…), y las operaciones,
-  `schedule.<entidad>.<acción>` (tabla de equivalencias en el informe del porte).
+  (contradicción señalada en `PLAN-HUB.md`).

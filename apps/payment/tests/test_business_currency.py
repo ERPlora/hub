@@ -1,4 +1,4 @@
-"""Payments in the business's currency (PAYMENT-F02, the old payments#35 and #38): a payment that does not say its
+"""Payments in the business's currency (PAYMENT-F02): a payment that does not say its
 currency is recorded in the business's, its country's as ``base.business.get`` reads it from this hub's registry
 (BASE-F50), never in a euro fixed in the app: by the screen, by the API and by the assistant (the same operation).
 A payment keeps the currency it was recorded in (a record is never rewritten), and says the decimals the server counts
@@ -13,16 +13,12 @@ from live.context import OperationContext
 from live.operations import get
 
 from apps.payment.models import Payment
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, make_method, make_payment
+from .conftest import HOST, HUB_DB, A, B, ctx_for, make_method, make_payment
 
-pytestmark = pytest.mark.django_db
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
+pytestmark = HUB_DB
 
 
 def run(name: str, data: dict, ctx: OperationContext | None = None):
@@ -48,7 +44,7 @@ def business_today(monkeypatch):
 
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
@@ -57,7 +53,7 @@ def admin_client(client, make_user):
 
 @pytest.mark.parametrize("said", [{}, {"currency": None}, {"currency": "  "}])
 def test_a_payment_that_does_not_say_its_currency_is_recorded_in_the_business_s(said):
-    # The old payments#35 (the screen sends none) and #38 (the assistant or the API may leave it out).
+    # The screen sends none, and the assistant or the API may leave it out.
     business_in("PL")
     created = record(make_method(), **said)
     assert created.currency == "PLN"
@@ -89,22 +85,22 @@ def test_the_route_records_in_the_business_s_currency(admin_client):
         "/api/payment/payments",
         json.dumps({"method_id": str(method.id), "payment_date": "2026-10-10", "amount": 1250, "beneficiary_name": "Ana"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
     assert response.status_code == 201
     assert response.json()["currency"] == "PLN"
 
 
-def test_each_hub_records_in_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
-    method = make_method()
-    assert record(method).currency == "PLN"
-    assert record(method, ctx_for(scope=B)).currency == "EUR"
+def test_each_hub_records_in_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
+    assert record(make_method()).currency == "PLN"
+    with use_hub(hub_b):
+        assert record(make_method(), ctx_for(scope=B)).currency == "EUR"
 
 
 def test_the_same_attempt_sent_again_answers_the_payment_already_recorded_in_the_business_s_currency():
-    # payments#8 on top of #38: the retry does not say the currency either; it is the same attempt, not a 409.
+    # The retry does not say the currency either; it is the same attempt, not a 409.
     business_in("PL")
     method = make_method()
     key = "0199f4a2-0000-7000-8000-000000000001"

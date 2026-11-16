@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// «Receipt» or «Invoice» (the old `.pay-docformat`, hub#962): the same two-up buttons as the payment
+// «Receipt» or «Invoice» (the old `.pay-docformat`): the same two-up buttons as the payment
 // methods, the other question the counter asks out loud («do you need an invoice?»). It only chooses:
 // what the sheet starts on, and hiding it above the ticket limit, are the sheet's.
 import type { DocumentType } from '../../operations';

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// «My apps» on the Home (BASE-G165, hub#367): the launcher goes first and is the only card that works with
-// no data. Same list as the topbar's «My apps» (`useMyApps`, from `base.session.me`), the most opened in this
-// browser first. «Add apps» goes last, to Apps, once the router has that screen (an entry that leads to the
-// 404 is worse than none). On a phone with six apps or more: the first four and «View all apps».
+// The Home's launcher, the only card that works with no data: the topbar's «My apps», the most opened in this browser
+// first. «Add apps» shows only once the router has that screen, because an entry that leads to the 404 is worse than
+// none.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { HubIcon, useMyApps, useSession } from '@erplora/ui/shell';
 import { IonBadge, IonSkeletonText } from '@ionic/vue';
@@ -44,7 +43,7 @@ function opened(id: string): void {
 
 <template>
   <section
-    class="home-card my-apps"
+    class="home-card my-apps ep-surface"
     data-testid="home-my-apps"
     :aria-busy="loading"
   >
@@ -110,7 +109,7 @@ function opened(id: string): void {
             @click="opened(app.id)"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               :name="app.icon"
             />
             <span class="my-app-name">{{ app.name }}</span>
@@ -122,7 +121,7 @@ function opened(id: string): void {
             data-testid="home-my-app"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               :name="app.icon"
             />
             <span class="my-app-name">{{ app.name }}</span>
@@ -137,7 +136,7 @@ function opened(id: string): void {
             @click="expanded = true"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               name="ion:grid-outline"
             />
             <span class="my-app-name">{{ $t('base.apps.viewAll') }}</span>
@@ -150,7 +149,7 @@ function opened(id: string): void {
             data-testid="home-my-apps-add"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               name="ion:add-outline"
             />
             <span class="my-app-name">{{ $t('base.apps.add') }}</span>
@@ -162,7 +161,7 @@ function opened(id: string): void {
 </template>
 
 <style scoped>
-/* The old hub's launcher: flat tiles, icon over name, as many per row as fit (three on a phone). */
+/* Flat tiles, icon over name, as many per row as fit (three on a phone). */
 .my-apps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -189,11 +188,21 @@ function opened(id: string): void {
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: background-color var(--ep-transition), box-shadow var(--ep-transition), transform var(--ep-transition);
 }
 
 .my-app:hover,
 .my-app:focus-visible {
   background: color-mix(in oklab, var(--ion-color-primary) 8%, transparent);
+}
+
+.my-app:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-focus-ring);
+}
+
+.my-app:active {
+  transform: scale(var(--ep-press-scale));
 }
 
 .my-app--waiting {
@@ -210,13 +219,19 @@ function opened(id: string): void {
   color: var(--ion-color-medium);
 }
 
-.my-app-icon {
-  font-size: 24px;
-  color: var(--ion-color-primary);
-}
-
 .my-app--add .my-app-icon {
   color: var(--ion-color-medium);
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-app {
+    transition: none;
+  }
+
+  .my-app:active {
+    transform: none;
+  }
 }
 
 .my-app-name {

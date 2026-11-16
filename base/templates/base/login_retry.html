@@ -1,24 +1,11 @@
-{% load i18n static %}<!doctype html>
-{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% extends "base/gate.html" %}{% load i18n %}
 {% comment %}
-403 of /auth/callback when the state is not this browser's (base.auth_views). Rendered without the
-request: no context processors, no database, no scripts nor inline styles (strict CSP,
-no nonce): its look is base/gate.css, a static file.
+403 of /auth/callback when the state is not this browser's (base.auth_views).
 {% endcomment %}
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% translate "Sign in again" %}</title>
-  <link rel="stylesheet" href="{% static 'base/gate.css' %}">
-</head>
-<body>
-  <main>
-    <div class="ep-gate__brand">
-      <img class="ep-gate__logo" src="{% static 'base/img/logo.png' %}" alt="" width="28" height="28"><span>ERPlora</span>
-    </div>
+{% block robots %}{% endblock %}
+{% block title %}{% translate "Sign in again" %}{% endblock %}
+{% block content %}
     <h1>{% translate "We could not finish signing you in" %}</h1>
     <p>{% translate "The sign-in expired or started in another browser." %}</p>
     <p><a href="{{ retry_url }}">{% translate "Sign in again" %}</a></p>
-  </main>
-</body>
-</html>
+{% endblock %}

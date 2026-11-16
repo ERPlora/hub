@@ -11,21 +11,17 @@ a custom field a write names, and a card and its duplicate are taken as a merge 
 none of them waits in a circle.
 """
 
-import threading
-import time
 import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import UTC, datetime
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.db import connection, transaction
-from django.test import Client
+from django.db import connections
 from live.context import system_context
 from live.errors import InvalidPayload, NotFound
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.customer import events
 from apps.customer.models import (
@@ -57,18 +53,18 @@ from apps.customer.schemas import (
     SetTagsIn,
 )
 from apps.customer.queries import CUSTOMER_UNAVAILABLE_CODE
+from apps.sale.tests.test_concurrency import delete_page_while_held, in_turn, locks
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile
 
-from .conftest import A, run
+from .conftest import HUB_DB_COMMITTED, A, reads, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 NOW = datetime(2026, 10, 14, 10, 0, tzinfo=UTC)
-#: How the platform staff delete: from the card's delete page, or with the list's «Delete selected».
-HOW = ["page", "list"]
 #: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).
 LOCK_TIMEOUT = "300ms"
-#: How long a session lets the other one run until it waits for what this one holds (or ends).
-WAIT_LIMIT = 10
 
 
 def card(name="Ana García", **fields) -> Customer:
@@ -95,76 +91,11 @@ def refund(sale, refund_id=None):
     return system("customer.purchase.refund", data)
 
 
-def locks(table: str) -> Callable[[str], bool]:
-    """Whether a statement locks rows of ``table``."""
-    return lambda sql: f'FROM "{table}"' in sql and "FOR UPDATE" in sql
-
-
-def _waited_for() -> bool:
-    """Whether another session waits for a lock this one holds."""
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT pg_stat_clear_snapshot()")
-        cursor.execute(
-            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pg_backend_pid() = ANY (pg_blocking_pids(pid)))"
-        )
-        return cursor.fetchone()[0]
-
-
-@pytest.fixture
-def hub_staff(transactional_db) -> Client:
-    """The platform staff, signed in to the Hub admin."""
-    staff = get_user_model().objects.create_superuser(
-        username="root", password="pw", email="root@example.com"
-    )
-    client = Client()
-    client.force_login(staff)
-    return client
-
-
-def admin_delete(client: Client, how: str, *targets):
-    """The Hub admin's «Delete» of ``targets`` (one for its page), ``how`` it says (see ``HOW``); it returns
-    the answer."""
-    meta = type(targets[0])._meta
-    changelist = f"/admin/{meta.app_label}/{meta.model_name}/"
-    if how == "page":
-        [target] = targets
-        url, data = f"{changelist}{target.pk}/delete/", {"post": "yes"}
-    else:
-        url, data = changelist, {
-            "action": "delete_selected",
-            "_selected_action": [str(target.pk) for target in targets],
-            "post": "yes",
-        }
-    return lambda: client.post(url, data, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en")
-
-
 def gone(answer, *targets) -> None:
     """The Hub admin deleted ``targets``: its answer is the redirect back to the list, never an error."""
     assert not isinstance(answer, Exception), answer
     assert answer.status_code == 302, answer.content[:500]
     assert not Customer.objects.filter(pk__in=[target.pk for target in targets]).exists()
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # an unexpected failure (a deadlock, an IntegrityError) is reported
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def with_lock_timeout(deletion):
@@ -173,8 +104,8 @@ def with_lock_timeout(deletion):
     the tests after this one."""
 
     def call():
-        with transaction.atomic():
-            with connection.cursor() as cursor:
+        with atomic():
+            with connections[current_alias()].cursor() as cursor:
                 cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
             return deletion()
 
@@ -193,44 +124,9 @@ def deleted_just_before(statement: Callable[[str], bool], deletion):
             deletions.extend(at_once(with_lock_timeout(deletion)))
         return execute(sql, params, many, context)
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
     assert deletions, "the statement never ran"
-
-
-@contextmanager
-def meanwhile(after: Callable[[str], bool], call):
-    """Runs ``call`` in another session right after the first statement of this one for which ``after``
-    holds; this one goes on once ``call`` waits for what it holds (or has ended). Yields its outcome (an
-    error raised, a 500 included, is the outcome)."""
-    outcome: list = []
-
-    def other():
-        try:
-            outcome.append(call())
-        except Exception as error:  # reported to the test
-            outcome.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=other)
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if thread.ident is None and after(sql):
-            thread.start()
-            deadline = time.monotonic() + WAIT_LIMIT
-            while thread.is_alive() and not _waited_for() and time.monotonic() < deadline:
-                time.sleep(0.02)
-        return result
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield outcome
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "this session never locked"
 
 
 # ── A void or a refund whose card the Hub admin deletes after finding it ─────────────────────────────
@@ -426,28 +322,8 @@ def test_the_hub_admin_confirmation_page_of_a_row_a_write_holds_does_not_wait(hu
     """The delete page (a GET, before the staff confirm) runs outside a transaction and locks nothing: it answers
     while a write still holds the row; only the confirmed deletion (a POST) waits for the write."""
     row = make()
-    meta = type(row)._meta
-    url = f"/admin/{meta.app_label}/{meta.model_name}/{row.pk}/delete/"
-    outcome: list = []
-
-    def other():
-        try:
-            outcome.append(hub_staff.get(url, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="en"))
-        except Exception as error:  # reported to the test
-            outcome.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=other)
-    with transaction.atomic():
-        list(type(row).objects.select_for_update().filter(pk=row.pk))
-        thread.start()
-        thread.join(WAIT_LIMIT)
-        answered_while_held = not thread.is_alive()
-    thread.join(30)
+    answered_while_held, answer = delete_page_while_held(row, hub_staff)
     assert answered_while_held, "the delete page waited for the write that held the row"
-    [answer] = outcome
-    assert not isinstance(answer, Exception), answer
     assert answer.status_code == 200, answer.content[:500]
     assert type(row).objects.filter(pk=row.pk).exists()
 
@@ -463,44 +339,6 @@ def test_the_hub_admin_deletes_the_card_a_merge_keeps_with_what_the_merge_moved_
     nothing_hangs_from(survivor)
     absorbed.refresh_from_db()
     assert (absorbed.merged_into_id, absorbed.deleted_at is not None) == (None, True)
-
-
-def waiting() -> int:
-    """How many other sessions on this database wait for a lock."""
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT pg_stat_clear_snapshot()")
-        cursor.execute(
-            "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"
-            " AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
-        )
-        return cursor.fetchone()[0]
-
-
-def in_turn(row, *calls) -> list:
-    """Holds ``row`` locked in this session and starts ``calls`` in their own sessions, each once the ones before
-    wait for a lock, so they queue for ``row`` in that order; then lets it go. Their outcomes (an error raised,
-    a 500 included, is the outcome)."""
-    outcomes: list = [None] * len(calls)
-
-    def other(index, call):
-        try:
-            outcomes[index] = call()
-        except Exception as error:  # reported to the test
-            outcomes[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=other, args=(i, call)) for i, call in enumerate(calls)]
-    with transaction.atomic():
-        list(type(row).objects.select_for_update().filter(pk=row.pk))
-        for queued, thread in enumerate(threads, start=1):
-            thread.start()
-            deadline = time.monotonic() + WAIT_LIMIT
-            while thread.is_alive() and waiting() < queued and time.monotonic() < deadline:
-                time.sleep(0.02)
-    for thread in threads:
-        thread.join(30)
-    return outcomes
 
 
 def stored_backwards() -> tuple[Customer, Customer]:
@@ -585,11 +423,6 @@ NAMED_WRITES = {
 }
 
 
-def reads(table: str) -> Callable[[str], bool]:
-    """Whether a statement reads rows of ``table``."""
-    return lambda sql: sql.lstrip().startswith("SELECT") and f'FROM "{table}"' in sql
-
-
 def nothing_points_at(target) -> None:
     model = type(target)
     assert not model.objects.filter(pk=target.pk).exists()
@@ -650,3 +483,24 @@ def test_the_hub_admin_deletes_a_group_or_a_tag_a_merge_moves_to_the_card_that_s
     assert not isinstance(answer, Exception), answer
     assert answer.status_code == 302
     nothing_points_at(target)
+
+
+# ── A deleted card brought back from a separate copy while the person asks to erase it ─────────────────────────────
+#
+# The restore holds the card while it judges it and gives back to it what the business deleted since the copy (a
+# group made again, hub#1356): an erasure that comes meanwhile waits, then erases the card that came back. Read
+# unlocked, the restore would bring back, live and in its group, a card already erased.
+
+
+def test_a_card_erased_while_it_is_brought_back_stays_erased_and_out_of_its_group():
+    ana = card(deleted_at=NOW, is_active=False)
+    restore = get("customer.customer.restore")
+    asked = restore.input.model_validate({"id": str(ana.id), "groups": [{"id": str(uuid.uuid7()), "name": "VIP"}]})
+    erase = lambda: run("customer.customer.erase", EraseIn(id=ana.id, reason="Asked for it"))  # noqa: E731
+    with meanwhile(reads("customer_customer"), erase) as outcomes:
+        restore(system_context(A), asked)
+    [outcome] = outcomes
+    assert not isinstance(outcome, Exception), outcome
+    ana.refresh_from_db()
+    assert (ana.erased_at is not None, ana.deleted_at is not None, ana.is_active) == (True, True, False)
+    assert (list(ana.groups.all()), list(Customer.objects.live())) == ([], [])

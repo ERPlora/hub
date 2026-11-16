@@ -160,7 +160,7 @@ D_ROLE_ID = (
 D_ROLE = "Name of the role, when its id is not known (an active role of this business)."
 #: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
 A_PERSON = names("base.hub_user.get")
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id. A schedule says whose it is and a time-off request whose, of what kind and which days: everyone
 # may have a «Regular schedule», and one person can ask for several absences.
 A_MEMBER = names("staff.member.detail", name=("full_name",))
@@ -481,7 +481,7 @@ class MemberDetailOut(MemberOut):
 
 
 class MemberMineOut(MemberDetailOut):
-    hourly_rate: int = Field(description="Hourly rate in cents.")
+    hourly_rate: int = Field(description="Hourly rate in cents.", json_schema_extra={"money": True})
     commission_rate: Decimal = Field(description="Commission, in percent.")
 
 
@@ -509,7 +509,7 @@ class CompensationOut(Schema):
     role_id: UUID | None
     role_name: str | None
     status: MemberStatus
-    hourly_rate: int = Field(description="Hourly rate in cents.")
+    hourly_rate: int = Field(description="Hourly rate in cents.", json_schema_extra={"money": True})
     commission_rate: Decimal = Field(description="Commission, in percent.")
     notes: str = Field(description="Private HR notes.")
 
@@ -545,9 +545,12 @@ class CommissionReportRow(Schema):
     commission_rate: Decimal = Field(description="Commission, in percent.")
     sold: int = Field(
         description="What they sold in the period, refunds and the vouchers they sold taken off and the value of the "
-        "voucher sessions they did added, in cents."
+        "voucher sessions they did added, in cents.", json_schema_extra={"money": True}
     )
-    commission: int = Field(description="sold x rate / 100, in cents, rounded half up once.")
+    commission: int = Field(
+        description="sold x rate / 100, in cents, rounded half up once.",
+        json_schema_extra={"money": True},
+    )
 
 
 class CommissionReportOut(Schema):

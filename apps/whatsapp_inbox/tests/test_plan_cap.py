@@ -1,7 +1,7 @@
 """WHATSAPP_INBOX-F13 with a plan that includes no WhatsApp messages.
 
 erplora.com sends the plan's ``whatsapp_messages_per_month`` as ``monthly_limit``, and 0 means the plan includes
-none (ADR-0474: there is no «unlimited», and erplora.com refuses every send with ``whatsapp.cap_reached``). So the
+none (there is no «unlimited», and erplora.com refuses every send with ``whatsapp.cap_reached``). So the
 month is spent from its first message, the inbox says so and «Send» explains it instead of sending, while what
 customers write keeps arriving (F03 step 6).
 """
@@ -17,11 +17,10 @@ from live.errors import Conflict
 
 from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Channel, Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import A, B, NOW, connect, ctx_for, receive, run, system
-from base.models import Hub
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, ctx_for, receive, run, system
 from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SEND = "http://saas.test/internal/whatsapp/send"
 #: What erplora.com sends for a plan without WhatsApp messages, before any is sent this month.
@@ -102,22 +101,28 @@ def test_a_spent_month_still_says_until_next_month():
     assert "does not include" not in str(spent)
 
 
+def channel_on_the_clock_of(hub, zone: str):
+    """The number's month as business ``hub`` reads it with its clock in ``zone``."""
+    hub.timezone = zone
+    hub.save(update_fields=["timezone"])
+    with use_hub(hub):
+        return run("whatsapp_inbox.channel.get", {})
+
+
 @pytest.mark.parametrize("zone", ["America/New_York", "Atlantic/Canary", "Europe/Madrid", "Asia/Tokyo"])
-def test_a_spent_month_lasts_as_long_as_erplora_com_counts_it_on_any_clock(monkeypatch, zone):
+def test_a_spent_month_lasts_as_long_as_erplora_com_counts_it_on_any_clock(monkeypatch, zone, hub_a):
     # erplora.com counts a UTC month and refuses until it ends, whatever day it already is for the business.
     connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
     monkeypatch.setattr(clock, "now", lambda: dt.datetime(2026, 10, 31, 23, 30, tzinfo=dt.UTC))
-    with use_hub(Hub(slug="a", timezone=zone)):
-        channel = run("whatsapp_inbox.channel.get", {})
+    channel = channel_on_the_clock_of(hub_a, zone)
     assert (channel.monthly_usage, channel.cap_reached) == (150, True)
 
 
 @pytest.mark.parametrize("zone", ["America/New_York", "Atlantic/Canary", "Europe/Madrid", "Asia/Tokyo"])
-def test_the_next_month_starts_when_erplora_com_starts_it_on_any_clock(monkeypatch, zone):
+def test_the_next_month_starts_when_erplora_com_starts_it_on_any_clock(monkeypatch, zone, hub_a):
     connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
     monkeypatch.setattr(clock, "now", lambda: dt.datetime(2026, 11, 1, 0, 30, tzinfo=dt.UTC))
-    with use_hub(Hub(slug="a", timezone=zone)):
-        channel = run("whatsapp_inbox.channel.get", {})
+    channel = channel_on_the_clock_of(hub_a, zone)
     assert (channel.monthly_usage, channel.cap_reached) == (0, False)
 
 
@@ -130,15 +135,25 @@ def test_what_customers_write_still_arrives():
     assert (row.unread_count, row.last_message_preview) == (2, "¿Tenéis hora el viernes?")
 
 
-def test_each_business_has_its_own_plan():
-    connect(**NONE)
-    system(
-        "whatsapp_inbox.channel.sync",
-        {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150},
-        B,
-    )
-    a = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=A))
-    b = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=B))
+@HUB_DB
+@pytest.mark.usefixtures("no_test_fallback")
+def test_each_business_has_its_own_plan(hub_a, hub_b):
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", **NONE},
+            Scope("host", hub_a.slug),
+        )
+        a = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=Scope("host", hub_a.slug)))
+    with use_hub(hub_b):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000001", "monthly_limit": 150},
+            Scope("host", hub_b.slug),
+        )
+        b = run("whatsapp_inbox.channel.get", {}, ctx_for(scope=Scope("host", hub_b.slug)))
     assert (a.cap_reached, b.cap_reached) == (True, False)
 
 

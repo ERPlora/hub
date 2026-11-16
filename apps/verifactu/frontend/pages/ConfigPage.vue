@@ -1,15 +1,13 @@
 <script setup lang="ts">
-// VeriFactu → Configuration (VERIFACTU-F02–F06, F34; the old `erp-verifactu-config`): «VeriFactu configuration» with
+// VeriFactu → Configuration (VERIFACTU-F02–F06, F34): «VeriFactu configuration» with
 // the two routes as tabs. «ERPlora files for you» (opens by default): «Representation authorisation», its state (not
 // signed, under review, approved, returned with the review's note, revoked) and the procedure to sign it and send it
-// from here (`RepresentationGrant`, the old module's `erp-verifactu-grant`); what the account has not sent yet is said
-// so. «My certificate»: «Loaded» /
+// from here (`RepresentationGrant`); what the account has not sent yet is said so. «My certificate»: «Loaded» /
 // «Not loaded», holder, its tax ID, kind, uploaded and expiry dates and the warning 30 days before it expires (or that
 // it expired); who configures VeriFactu uploads the .p12/.pfx here with its password («Upload the certificate») or
 // removes it («Remove», asking first in a card). It is kept encrypted in the hub's database and never shown again.
 // Outside Spain VeriFactu is not for the business: «VeriFactu is only for businesses in Spain.» is the one reason said,
-// with no authorisation to sign and no certificate to upload, only the certificate's state
-// (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
+// with no authorisation to sign and no certificate to upload, only the certificate's state.
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastSuccess, useSession } from '@erplora/ui/shell';
@@ -24,7 +22,7 @@ import { refusal } from '../lib/refusal';
 import { verifactuTabs } from '../tabs';
 
 const EXPIRY_WARNING_DAYS = 30;
-/** A business certificate weighs a few KB; anything over 1 MB is not one (the old module's limit). */
+/** A business certificate weighs a few KB; anything over 1 MB is not one. */
 const MAX_CERTIFICATE_BYTES = 1024 * 1024;
 
 const t = useT();

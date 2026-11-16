@@ -71,7 +71,7 @@ watch(
   },
   { immediate: true },
 );
-// The strip fades the edge with more zones behind it (tables#97): a hard cut reads «no more zones».
+// The strip fades the edge with more zones behind it: a hard cut reads «no more zones».
 const zoneStrip = useTemplateRef<InstanceType<typeof IonSegment>>('zoneStrip');
 const zoneEdges = useScrollEdges(computed(() => (zoneStrip.value?.$el as HTMLElement | undefined) ?? null));
 // Zones added or renamed widen the strip without resizing it.

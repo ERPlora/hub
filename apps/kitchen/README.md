@@ -5,8 +5,7 @@ que se reparte por estaciones (plancha, barra, postres…) en la pantalla y en p
 listos, el pase entrega lo terminado y queda un historial de lo que pasó. Cocina no cobra, no descuenta stock y no
 sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
 
-- **Estado**: completa (2026-10-21): 30 de sus 31 flujos, `KITCHEN-F01` … `F31`, están `hecho`, y `KITCHEN-F30`
-  está `descartado` con su motivo (la comanda no guarda cliente).
+- **Estado**: completa (2026-10-21): sus 30 flujos están `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -22,7 +21,8 @@ sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
   vez por impresora y se puede reimprimir como copia.
 - **La pantalla** (F10–F17): tarjetas con semáforo verde, ámbar y rojo desde el envío, por estación o «Todas» (el
   pase); marcar listo por plato, por menú o por tarjeta, recuperar, entregar, marcar urgente (con aviso en papel),
-  «Resumen» de lo que queda por cocinar, sonido al entrar una comanda y pase en papel al quedar lista.
+  «Resumen» de lo que queda por cocinar, sonido y aviso del sistema al entrar una comanda (que abre Cocina al
+  tocarlo) y pase en papel al quedar lista.
 - **Desde el TPV de Ventas** (F18–F20): «Enviar comanda (N)» con la llama de urgencia, la hoja «Comandas de la
   cuenta» con el estado de cada ronda, viva, y «Marcar urgente» desde allí.
 - **La lista y el historial** (F21–F26): Comandas con búsqueda, filtros y páginas; lanzar, marcar lista, recuperar,
@@ -42,7 +42,7 @@ sabe de mesas ni de clientes: pinta e imprime la etiqueta que le da la cuenta.
 | Quién la usa | Ventas, en la pantalla «Vender»: `kitchen.ticket.send` al enviar (`useTill.ts`) y la hoja de la cuenta con `kitchen.ticket.by_order`, `kitchen.settings.get` y `kitchen.ticket.set_rush` (`KitchenTickets.vue`). Caja, al cerrar: `kitchen.ticket.board` (`CloseSessionForm.vue`). Ninguna app llama a Cocina desde su servidor; Menús y Suplementos no la llaman: sus datos llegan en las líneas de Ventas |
 | Usa de otras apps | Ventas: `sale.order.fire` (el envío) y sus modelos de cuenta y línea. Impresión: `printing.job.create` (documento `kitchen_order`). Inventario: `held` (retiene producto y categoría al enrutar) y, en las páginas, `inventory.product.list` e `inventory.category.list` |
 | Pantallas | `/kitchen/display`, `/kitchen/tickets`, `/kitchen/stations`, `/kitchen/history`, `/kitchen/settings`; la pestaña «Comanda actual» y la hoja «Comandas de la cuenta» del TPV las monta Ventas |
-| Operaciones | 9 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 27 rutas en `/api/kitchen/…` (`kitchen.ticket.receive` y `kitchen.ticket.sync`, del sistema, no tienen ruta) |
+| Operaciones | 12 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 28 rutas en `/api/kitchen/…` (sin ruta: `kitchen.ticket.receive` y `kitchen.ticket.sync`, del sistema, y `kitchen.item.get` y `kitchen.station.get`) |
 | Eventos | 18, `kitchen.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `sale.order.fired` (`kitchen.ticket.receive`) y a `sale.order.completed`, `sale.order.voided` y `sale.order.line_voided` (`kitchen.ticket.sync`), por el relay del outbox |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial`, `0002_settings_row`, `0003_ticket_printed_at`, `0004_item_options_and_menu` |
@@ -70,7 +70,7 @@ pnpm e2e tests/e2e/kitchen-*.spec.ts tests/e2e/printing-kitchen.spec.ts
 ## Qué queda fuera
 
 - Cursos con retener y lanzar (kitchen#71), vaciar de golpe lo cobrado antes de pasar a papel (kitchen#158) y los
-  alérgenos de punta a punta (pm#115): «Lo que queda fuera» del WORKBOOK.
+  alérgenos de punta a punta (hub#1195, que sustituye a pm#115 del tablero viejo): «Lo que queda fuera» del WORKBOOK.
 - Lo que sigue pedido a Ventas: el aviso propio del cambio de título y dos índices parciales («Lo que pide a otras
   apps» del WORKBOOK).
 - Los iconos, los composables compartidos y el selector de color de [`UI-REQUESTS.md`](UI-REQUESTS.md).

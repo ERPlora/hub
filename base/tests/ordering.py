@@ -1,4 +1,4 @@
-"""What the test of an app's lists checks (``base/ordering.py``, the rule of hub#2355)."""
+"""What the test of an app's lists checks (``base/ordering.py``)."""
 
 
 def assert_reads_backwards(listed, expected):

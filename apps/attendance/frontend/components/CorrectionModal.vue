@@ -12,6 +12,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useBusinessClock } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, toLocalInput } from '../lib/time';
@@ -102,11 +103,23 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// What would be sent, so the business's clock answering after it opened is not a change of the person's.
+const canDismiss = useUnsavedFormOnOpen(
+  'attendance-correct',
+  () => ({
+    clockIn: instant(clockIn.value, props.record?.clock_in_at ?? null),
+    clockOut: instant(clockOut.value, props.record?.clock_out_at ?? null),
+    reason: reason.value,
+  }),
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="attendance-correct"
     :title="$t('attendance.correct.title')"
     :submit-label="$t('attendance.correct.save')"
@@ -131,6 +144,7 @@ async function save(): Promise<void> {
         label-placement="floating"
         fill="outline"
         mode="md"
+        name="clock_in_at"
         :error-text="local.clock_in_at || fieldErrors.clock_in_at"
         :class="invalid(local.clock_in_at || fieldErrors.clock_in_at)"
         @ion-input="clockIn = text($event.detail.value)"
@@ -144,6 +158,7 @@ async function save(): Promise<void> {
         label-placement="floating"
         fill="outline"
         mode="md"
+        name="clock_out_at"
         :error-text="local.clock_out_at || fieldErrors.clock_out_at"
         :class="invalid(local.clock_out_at || fieldErrors.clock_out_at)"
         @ion-input="clockOut = text($event.detail.value)"
@@ -159,6 +174,7 @@ async function save(): Promise<void> {
         auto-grow
         counter
         :maxlength="500"
+        name="reason"
         :error-text="local.reason || fieldErrors.reason"
         :class="invalid(local.reason || fieldErrors.reason)"
         @ion-input="reason = text($event.detail.value)"

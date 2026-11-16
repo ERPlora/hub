@@ -1,11 +1,10 @@
-// The screen's own error report (BASE-G95, G13; the old hub's lib/error-report.ts, HUB_SHELL-F149): an error nobody
-// caught, a promise rejected without a handler or a component that failed to render goes to the Hub by itself, with no
-// window, no screenshot and no confirmation. The Hub writes it as one line of its log (`base/error_report.py`), which
-// CloudWatch counts. An identical error is sent once every 30 s and at most 50 different ones are remembered; the
-// report is best effort: `navigator.sendBeacon` (it survives the page closing and needs no answer), never retried, and
-// a report that cannot leave never makes another. Nothing is kept in the browser. The address goes without its query
-// string (a sign-in code may travel there). The browser's own notices that are no error of the screen are not sent
-// (BASE-F47, `BROWSER_NOTICES`).
+// The screen's own error report: an error nobody caught, a promise rejected without a handler or a component that
+// failed to render goes to the Hub by itself, with no window, no screenshot and no confirmation. The Hub writes it as
+// one line of its log (`base/error_report.py`), which CloudWatch counts. An identical error is sent once every 30 s and
+// at most 50 different ones are remembered; the report is best effort: `navigator.sendBeacon` (it survives the page
+// closing and needs no answer), never retried, and a report that cannot leave never makes another. Nothing is kept in
+// the browser. The address goes without its query string (a sign-in code may travel there). The browser's own notices
+// that are no error of the screen are not sent (BASE-F47, `BROWSER_NOTICES`).
 import type { App } from 'vue';
 
 export const REPORT_URL = '/api/error-report';

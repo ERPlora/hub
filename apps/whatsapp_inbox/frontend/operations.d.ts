@@ -1,8 +1,8 @@
-// Types of the WhatsApp inbox's operations for the SDK (`useLive`, `useCommand`), from
-// apps/whatsapp_inbox/schemas.py. Written by hand, as the other apps', until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, a conversation's `id` travels in the input.
-// Instants are ISO 8601 strings; person ids are UUIDs (the people of the business's database, base.HubUser).
+// Types of the WhatsApp inbox's operations for the SDK (`useLive`, `useCommand`), from apps/whatsapp_inbox/schemas.py.
+// Written by hand, as the other apps' are: nothing generates them from `/api/openapi.json`. Keep it in step with
+// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
+// parameters, a conversation's `id` travels in the input. Instants are ISO 8601 strings; person ids are UUIDs (the
+// people of the business's database, base.HubUser).
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';
@@ -222,10 +222,9 @@ export interface TemplateListIn extends PageIn {
   status?: TemplateStatus;
   category?: TemplateCategory;
   language?: string;
-  /** true: only what the Hub can send now (approved, not being deleted, no file header). */
-  /** Only what goes as it is (an automation's): a file header only with its own file. */
+  /** true: only what goes as it is, with nothing to choose (a file header only with its own file). */
   sendable?: boolean;
-  /** What the inbox can send: a file header asking for its file when it has none. */
+  /** true: what the inbox and an automation's «Send a message» step send (a file header asks for one if it has none). */
   fillable?: boolean;
 }
 

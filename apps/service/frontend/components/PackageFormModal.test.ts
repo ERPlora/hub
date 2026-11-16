@@ -6,6 +6,12 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
@@ -152,8 +158,101 @@ describe('PackageFormModal: New package', () => {
   });
 });
 
+describe('PackageFormModal: fields refused with the same words (hub#888)', () => {
+  // Name, the discount, Closed price, Validity, Uses and a line's service (the picker) and Sessions each paint a refusal
+  // under their own key; a line's are named after its place in what was sent.
+  const FIELD_OF: Record<string, string> = {
+    discount_percent_bp: 'discount_percent',
+    'items.0.service_id': 'line-service-0',
+    'items.0.sessions': 'line-sessions-0',
+  };
+  async function filled(locale: 'en' | 'es', refusal: unknown, discount: (s: Awaited<ReturnType<typeof setup>>) => Promise<void>) {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Bono', 'ionInput');
+    await discount(s);
+    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await settle();
+    s.answer(422, refusal);
+    return { field: (key: string) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }
+
+  itTellsTheCorrectedFieldApart(
+    ['name', 'discount_percent_bp', 'fixed_price', 'validity_days', 'max_uses', 'items.0.service_id', 'items.0.sessions'],
+    (locale, refusal) => filled(locale, refusal, (s) => ionValue(s.field('discount_percent'), '5', 'ionInput')),
+    'fixed_price',
+  );
+
+  describe('with a fixed discount', () => {
+    itTellsTheCorrectedFieldApart(['discount_amount', 'fixed_price', 'max_uses'], (locale, refusal) =>
+      filled(locale, refusal, async (s) => {
+        await ionValue(s.field('discount_type'), 'fixed', 'ionChange');
+        await ionValue(s.field('discount_amount'), '5', 'ionInput');
+      }),
+    );
+  });
+});
+
+// The server refuses the lines as a whole (a service twice) on the line under them, not under one line: any change the
+// person makes to the lines takes that line away at once, and only that line (hub#888).
+describe('PackageFormModal: a refusal of the lines as a whole', () => {
+  const REPEATED = 'A service is repeated in the lines: each service goes once.';
+  const NAME_TAKEN = 'There is already a package with that name. Pick another name.';
+
+  async function refusedLines(fields: Record<string, string> = { items: REPEATED }) {
+    const s = await setup();
+    await ionValue(s.field('name'), 'Bono', 'ionInput');
+    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await click(s.field('add-line'));
+    s.lines()[1].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await settle();
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields } });
+    await click(s.save());
+    const said = () => s.inDoc('service-package-form-no-lines')?.textContent ?? '';
+    return { ...s, said };
+  }
+
+  const CHANGES: [string, (s: Awaited<ReturnType<typeof refusedLines>>) => Promise<void>][] = [
+    ['choosing a line’s service', async (s) => {
+      s.lines()[1].vm.$emit('update:modelValue', { id: 's2', label: 'Colour' });
+      await settle();
+    }],
+    ['typing a line’s sessions', (s) => ionValue(s.field('line-sessions-1'), '3', 'ionInput')],
+    ['removing a line', (s) => click(s.field('remove-line-1'))],
+    ['adding a line', (s) => click(s.field('add-line'))],
+  ];
+
+  it.each(CHANGES)('%s takes it away before saving again', async (_, change) => {
+    const s = await refusedLines();
+    expect(s.said()).toContain(REPEATED);
+    await change(s);
+    expect(s.said()).not.toContain(REPEATED);
+    expect(s.sent()).toHaveLength(1);
+  });
+
+  it('the lines are one group, named as their heading says', async () => {
+    const s = await setup();
+    const group = s.inDoc('service-package-form-add-line')?.closest('fieldset');
+    expect([group?.getAttribute('name'), group?.getAttribute('aria-label')]).toEqual(['items', 'Services included']);
+  });
+
+  it('a change to the lines leaves another field’s refusal under it', async () => {
+    const s = await refusedLines({ name: NAME_TAKEN, items: REPEATED });
+    await ionValue(s.field('line-sessions-1'), '3', 'ionInput');
+    expect([s.field('name').errorText, s.said().includes(REPEATED)]).toEqual([NAME_TAKEN, false]);
+  });
+});
+
 // flow service-business-currency: a voucher's closed price and its amount off are the business's currency.
 describe('PackageFormModal: in the business currency (service-business-currency)', () => {
+  // SERVICE-F12, F13, hub#924: an amount off and a closed price are judged in the business's money: a euro one is no
+  // złoty amount in Poland.
+  it.each(['discount_amount', 'fixed_price'])('in Poland «13,50 €» in the %s says it is not an amount, and nothing is sent', async (name) => {
+    const s = await setup(pkg({ discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 500 }), 'en', { business: business(POLISH) });
+    await ionValue(s.field(name), '13,50 €', 'ionInput');
+    await click(s.save());
+    expect([s.field(name).errorText, s.sent()]).toEqual(['This is not an amount. Type a figure, for example 12.50.', []]);
+  });
+
   it('a business in Japan saves «9000» as a closed price of 9000 yen and «500» off as 500 yen', async () => {
     const s = await setup(null, 'en', { business: business(JAPANESE) });
     expect(s.field('fixed_price').label).toBe('Closed price (JPY)');
@@ -189,6 +288,58 @@ describe('PackageFormModal: in the business currency (service-business-currency)
     await click(s.save());
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', max_uses: 10 }]);
   });
+
+  // «1500» reads in any money, so alone it would not tell a guard put after the reading: «¥1500» is not an amount until
+  // the money is known, and the field must not say so while the window waits.
+  it.each(['1500', '¥1500'])(
+    'a closed price typed before the business answers is never read without it: «Create package» waits in grey and the field says nothing, then «%s» is 1500 yen (hub#921)',
+    async (typed) => {
+      const s = await setup(null, 'en', { business: null });
+      await ionValue(s.field('name'), 'Bono', 'ionInput');
+      await ionValue(s.field('fixed_price'), typed, 'ionInput');
+      s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+      await settle();
+      s.answer(201, PACKAGE);
+      await expectSaveWaitsForMoney({ ...s, amount: () => s.field('fixed_price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+      expect([s.field('fixed_price').value, s.field('fixed_price').errorText]).toEqual([typed, undefined]);
+      await click(s.save());
+      expect(s.sent().map((call) => (call.body as { fixed_price: number }).fixed_price)).toEqual([1500]);
+    },
+  );
+
+  it('editing, a closed price typed before the business answers stays as typed when it does and is read in yen (hub#921)', async () => {
+    const s = await setup(PACKAGE, 'en', { business: null });
+    await ionValue(s.field('fixed_price'), '1500', 'ionInput');
+    s.answer(200, pkg({ fixed_price: 1500 }));
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('fixed_price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('fixed_price').value).toBe('1500');
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', fixed_price: 1500 }]);
+  });
+
+  it('editing, an amount off typed before the business answers stays as typed when it does and is read in yen', async () => {
+    const s = await setup(pkg({ discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 500 }), 'en', { business: null });
+    expect(s.field('discount_amount').value).toBe('5.00');
+    await ionValue(s.field('discount_amount'), '700', 'ionInput');
+    await s.result('base.business.get', business(JAPANESE));
+    expect([s.field('discount_amount').value, s.field('fixed_price').value]).toEqual(['700', '9000']);
+    s.answer(200, PACKAGE);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', discount_amount: 700 }]);
+  });
+
+  // hub#945 (SERVICE-F12): a closed price or an amount off typed with its currency's sign and left before the business
+  // answers is neither rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['fixed_price', '¥9500', JAPANESE, 9500],
+    ['discount_amount', '7,50 zł', POLISH, 750],
+  ] as const)('the %s «%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (name, typed, money, cents) => {
+    const s = await setup(pkg({ discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 500 }), 'en', { business: null });
+    await expectAmountLeftWaitsForMoney({ amount: () => s.field(name), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(200, PACKAGE);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', [name]: cents }]);
+  });
 });
 
 describe('PackageFormModal: Editing package — {name}', () => {
@@ -223,5 +374,28 @@ describe('PackageFormModal: Editing package — {name}', () => {
     expect(s.field('discount_percent').value).toBe('10,5');
     // No word shouts in the help: «compra» as the old panel said it, not «COMPRA».
     expect(s.field('validity_days').helperText).toBe('Días canjeables desde la compra; vacío = no caduca.');
+  });
+});
+
+// hub#938 (SERVICE-F12, F13): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('PackageFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountService(PackageFormModal, { props: { open: !late, pkg: PACKAGE }, path: '/service/packages', business: null });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'service-package-form-submit', m.sent, opens);
+  });
+});
+
+describe('PackageFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('service-package-form'),
+      change: () => ionValue(s.field('name'), 'Bono', 'ionInput'),
+      restore: () => ionValue(s.field('name'), '', 'ionInput'),
+    });
   });
 });

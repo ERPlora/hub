@@ -1,36 +1,19 @@
-// «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164; hub#372): one live read of
-// `base.setup.status`, painted as the server ordered and filtered it. «Set up» only where a screen exists and
-// the person can do it; a ⛔ only an administrator can do says so; folded to 5 rows (2 on a phone).
 import { IonProgressBar } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { setupItem, setupStatus } from '../__tests__/home-fixtures';
 import type { SetupItem, SetupStatus } from '../operations';
 import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { createAssistant, installAssistant } from '@erplora/ui/components';
 import SetupChecklist from './SetupChecklist.vue';
 
+/** A step titled «Title <key>», described and routed by its key. */
 function item(key: string, fields: Partial<SetupItem> = {}): SetupItem {
-  return {
-    key,
-    app: key.split('.')[0],
-    state: 'pending',
-    level: 'functional',
-    required: true,
-    actionable: true,
-    title: `Title ${key}`,
-    description: `About ${key}`,
-    icon: 'ion:settings-outline',
-    route: `/${key.replace('.', '/')}`,
-    order: 50,
-    ...fields,
-  };
+  return setupItem(key, { title: `Title ${key}`, description: `About ${key}`, route: `/${key.replace('.', '/')}`, ...fields });
 }
 
 function status(items: SetupItem[]): SetupStatus {
-  const pending = items.filter((i) => i.state === 'pending').length;
-  const unavailable = items.filter((i) => i.state === 'unavailable').length;
-  const blocking = items.filter((i) => i.state === 'pending' && i.level === 'legal').length;
-  return { total: items.length, pending, unavailable, blocking_pending: blocking, items };
+  return setupStatus(items);
 }
 
 async function setup(options: { routes?: string[]; locale?: 'en' | 'es' } = {}) {
@@ -72,7 +55,7 @@ describe('SetupChecklist', () => {
     expect(s.rows()[0].get('[data-testid="setup-pill"]').attributes('data-tone')).toBe('danger');
   });
 
-  it('«Set up» opens the screen of the step (BASE-G130)', async () => {
+  it('«Set up» opens the screen of the step', async () => {
     const s = await setup({ routes: ['/a/one'] });
     await s.show(status([item('a.one')]));
     const configure = s.wrapper.get('[data-testid="setup-configure-a.one"]');
@@ -88,7 +71,7 @@ describe('SetupChecklist', () => {
     expect(s.wrapper.find('[data-testid="setup-configure-a.one"]').exists()).toBe(false);
   });
 
-  it('a pending step this person cannot do says an administrator has to, with no button (BASE-G164)', async () => {
+  it('a pending step this person cannot do says an administrator has to, with no button', async () => {
     const s = await setup({ locale: 'es', routes: ['/invoice/business_identity'] });
     await s.show(status([item('invoice.business_identity', { level: 'legal', actionable: false })]));
     expect(s.wrapper.find('[data-testid="setup-configure-invoice.business_identity"]').exists()).toBe(false);
@@ -157,7 +140,7 @@ describe('SetupChecklist', () => {
     expect(error.text()).toContain('Could not load what is left to set up');
     expect(error.find('[data-testid="setup-retry"]').exists()).toBe(true);
   });
-  // BASE-G121 (gh:hub#373): «Ask the assistant» opens its panel on the setup; every step keeps its own «Set up».
+
   it('«Ask the assistant» opens the assistant on the setup, while something is left', async () => {
     const assistant = createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined });
     installAssistant(assistant);

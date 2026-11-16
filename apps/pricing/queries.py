@@ -19,19 +19,20 @@ from uuid import UUID
 
 import pydantic
 from babel.numbers import format_decimal
+from psycopg import sql
 from django.db.models import CharField, Count, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
 from live.operations import UnknownOperation, get, operation
 
 from apps.customer.models import CustomerGroup
 from apps.customer.queries import find_customer, find_group
 from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
-from apps.inventory.queries import find_category, find_product
+from apps.inventory.queries import find_category, find_product, products_standing_for
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.schemas import (
     CatalogRecordOut,
@@ -68,6 +69,7 @@ SERVICES_UNAVAILABLE = _("Services is not active in this business.")
 FROM_QUANTITY = pgettext_lazy("pricing", "from %(quantity)s")
 
 SERVICE_GET = "service.service.get"
+SERVICE_STANDING_FOR = "service.service.standing_for"
 
 
 def business_today() -> dt.date:
@@ -96,7 +98,7 @@ def _page(rows: QuerySet, params, to_row) -> dict:
     return {"rows": [to_row(row) for row in page], "total": rows.count(), "limit": params.limit, "offset": params.offset}
 
 
-def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, ambiguous_code: str):
+def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, ambiguous_code: str):  # noqa: PLR0913
     """The one row whose code or name is ``said`` (any case), else the one whose name holds it."""
     text = said.strip()
     for lookup in (Q(code__iexact=text), Q(name__iexact=text), Q(name__icontains=text) | Q(code__icontains=text)):
@@ -182,6 +184,19 @@ def call_service(ctx: OperationContext, service_id: UUID | None, said: str | Non
         raise unavailable from None
 
 
+def services_standing_for(ids: set[UUID]) -> dict[UUID, UUID]:
+    """Services' ``service.service.standing_for``, asked as the platform in the business at work: the service a
+    recovery made again for each of a separate copy's ``ids`` the business no longer holds, ``{id there: id here}``.
+    With Services off or absent, none: each price keeps the copy's service, and the list detail's add says why."""
+    if not ids:
+        return {}
+    try:
+        op = get(SERVICE_STANDING_FOR)
+        return op(system_context(platform.current_business_scope()), op.input(ids=sorted(ids))).standing_for
+    except (UnknownOperation, AppInactive):
+        return {}
+
+
 # ── Rows ─────────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -218,7 +233,8 @@ def list_row(price_list: PriceList) -> dict:
 
 
 def item_row(item: PriceItem) -> dict:
-    """A ``PriceItemOut``: a product's name, SKU, unit and catalog price, read from Inventory now."""
+    """A ``PriceItemOut``: a product's name, SKU, unit and catalog price, read from Inventory now, and the currency of
+    its list, the one its price is in."""
     product = item.product
     return {
         "id": item.id,
@@ -234,6 +250,7 @@ def item_row(item: PriceItem) -> dict:
         "base_price": product.price if product else None,
         "min_quantity": item.min_quantity,
         "price": item.price,
+        "currency": item.price_list.currency,
         "updated_at": item.updated_at,
     }
 
@@ -257,8 +274,9 @@ def _rules() -> QuerySet:
     return DiscountRule.objects.select_related("category", "product").annotate(customer_group_name=_group_name())
 
 
-def rule_row(rule: DiscountRule) -> dict:
-    """A ``RuleOut``; reads the names of what it applies to when the row lacks them."""
+def rule_row(rule: DiscountRule, currency: str) -> dict:
+    """A ``RuleOut``, its amount per unit in ``currency`` (the business's: a rule belongs to no list); reads the names
+    of what it applies to when the row lacks them."""
     if not hasattr(rule, "customer_group_name"):
         rule = _rules().get(pk=rule.pk)
     return {
@@ -268,6 +286,7 @@ def rule_row(rule: DiscountRule) -> dict:
         "rule_type": rule.rule_type,
         "percent": rule.percent,
         "amount": rule.amount,
+        "currency": currency,
         "buy_quantity": rule.buy_quantity,
         "get_quantity": rule.get_quantity,
         "tiers": [{"min_quantity": Decimal(t["min_quantity"]), "percent": Decimal(t["percent"])} for t in rule.tiers],
@@ -308,6 +327,18 @@ def _status(rows: QuerySet, status: str) -> QuerySet:
     output=Page[PriceListOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "who do I give special conditions to?",
+                "show me the special conditions for partners and distributors",
+                "how many special conditions are still in force?",
+            ),
+            "es": (
+                "¿para quién tengo condiciones especiales?",
+                "enséñame las condiciones de socios y distribuidores",
+                "¿cuántas condiciones especiales siguen en vigor?",
+            ),
+        },
         "description": "List the price lists (the active ones by default): code, name, currency, whether the "
         "prices carry the tax, customer group, dates, whether it is the general list and how many prices it has. "
         "Search by code or name; filter by currency, group, tax or status."
@@ -338,7 +369,21 @@ def list_price_lists(ctx: OperationContext, params: PriceListListIn) -> dict:
     input=PriceListRefIn,
     output=PriceListOut,
     expose_api=True,
-    ai={"description": "Get one price list by its id, its code or its name (e.g. «wholesale list»)."},
+    ai={
+        "asks": {
+            "en": (
+                "is the Hospitality one valid all year or does it end?",
+                "give me the details of Hospitality, HOST-24",
+                "until when is Hospitality valid?",
+            ),
+            "es": (
+                "¿lo de Hostelería vale todo el año o caduca?",
+                "dame el detalle de Hostelería, la HOST-24",
+                "¿qué fechas tiene la de Hostelería?",
+            ),
+        },
+        "description": "Get one price list by its id, its code or its name (e.g. «wholesale list»).",
+    },
 )
 def get_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     return list_row(find_list(data.id, data.price_list, rows=_lists()))
@@ -355,6 +400,18 @@ def get_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     output=Page[PriceItemOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how much is the croissant in each one?",
+                "what does the croissant go for everywhere?",
+                "show me one by one what each thing costs in Hospitality",
+            ),
+            "es": (
+                "¿cuánto cuesta el croissant en cada una?",
+                "¿a cuánto va el croissant en todas?",
+                "enséñame uno por uno lo que cuesta cada cosa en la de Hostelería",
+            ),
+        },
         "description": "List the prices of a price list (named by its code or name), or the prices of one product "
         "or service across every list: the article, its catalog price, the from quantity and the price in cents. "
         "Search by product name or SKU or by service name."
@@ -390,6 +447,18 @@ def list_price_items(ctx: OperationContext, params: PriceItemListIn) -> dict:
     output=PriceItemDetailOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "from how many does the beer's amount in the partners' one apply?",
+                "give me the details of the croissant in the partners' one",
+                "what exactly does a beer go for with the partners?",
+            ),
+            "es": (
+                "¿a partir de cuántas vale lo de la caña de los socios?",
+                "dame el detalle de lo del croissant en la de socios",
+                "¿a cuánto va exactamente la caña para los socios?",
+            ),
+        },
         "description": "Get one price of a price list by its id (see pricing.price_item.list): the article, its list "
         "and the list's currency, the from quantity and the price in cents of that currency."
     },
@@ -399,7 +468,7 @@ def get_price_item(ctx: OperationContext, data: PriceItemIdIn) -> dict:
     if item is None:
         raise NotFound(str(ITEM_NOT_FOUND), code="pricing.price_item_not_found")
     row = item_row(item)
-    return {**row, "currency": item.price_list.currency, "label": item_label(row, ctx.language)}
+    return {**row, "label": item_label(row, ctx.language)}
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────────────────────────
@@ -413,6 +482,18 @@ def get_price_item(ctx: OperationContext, data: PriceItemIdIn) -> dict:
     output=Page[RuleOut],
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the promotions running now",
+                "which promotions apply by themselves?",
+                "what gets cheaper by itself and for whom?",
+            ),
+            "es": (
+                "enséñame las promociones que hay ahora",
+                "¿qué promociones se aplican solas?",
+                "¿qué se rebaja solo y para quién?",
+            ),
+        },
         "description": "List the automatic discount rules (the active ones by default): type and value (a percent, "
         "an amount per unit, buy X get Y, tiers by quantity), what each applies to, its customer group, minimum "
         "quantity, dates and priority. Search by code or name."
@@ -431,7 +512,8 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
         if value:
             rows = rows.filter(**{column: value})
     rows = rows.order_by(*list_order(params.sort, Lower("code"), descending=params.dir == "desc", nulls_last=True))
-    return _page(rows, params, rule_row)
+    currency = platform.business_currency(ctx.scope)
+    return _page(rows, params, lambda rule: rule_row(rule, currency))
 
 
 @operation(
@@ -441,10 +523,24 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     input=RuleRefIn,
     output=RuleOut,
     expose_api=True,
-    ai={"description": "Get one discount rule, active or not, by its id, its code or its name (e.g. «summer rule»)."},
+    ai={
+        "asks": {
+            "en": (
+                "how big is the happy hour discount and how long does it last?",
+                "what does the happy hour consist of?",
+                "give me the details of the happy hour, PROMO-HH",
+            ),
+            "es": (
+                "¿de cuánto es el descuento de la happy hour y cuánto dura?",
+                "¿en qué consiste la happy hour?",
+                "dame el detalle de la happy hour, la PROMO-HH",
+            ),
+        },
+        "description": "Get one discount rule, active or not, by its id, its code or its name (e.g. «summer rule»).",
+    },
 )
 def get_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
-    return rule_row(find_rule(data.id, data.rule))
+    return rule_row(find_rule(data.id, data.rule), platform.business_currency(ctx.scope))
 
 
 # ── What a price or a rule points at in another app ──────────────────────────────────────────────
@@ -458,6 +554,18 @@ def get_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     output=CatalogRecordOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what group is behind the partners' one?",
+                "what is the real name of the group behind that identifier?",
+                "name the identifier this one points at",
+            ),
+            "es": (
+                "¿qué grupo hay detrás de la de socios?",
+                "¿cómo se llama de verdad el grupo de ese identificador?",
+                "¿a qué apunta ese identificador y cómo se llama?",
+            ),
+        },
         "description": "Name by its id the service, the category or the customer group a price list, a price or a "
         "rule points at, as Services, Inventory or Customers name it (a service needs its permission in Services)."
     },
@@ -524,10 +632,10 @@ def _of_article(article: Article) -> Q:
     return Q(service_id=article.service_id)
 
 
-def _customer_groups(data: ResolveIn) -> list[UUID]:
+def _customer_groups(ctx: OperationContext, data: ResolveIn) -> list[UUID]:
     if data.customer_id is None and data.customer is None:
         return []
-    customer = find_customer(data.customer_id, data.customer)
+    customer = find_customer(ctx, data.customer_id, data.customer)
     return list(customer.groups.filter(is_active=True).values_list("id", flat=True))
 
 
@@ -567,8 +675,8 @@ def rule_discount(rule: DiscountRule, line_amount: int, measure: Fraction) -> in
     """What ``rule`` takes off a line of ``line_amount`` cents, between 0 and the line.
 
     Its quantities (amount per unit, buy and free, tiers, minimum) count ``measure``: the line's quantity
-    in the unit its price is for (market-decision 2026-10-15: Odoo, Business Central, Dynamics 365
-    Commerce), so «0,50 € per unit» is per kg of a coffee sold in grams; free units are rounded down.
+    in the unit its price is for (as Odoo, Business Central and Dynamics 365
+    Commerce count it), so «0,50 € per unit» is per kg of a coffee sold in grams; free units are rounded down.
     """
     if rule.min_quantity is not None and measure < Fraction(rule.min_quantity):
         return 0
@@ -623,7 +731,7 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
     """The price of a line (a ``ResolveOut``): the list's or the catalog's, and the best rule's discount."""
     on = business_day(data.when)
     article = article_of(ctx, data)
-    groups = _customer_groups(data)
+    groups = _customer_groups(ctx, data)
     currency = platform.business_currency(ctx.scope)
     lists = candidate_lists(data, on, groups, currency)
     item, price_list = best_list_price(article, data.quantity, lists)
@@ -663,6 +771,18 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
     output=ResolveOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "work out what three croissants cost Nuria",
+                "how much do three croissants come to for Nuria?",
+                "calculate a beer for the hotels' group, with its discount",
+            ),
+            "es": (
+                "calcula lo que cuestan tres croissants para Nuria",
+                "¿cuánto paga Nuria por tres croissants con su descuento?",
+                "calcula cuánto cuesta una caña para el grupo de hoteles",
+            ),
+        },
         "description": "The price of a line: give the product (by its name or SKU) or the service (by its name), "
         "and if you know them the customer (name, phone or email), the quantity and the moment. It answers the "
         "catalog price, the price that applies and the price list it comes from (the general list or the "
@@ -690,3 +810,77 @@ def snapshot_values(rule: DiscountRule) -> dict[str, Any]:
         "valid_from": rule.valid_from,
         "valid_until": rule.valid_until,
     }
+
+
+# ── A separate copy of the business (BASE-F114): what Price Lists gives back from it ─────────────────────────────────
+
+#: What a price of a separate copy is read with: its id there, what ``pricing.price_item.add`` takes and its product's
+#: SKU there (``None`` for a service's), each a column since ``0001_initial``.
+PRICE_FIELDS = ("id", "price_list_id", "product_id", "service_id", "price", "min_quantity", "sku")
+
+
+def prices_in_copy(conn) -> list[dict]:
+    """Each price of a separate copy of the business that counts there (of a service, or of a product Inventory had not
+    deleted: ``live_items``), with what ``PRICE_FIELDS`` names; nothing where the app's table is not there. ``conn`` is
+    the copy's direct, read-only connection: it is read by its own SQL over the models' names, never the ORM."""
+    item, product = PriceItem._meta, Product._meta
+    if conn.execute("SELECT to_regclass(%s)", [item.db_table]).fetchone()[0] is None:
+        return []
+
+    def column(meta, field: str) -> sql.Identifier:
+        return sql.Identifier(meta.get_field(field).column)
+
+    read = sql.SQL(
+        "SELECT {columns} FROM {items} i LEFT JOIN {products} p ON p.{product_pk} = i.{product_id}"
+        " WHERE i.{product_id} IS NULL OR NOT p.{deleted} ORDER BY i.{item_pk}"
+    ).format(
+        columns=sql.SQL(", ").join(
+            [
+                *(
+                    sql.SQL("i.{}").format(column(item, field))
+                    for field in ("id", "price_list", "product", "service_id", "price", "min_quantity")
+                ),
+                sql.SQL("p.{}").format(column(product, "sku")),
+            ]
+        ),
+        items=sql.Identifier(item.db_table),
+        products=sql.Identifier(product.db_table),
+        product_pk=column(product, "id"),
+        product_id=column(item, "product"),
+        deleted=column(product, "is_deleted"),
+        item_pk=column(item, "id"),
+    )
+    return [dict(zip(PRICE_FIELDS, row, strict=True)) for row in conn.execute(read)]
+
+
+def prices_not_in_business(prices: list[dict]) -> list[dict]:
+    """The prices of a separate copy (``prices_in_copy``) the business no longer has, in their order, each as
+    ``pricing.price_item.add`` takes it with its ``id`` there: its list, its one article (a product or a service), its
+    price and its from quantity. Its product is the business's that stands for the copy's (Inventory's
+    ``products_standing_for``), and its service too (Services', ``services_standing_for``). Not lacking: one the
+    business still holds, nor one whose place (its list, its article and its from quantity) the business has taken
+    again, at whatever price: that one stays as the business has it."""
+    held = set(PriceItem.objects.filter(pk__in=[one["id"] for one in prices]).values_list("pk", flat=True))
+    taken = set(
+        PriceItem.objects.filter(price_list_id__in={one["price_list_id"] for one in prices}).values_list(
+            "price_list_id", "product_id", "service_id", "min_quantity"
+        )
+    )
+    here = products_standing_for({one["product_id"]: one["sku"] for one in prices if one["product_id"]})
+    serving = services_standing_for({one["service_id"] for one in prices if one["service_id"]})
+    lacking = []
+    for one in prices:
+        product = here.get(one["product_id"], one["product_id"])
+        service = serving.get(one["service_id"], one["service_id"])
+        if one["id"] in held or (one["price_list_id"], product, service, one["min_quantity"]) in taken:
+            continue
+        lacking.append(
+            {
+                "id": one["id"],
+                "price_list_id": one["price_list_id"],
+                **({"product_id": product} if product else {"service_id": service}),
+                "price": one["price"],
+                "min_quantity": one["min_quantity"],
+            }
+        )
+    return lacking

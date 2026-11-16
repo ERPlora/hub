@@ -1,0 +1,11 @@
+{% extends "base/gate.html" %}{% load i18n %}
+{% comment %}
+503 of a cut of the database past the limit of its wait (base.database_cut, BASE-F111), with Retry-After: it refreshes
+itself until ERPlora answers again. Its `message` is live.database_cut's, in the visitor's language.
+{% endcomment %}
+{% block head %}<meta http-equiv="refresh" content="10">{% endblock %}
+{% block title %}{% translate "We will be back soon" %}{% endblock %}
+{% block content %}
+    <h1>{% translate "We will be back soon" %}</h1>
+    <p>{{ message }}</p>
+{% endblock %}

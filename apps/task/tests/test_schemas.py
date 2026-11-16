@@ -10,9 +10,11 @@ from pydantic import ValidationError
 from apps.task.schemas import (
     AssignIn,
     CommentIn,
+    CommentListIn,
     PageIn,
     ProjectIn,
     ProjectPatchIn,
+    ProjectRefIn,
     SetStatusIn,
     TaskIn,
     TaskListIn,
@@ -20,8 +22,8 @@ from apps.task.schemas import (
     TaskPatchIn,
     TaskRefIn,
 )
-from base.models import Hub
-from base.tenancy.context import use_hub
+
+from .conftest import HUB_DB
 
 
 def errors(schema, **data) -> dict[str, str]:
@@ -51,6 +53,7 @@ def test_only_the_four_priorities():
     assert errors(TaskIn, title="t", priority="critical") == {"priority": "literal_error"}
 
 
+@HUB_DB  # a moment is read on the clock of the business at work, A's (the deployment's, Madrid)
 def test_a_due_date_is_a_day_and_a_moment_is_taken_as_its_day_in_madrid():
     assert TaskIn(title="t", due_date="2026-10-20").due_date == dt.date(2026, 10, 20)
     # 23:30 UTC on the 20th is already the 21st in Madrid (UTC+2 in October).
@@ -76,6 +79,28 @@ def test_a_task_is_named_by_id_or_by_text():
     the_id = uuid.uuid7()
     assert TaskRefIn(id=the_id).id == the_id
     assert errors(TaskRefIn) == {"task": "value_error"}
+
+
+@pytest.mark.parametrize(
+    ("schema", "id_field", "text_field", "message"),
+    [
+        (TaskRefIn, "id", "task", "Say which task: its id, its number or its title."),
+        (ProjectRefIn, "id", "project", "Say which project: its id, its code or its name."),
+        (CommentListIn, "task_id", "task", "Say which task: its id, its number or its title."),
+        (CommentIn, "task_id", "task", "Say which task: its id, its number or its title."),
+    ],
+)
+def test_a_record_is_named_by_its_id_or_by_its_text_and_saying_neither_is_a_422_on_the_text(
+    schema, id_field, text_field, message
+):
+    extra = {"text": "On it"} if schema is CommentIn else {}
+    the_id = uuid.uuid7()
+    assert getattr(schema.model_validate({id_field: str(the_id), **extra}), id_field) == the_id
+    assert getattr(schema.model_validate({text_field: " Opening ", **extra}), text_field) == "Opening"
+    with pytest.raises(ValidationError) as caught:
+        schema.model_validate(extra)
+    assert [(error["loc"], error["type"]) for error in caught.value.errors()] == [((text_field,), "value_error")]
+    assert message in caught.value.errors()[0]["msg"]
 
 
 def test_a_status_change_names_one_of_the_five():
@@ -114,7 +139,7 @@ def test_a_project_needs_code_and_name_and_a_hex_colour():
     assert "color" in errors(ProjectIn, code="c", name="n", color="red; background:url(x)")
     assert "name" in errors(ProjectPatchIn, project="c", name=" ")
     assert errors(ProjectPatchIn, name="n") == {"project": "value_error"}
-    # tasks#43: an edit never changes the code, the project's key.
+    # An edit never changes the code, the project's key.
     assert "code" in errors(ProjectPatchIn, project="c", code="other")
 
 
@@ -127,7 +152,8 @@ def test_the_lists_declare_their_filters_and_sorts():
     assert "due_within_days" in errors(TaskMineIn, due_within_days=-1)
 
 
-def test_a_moment_is_the_day_it_falls_on_in_the_businesss_zone():
+@HUB_DB
+def test_a_moment_is_the_day_it_falls_on_in_the_businesss_zone(monkeypatch, in_business_a):
     # 23:30 UTC on 2 November is still the 2nd in the Canaries and already the 3rd in Madrid (hub#779).
-    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
-        assert TaskIn(title="t", due_date="2026-11-02T23:30:00Z").due_date == dt.date(2026, 11, 2)
+    monkeypatch.setattr(in_business_a, "timezone", "Atlantic/Canary")
+    assert TaskIn(title="t", due_date="2026-11-02T23:30:00Z").due_date == dt.date(2026, 11, 2)

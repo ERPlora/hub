@@ -13,7 +13,9 @@ from PIL import Image as PILImage
 
 from apps.website.api import router
 from apps.website.queries import PUBLIC_LIMIT
-from apps.website.tests.conftest import full_content
+from apps.website.tests.conftest import HOST, HUB_DB, A, B, full_content
+from apps.website.tests.test_apps import CARD_ONLY
+from base.tests.routes import spa_routes
 from config.api import api
 
 ROUTES = {
@@ -29,8 +31,6 @@ ROUTES = {
     ("GET", "/website/public/catalog", "website.public.catalog"),
     ("GET", "/website/public/reviews", "website.public.reviews"),
 }
-HOST = "a.localhost"
-
 
 def get(client, path, **params):
     headers = params.pop("headers", {})
@@ -75,19 +75,22 @@ def test_the_api_keeps_parity():
 def test_every_operation_has_a_route_and_is_open_to_api_keys():
     from live.operations import registry
 
-    ops = {name for name in registry if name.startswith("website.")}
+    ops = {name for name in registry if name.startswith("website.")} - CARD_ONLY
     assert ops == {operation for _m, _p, operation in ROUTES}
     assert all(registry[name].expose_api for name in ops)
 
 
+def test_what_only_the_assistants_card_reads_has_no_route():
+    from live.operations import registry
+
+    assert {name for name in CARD_ONLY if registry[name].expose_api} == set()
+
+
 def test_the_spas_route_map_names_every_website_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op.startswith("website.")}
-    assert mine == ROUTES
+    assert spa_routes("website.") == ROUTES
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_owner_saves_and_publishes_and_a_manager_only_reads(admin_client, make_user, client):
     save_and_publish(admin_client)
     site = get(admin_client, "/website/site").json()
@@ -100,14 +103,24 @@ def test_the_owner_saves_and_publishes_and_a_manager_only_reads(admin_client, ma
     assert post(client, "/website/site/publish").status_code == 403
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_section_that_cannot_hide_is_a_422_on_its_field(admin_client):
     response = post(admin_client, "/website/site", {"template": "classic", "theme": {}, "content": {"hero": {"hidden": True}}})
     assert response.status_code == 422
     assert "content.hero.hidden" in response.json()["error"]["fields"]
 
 
-@pytest.mark.django_db
+@HUB_DB
+def test_a_wrong_email_is_refused_in_the_websites_own_words(admin_client):
+    """The editor's error under the email field speaks as its others do and as the WORKBOOK says (WEBSITE-F01), not
+    with Equipo's «Introduzca…» for the same English (hub#661)."""
+    draft = {"template": "classic", "theme": {}, "content": {"contact": {"email": "not-an-email"}}}
+    response = post(admin_client, "/website/site", draft, HTTP_ACCEPT_LANGUAGE="es")
+    assert response.status_code == 422
+    assert response.json()["error"]["fields"]["content.contact.email"] == "Escribe un correo electrónico válido."
+
+
+@HUB_DB
 @pytest.mark.usefixtures("website_manifest")
 def test_preview_needs_website_manage_and_allows_framing_by_the_spa(admin_client, client, make_user):
     post(admin_client, "/website/site", {"template": "bold", "theme": {}, "content": full_content()})
@@ -126,20 +139,20 @@ def test_preview_needs_website_manage_and_allows_framing_by_the_spa(admin_client
     assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_qr_downloads_as_a_file_or_comes_as_json(manager_client):
     png = get(manager_client, "/website/qr", format="png")
     assert png.status_code == 200
     assert png["Content-Type"] == "image/png"
-    assert png["Content-Disposition"] == 'attachment; filename="website-qr-a.png"'
+    assert png["Content-Disposition"] == f'attachment; filename="website-qr-{A.key}.png"'
     assert png.content.startswith(b"\x89PNG")
     svg = get(manager_client, "/website/qr", format="svg")
     assert svg["Content-Type"] == "image/svg+xml" and svg.content.startswith(b"<svg")
     as_json = get(manager_client, "/website/qr", format="svg", headers={"HTTP_ACCEPT": "application/json"})
-    assert as_json.json()["url"] == "http://a.localhost/"
+    assert as_json.json()["url"] == f"http://{HOST}/"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_image_bigger_than_djangos_ceiling_still_uploads(admin_client, hub_files):
     noise = PILImage.frombytes("RGB", (1000, 1000), os.urandom(3_000_000))
     buffer = io.BytesIO()
@@ -155,7 +168,7 @@ def test_an_image_bigger_than_djangos_ceiling_still_uploads(admin_client, hub_fi
     assert response.json()["url"].startswith("/p/media/")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_image_past_the_plans_space_answers_409_with_the_code_of_files(admin_client, hub_files):
     from apps.website.models import Image
     from base.models import Hub
@@ -163,23 +176,23 @@ def test_an_image_past_the_plans_space_answers_409_with_the_code_of_files(admin_
     buffer = io.BytesIO()
     PILImage.new("RGB", (4, 3), (200, 30, 30)).save(buffer, format="PNG")
     body = {"filename": "logo.png", "content_type": "image/png", "data_base64": base64.b64encode(buffer.getvalue()).decode()}
-    Hub.objects.filter(slug="a").update(state={"plan": {"max_storage_bytes": len(buffer.getvalue()) - 1}})
+    Hub.objects.filter(slug=A.key).update(state={"plan": {"max_storage_bytes": len(buffer.getvalue()) - 1}})
 
     response = post(admin_client, "/website/images", body)
 
     assert (response.status_code, response.json()["error"]["code"]) == (409, "base.file_no_space")
     assert not Image.objects.exists()
-    Hub.objects.filter(slug="a").update(state={"plan": {"max_storage_bytes": len(buffer.getvalue())}})
+    Hub.objects.filter(slug=A.key).update(state={"plan": {"max_storage_bytes": len(buffer.getvalue())}})
     assert post(admin_client, "/website/images", body).status_code == 201
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_upload_past_its_limit_is_refused_before_it_is_read(admin_client):
     response = post(admin_client, "/website/images", {"data_base64": "A" * 7_200_000})
     assert (response.status_code, response.json()["error"]["code"]) == (413, "payload_too_large")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_public_catalog_answers_without_a_session_only_when_published_and_is_rate_limited(admin_client, client):
     response = get(client, "/website/public/catalog")
     assert (response.status_code, response.json()["error"]["code"]) == (404, "website.not_published")
@@ -199,17 +212,17 @@ def test_public_catalog_answers_without_a_session_only_when_published_and_is_rat
     assert get(client, "/website/public/catalog", headers={"REMOTE_ADDR": "198.51.100.9"}).status_code == 200
 
 
-@pytest.mark.django_db
-def test_one_hubs_publication_is_not_another_hubs_public_site(admin_client, client):
+@HUB_DB
+def test_one_hubs_publication_is_not_another_hubs_public_site(admin_client, client, hub_b):
     save_and_publish(admin_client)
     admin_client.logout()
     for path in ("/api/website/public/site", "/api/website/public/catalog", "/api/website/public/reviews"):
-        response = client.get(path, HTTP_HOST="b.localhost")
+        response = client.get(path, HTTP_HOST=f"{B.key}.localhost")
         assert (response.status_code, response.json()["error"]["code"]) == (404, "website.not_published"), path
         assert client.get(path, HTTP_HOST=HOST).status_code == 200, path
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_public_site_is_json_for_anyone_once_published(admin_client, client):
     save_and_publish(admin_client)
     admin_client.logout()
@@ -217,7 +230,7 @@ def test_the_public_site_is_json_for_anyone_once_published(admin_client, client)
     assert (body["version"], body["template"], body["content"]["hero"]["title"]) == (1, "modern", "Fresh food every day")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_public_reviews_answer_without_a_session_once_published_in_the_visitors_language(admin_client, client):
     from django.core.cache import cache
 
@@ -237,7 +250,7 @@ def test_the_public_reviews_answer_without_a_session_once_published_in_the_visit
         "write_uri": "",
         "reviews": [],
     }
-    cache.set(reviews.reviews_key("a", PLACE_ID), google_reviews(), reviews.TTL)
+    cache.set(reviews.reviews_key(A.key, PLACE_ID), google_reviews(), reviews.TTL)
     response = client.get("/api/website/public/reviews", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es")
     body = response.json()
     assert response.status_code == 200 and "Set-Cookie" not in response.headers

@@ -1,9 +1,9 @@
-// flow: SALE-F28 (SALE-G01) — with the period «7 days», what was sold each of those business days, today last
+// flow: SALE-F28 — with the period «7 days», what was sold each of those business days, today last
 // (`sale.sale.last_7_days`, live): the old Home's «Last 7 days» panel, inside Sales. A day without sales says
 // 0,00 €; a failure says so.
 import { describe, expect, it } from 'vitest';
 
-import { errorFrame, mountSale } from '../../__tests__/mount-sale';
+import { business, errorFrame, JAPANESE, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import SalesWeek from './SalesWeek.vue';
 
@@ -28,6 +28,18 @@ describe('SalesWeek', () => {
     expect(days[0]).toMatch(/mi/i);
     expect(days[6]).toContain('125,50 €');
     expect(days[6]).toContain('20');
+  });
+
+  // hub#936: until the business says its money, a day's total is «—», never 125,50 for 12,550 yen.
+  it('a day’s total waits for the business’s money', async () => {
+    const m = await mountSale(SalesWeek, { locale: 'es', business: null });
+    await m.live();
+    await m.result(OP, { rows: DAYS.map((day) => ({ day, total: 12550 })) });
+    const last = () => plain(m.wrapper.findAll('[data-testid="sale-week-day"]')[6]?.text() ?? '');
+    expect(last()).toContain('—');
+    expect(last()).not.toContain('125,50');
+    await m.result('base.business.get', business(JAPANESE));
+    expect(last()).toContain('12.550 ¥');
   });
 
   it('a failure says so', async () => {

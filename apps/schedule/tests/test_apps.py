@@ -8,13 +8,12 @@ from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.schedule import events
 from apps.schedule import queries, services  # noqa: F401  (importing them registers the operations)
 from base import home
 
-# The old module's five permissions (module.json), renamed <app>.<action>.
 PERMISSIONS = [
     "schedule.view",
     "schedule.add",
@@ -29,7 +28,12 @@ QUERIES = {
     "schedule.settings.get",
     "schedule.business.is_open",
     "schedule.hours.for_range",
+    "schedule.special_day.get",
+    "schedule.override.get",
 }
+#: What names a special day or a temporary change on the card of a write (hub#675): only the card reads them, the model
+#: finds those records in their lists; no tool, no door of the API.
+CARD_ONLY = {"schedule.special_day.get", "schedule.override.get"}
 COMMANDS = {
     "schedule.week.set_day",
     "schedule.week.confirm",
@@ -112,10 +116,10 @@ def test_every_granted_permission_is_declared():
             )
 
 
-def test_navigation_is_the_three_tabs_of_the_old_module():
+def test_navigation_is_three_tabs():
     entries = schedule().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
-    # `star-outline` (the old special days' icon) is not registered: calendar-outline stands in.
+    # `star-outline` for the special days is not registered: calendar-outline stands in.
     assert [
         (entry.id, str(entry.label), entry.path, entry.icon) for entry in entries
     ] == [
@@ -141,6 +145,9 @@ def test_the_operations_of_the_app():
 
 def test_every_operation_tells_the_assistant_what_it_does():
     for name, op in schedule_operations().items():
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         if op.kind == "command":
@@ -153,7 +160,7 @@ def test_the_high_risk_commands():
     assert {
         name
         for name, op in schedule_operations().items()
-        if op.ai.get("risk") == "high"
+        if op.kind == "command" and op.ai.get("risk") == "high"
     } == HIGH_RISK
 
 
@@ -186,15 +193,12 @@ def test_the_lists_are_api_and_assistant_operations():
         assert operations[name].expose_api is True, name
 
 
-# The Home's hook (PLAN-HUB round 2026-10-21; FIX-SCHEDULE-SETUP-HOOKS): the old module's own item «Confirm your
-# opening hours» (module.json `setup`, schedules#42), which reads whether the week is still the default one. The old
-# module declared no panel and no bell row.
+# The Home's step «Confirm your opening hours», which reads whether the week is still the default one.
 
 
 def test_the_homes_step_is_confirm_your_opening_hours_done_once_the_week_is_confirmed():
-    """The old module's item, same order and words: recommended, as it declared it (`required: false`), done once a
-    person confirmed the week or saved a day of it (the settings' ``hours_confirmed``, the old `confirmed_hours`), for
-    whoever changes the hours, leading to the week (the old `/m/schedules/hours`)."""
+    """Recommended (`required: false`), done once a person confirmed the week or saved a day of it (the settings'
+    ``hours_confirmed``), for whoever changes the hours, leading to the week."""
     (step,) = schedule().setup
     assert isinstance(step, SetupStep)
     assert (
@@ -253,12 +257,11 @@ def test_the_step_is_refreshed_on_what_confirms_the_week():
 
 
 def test_the_steps_icon_is_registered():
-    # The app's own icon, the old module's `time-outline`.
+    # The app's own icon, `time-outline`.
     (step,) = schedule().setup
     icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
     assert f"'{step.icon.removeprefix('ion:')}'" in icons
 
 
 def test_schedules_brings_no_panels_and_no_bell_rows_to_the_home():
-    # The old module declared neither (its module.json has no `widgets` and no `bell`).
     assert (schedule().widgets, schedule().bell) == ([], [])

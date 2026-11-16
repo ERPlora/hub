@@ -1,7 +1,7 @@
 // What the specs of the website editor (website*.spec.ts and the fixes seen in it) share and the rest of the e2e does not.
-import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, settled } from './helpers';
+import { A, api, hostPage, type Registration, registerBusinessIn, registrationOf, settled } from './helpers';
 
 /** The site as `GET /website/site` answers it: what a spec puts back after. */
 export interface Site {
@@ -62,4 +62,81 @@ export async function photo(page: Page, label: string, hue: number): Promise<Buf
     { label, hue },
   );
   return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+}
+
+/** The site as it was, with a service `name` at 15,50 and Services' whole catalog with its prices shown, published: the
+ *  site as it was, to put it back. */
+export async function publishedWithAService(context: BrowserContext, name: string): Promise<Site> {
+  const site = await api<Site>(context, A, 'GET', '/website/site');
+  expect(site.status).toBe(200);
+  const found = site.data;
+  const created = await api(context, A, 'POST', '/service/services', { name, price: 1550, duration_minutes: 30, tax_category_key: 'service.generic' });
+  expect(created.status, JSON.stringify(created.data)).toBe(201);
+  const content = {
+    ...found.content,
+    catalog: { ...found.content.catalog, hidden: false, source: 'service', category_ids: [], show_prices: true },
+  };
+  const saved = await api(context, A, 'POST', '/website/site', { template: found.template, theme: found.theme, content });
+  expect(saved.status, JSON.stringify(saved.data)).toBe(200);
+  const published = await api(context, A, 'POST', '/website/site/publish');
+  expect(published.status, JSON.stringify(published.data)).toBe(200);
+  return found;
+}
+
+/** The site put back as it was (`found`) and offline: the other specs on hub `a` expect `/` to jump to the login. */
+export async function siteBackOffline(context: BrowserContext, found: Site): Promise<void> {
+  const restored = await api(context, A, 'POST', '/website/site', { template: found.template, theme: found.theme, content: found.content });
+  expect(restored.status, JSON.stringify(restored.data)).toBe(200);
+  const offline = await api(context, A, 'POST', '/website/site/unpublish');
+  expect(offline.status, JSON.stringify(offline.data)).toBe(200);
+}
+
+/** What a spec of the public page keeps to put back: `a`'s registration, the owner on the editor and the site as found. */
+export interface KeptSite {
+  original: Registration;
+  owner: { context: BrowserContext; page: Page };
+  found: Site;
+}
+
+/** `a`'s registration kept, the owner on the website's editor at a desk's size, and the site published with a service
+ *  `name` (`publishedWithAService`). */
+export async function publishedSiteOf(browser: Browser, name: string): Promise<KeptSite> {
+  const original = registrationOf('a');
+  const owner = await hostPage(browser, A, { next: '/website', viewport: { width: 1440, height: 900 } });
+  return { original, owner, found: await publishedWithAService(owner.context, name) };
+}
+
+/** Registers the hooks of a spec of the public page: `cleanUp` and the site published with the service `name`
+ *  (`publishedSiteOf`) before its tests, and everything put back after them (`siteAndCountryBack`). Gives what it kept,
+ *  filled once the first hook has run. */
+export function publishedSiteSpec(name: string, cleanUp: () => void): Partial<KeptSite> {
+  const kept: Partial<KeptSite> = {};
+  test.beforeAll(async ({ browser }) => {
+    cleanUp();
+    Object.assign(kept, await publishedSiteOf(browser, name));
+  });
+  test.afterAll(() => siteAndCountryBack(kept, cleanUp));
+  return kept;
+}
+
+/** After the spec: `a` registered where it was, its site put back and offline, `cleanUp`, and the owner's context closed. */
+export async function siteAndCountryBack(kept: Partial<KeptSite>, cleanUp: () => void): Promise<void> {
+  try {
+    if (kept.original) await registerBusinessIn(kept.original, kept.original.country);
+    if (kept.owner && kept.found) await siteBackOffline(kept.owner.context, kept.found);
+  } finally {
+    cleanUp();
+    await kept.owner?.context.close();
+  }
+}
+
+/** The label of the price of the service `name` in the public catalog, as the bundle reads it: no session, and in the
+ *  visitor's `language` when one is given. */
+export async function publicPriceLabel(context: BrowserContext, name: string, language?: string): Promise<string> {
+  const answer = await context.request.get(`${A}/api/website/public/catalog`, language ? { headers: { 'Accept-Language': language } } : undefined);
+  expect(answer.status()).toBe(200);
+  const catalog = (await answer.json()) as { groups: { items: { name: string; price_label: string }[] }[] };
+  const item = catalog.groups.flatMap((group) => group.items).find((row) => row.name === name);
+  expect(item, `${name} in the public catalog`).toBeTruthy();
+  return item?.price_label ?? '';
 }

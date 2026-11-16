@@ -1,28 +1,32 @@
-"""Turning a business's modules on and off, and the plan's limit on them (PLAN-HUB §9, PLAN-DB §7; BASE-F18, F23–F25).
+"""Turning a business's modules on and off, and the plan's limit on them.
 
 The rules, without the database: ``base.services`` (``base.app.enable``, ``base.app.disable``) and ``base.queries``
 (``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.AppActivation``.
 
 - A module (``kind = "app"``) is ``on`` or ``off`` in a hub. In a hub with its own database its tables are made the
-  first time it is turned on (S3; PLAN-DB §7): meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried
+  first time it is turned on: meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried
   again). Both are **wanted** on: the closure by ``requires``, the plan's limit and what goes off count them as on; only
   ``on`` is active (its operations, the relay, the menu). It is **chosen** when the business turned it on itself; what
   the closure by ``requires`` brought along with it is not, and goes off again with the last chosen module on that
   needs it (Odoo's «an app with its dependencies»).
-- **The baseline** (round 2026-10-27): a hub is born with every module off, a demo too. The business turns on what it
+- **The baseline**: a hub without rows has every module off. The business turns on what it
   uses, one by one in Apps or all of a blueprint's at once (``base.blueprint.import`` turns them on, then loads); a
-  module without its row is off (PLAN-DB: «``off`` o sin fila»). The first change writes every module down
-  (``base.services``), so two changes at once have rows to lock. A vertical's template turns on its modules with
+  module without its row is off. The first change writes every module down
+  (``base.services``), so two changes at once have rows to lock.
+- **What a business is born with**: its sign-up writes every module down, off but
+  the apps its country requires that say the platform may turn them on by itself (:func:`born_on`: Taxes, in every
+  country), on with what they need and none chosen (:func:`born`), a demo too. Never one that binds the business to a
+  tax authority (VeriFactu): its owner turns it on, asked by the Home. A vertical's template turns on its modules with
   their roots chosen (:func:`template`; 13 of 21 for the restaurant): the modules on that no other module on needs.
-- **Every module on** (:func:`every_on`): what a hub had without rows before that round, every module on and its roots
-  chosen (today 17 of 27). The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
+- **Every module on** (:func:`every_on`), its roots chosen: what a hub without rows had before hubs started with every
+  module off. The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
-  that is no business's, ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active) and the
-  worker's scope (``WORKER_SCOPE_SLUG``), where phase 1 runs every app's scheduled tasks over the tables every hub
-  shares (:func:`is_platform`).
+  that is no business's and ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active;
+  :func:`is_platform`). The worker runs each hub's scheduled tasks on that hub's own scope (``base.scheduler``), so a
+  business's apps are its own there too (hub#1053).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
-  lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
+  lowered) turns nothing off: it only refuses turning on one more.
 - **An app's refusal**: a module may refuse to go off (VeriFactu once on in Spain, VERIFACTU-F32) by defining
   ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``, and to go on (VeriFactu outside Spain,
   VERIFACTU-F01) by defining ``can_enable`` alike: the reason, in the person's language, or ``None``. Each runs in the
@@ -39,6 +43,7 @@ opened), so what a business has costs no call; only what that row does not list 
 cache. Tables are never dropped: a row that lists a module is right however old it is, one that does not may be behind.
 """
 
+import datetime as dt
 import logging
 from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
@@ -49,9 +54,11 @@ from typing import Any
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import translation
+from django.utils.translation import gettext_lazy
 from live.context import Scope
 from live.meta import module_configs
 
+from base.business import country_name, country_or_market
 from base.tenancy.context import HUB_SCOPE_KIND
 
 logger = logging.getLogger(__name__)
@@ -64,6 +71,8 @@ FAILED = "failed"
 STATES = (ON, OFF, CREATING, FAILED)
 #: What the business wants on: on, or on its way (its tables being made, or tried again after failing).
 WANTED = frozenset({ON, CREATING, FAILED})
+#: How long an app may wait for its tables before it counts as stuck: the alarm goes off past it.
+STUCK_AFTER = dt.timedelta(minutes=10)
 
 #: The modules off in a business, kept in Django's cache (Valkey in production, only as a cache) per host: the gate
 #: of every operation of a module, the relay and the menu ask it, and the rows are read once per business. A change
@@ -75,7 +84,7 @@ OFF_APPS_TTL = 60
 #: to different slots of the Valkey cluster, which refuses a call on both (``base.cache``).
 CREATING_APPS_CACHE = "base.apps_creating:"
 #: The modules whose tables a hub's own database has, as control's row says (``Hub.schema_apps``), kept and forgotten with
-#: them: what is refused is read from control once a minute at most. Behind, it can only say «not yet» (PLAN-DB §9).
+#: them: what is refused is read from control once a minute at most. Behind, it can only say «not yet».
 CREATED_APPS_CACHE = "base.apps_created:"
 #: What the migrator always notes of a database it confirmed: a row without it knows nothing of what that database has.
 CONFIRMED_BY = "base"
@@ -86,6 +95,9 @@ _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", d
 #: The hooks a module refuses by (:func:`refusals`): to go off, and to go on.
 CAN_DISABLE = "can_disable"
 CAN_ENABLE = "can_enable"
+#: Base's own reason not to turn off a module the business must have on in its country (:func:`mandatory_on`,
+#: hub#997), when the module gives none of its own.
+MANDATORY_OFF = gettext_lazy("%(app)s is mandatory for businesses in %(country)s: it can't be turned off.")
 
 #: ``{label: what it requires}``, a module's direct ``requires`` (acyclic: ``live.checks``).
 Graph = Mapping[str, Iterable[str]]
@@ -132,6 +144,26 @@ def needs(labels: Iterable[str], graph: Graph) -> set[str]:
     return found
 
 
+def in_requires_order(labels: Iterable[str], graph: Graph) -> list[str]:
+    """``labels``, each once, each after those of them it requires, directly or not, and otherwise in their order: what
+    is brought back from a separate copy goes so, and a record finds what it points at (hub#1284). One ``graph`` does
+    not know (a platform app) requires none."""
+    asked = list(dict.fromkeys(labels))
+    below = {label: needs([label], graph) if label in graph else set() for label in asked}
+    ordered: list[str] = []
+
+    def place(label: str) -> None:
+        if label not in ordered:
+            for required in asked:
+                if required in below[label]:
+                    place(required)
+            ordered.append(label)
+
+    for label in asked:
+        place(label)
+    return ordered
+
+
 def roots(on: Iterable[str], graph: Graph) -> frozenset[str]:
     """The modules of ``on`` that no other module of ``on`` needs, directly or not."""
     on = set(on)
@@ -147,12 +179,41 @@ def template(apps: Iterable[str], graph: Graph) -> dict[str, Activation]:
 
 
 def baseline(graph: Graph) -> dict[str, Activation]:
-    """What a hub that never turned anything on or off has: every module off, none chosen (round 2026-10-27)."""
+    """What a hub that never turned anything on or off has: every module off, none chosen."""
     return template((), graph)
 
 
+def born_on(country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
+    """The modules a business of ``country`` is born with on: those it must have on there, as each says in its
+    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
+    (``platform_turns_on``: Taxes), never one that binds the business to a tax authority (VeriFactu)."""
+    from base.home import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
+
+    return frozenset(
+        config.label
+        for config in (module_configs() if configs is None else configs)
+        if mandatory_in(config, country) and getattr(config, MANDATORY_ATTRIBUTE).get("platform_turns_on") is True
+    )
+
+
+def born_apps(country: str) -> frozenset[str]:
+    """Every module a business of ``country`` is born with on: :func:`born_on` and what they need. Its sign-up makes
+    their tables and turns them on (``base.tenancy.provision``); none of them makes the business's «Your apps»."""
+    graph = module_graph()
+    return frozenset(label for label, row in born(born_on(country), graph).items() if row.on)
+
+
+def born(labels: Iterable[str], graph: Graph) -> dict[str, Activation]:
+    """Every module's state in a business born with ``labels`` on (:func:`born_on`): they and what they need on, none
+    chosen (the business chose none: they take nothing of the plan's limit); every other module off."""
+    on = set(labels)
+    on |= needs(on, graph)
+    return {label: Activation(ON, False) if label in on else OFF_ROW for label in graph}
+
+
 def every_on(graph: Graph) -> dict[str, Activation]:
-    """Every module on, its roots chosen: the hubs of before round 2026-10-27, the local hubs and the platform."""
+    """Every module on, its roots chosen: the hubs made before every module started off, the local hubs and the
+    platform."""
     return template(graph, graph)
 
 
@@ -186,17 +247,21 @@ def enabling(label: str, current: Mapping[str, Activation], graph: Graph) -> dic
     return changes
 
 
-def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> dict[str, Activation]:
+def disabling(
+    label: str, current: Mapping[str, Activation], graph: Graph, kept: Iterable[str] = ()
+) -> dict[str, Activation]:
     """What turning ``label`` off changes: it, and what came along with it (on, not chosen) that no module left on
-    needs any more; ``{}`` when it is off. ``ValueError`` when a module on needs it: check :func:`required_by` first.
-    A module being created (or that failed) is wanted on: it goes off as one on does, its tables kept."""
+    needs any more, but those of ``kept`` (:func:`mandatory_on`), which stay on; ``{}`` when it is off. ``ValueError``
+    when a module on needs it: check :func:`required_by` first. A module being created (or that failed) is wanted on:
+    it goes off as one on does, its tables kept."""
     if not current[label].wanted:
         return {}
     needed_by = required_by(label, current, graph)
     if needed_by:
         raise ValueError(f"{label!r} is needed by {', '.join(needed_by)}: they go off first.")
     off = {label}
-    brought = needs([label], graph)
+    # One kept on stays wanted, and so does what it needs: ``staying`` below keeps it all.
+    brought = needs([label], graph) - set(kept)
     changed = True
     while changed:
         changed = False
@@ -210,11 +275,11 @@ def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> di
     return {other: OFF_ROW for other in [label, *sorted(off - {label})]}
 
 
-def keeping_on(label: str, current: Mapping[str, Activation], graph: Graph) -> list[str]:
+def keeping_on(label: str, current: Mapping[str, Activation], graph: Graph, kept: Iterable[str] = ()) -> list[str]:
     """Whose refusal to go off keeps ``label`` on: the modules wanted on that need it (they would have to go off first)
-    and itself; with none, itself and what would go off along with it."""
+    and itself; with none, itself and what would go off along with it (never one of ``kept``: :func:`disabling`)."""
     needed = required_by(label, current, graph)
-    return [*needed, label] if needed else list(disabling(label, current, graph))
+    return [*needed, label] if needed else list(disabling(label, current, graph, kept))
 
 
 def chosen_on(current: Mapping[str, Activation], *, among: Iterable[str] | None = None) -> int:
@@ -235,21 +300,46 @@ def plan_limit(photo: Any) -> int | None:
     return limit
 
 
-def refusals(
-    labels: Iterable[str], *, ctx: Any, hook: str = CAN_DISABLE, configs: Iterable[Any] | None = None
+def mandatory_on(current: Mapping[str, Activation], country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
+    """The modules on in ``current`` that a business of ``country`` must have on (hub#997), as each says in its
+    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain): they never go off there, by themselves
+    (:func:`refusals`) nor along with another (:func:`disabling`). One being set up, or that could not be, binds
+    nothing yet: it can still be given up on."""
+    from base.home import mandatory_in  # base.home reads the modules' declarations; this module is imported earlier
+
+    return frozenset(
+        config.label
+        for config in (module_configs() if configs is None else configs)
+        if config.label in current and current[config.label].on and mandatory_in(config, country)
+    )
+
+
+def refusals(  # noqa: PLR0913
+    labels: Iterable[str],
+    *,
+    ctx: Any,
+    hook: str = CAN_DISABLE,
+    configs: Iterable[Any] | None = None,
+    kept: Iterable[str] = (),
+    country: str = "",
 ) -> dict[str, str]:
     """``{label: its reason}`` of those of ``labels`` whose ``hook`` (:data:`CAN_DISABLE`, :data:`CAN_ENABLE`) gives one,
     in the order of ``labels``. Each hook runs once, in the language of who asks: its reason is said in it, whatever the
-    process runs in."""
+    process runs in. To go off, one of ``kept`` (:func:`mandatory_on` of a business of ``country``) without a reason of
+    its own gives base's (:data:`MANDATORY_OFF`)."""
     by_label = {config.label: config for config in (module_configs() if configs is None else configs)}
     language = getattr(ctx, "language", None)
+    kept = set(kept) if hook == CAN_DISABLE else set()
     said: dict[str, str] = {}
     for label in labels:
         ask = getattr(by_label.get(label), hook, None)
-        if not callable(ask):
-            continue
         with translation.override(language) if language else nullcontext():
-            reason = ask(ctx)
+            reason = ask(ctx) if callable(ask) else None
+            if not (isinstance(reason, str) and reason.strip()) and label in kept:
+                reason = MANDATORY_OFF % {
+                    "app": by_label[label].verbose_name,
+                    "country": country_name(country_or_market(country), translation.get_language()),
+                }
         if isinstance(reason, str) and reason.strip():
             said[label] = reason.strip()
     return said
@@ -263,9 +353,9 @@ def veto(
 
 
 def is_platform(scope: Scope) -> bool:
-    """A scope that is no business choosing its apps: no business's at all, ERPlora's own hub or the worker's (phase
-    1 runs every app's scheduled tasks there, over the tables every hub shares). Every module is on in it."""
-    return scope.kind != HUB_SCOPE_KIND or scope.key in {settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG}
+    """A scope that is no business choosing its apps: no business's at all, or ERPlora's own hub. Every module is on
+    in it."""
+    return scope.kind != HUB_SCOPE_KIND or scope.key == settings.PLATFORM_HUB_SLUG
 
 
 def states_of(scope: Scope) -> dict[str, Activation]:
@@ -292,7 +382,8 @@ def off_apps(scope: Scope) -> frozenset[str]:
 
 def creating_apps(scope: Scope) -> frozenset[str]:
     """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
-    tells them «activating». None in the platform, nor in a hub that shares phase 1's database."""
+    tells them «activating». None in the platform, nor in a hub without a database of its own, where nothing is made
+    later (only the test suite's fallback keeps one)."""
     if is_platform(scope):
         return frozenset()
     return _kept(scope)[1]
@@ -327,8 +418,9 @@ def _created_apps(hub: Any) -> frozenset[str] | None:
     if isinstance(kept, list):
         return frozenset(kept)
     from base import services  # base.services imports this module
+    from base.services import provisioning
 
-    row = services.registry_row(hub.pk)
+    row = provisioning.registry_row(hub.pk)
     if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
         return None
     created = services.apps_created(row)

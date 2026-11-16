@@ -4,11 +4,10 @@ services.py records them in the outbox, in the command's transaction; live.py na
 each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists. VeriFactu (which
 requires invoice) registers every ``invoice.invoice.issued``.
 
-Reactions: a charged sale is invoiced, a refund and a void are rectified, each through an operation of
-this app run as the system, in its own transaction. The outbox relay (phase 2, in the worker) hands each
-delivered event to ``react``; the operations are idempotent (one invoice per sale, one rectification per
-refund and per void), and a refund or a void that comes before its sale's invoice is refused so that the
-relay retries it (``invoice.sale_not_invoiced``).
+Reactions: a charged sale is invoiced, a refund and a void are rectified, each through an operation of this app run as
+the system, in its own transaction. The worker's outbox relay hands each delivered event to ``react``; the operations
+are idempotent (one invoice per sale, one rectification per refund and per void), and a refund or a void that comes
+before its sale's invoice is refused so that the relay retries it (``invoice.sale_not_invoiced``).
 """
 
 from typing import Any

@@ -17,16 +17,17 @@ from asgiref.sync import async_to_sync
 from django.core.signals import request_finished, request_started
 from django.db import close_old_connections
 
+from base.tenancy.tests.business import A, HUB_DB
 from config.asgi import application
 
-# The SPA reads the session through an operation (a transaction).
+# The SPA reads the session through an operation (a transaction), in business A's own database.
 pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.usefixtures("keep_the_test_connection", "spa_manifest"),
+    HUB_DB,
+    pytest.mark.usefixtures("hub_a", "keep_the_test_connection", "spa_manifest"),
 ]
 
 PLATFORM_HOST = "hubs.localhost:8000"
-HUB_HOST = "a.localhost:8000"
+HUB_HOST = f"{A.key}.localhost:8000"
 
 
 @pytest.fixture
@@ -122,7 +123,7 @@ def test_a_client_root_path_does_not_reach_the_api_of_a_hub():
     assert urlsplit(target).path == "/auth/login"
 
 
-# WebSockets: /ws/print is the only one (PLAN-HUB §5); it was a 500, Django serves HTTP only.
+# WebSockets: /ws/print is the only one, served next to Django, which serves HTTP only.
 
 
 def websocket_scope(path: str, root_path: str = "") -> dict:

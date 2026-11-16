@@ -1,6 +1,5 @@
-"""Django admin of the verifactu app, for the platform's staff (hubs.erplora.com, PLAN §17–§18), at the service of
-support (Ioan, 2026-10-15: «a record not sent is not a record registered»; support fixes a sending problem, it never
-deletes a sale).
+"""Django admin of the verifactu app, for the platform's staff (hubs.erplora.com), at the service of support: a
+record not sent is not a record registered; support fixes a sending problem, it never deletes a sale.
 
 Nothing fiscal is typed: what was sealed is shown whole and read-only, never added, changed nor deleted, and a record
 the AEAT registered stays as it is. What support changes, it changes through the module's operations, for the hub
@@ -10,17 +9,23 @@ form's error). The SaaS's photo, the environment and the certificate are never t
 """
 
 import pytest
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.utils import flatten_fieldsets
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
+from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.html import escape
+from live.context import system_context
 
+from apps.verifactu import gateway
 from apps.verifactu.admin import (
+    CHAINS_RESCHEDULED,
+    CORRECTED,
+    RESCHEDULED,
     AeatRecordAdmin,
     ChainAdmin,
     ConfigAdmin,
@@ -37,13 +42,24 @@ from apps.verifactu.models import (
     OwnCertificate,
     Record,
     SendControl,
+    wait_reason_text,
 )
-from apps.verifactu import gateway
-from apps.verifactu.models import wait_reason_text
-from apps.verifactu.tests.conftest import aeat_holds, aeat_answer, answering, manual, records_of, run
+from apps.verifactu.tests.conftest import (
+    HUB_DB,
+    ISSUER,
+    A,
+    B,
+    aeat_answer,
+    aeat_holds,
+    answering,
+    ctx_for,
+    manual,
+    records_of,
+    run,
+)
 from base.admin import ADMIN_HUB_SESSION_KEY
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 PLATFORM = "hubs.localhost:8000"
 RECORDS = "/admin/verifactu/record/"
@@ -57,7 +73,7 @@ def staff(db):
 
 @pytest.fixture
 def request_of(staff):
-    def make(hub: str | None = "a"):
+    def make(hub: str | None = A.key):
         request = RequestFactory().post(RECORDS)
         request.user = staff
         request.session = SessionStore()
@@ -67,6 +83,16 @@ def request_of(staff):
         return request
 
     return make
+
+
+def signed_in(client, staff, hub: str = A.key):
+    """The staff's admin session with ``hub`` chosen, as ``/admin/hub/<slug>/`` leaves it: its pages open that
+    business's own database."""
+    client.force_login(staff)
+    session = client.session
+    session[ADMIN_HUB_SESSION_KEY] = hub
+    session.save()
+    return client
 
 
 def model_admin(admin_class, model):
@@ -81,6 +107,13 @@ def record() -> Record:
 
 def said(request) -> list[str]:
     return [str(message) for message in request._messages]
+
+
+def rejecting(payload) -> gateway.Reply:
+    """The AEAT rejects every record of the submission (its real answer, «Incorrecto» 1189, for each)."""
+    body = aeat_answer("alta_2007_aceptado_con_errores_2026-08-02.xml", records_of(payload["envelope"]))
+    body = body.replace(">AceptadoConErrores<", ">Incorrecto<").replace(">2007<", ">1189<")
+    return gateway.Reply(kind=gateway.ANSWERED, aeat_status=200, aeat_body=body)
 
 
 def test_every_model_is_registered():
@@ -136,7 +169,7 @@ def test_the_records_list_shows_what_the_records_screen_showed(client, staff, is
     assert {"status", "record_type", "invoice_type", "environment"} <= set(instance.list_filter)
     assert {"invoice_number", "issuer_nif", "csv", "fingerprint"} <= set(instance.search_fields)
     sealed = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     response = client.get(RECORDS, HTTP_HOST=PLATFORM)
     assert response.status_code == 200
     html = response.content.decode()
@@ -145,11 +178,11 @@ def test_the_records_list_shows_what_the_records_screen_showed(client, staff, is
 
 
 def test_the_records_list_groups_the_thousands_of_a_total(client, staff, issuer):
-    # hub#1090: a total of four digits is «1,234.56 €» in English and «1.234,56 €» in Spanish, never «1234.56 €».
+    # A total of four digits is «1,234.56 €» in English and «1.234,56 €» in Spanish, never «1234.56 €».
     lines = [{"description": "Course", "quantity": "1", "unit_price": 102030, "tax_rate": "21"}]
     invoice = manual(lines, series_code="TICKET")
     run("verifactu.record.create", {"invoice_id": str(invoice.id)})
-    client.force_login(staff)
+    signed_in(client, staff)
     for language, total in (("en", "1,234.56 €"), ("es", "1.234,56 €")):
         response = client.get(RECORDS, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE=language)
         assert response.status_code == 200
@@ -161,13 +194,13 @@ def test_the_records_list_groups_the_thousands_of_a_total(client, staff, issuer)
 )
 def test_every_list_opens(client, staff, issuer, model):
     record()
-    client.force_login(staff)
+    signed_in(client, staff)
     assert client.get(f"/admin/verifactu/{model}/", HTTP_HOST=PLATFORM).status_code == 200
 
 
 def test_a_record_opens_read_only_and_is_never_saved(client, staff, issuer):
     sealed = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     page = f"{RECORDS}{sealed.pk}/change/"
     response = client.get(page, HTTP_HOST=PLATFORM)
     assert response.status_code == 200
@@ -178,6 +211,19 @@ def test_a_record_opens_read_only_and_is_never_saved(client, staff, issuer):
     refused = client.post(page, {"status": "accepted", "csv": "X"}, HTTP_HOST=PLATFORM)
     assert refused.status_code == 403
     assert Record.objects.get(pk=sealed.pk).status == "pending"
+
+
+def test_a_record_page_in_spanish_says_the_aeats_words(client, staff, issuer):
+    """The record's labels are VeriFactu's, the AEAT's, never those of an app installed before it that says
+    the same English (invoice's «fecha de emisión» and «tipo de rectificación», sale's «desglose de impuestos» and
+    «impuesto», attendance's «corrección»)."""
+    sealed = record()
+    signed_in(client, staff)
+    response = client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es")
+    assert response.status_code == 200
+    html = response.content.decode()
+    words = ["Fecha de expedición", "Tipo de rectificativa", "Desglose", "Cuota", "Subsanación"]
+    assert [word for word in words if f">{word}:</label>" in html] == words
 
 
 def test_the_record_page_shows_every_field_once_and_why_it_waits(request_of):
@@ -211,6 +257,47 @@ def test_resend_sends_the_chain_once_and_says_what_the_aeat_answered(
     assert len(gateway_answers.calls) == 1
     assert set(Record.objects.values_list("status", flat=True)) == {"accepted"}
     assert said(request) == ["Resend finished: 2 accepted, 0 rejected, 0 still waiting."]
+
+
+#: What the AEAT answers a resend, by what the notice counts: every record accepted, every record rejected, or no
+#: answer at all (the submission stays «sent», still waiting).
+RESEND_ANSWERS = {
+    "accepted": answering(),
+    "rejected": rejecting,
+    "waiting": gateway.Reply(kind=gateway.UNKNOWN, message="read timeout"),
+}
+
+
+@pytest.mark.parametrize(
+    ("answer", "count", "language", "notice"),
+    [
+        ("accepted", 1, "en", "Resend finished: 1 accepted, 0 rejected, 0 still waiting."),
+        ("accepted", 2, "en", "Resend finished: 2 accepted, 0 rejected, 0 still waiting."),
+        ("accepted", 1, "es", "Reenvío terminado: 1 aceptado, 0 rechazados, 0 siguen esperando."),
+        ("accepted", 2, "es", "Reenvío terminado: 2 aceptados, 0 rechazados, 0 siguen esperando."),
+        ("rejected", 1, "en", "Resend finished: 0 accepted, 1 rejected, 0 still waiting."),
+        ("rejected", 2, "en", "Resend finished: 0 accepted, 2 rejected, 0 still waiting."),
+        ("rejected", 1, "es", "Reenvío terminado: 0 aceptados, 1 rechazado, 0 siguen esperando."),
+        ("rejected", 2, "es", "Reenvío terminado: 0 aceptados, 2 rechazados, 0 siguen esperando."),
+        ("waiting", 1, "en", "Resend finished: 0 accepted, 0 rejected, 1 still waiting."),
+        ("waiting", 2, "en", "Resend finished: 0 accepted, 0 rejected, 2 still waiting."),
+        ("waiting", 1, "es", "Reenvío terminado: 0 aceptados, 0 rechazados, 1 sigue esperando."),
+        ("waiting", 2, "es", "Reenvío terminado: 0 aceptados, 0 rechazados, 2 siguen esperando."),
+    ],
+)
+def test_resend_says_each_count_in_the_singular_with_one_and_in_the_plural_with_several(
+    issuer, gateway_answers, request_of, answer, count, language, notice
+):
+    # Never «1 aceptados», «1 rechazados»: each count of the notice has its own singular and plural.
+    sealed = [record() for _ in range(count)]
+    gateway_answers.set(RESEND_ANSWERS[answer])
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).resend_to_aeat(
+            request, Record.objects.filter(pk__in=[item.pk for item in sealed])
+        )
+    assert len(gateway_answers.calls) == 1
+    assert said(request)[-1] == notice
 
 
 def test_resend_of_a_record_out_of_the_queue_says_why_and_sends_nothing(
@@ -251,7 +338,7 @@ def test_the_staff_resends_from_the_records_list_of_the_chosen_hub(
     gateway_answers.set(answering())
     sealed = record()
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         RECORDS,
         {"action": "resend_to_aeat", "_selected_action": [str(sealed.pk)], "index": "0"},
@@ -265,11 +352,11 @@ def test_the_staff_resends_from_the_records_list_of_the_chosen_hub(
 
 
 def test_without_staff_the_records_are_forbidden(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
     assert client.get(RECORDS, HTTP_HOST=PLATFORM).status_code == 403
 
 
-# Support's actions on what is not registered yet (Ioan, 2026-10-15)
+# Support's actions on what is not registered yet
 
 
 def failed_once(gateway_answers) -> Record:
@@ -296,17 +383,18 @@ def left_without_answer(gateway_answers, count: int = 1) -> list[Record]:
 
 def rejected_by_the_aeat(gateway_answers) -> Record:
     """A ticket the AEAT rejected (its real answer, «Incorrecto» 1189)."""
+    [sealed] = rejected_together(gateway_answers, 1)
+    return sealed
 
-    def reply(payload):
-        body = aeat_answer("alta_2007_aceptado_con_errores_2026-08-02.xml", records_of(payload["envelope"]))
-        body = body.replace(">AceptadoConErrores<", ">Incorrecto<").replace(">2007<", ">1189<")
-        return gateway.Reply(kind=gateway.ANSWERED, aeat_status=200, aeat_body=body)
 
-    gateway_answers.set(reply)
-    sealed = record()
+def rejected_together(gateway_answers, count: int) -> list[Record]:
+    """``count`` tickets sent together that the AEAT rejected (its real answer, «Incorrecto» 1189, for each)."""
+    gateway_answers.set(rejecting)
+    sealed = [record() for _ in range(count)]
     run("verifactu.contingency.process")
-    sealed.refresh_from_db()
-    assert sealed.status == "rejected"
+    for item in sealed:
+        item.refresh_from_db()
+        assert item.status == "rejected"
     return sealed
 
 
@@ -338,11 +426,67 @@ def test_reschedule_puts_the_record_out_with_the_next_pass_and_keeps_why_it_was_
     # Its reason stays: it is what declares it late (Incidencia S) when it goes; the next pass rewrites it.
     assert (sealed.status, sealed.wait_reason, sealed.attempts) == ("pending", "unreachable", 1)
     assert Event.objects.filter(message_key="queue_retried", record=sealed, actor="staff").exists()
-    assert said(request) == ["Rescheduled: 1 record(s) go out with the next pass."]
+    assert said(request) == ["Rescheduled: 1 record goes out with the next pass."]
     with translation.override("es"):
         request = request_of()
         model_admin(RecordAdmin, Record).reschedule(request, Record.objects.filter(pk=sealed.pk))
-        assert said(request) == ["Reprogramado: 1 registro(s) salen en la próxima pasada."]
+        assert said(request) == ["Reprogramado: 1 registro sale en la próxima pasada."]
+
+
+def failed_together(gateway_answers, count: int) -> list[Record]:
+    """``count`` tickets of one chain whose submission found the AEAT unreachable: pending, waiting for a timer."""
+    gateway_answers.set(gateway.Reply(kind=gateway.UNREACHABLE, message="connection refused"))
+    sealed = [record() for _ in range(count)]
+    run("verifactu.contingency.process")
+    for item in sealed:
+        item.refresh_from_db()
+        assert (item.status, item.wait_reason) == ("pending", "unreachable")
+    return sealed
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Rescheduled: 2 records go out with the next pass."),
+        ("es", "Reprogramado: 2 registros salen en la próxima pasada."),
+    ],
+)
+def test_rescheduling_several_records_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # Never «record(s)» with the parentheses, whatever the number.
+    sealed = failed_together(gateway_answers, 2)
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).reschedule(
+            request, Record.objects.filter(pk__in=[item.pk for item in sealed])
+        )
+    assert said(request) == [notice]
+
+
+@pytest.mark.parametrize(
+    ("notice", "count", "language", "said_as"),
+    [
+        (RESCHEDULED, 1, "en", "Rescheduled: 1 record goes out with the next pass."),
+        (RESCHEDULED, 3, "en", "Rescheduled: 3 records go out with the next pass."),
+        (RESCHEDULED, 1, "es", "Reprogramado: 1 registro sale en la próxima pasada."),
+        (RESCHEDULED, 3, "es", "Reprogramado: 3 registros salen en la próxima pasada."),
+        (CHAINS_RESCHEDULED, 1, "en", "Rescheduled: 1 chain goes out with the next pass."),
+        (CHAINS_RESCHEDULED, 3, "en", "Rescheduled: 3 chains go out with the next pass."),
+        (CHAINS_RESCHEDULED, 1, "es", "Reprogramado: 1 cadena sale en la próxima pasada."),
+        (CHAINS_RESCHEDULED, 3, "es", "Reprogramado: 3 cadenas salen en la próxima pasada."),
+        (CORRECTED, 1, "en", "Corrected: 1 new record in the queue."),
+        (CORRECTED, 3, "en", "Corrected: 3 new records in the queue."),
+        (CORRECTED, 1, "es", "Subsanado: 1 registro nuevo en la cola."),
+        (CORRECTED, 3, "es", "Subsanado: 3 registros nuevos en la cola."),
+    ],
+)
+def test_each_notice_of_a_count_says_one_in_the_singular_and_several_in_the_plural(
+    notice, count, language, said_as
+):
+    # The three notices of the actions never say «record(s)», «chain(s)» nor «new record(s)», whatever the number.
+    with translation.override(language):
+        assert notice % {"count": count} == said_as
 
 
 def test_reschedule_leaves_a_registered_record_as_it_is(issuer, gateway_answers, request_of):
@@ -376,8 +520,51 @@ def test_asking_the_aeat_takes_out_of_the_queue_only_what_it_holds(
         request = request_of()
         model_admin(RecordAdmin, Record).ask_the_aeat(request, Record.objects.filter(pk=missing.pk))
         assert said(request) == [
-            "Consulta a la AEAT: 0 ya registrados (fuera de la cola), 1 no están en la AEAT (siguen en la cola)."
+            "Consulta a la AEAT: 0 ya registrados (fuera de la cola), 1 no está en la AEAT (sigue en la cola)."
         ]
+
+
+@pytest.mark.parametrize(
+    ("held", "missing", "language", "notice"),
+    [
+        (
+            1,
+            2,
+            "en",
+            "Asked the AEAT: 1 already registered (out of the queue), 2 not in the AEAT (still in the queue).",
+        ),
+        (
+            2,
+            1,
+            "en",
+            "Asked the AEAT: 2 already registered (out of the queue), 1 not in the AEAT (still in the queue).",
+        ),
+        (
+            1,
+            2,
+            "es",
+            "Consulta a la AEAT: 1 ya registrado (fuera de la cola), 2 no están en la AEAT (siguen en la cola).",
+        ),
+        (
+            2,
+            1,
+            "es",
+            "Consulta a la AEAT: 2 ya registrados (fuera de la cola), 1 no está en la AEAT (sigue en la cola).",
+        ),
+    ],
+)
+def test_asking_the_aeat_says_each_count_in_the_singular_with_one_and_in_the_plural_with_several(
+    issuer, gateway_answers, request_of, held, missing, language, notice
+):
+    # Never «1 ya registrados», «1 no están en la AEAT»: each count of the notice has its own singular and plural.
+    sealed = left_without_answer(gateway_answers, held + missing)
+    gateway_answers.set(aeat_holds(*sealed[:held]))
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).ask_the_aeat(
+            request, Record.objects.filter(pk__in=[item.pk for item in sealed])
+        )
+    assert said(request) == [notice]
 
 
 def test_asking_the_aeat_about_a_registered_record_asks_nothing(
@@ -402,7 +589,27 @@ def test_a_rejection_is_corrected_with_a_new_record_and_the_rejected_one_stays(
     correction = Record.objects.exclude(pk=sealed.pk).get(invoice_id=sealed.invoice_id)
     assert (correction.status, correction.correction) == ("pending", True)
     assert correction.created_by == "staff"
-    assert said(request) == ["Corrected: 1 new record(s) in the queue."]
+    assert said(request) == ["Corrected: 1 new record in the queue."]
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Corrected: 2 new records in the queue."),
+        ("es", "Subsanado: 2 registros nuevos en la cola."),
+    ],
+)
+def test_correcting_several_rejections_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # Never «new record(s)» with the parentheses, whatever the number.
+    rejected = rejected_together(gateway_answers, 2)
+    request = request_of()
+    with translation.override(language):
+        model_admin(RecordAdmin, Record).correct_rejection(
+            request, Record.objects.filter(pk__in=[item.pk for item in rejected])
+        )
+    assert said(request) == [notice]
 
 
 def test_a_registered_record_is_never_corrected_from_the_admin(
@@ -433,7 +640,7 @@ def test_the_staff_asks_the_aeat_from_the_records_list(client, staff, issuer, ga
     [sealed] = left_without_answer(gateway_answers)
     gateway_answers.set(aeat_holds(sealed))
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         RECORDS,
         {"action": "ask_the_aeat", "_selected_action": [str(sealed.pk)], "index": "0"},
@@ -452,7 +659,28 @@ def test_a_chain_is_rescheduled_from_its_send_control(issuer, gateway_answers, r
     model_admin(SendControlAdmin, SendControl).reschedule_chain(request, SendControl.objects.all())
     sealed.refresh_from_db()
     assert sealed.next_attempt_at <= timezone.now()
-    assert said(request) == ["Rescheduled: 1 chain(s) go out with the next pass."]
+    assert said(request) == ["Rescheduled: 1 chain goes out with the next pass."]
+
+
+@pytest.mark.parametrize(
+    ("language", "notice"),
+    [
+        ("en", "Rescheduled: 2 chains go out with the next pass."),
+        ("es", "Reprogramado: 2 cadenas salen en la próxima pasada."),
+    ],
+)
+def test_rescheduling_several_chains_says_them_in_the_plural(
+    issuer, gateway_answers, request_of, language, notice
+):
+    # Never «chain(s)» with the parentheses, whatever the number; the number is the chains', not a fixed one.
+    failed_once(gateway_answers)
+    run("invoice.issuer.update", {**ISSUER, "tax_id": "A58818501"})  # another issuer: its own chain
+    failed_once(gateway_answers)
+    assert SendControl.objects.count() == 2
+    request = request_of()
+    with translation.override(language):
+        model_admin(SendControlAdmin, SendControl).reschedule_chain(request, SendControl.objects.all())
+    assert said(request) == [notice]
 
 
 def test_a_chain_with_nothing_waiting_says_so(issuer, gateway_answers, request_of):
@@ -478,7 +706,7 @@ def test_the_send_controls_only_action_is_reschedule(request_of):
 def test_the_records_are_filtered_by_why_they_wait(client, staff, issuer, gateway_answers):
     waiting = failed_once(gateway_answers)
     fresh = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     html = client.get(f"{RECORDS}?wait_reason=unreachable", HTTP_HOST=PLATFORM).content.decode()
     assert waiting.invoice_number in html
     assert fresh.invoice_number not in html
@@ -491,7 +719,7 @@ def test_a_record_page_says_why_it_waits_and_links_its_invoice(
     client, staff, issuer, gateway_answers
 ):
     sealed = failed_once(gateway_answers)
-    client.force_login(staff)
+    signed_in(client, staff)
     html = client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
     assert wait_reason_text("unreachable", "connection refused") in html
     assert f"/admin/invoice/invoice/{sealed.invoice_id}/change/" in html
@@ -519,7 +747,7 @@ def test_a_record_the_gateway_refused_is_filtered_and_its_page_gives_the_gateway
 ):
     refused = refused_once(gateway_answers)
     fresh = record()
-    client.force_login(staff)
+    signed_in(client, staff)
     listing = client.get(RECORDS, HTTP_HOST=PLATFORM).content.decode()
     assert escape(wait_reason_text("refused", "…", "…")) in listing
     html = client.get(f"{RECORDS}?wait_reason=refused", HTTP_HOST=PLATFORM).content.decode()
@@ -540,7 +768,7 @@ def test_reschedule_of_a_record_the_gateway_refused_puts_it_back_in_the_queue(
     assert (refused.status, refused.wait_reason, refused.wait_detail) == ("pending", "", "")
     assert refused.next_attempt_at <= timezone.now()
     assert refused.attempts == 1
-    assert said(request) == ["Rescheduled: 1 record(s) go out with the next pass."]
+    assert said(request) == ["Rescheduled: 1 record goes out with the next pass."]
 
 
 # The configuration: only the route, through its operation
@@ -570,7 +798,7 @@ def test_the_configuration_is_seen_whole_and_only_its_route_is_chosen(config, re
         "synced_version",
         "synced_at",
     } <= readonly
-    # The retired live option (PLAN §30, round 2026-10-22b) is not shown: its column only waits to be dropped.
+    # The retired live option is not shown: its column only waits to be dropped.
     assert "live_paid" not in instance.list_display
     assert "live_paid" not in instance.get_fields(request, config)
 
@@ -582,7 +810,7 @@ def config_page(config) -> str:
 def test_the_route_is_chosen_through_its_operation(client, staff, config):
     Config.objects.filter(pk=config.pk).update(route="own")
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         config_page(config),
         {"route": "erplora", "hub_status": "suspended", "_save": "Save"},
@@ -597,7 +825,7 @@ def test_the_route_is_chosen_through_its_operation(client, staff, config):
 
 def test_a_route_the_operation_refuses_is_the_forms_error(client, staff, config):
     client.force_login(staff)
-    client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+    client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
     response = client.post(
         config_page(config), {"route": "own", "_save": "Save"}, HTTP_HOST=PLATFORM
     )
@@ -609,76 +837,93 @@ def test_a_route_the_operation_refuses_is_the_forms_error(client, staff, config)
 
 
 def test_without_a_chosen_hub_the_route_is_not_changed(client, staff, config):
+    # A business's configuration is only in its own database: without one chosen, the page goes back to the admin's
+    # index, warning to choose it first.
     Config.objects.filter(pk=config.pk).update(route="own")
     client.force_login(staff)
     response = client.post(
         config_page(config), {"route": "erplora", "_save": "Save"}, HTTP_HOST=PLATFORM
     )
-    assert response.status_code == 200
-    assert "Choose a hub first" in response.content.decode()
+    assert (response.status_code, response.url) == (302, reverse("admin:index"))
+    assert [message.level for message in get_messages(response.wsgi_request)] == [messages.WARNING]
     config.refresh_from_db()
     assert config.route == "own"
 
 
-def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(client, staff, settings):
-    # saas#2524: the page of a record says why it waits for the hub chosen in the admin session. ERPlora's own hub
-    # needs no authorisation for ERPlora's records; a business with ERPlora's tax ID typed in, the approved one.
-    from live.context import Scope, system_context
+def test_the_form_itself_refuses_a_route_without_a_chosen_hub(request_of, config):
+    # The page never hands the form a request without a hub chosen; the form refuses one on its own all the same.
+    Config.objects.filter(pk=config.pk).update(route="own")
+    config.refresh_from_db()
+    form_class = model_admin(ConfigAdmin, Config).get_form(request_of(hub=None), config, change=True)
+    form = form_class({"route": "erplora"}, instance=config)
+    assert not form.is_valid()
+    assert "Choose a hub first" in str(form.errors)
+    assert Config.objects.get(pk=config.pk).route == "own"
+    assert not Event.objects.filter(message_key="route_erplora").exists()
 
-    from apps.verifactu.tests.conftest import ISSUER, ctx_for
 
-    settings.PLATFORM_HUB_SLUG = "erplora"
+TICKET = {
+    "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
+    "series_code": "TICKET",
+}
+
+
+def sealed_by_erploras_own_hub(settings) -> Record:
+    """ERPlora's invoice on its own hub (the business ``B``), issued by the system (``/internal/platform/invoices``) and
+    sealed in production."""
+    settings.PLATFORM_HUB_SLUG = B.key
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, ctx_for(scope=B))
+    run("verifactu.config.follow_deployment", {}, system_context(B))
+    sealed = Record.objects.get(invoice_id=run("invoice.invoice.create", TICKET, system_context(B)).id)
+    assert sealed.environment == "production"
+    return sealed
+
+
+def sealed_by_a_business_with_erploras_tax_id(settings) -> Record:
+    """An invoice of the business ``A``, which typed ERPlora's tax ID, sealed in production while its authorisation was
+    approved; revoked since."""
+    run("invoice.issuer.update", ISSUER)
+    run("verifactu.config.sync", {"version": 1, "representation": {"status": "approved"}}, system_context(A))
+    run("verifactu.config.go_live")
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID})
+    sealed = Record.objects.get(invoice_id=run("invoice.invoice.create", TICKET).id)
+    run("verifactu.config.sync", {"version": 2, "representation": {"status": "revoked"}}, system_context(A))
+    assert sealed.environment == "production"
+    return sealed
+
+
+@pytest.fixture
+def production_server(settings):
     settings.ERPLORA_ENVIRONMENT = "prod"
     settings.VERIFACTU_PRODUCTION_ENABLED = True
     settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform)
-    run("verifactu.config.follow_deployment", {}, system_context(platform.scope))
-    invoice = run(
-        "invoice.invoice.create",
-        {
-            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
-            "series_code": "TICKET",
-        },
-        system_context(platform.scope),  # ERPlora's invoices are issued by the system (/internal/platform/invoices)
-    )
-    sealed = Record.objects.get(invoice_id=invoice.id)
-    assert sealed.environment == "production"
+    return settings
+
+
+def test_only_erploras_own_hub_files_erploras_records_without_an_authorisation(
+    client, staff, production_server, in_business_b
+):
+    # The page of a record says why it waits for the hub chosen in the admin session, whose database holds it.
+    # ERPlora's own hub needs no authorisation for ERPlora's records; a business with ERPlora's tax ID typed in, the
+    # approved one.
+    with in_business_b():
+        erploras = sealed_by_erploras_own_hub(production_server)
+    typed = sealed_by_a_business_with_erploras_tax_id(production_server)
     needs_it = escape(wait_reason_text("representation_not_approved"))
-    client.force_login(staff)
-    session = client.session
 
-    session[ADMIN_HUB_SESSION_KEY] = "erplora"
-    session.save()
-    assert needs_it not in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
-
-    session[ADMIN_HUB_SESSION_KEY] = "a"
-    session.save()
-    assert needs_it in client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM).content.decode()
+    on_erploras = signed_in(client, staff, B.key).get(f"{RECORDS}{erploras.pk}/change/", HTTP_HOST=PLATFORM)
+    assert on_erploras.status_code == 200
+    assert needs_it not in on_erploras.content.decode()
+    on_the_business = signed_in(client, staff, A.key).get(f"{RECORDS}{typed.pk}/change/", HTTP_HOST=PLATFORM)
+    assert on_the_business.status_code == 200
+    assert needs_it in on_the_business.content.decode()
 
 
-def test_without_a_hub_drawn_erploras_tax_id_is_no_exemption_and_the_reason_is_said(settings):
-    # saas#2524: «Why it waits» drawn outside a hub's page (no hub chosen: no scope) never takes ERPlora's tax ID as
+def test_without_a_hub_drawn_erploras_tax_id_is_no_exemption_and_the_reason_is_said(production_server, in_business_b):
+    # «Why it waits» drawn outside a hub's page (no hub chosen: no scope) never takes ERPlora's tax ID as
     # ERPlora's own hub; it says the authorisation is missing instead of failing.
     from django.contrib.admin.sites import site
-    from live.context import Scope, system_context
 
-    from apps.verifactu.tests.conftest import ISSUER, ctx_for
-
-    settings.PLATFORM_HUB_SLUG = "erplora"
-    settings.ERPLORA_ENVIRONMENT = "prod"
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
-    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
-    platform = ctx_for(scope=Scope("host", "erplora"))
-    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform)
-    run("verifactu.config.follow_deployment", {}, system_context(platform.scope))
-    invoice = run(
-        "invoice.invoice.create",
-        {
-            "lines": [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}],
-            "series_code": "TICKET",
-        },
-        system_context(platform.scope),
-    )
-    sealed = Record.objects.get(invoice_id=invoice.id)
-    assert str(wait_reason_text("representation_not_approved")) in site._registry[Record].why_waiting(sealed)
+    with in_business_b():
+        sealed = sealed_by_erploras_own_hub(production_server)
+        assert str(wait_reason_text("representation_not_approved")) in site._registry[Record].why_waiting(sealed)

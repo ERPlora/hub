@@ -3,15 +3,14 @@ to Inventory's events: a deleted product or category drops the groups hung from 
 
 import re
 
-import pytest
-from live.context import Scope
 from live.models import OutboxEvent
 from live.operations import NAME_RE
 
 from apps.modifier import events
 from apps.modifier.models import ModifierGroup, ModifierLink
+from base.tenancy.context import use_hub
 
-from .conftest import A, make_category, make_product, run
+from .conftest import FOOD, HUB_DB, A, B, ctx_for, make_category, make_product, run
 
 PAST_FACT = re.compile(r"^modifier\.(group|option|link)\.[a-z_]+ed$")
 
@@ -59,7 +58,7 @@ def test_an_event_without_a_reaction_does_nothing():
     assert events.react(A, "inventory.product.created", {"id": "x"}) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deleted_product_drops_its_links_and_says_so_once():
     burger = make_product()
     sauces = run("modifier.group.create", {"name": "Sauces"})
@@ -101,7 +100,7 @@ def test_a_deleted_product_drops_its_links_and_says_so_once():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deleted_category_drops_its_links():
     mains = make_category()
     sauces = run("modifier.group.create", {"name": "Sauces"})
@@ -121,19 +120,25 @@ def test_a_deleted_category_drops_its_links():
     assert ModifierGroup.objects.count() == 1
 
 
-@pytest.mark.django_db
-def test_the_reaction_runs_as_the_system_scope_given():
-    other = Scope("host", "b")
-    burger = make_product()
-    group = run("modifier.group.create", {"name": "Sauces"})
-    run(
-        "modifier.link.attach",
-        {"group_id": str(group.id), "product_id": str(burger.id)},
-    )
-    events.react(other, "inventory.product.deleted", {"id": str(burger.id)})
-    assert (
-        OutboxEvent.objects.filter(name="modifier.link.detached")
-        .latest("created_at")
-        .scope_key
-        == "b"
-    )
+@HUB_DB
+def test_the_reaction_runs_as_the_system_scope_given(hub_b):
+    in_b = ctx_for(scope=B)
+    with use_hub(hub_b):
+        burger = run(
+            "inventory.product.create",
+            {"name": "Burger", "sku": "BUR", "price": 800, "tax_category_key": FOOD},
+            ctx=in_b,
+        )
+        group = run("modifier.group.create", {"name": "Sauces"}, ctx=in_b)
+        run(
+            "modifier.link.attach",
+            {"group_id": str(group.id), "product_id": str(burger.id)},
+            ctx=in_b,
+        )
+        events.react(B, "inventory.product.deleted", {"id": str(burger.id)})
+        assert (
+            OutboxEvent.objects.filter(name="modifier.link.detached")
+            .latest("created_at")
+            .scope_key
+            == B.key
+        )

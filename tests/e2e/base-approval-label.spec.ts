@@ -1,5 +1,4 @@
 // flow: BASE-F84 BASE-F85 DEMO-F06
-// FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE (base/WORKBOOK.md BASE-F84 and BASE-F85; hub#2180, hub#2186):
 // «An approval is needed» says what is approved with the figures of that very request, as Toast and Square print
 // «Approve 50 % discount», so the manager knows how much they approve. Opened from a real app that declares its
 // sentence: Demo names «add a line» as approvable and says it with the line's quantity and text (DEMO-F06). The

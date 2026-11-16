@@ -106,6 +106,20 @@ describe('StepNode', () => {
     expect(s.find('flow-step-queryhint-s1').exists()).toBe(true);
   });
 
+  it('a step of an app that is off says so in place, in its language, until the app is on again (hub#1054)', async () => {
+    const step: Step = { id: 's1', kind: 'command', operation: 'task.task.create', params: {} };
+    const off = { events: [], actions: [], off_apps: [{ app: 'task', app_name: 'Tasks' }] } as unknown as CatalogOut;
+    const s = await mountFlow(StepNode, { props: { step, index: 0, steps: [step], catalog: off, open: true, errors: {}, choices: [], pick: async () => '' } });
+    expect(s.wrapper.findComponent(Combo).props('errorText')).toBe('Its app, Tasks, is off in this business: turn it on in Apps, or choose another action.');
+    const es = await mountFlow(StepNode, {
+      locale: 'es',
+      props: { step, index: 0, steps: [step], catalog: { ...off, off_apps: [{ app: 'task', app_name: 'Tareas' }] }, open: true, errors: {}, choices: [], pick: async () => '' },
+    });
+    expect(es.wrapper.findComponent(Combo).props('errorText')).toBe('Su app, Tareas, está apagada en este negocio: enciéndela en Apps o elige otra acción.');
+    await s.wrapper.setProps({ catalog: CATALOG });
+    expect(s.wrapper.findComponent(Combo).props('errorText')).toBeFalsy();
+  });
+
   it('shows the server’s refusal next to the action and removes the step', async () => {
     const s = await setup({ id: 's1', kind: 'command', operation: 'spa.sauna.heat', params: {} }, true, {
       'steps.0.operation': 'That action does not exist in this business: «spa.sauna.heat».',

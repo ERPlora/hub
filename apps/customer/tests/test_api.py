@@ -1,10 +1,9 @@
 """The customer app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. The two purchase commands have no route: only the system runs them.
+Requests go to business A's host (``hub_a``, in its own database) with Django's sync test client, which sees the
+test's transaction. The two purchase commands have no route: only the system runs them.
 """
 
-import json
 import uuid
 
 import pytest
@@ -12,7 +11,10 @@ from live.ninja import ensure_api_parity
 
 from apps.customer.api import router
 from apps.customer.models import CustomField
+from apps.flow.tests.test_api import get, post
 from config.api import api
+
+from .conftest import HOST, HUB_DB, B
 
 ROUTES = {
     ("GET", "/customer/customers", "customer.customer.list"),
@@ -59,25 +61,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", role="hub_employee"))
     return client
 
 
@@ -99,13 +91,25 @@ def test_the_purchase_commands_have_no_route():
     assert {"customer.purchase.record", "customer.purchase.void", "customer.purchase.refund"}.isdisjoint(bound)
 
 
+def test_restoring_a_deleted_card_has_no_route():
+    # Only the system restores a card: its one door is the recovery from a separate copy (BASE-F114, CUSTOMER-F33).
+    bound = {operation for _, _, operation in ROUTES}
+    assert "customer.customer.restore" not in bound
+
+
+def test_recovering_a_card_from_a_copy_has_no_route():
+    # Only the system makes again a card the business no longer has, with what hung from it in the copy (hub#1285).
+    bound = {operation for _, _, operation in ROUTES}
+    assert "customer.customer.recover" not in bound
+
+
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
+@HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_names_every_route_after_its_operation(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -118,7 +122,7 @@ def test_openapi_names_every_route_after_its_operation(client):
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/customer/customers"),
@@ -130,7 +134,7 @@ def test_anonymous_gets_the_401_envelope(client):
         )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_employee_works_the_counter_but_neither_exports_nor_deletes(
     employee_client,
 ):
@@ -154,17 +158,17 @@ def test_the_employee_works_the_counter_but_neither_exports_nor_deletes(
     )
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
     assert (
-        get(admin_client, "/customer/customers", host="b.localhost").status_code == 403
+        get(admin_client, "/customer/customers", host=f"{B.key}.localhost").status_code == 403
     )
 
 
 # Validation
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_card_is_422_per_field(admin_client):
     response = post(
         admin_client,
@@ -180,7 +184,7 @@ def test_an_invalid_card_is_422_per_field(admin_client):
     assert error["fields"]["email"] == "Enter a valid email."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_bad_phone_is_422_under_the_phone(admin_client):
     error = post(
         admin_client, "/customer/customers", {"name": "Ana", "phone": "600111"}
@@ -191,7 +195,7 @@ def test_a_bad_phone_is_422_under_the_phone(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_customer_needs_its_id_or_a_reference(admin_client):
     response = get(admin_client, "/customer/customers/detail")
     assert response.status_code == 422
@@ -200,7 +204,7 @@ def test_a_customer_needs_its_id_or_a_reference(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deleted_group_is_named_in_the_422(admin_client):
     customer = post(admin_client, "/customer/customers", {"name": "Ana"}).json()
     gone = str(uuid.uuid7())
@@ -222,7 +226,7 @@ def test_a_deleted_group_is_named_in_the_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/customer/customers", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (
@@ -231,7 +235,7 @@ def test_a_limit_over_100_is_422(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_card_is_404_with_the_apps_code(admin_client):
     response = get(admin_client, "/customer/customers/detail", id=str(uuid.uuid7()))
     assert (response.status_code, response.json()["error"]["code"]) == (
@@ -243,8 +247,8 @@ def test_an_unknown_card_is_404_with_the_apps_code(admin_client):
 # The flows over HTTP
 
 
-@pytest.mark.django_db
-def test_the_card_round_trip(admin_client):
+@HUB_DB
+def test_the_card_round_trip(admin_client):  # noqa: PLR0915
     created = post(
         admin_client,
         "/customer/customers",
@@ -463,7 +467,7 @@ def test_the_card_round_trip(admin_client):
     ).json() == {"id": customer_id}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_import_over_http(admin_client):
     response = post(
         admin_client,
@@ -482,7 +486,7 @@ def test_the_import_over_http(admin_client):
 # Health data (CUSTOMER-F32)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_health_block_over_http(employee_client):
     ana = post(employee_client, "/customer/customers", {"name": "Ana"}).json()
     refused = post(

@@ -1,4 +1,4 @@
-"""A business that left, once its 90 days are over (PLAN-DB §6 «Baja», proposal (a) of round 2026-10-30; hub#599).
+"""A business that left, once its 90 days are over.
 
 The worker's data pass (``base.worker._data``), under the row's lease, takes the business from ``cancelled`` through
 
@@ -8,7 +8,7 @@ The worker's data pass (``base.worker._data``), under the row's lease, takes the
    then its files, that business's prefix in the store and no other (``base.files.delete_hub_files``);
 3. ``purged``: ``base.hub.purge``, in one transaction of control, leaves the row as a tombstone.
 
-**A business with fiscal documents is not dropped.** PLAN-DB §6 archives its fiscal records and invoices for 6 years
+**A business with fiscal documents is not dropped.** Its fiscal records and invoices must be archived for 6 years
 (Código de Comercio, art. 30) before the drop, and that archive does not exist yet: every app that keeps such documents
 answers ``fiscal_documents_kept()`` on its ``LiveAppConfig``, and with any of them (asked before the copy and again after
 it: the worker still serves the business meanwhile) the business stays ``cancelled`` with its database, its row saying
@@ -36,6 +36,7 @@ from live.meta import all_live_app_configs
 from psycopg import errors
 
 from base import files, registry, services
+from base.services import provisioning
 from base.schemas import HubGetIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, names, ops, provision
@@ -119,7 +120,7 @@ def retire(hub_id, now: dt.datetime, cancelled: Callable[[], bool] | None = None
 
     What fails is noted on it and tried again at its next attempt, never raised. A worker that stops
     (``dumps.DumpStopped``) leaves it due; a lease lost leaves it to its new holder."""
-    hub = services.registry_row(hub_id)
+    hub = provisioning.registry_row(hub_id)
     if hub is None or not services.past_retention(hub, now):
         return
     if hub.next_attempt_at is not None and hub.next_attempt_at > now:
@@ -128,7 +129,7 @@ def retire(hub_id, now: dt.datetime, cancelled: Callable[[], bool] | None = None
         _retire(hub, now, cancelled)
     except dumps.DumpStopped:
         raise
-    except services.ProvisioningStopped as stopped:
+    except provisioning.ProvisioningStopped as stopped:
         logger.info("base.tenancy.offboarding.stopped hub=%s: %s", hub.slug, stopped)
     except dumps.DumpError as failed:
         _failed(hub, failed.code, failed)

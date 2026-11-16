@@ -1,9 +1,7 @@
-// flow: los paneles de las apps en el Inicio (BASE-F06) y el panel de la cola de contingencia de VeriFactu (VERIFACTU-F31)
-// The text under a panel's figure (FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT): VeriFactu's «Cola de contingencia» on the
-// owner's board of hub `a` says under the server's figure what it counts, «En cola de contingencia» in Spanish and
-// «In contingency queue» in English, as the old module did (its module.json, `verifactu.contingency` options.label);
-// the board list no longer fails on a translated text among a panel's options. Each size and language leaves the
-// capture `FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT[-en]-<width>`.
+// flow: the apps' panels on the Home (BASE-F06) and VeriFactu's contingency queue panel (VERIFACTU-F31)
+// The text under a panel's figure: VeriFactu's «Cola de contingencia» on the owner's board of hub `a` says under the
+// server's figure what it counts, «En cola de contingencia» in Spanish and «In contingency queue» in English, and the
+// board list does not fail on a translated text among a panel's options. Each size and language leaves a capture.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';

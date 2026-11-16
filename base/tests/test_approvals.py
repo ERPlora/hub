@@ -1,4 +1,4 @@
-"""BASE-G136 and G145: a manager's PIN lets one refused action through, and Employees › Approvals keeps the record.
+"""A manager's PIN lets one refused action through, and Employees › Approvals keeps the record.
 
 An app names the commands of its own that a manager may approve on the spot (``LiveAppConfig.approvals``: operation →
 what is approved, in words). Whoever lacks the permission of one of them gets, instead of a flat refusal,
@@ -7,7 +7,7 @@ holds the permission approves it with their PIN (or their badge) and the hub han
 minutes, bound to that person, that command, that very request and this business. The command repeated with the pass
 goes through once; the record (who asked, who approved, what, when, whether it was used) stays in the hub and only who
 runs the business reads it. A query, a command no app names and a command the caller may run anyway never ask. The
-PIN is checked as the PIN pad checks it (APP-BASE-3): same hash, same brakes.
+PIN is checked as the PIN pad checks it: same hash, same brakes.
 """
 
 import csv
@@ -23,13 +23,15 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from base.models import AccessSettings, Approval, Hub, Membership
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tenancy.tests.hubs import HUB_DATABASES
 from base.tests.test_people import with_badge, with_pin
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-HOST = "a.localhost:8000"
-B_HOST = "b.localhost:8000"
+pytestmark = HUB_DB
+
+B_HOST = f"{B.key}.localhost"
 APPROVABLE = "base.access.settings_update"
 SETTINGS = "/access/settings/update"
 CHANGE = {"pin_policy": "always", "pin_inactivity_minutes": 5, "pin_length": 4}
@@ -63,21 +65,21 @@ def approvable(monkeypatch):
 
 @pytest.fixture
 def adam(make_user):
-    user = make_user("saas:2", host="a", role=Membership.Role.ADMIN, first_name="Adam")
+    user = make_user("saas:2", host=A.key, role=Membership.Role.ADMIN, first_name="Adam")
     with_pin("saas:2", "2580")
     return user
 
 
 @pytest.fixture
 def eva(make_user, client):
-    user = make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva")
+    user = make_user("saas:3", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Eva")
     client.force_login(user)
     return user
 
 
 @pytest.fixture
 def mario(make_user):
-    user = make_user("saas:4", host="a", role=Membership.Role.MANAGER, first_name="Mario")
+    user = make_user("saas:4", host=A.key, role=Membership.Role.MANAGER, first_name="Mario")
     with_pin("saas:4", "1357")
     return user
 
@@ -185,7 +187,7 @@ class TestApproving:
         assert braked.status_code == 429 and code(braked) == "base.too_many_attempts"
 
     def test_twenty_wrong_pins_from_one_address_brake_it_whatever_name_they_try(self, client, adam, eva):
-        """hub#2517 of the old hub: changing the person on every try does not dodge the address's brake."""
+        """Changing the person on every try does not dodge the address's brake."""
         from uuid import uuid4
 
         asked = refused(client)
@@ -201,7 +203,7 @@ class TestApproving:
         assert response.status_code == 403 and code(response) == "base.approver_cannot"
 
     def test_nothing_is_approved_for_who_already_holds_the_permission(self, client, adam, make_user):
-        olga = make_user("saas:1", host="a", role=Membership.Role.OWNER, first_name="Olga")
+        olga = make_user("saas:1", host=A.key, role=Membership.Role.OWNER, first_name="Olga")
         client.force_login(olga)
         asked = {"operation": APPROVABLE, "fingerprint": "0" * 64}
         response = approve(client, asked, "saas:2")
@@ -246,14 +248,27 @@ class TestThePassIsBound:
 
     def test_to_the_person_who_asked(self, client, adam, eva, make_user):
         token = granted(client)
-        ana = make_user("saas:5", host="a", role=Membership.Role.EMPLOYEE, first_name="Ana")
+        ana = make_user("saas:5", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Ana")
         client.force_login(ana)
         assert code(post(client, SETTINGS, CHANGE, **with_pass(token))) == "requires_elevation"
 
-    def test_to_this_business(self, client, adam, eva):
-        Membership.objects.create(user=eva, host="b", role=Membership.Role.EMPLOYEE)
+    def test_to_this_business(self, client, adam, eva, hub_b):
+        Membership.objects.create(user=eva, host=B.key, role=Membership.Role.EMPLOYEE)
         token = granted(client)
         assert code(post(client, SETTINGS, CHANGE, host=B_HOST, **with_pass(token))) == "requires_elevation"
+
+    def test_to_this_business_even_with_its_very_row_in_the_other_one(self, client, adam, eva, hub_b):
+        """The request a pass is for names its business: the same row, in B's database, lets nothing through there."""
+        from base.tenancy.context import use_hub
+
+        Membership.objects.create(user=eva, host=B.key, role=Membership.Role.EMPLOYEE)
+        token = granted(client)
+        row = Approval.objects.values().get()
+        with use_hub(hub_b):
+            Approval.objects.create(**row)
+        assert code(post(client, SETTINGS, CHANGE, host=B_HOST, **with_pass(token))) == "requires_elevation"
+        with use_hub(hub_b):
+            assert Approval.objects.get().used_at is None
 
     def test_for_two_minutes(self, client, adam, eva):
         token = granted(client)
@@ -342,7 +357,7 @@ class TestTheExport:
 
     def test_its_hours_are_the_businesss_and_not_the_deployments(self, client, adam, eva):
         """hub#687: 9:00 UTC is 10:00 in Madrid and 9:00 in the Canaries."""
-        Hub.objects.filter(slug="a").update(timezone="Atlantic/Canary")
+        Hub.objects.filter(slug=A.key).update(timezone="Atlantic/Canary")
         recorded(at=dt.datetime(2026, 11, 2, 9, 0, tzinfo=dt.UTC))
         client.force_login(adam)
         assert lines(exported(client))[1][0] == "2026-11-02 09:00"
@@ -413,11 +428,11 @@ APPROVAL_ROUTES = {
 
 
 class TestNotOfTheBusiness:
-    """rv-hub-244: whoever is not of the business gets the refusal of always, never the approval's question with what
+    """Whoever is not of the business gets the refusal of always, never the approval's question with what
     it would approve."""
 
     def test_a_session_of_another_business_is_refused_flat(self, client, adam, make_user):
-        stranger = make_user("saas:9", host="b", role=Membership.Role.EMPLOYEE, first_name="Zoe")
+        stranger = make_user("saas:9", host=B.key, role=Membership.Role.EMPLOYEE, first_name="Zoe")
         client.force_login(stranger)
         response = post(client, SETTINGS, CHANGE)
         assert response.status_code == 403, response.content
@@ -434,7 +449,7 @@ class TestNotOfTheBusiness:
 
 class TestACommandThatTouchesNoDatabase:
     """rv-live-10: a manager's pass is spent in the transaction of the command it lets through (base.approval_spend).
-    A command declared ``database=False`` (live#10) opens none, so naming it approvable is an error of the declaration,
+    A command declared ``database=False`` opens none, so naming it approvable is an error of the declaration,
     said at start, and never a ``LiveMisuse`` at the till."""
 
     NO_DATABASE = "base.assistant.report"
@@ -461,13 +476,13 @@ class TestACommandThatTouchesNoDatabase:
         assert approvable(self.NO_DATABASE) is None
 
 
-# ── What is approved, with the figure of that very request (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE) ─────
-# hub#2180, hub#2186, sales#398, sales#403: the manager sees how much they approve («a 50 % discount»), as Toast and
-# Square print it, not only what kind of action. Beside its words, an app declares in ``approval_figures`` how they are
-# said with the figures of the request: sentences tried in order, whose holes name fields of the command's input
-# (``{field}``, ``{field, percent}``, ``{field, money}``); the first one whose every hole fills is said. The figures are
-# read from the input as the command's own schema validates it, never from the raw body, and only the fields a sentence
-# names; a hole fills with no empty value and no zero; none fills, or no declaration: the words of always.
+# ── What is approved, with the figure of that very request ───────────────────────────────────────────────────────
+# The manager sees how much they approve («a 50 % discount»), as Toast and Square print it, not only what kind of
+# action. Beside its words, an app declares in ``approval_figures`` how they are said with the figures of the request:
+# sentences tried in order, whose holes name fields of the command's input (``{field}``, ``{field, percent}``,
+# ``{field, money}``); the first one whose every hole fills is said. The figures are read from the input as the
+# command's own schema validates it, never from the raw body, and only the fields a sentence names; a hole fills with
+# no empty value and no zero; none fills, or no declaration: the words of always.
 
 FIGURED = {APPROVABLE: ["Lock the till after {pin_inactivity_minutes} minutes with {pin_length} digits",
                         "Lock the till after {pin_inactivity_minutes} minutes"]}
@@ -477,6 +492,12 @@ THIRTY = {"pin_policy": "always", "pin_inactivity_minutes": 30}
 
 def declare(monkeypatch, figures: dict, config: str = "base") -> None:
     monkeypatch.setattr(apps.get_app_config(config), "approval_figures", figures, raising=False)
+
+
+def selling_in_spain(monkeypatch, figures: dict) -> None:
+    """Business A in Spain, its currency the euro, with Sales' approvals saying ``figures``."""
+    Hub.objects.update_or_create(slug=A.key, defaults={"status": "ready", "name": "A", "country": "ES"})
+    declare(monkeypatch, figures, config="sale")
 
 
 def asked_in(client, language: str, body=THIRTY) -> dict:
@@ -566,15 +587,9 @@ class TestTheFigureOnTheRecord:
         assert [row[3] for row in lines(exported(client, "en", search="till"))[1:]] == ["Ana", "Eva"]
 
 class TestTheFigureOfEachHub:
-    """Two hubs with their own databases (phase 2): the figure approved in one is never on the other's record."""
+    """Two hubs with their own databases: the figure approved in one is never on the other's record."""
 
     pytestmark = pytest.mark.django_db(databases=HUB_DATABASES)
-
-    @pytest.fixture(autouse=True)
-    def as_in_production(self, monkeypatch):
-        from base.tenancy import context
-
-        monkeypatch.setattr(context, "_test_fallback", None)
 
     def test_each_record_says_only_its_own(self, client, hub_a, hub_b, monkeypatch):
         from django.contrib.auth import get_user_model
@@ -601,9 +616,8 @@ class TestTheFigureOfEachHub:
 
 
 class TestTheFiguresOfTheTill:
-    """The sentences Sales will declare (its FIX, ``espera: base``), on its real commands and their schemas: a percent
-    and an amount in the business's currency, and the check's discount that may carry either or both (hub#2186: never
-    «and 0.00 €»)."""
+    """The sentences Sales declares, on its real commands and their schemas: a percent and an amount in the business's
+    currency, and the check's discount that may carry either or both (never «and 0.00 €»)."""
 
     CHECK = "sale.order.set_discount_over_limit"
     LINE = "sale.order.set_line_discount_over_limit"
@@ -618,21 +632,17 @@ class TestTheFiguresOfTheTill:
 
     @pytest.fixture(autouse=True)
     def in_spain(self, monkeypatch):
-        from base.models import Hub
-
-        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
-        declare(monkeypatch, self.SENTENCES, config="sale")
+        selling_in_spain(monkeypatch, self.SENTENCES)
 
     def said(self, name: str, language: str = "en", **data) -> str:
         from django.utils import translation
-        from live.context import Scope
         from live.operations import get as get_operation
 
         from base.approvals import figures_of, label_of
 
         op = get_operation(name)
         with translation.override(language):
-            return label_of(op, figures_of(op, op.input.model_validate(data)), Scope("host", "a"))
+            return label_of(op, figures_of(op, op.input.model_validate(data)), A)
 
     def test_a_line_discount_says_its_percent(self):
         line = {"order_id": "0190a1b2-0000-7000-8000-000000000001", "line_id": "0190a1b2-0000-7000-8000-000000000002"}
@@ -651,14 +661,14 @@ class TestTheFiguresOfTheTill:
     def test_the_amount_is_in_the_business_s_currency(self):
         from base.models import Hub
 
-        Hub.objects.filter(slug="a").update(country="JP")
+        Hub.objects.filter(slug=A.key).update(country="JP")
         order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
         assert self.said(self.CHECK, discount_percent="0", discount_amount=500, **order) == "Discount the check by ¥500"
 
     def test_a_business_whose_currency_is_unknown_says_the_words_of_always(self):
         from base.models import Hub
 
-        Hub.objects.filter(slug="a").delete()
+        Hub.objects.filter(slug=A.key).delete()
         order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
         assert self.said(self.CHECK, discount_percent="0", discount_amount=500, **order) == "Discount the check above the maximum"
 
@@ -713,19 +723,15 @@ class TestTheFiguresAreCheckedAtStart:
 
 
 class TestTheFiguresTheReviewAdded:
-    """Three holes the review found (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE): the record says an amount in
-    the business's currency (the list and the CSV ask it only when a row has figures); a currency written in letters
-    never touches its figure («PLN 1.00»); and ``base.E008`` refuses the sentences of another app's command even when
-    that app's ``approvals`` name it too."""
+    """Three holes a review found: the record says an amount in the business's currency (the list and the CSV ask it
+    only when a row has figures); a currency written in letters never touches its figure («PLN 1.00»); and ``base.E008``
+    refuses the sentences of another app's command even when that app's ``approvals`` name it too."""
 
     CHECK = "sale.order.set_discount_over_limit"
 
     @pytest.fixture(autouse=True)
     def in_spain(self, monkeypatch):
-        from base.models import Hub
-
-        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
-        declare(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]}, config="sale")
+        selling_in_spain(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]})
 
     def test_the_record_says_the_amount_in_the_business_s_currency(self, client, adam, eva):
         recorded(operation=self.CHECK, figures={"discount_amount": 500})

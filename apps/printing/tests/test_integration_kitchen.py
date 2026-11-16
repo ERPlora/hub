@@ -5,15 +5,14 @@ through Kitchen's own operations, which call ``printing.job.create`` by name ins
 dishes to its stations and Printing queues one sheet per printer.
 """
 
-import pytest
 from live.context import system_context
 
 from apps.kitchen.models import Destination
 from apps.kitchen.tests.conftest import add_line, make_station, open_check, route_product
 from apps.printing.models import PrintJob
-from apps.printing.tests.conftest import A, ctx_for, printer, run
+from apps.printing.tests.conftest import A, HUB_DB, ctx_for, printer, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def dish(name: str):
@@ -22,9 +21,13 @@ def dish(name: str):
     return run("inventory.product.create", data, system_context(A))
 
 
+def waiter():
+    return ctx_for(actor="waiter")
+
+
 def send(order_id, **more):
     """«Send order» of the till: Kitchen opens the round and asks Printing for its sheets."""
-    return run("kitchen.ticket.send", {"order_id": str(order_id), **more}, ctx_for(actor="waiter"))
+    return run("kitchen.ticket.send", {"order_id": str(order_id), **more}, waiter())
 
 
 def sheets() -> list[PrintJob]:
@@ -35,11 +38,11 @@ def test_the_order_comes_out_on_the_printer_of_each_station():
     printer("Grill printer", usage="kitchen", address="10.0.0.2")
     printer("Bar printer", usage="bar", address="10.0.0.3")
     bar = make_station("Bar", destination=Destination.PRINTER, printer_usage="bar")
-    order = open_check("Table 4")
-    add_line(order.id, dish("Burger"))
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
     beer = dish("Beer")
     route_product(beer.id, bar)
-    add_line(order.id, beer)
+    add_line(order.id, beer, ctx=waiter())
     ticket = send(order.id)
     by_usage = {job.usage: job for job in sheets()}
     assert sorted(by_usage) == ["bar", "kitchen"]
@@ -60,8 +63,8 @@ def test_the_order_comes_out_on_the_printer_of_each_station():
 
 def test_an_order_without_a_kitchen_printer_waits_for_one():
     printer("Till")
-    order = open_check("Table 4")
-    add_line(order.id, dish("Burger"))
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
     send(order.id)
     (job,) = sheets()
     assert (job.usage, job.printer, job.status) == ("kitchen", None, "pending")
@@ -71,8 +74,8 @@ def test_an_order_without_a_kitchen_printer_waits_for_one():
 
 def test_a_reprint_is_a_new_sheet_marked_copy_each_time():
     printer("Grill printer", usage="kitchen", address="10.0.0.2")
-    order = open_check("Table 4")
-    add_line(order.id, dish("Burger"))
+    order = open_check("Table 4", ctx=system_context(A))
+    add_line(order.id, dish("Burger"), ctx=waiter())
     ticket = send(order.id)
     for _ in range(2):
         run("kitchen.ticket.reprint", {"ticket_id": str(ticket.id)})

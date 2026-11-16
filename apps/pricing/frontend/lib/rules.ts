@@ -1,4 +1,4 @@
-// What the rules table and a list's row paint (the old module's `rule-value.ts`, pricing#28): the VALUE
+// What the rules table and a list's row paint (the old module's `rule-value.ts`): the VALUE
 // of a rule with its unit in ONE column («10 %», «0,50 € por unidad», «Compra 2, llévate 1», «3+: 10 % ·
 // 6+: 15 %»), never a bare number whose unit has to be guessed; what it applies to, with its customer
 // group after it (or «Deleted group» when Customers deleted it); and the tax basis of a list, where an empty one follows the business and says so.
@@ -7,7 +7,7 @@ import { formatMoney, formatPercent, formatQuantity, type Money } from './format
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 
-/** A rule's value; an amount per unit in the business's `money` (a bare figure until it answers). */
+/** A rule's value; an amount per unit in the business's `money` (a dash until it answers). */
 export function ruleValueLabel(rule: RuleOut, t: Translate, locale: string, money?: Money): string {
   switch (rule.rule_type) {
     case 'percent':

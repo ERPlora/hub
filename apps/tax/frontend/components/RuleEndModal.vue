@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import type { RuleOut } from '../operations';
 
 const props = defineProps<{
@@ -43,11 +45,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('tax-rule-end', validTo, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="tax-rule-end"
     size="sm"
     :title="$t('tax.rules.end.title')"
@@ -67,6 +72,7 @@ async function save(): Promise<void> {
       </p>
       <ion-input
         data-testid="tax-rule-end-valid_to"
+        name="valid_to"
         type="date"
         :value="validTo"
         :label="$t('tax.rules.end.field')"

@@ -9,6 +9,8 @@
 //     the money goes instead (`to_method_id`);
 //   - nothing marked proposes all that is left;
 //   - a line a voucher paid (SALE-F32) is worth 0: marking it gives its session back, also with no money.
+import { decimalMark } from '@erplora/ui/components';
+
 import { centsFromAmount, type Money, moneyDecimals } from '../../lib/format';
 import type { AllocationIn, LineOption, RefundLineIn, TenderOption } from '../../operations';
 
@@ -95,13 +97,7 @@ export function amountInput(cents: number, locale: string, money?: Money): strin
   const whole = String(Math.max(0, Math.round(cents)));
   if (decimals === 0) return whole;
   const digits = whole.padStart(decimals + 1, '0');
-  let separator = '.';
-  try {
-    separator = new Intl.NumberFormat(locale).formatToParts(1.1).find((part) => part.type === 'decimal')?.value ?? '.';
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-  }
-  return `${digits.slice(0, -decimals)}${separator}${digits.slice(-decimals)}`;
+  return `${digits.slice(0, -decimals)}${decimalMark(locale)}${digits.slice(-decimals)}`;
 }
 
 /** What was typed, in minor units of the sale's `money`: blank is 0; anything that is not an amount is `NaN`. */

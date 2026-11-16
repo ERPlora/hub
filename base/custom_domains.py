@@ -1,4 +1,4 @@
-"""Which business a host outside ``ALLOWED_HOSTS`` belongs to (HUBS-F17, PLAN-SAAS §37 point 2), at no read per request.
+"""Which business a host outside ``ALLOWED_HOSTS`` belongs to, at no read per request.
 
 The SaaS names a business's own domain in its photo (``custom_domain``, ``base.hub.state_apply``), and that is the only
 way the Hub learns it: it is kept on the business's row and never asked of the SaaS. The ALB's last rule sends the Hub
@@ -43,6 +43,13 @@ def hub_of(domain: str) -> uuid.UUID | None:
     if monotonic() >= _next_read:
         _read_if_nobody_is()
     return _known.get(domain)
+
+
+def served_on(hub) -> str:
+    """The own domain the door opens ``hub``'s website on now, or ``""``: the one its row names, while the map gives
+    it to ``hub`` (a domain two businesses name is nobody's). What its page names as its main address (hub#818)."""
+    domain = hub.custom_domain
+    return domain if domain and hub_of(domain) == hub.id else ""
 
 
 def forget() -> None:

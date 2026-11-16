@@ -11,6 +11,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { parseTags, tagsText } from '../lib/format';
 import { searchMembers, searchProjects } from '../lib/pickers';
@@ -111,11 +113,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedForm('task-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="task-form"
     :title="title"
     :submit-label="task ? $t('task.form.save') : $t('task.form.create')"
@@ -128,6 +133,7 @@ async function save(): Promise<void> {
       <div class="task-form">
         <ion-input
           data-testid="task-form-title"
+          name="title"
           :value="form.title"
           :label="$t('task.form.title')"
           :placeholder="$t('task.form.titlePlaceholder')"
@@ -141,6 +147,7 @@ async function save(): Promise<void> {
         />
         <ion-textarea
           data-testid="task-form-description"
+          name="description"
           :value="form.description"
           :label="$t('task.form.description')"
           label-placement="floating"
@@ -155,6 +162,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="task-form-priority"
+          name="priority"
           :value="form.priority"
           :label="$t('task.form.priority')"
           label-placement="floating"
@@ -174,6 +182,7 @@ async function save(): Promise<void> {
         </ion-select>
         <ion-input
           data-testid="task-form-due_date"
+          name="due_date"
           type="date"
           :value="form.due"
           :label="$t('task.form.due')"
@@ -187,6 +196,7 @@ async function save(): Promise<void> {
         <Combo
           v-if="!task"
           testid="task-form-assignee"
+          name="assigned_to_id"
           :model-value="form.assignee"
           :search="findMembers"
           :label="$t('task.form.assignee')"
@@ -196,6 +206,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="task-form-project"
+          name="project_id"
           :model-value="form.project"
           :search="findProjects"
           :label="$t('task.form.project')"
@@ -205,6 +216,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="task-form-tags"
+          name="tags"
           :value="form.tags"
           :label="$t('task.form.tags')"
           :helper-text="$t('task.form.tagsHelper')"

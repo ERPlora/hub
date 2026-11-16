@@ -1,9 +1,9 @@
-// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas.py.
-// Written by hand, as `frontend/sdk-types.d.ts` is for the PoC, until V3 generates them from
-// `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`.
-// One input per operation (ninja's parity): no path parameters, an invoice's id or number travels in the
-// input. Money is whole cents with a sign (a rectifying invoice is negative); decimals (`quantity`,
-// rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO `YYYY-MM-DD`.
+// Types of the invoice app's operations for the SDK (`useLive`, `useCommand`), from apps/invoice/schemas.py. Written by
+// hand, as `frontend/sdk-types.d.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
+// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
+// parameters, an invoice's id or number travels in the input. Money is whole cents with a sign (a rectifying invoice is
+// negative); decimals (`quantity`, rates) are JSON strings on the way out («2.000», «21.00»); dates are ISO
+// `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';

@@ -1,12 +1,8 @@
-"""Models of the appointment app: the settings, the day counter of the numbers, the appointments with their
-frozen service lines and their history, the blocked periods, and the repeating series.
-
-Instants are stored with their zone (UTC) and read on the business's clock. An appointment copies what
+"""Instants are stored with their zone (UTC) and read on the business's clock. An appointment copies what
 it was booked with — the customer's name and contact, each service's name, price and length, the
 professional's name — so that changing a card or the catalog later never rewrites what was booked.
 Money is in cents. Deleting an appointment or a series is logical (``deleted_at``): what points at them
-keeps pointing. Phase 1 has no tenancy: every scope shares these tables; phase 2 moves them to each
-hub's database.
+keeps pointing.
 """
 
 from django.db import models
@@ -101,7 +97,32 @@ class Counter(UUIDModel):
         return f"{self.day:%Y%m%d}: {self.last_number}"
 
 
-class Recurring(UUIDModel):
+class Audited(UUIDModel):
+    """When an appointment or a series was created, changed and deleted, and who created it.
+
+    Its own context, as a «cita»: «borrada», «creada» and «actualizada», not the «eliminado» or «creado» other apps
+    say for the same English (hub#633)."""
+
+    deleted_at = models.DateTimeField(
+        pgettext_lazy("appointment", "deleted at"), null=True, blank=True
+    )
+    created_at = models.DateTimeField(
+        pgettext_lazy("appointment", "created at"), auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        pgettext_lazy("appointment", "updated at"), auto_now=True
+    )
+    created_by = models.CharField(
+        pgettext_lazy("appointment", "created by"),
+        max_length=ACTOR_MAX_LENGTH,
+        blank=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class Recurring(Audited):
     """A repeating booking: who, what, with whom and its rule; each date it books is an appointment."""
 
     class Frequency(models.TextChoices):
@@ -139,7 +160,10 @@ class Recurring(UUIDModel):
     max_occurrences = models.PositiveIntegerField(
         _("number of appointments"), null=True, blank=True
     )
-    is_active = models.BooleanField(_("active"), default=True)
+    # Own context: a series is «activa», not Django's «activo» of the same English (hub#633).
+    is_active = models.BooleanField(
+        pgettext_lazy("appointment", "active"), default=True
+    )
     # The series this one continues after an edit «from this occurrence on».
     split_from = models.ForeignKey(
         "self",
@@ -148,12 +172,6 @@ class Recurring(UUIDModel):
         blank=True,
         related_name="+",
         verbose_name=_("split from"),
-    )
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
 
     class Meta:
@@ -219,7 +237,7 @@ class RecurringService(UUIDModel):
         return f"{self.recurring_id} #{self.position}"
 
 
-class Appointment(UUIDModel):
+class Appointment(Audited):
     """A booking: a customer, one or more services and a professional at a time on the business's clock."""
 
     # Short labels carry a context: Django merges the apps' catalogues, and another app may translate
@@ -296,14 +314,11 @@ class Appointment(UUIDModel):
     )
     # The wall-clock date the series generated: the occurrence's key, not where it ended up.
     occurrence_date = models.DateField(_("occurrence"), null=True, blank=True)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
-    )
+    # Own context, as Audited's (hub#633).
     updated_by = models.CharField(
-        _("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("appointment", "updated by"),
+        max_length=ACTOR_MAX_LENGTH,
+        blank=True,
     )
 
     class Meta:
@@ -402,6 +417,7 @@ class History(UUIDModel):
         CHARGED = "charged", _("Charged")
         UNCHARGED = "uncharged", _("Sale voided")
         DELETED = "deleted", _("Deleted")
+        RESTORED = "restored", pgettext_lazy("appointment history", "Restored")
 
     appointment = models.ForeignKey(
         Appointment,
@@ -411,7 +427,10 @@ class History(UUIDModel):
     )
     action = models.CharField(_("action"), max_length=16, choices=Action.choices)
     at = models.DateTimeField(_("at"), auto_now_add=True)
-    actor = models.CharField(_("by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    # Own context: the history says «quién» did each change, not Clientes' «por» of the same English (hub#633).
+    actor = models.CharField(
+        pgettext_lazy("appointment", "by"), max_length=ACTOR_MAX_LENGTH, blank=True
+    )
     by_customer = models.BooleanField(_("requested by the customer"), default=False)
     reason = models.CharField(_("reason"), max_length=500, blank=True)
     old_value = models.JSONField(_("before"), default=dict, blank=True)
@@ -438,6 +457,7 @@ class History(UUIDModel):
                         "charged",
                         "uncharged",
                         "deleted",
+                        "restored",
                     ]
                 ),
                 name="appointment_history_action",

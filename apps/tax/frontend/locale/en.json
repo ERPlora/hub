@@ -165,6 +165,7 @@
     "setup": {
       "heading": "Your taxes",
       "message": "Set up the VAT rates of the country you sell in so the till can price a sale.",
+      "ownRules": "{country} does not come with its tax rates ready: create in Rules the rate of each category you sell so the till can price a sale.",
       "action": "Set up"
     },
     "settings": {
@@ -175,6 +176,7 @@
       "countryHelp": "It is the country of your ERPlora account.",
       "region": "Tax region",
       "regionHelp": "The Canary Islands charge IGIC and Ceuta and Melilla IPSI. Each category is charged with the rule of your region: create one per category in Rules. Until it has one, the till cannot charge it — the national VAT never applies there.",
+      "noRegionsHelp": "{country} has no tax territories of its own: each category is charged with the rule of the whole country, which you create in Rules.",
       "regions": {
         "wholeCountry": "Whole country (VAT)",
         "canaryIslands": "Canary Islands (IGIC)",

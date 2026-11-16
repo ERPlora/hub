@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// STAFF-G02, G03, G04: the old Home panels «Active staff», «On leave today» and «Pending time off»
+// The old Home panels «Active staff», «On leave today» and «Pending time off»
 // (STAFF-F20, F23) above the staff list, as Customers shows its figures above its own, while the Hub's
 // Home has no panels. Followed live from `staff.member.stats`: a write anywhere re-runs it on the server.
 // The cards are the product's `ok-kpi` (label over a big value), as `CustomerStats.vue` rebuilds them

@@ -1,12 +1,9 @@
 <script setup lang="ts">
-// A person's page (BASE-G10, G139, G140; the old hub's EmployeeFormPage, «Edit user»), for who runs the business: the
-// live `base.person.detail` of the address. Their details — name, email, role — are erplora.com's and are changed there
-// («Open on erplora.com»: the business's «Members»). Their PIN: since when, and «Remove the PIN», asked first with its
-// consequence (they keep entering with their account). Their badge: a reader's burst fills the field wherever the focus
-// is (BASE-G56's reader), or the number is typed; «Save badge» and «Remove the badge». What this administrator may not
-// change (the owner's way in, one's own badge) is said instead of offered; a refusal is told from its code. «Open on
-// erplora.com» leaves the Hub by `openExternalLink` (in the installed app, the system browser: gh:hub#439) and, a way to
-// erplora.com's panel, never in the Google Play copy (`managementOffered`, gh:hub#1897).
+// A person's page, for whoever runs the business. Their name, email and role belong to erplora.com and are changed
+// there; here only their PIN and badge. A badge reader's burst fills the field wherever the focus is. What this
+// administrator may not change (the owner's way in, one's own badge) is said instead of offered. «Open on erplora.com»
+// leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered in the
+// Google Play copy (`managementOffered`).
 import { ConfirmDialog, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, openExternalLink, toastSuccess } from '@erplora/ui/shell';

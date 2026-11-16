@@ -1,37 +1,22 @@
-// Test helper of base's Home and its pieces of the chrome: the SDK's live harness (fake clock, fake network
-// serving the stream and the API) on the hub's generated op → route map, the shell's i18n with base's
-// catalogues and the shared assistant's words merged in, the assistant configured as the Hub's (both as main.ts
-// does), a session, the shell's config, a memory router with the routes a test names and Ionic's router API on it
-// (`useIonRouter`).
-import {
-  createShellI18n,
-  provideSession,
-  provideShellConfig,
-  type SessionMe,
-  type SessionStatus,
-  type ShellSidebar,
-} from '@erplora/ui/shell';
+// Test helper of base's Home and its pieces of the chrome: `mountInShell` with base's catalogues and the shared
+// assistant's words merged in, the assistant configured as the Hub's (both as main.ts does), the shell's config, a
+// memory router with the routes a test names and Ionic's router API on it (`useIonRouter`).
+import { type SessionMe, type SessionStatus, type ShellSidebar } from '@erplora/ui/shell';
 import { assistantMessages, configureAssistant } from '@erplora/ui/components';
-import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
-import { mount } from '@vue/test-utils';
+import { type BaseWrapper } from '@vue/test-utils';
 import { vi } from 'vitest';
-import { type Component, createApp, ref } from 'vue';
+import { type Component } from 'vue';
 import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
 
-import {
-  type ApiHandler,
-  createTestClient,
-  flush,
-  resultFrame,
-  type StreamCall,
-} from '../../../packages/ui/src/sdk/__tests__/live-harness';
-import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
+import { type ApiCall, type ApiHandler, flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { HUB_ASSISTANT } from '../lib/assistant-hub';
 import { forgetAppDistribution } from '../lib/management';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
+import { mountInShell } from './mount-in-shell';
 
-export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+export * from './mount-in-shell';
 
 configureAssistant(HUB_ASSISTANT);
 
@@ -78,6 +63,39 @@ export function tap(element: Element): { defaultPrevented: boolean } {
     window.removeEventListener('click', last);
   }
   return seen;
+}
+
+/** What `base.saas_pass.create` signs in these tests (BASE-F11). */
+export const SIGNED = 'http://localhost:8001/hub-pass/?pass=abc';
+
+/** `base.saas_pass.create` refusing to sign (a session opened without the account): the usual address must open. */
+export function passRefused(): Response {
+  return Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 });
+}
+
+/** Taps, in a browser, a link of the mounted `m` that goes with the pass to erplora.com (`useSaasPass`): what it asked
+ *  the pass for (`next`, none when it asked nothing) and where its new tab was sent (`to`): the signed address, or the
+ *  usual one when the pass could not be signed. */
+export async function followPass(m: { net: { api: ApiCall[] } }, link: Element): Promise<{ next?: string; to: string }> {
+  const tab = { opener: {} as unknown, location: { href: 'about:blank' } };
+  const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+  try {
+    tap(link);
+    await flush();
+    const pass = m.net.api.filter((call) => call.url.includes('/saas-pass')).at(-1);
+    const next = pass ? (JSON.parse(pass.init.body as string) as { next: string }).next : undefined;
+    return { next, to: tab.location.href };
+  } finally {
+    open.mockRestore();
+  }
+}
+
+/** The «Upgrade plan» a screen places in `within`, as the person and the pass see it, when it is the platform's
+ *  PlanUpgradeLink (BASE-F11); `null` when there is none, or only a copy of its click. */
+export function placedUpgrade(within: Pick<BaseWrapper<Node>, 'findComponent'>): { url: string; testid?: string; says: string } | null {
+  const piece = within.findComponent(PlanUpgradeLink);
+  if (!piece.exists()) return null;
+  return { url: piece.props('url'), testid: piece.attributes('data-testid'), says: piece.text() };
 }
 
 const BLANK = { template: '<div />' };
@@ -132,16 +150,7 @@ function navManager(router: Router) {
   };
 }
 
-/** The subscription id the stream holds for `op` (the first one). */
-export function subId(client: LiveClient, op: OpName): string {
-  const sub = client.stream.subscriptions(op)[0];
-  if (!sub) throw new Error(`no live subscription for ${op}`);
-  return sub.id;
-}
-
 export async function mountBase(component: Component, options: MountOptions = {}) {
-  const harness = createTestClient({ routes: OPERATION_ROUTES });
-  if (options.onApi) harness.net.onApi(options.onApi);
   const known: RouteRecordRaw[] = (options.routes ?? []).map((path) => ({ path, component: BLANK }));
   const router = createRouter({
     history: createMemoryHistory(),
@@ -151,36 +160,18 @@ export async function mountBase(component: Component, options: MountOptions = {}
       { path: '/:pathMatch(.*)*', name: 'not-found', component: BLANK },
     ],
   });
-  await router.push(options.path ?? '/');
-  await router.isReady();
-  // The session and the shell's config are provided app-wide, as createShell does.
-  const app = createApp({});
-  provideSession(ref(options.session === null ? undefined : (options.session ?? OWNER)), ref(options.status ?? 'live'), {
-    app,
-  });
-  provideShellConfig({ homePath: '/', home: true, sidebar: options.sidebar }, app);
   const ionRouter = navManager(router);
-  const wrapper = mount(component, {
-    props: options.props,
-    attachTo: document.body,
-    global: {
-      plugins: [
-        router,
-        createShellI18n({
-          locale: options.locale ?? 'en',
-          messages: { en: { ...assistantMessages.en, ...en }, es: { ...assistantMessages.es, ...es } },
-        }),
-      ],
-      provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client, navManager: ionRouter },
-      stubs: options.stubs,
+  const mounted = await mountInShell(
+    component,
+    { ...options, api: options.onApi, attachTo: document.body },
+    {
+      path: '/',
+      session: OWNER,
+      messages: { en: { ...assistantMessages.en, ...en }, es: { ...assistantMessages.es, ...es } },
+      router,
+      provide: { navManager: ionRouter },
+      shell: { homePath: '/', home: true, sidebar: options.sidebar },
     },
-  });
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
-  /** Pushes a result for the first subscription of `op` and lets Vue render it. */
-  async function result(call: StreamCall, op: OpName, data: unknown, rev = 1): Promise<void> {
-    call.push(resultFrame(subId(harness.client, op), data, rev));
-    await flush();
-  }
-  return { ...harness, router, ionRouter, wrapper, live, result };
+  );
+  return { ...mounted, ionRouter, result: mounted.resultOn };
 }

@@ -1,5 +1,5 @@
-// A refused microphone on the till's «Speak» key says where to allow it again (FIX-HUB-SALE-SPEAK-KEY-MIC-DENIED-SAYS-
-// BROWSER-INSIDE-THE-APP; apps/sale/WORKBOOK.md «Estados», «Hablando (Vender)»): in a browser, the browser; inside the
+// A refused microphone on the till's «Speak» key says where to allow it again (apps/sale/WORKBOOK.md «Estados»,
+// «Hablando (Vender)»): in a browser, the browser; inside the
 // installed app (Android, Windows), which has no browser bar, the device's settings, as the assistant's composer
 // (base-assistant-microphone.spec.ts, BASE-F94). The Hub and its SaaS are the real ones. Tauri does not run in
 // Playwright: the app's bridge is simulated at the edge (`window.__TAURI__`). The microphone is refused by Chrome

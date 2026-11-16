@@ -5,7 +5,8 @@ one settings row, UUIDv7 keys, and intervals that go with their day."""
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.schedule.models import (
     Override,
@@ -16,13 +17,13 @@ from apps.schedule.models import (
     WeekDay,
     WeekDayInterval,
 )
-from apps.schedule.tests.conftest import d, make_day, make_override, make_special_day, t
+from apps.schedule.tests.conftest import HUB_DB, d, make_day, make_override, make_special_day, t
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(create) -> None:
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         create()
 
 

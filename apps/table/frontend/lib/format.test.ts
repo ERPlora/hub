@@ -73,9 +73,9 @@ describe('formatMoney', () => {
     expect(spaced(formatMoney(125000, 'es', HUF))).toBe('1.250,00 Ft');
   });
 
-  it('while the business has not answered, the figure goes without a symbol, never in euros', () => {
-    expect(formatMoney(2250, 'es')).toBe('22,50');
-    expect(formatMoney(123450, 'en')).toBe('1,234.50');
+  it('while the business has not answered, the amount is a dash, never in euros', () => {
+    expect(formatMoney(2250, 'es')).toBe('—');
+    expect(formatMoney(123450, 'en')).toBe('—');
   });
 
   // hub#658: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
@@ -84,7 +84,7 @@ describe('formatMoney', () => {
     expect(spaced(formatMoney(123456789, 'es', EUR))).toBe('1.234.567,89 €');
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
     expect(spaced(formatMoney(1500, 'es', JPY))).toBe('1.500 ¥');
-    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(123456, 'es')).toBe('—');
     expect(spaced(formatMoney(99999, 'es', EUR))).toBe('999,99 €');
   });
 });

@@ -1,7 +1,7 @@
-"""The assistant's card for a write of invoice (FIX-HUB-INVOICE-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258):
-in Spanish, every datum it sends by the name the Facturas screens give it, never by the title pydantic makes up from
-the field («Duplicate», «Lines», «Next Number»). The card is base's (``base.assistant.card``); the names are invoice's:
-the titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of invoice: in Spanish, every datum it sends by the name the Facturas screens give
+it, never by the title pydantic makes up from the field («Duplicate», «Lines», «Next Number»). The card is base's
+(``base.assistant.cards.card``); the names are invoice's: the titles of its schemas and the ``verbose_name`` of its models,
+with their Spanish in its catalog."""
 
 import datetime as dt
 import json
@@ -11,17 +11,18 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import timezone, translation
+from live import assistant as shared
 from live.context import OperationContext, Scope, system_context
 from live.operations import get, registry
 
-from apps.invoice import queries
+from apps.invoice import queries, schemas
 from apps.invoice.models import Invoice, InvoiceSeries, InvoiceType
-from apps.invoice.tests.conftest import ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import HUB_DB, ISSUER, ctx_for, run
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_assistant import named_by_the_screen
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant import technical_names
+from base.tests.test_assistant_card_values_references import AN_ID
+from base.tests.test_services_assistant import answered, waiting
 
 LOCALE = Path(apps.get_app_config("invoice").path) / "frontend/locale"
 SCREENS = json.loads((LOCALE / "es.json").read_text())["invoice"]
@@ -33,13 +34,12 @@ def labels(card: dict) -> list[str]:
 
 
 def invoice_writes() -> list:
-    return [op for op in registry.values() if op.app_label == "invoice" and op.kind == "command" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "invoice" and op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_no_datum_of_a_write_of_invoice_reaches_a_spanish_card_by_its_technical_name():
     """Every write of invoice the assistant may ask for, with all its data: each datum by a name of its own in Spanish,
     never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = invoice_writes()
     # Positive control: the registry has invoice's writes, those that send the data this fix names among them.
     assert {
@@ -52,43 +52,37 @@ def test_no_datum_of_a_write_of_invoice_reaches_a_spanish_card_by_its_technical_
         "invoice.series.create",
         "invoice.series.update",
     } <= {op.name for op in writes}
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_a_reprint_as_the_paper_stamps_it():
     print_ = get("invoice.invoice.print")
-    assert labels(assistant.card(print_, {"number": "F-1", "duplicate": True}, "es")) == ["Número", SCREENS["paper"]["copy"]]
-    assert labels(assistant.card(print_, {"number": "F-1", "duplicate": True}, "en")) == ["Number", SCREENS_EN["paper"]["copy"]]
+    assert labels(assistant.cards.card(print_, {"number": "F-1", "duplicate": True}, "es")) == ["Número", SCREENS["paper"]["copy"]]
+    assert labels(assistant.cards.card(print_, {"number": "F-1", "duplicate": True}, "en")) == ["Number", SCREENS_EN["paper"]["copy"]]
 
 
 def test_the_card_names_the_kind_of_a_rectification_as_its_form_does():
     # The invoice by its number: one named by its id is said by its number, read as the person (below).
     rectify = get("invoice.invoice.rectify")
     arguments = {"number": "FACT-2026-000001", "rectification_type": "R4"}
-    assert labels(assistant.card(rectify, arguments, "es")) == ["Número", SCREENS["rectify"]["type"]]
-    assert labels(assistant.card(rectify, arguments, "en")) == ["Number", SCREENS_EN["rectify"]["type"]]
+    assert labels(assistant.cards.card(rectify, arguments, "es")) == ["Número", SCREENS["rectify"]["type"]]
+    assert labels(assistant.cards.card(rectify, arguments, "en")) == ["Number", SCREENS_EN["rectify"]["type"]]
 
 
 def test_the_card_names_the_lines_of_a_manual_invoice():
     lines = [{"description": "Corte", "quantity": "1", "unit_price": 1500, "tax_rate": "21"}]
     create = get("invoice.invoice.create")
-    assert labels(assistant.card(create, {"lines": lines}, "es")) == ["Líneas"]
-    assert labels(assistant.card(create, {"lines": lines}, "en")) == ["Lines"]
+    assert labels(assistant.cards.card(create, {"lines": lines}, "es")) == ["Líneas"]
+    assert labels(assistant.cards.card(create, {"lines": lines}, "en")) == ["Lines"]
 
 
 def test_the_card_names_a_series_next_number_as_its_form_does():
     for name in ("invoice.series.create", "invoice.series.update"):
-        assert labels(assistant.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]
-        assert labels(assistant.card(get(name), {"next_number": 120}, "en")) == [SCREENS_EN["series"]["form"]["nextNumber"]]
+        assert labels(assistant.cards.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]
+        assert labels(assistant.cards.card(get(name), {"next_number": 120}, "en")) == [SCREENS_EN["series"]["form"]["nextNumber"]]
 
 
-# ── Rectifying by asking the assistant (INVOICE-F08; PLAN §30, «Cinco acciones de IA pulidas», the second) ────────
+# ── Rectifying by asking the assistant (INVOICE-F08) ──────────────────────────────────────────────────────────────
 # Against the Hub's real assistant turn (``base.assistant.turn``): «rectifica la factura … porque el precio estaba mal»
 # offers the preview and the rectification; the preview (``invoice.invoice.rectification_preview``) is a read, so it
 # runs by itself and goes back to the model with the rectifying invoice that would be born (no number taken); the
@@ -103,7 +97,7 @@ def ask():
 
 
 def call(name, arguments, call_id="c1"):
-    return {"call_id": call_id, "name": assistant.tool_name(name), "arguments": json.dumps(arguments)}
+    return {"call_id": call_id, "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
 
 
 def asked(*calls):
@@ -136,6 +130,7 @@ def rectifications():
     return Invoice.objects.filter(invoice_type__startswith="R")
 
 
+@HUB_DB
 def test_rectifying_an_invoice_offers_the_preview_and_the_rectification(issuer):
     names = [tool["name"] for tool in turn()["tools"]]
     assert {"invoice__invoice__rectification_preview", "invoice__invoice__rectify"} <= set(names)
@@ -143,13 +138,14 @@ def test_rectifying_an_invoice_offers_the_preview_and_the_rectification(issuer):
 
 def test_the_rectification_tells_the_assistant_to_read_its_preview_first_and_to_name_that_invoice():
     rectify = get("invoice.invoice.rectify")
-    assert "invoice.invoice.rectification_preview" in assistant.description(rectify)
-    assert assistant.risk(rectify) == "high"
+    assert "invoice.invoice.rectification_preview" in shared.description(rectify)
+    assert shared.risk(rectify) == "high"
     # The preview is a read the assistant may run by itself: never a card, never a change.
     seen = get("invoice.invoice.rectification_preview")
-    assert (seen.kind, assistant.is_tool(seen), seen.permission) == ("query", True, rectify.permission)
+    assert (seen.kind, assistant.tools.is_tool(seen), seen.permission) == ("query", True, rectify.permission)
 
 
+@HUB_DB
 def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_be_born(issuer, today):
     original = an_invoice()
     plan = turn(call("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON}))
@@ -170,6 +166,7 @@ def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_b
     assert not InvoiceSeries.objects.filter(code="RECT").exists()
 
 
+@HUB_DB
 def test_what_cannot_be_rectified_the_preview_says_why_in_the_persons_language_and_no_card_comes(issuer):
     original = an_invoice()
     rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
@@ -185,6 +182,7 @@ def test_what_cannot_be_rectified_the_preview_says_why_in_the_persons_language_a
     assert rectifications().count() == 1
 
 
+@HUB_DB
 def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_the_reason(issuer):
     original = an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
@@ -200,15 +198,16 @@ def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_th
         ("number", original.number),
         ("reason", REASON),
     ]
-    assert plan["pending"] == [rectify]
+    assert waiting(plan) == [rectify]
     assert not rectifications().exists()
 
 
+@HUB_DB
 def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today):
     original = an_invoice()
     seen = run("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON})
     rectify = call("invoice.invoice.rectify", {"number": seen.original.number, "reason": REASON})
-    plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "})
+    plan = answered(rectify, decision={"call_id": "c1", "accepted": True, "typed": " confirmar "}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     rect = rectifications().get()
     assert (rect.rectifies_id, rect.number, rect.invoice_type, rect.total_amount, rect.issue_date, rect.created_by) == (
@@ -222,6 +221,7 @@ def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today
     assert Invoice.objects.get(pk=original.id).status == "cancelled"
 
 
+@HUB_DB
 @pytest.mark.parametrize(
     "decision",
     [
@@ -240,32 +240,33 @@ def test_without_the_word_nothing_is_issued_and_the_original_stays_issued(issuer
     assert not InvoiceSeries.objects.filter(code="RECT").exists()
 
 
+@HUB_DB
 def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(issuer, today):
     original = an_invoice()
     yesterday = str(today - dt.timedelta(days=1))
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON, "issue_date": yesterday})
-    plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = answered(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, turn_of=turn)
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "invoice.rectify_date_not_allowed")]
     assert Invoice.objects.get(pk=original.id).status == "issued"
     assert not rectifications().exists()
 
 
-# ── What rectifying will do, on its card (FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW; BASE-F98's hook) ─
-# The card of the rectification listed only what it sends (the number and the reason), never the rectifying invoice it
-# issues. Through base's hook it shows, before the word is typed, what invoice.invoice.rectification_preview answers
+# ── What rectifying will do, on its card (BASE-F98's hook) ─────────────────────────────────────────────────────────
+# The card of the rectification lists not only what it sends (the number and the reason) but the rectifying invoice it
+# issues: through base's hook it shows, before the word is typed, what invoice.invoice.rectification_preview answers
 # for the person: the type, the next number of the series (NOT taken) and the amounts in negative, as money.
 
 PREVIEWED = ["invoice_type", "next_number", "base_amount", "tax_amount", "total_amount"]
 
 
 def name_of(code: str, language: str) -> str:
-    """The name the models give a kind of invoice in ``language``: the one the card says it by (hub#708)."""
+    """The name the models give a kind of invoice in ``language``: the one the card says it by."""
     with translation.override(language):
         return str(InvoiceType(code).label)
 
 
 def preview_of(number: str, language: str) -> list[dict]:
-    failure, preview = assistant.preview(
+    failure, preview = assistant.cards.preview(
         ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON}
     )
     assert failure is None
@@ -283,6 +284,7 @@ def card_labels(screens: dict) -> list[str]:
     ]
 
 
+@HUB_DB
 def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in_negative_as_money(issuer, today):
     original = an_invoice()
     preview = preview_of(original.number, "es")
@@ -295,9 +297,10 @@ def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in
     ]
     assert [field["label"] for field in preview] == card_labels(SCREENS)
     assert [field["label"] for field in preview_of(original.number, "en")] == card_labels(SCREENS_EN)
-    assert assistant.preview_of(get("invoice.invoice.rectify"))["fields"] == PREVIEWED
+    assert shared.preview_of(get("invoice.invoice.rectify"))["fields"] == PREVIEWED
 
 
+@HUB_DB
 def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issuer, today):
     original = an_invoice()
     plan = turn(call("invoice.invoice.rectify", {"number": original.number, "reason": REASON}))
@@ -315,11 +318,13 @@ def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issue
     assert not rectifications().exists()
 
 
+@HUB_DB
 def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     original = an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
-    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}
-    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    drawn = turn(rectify)
+    said = {field["name"]: field["value"] for field in drawn["confirm"]["preview"]}
+    turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     rect = rectifications().get()
     assert (rect.number, name_of(rect.invoice_type, "es"), rect.base_amount, rect.tax_amount, rect.total_amount) == (
         said["next_number"],
@@ -330,17 +335,28 @@ def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     )
 
 
-def test_another_rectification_issued_after_the_card_takes_its_number_and_this_one_the_next(issuer, today):
-    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»)."""
+@HUB_DB
+def test_another_rectification_issued_after_the_card_takes_its_number_and_the_yes_shows_the_next_first(issuer, today):
+    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»): another rectification issued
+    before the yes takes it, and the yes issues nothing — the card comes again with the next number — until it is
+    answered: a yes is for what its card showed."""
     original, other = an_invoice(), an_invoice()
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
-    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}["next_number"]
+    drawn = turn(rectify)
+    said = {field["name"]: field["value"] for field in drawn["confirm"]["preview"]}["next_number"]
     first = run("invoice.invoice.rectify", {"number": other.number, "reason": "otro"}).invoice
-    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
-    mine = rectifications().get(rectifies_id=original.id)
-    assert (first.number, mine.number) == (said, f"RECT-{today.year}-000002")
+    yes = {"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}
+
+    again = turn(*drawn["pending"], decision=yes)
+
+    assert again["executed"] == [] and not rectifications().filter(rectifies_id=original.id).exists()
+    shown = {field["name"]: field["value"] for field in again["confirm"]["preview"]}["next_number"]
+    assert (first.number, shown) == (said, f"RECT-{today.year}-000002")
+    turn(*again["pending"], decision=yes)
+    assert rectifications().get(rectifies_id=original.id).number == shown
 
 
+@HUB_DB
 def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_says_why(issuer):
     """Without reading the preview first, a rectifying invoice asked to be rectified: the card's preview cannot be read,
     so no card (nothing is confirmed blind) and the model hears why, in the person's language."""
@@ -357,9 +373,9 @@ def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_say
     assert rectifications().count() == 1
 
 
-# ── The kind of a rectification, by its name (hub#708) ─────────────────────────────────────────────────────────────
-# The card said «Tipo de rectificativa: R4» twice over: in what it sends (``rectification_type``, which no field of the
-# models is called) and in what it will do (the preview's ``invoice_type``, an open text). Both now say the name the
+# ── The kind of a rectification, by its name ───────────────────────────────────────────────────────────────────────
+# The card never says «Tipo de rectificativa: R4», neither in what it sends (``rectification_type``, which no field of
+# the models is called) nor in what it will do (the preview's ``invoice_type``, an open text). Both say the name the
 # models give that kind; the write, the model and the fiscal record keep the code.
 
 RECTIFICATION_KINDS = ("R1", "R2", "R3", "R4")
@@ -371,32 +387,33 @@ RECTIFICATION_KINDS = ("R1", "R2", "R3", "R4")
 )
 def test_the_card_says_the_kind_it_sends_by_its_name(language, named):
     arguments = {"number": "FACT-2026-000001", "rectification_type": "R4"}
-    assert values(assistant.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"] == named
+    assert values(assistant.cards.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"] == named
 
 
 @pytest.mark.parametrize("language", ["es", "en"])
 @pytest.mark.parametrize("code", RECTIFICATION_KINDS)
 def test_every_kind_a_rectification_takes_has_its_name_on_the_card(code, language):
     arguments = {"number": "FACT-2026-000001", "rectification_type": code}
-    said_it = values(assistant.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"]
+    said_it = values(assistant.cards.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"]
     assert said_it == name_of(code, language) != code
 
 
 def test_the_kinds_the_card_names_are_those_its_write_takes():
     """Positive control of the two above: a kind the write comes to take would need its name here."""
     schema = get("invoice.invoice.rectify").input.model_json_schema()
-    prop = assistant._resolved(schema["properties"]["rectification_type"], schema.get("$defs", {}))
+    prop = shared.resolved(schema["properties"]["rectification_type"], schema.get("$defs", {}))
     assert tuple(prop["enum"]) == RECTIFICATION_KINDS
 
 
 def previewed_kind(number: str, language: str, **more) -> dict:
-    failure, preview = assistant.preview(
+    failure, preview = assistant.cards.preview(
         ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON, **more}
     )
     assert failure is None
     return next(field for field in preview if field["name"] == "invoice_type")
 
 
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_what_the_card_says_it_will_do_names_the_kind_too(issuer, language):
     original = an_invoice()
@@ -404,6 +421,7 @@ def test_what_the_card_says_it_will_do_names_the_kind_too(issuer, language):
     assert (kind["kind"], kind["value"]) == ("text", name_of("R4", language))
 
 
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_ticket_is_previewed_by_the_name_of_its_own_kind(issuer, language):
     """A ticket is always R5, whatever was asked: the preview's closed list takes the kind no rectification asks for."""
@@ -413,21 +431,23 @@ def test_a_ticket_is_previewed_by_the_name_of_its_own_kind(issuer, language):
     assert kind["value"] == name_of("R5", language)
 
 
+@HUB_DB
 def test_the_model_and_the_write_keep_the_code_the_card_names(issuer):
     """Only the card is in words: the read still tells the model the code, and the record is issued with it."""
     original = an_invoice()
     arguments = {"number": original.number, "reason": REASON, "rectification_type": "R4"}
     told = json.loads(turn(call("invoice.invoice.rectification_preview", arguments))["append"][0]["content"])
     assert told["invoice_type"] == "R4"
-    plan = turn(call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    plan = answered(
+        call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, turn_of=turn
+    )
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
     assert rectifications().get().invoice_type == "R4"
 
 
-# ── The record a write names by its id, by its name (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half
-# is hub#416) ──
-# Since hub#416 the card leaves out an id its schema does not mark: «marca como pagada esa factura», «emite la factura de
-# esa venta» or «rectifica esa devolución» said no invoice, no sale and no refund. Now each record is named as the
+# ── The record a write names by its id, by its name ───────────────────────────────────────────────────────────────────
+# The card leaves out an id its schema does not mark, so «marca como pagada esa factura», «emite la factura de esa
+# venta» or «rectifica esa devolución» would say no invoice, no sale and no refund. Each record is named as the
 # Facturas screens show it: an invoice and a sale by their numbers, a refund by its sale and what it gave back, a series
 # by its code, its year and its name, and the customer by the name on their card. Read as whoever asks, in the hub they
 # ask in: never by the id, and left out when nobody, or somebody who may not see them, is behind the request. The product
@@ -455,7 +475,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def values(card: dict) -> dict:
@@ -518,7 +538,7 @@ def said(business: dict, language: str = "es") -> dict:
 def cards(business: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        write: assistant.card(
+        write: assistant.cards.card(
             get(write), {**{datum: str(business["ids"][datum]) for datum in data}, **BESIDES.get(write, {})}, language, ctx
         )
         for write, data in NAMED.items()
@@ -541,9 +561,9 @@ def test_every_record_a_write_of_invoice_names_by_its_id_is_listed_here():
     }
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
-def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(language, hub_a, no_fallback):
+def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(language, hub_a):
     """«Marca como pagada esa factura», «emite la factura de esa venta», «rectifica esa devolución»: the card says which
     invoice, sale, refund, series or customer as the Facturas screens show them, in the person's language, never by its
     id."""
@@ -554,7 +574,7 @@ def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(languag
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "titles"),
     [
@@ -562,7 +582,7 @@ def test_a_write_of_invoice_names_each_record_as_the_invoices_screens_do(languag
         ("en", {"customer_id": "Customer", "series_id": "Series", "invoice_id": "Invoice"}),
     ],
 )
-def test_each_record_is_titled_as_the_invoice_titles_it(language, titles, hub_a, no_fallback):
+def test_each_record_is_titled_as_the_invoice_titles_it(language, titles, hub_a):
     """«Factura: FACT-2026-000001», «Venta: 20261031-0001», «Devolución de venta: …»: each record by the name its screens
     give it, never by its field («Invoice Id», «Refund Id»)."""
     screens = SCREENS if language == "es" else SCREENS_EN
@@ -575,8 +595,8 @@ def test_each_record_is_titled_as_the_invoice_titles_it(language, titles, hub_a,
     } == {write: {datum: titles[datum] for datum in data} for write, data in NAMED.items()}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_nobody_behind_the_request_reads_no_record_of_invoice(hub_a, no_fallback):
+@HUB_DB
+def test_nobody_behind_the_request_reads_no_record_of_invoice(hub_a):
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     with use_hub(hub_a):
         shown = cards(a_business(Scope("host", hub_a.slug)), None)
@@ -584,8 +604,8 @@ def test_nobody_behind_the_request_reads_no_record_of_invoice(hub_a, no_fallback
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback):
+@HUB_DB
+def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a):
     """Whoever may issue, rectify and keep the series but see neither invoices, nor sales, nor customers (a key that only
     writes, say) gets every record left out, never its id."""
     writes_only = frozenset({"invoice.add_invoice", "invoice.rectify_invoice", "invoice.manage_series"})
@@ -596,8 +616,8 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {"ids": {datum: uuid.uuid7() for datum in ("customer_id", "series_id", "sale_id", "refund_id", "invoice_id")}}
     with use_hub(hub_a):
         shown = cards(gone, in_hub(hub_a))
@@ -605,8 +625,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a, no_fallba
     assert all(no_id(card) for card in shown.values())
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+@HUB_DB
+def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
     """The read runs in the hub the person asks in: hub B's invoice, sale, refund, series or customer is nobody in hub A."""
     with use_hub(hub_b):
         theirs = a_business(Scope("host", hub_b.slug))
@@ -619,8 +639,8 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fa
     assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens(theirs)
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_the_product_of_a_manual_line_is_left_out_never_by_its_id(hub_a, no_fallback):
+@HUB_DB
+def test_the_product_of_a_manual_line_is_left_out_never_by_its_id(hub_a):
     """Inventory is no requirement of Invoicing: its product on a manual line is left out of the card, whose line says
     what is invoiced by its description."""
     line = {"description": "Champú", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}
@@ -630,7 +650,7 @@ def test_the_product_of_a_manual_line_is_left_out_never_by_its_id(hub_a, no_fall
             {"name": "Champú", "sku": "CH-1", "price": 1210, "tax_category_key": "product.generic"},
             system_context(Scope("host", hub_a.slug)),
         )
-        card = assistant.card(get("invoice.invoice.create"), {"lines": [{**line, "product_id": str(shampoo.id)}]}, "es", in_hub(hub_a))
+        card = assistant.cards.card(get("invoice.invoice.create"), {"lines": [{**line, "product_id": str(shampoo.id)}]}, "es", in_hub(hub_a))
     assert [{key: value for key, value in row.items() if key != "unit_price"} for row in values(card)["lines"]] == [
         {"description": "Champú", "quantity": "1", "tax_rate": "21"}
     ]
@@ -646,7 +666,7 @@ def test_the_kind_of_a_foreign_recipient_s_document_is_said_as_the_recipient_for
     kinds = screens["recipient"]["idTypes"]
     assert set(kinds) == {"02", "03", "04", "05", "06", "07"}  # positive control: every kind the form offers
     assert {
-        code: values(assistant.card(get(write), {"customer_id_type": code}, language))["customer_id_type"]
+        code: values(assistant.cards.card(get(write), {"customer_id_type": code}, language))["customer_id_type"]
         for code in kinds
     } == kinds
 
@@ -665,10 +685,33 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             schema = op.input.model_json_schema()
             for datum in data:
                 checked += 1
-                marked = assistant.refers_of(assistant._resolved(schema["properties"][datum], schema.get("$defs", {})))
+                marked = shared.refers_of(shared.resolved(schema["properties"][datum], schema.get("$defs", {})))
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
     # Positive control: the employee issues, prints and marks as paid (7 records); the manager, the admin and the owner
     # run every one of the 11.
     assert checked == 7 + 11 * 3
     assert unread == []
+
+
+# ── A series asked for with a code of another shape (INVOICE-F12) ───────────────────────────────────────────────────
+
+
+@HUB_DB
+def test_a_series_with_a_code_of_another_shape_gets_no_card_and_the_model_hears_what_a_code_takes():
+    """The code is checked before the card, as the screen checks it: no card for data the operation refuses, and the
+    model hears, in the person's language, what a code takes (letters, digits, hyphens and underscores), never
+    pydantic's pattern."""
+    wrong = {"code": "E2E-?", "name": "Online", "invoice_type": "F1", "year": 2026}
+    with translation.override("es"):
+        plan = turn(call("invoice.series.create", wrong))
+        why = str(schemas.SERIES_CODE_INVALID)
+    assert plan["confirm"] is None
+    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
+        ("invoice.series.create", "error", "invalid_payload")
+    ]
+    error = json.loads(plan["append"][0]["content"])["error"]
+    assert (error["code"], set(error["fields"])) == ("invalid_payload", {"code"})
+    assert error["fields"]["code"].endswith(why)
+    assert why.startswith("Usa solo letras sin tilde")
+    assert not InvoiceSeries.objects.filter(code="E2E-?").exists()

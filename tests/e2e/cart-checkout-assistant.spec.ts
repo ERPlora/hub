@@ -1,13 +1,12 @@
-// The assistant's card for a write of Cart & checkout (FIX-HUB-CART_CHECKOUT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's
-// half is hub#416, BASE-F97): the cart a write acts on by its session code, as the Carts list and «Delete the cart …?»
-// name it; a line by its product; an order by its number, as the Orders list — never by the id the model sent (and,
-// since hub#416, never left out for whoever may read them). End to end with the stack's SaaS gateway and the e2e's
+// The assistant's card for a write of Cart & checkout (BASE-F97): the cart a write acts on by its session code, as the
+// Carts list and «Delete the cart …?» name it; a line by its product; an order by its number, as the Orders list —
+// never by the id the model sent, and never left out for whoever may read them. End to end with the stack's SaaS gateway and the e2e's
 // provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder,
 // «El asistente»). The owner, in Spanish, asks to empty a cart (CART_CHECKOUT-F04), to remove one of its lines
 // (CART_CHECKOUT-F03) and to mark its order paid (CART_CHECKOUT-F09, dangerous): each card names its record; cancelled,
 // nothing changes. What this file creates carries the session prefix of the cart_checkout specs and goes away; the app
-// it turns on is turned off again. Each card says what its write does (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-
-// EMPTYING-A-CART, BASE-F97): emptying a cart «Vaciar», never «Quitar», the verb of removing one of its lines.
+// it turns on is turned off again. Each card says what its write does (BASE-F97): emptying a cart «Vaciar», never
+// «Quitar», the verb of removing one of its lines.
 // flow: cart-checkout-assistant-card
 // flow: base-assistant-card-verbs
 // flow: CART_CHECKOUT-F03 CART_CHECKOUT-F04 CART_CHECKOUT-F09 BASE-F97
@@ -17,6 +16,7 @@ import { writeFileSync } from 'node:fs';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { type Cart, cleanUp, code, get, type Line, type Order, post } from './cart-checkout-helpers';
 import { A, capture, compactBar, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
@@ -237,29 +237,9 @@ test('cart-checkout-assistant-card — in Spanish marking an order paid names it
   await context.close();
 });
 
-type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (the
- *  first one only asks for the tool). */
-async function sentCard(page: Page): Promise<SentCard> {
-  const answer = await page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-  );
-  return confirmedCard(await answer.text())!;
-}
-
 // flow: base-assistant-money-mark (BASE-F97)
-// FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: a line added to a cart in dollars went as «12,50 €»: the
-// write names the cart, not its currency. The card reads the cart as the person and sends the price in its currency,
+// A line added to a cart in dollars must not read «12,50 €»: the write names the cart, not its currency. The card
+// reads the cart as the person and sends the price in its currency,
 // with its decimals (none in yen), as Shopify or Stripe show it. A normal card says its first three data in one line and
 // the price is the sixth: the screen that shows every datum (an automation's question, FLOW-F29) gets it from what the
 // server sends, checked here as it arrives. Cancelled: nothing is added.

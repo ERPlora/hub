@@ -5,7 +5,7 @@
 // Assign to me and Unassign; Edit and Delete; the subtasks with Open (Back and the trail of numbers
 // above) and «Add subtask»; the comments, newest first, signed and dated, and «Comment». The task, its
 // subtasks and its comments are followed live. A box empties as soon as what it sent is accepted (only
-// if nothing new was typed meanwhile, tasks#44); a refusal stays inside the sheet, with the text kept.
+// if nothing new was typed meanwhile); a refusal stays inside the sheet, with the text kept.
 import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -24,6 +24,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useSheetWaysOut, useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { dueTone, formatDay, formatMoment, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
@@ -81,10 +82,20 @@ const newSubtask = ref('');
 const newComment = ref('');
 const editOpen = ref(false);
 const deleteOpen = ref(false);
+/** «Close», Escape and a tap outside ask «Discard changes?» while a comment or a subtask is half-written (hub#1233). */
+const { canDismiss, close } = useSheetWaysOut(
+  useUnsavedFormOnOpen('task-sheet', () => ({ subtask: newSubtask.value, comment: newComment.value }), open),
+  open,
+);
 
 watch(current, () => {
   actionError.value = null;
   assignTo.value = null;
+  newSubtask.value = '';
+  newComment.value = '';
+});
+watch(open, (isOpen) => {
+  if (isOpen) return;
   newSubtask.value = '';
   newComment.value = '';
 });
@@ -164,6 +175,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
 <template>
   <ion-modal
     :is-open="open"
+    :can-dismiss="canDismiss"
     data-testid="task-sheet"
     @did-dismiss="open = false"
   >
@@ -184,7 +196,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
         <ion-buttons slot="end">
           <ion-button
             data-testid="task-sheet-close"
-            @click="open = false"
+            @click="close"
           >
             {{ t('task.actions.close') }}
           </ion-button>

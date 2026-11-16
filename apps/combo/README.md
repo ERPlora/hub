@@ -5,7 +5,8 @@ bebida» para llevar. Cada menú tiene platos (Primero, Segundo, Bebida…) con 
 ofrece elecciones, que son productos de Inventario con su suplemento. Menús dice lo que vale cada línea y cómo se
 factura; Ventas la cobra, Inventario baja el stock de cada plato y Cocina recibe cada plato en su estación.
 
-- **Estado**: completa (2026-10-21): los 13 flujos, `COMBO-F01` … `F13`, están `hecho`.
+- **Estado**: completa (2026-10-21): los 14 flujos, `COMBO-F01` … `F14`, están `hecho` (F14, la foto del menú, llegó
+  después).
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -27,6 +28,7 @@ factura; Ventas la cobra, Inventario baja el stock de cada plato y Cocina recibe
 - **Agotados y bajas** (F12–F13): marcar una elección agotada (o que lo esté su producto en Inventario) la
   quita del TPV sin tocar el menú; un producto desactivado se marca y no se ofrece, y uno eliminado sale solo
   de todos los menús por la reacción a `inventory.product.deleted`.
+- **La foto del menú** (F14): de la librería o propia, como el artículo de Inventario.
 
 ## Ficha
 
@@ -37,9 +39,9 @@ factura; Ventas la cobra, Inventario baja el stock de cada plato y Cocina recibe
 | `requires` | `["inventory", "tax"]`: las elecciones son FK a `inventory.Product` y el menú «en el local», a `tax.TaxCategory`. No admite servicios de Servicios (los packs de peluquería son sus bonos) |
 | Quién la usa | Ventas la llama por nombre (`combo.combo.resolve`, y la hoja del TPV lee `combo.combo.for_sale` en vivo) sin requerirla; Cocina e Inventario no la llaman: leen los componentes que Ventas pone en sus avisos |
 | Pantallas | `/combo/menus` (lista) y `/combo/menus/:id` (constructor); la hoja del TPV es de Ventas |
-| Operaciones | 4 consultas (`queries.py`) y 13 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/combo/…` (`combo.option.drop_product`, de la plataforma, no tiene ruta) |
+| Operaciones | 7 consultas (`queries.py`) y 15 acciones (`services.py`), todas con `ai=`; 19 rutas en `/api/combo/…` (sin ruta: `combo.option.drop_product`, de la plataforma, y `combo.group.get` y `combo.option.get`) |
 | Eventos | 11, `combo.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `inventory.product.deleted` (`combo.option.drop_product`), por el relay del outbox |
-| Migraciones | `0001_initial` (depende de `inventory 0001` y `tax 0005`) |
+| Migraciones | `0001_initial` (depende de `inventory 0001` y `tax 0005`) y `0002_combo_image` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (concurrencia, cuándo sale un menú en el TPV, el reparto al céntimo, el riesgo de cada
@@ -66,8 +68,8 @@ pnpm e2e tests/e2e/combo-menus.spec.ts tests/e2e/combo-till.spec.ts tests/e2e/co
 - `combo-business-currency.spec.ts`: la lista de menús, el constructor (precio cerrado y suplementos) y los
   campos de importe en la moneda del negocio (el negocio `a` en Polonia, en złoty, en 390, 834 y 1440, y de
   vuelta en España, en euros). Los importes se pintan y se leen con `base.business.get` (`useBusinessMoney`),
-  con los decimales que cuenta el servidor; mientras el negocio no contesta, una cifra sin símbolo, nunca un
-  euro.
+  con los decimales que cuenta el servidor; mientras el negocio no contesta, un importe es «—», nunca un
+  euro ni decimales supuestos.
 
 ## Qué queda fuera
 

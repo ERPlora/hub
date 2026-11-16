@@ -14,11 +14,12 @@ from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 
 from apps.online_booking.models import Booking
 from apps.online_booking.queries import hash_token, visitor_key
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
+    HUB_DB,
     MONDAY,
     TUESDAY,
     at,
@@ -36,7 +37,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def listed(data: dict | None = None, **ctx) -> dict:
@@ -485,7 +486,7 @@ def test_a_link_is_kept_as_its_hash():
 
 
 def test_ties_go_by_id_in_the_lists_own_direction(salon):
-    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    """hub#768: a descending list is the ascending one read backwards, ties included, and its
     pages neither repeat nor lose rows."""
     rows = [
         make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, f"{hour:02}:00"), status="pending")

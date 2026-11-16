@@ -1,9 +1,9 @@
 """Django admin of the cart_checkout app: carts with their lines, orders and the counter of the day, with
 full CRUD.
 
-Round 12 (PLAN §17; CLAUDE.md «Frontend y admin»): the Hub's admin lives only on hubs.erplora.com, for the
-platform's staff, and has full CRUD over every table. The database still refuses what no door may save:
-an unknown status, negative totals, a repeated live session code or order number.
+The Hub's admin lives only on hubs.erplora.com, for the platform's staff, and has full CRUD over every table. The
+database still refuses what no door may save: an unknown status, negative totals, a repeated live session code or order
+number.
 """
 
 import pytest
@@ -18,7 +18,7 @@ from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
 
 from base.admin import ADMIN_HUB_SESSION_KEY
 
-from .conftest import make_cart, make_item, make_order
+from .conftest import HUB_DB, A, make_cart, make_item, make_order
 
 
 @pytest.fixture
@@ -43,6 +43,7 @@ def test_the_models_are_registered_and_the_lines_go_with_their_cart():
     assert "erase_customer_data" in OrderAdmin.actions
 
 
+@HUB_DB
 def test_full_crud_for_the_staff(superuser):
     request = request_by(superuser)
     for model in (Cart, Order, OrderCounter):
@@ -53,14 +54,13 @@ def test_full_crud_for_the_staff(superuser):
         assert model_admin.has_delete_permission(request)
 
 
-@pytest.mark.django_db
-def test_the_pages_render(client, superuser):
+@HUB_DB
+def test_the_pages_render(hub_staff):
     cart = make_cart("sess_admin", customer_email="ana@example.com")
     make_item(cart, product_name="Champú de prueba")
     order = make_order(cart, order_number="OS-20261014-0007")
     counter = OrderCounter.objects.create(day="2026-10-14", last=7)
-    client.force_login(superuser)
-    # The admin lives only on the platform host (PLAN §18.1.3).
+    # The admin lives only on the platform host.
     pages = {
         "/admin/cart_checkout/cart/": b"sess_admin",
         f"/admin/cart_checkout/cart/{cart.pk}/change/": b"Champ\xc3\xba de prueba",
@@ -73,16 +73,15 @@ def test_the_pages_render(client, superuser):
         f"/admin/cart_checkout/ordercounter/{counter.pk}/change/": b"last",
     }
     for path, content in pages.items():
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, path
         assert content in response.content, path
 
 
-@pytest.mark.django_db
-def test_the_staff_changes_a_cart(client, superuser):
+@HUB_DB
+def test_the_staff_changes_a_cart(hub_staff):
     cart = make_cart("sess_admin")
-    client.force_login(superuser)
-    changed = client.post(
+    changed = hub_staff.post(
         f"/admin/cart_checkout/cart/{cart.pk}/change/",
         {
             "session_token": "sess_admin",
@@ -108,7 +107,7 @@ def test_the_staff_changes_a_cart(client, superuser):
     assert (cart.customer_name, cart.status) == ("Ana", "abandoned")
 
 
-def staff_request(user, hub: str | None = "a"):
+def staff_request(user, hub: str | None = A.key):
     request = RequestFactory().post("/admin/cart_checkout/cart/")
     request.user = user
     request.session = SessionStore()
@@ -118,7 +117,7 @@ def staff_request(user, hub: str | None = "a"):
     return request
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_staff_erases_the_personal_data_of_the_selected_carts_customers(superuser):
     # CART_CHECKOUT-F14 from the admin: the same operation, once per customer email of the selection.
     ana = make_cart("sess_ana", customer_email="ana@example.com", customer_name="Ana")
@@ -131,10 +130,31 @@ def test_the_staff_erases_the_personal_data_of_the_selected_carts_customers(supe
     assert list(Cart.objects.filter(customer_email="ana@example.com")) == []
     assert Order.objects.get(pk=order.pk).notes == ""
     said = [str(message) for message in request._messages]
-    assert said == ["ana@example.com: personal data erased from 2 cart(s) and 1 order(s)."]
+    assert said == ["ana@example.com: personal data erased from 2 carts and 1 order."]
 
 
-@pytest.mark.django_db
+@HUB_DB
+@pytest.mark.parametrize(
+    ("language", "said"),
+    [
+        ("en", "ana@example.com: personal data erased from 1 cart and 2 orders."),
+        ("es", "ana@example.com: datos personales borrados de 1 carrito y 2 pedidos."),
+    ],
+)
+def test_the_erasure_says_each_count_in_the_singular_or_the_plural(superuser, language, said):
+    # hub#1147: «cart(s)» and «order(s)» showed the parentheses whatever the number.
+    from django.utils import translation
+
+    ana = make_cart("sess_ana", customer_email="ana@example.com", customer_name="Ana")
+    make_order(make_cart("sess_x"), customer_email="ana@example.com", order_number="OS-20261014-0001")
+    make_order(make_cart("sess_y"), customer_email="ana@example.com", order_number="OS-20261014-0002")
+    request = staff_request(superuser)
+    with translation.override(language):
+        CartAdmin(Cart, admin.site).erase_customer_data(request, Cart.objects.filter(pk=ana.pk))
+    assert [str(message) for message in request._messages] == [said]
+
+
+@HUB_DB
 def test_without_a_chosen_hub_the_erasure_does_nothing(superuser):
     ana = make_cart("sess_ana", customer_email="ana@example.com")
     request = staff_request(superuser, hub=None)

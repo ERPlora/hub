@@ -1,5 +1,4 @@
-// Layer 2 of the assistant's QA with the real model (docs plan 2026-10-31 of erplora-next, the assistant's knowledge
-// and QA, §1.5): PROBES. A probe is one NEW natural phrase a QA agent writes for one tool, as a person of one role
+// Layer 2 of the assistant's QA, with the real model: PROBES. A probe is one NEW natural phrase a QA agent writes for one tool, as a person of one role
 // would type it in one language (never one of the tool's own `asks`: it measures that the assistant generalises), and
 // what that turn must do: run the read, show the write's card, refuse what the role may not do, or search the docs.
 // Pure, so Vitest proves it (assistant-probes.test.ts): reading and checking the probe files (qa/probes/*.json, schema
@@ -476,7 +475,7 @@ export function skeleton(roleCatalog: Catalog, ownerCatalog: Catalog, options: S
     const lacked = ownerCatalog.filter((row) => row.app_label === app && offered(row) && !held.has(row.name));
     const taken = options.all ? mine : mixed(mine, options.sample, next);
     // What to expect comes from the kind alone: every write a person holds shows its card before it runs (the turn's
-    // instructions, base/assistant.py: «To change something, call its tool: the person sees a card and confirms it»).
+    // instructions, base/assistant/prompt.py: «To change something, call its tool: the person sees a card and confirms it»).
     for (const row of taken) add(row.name, app, row.kind === 'read' ? 'read' : 'card');
     const refused = options.all ? lacked : shuffled([...lacked].sort((a, b) => a.name.localeCompare(b.name)), next).slice(0, options.sample);
     for (const row of refused) add(row.name, app, 'refused');

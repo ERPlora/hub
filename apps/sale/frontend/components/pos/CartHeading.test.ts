@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { click, mountSale } from '../../__tests__/mount-sale';
 import CartHeading from './CartHeading.vue';
+import source from './CartHeading.vue?raw';
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   return mountSale(CartHeading, {
@@ -90,5 +91,11 @@ describe('CartHeading: the chips', () => {
     await click(chip.element);
     expect(m.wrapper.emitted('askCustomer')).toHaveLength(1);
     expect(m.find('pos-check-context-empty').exists()).toBe(false);
+  });
+
+  it('gives the title editor a 44px touch target on coarse-pointer devices', () => {
+    expect(source).toMatch(
+      /@media \(pointer: coarse\)\s*\{\s*\.pos-heading__edit\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,
+    );
   });
 });

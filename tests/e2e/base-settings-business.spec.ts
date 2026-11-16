@@ -1,26 +1,15 @@
-// flow: BASE-G96 BASE-G97 BASE-G98 BASE-G99 (base/WORKBOOK.md) · HUBS-F15 of the SaaS (hubs/WORKBOOK.md)
-// Settings (APP-BASE-6; the old hub's settings-*.png) in the three viewports, against the real Hub and the real SaaS of
-// this run's stack (the SaaS's `HUB_INTERNAL_URL` points here): a fresh owner signs up on the SaaS's screens and creates
-// a business through its API as the panel does, so the SaaS registers it in this Hub with the same id.
-//   - BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3, as in the old hub), and
-//     «Business» is the next; its four tabs fit the phone; a tab is in the address (replaced: Back leaves Settings);
-//     «Printing» opens the Printing app.
-//   - BASE-G97, G98: «Business» shows the country (Spain) and its currency (EUR · Euro), read-only, and where they change;
-//     «Fiscal data» opens Invoicing's issuer.
-//   - BASE-G99: the owner changes the business's language on erplora.com (HUBS-F15, the panel's own call); the open tab
-//     shows it without reloading. «Change on erplora.com» opens the business's settings there, in a new tab.
-//   - BASE-G98 on the Home: the amounts of «Sales, last 7 days» are in the business's currency — euros in the business
-//     in Spain, złoty in a second one in Poland (`APP-BASE-6-BASE-G98-HOME-<width>`) —, never a fixed euro.
-// Each flow leaves its capture `APP-BASE-6-<key>-<width>`.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+// flow: HUBS-F15 of the SaaS (hubs/WORKBOOK.md)
+// Against the real Hub and the real SaaS of this run's stack (the SaaS's `HUB_INTERNAL_URL` points here): a fresh
+// owner signs up on the SaaS's screens and creates a business through its API as the panel does, so the SaaS registers
+// it in this Hub with the same id.
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, horizontalOverflow, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
-import { readMailCode } from './mail';
+import { api, horizontalOverflow, login, SAAS, shot, shown, turnOn, untilStill } from './helpers';
+import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 
 test.use({ actionTimeout: 30_000 });
 
-const PASSWORD = 'Masa-madre-y-centeno-26';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -29,58 +18,12 @@ const SIZES = [
 /** What the SaaS's steps wait (its pushes to this Hub happen after its COMMIT). */
 const SAAS_STEP = 30_000;
 
-interface Owner {
-  context: BrowserContext;
-  page: Page;
-  credentials: Credentials;
-}
-
-interface Business {
-  id: string;
-  slug: string;
-}
-
-/** A fresh account signed up on the SaaS's «Create account», its address proven with the mailed code; signed in. */
-async function signUp(browser: Browser): Promise<Owner> {
-  const credentials = { email: `e2e-settings-${Date.now()}@example.com`, password: PASSWORD };
-  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto(`${SAAS}/launch?tab=signup`);
-  const form = page.getByTestId('login-form');
-  await expect(page.getByTestId('login-submit')).toHaveText('Create account');
-  await form.getByTestId('login-email').locator('input').fill(credentials.email);
-  await form.getByTestId('login-password').locator('input').fill(credentials.password);
-  const since = Date.now() - 50;
-  await form.getByTestId('login-submit').click();
-  await expect(page).toHaveURL(/\/verify-email$/);
-  const code = await readMailCode({ dir: MAIL_DIR, to: credentials.email, since, timeout: SAAS_STEP });
-  await page.getByTestId('code').locator('input').fill(code);
-  await page.getByTestId('verify-email-submit').click();
-  await expect(page).toHaveURL(/\/launch$/);
-  return { context, page, credentials };
-}
-
-/** A POST to the SaaS's API as `context`'s account, with the SaaS's CSRF token. */
-async function saasPost(context: BrowserContext, path: string, data: unknown) {
-  const host = new URL(SAAS).hostname;
-  const csrf = (await context.cookies(SAAS)).find((c) => c.name === 'csrftoken' && c.domain === host)?.value;
-  if (!csrf) throw new Error(`POST ${path}: no csrftoken of the SaaS (sign in first)`);
-  return context.request.post(`${SAAS}/api${path}`, { headers: { 'X-CSRFToken': csrf }, data });
-}
-
-/** The owner's new business in `country`, once the SaaS registered it in this Hub and heard it is ready. */
-async function businessOf(owner: Owner, country = 'ES'): Promise<Business> {
-  const created = await saasPost(owner.context, '/hubs/businesses', { name: `Ajustes ${Date.now().toString(36)}`, country });
-  expect(created.status(), await created.text()).toBe(201);
-  const business = (await created.json()) as Business;
-  await expect
-    .poll(() => psql(`SELECT status FROM base_hub WHERE id = '${business.id}'`), { timeout: SAAS_STEP, message: 'registered here' })
-    .toBe('ready');
-  return business;
-}
+/** The owner's new business in `country`, created on erplora.com (`businessOnSaas`). */
+const businessOf = (owner: SaasOwner, country = 'ES'): Promise<SaasBusiness> =>
+  businessOnSaas(owner, { name: `Ajustes ${Date.now().toString(36)}`, country });
 
 /** The business's language, changed on erplora.com as its panel changes it (HUBS-F15). */
-async function changeLanguage(owner: Owner, business: Business, language: 'en' | 'es'): Promise<void> {
+async function changeLanguage(owner: SaasOwner, business: SaasBusiness, language: 'en' | 'es'): Promise<void> {
   const changed = await saasPost(owner.context, '/hubs/businesses/update', { id: business.id, language });
   expect(changed.status(), await changed.text()).toBe(200);
 }
@@ -100,7 +43,7 @@ const weekPanel = (page: Page): Locator =>
 const rowValue = (page: Page, row: string): Locator =>
   shown(page).locator(`[data-testid="business-${row}"] [data-testid="settings-row-value"]`);
 
-/** `ready` at each size and a capture `APP-BASE-6-<key>-<size>`; back at 1440 after. */
+/** `ready` at each size and a capture; back at 1440 after. */
 async function atEverySize(page: Page, keys: string[], ready: () => Promise<void>): Promise<void> {
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -111,22 +54,23 @@ async function atEverySize(page: Page, keys: string[], ready: () => Promise<void
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing, and a change made on erplora.com', async ({
+test('Settings › Business and Printing, and a change made on erplora.com', async ({
   browser,
 }) => {
   test.setTimeout(240_000);
-  const owner = await signUp(browser);
+  const owner = await signUpOnSaas(browser, 'settings');
   const business = await businessOf(owner);
   const origin = STACK.hub(business.slug);
   await changeLanguage(owner, business, 'es');
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
-  // A business is born with every app off (PLAN-HUB round 2026-10-27): the ones these screens open, and the Home's sales;
+  // A business is born with every app off but Taxes: the ones these screens
+  // open, and the Home's sales;
   // the page reads its session again, whose menu has them now.
   await turnOn(owner.context, origin, 'sale', 'invoice', 'printing');
   await page.reload();
 
-  // BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3); «Business» is the next one.
+  // «Settings» from the side menu opens its first tab, «General»; «Business» is the next one.
   await page.locator('ion-item.nav-item', { hasText: 'Settings' }).first().click();
   await expect(page).toHaveURL(new RegExp(`^${origin}/settings`));
   await expect(shown(page).getByTestId('tab-general')).toHaveClass(/segment-button-checked/);
@@ -134,7 +78,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await expect(page).toHaveURL(`${origin}/settings#business`);
   await expect(rowValue(page, 'name')).toHaveText(/^Ajustes /);
 
-  // BASE-G97, G98: the country and its currency, as erplora.com registered the business; nothing to type.
+  // The country and its currency, as erplora.com registered the business; nothing to type.
   await expect(rowValue(page, 'country')).toHaveText('Spain');
   await expect(rowValue(page, 'currency')).toHaveText('EUR · Euro');
   await expect(rowValue(page, 'timezone')).toHaveText(/^Europe\/Madrid · \d\d:\d\d$/);
@@ -145,7 +89,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   );
   await atEverySize(page, ['BASE-G97', 'BASE-G98'], async () => {
     await expect(rowValue(page, 'currency')).toBeVisible();
-    // gh:hub#2617 — the four tabs fit the phone: none under the edge, none cut.
+    // The four tabs fit the phone: none under the edge, none cut.
     for (const tab of ['general', 'business', 'tickets', 'data']) {
       const box = await shown(page).getByTestId(`tab-${tab}`).boundingBox();
       expect(box, tab).not.toBeNull();
@@ -154,7 +98,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
     }
   });
 
-  // BASE-G99: the language changed on erplora.com shows in the open tab without reloading.
+  // The language changed on erplora.com shows in the open tab without reloading.
   let reloaded = false;
   page.on('framenavigated', (frame) => {
     if (frame === page.mainFrame()) reloaded = true;
@@ -180,7 +124,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`^${origin}/settings`));
 
-  // BASE-G96: «Printing», in the address and replaced (Back leaves Settings); its row opens the Printing app.
+  // «Printing», in the address and replaced (Back leaves Settings); its row opens the Printing app.
   await shown(page).getByTestId('tab-tickets').click();
   await expect(page).toHaveURL(`${origin}/settings#tickets`);
   const printers = shown(page).getByTestId('tickets-printers');
@@ -199,22 +143,22 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await page.goto(`${origin}/settings#tax`);
   await expect(rowValue(page, 'country')).toHaveText('Spain');
 
-  // BASE-G98 on the Home: the amounts of this business in Spain are in euros.
+  // On the Home, the amounts of this business in Spain are in euros.
   await onlyTheWeek(owner.context);
   await page.goto(`${origin}/`);
   await expect(weekPanel(page).locator('[data-testid="widget-chart-amount"]')).toHaveText(/^€[\d,]+\.\d\d$/);
   await owner.context.close();
 });
 
-test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty, never in euros', async ({ browser }) => {
+test('the Home of a business in Poland writes its amounts in złoty, never in euros', async ({ browser }) => {
   test.setTimeout(240_000);
-  const owner = await signUp(browser);
+  const owner = await signUpOnSaas(browser, 'settings');
   const business = await businessOf(owner, 'PL');
   const origin = STACK.hub(business.slug);
   await onlyTheWeek(owner.context);
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
-  await turnOn(owner.context, origin, 'sale'); // born with every app off: the Home's week of sales
+  await turnOn(owner.context, origin, 'sale'); // born without Sales: the Home's week of sales
   if (process.env.E2E_SAVE_STORAGE_STATE) await owner.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
   // What Settings › Business says (its country's currency) and the server's seven days, in cents.
@@ -251,8 +195,11 @@ test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty
   await atEverySize(page, ['BASE-G98-HOME'], async () => {
     await expect(amount).toHaveText(zloty[6]);
     await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    const overflow = await horizontalOverflow(page);
-    expect(overflow, `no sideways scroll at ${page.viewportSize()!.width}`).toBeLessThanOrEqual(0);
+    // Once the shell has laid itself out at the new size: right after the resize the bar's buttons of the wide layout
+    // are still there for a moment (hub#997's run caught it 3 times in 12); an overflow that stays still fails.
+    await expect
+      .poll(() => horizontalOverflow(page), { message: `no sideways scroll at ${page.viewportSize()!.width}` })
+      .toBeLessThanOrEqual(0);
   });
   await owner.context.close();
 });

@@ -160,7 +160,7 @@ describe('DayGrid', () => {
     expect(overnight.block('a2').attributes('style')).toContain('width: 48px');
   });
 
-  // outfitkit#284: a row's name never ends cut with no way to read it: it wraps to a second line and says
+  // A row's name never ends cut with no way to read it: it wraps to a second line and says
   // itself whole on hover or a long press.
   it('a row says its whole name', async () => {
     const s = await setup();
@@ -169,7 +169,7 @@ describe('DayGrid', () => {
     expect(name.text()).not.toBe('');
   });
 
-  // outfitkit#71 · appointments#77: two appointments of the same professional at once share the row side by
+  // Two appointments of the same professional at once share the row side by
   // side (a track each, as Google Calendar), never one on top of the other; one that follows takes the row back.
   it('appointments at the same time share the row, each in its own track', async () => {
     const s = await setup([row('a1', 's1', '10:00', 60), row('a2', 's1', '10:30', 30), row('a3', 's1', '11:00', 30)]);

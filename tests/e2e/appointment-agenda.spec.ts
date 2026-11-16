@@ -12,6 +12,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E Apt';
 const RUN = Date.now().toString(36);
@@ -146,7 +147,7 @@ async function chooseServiceStaffAndDay(page: Page, what: Offer, day: string): P
   await input.press('Tab');
 }
 
-test('Agenda: book with a free time, an overlap refused, the grid and the week, drag, cancel, charge, series and the card', async ({ browser }) => {
+test('Agenda: book with a free time, an overlap refused, the grid and the week, drag, cancel, charge, series and the card @smoke', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/appointment/agenda');
   let who!: Cast;
   try {
@@ -186,7 +187,9 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await page.locator('[data-testid=appointment-form-submit]').click();
     await expect(page.locator('[data-testid=appointment-form-error]')).toContainText('already has an appointment at that time');
     await page.screenshot({ path: shot('appointment-overlap-refused') });
+    // «Cancel» asks before losing the refused booking (BASE-F05): the person discards it.
     await page.locator('[data-testid=appointment-form-cancel]').click();
+    await discardChanges(page);
 
     // «By professional»: the professional's row with the block; a drag moves it one hour.
     await view.locator('[data-testid=appointment-toolbar-view-staff]').click();
@@ -291,7 +294,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
   }
 });
 
-// flow: CUSTOMER-F25 · gh:appointments#306, #318 — the old picker only searched, so a new customer meant
+// flow: CUSTOMER-F25 — the old picker only searched, so a new customer meant
 // leaving the agenda for Customers and coming back.
 test('CUSTOMER-F25: a new customer from «New appointment» without leaving the agenda; what was chosen stays', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/appointment/agenda');

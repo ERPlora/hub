@@ -202,7 +202,7 @@ async def config_update(request, data: ConfigPatchIn):
     return await run_operation(request, services.update_config, data)
 
 
-# The product's image (round 2026-10-30, base.images)
+# The product's image (base.images)
 
 
 @bind(router, "inventory.product.set_image", "/inventory/products/image")

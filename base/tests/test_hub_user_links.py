@@ -1,66 +1,47 @@
-"""Every app fits a hub's own database: the people of the business are its own (tenancy W10; PLAN-DB §2).
+"""Every app fits a hub's own database: the people of the business are its own.
 
-Phase 1 hung a staff record, its time off, a clock-in, a task, its comments and the WhatsApp inbox's assignments and
-messages from control's ``auth.User``. A key between two databases does not exist, so those apps could not live in a
-hub's own database and the templates of the verticals left them out: a hair salon would have been born with no staff,
-no services and no appointments. They hang from ``base.HubUser`` now (``tests/test_guardrails.py``, «(h)»), so every
-app fits, every vertical's template holds its whole list, and the expand migrations that moved them fill the new links
-in phase 1's shared database and nothing in a hub's own.
+A staff record, its time off, a clock-in, a task, its comments and the WhatsApp inbox's assignments and messages hang
+from ``base.HubUser``, never from control's ``auth.User``: a key between two databases does not exist
+(``tests/test_guardrails.py``, «(h)»). So every app fits, every vertical's template holds its whole list, and the
+expand migrations that moved those links only change the schema: a business's own database holds no control users to
+fill them from and no key to them to drop.
 """
-
-import datetime as dt
-import importlib
-from types import SimpleNamespace
 
 import pytest
 from django.apps import apps
-from django.contrib.auth import get_user_model
-from django.db import connection
-from django.db.migrations.loader import MigrationLoader
+from django.db import connections
 
 from base import catalog
-from base.models import HubUser
 from base.tenancy import inventory, migrator, names
 from base.tenancy.tests import hubs
+from base.tests.migration_steps import python_steps
+from base.tests.test_auth_views import ON_HUB_A
 
 #: The apps whose links to control's users moved to ``base.HubUser``, and those that waited for them.
 PEOPLE_APPS = {"staff", "attendance", "task", "whatsapp_inbox"}
 WAITED_FOR_THEM = {"appointment", "online_booking", "service"}
-AT = dt.datetime(2026, 10, 6, 7, tzinfo=dt.UTC)
 
-#: Each expand migration: ``(app, migration, the migration it follows, [(model, old field, new field, old column)])``.
+#: Each expand migration: ``(app, migration, [(model, old column, new column)])``.
 EXPANDS = [
-    (
-        "staff",
-        "0004_hub_users",
-        "0003_hourly_rate_verbose_name",
-        [("member", "user", "hub_user", "user_id"), ("timeoff", "approved_by", "approved_by_hub_user", "approved_by_id")],
-    ),
+    ("staff", "0004_hub_users", [("member", "user_id", "hub_user_id"), ("timeoff", "approved_by_id", "approved_by_hub_user_id")]),
     (
         "attendance",
         "0003_hub_users",
-        "0002_correction_author",
         [
-            ("record", "created_by", "created_by_hub_user", "created_by_id"),
-            ("record", "updated_by", "updated_by_hub_user", "updated_by_id"),
-            ("correction", "created_by", "created_by_hub_user", "created_by_id"),
-            ("attendancesettings", "updated_by", "updated_by_hub_user", "updated_by_id"),
+            ("record", "created_by_id", "created_by_hub_user_id"),
+            ("record", "updated_by_id", "updated_by_hub_user_id"),
+            ("correction", "created_by_id", "created_by_hub_user_id"),
+            ("attendancesettings", "updated_by_id", "updated_by_hub_user_id"),
         ],
     ),
-    (
-        "task",
-        "0002_hub_users",
-        "0001_initial",
-        [("task", "created_by", "created_by_hub_user", "created_by_id"), ("comment", "author", "author_hub_user", "author_id")],
-    ),
+    ("task", "0002_hub_users", [("task", "created_by_id", "created_by_hub_user_id"), ("comment", "author_id", "author_hub_user_id")]),
     (
         "whatsapp_inbox",
         "0010_hub_users",
-        "0009_conversation_needs_attention",
         [
-            ("conversation", "assigned_to", "assigned_to_hub_user", "assigned_to_id"),
-            ("message", "sent_by", "sent_by_hub_user", "sent_by_id"),
-            ("note", "author", "author_hub_user", "author_id"),
+            ("conversation", "assigned_to_id", "assigned_to_hub_user_id"),
+            ("message", "sent_by_id", "sent_by_hub_user_id"),
+            ("note", "author_id", "author_hub_user_id"),
         ],
     ),
 ]
@@ -113,126 +94,35 @@ def test_the_tests_template_and_its_hubs_have_the_people_apps_tables(hub_databas
         assert tables <= hubs.table_names(database), database
 
 
-def _before_the_new_links_take_their_names(app: str, migration: str, previous: str):
-    """The apps' state of ``migration``'s ``RunPython`` (its ``AddField`` applied): old and new links side by side."""
-    loader = MigrationLoader(connection)
-    state = loader.project_state([(app, previous), ("base", "0020_hub_user")])
-    for operation in loader.get_migration(app, migration).operations:
-        if operation.__class__.__name__ == "RunPython":
-            break
-        operation.state_forwards(app, state)
-    return state.apps
+def _columns(database, table: str) -> dict[str, bool]:
+    """Each column of ``table`` in ``database`` and whether it takes NULL."""
+    with database.cursor() as cursor:
+        return {column.name: column.null_ok for column in database.introspection.get_table_description(cursor, table)}
 
 
-def _row(historical, app: str, model: str, old: str, user):
-    """A row of ``app.model`` whose old link ``old`` names control's ``user``, with what the table needs."""
-
-    def staff_member():
-        return historical.get_model("staff", "Member").objects.create(first_name="Ana", last_name="López")
-
-    def conversation():
-        # One live conversation per number: each row its own.
-        phone = f"+346002{historical.get_model('whatsapp_inbox', 'Conversation').objects.count():05d}"
-        return historical.get_model("whatsapp_inbox", "Conversation").objects.create(phone=phone)
-
-    def working_day():
-        return historical.get_model("attendance", "Record").objects.create(
-            member=staff_member(), clock_in_at=AT, work_date=AT.date()
-        )
-
-    needs = {
-        ("staff", "member"): lambda: {"first_name": "Ana", "last_name": "López"},
-        ("staff", "timeoff"): lambda: {
-            "member": staff_member(), "start_date": dt.date(2026, 10, 1), "end_date": dt.date(2026, 10, 1)
-        },
-        ("attendance", "record"): lambda: {"member": staff_member(), "clock_in_at": AT, "work_date": AT.date()},
-        ("attendance", "correction"): lambda: {
-            "record": working_day(),
-            "old_clock_in_at": AT,
-            "old_status": "open",
-            "new_clock_in_at": AT,
-            "new_status": "open",
-            "reason": "Forgot to clock out",
-        },
-        ("attendance", "attendancesettings"): dict,
-        ("task", "task"): lambda: {"number": "TSK-20261006-0001", "title": "Restock"},
-        ("whatsapp_inbox", "conversation"): lambda: {"phone": "+34600111111"},
-        ("whatsapp_inbox", "message"): lambda: {"conversation": conversation(), "direction": "outbound", "kind": "text", "sent_at": AT},
-        ("whatsapp_inbox", "note"): lambda: {"conversation": conversation(), "text": "Call back", "created_at": AT},
-        ("task", "comment"): lambda: {
-            "task": historical.get_model("task", "Task").objects.create(number="TSK-20261006-0002", title="Mop"),
-            "text": "On it",
-        },
-    }
-    return historical.get_model(app, model).objects.create(**needs[(app, model)](), **{f"{old}_id": user.pk})
+def _keys(database, table: str) -> dict[str, str]:
+    """The foreign keys of ``table`` in ``database``: the table each column points to."""
+    with database.cursor() as cursor:
+        constraints = database.introspection.get_constraints(cursor, table)
+    return {details["columns"][0]: details["foreign_key"][0] for details in constraints.values() if details["foreign_key"]}
 
 
-def _migration(app: str, name: str):
-    return importlib.import_module(f"apps.{app}.migrations.{name}")
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize(("app", "name", "previous", "links"), EXPANDS, ids=[expand[0] for expand in EXPANDS])
+@pytest.mark.parametrize(("app", "name", "links"), EXPANDS, ids=[expand[0] for expand in EXPANDS])
 class TestTheExpand:
-    def _rows(self, historical, app, links, user):
-        """One row per old link of ``app``, named by control's ``user``, made through the historical models."""
-        return {(model, old): _row(historical, app, model, old, user) for model, old, _new, _column in links}
+    """Each expand migration runs on a business's own database, which holds no control users: nothing to fill from
+    them and no key to them to drop, so it only changes the schema."""
 
-    def test_it_fills_the_new_links_with_each_control_user_s_person(self, app, name, previous, links):
-        historical = _before_the_new_links_take_their_names(app, name, previous)
-        ana = get_user_model().objects.create_user(
-            username="saas:0199c4b0-0000-7000-8000-00000000a0a0", first_name="Ana", email="ana@example.com"
-        )
-        rows = self._rows(historical, app, links, ana)
+    pytestmark = ON_HUB_A
 
-        _migration(app, name).link_hub_users(historical, SimpleNamespace(connection=connection))
+    def test_it_runs_no_python(self, app, name, links):
+        assert python_steps(f"apps.{app}.migrations.{name}") == []
 
-        person = HubUser.objects.get(username=ana.username)
-        assert (str(person.account_id), person.name, person.email) == (ana.username[5:], "Ana", "ana@example.com")
-        for model, old, new, _column in links:
-            row = historical.get_model(app, model).objects.get(pk=rows[(model, old)].pk)
-            assert getattr(row, f"{new}_id") == person.pk, (model, old)
+    def test_the_old_columns_stay_unkeyed_and_the_new_ones_point_to_the_business_s_people(self, app, name, links):
+        database = connections[hubs.HUB_A_ALIAS]
+        for model, old_column, new_column in links:
+            table = apps.get_model(app, model)._meta.db_table
+            keys = _keys(database, table)
 
-    def test_a_person_the_database_already_has_is_used_again(self, app, name, previous, links):
-        historical = _before_the_new_links_take_their_names(app, name, previous)
-        ana = get_user_model().objects.create_user(username="saas:x", first_name="Ana")
-        known = HubUser.objects.create(username="saas:x", name="Ana from the photo")
-        self._rows(historical, app, links, ana)
-
-        _migration(app, name).link_hub_users(historical, SimpleNamespace(connection=connection))
-
-        assert list(HubUser.objects.values_list("pk", "name")) == [(known.pk, "Ana from the photo")]
-
-    def test_a_hub_s_own_database_has_nothing_to_fill(self, app, name, previous, links, monkeypatch):
-        historical = _before_the_new_links_take_their_names(app, name, previous)
-        ana = get_user_model().objects.create_user(username="saas:x")
-        self._rows(historical, app, links, ana)
-        migration = _migration(app, name)
-        monkeypatch.setattr(migration.router, "allow_migrate_model", lambda alias, model: False)
-
-        migration.link_hub_users(historical, SimpleNamespace(connection=connection))
-
-        assert not HubUser.objects.exists()
-
-    def test_it_drops_the_old_columns_keys_to_control_s_users(self, app, name, previous, links):
-        # A database migrated before W10 has them (phase 1's shared one); this history made the tests' without.
-        historical = _before_the_new_links_take_their_names(app, name, previous)
-        users = get_user_model()._meta.db_table
-        for model, _old, _new, column in links:
-            table = historical.get_model(app, model)._meta.db_table
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f'ALTER TABLE "{table}" ADD CONSTRAINT "{table}_{column}_w10_fk" FOREIGN KEY ("{column}") '
-                    f'REFERENCES "{users}" ("id") DEFERRABLE INITIALLY DEFERRED'
-                )
-
-        with connection.schema_editor() as editor:
-            _migration(app, name).drop_keys_to_control_users(historical, editor)
-
-        for model, _old, _new, column in links:
-            table = historical.get_model(app, model)._meta.db_table
-            with connection.cursor() as cursor:
-                keys = connection.introspection.get_constraints(cursor, table)
-            assert not [
-                key for key, details in keys.items() if details["foreign_key"] and details["foreign_key"][0] == users
-            ], table
+            assert _columns(database, table)[old_column] is True, (table, old_column)
+            assert old_column not in keys, (table, old_column)
+            assert keys[new_column] == "base_hubuser", (table, new_column)

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// «Fiscal document pending» (SALE-F29; INVOICE-F06 in phase 1, which has no relay to issue it on its
-// own): Invoicing could not issue a document of this sale in its write — its ticket or invoice, the
-// rectifying invoice of its void or of a refund — (no issuer yet, no permission…). The notice says so
-// and, to whoever may charge, offers «Issue now» (`sale.sale.issue_documents`); a refusal says why,
+// «Fiscal document pending» (SALE-F29; INVOICE-F06): Invoicing could not issue a document of this sale in its write —
+// its ticket or invoice, the rectifying invoice of its void or of a refund — (no issuer yet, no permission…). The
+// notice says so and, to whoever may charge, offers «Issue now» (`sale.sale.issue_documents`); a refusal says why,
 // worded by the server, and the notice stays. Once issued, the live sale drops the notice by itself.
 //   <PendingDocuments v-if="sale.documents_pending" :sale-id="sale.id" />
 import { InlineFeedback } from '@erplora/ui/components';

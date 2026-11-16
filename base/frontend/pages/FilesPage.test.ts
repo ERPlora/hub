@@ -1,9 +1,3 @@
-// Files (APP-BASE-8; the old hub's FilesPage, HUB_SHELL-F130…F134): the business's files, live (`base.file.list`).
-// The tree of folders on the left (a selector on a narrow screen), the open folder's path, its folders and files in a
-// grid or a list, «Space», «Search files…» in the open folder; upload (also by dropping files), «New folder»,
-// «Rename», «Move to…» (also by dragging onto a folder), «Delete» with its confirmation, «Open» (the preview) and
-// «Download». Who does not run the business only sees and opens. Every refusal reads its own sentence (hub#1776) and
-// every notice is a sentence, never a key (hub#2197). A listing that could not be read says why, with «Retry».
 import { fetchFile } from '@erplora/ui/sdk';
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +6,7 @@ import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../__tests
 import type { FileItem, FilesListing } from '../operations';
 import FilesPage from './FilesPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn(), syncSearchbarInputName: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn(async () => true), syncSearchbarInputName: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
@@ -27,10 +21,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/sdk')>()),
   fetchFile: vi.fn(),
 }));
-vi.mock('../lib/data', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/data')>()),
-  saveFile: mocks.saveFile,
-}));
+vi.mock('../lib/download', () => ({ saveFile: mocks.saveFile }));
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub, IonPopover: IonModalStub };
@@ -119,7 +110,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('FilesPage · see (BASE-G82)', () => {
+describe('FilesPage · see', () => {
   it('follows the root live, loading meanwhile', async () => {
     const m = await open({}, null);
     expect(params(m)).toEqual([{ folder: '' }]);
@@ -249,7 +240,7 @@ describe('FilesPage · see (BASE-G82)', () => {
     expect(m.wrapper.find('[data-testid="files-empty"]').text()).toContain('Upload a file or drag it here.');
   });
 
-  it('a listing that could not be read says why, never «check the connection» for all (hub#1776), with «Retry»', async () => {
+  it('a listing that could not be read says why, never «check the connection» for all, with «Retry»', async () => {
     const m = await open({}, null);
     m.call.push(errorFrame(subId(m.client, OP), 'base.file_store_unavailable'));
     await flush();
@@ -273,7 +264,7 @@ describe('FilesPage · see (BASE-G82)', () => {
     expect(m.wrapper.find('[data-testid="files-folders-label"]').text()).toBe('Carpetas');
   });
 
-  it('the search box is named by its hint in the person’s language, never Ionic’s English «search text» (BASE-G152)', async () => {
+  it('the search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
     mocks.syncSearchbarInputName.mockClear();
     await open({ locale: 'es' });
     const search = byTestid('files-search');
@@ -283,7 +274,7 @@ describe('FilesPage · see (BASE-G82)', () => {
   });
 });
 
-describe('FilesPage · upload and new folder (BASE-G83)', () => {
+describe('FilesPage · upload and new folder', () => {
   function choose(m: Awaited<ReturnType<typeof open>>, files: File[]) {
     const element = m.wrapper.find('[data-testid="files-upload-input"]').element as HTMLInputElement;
     Object.defineProperty(element, 'files', { value: files, configurable: true });
@@ -399,7 +390,7 @@ describe('FilesPage · upload and new folder (BASE-G83)', () => {
   });
 });
 
-describe('FilesPage · open and download (BASE-G84)', () => {
+describe('FilesPage · open and download', () => {
   it('«Open» shows the file in the preview', async () => {
     const m = await open();
     await menu(m, 'marzo.pdf', 'open');
@@ -421,7 +412,9 @@ describe('FilesPage · open and download (BASE-G84)', () => {
     await menu(m, 'marzo.pdf', 'download');
     await flush();
     expect(fetchFile).toHaveBeenCalledWith('/api/files/raw?path=marzo.pdf', 'application/pdf');
-    expect(mocks.saveFile).toHaveBeenCalledWith('marzo.pdf', blob);
+    expect(mocks.saveFile).toHaveBeenCalledWith('marzo.pdf', blob, expect.any(Function));
+    const t = (mocks.saveFile.mock.calls[0] as unknown[])[2] as (key: string, values: object) => string;
+    expect(t('base.download.savedTo', { path: 'Download/x' })).toBe('Saved to Download/x');
   });
 
   it('a download that fails says so, with why', async () => {
@@ -435,7 +428,7 @@ describe('FilesPage · open and download (BASE-G84)', () => {
   });
 });
 
-describe('FilesPage · rename and move (BASE-G85)', () => {
+describe('FilesPage · rename and move', () => {
   it('renames with the current name written in, and says so', async () => {
     const m = await open({ onApi: () => reply(200, { path: 'abril.pdf', name: 'abril.pdf' }) });
     await menu(m, 'marzo.pdf', 'rename');
@@ -483,7 +476,7 @@ describe('FilesPage · rename and move (BASE-G85)', () => {
     expect(m.wrapper.find('[data-testid="files-folder-actions"]').exists()).toBe(false);
   });
 
-  it('moves to the folder chosen and says where it went (hub#2197), the top named «Files»', async () => {
+  it('moves to the folder chosen and says where it went, the top named «Files»', async () => {
     const m = await open({ onApi: () => reply(200, { path: 'Facturas/2026/marzo.pdf', name: 'marzo.pdf' }) });
     await menu(m, 'marzo.pdf', 'move');
     const options = [...document.querySelectorAll<HTMLElement>('[data-testid="files-move-option"]')];
@@ -503,7 +496,7 @@ describe('FilesPage · rename and move (BASE-G85)', () => {
     expect(options.map((o) => o.dataset.to)).toEqual(['', 'Contratos']);
   });
 
-  it('a refused move reads a sentence, never the key (hub#2197)', async () => {
+  it('a refused move reads a sentence, never the key', async () => {
     const m = await open({
       onApi: () => reply(409, { error: { code: 'base.file_already_there', message: 'x' } }),
     });
@@ -547,7 +540,7 @@ describe('FilesPage · rename and move (BASE-G85)', () => {
   });
 });
 
-describe('FilesPage · delete (BASE-G86)', () => {
+describe('FilesPage · delete', () => {
   it('asks first, deletes and says so', async () => {
     mocks.confirm.mockResolvedValue(true);
     const m = await open({ onApi: () => reply(200, { path: 'marzo.pdf', folder: false }) });
@@ -598,5 +591,33 @@ describe('FilesPage · delete (BASE-G86)', () => {
     expect(toastError).toHaveBeenCalledWith(
       'Could not delete: Your session has expired. Sign in again and try once more.',
     );
+  });
+});
+
+
+describe('FilesPage: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('New folder: as opened closes; a change asks; restored as opened closes again', async () => {
+    const m = await open();
+    await m.wrapper.find('[data-testid="files-new-folder"]').trigger('click');
+    await flush();
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => byTestid('files-new-folder-dialog'),
+      change: () => input('files-new-folder-name', '2027'),
+      restore: () => input('files-new-folder-name', ''),
+      confirm: mocks.confirm,
+    });
+  });
+
+  it('Rename: as opened closes; a change asks; restored as opened closes again', async () => {
+    const m = await open();
+    await menu(m, 'marzo.pdf', 'rename');
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => byTestid('files-rename-dialog'),
+      change: () => input('files-rename-name', 'abril.pdf'),
+      restore: () => input('files-rename-name', 'marzo.pdf'),
+      confirm: mocks.confirm,
+    });
   });
 });

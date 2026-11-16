@@ -7,48 +7,25 @@ a 404 or the till's 409, never a 500. A product or a tax category deleted while 
 waits for the write or refuses it as one deleted before, never a 500 nor a menu offering a deleted product.
 """
 
-import threading
-import time
+import uuid
 from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from live.errors import Conflict, NotFound, OperationError
 from live.models import OutboxEvent
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.inventory.models import Product
+from apps.inventory.tests.test_concurrency import attempt, deleted, deleted_in_flight, deleted_just_before, held
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once
 
-from .conftest import FOOD, make_combo, make_group, make_option, make_product, run
+from .conftest import FOOD, HUB_DB_COMMITTED, ctx_for, make_combo, make_group, make_option, make_product, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except (
-            Exception
-        ) as error:  # an expected refusal or an unexpected failure, both reported
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def refused(results) -> list[OperationError]:
@@ -68,6 +45,25 @@ def test_two_courses_with_the_same_name_at_once_make_one():
     assert [error.code for error in refused(results)] == ["combo.group_exists"] * 2
     assert ChoiceGroup.objects.filter(combo=combo).count() == 1
     assert OutboxEvent.objects.filter(name="combo.group.created").count() == 1
+
+
+def as_the_platform():
+    """What a recovery from a separate copy runs its operations with: every permission."""
+    return ctx_for(actor="system", permissions={"*"})
+
+
+def test_a_course_made_again_while_one_with_its_name_is_added_makes_one():
+    combo = make_combo()
+    results = at_once(
+        lambda: run("combo.group.create", {"combo_id": str(combo.id), "name": "Sides"}),
+        lambda: run(
+            "combo.group.recover",
+            {"combo_id": str(combo.id), "name": "sides", "stands_for": str(uuid.uuid7())},
+            as_the_platform(),
+        ),
+    )
+    assert [error.code for error in refused(results)] == ["combo.group_exists"]
+    assert ChoiceGroup.objects.filter(combo=combo).count() == 1
 
 
 def test_the_same_product_twice_at_once_in_one_course_makes_one_choice():
@@ -106,8 +102,8 @@ def test_a_full_course_takes_no_one_more_whatever_arrives_together():
     assert sorted(course.options.values_list("sort_order", flat=True))[-2:] == [38, 39]
 
 
-# Edits and reorders against writes of the same menu: a 409 or a success, never a raw database error
-# (review 3). Each case repeats, so a race that only bites now and then still shows.
+# Edits and reorders against writes of the same menu: a 409 or a success, never a raw database error.
+# Each case repeats, so a race that only bites now and then still shows.
 
 
 def unexpected(results) -> list:
@@ -187,12 +183,8 @@ def withdrawn_after_the_first_read_of(combo):
             deletions.extend(at_once(lambda: run("combo.combo.delete", {"id": str(combo.id)})))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
-
-
-def deleted(deletions) -> list[str]:
-    return ["ok" if not isinstance(result, Exception) else repr(result) for result in deletions]
 
 
 def a_menu_with_a_course():
@@ -260,106 +252,7 @@ def test_a_menu_withdrawn_between_its_name_and_its_price_is_missing_for_the_till
 # before. Both Inventory's «Delete» (the row stays, marked deleted) and the Hub admin's (the row goes).
 
 DELETIONS = ["operation", "row"]
-#: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).
-LOCK_TIMEOUT = "300ms"
-#: Postgres' ``lock_not_available``: the deletion found the row held.
-LOCK_NOT_AVAILABLE = "55P03"
-#: How long a deletion under way holds its row before it commits.
-IN_FLIGHT = 0.5
 PROBE = "product.probe"
-
-
-def remove(target, how: str) -> None:
-    if how == "operation":
-        run("inventory.product.delete", {"id": str(target.id)})
-    else:
-        # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
-        type(target).objects.get(pk=target.pk).delete()
-
-
-def delete(target, how: str) -> None:
-    """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds. The
-    lock timeout is the transaction's (SET LOCAL): a session-level one would go back with the connection and
-    reach the tests after this one."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
-        remove(target, how)
-
-
-@contextmanager
-def deleted_just_before(statement: str, target, how: str):
-    """Deletes ``target`` in another session right before the first statement of this one that starts with
-    ``statement`` (the write that names it): between the read that found it and the write, every time. It
-    commits, or waits for this session when it holds the row (and gives up)."""
-    deletions: list = []
-
-    def wrapper(execute, sql, params, many, context):
-        if not deletions and sql.lstrip().startswith(statement):
-            deletions.extend(at_once(lambda: delete(target, how)))
-        return execute(sql, params, many, context)
-
-    with connection.execute_wrapper(wrapper):
-        yield deletions
-
-
-@contextmanager
-def deleted_in_flight(target, how: str):
-    """A deletion of ``target`` under way in another session when this one first reads its table: it holds
-    the row, as a deletion takes it first, and commits a moment later while this one goes on."""
-    table = f'FROM "{type(target)._meta.db_table}"'
-    holds = threading.Event()
-    deletions: list = []
-
-    def deletion():
-        try:
-            with transaction.atomic():
-                type(target).objects.select_for_update().get(pk=target.pk)
-                holds.set()
-                time.sleep(IN_FLIGHT)
-                remove(target, how)
-            deletions.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            deletions.append(repr(error))
-        finally:
-            holds.set()
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
-            thread.start()
-            holds.wait(5)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-
-
-def sqlstate(error) -> str | None:
-    while error is not None:
-        if getattr(error, "sqlstate", None):
-            return error.sqlstate
-        error = error.__cause__ or error.__context__
-    return None
-
-
-def held(deletions) -> bool:
-    """The deletion waited for the row this write holds (and gave up)."""
-    return len(deletions) == 1 and sqlstate(deletions[0]) == LOCK_NOT_AVAILABLE
-
-
-def attempt(call):
-    """What ``call`` answers: its result, or the error it is refused with (a 500 is raised as it comes)."""
-    try:
-        return call()
-    except OperationError as error:
-        return error
 
 
 @pytest.fixture
@@ -448,6 +341,18 @@ TAX_WRITES = {
     "combo.update": (
         lambda w: run("combo.combo.update", {"id": str(w.combo.id), "tax_category_key": PROBE}),
         'UPDATE "combo_combo" SET',
+    ),
+    # A menu made again from a separate copy names its tax category as the screen's create does.
+    "combo.recover": (
+        lambda w: run(
+            "combo.combo.recover",
+            {
+                "name": "Menu of the night", "price": 1500, "supply_kind": "service", "tax_category_key": PROBE,
+                "stands_for": str(uuid.uuid7()),
+            },
+            as_the_platform(),
+        ),
+        'INSERT INTO "combo_combo"',
     ),
 }
 

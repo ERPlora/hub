@@ -1,22 +1,19 @@
 """The sale app's events (``sale.<entity>.<fact>``) and its reactions to Customers' merge and to the
 document Invoicing issues for a sale.
 
-There is no outbox relay yet (phase 2 runs it in the worker); a reaction is tested by handing ``react``
-the event as the relay will: its name, its scope and its payload.
+A reaction is tested by handing ``react`` the event as the worker's outbox relay does: its name, its scope and its
+payload.
 """
 
 import re
 
-import pytest
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.sale import events
 from apps.sale.models import Sale
-from apps.sale.tests.conftest import run
+from apps.sale.tests.conftest import HUB_DB, A, run
 
 PAST_FACT = re.compile(r"^sale\.[a-z_]+\.[a-z_]+(ed|_from_appointment)$")
-A = Scope("host", "a")
 
 
 def declared():
@@ -36,6 +33,7 @@ def test_the_events_of_the_workbook():
         "SALE_REASSIGNED": "sale.sale.reassigned",
         "SALE_INVOICED": "sale.sale.invoiced",
         "SALE_VOUCHER_LINE_CHANGED": "sale.sale.voucher_line_changed",
+        "VOUCHER_SESSION_RECORDED": "sale.voucher_session.recorded",
         "ORDER_OPENED": "sale.order.opened",
         "ORDER_CHANGED": "sale.order.changed",
         "ORDER_FIRED": "sale.order.fired",
@@ -78,7 +76,7 @@ def test_an_event_it_does_not_follow_is_ignored():
     assert events.react(A, "customer.customer.created", {"id": "x"}) is None
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_merge_of_customer_moves_the_sales(product, customer):
     product("Coffee", "COF", 150, "product.generic")
     ana, duplicate = customer("Ana López"), customer("Ana Lopez")
@@ -140,7 +138,7 @@ def _card_charge(key: str, ctx=None):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_rectifying_invoice_of_a_void_issued_later_goes_back_to_its_sale(product):
     # No issuer at the till: the ticket and the void's rectifying invoice both wait (pending). Invoicing
     # issues them from the outbox once the issuer exists and gives each to the sale as it issues it
@@ -165,7 +163,7 @@ def test_the_rectifying_invoice_of_a_void_issued_later_goes_back_to_its_sale(pro
     assert not any(events.react(A, n.name, n.payload).recorded for n in notices)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_rectifying_invoice_of_a_refund_issued_later_goes_back_to_its_refund(product):
     # The ticket was issued at the till; the manager who refunded may not rectify invoices, so the
     # refund's rectifying invoice waits and Invoicing's reaction issues it: the refund has its number at
@@ -216,7 +214,7 @@ def test_the_rectifying_invoice_of_a_refund_issued_later_goes_back_to_its_refund
     assert events.react(A, notice.name, notice.payload).recorded is False
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_document_not_issued_from_a_sale_is_ignored(product):
     product("Coffee", "COF", 150, "restaurant.drink")
     sale = _card_charge("source-other-01")

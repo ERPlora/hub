@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { Destination, PrinterUsage, StationOut, StationPatchIn } from '../operations';
 
@@ -17,6 +19,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+const canDismiss = useUnsavedFormOnOpen('kitchen-station-form', () => form.value, open);
 const emit = defineEmits<{ saved: [station: StationOut] }>();
 
 /** The palette of the old module's chips; the first is the factory colour. */
@@ -104,6 +108,7 @@ async function save(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="kitchen-station-form"
     :title="title"
     :submit-label="station ? t('kitchen.stations.form.save') : t('kitchen.stations.form.create')"
@@ -113,7 +118,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="kitchen-station-form">
+      <div
+        class="kitchen-station-form"
+      >
         <ion-input
           data-testid="kitchen-station-form-name"
           :value="form.name"
@@ -123,6 +130,7 @@ async function save(): Promise<void> {
           fill="outline"
           mode="md"
           :maxlength="80"
+          name="name"
           :error-text="fieldErrors.name"
           :class="invalid(fieldErrors.name)"
           @ion-input="set('name', text($event.detail.value))"
@@ -190,6 +198,7 @@ async function save(): Promise<void> {
           fill="outline"
           mode="md"
           :maxlength="100"
+          name="printer_name"
           :error-text="fieldErrors.printer_name"
           :class="invalid(fieldErrors.printer_name)"
           @ion-input="set('printer_name', text($event.detail.value))"

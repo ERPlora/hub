@@ -1,7 +1,6 @@
 """Models of the schedule app: the usual week, the special days, the temporary changes and the settings.
 
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
-per scope. Phase 2 moves them to each hub's database. Every row is really deleted (no soft delete): a
+Each business keeps these tables in its own database. Every row is really deleted (no soft delete): a
 special day deleted frees its date. The rules about a set of intervals (sorted, never overlapping, at
 most twelve) are engine.py's and the services', which write them; the database keeps what it can.
 """

@@ -15,12 +15,11 @@ from datetime import UTC, date, datetime, timedelta
 
 import psycopg
 import pytest
-from django.db import connection, transaction
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import INTERNAL, get
+from live.operations import INTERNAL, atomic, get
 from live.outbox import channel_for
 
 from apps.customer import events
@@ -51,6 +50,9 @@ from apps.customer.schemas import (
     CustomerDetailOut,
     CustomerIn,
     CustomerPatchIn,
+    CustomerRecoveredOut,
+    CustomerRecoverIn,
+    CustomerRestoreIn,
     DeletedOut,
     EraseIn,
     ErasedOut,
@@ -89,10 +91,18 @@ from apps.customer.schemas import (
 from apps.customer.services import (
     ALREADY_IMPORTED,
     DATE_IN_FUTURE,
+    FIELD_INACTIVE_LEFT,
+    FIELD_OPTION_LEFT,
+    FIELD_TYPE_LEFT,
     HEALTH_TEST_DATE_MISSING,
 )
 
-from .conftest import A, B, run
+from base.tenancy.context import use_hub
+from base.tenancy.tests.concurrency import in_a_thread
+
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, run
+
+pytestmark = HUB_DB
 
 WAIT = 1.0
 QUIET = 0.3
@@ -147,6 +157,8 @@ def invalid(error):
         ("customer.customer.delete", "customer.delete", RefIn, DeletedOut),
         ("customer.customer.merge", "customer.merge", MergeIn, CustomerDetailOut),
         ("customer.customer.erase", "customer.erase", EraseIn, ErasedOut),
+        ("customer.customer.restore", "customer.restore", CustomerRestoreIn, CustomerRecoveredOut),
+        ("customer.customer.recover", "customer.restore", CustomerRecoverIn, CustomerRecoveredOut),
         ("customer.note.add", "customer.manage", NoteIn, ActivityRow),
         ("customer.activity.add", "customer.record_activity", ActivityIn, ActivityRow),
         ("customer.consent.grant", "customer.manage", ConsentGrantIn, ConsentRow),
@@ -188,7 +200,6 @@ def test_declarations(name, permission, input, output):
 # customer.customer.create (CUSTOMER-F01, F18, F26; create_walk_in.pg, phone_e164.hub)
 
 
-@pytest.mark.django_db
 def test_a_walk_in_is_created_from_a_name_and_announced():
     detail = run("customer.customer.create", CustomerIn(name="Ana"), "hub_employee")
     customer = Customer.objects.get()
@@ -209,7 +220,6 @@ def test_a_walk_in_is_created_from_a_name_and_announced():
     assert outbox() == [(events.CUSTOMER_CREATED, {"id": str(customer.id)})]
 
 
-@pytest.mark.django_db
 def test_the_full_card_keeps_every_value_and_the_phone_in_e164():
     detail = run(
         "customer.customer.create",
@@ -245,7 +255,6 @@ def test_the_full_card_keeps_every_value_and_the_phone_in_e164():
     )
 
 
-@pytest.mark.django_db
 def test_a_phone_that_is_no_number_of_its_country_creates_nothing():
     with pytest.raises(InvalidPayload) as excinfo:
         run("customer.customer.create", CustomerIn(name="Ana", phone="600111"))
@@ -258,7 +267,6 @@ def test_a_phone_that_is_no_number_of_its_country_creates_nothing():
 # customer.customer.update (CUSTOMER-F04)
 
 
-@pytest.mark.django_db
 def test_update_changes_only_what_was_sent_and_announces_it():
     ana = card("Ana", notes="keep me", email="old@example.com")
     detail = run(
@@ -273,7 +281,6 @@ def test_update_changes_only_what_was_sent_and_announces_it():
     assert outbox() == [(events.CUSTOMER_UPDATED, {"id": str(ana.id)})]
 
 
-@pytest.mark.django_db
 def test_update_by_the_customers_name_and_null_leaves_a_field_but_clears_a_date():
     ana = card("Ana", birthday=date(1990, 1, 1), city="Madrid")
     detail = run(
@@ -285,7 +292,6 @@ def test_update_by_the_customers_name_and_null_leaves_a_field_but_clears_a_date(
     assert ana.birthday is None
 
 
-@pytest.mark.django_db
 def test_an_update_that_changes_nothing_announces_nothing():
     ana = card("Ana", phone="+34600111222")
     run(
@@ -295,7 +301,6 @@ def test_an_update_that_changes_nothing_announces_nothing():
     assert outbox() == []
 
 
-@pytest.mark.django_db
 def test_an_update_with_a_bad_phone_changes_nothing():
     ana = card("Ana")
     with pytest.raises(InvalidPayload):
@@ -307,14 +312,13 @@ def test_an_update_with_a_bad_phone_changes_nothing():
     assert ana.name == "Ana" and outbox() == []
 
 
-@pytest.mark.django_db
 def test_a_card_that_is_gone_cannot_be_updated():
     gone = card("Gone", deleted_at=NOW)
     with pytest.raises(NotFound):
         run("customer.customer.update", CustomerPatchIn(id=gone.id, name="Back"))
 
 
-# Custom field values on the update (customers#13)
+# Custom field values on the update
 
 
 @pytest.fixture
@@ -345,7 +349,6 @@ def field_values(fields, **sent):
     ]
 
 
-@pytest.mark.django_db
 def test_the_sheet_and_its_fields_are_saved_in_one_write(fields):
     ana = card("Ana")
     detail = run(
@@ -374,7 +377,6 @@ def test_the_sheet_and_its_fields_are_saved_in_one_write(fields):
     assert outbox() == [(events.CUSTOMER_UPDATED, {"id": str(ana.id)})]
 
 
-@pytest.mark.django_db
 def test_an_empty_value_clears_a_field_and_the_old_one_and_zero_still_read_as_booleans(
     fields,
 ):
@@ -392,7 +394,6 @@ def test_an_empty_value_clears_a_field_and_the_old_one_and_zero_still_read_as_bo
     assert values(ana) == {"Allergies": "Latex", "Vegan": "true"}
 
 
-@pytest.mark.django_db
 def test_a_required_field_is_satisfied_by_its_stored_value(fields):
     ana = card("Ana")
     CustomFieldValue.objects.create(
@@ -405,7 +406,6 @@ def test_a_required_field_is_satisfied_by_its_stored_value(fields):
     assert values(ana)["Hair"] == "Short"
 
 
-@pytest.mark.django_db
 def test_a_required_field_left_empty_rejects_the_whole_save(fields):
     ana = card("Ana")
     with pytest.raises(InvalidPayload) as excinfo:
@@ -425,7 +425,6 @@ def test_a_required_field_left_empty_rejects_the_whole_save(fields):
     assert (ana.name, values(ana)) == ("Ana", {})
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("name", "value", "code", "message"),
     [
@@ -457,7 +456,6 @@ def test_a_value_that_does_not_fit_its_type_rejects_the_save(
     assert values(ana) == {}
 
 
-@pytest.mark.django_db
 def test_an_unknown_or_inactive_field_is_unavailable(fields):
     ana = card("Ana")
     for field_id in (fields["old"].id, uuid.uuid7()):
@@ -476,7 +474,6 @@ def test_an_unknown_or_inactive_field_is_unavailable(fields):
         )
 
 
-@pytest.mark.django_db
 def test_without_field_values_the_required_fields_are_not_checked(fields):
     # Creating a card and a plain edit never ask for the custom fields (CUSTOMER-F29).
     ana = card("Ana")
@@ -489,7 +486,6 @@ def test_without_field_values_the_required_fields_are_not_checked(fields):
 # customer.customer.import (CUSTOMER-F08; wasm_handlers.hub bulk_create)
 
 
-@pytest.mark.django_db
 def test_import_creates_the_good_rows_and_skips_the_bad_ones_with_their_reason():
     result = run(
         "customer.customer.import",
@@ -541,7 +537,7 @@ def test_import_creates_the_good_rows_and_skips_the_bad_ones_with_their_reason()
         "import",
         "active",
     )
-    # A country named in English or Spanish is read as its code, as the screen does (customers#72).
+    # A country named in English or Spanish is read as its code, as the screen does.
     assert (dora.country, dora.lifecycle_stage) == ("ES", "active")
     assert (eva.source, eva.lifecycle_stage, eva.birthday) == (
         "referral",
@@ -554,7 +550,6 @@ def test_import_creates_the_good_rows_and_skips_the_bad_ones_with_their_reason()
     ]
 
 
-@pytest.mark.django_db
 def test_import_reads_a_country_by_its_code_or_its_name_and_warns_when_it_names_none():
     # The same reading as the screen, for an import through the API or the assistant: a code, a name
     # in Spanish or English (case and accents aside), the Spanish regions as Spain; else, a warning.
@@ -593,7 +588,6 @@ def test_import_reads_a_country_by_its_code_or_its_name_and_warns_when_it_names_
     }
 
 
-@pytest.mark.django_db
 def test_import_takes_back_the_apostrophe_the_export_puts_in_front_of_a_formula():
     run(
         "customer.customer.import",
@@ -603,9 +597,8 @@ def test_import_takes_back_the_apostrophe_the_export_puts_in_front_of_a_formula(
     assert (ana.name, ana.phone) == ("=Ana", "+34600111222")
 
 
-@pytest.mark.django_db
 def test_importing_the_same_file_again_creates_nothing_new():
-    """services#152, customers#15: a file imported twice (or a row repeated in it) does not duplicate."""
+    """A file imported twice (or a row repeated in it) does not duplicate."""
     rows = [
         {"name": "Ana", "phone": "600 111 222", "email": "ana@example.com"},
         # Her daughter: the same phone, another person (CUSTOMER-F12): she is created.
@@ -655,7 +648,6 @@ def test_importing_the_same_file_again_creates_nothing_new():
 # customer.customer.set_groups / set_tags (CUSTOMER-F06)
 
 
-@pytest.mark.django_db
 def test_set_groups_replaces_the_selection_by_id_or_by_name():
     vip, wholesale = (
         CustomerGroup.objects.create(name="VIP"),
@@ -681,7 +673,6 @@ def test_set_groups_replaces_the_selection_by_id_or_by_name():
     assert list(ana.groups.all()) == []
 
 
-@pytest.mark.django_db
 def test_a_group_that_no_longer_exists_saves_nothing():
     vip = CustomerGroup.objects.create(name="VIP")
     ana = card("Ana")
@@ -693,7 +684,6 @@ def test_a_group_that_no_longer_exists_saves_nothing():
     assert list(ana.groups.all()) == [vip]
 
 
-@pytest.mark.django_db
 def test_set_tags():
     moroso = CustomerTag.objects.create(name="Moroso")
     ana = card("Ana")
@@ -706,7 +696,6 @@ def test_set_tags():
     assert excinfo.value.code == "customer.tag_unavailable"
 
 
-@pytest.mark.django_db
 def test_the_refusal_names_the_groups_and_tags_sent_by_id_that_no_longer_exist():
     # Same code, message and field as before; besides, which of the ids sent are gone, so a client
     # (the card's editor, CUSTOMER-F06) takes exactly those off its selection. By name there is no id.
@@ -758,7 +747,6 @@ def test_the_refusal_names_the_groups_and_tags_sent_by_id_that_no_longer_exist()
 # customer.customer.delete (CUSTOMER-F07; delete_guarded.pg)
 
 
-@pytest.mark.django_db
 def test_delete_keeps_the_data_and_announces_it():
     ana = card("Ana", email="ana@example.com")
     Purchase.objects.create(customer=ana, sale_id=uuid.uuid7(), amount=500)
@@ -774,7 +762,6 @@ def test_delete_keeps_the_data_and_announces_it():
     assert outbox() == [(events.CUSTOMER_DELETED, {"id": str(ana.id)})]
 
 
-@pytest.mark.django_db
 def test_deleting_an_unknown_card_fails_and_announces_nothing():
     with pytest.raises(NotFound) as excinfo:
         run("customer.customer.delete", RefIn(id=uuid.uuid7()))
@@ -782,7 +769,6 @@ def test_deleting_an_unknown_card_fails_and_announces_nothing():
     assert outbox() == []
 
 
-@pytest.mark.django_db
 def test_deleting_a_card_that_is_already_gone_answers_well_and_announces_again():
     gone = card("Gone", deleted_at=NOW)
     run("customer.customer.delete", RefIn(id=gone.id))
@@ -791,13 +777,353 @@ def test_deleting_a_card_that_is_already_gone_answers_well_and_announces_again()
     assert outbox() == [(events.CUSTOMER_DELETED, {"id": str(gone.id)})]
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize("role", ["hub_manager", "hub_employee"])
 def test_only_owner_and_admin_delete(role):
     ana = card("Ana")
     with pytest.raises(PermissionDenied):
         run("customer.customer.delete", RefIn(id=ana.id), role)
     assert run("customer.customer.delete", RefIn(id=ana.id), "hub_owner").id == ana.id
+
+
+# customer.customer.restore (CUSTOMER-F33; BASE-F114, the recovery from a separate copy, hub#1306)
+
+
+def test_restore_brings_the_same_card_back_with_all_that_hangs_from_it_and_announces_it():
+    ana = card("Ana", email="ana@example.com", phone="+34600111222", total_purchases=1, total_spent=500)
+    vip = CustomerGroup.objects.create(name="VIP")
+    ana.groups.add(vip)
+    Purchase.objects.create(customer=ana, sale_id=uuid.uuid7(), amount=500)
+    OrderLink.objects.create(order_id=uuid.uuid7(), customer=ana)
+    run("customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"))
+    run(
+        "customer.consent.grant",
+        ConsentGrantIn(customer_id=ana.id, channel="sms", notice_text="I want offers.", notice_version="v1"),
+    )
+    run("customer.customer.delete", RefIn(id=ana.id))
+    clear_outbox()
+
+    back = system("customer.customer.restore", CustomerRestoreIn(id=ana.id))
+
+    assert (back.id, back.left_out) == (ana.id, [])
+    ana.refresh_from_db()
+    assert (ana.deleted_at, ana.is_active) == (None, True)
+    assert Customer.objects.live().filter(pk=ana.pk).exists()
+    assert (ana.purchases.count(), ana.orders.count(), ana.consents.count(), list(ana.groups.all())) == (1, 1, 1, [vip])
+    assert ana.activity.filter(kind=Activity.Kind.NOTE_ADDED, text="Prefers mornings").exists()
+    assert (ana.total_purchases, ana.total_spent, ana.phone) == (1, 500, "+34600111222")
+    assert outbox() == [(events.CUSTOMER_RESTORED, {"id": str(ana.id)})]
+
+
+def test_restoring_a_live_card_answers_well_changes_nothing_and_announces_again():
+    ana = card("Ana")
+    before = Customer.objects.get(pk=ana.pk).updated_at
+
+    assert system("customer.customer.restore", CustomerRestoreIn(id=ana.id)).id == ana.id
+
+    assert Customer.objects.get(pk=ana.pk).updated_at == before
+    assert outbox() == [(events.CUSTOMER_RESTORED, {"id": str(ana.id)})]
+
+
+@pytest.mark.parametrize("gone", ["merged", "erased", "unknown"])
+def test_a_card_merged_into_another_erased_or_unknown_never_comes_back(gone):
+    survivor = card("Marta")
+    lost = {
+        "merged": lambda: card("Luis", deleted_at=NOW, is_active=False, merged_into=survivor).id,
+        "erased": lambda: card("Deleted customer", deleted_at=NOW, is_active=False, erased_at=NOW).id,
+        "unknown": uuid.uuid7,
+    }[gone]()
+
+    with pytest.raises(NotFound) as refused:
+        system("customer.customer.restore", CustomerRestoreIn(id=lost))
+
+    assert refused.value.code == "customer.customer_unavailable"
+    assert list(Customer.objects.live().values_list("name", flat=True)) == ["Marta"]
+    assert outbox() == []
+
+
+@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+def test_only_the_system_restores_a_card(role):
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.restore", CustomerRestoreIn(id=ana.id), role)
+
+    assert Customer.objects.get(pk=ana.pk).deleted_at == NOW
+
+
+def restored_with(ana: Customer, **hanging):
+    """``customer.customer.restore`` of ``ana`` as the recovery gives it: with what hung from her card in a separate
+    copy, each with its id there."""
+    return system("customer.customer.restore", CustomerRestoreIn.model_validate({"id": ana.id} | hanging))
+
+
+def test_restore_gives_back_what_the_business_deleted_since_and_leaves_what_it_has_as_it_is():
+    """hub#1356: a group, tag or field the business still has (by its id in the copy) is its own, the card in it or
+    not; one it deleted since is made again as the copy had it, by its screen's operation, and the card goes back in
+    it, as a card made again from the copy (hub#1285)."""
+    regulars = CustomerGroup.objects.create(name="Regulars")
+    # Kept, Known and Size the business still has: it took Ana out of Kept and of Known and cleared her Size before
+    # deleting her.
+    kept = CustomerGroup.objects.create(name="Kept")
+    known = CustomerTag.objects.create(name="Known")
+    size = CustomField.objects.create(name="Size", field_type="select", options=["S", "M"])
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+    ana.groups.add(regulars)
+    clear_outbox()
+
+    restored_with(
+        ana,
+        groups=[
+            {"id": regulars.id, "name": "Regulars"},
+            {"id": kept.id, "name": "Kept"},
+            {"id": uuid.uuid7(), "name": "VIP", "color": "warning", "sort_order": 2},
+            {"id": uuid.uuid7(), "name": "Old", "is_active": False},
+        ],
+        tags=[{"id": known.id, "name": "Known"}, {"id": uuid.uuid7(), "name": "Regular", "color": "success"}],
+        field_values=[
+            {"id": size.id, "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
+            {"id": uuid.uuid7(), "name": "Pet", "sort_order": 2, "value": "Luna"},
+        ],
+    )
+
+    ana.refresh_from_db()
+    assert (ana.deleted_at, ana.is_active) == (None, True)
+    assert sorted(ana.groups.values_list("name", "color", "sort_order", "is_active")) == [
+        ("Old", "primary", 0, False),
+        ("Regulars", "primary", 0, True),
+        ("VIP", "warning", 2, True),
+    ]
+    assert list(ana.tags.values_list("name", "color", "is_active")) == [("Regular", "success", True)]
+    pet = CustomField.objects.get(name="Pet")
+    assert (pet.sort_order, list(ana.field_values.values_list("field_id", "value"))) == (2, [(pet.id, "Luna")])
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (4, 2, 2)
+    names = [name for name, _ in outbox()]
+    assert names[0] == events.CUSTOMER_RESTORED
+    assert sorted(names[1:]) == sorted(
+        [
+            events.GROUP_CREATED,
+            events.GROUP_CREATED,
+            events.GROUP_UPDATED,
+            events.CUSTOMER_GROUPS_CHANGED,
+            events.TAG_CREATED,
+            events.CUSTOMER_TAGS_CHANGED,
+            events.FIELD_CREATED,
+        ]
+    )
+
+
+def test_restore_puts_the_card_in_what_the_business_made_again_by_name_and_keeps_its_own_value():
+    """A group, tag or field the business deleted and made again by hand is that one (its name, the case aside), never a
+    second one; a value the card holds already in it stays, and a field made again and deactivated takes none: the
+    card comes back without it, and says so. Its own value kept is nothing left out."""
+    vip = CustomerGroup.objects.create(name="vip")
+    regular = CustomerTag.objects.create(name="REGULAR")
+    pet = CustomField.objects.create(name="Pet")
+    CustomField.objects.create(name="Size", is_active=False)
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+    CustomFieldValue.objects.create(customer=ana, field=pet, value="Max")
+
+    back = restored_with(
+        ana,
+        groups=[{"id": uuid.uuid7(), "name": "VIP"}],
+        tags=[{"id": uuid.uuid7(), "name": "Regular"}],
+        field_values=[{"id": uuid.uuid7(), "name": "Pet", "value": "Luna"}, {"id": uuid.uuid7(), "name": "Size", "value": "M"}],
+    )
+
+    ana.refresh_from_db()
+    assert (list(ana.groups.all()), list(ana.tags.all())) == ([vip], [regular])
+    assert list(ana.field_values.values_list("field_id", "value")) == [(pet.id, "Max")]
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (1, 1, 2)
+    assert [one.code for one in back.left_out] == ["customer.field_inactive"]
+    assert '"Size"' in back.left_out[0].message
+
+
+def test_restore_brings_the_card_back_without_a_value_its_field_no_longer_takes_and_says_why():
+    """A field the business made again by hand with other options does not keep the card deleted: it comes back with
+    all else that hung from it, without that value, and the output says which field and why."""
+    CustomField.objects.create(name="Size", field_type="select", options=["S", "L"])
+    ana = card("Ana", deleted_at=NOW, is_active=False)
+
+    back = restored_with(
+        ana,
+        tags=[{"id": uuid.uuid7(), "name": "Regular"}],
+        field_values=[
+            {"id": uuid.uuid7(), "name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
+            {"id": uuid.uuid7(), "name": "Pet", "value": "Luna"},
+        ],
+    )
+
+    ana.refresh_from_db()
+    assert (ana.deleted_at, ana.is_active) == (None, True)
+    assert list(ana.tags.values_list("name", flat=True)) == ["Regular"]
+    assert list(ana.field_values.values_list("field__name", "value")) == [("Pet", "Luna")]
+    assert list(CustomField.objects.filter(name="Size").values_list("options", flat=True)) == [["S", "L"]]
+    assert [one.code for one in back.left_out] == ["customer.field_invalid_option"]
+    assert '"Size"' in back.left_out[0].message
+
+
+# customer.customer.recover (BASE-F114, the recovery from a separate copy, hub#1285)
+
+
+def a_card_of_the_copy(**fields) -> CustomerRecoverIn:
+    """A card of a separate copy as its recovery takes it: what the create takes and what hung from it there."""
+    return CustomerRecoverIn.model_validate({"name": "Luis Pérez", "phone": "+34600333444"} | fields)
+
+
+def test_recover_makes_the_card_with_its_groups_tags_and_values_by_the_screens_own_operations():
+    vip = CustomerGroup.objects.create(name="VIP")
+    vegan = CustomerTag.objects.create(name="Vegan")
+    size = CustomField.objects.create(name="Size", field_type="select", options=["S", "M"])
+    clear_outbox()
+
+    made = system(
+        "customer.customer.recover",
+        a_card_of_the_copy(
+            groups=[{"name": "vip"}, {"name": "Old", "color": "danger", "sort_order": 4, "is_active": False}],
+            tags=[{"name": "VEGAN"}, {"name": "Regular", "color": "success"}, {"name": "Winter", "is_active": False}],
+            field_values=[
+                {"name": "SIZE", "field_type": "select", "options": ["S", "M"], "value": "M"},
+                {"name": "Pet", "field_type": "text", "sort_order": 2, "value": "Luna"},
+            ],
+        ),
+    )
+
+    luis = Customer.objects.get(pk=made.id)
+    assert (luis.name, luis.phone) == ("Luis Pérez", "+34600333444")
+    # VIP and Size are the business's own, by name: never a second one.
+    old = CustomerGroup.objects.get(name="Old")
+    assert set(luis.groups.all()) == {vip, old}
+    assert (old.color, old.sort_order, old.is_active) == ("danger", 4, False)
+    assert sorted(luis.tags.values_list("name", "color", "is_active")) == [
+        ("Regular", "success", True),
+        ("Vegan", "primary", True),
+        ("Winter", "primary", False),
+    ]
+    assert vegan in luis.tags.all()
+    pet = CustomField.objects.get(name="Pet")
+    assert (pet.field_type, pet.sort_order, pet.is_active) == ("text", 2, True)
+    assert sorted(luis.field_values.values_list("field_id", "value")) == sorted([(size.id, "M"), (pet.id, "Luna")])
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count(), CustomField.objects.count()) == (2, 3, 2)
+    # Each by its own operation, with its own event: the card's create, the group, tag and field it made again, and
+    # the card's groups and tags set as its screen sets them.
+    names = [name for name, _ in outbox()]
+    assert names[0] == events.CUSTOMER_CREATED
+    assert sorted(names[1:]) == sorted(
+        [
+            events.GROUP_CREATED,
+            events.GROUP_UPDATED,
+            events.CUSTOMER_GROUPS_CHANGED,
+            events.TAG_CREATED,
+            events.TAG_CREATED,
+            events.TAG_UPDATED,
+            events.CUSTOMER_TAGS_CHANGED,
+            events.FIELD_CREATED,
+        ]
+    )
+
+
+def test_recover_reuses_the_active_one_of_a_name_over_one_deactivated():
+    CustomerGroup.objects.create(name="VIP", is_active=False)
+    live = CustomerGroup.objects.create(name="vip")
+
+    made = system("customer.customer.recover", a_card_of_the_copy(groups=[{"name": "VIP"}]))
+
+    assert list(Customer.objects.get(pk=made.id).groups.all()) == [live]
+    assert CustomerGroup.objects.count() == 2
+
+
+def test_recover_reuses_the_oldest_of_a_name_when_the_business_has_none_active():
+    """Deactivating a group frees its name, so the business may hold several deactivated ones of a name:
+    the card goes to the one made first, always the same, whatever order the database gives them in."""
+    first = CustomerGroup.objects.create(name="VIP", is_active=False)
+    CustomerGroup.objects.create(name="vip", is_active=False)
+    oldest = CustomerTag.objects.create(name="Regular", is_active=False)
+    CustomerTag.objects.create(name="regular", is_active=False)
+
+    made = system("customer.customer.recover", a_card_of_the_copy(groups=[{"name": "VIP"}], tags=[{"name": "Regular"}]))
+
+    luis = Customer.objects.get(pk=made.id)
+    assert (list(luis.groups.all()), list(luis.tags.all())) == ([first], [oldest])
+    assert (CustomerGroup.objects.count(), CustomerTag.objects.count()) == (2, 2)
+
+
+def test_recover_without_anything_hanging_makes_the_card_as_its_create_does():
+    clear_outbox()
+
+    made = system("customer.customer.recover", a_card_of_the_copy())
+
+    luis = Customer.objects.get(pk=made.id)
+    assert (luis.groups.count(), luis.tags.count(), luis.field_values.count()) == (0, 0, 0)
+    assert outbox() == [(events.CUSTOMER_CREATED, {"id": str(luis.id)})]
+    assert made.left_out == []
+
+
+def test_recover_makes_the_card_without_a_value_its_field_no_longer_takes_and_says_why():
+    """A value no longer one of its field's options, or no longer of its field's type, does not keep the card out: it
+    is made with all else, without those values, and the output says each field and why, in the copy's order."""
+    CustomField.objects.create(name="Size", field_type="select", options=["S", "L"])
+    CustomField.objects.create(name="Shoe", field_type="number")
+    clear_outbox()
+
+    made = system(
+        "customer.customer.recover",
+        a_card_of_the_copy(
+            tags=[{"name": "Regular"}],
+            field_values=[
+                {"name": "Size", "field_type": "select", "options": ["S", "M"], "value": "M"},
+                {"name": "Pet", "value": "Luna"},
+                {"name": "Shoe", "value": "forty"},
+            ],
+        ),
+    )
+
+    luis = Customer.objects.get(pk=made.id)
+    assert list(luis.tags.values_list("name", flat=True)) == ["Regular"]
+    assert list(luis.field_values.values_list("field__name", "value")) == [("Pet", "Luna")]
+    assert [one.code for one in made.left_out] == ["customer.field_invalid_option", "customer.field_invalid_number"]
+    assert [one.message for one in made.left_out] == [
+        FIELD_OPTION_LEFT % {"field": "Size"},
+        FIELD_TYPE_LEFT % {"field": "Shoe"},
+    ]
+
+
+def test_recover_leaves_out_a_value_of_a_field_deactivated_says_why_and_never_asks_a_required_one():
+    CustomField.objects.create(name="Pet", is_active=False)
+    nickname = CustomField.objects.create(name="Nickname")
+    allergies = CustomField.objects.create(name="Allergies", is_required=True)
+
+    made = system(
+        "customer.customer.recover",
+        a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}, {"name": "Nickname", "value": "Lu"}]),
+    )
+
+    luis = Customer.objects.get(pk=made.id)
+    assert list(luis.field_values.values_list("field_id", "value")) == [(nickname.id, "Lu")]
+    assert CustomField.objects.filter(name="Pet").count() == 1
+    assert not CustomFieldValue.objects.filter(field=allergies).exists()
+    # The required field it has no value of is nothing it came back without: the till makes a card so too.
+    assert [one.code for one in made.left_out] == ["customer.field_inactive"]
+    assert '"Pet"' in made.left_out[0].message
+
+
+def test_what_a_card_came_back_without_is_said_in_the_language_it_is_made_in():
+    CustomField.objects.create(name="Pet", is_active=False)
+
+    with translation.override("es"):
+        made = system("customer.customer.recover", a_card_of_the_copy(field_values=[{"name": "Pet", "value": "Luna"}]))
+        [said] = made.left_out
+        spanish = FIELD_INACTIVE_LEFT % {"field": "Pet"}
+
+    assert said.message == spanish
+    assert said.message != FIELD_INACTIVE_LEFT % {"field": "Pet"}
+
+
+@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+def test_only_the_system_recovers_a_card_from_a_copy(role):
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.recover", a_card_of_the_copy(), role)
+
+    assert Customer.objects.count() == 0
 
 
 # customer.customer.merge (CUSTOMER-F13; merge.pg)
@@ -830,7 +1156,6 @@ def duplicates(db):
     return survivor, absorbed
 
 
-@pytest.mark.django_db
 def test_the_survivor_keeps_its_data_fills_its_gaps_and_sums_the_figures(duplicates):
     survivor, absorbed = duplicates
     detail = run(
@@ -877,7 +1202,6 @@ def test_the_survivor_keeps_its_data_fills_its_gaps_and_sums_the_figures(duplica
     ]
 
 
-@pytest.mark.django_db
 def test_everything_that_hangs_from_the_duplicate_moves_to_the_survivor(duplicates):
     survivor, absorbed = duplicates
     vip, gold, moroso = (
@@ -935,7 +1259,6 @@ def test_everything_that_hangs_from_the_duplicate_moves_to_the_survivor(duplicat
     assert ("note_added", "", {}) in timeline
 
 
-@pytest.mark.django_db
 def test_a_merge_that_cannot_be_done_writes_nothing(duplicates):
     survivor, absorbed = duplicates
     gone = card("Gone", deleted_at=NOW)
@@ -954,7 +1277,6 @@ def test_a_merge_that_cannot_be_done_writes_nothing(duplicates):
     assert absorbed.deleted_at is None and outbox() == []
 
 
-@pytest.mark.django_db
 def test_the_employee_does_not_merge(duplicates):
     survivor, absorbed = duplicates
     with pytest.raises(PermissionDenied):
@@ -1010,7 +1332,6 @@ def erasable(db):
     return ana
 
 
-@pytest.mark.django_db
 def test_erase_replaces_the_personal_data_and_keeps_what_the_law_keeps(erasable):
     ana = erasable
     assert run(
@@ -1078,7 +1399,6 @@ def test_erase_replaces_the_personal_data_and_keeps_what_the_law_keeps(erasable)
     assert outbox() == [(events.CUSTOMER_ERASED, {"id": str(ana.id)})]
 
 
-@pytest.mark.django_db
 def test_erasing_twice_changes_nothing_but_announces_again(erasable):
     run("customer.customer.erase", EraseIn(id=erasable.id))
     run("customer.customer.erase", EraseIn(id=erasable.id, reason="again"))
@@ -1086,7 +1406,6 @@ def test_erasing_twice_changes_nothing_but_announces_again(erasable):
     assert outbox() == [(events.CUSTOMER_ERASED, {"id": str(erasable.id)})] * 2
 
 
-@pytest.mark.django_db
 def test_a_deleted_or_merged_card_can_still_be_erased_by_its_id():
     survivor = card("Ana")
     absorbed = card(
@@ -1097,7 +1416,6 @@ def test_a_deleted_or_merged_card_can_still_be_erased_by_its_id():
     assert (absorbed.email, absorbed.erased_at is not None) == ("", True)
 
 
-@pytest.mark.django_db
 def test_erasing_an_unknown_card_fails_and_only_the_owner_and_admin_erase(erasable):
     with pytest.raises(NotFound):
         run("customer.customer.erase", EraseIn(id=uuid.uuid7()))
@@ -1109,7 +1427,6 @@ def test_erasing_an_unknown_card_fails_and_only_the_owner_and_admin_erase(erasab
 # customer.note.add and customer.activity.add (CUSTOMER-F05; note_add_projects_activity.pg)
 
 
-@pytest.mark.django_db
 def test_a_note_is_its_own_timeline_entry():
     ana = card("Ana")
     note = run(
@@ -1132,7 +1449,6 @@ def test_a_note_is_its_own_timeline_entry():
     ]
 
 
-@pytest.mark.django_db
 def test_a_note_on_a_card_that_is_gone_writes_nothing():
     with pytest.raises(NotFound):
         run(
@@ -1142,7 +1458,6 @@ def test_a_note_on_a_card_that_is_gone_writes_nothing():
     assert not Activity.objects.exists() and outbox() == []
 
 
-@pytest.mark.django_db
 def test_another_app_writes_its_own_entry_in_the_timeline():
     ana = card("Ana")
     entry = run(
@@ -1178,7 +1493,6 @@ def test_another_app_writes_its_own_entry_in_the_timeline():
 # customer.consent.grant / withdraw (CUSTOMER-F14, F15; consent_ledger.pg)
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("channel", "address"),
     [
@@ -1239,7 +1553,6 @@ def test_a_grant_is_a_fact_for_the_cards_address_on_that_channel(channel, addres
     ]
 
 
-@pytest.mark.django_db
 def test_grant_withdraw_and_grant_again_leave_three_facts_and_the_last_one_rules():
     ana = card("Ana", email="ana@example.com")
     yesterday = timezone.now() - timedelta(days=1)
@@ -1281,7 +1594,6 @@ def test_grant_withdraw_and_grant_again_leave_three_facts_and_the_last_one_rules
     ]
 
 
-@pytest.mark.django_db
 def test_a_consent_said_in_the_future_or_for_a_card_that_is_gone_is_refused():
     ana = card("Ana")
     with pytest.raises(InvalidPayload) as excinfo:
@@ -1312,7 +1624,6 @@ def test_a_consent_said_in_the_future_or_for_a_card_that_is_gone_is_refused():
 # customer.order.link (CUSTOMER-F19; orders_link.pg)
 
 
-@pytest.mark.django_db
 def test_an_order_has_at_most_one_customer_and_a_relink_replaces_it():
     order = uuid.uuid7()
     ana, bea = card("Ana"), card("Bea")
@@ -1342,7 +1653,6 @@ def test_an_order_has_at_most_one_customer_and_a_relink_replaces_it():
     ]
 
 
-@pytest.mark.django_db
 def test_without_a_customer_the_link_goes():
     order = uuid.uuid7()
     ana = card("Ana")
@@ -1357,7 +1667,6 @@ def test_without_a_customer_the_link_goes():
     ]
 
 
-@pytest.mark.django_db
 def test_a_card_that_is_gone_is_not_linked():
     with pytest.raises(NotFound):
         run(
@@ -1371,7 +1680,6 @@ def test_a_card_that_is_gone_is_not_linked():
 # Groups, tags and custom fields (CUSTOMER-F27..F29; group_name_unique.pg, tag_field_name_unique.pg)
 
 
-@pytest.mark.django_db
 def test_group_crud_with_its_notices():
     group = run(
         "customer.group.create",
@@ -1409,7 +1717,6 @@ def test_group_crud_with_its_notices():
     ]
 
 
-@pytest.mark.django_db
 def test_a_taken_group_name_is_refused_under_the_name_field():
     CustomerGroup.objects.create(name="VIP")
     for attempt in (lambda: run("customer.group.create", GroupIn(name=" vip ")),):
@@ -1435,7 +1742,6 @@ def test_a_taken_group_name_is_refused_under_the_name_field():
         )
 
 
-@pytest.mark.django_db
 def test_only_owner_and_admin_delete_groups_and_tags_but_the_manager_deletes_fields():
     group = CustomerGroup.objects.create(name="VIP")
     tag = CustomerTag.objects.create(name="Moroso")
@@ -1453,7 +1759,6 @@ def test_only_owner_and_admin_delete_groups_and_tags_but_the_manager_deletes_fie
     assert excinfo.value.code == "customer.group_unavailable"
 
 
-@pytest.mark.django_db
 def test_tag_crud_and_its_taken_name():
     tag = run("customer.tag.create", TagIn(name="Moroso", color="danger"))
     assert (tag.name, tag.color, tag.is_active) == ("Moroso", "danger", True)
@@ -1473,7 +1778,6 @@ def test_tag_crud_and_its_taken_name():
     ]
 
 
-@pytest.mark.django_db
 def test_field_crud_and_its_rules():
     field = run(
         "customer.field.create",
@@ -1527,7 +1831,6 @@ def test_field_crud_and_its_rules():
     ]
 
 
-@pytest.mark.django_db
 def test_turning_a_field_into_a_select_needs_its_options():
     field = CustomField.objects.create(name="Hair")
     with pytest.raises(InvalidPayload) as excinfo:
@@ -1539,7 +1842,6 @@ def test_turning_a_field_into_a_select_needs_its_options():
     )
 
 
-@pytest.mark.django_db
 def test_the_employee_does_not_configure():
     with pytest.raises(PermissionDenied):
         run("customer.group.create", GroupIn(name="VIP"), "hub_employee")
@@ -1575,7 +1877,6 @@ def void(sale, reason="mistake"):
     return system("customer.purchase.void", PurchaseVoidIn(sale_id=sale, reason=reason))
 
 
-@pytest.mark.django_db
 def test_a_sale_is_recorded_once_and_moves_the_stage():
     ana = card("Ana")
     first, second = uuid.uuid7(), uuid.uuid7()
@@ -1604,7 +1905,6 @@ def test_a_sale_is_recorded_once_and_moves_the_stage():
     assert outbox()[0][1] == {"customer_id": str(ana.id), "sale_id": str(first)}
 
 
-@pytest.mark.django_db
 def test_a_sale_without_customer_or_for_a_card_that_is_gone_records_nothing():
     assert record(None, uuid.uuid7(), 999).recorded is False
     gone = card("Gone", deleted_at=NOW)
@@ -1613,7 +1913,6 @@ def test_a_sale_without_customer_or_for_a_card_that_is_gone_records_nothing():
     assert not Purchase.objects.exists() and outbox() == []
 
 
-@pytest.mark.django_db
 def test_a_manual_entry_has_no_sale_and_is_never_deduplicated():
     ana = card("Ana")
     record(ana, None, 100)
@@ -1621,7 +1920,6 @@ def test_a_manual_entry_has_no_sale_and_is_never_deduplicated():
     assert totals(ana)[:2] == (2, 200)
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("before", "after"),
     [
@@ -1641,7 +1939,6 @@ def test_the_stage_moves_forward_with_a_purchase(before, after):
     assert totals(ana)[2] == after
 
 
-@pytest.mark.django_db
 def test_a_void_reverts_the_figures_once_and_keeps_the_history():
     ana = card("Ana")
     first, second = uuid.uuid7(), uuid.uuid7()
@@ -1665,7 +1962,6 @@ def test_a_void_reverts_the_figures_once_and_keeps_the_history():
     ]
 
 
-@pytest.mark.django_db
 def test_a_void_never_demotes_a_vip():
     ana = card("Ana", lifecycle_stage="vip")
     sale = uuid.uuid7()
@@ -1674,7 +1970,6 @@ def test_a_void_never_demotes_a_vip():
     assert totals(ana)[2] == "vip"
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     "role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
 )
@@ -1690,7 +1985,6 @@ def test_only_the_system_records_and_voids_purchases(role):
         run("customer.purchase.void", PurchaseVoidIn(sale_id=uuid.uuid7()), role)
 
 
-@pytest.mark.django_db
 def test_a_deleted_card_with_purchases_keeps_them_and_a_later_sale_does_not_add_up():
     ana = card("Ana")
     record(ana, uuid.uuid7(), 500)
@@ -1724,17 +2018,18 @@ def received(session, timeout=WAIT, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_command_in_scope_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("customer.customer.create", CustomerIn(name="Ana"), scope=B)
+    with use_hub(hub_b):
+        run("customer.customer.create", CustomerIn(name="Ana"), scope=B)
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.CUSTOMER_CREATED]})
     ]
     assert received(on_a, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_rejected_command_notifies_nobody(listen):
     on_a = listen(A)
     with pytest.raises(InvalidPayload):
@@ -1750,7 +2045,6 @@ def erased(customer):
     return (customer.name, customer.email, customer.erased_at is not None)
 
 
-@pytest.mark.django_db
 def test_erasing_a_card_erases_the_duplicates_merged_into_it():
     survivor = card("Ana", email="ana@example.com")
     absorbed = card(
@@ -1786,7 +2080,6 @@ def test_erasing_a_card_erases_the_duplicates_merged_into_it():
     ]
 
 
-@pytest.mark.django_db
 def test_a_merge_keeps_the_chain_flat_and_erasing_reaches_every_card_of_it():
     first, second, third = (
         card("A"),
@@ -1811,7 +2104,6 @@ def test_a_merge_keeps_the_chain_flat_and_erasing_reaches_every_card_of_it():
     }
 
 
-@pytest.mark.django_db
 def test_erasing_follows_a_chain_that_is_not_flat():
     first = card("A")
     second = card("B", merged_into=first, deleted_at=NOW)
@@ -1820,7 +2112,6 @@ def test_erasing_follows_a_chain_that_is_not_flat():
     assert erased(third) == ("Deleted customer", "", True)
 
 
-@pytest.mark.django_db
 def test_repeating_the_erasure_of_a_merged_card_announces_every_card_again_and_writes_nothing():
     survivor, absorbed = card("Ana"), card("ana", email="ana@example.com")
     run("customer.customer.merge", MergeIn(id=survivor.id, absorbed_id=absorbed.id))
@@ -1847,7 +2138,6 @@ def refund(sale, refund_id, total, reason="returned", at=None):
     )
 
 
-@pytest.mark.django_db
 def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_history():
     ana = card("Ana")
     sale, first, second = uuid.uuid7(), uuid.uuid7(), uuid.uuid7()
@@ -1901,7 +2191,6 @@ def test_a_refund_lowers_the_spend_once_and_leaves_a_negative_line_in_the_histor
     ]
 
 
-@pytest.mark.django_db
 def test_a_refund_of_a_sale_not_recorded_or_voided_changes_nothing():
     assert refund(uuid.uuid7(), uuid.uuid7(), 100).refunded is False
     ana = card("Ana")
@@ -1913,7 +2202,6 @@ def test_a_refund_of_a_sale_not_recorded_or_voided_changes_nothing():
     assert totals(ana)[:2] == (0, 0) and outbox() == []
 
 
-@pytest.mark.django_db
 def test_a_refund_of_an_erased_card_counts_but_adds_nothing_to_its_timeline():
     ana = card("Ana")
     sale = uuid.uuid7()
@@ -1924,7 +2212,6 @@ def test_a_refund_of_an_erased_card_counts_but_adds_nothing_to_its_timeline():
     assert list(ana.activity.values_list("kind", flat=True)) == ["erased"]
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     "role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
 )
@@ -1937,7 +2224,6 @@ def test_only_the_system_records_refunds(role):
         )
 
 
-@pytest.mark.django_db
 def test_voiding_a_sale_of_an_erased_card_adds_nothing_to_its_timeline():
     ana = card("Ana")
     sale = uuid.uuid7()
@@ -1958,33 +2244,31 @@ def race(hold, attempt, then=None):
     """Runs ``attempt`` here while another thread, in a transaction, holds what ``hold`` locked.
 
     The other thread runs ``hold``, lets ``attempt`` start, waits ``HOLD`` seconds, runs ``then``
-    (if any) and commits. ``attempt``'s result (or its exception) is this function's.
+    (if any) and commits. ``attempt``'s result (or its exception) is this function's; the other thread's error, a
+    deadlock included, fails the test.
     """
     locked = threading.Event()
-    problems = []
+    problems = [None]
 
     def holder():
         try:
-            with transaction.atomic():
+            with atomic():
                 hold()
                 locked.set()
                 time.sleep(HOLD)
                 if then is not None:
                     then()
-        except Exception as exc:  # reported below: a deadlock shows up here
-            problems.append(exc)
         finally:
             locked.set()
-            connection.close()
 
-    thread = threading.Thread(target=holder)
+    thread = in_a_thread(holder, problems)
     thread.start()
     try:
         assert locked.wait(5)
         return attempt()
     finally:
         thread.join(10)
-        assert problems == []
+        assert problems == [None]
 
 
 def note_on(customer):
@@ -2011,7 +2295,7 @@ def order_on(customer):
     )
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 @pytest.mark.parametrize(
     ("write", "written"),
     [
@@ -2021,7 +2305,7 @@ def order_on(customer):
         (order_on, lambda: OrderLink.objects.all()),
     ],
 )
-def test_a_write_on_a_card_being_deleted_waits_and_then_finds_it_gone(write, written):
+def test_a_write_on_a_card_being_deleted_waits_and_then_finds_it_gone(write, written, plan_with_room):
     ana = card("Ana", email="ana@example.com")
     name, data = write(ana)
     with pytest.raises(NotFound):
@@ -2032,8 +2316,8 @@ def test_a_write_on_a_card_being_deleted_waits_and_then_finds_it_gone(write, wri
     assert not written().exists()
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_note_on_a_card_being_merged_lands_on_the_card_that_stays():
+@HUB_DB_COMMITTED
+def test_a_note_on_a_card_being_merged_lands_on_the_card_that_stays(plan_with_room):
     survivor, absorbed = card("Ana"), card("ana")
     with pytest.raises(NotFound):
         race(
@@ -2049,8 +2333,8 @@ def test_a_note_on_a_card_being_merged_lands_on_the_card_that_stays():
     assert not absorbed.activity.filter(kind="note_added").exists()
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_void_locks_the_card_before_its_purchase_so_it_never_deadlocks_with_a_merge():
+@HUB_DB_COMMITTED
+def test_a_void_locks_the_card_before_its_purchase_so_it_never_deadlocks_with_a_merge(plan_with_room):
     # A merge locks the cards and then their purchases; a void used to lock the purchase and then
     # the card. Both orders at once wait for each other until Postgres kills one of them.
     ana = card("Ana")
@@ -2106,7 +2390,6 @@ def grant_health(customer, actor="clara"):
     )
 
 
-@pytest.mark.django_db
 def test_health_data_is_refused_until_the_permission_is_recorded():
     ana = card("Ana")
     with pytest.raises(Conflict) as refused:
@@ -2122,7 +2405,6 @@ def test_health_data_is_refused_until_the_permission_is_recorded():
     assert (HealthRecord.objects.count(), outbox()) == (0, [])
 
 
-@pytest.mark.django_db
 def test_the_permission_is_a_health_fact_with_its_words_and_then_the_data_is_kept():
     ana = card("Ana", phone="+34600111222", email="ana@example.com")
     block = grant_health(ana)
@@ -2204,7 +2486,6 @@ def test_the_permission_is_a_health_fact_with_its_words_and_then_the_data_is_kep
     assert (outbox(), Activity.objects.filter(kind="health_updated").count()) == ([], 1)
 
 
-@pytest.mark.django_db
 def test_withdrawing_the_permission_erases_the_health_data_at_once():
     ana = card("Ana")
     grant_health(ana)
@@ -2239,7 +2520,6 @@ def test_withdrawing_the_permission_erases_the_health_data_at_once():
         run("customer.health.update", HealthIn(customer_id=ana.id, allergies="Latex"))
 
 
-@pytest.mark.django_db
 def test_a_test_in_the_future_or_a_result_without_its_date_saves_nothing():
     ana = card("Ana")
     grant_health(ana)
@@ -2258,7 +2538,6 @@ def test_a_test_in_the_future_or_a_result_without_its_date_saves_nothing():
     assert (HealthRecord.objects.count(), outbox()) == (0, [])
 
 
-@pytest.mark.django_db
 def test_a_test_is_in_the_future_only_past_the_businesss_midnight(night_elsewhere):
     ana = card("Ana")
     grant_health(ana)
@@ -2269,7 +2548,6 @@ def test_a_test_is_in_the_future_only_past_the_businesss_midnight(night_elsewher
     assert record.sensitivity_test_on == date(2026, 11, 2)
 
 
-@pytest.mark.django_db
 def test_health_on_a_card_that_is_gone_or_by_who_does_not_manage_cards_is_refused():
     ana = card("Ana", deleted_at=timezone.now())
     for name, data in (
@@ -2292,7 +2570,6 @@ def test_health_on_a_card_that_is_gone_or_by_who_does_not_manage_cards_is_refuse
     assert (Consent.objects.count(), outbox()) == (0, [])
 
 
-@pytest.mark.django_db
 def test_erasing_a_card_erases_its_health_data():
     ana = card("Ana")
     grant_health(ana)
@@ -2302,7 +2579,6 @@ def test_erasing_a_card_erases_its_health_data():
     assert Consent.objects.filter(customer=ana, purpose="health").exists()
 
 
-@pytest.mark.django_db
 def test_a_merge_brings_the_duplicates_health_data_while_the_permission_holds():
     survivor, absorbed = card("Ana"), card("Ana G.")
     grant_health(absorbed)
@@ -2332,7 +2608,6 @@ def test_a_merge_brings_the_duplicates_health_data_while_the_permission_holds():
     ) == (other.id, "Latex", timezone.localdate(), "negative")
 
 
-@pytest.mark.django_db
 def test_a_merge_fills_the_survivors_empty_allergies_with_the_duplicates():
     survivor, absorbed = card("Ana"), card("Ana G.")
     for one in (survivor, absorbed):
@@ -2356,7 +2631,6 @@ def test_a_merge_fills_the_survivors_empty_allergies_with_the_duplicates():
     )
 
 
-@pytest.mark.django_db
 def test_a_merge_drops_the_health_data_when_the_last_decision_withdrew_the_permission():
     survivor, absorbed = card("Ana"), card("Ana G.")
     grant_health(absorbed)
@@ -2368,7 +2642,6 @@ def test_a_merge_drops_the_health_data_when_the_last_decision_withdrew_the_permi
     assert HealthRecord.objects.count() == 0
 
 
-@pytest.mark.django_db
 def test_who_wrote_it_is_the_persons_name_never_their_account_id():
     """CUSTOMER-F05, F14, F32: «with your name and the time», not the session's account id."""
     from django.contrib.auth import get_user_model

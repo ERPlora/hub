@@ -1,10 +1,7 @@
-"""Models of the modifier app: groups of choices, their options and the links to what is sold.
-
-A group says how many options are chosen (``min_choices`` ≥ 1 IS «required»: there is no flag, Clover's
+"""A group says how many options are chosen (``min_choices`` ≥ 1 IS «required»: there is no flag, Clover's
 rule) and whether one can be repeated; an option carries its supplement in cents (negative = a
 discount) and, only when it taxes differently from the dish, a tax category of its own. A link hangs a
-group from exactly one product or one category of Inventory. Phase 1 has no tenancy: every scope shares
-these tables; phase 2 moves them to each hub's database.
+group from exactly one product or one category of Inventory.
 
 Deleting is deleting: a group takes its options and links with it (``CASCADE``); Sales keeps its own
 frozen copy of what was ordered. Every uniqueness and every rule of a group is held by Postgres too.
@@ -14,6 +11,7 @@ from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 ACTOR_MAX_LENGTH = 128
@@ -29,9 +27,10 @@ class ModifierGroup(UUIDModel):
     """A reusable group of choices («Sauces», «Doneness»), shared by every product or category it hangs from."""
 
     name = models.CharField(_("name"), max_length=NAME_MAX_LENGTH)
-    # The kitchen ticket's name, other than the commercial one (Toast's rule); empty = the name.
+    # The kitchen ticket's name, other than the commercial one (Toast's rule); empty = the name. Its own context: the
+    # forms say «Nombre en la comanda», Menús' menu says «nombre de cocina» (hub#663).
     kitchen_name = models.CharField(
-        _("kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
+        pgettext_lazy("modifier", "kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
     )
     # 1 or more IS required; 0 = optional.
     min_choices = models.PositiveSmallIntegerField(_("minimum choices"), default=0)
@@ -81,7 +80,7 @@ class ModifierOption(UUIDModel):
     )
     name = models.CharField(_("name"), max_length=NAME_MAX_LENGTH)
     kitchen_name = models.CharField(
-        _("kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
+        pgettext_lazy("modifier", "kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
     )
     # Cents; may be negative (a discount) or zero (free).
     price_delta = models.BigIntegerField(_("supplement"), default=0)

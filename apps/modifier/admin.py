@@ -1,4 +1,4 @@
-"""Django admin of the modifier app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the modifier app: full CRUD on every table, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations, so
 it leaves no event and does not hold the rules only they apply (the defaults of a group within its

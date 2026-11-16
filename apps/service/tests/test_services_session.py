@@ -26,18 +26,11 @@ from apps.service.schemas import (
 )
 
 from .conftest import (
-    A,
-    ctx_for,
-    make_customer,
-    make_grant,
-    make_package,
-    make_redemption,
-    make_service,
-    make_tax,
+    HUB_DB, A, ctx_for, make_customer, make_grant, make_package, make_redemption, make_service, make_tax,
 )
 from live.context import system_context
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin", **ctx):
@@ -460,7 +453,7 @@ def test_the_hourly_task_marks_the_holds_past_their_deadline(cut, lucia):
         lapsed.hold_until,
     )
     assert alive.status == "held"
-    # hub#2681: one notice per session the task marks, saying which session of which voucher (WORKBOOK
+    # One notice per session the task marks, saying which session of which voucher (WORKBOOK
     # «Lo que avisa»), so whatever follows it knows what changed; a pass that marks nothing says nothing.
     assert events("service.session.expired") == [
         {"id": str(lapsed.id), "grant_id": str(grant.id)}

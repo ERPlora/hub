@@ -6,6 +6,12 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  expectAmountLeftWaitsForMoney,
+  expectSaveWaitsForMoney,
+  expectWindowSaysMoneyUnreadable,
+} from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -225,6 +231,19 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     expect(s.field('price').label).toBe('Price');
   });
 
+  // hub#945 (SERVICE-F01): a price typed with its currency's sign and left before the business answers is neither
+  // rewritten nor called «not an amount»; once it answers, it is read in its money.
+  it.each([
+    ['¥1600', JAPANESE, 1600],
+    ['12,50 zł', POLISH, 1250],
+  ] as const)('«%s» left before the business says its currency stays as typed and unmarked, then is read in it (hub#945)', async (typed, money, price) => {
+    const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
+    await expectAmountLeftWaitsForMoney({ amount: () => s.field('price'), settle }, typed, () => s.result('base.business.get', business(money)));
+    s.answer(200, CUT);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', price }]);
+  });
+
   it('the business answers with the form open: the untouched price is rewritten in its decimals and not sent', async () => {
     const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
     expect(s.field('price').value).toBe('15.00');
@@ -236,21 +255,31 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', name: 'Cut and wash' }]);
   });
 
-  it('what was typed before the business answered stays as typed and is read in its currency', async () => {
+  it('editing, a price typed before the business answers stays as typed when it does and is read in yen', async () => {
+    const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
+    await ionValue(s.field('price'), '1600', 'ionInput');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('price').value).toBe('1600');
+    s.answer(200, CUT);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', price: 1600 }]);
+  });
+
+  it('what was typed before the business answered is never read without it: «Create service» waits in grey, then «1500» is 1500 yen (hub#918)', async () => {
     const s = await setup(null, 'en', true, { business: null });
     await s.result('service.settings.get', SETTINGS);
     await ionValue(s.field('name'), 'Haircut', 'ionInput');
     await ionValue(s.field('price'), '1500', 'ionInput');
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.field('price').value).toBe('1500');
     s.answer(201, CUT);
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('price').value).toBe('1500');
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
   });
 });
 
 describe('ServiceFormModal: two rows opened one after the other', () => {
-  it('shows the second one, never what was left of the first (pm#459)', async () => {
+  it('shows the second one, never what was left of the first', async () => {
     const s = await setup(CUT);
     expect(s.field('name').value).toBe('Cut');
     await s.wrapper.setProps({ service: { ...CUT, id: 's2', name: 'Beard', price: 1200, duration_minutes: 15 } });
@@ -357,5 +386,65 @@ describe('ServiceFormModal: photo', () => {
     await settle();
     expect(s.inDoc('service-form-image-preview')?.querySelector('img')).toBeNull();
     expect(s.inDoc('service-form-image-preview')?.textContent?.trim()).toBe('BT');
+  });
+});
+
+// hub#938 (SERVICE-F01, F02): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('ServiceFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountService(ServiceFormModal, { props: { open: !late, service: CUT, canChange: true }, business: null });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'service-form-submit', m.sent, opens);
+  });
+});
+
+// hub#946 (SERVICE-F31, F32): «Professionals who do it» reads its own prices in the business's money too. If it cannot be
+// read, the window's notice says so and «Assign» waits in grey with the form's «Save» until the yen arrives.
+describe('ServiceFormModal: «Professionals who do it» while the money cannot be read (hub#946)', () => {
+  it.each([false, true])('«Assign» waits in grey under the notice; once the yen arrives it lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountService(ServiceFormModal, { props: { open: !late, service: CUT, canChange: true }, business: null });
+    await m.live();
+    /** «Assign» waits for someone picked too: Carla is, so only the money keeps it grey. */
+    const pick = async () => {
+      m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === 'service-professionals-member')!.vm.$emit('update:modelValue', { id: 'm9', label: 'Carla' });
+      await settle();
+    };
+    if (!late) await pick();
+    const opens = late
+      ? async () => {
+          await m.wrapper.setProps({ open: true });
+          await settle();
+          await pick();
+        }
+      : undefined;
+    const assigned = () => m.sent().filter((call) => call.path.startsWith('/api/service/assignments'));
+    await expectWindowSaysMoneyUnreadable(m, 'service-professionals-assign', assigned, opens);
+  });
+});
+
+describe('ServiceFormModal: fields refused with the same words (hub#888)', () => {
+  // Name, Pricing, Price, Duration, the Category and the Tax category (the pickers) each paint a refusal under their own key.
+  const FIELD_OF: Record<string, string> = { duration_minutes: 'duration', category_id: 'category', tax_category_key: 'tax' };
+  itTellsTheCorrectedFieldApart(['name', 'pricing_type', 'price', 'duration_minutes', 'category_id', 'tax_category_key'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await s.result('service.settings.get', SETTINGS);
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'price');
+});
+
+describe('ServiceFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    await s.result('service.settings.get', SETTINGS);
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({
+      overlay: () => s.inDoc('service-form'),
+      change: () => ionValue(s.field('name'), 'Haircut', 'ionInput'),
+      restore: () => ionValue(s.field('name'), '', 'ionInput'),
+    });
   });
 });

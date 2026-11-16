@@ -1,19 +1,18 @@
 """The WhatsApp inbox's events and its reactions to Customers (WHATSAPP_INBOX-F04, F11, F12).
 
 Each reaction is driven by the very event Customers records in its outbox when its own operation runs
-(create, update, merge, erase): the dependency is real, never a mock. The relay of phase 2 hands the
-delivered event to ``events.react``; here the test hands it over the same way, twice where the outbox
+(create, update, merge, erase): the dependency is real, never a mock. The worker's outbox relay hands
+the delivered event to ``events.react``; here the test hands it over the same way, twice where the outbox
 may deliver twice.
 """
 
-import pytest
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox import events
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import A, card, receive, run
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, A, card, receive, run, system
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def delivered(name: str):
@@ -32,6 +31,7 @@ def test_the_reactions_are_declared_by_name():
     assert events.REACTIONS == {
         "customer.customer.created": "whatsapp_inbox.conversation.claim_for_customer",
         "customer.customer.updated": "whatsapp_inbox.conversation.claim_for_customer",
+        "customer.customer.restored": "whatsapp_inbox.conversation.claim_for_customer",
         "customer.customer.merged": "whatsapp_inbox.conversation.move_customer",
         "customer.customer.deleted": "whatsapp_inbox.conversation.release_customer",
         "customer.customer.erased": "whatsapp_inbox.conversation.erase_for_customer",
@@ -129,6 +129,22 @@ def test_a_deleted_card_lets_her_conversation_go_and_another_card_of_the_number_
     assert delivered("customer.customer.created").count == 1
     assert conversation().customer_id == new.id
 
+
+def test_a_card_recovered_from_the_separate_copy_claims_her_conversation_again():
+    """hub#1324: Customers brings the deleted card back, the same one (CUSTOMER-F33, run as the system from the
+    separate copy); the conversation its deletion let go is hers again at once, not when she writes again."""
+    receive("wamid.1", "34600111222")
+    ana = card("Ana López", "600111222")
+    delivered("customer.customer.created")
+    run("customer.customer.delete", {"id": str(ana.id)})
+    delivered("customer.customer.deleted")
+    assert conversation().customer_id is None
+    system("customer.customer.restore", {"id": str(ana.id)})
+    claimed = delivered("customer.customer.restored")
+    assert conversation().customer_id == ana.id
+    assert claimed.count == 1
+    # Delivered again: nothing more to do.
+    assert delivered("customer.customer.restored").count == 0
 
 def test_a_card_deleted_while_nobody_reacted_counts_as_no_card_when_she_writes():
     receive("wamid.1", "34600111222")

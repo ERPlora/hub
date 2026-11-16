@@ -1,6 +1,6 @@
-// A status pill in a narrow table cell is never cut (FIX-UI-STATUSPILL-834): in Sales → Sales at 834×1112
-// the «Document pending» pill under a sale's status came out «● Document pend», clipped by its Status cell.
-// The pill (`@erplora/ui` StatusPill) is now never wider than its box, and its label wraps between words:
+// A status pill in a narrow table cell is never cut: in Sales → Sales at 834×1112 the «Document pending» pill
+// under a sale's status never reads «● Document pend», clipped by its Status cell.
+// The pill (`@erplora/ui` StatusPill) is never wider than its box, and its label wraps between words:
 // the whole text is on screen at 390×844 (cards), 834×1112 and 1440×900 (list), and it is the pill's
 // title. Setup as in sale-pending-document.spec.ts: no issuer while the run charges by card (its ticket
 // waits), put back after; what the run creates is deleted after it.

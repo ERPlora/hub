@@ -1,5 +1,5 @@
-// BASE-F05 · gh:hub#1906 — Android's Back button on the installed app (ported from the old hub's
-// `apps/web/src/router/back-closes-overlay.ts` and its test, origin/develop).
+// BASE-F05 — Android's Back button on the installed app (ported from the old hub's
+// `apps/web/src/router/back-closes-overlay.ts` and its test).
 //
 // On the installed app Tauri's Android activity turns the system Back into `webView.goBack()` — but ONLY while nobody
 // listens to its `back-button` event. Nobody in the Hub did: an app opened cold (a link, a reload) CLOSED the app on
@@ -8,16 +8,24 @@
 //
 // The contract pinned here:
 //   1. `closeTopmostLayer`: a presented Ionic overlay is dismissed (role `backdrop`, as Ionic's own hardware back); one
-//      that cannot be dismissed HOLDS the press; inline-hidden overlays and toasts do not count; then an open
+//      that cannot be dismissed HOLDS the press, and so does a window with unsaved changes, which asks first and
+//      closes only on «Discard changes» (hub#1015); inline-hidden overlays and toasts do not count; then an open
 //      `ion-menu`; then the mounted app, through the cancelable `erplora:back` (`preventDefault()` = "I closed one");
 //   2. `installSystemBackButton`, with nothing open: on a detail view the screen's own Back (the topbar's: history
 //      inside the app, else its `backHref`); on the root of an app, Home, with history behind or not (a screen of an
-//      app has no Back, PLAN-MIGRATIONS §16); on Home, out of the app (`leave_app`), as the system Back would;
+//      app has no Back); on Home, out of the app (`leave_app`), as the system Back would;
 //   3. it never cancels a navigation (rv-2042), and outside the installed app it registers nothing and never throws;
 //   4. the listener goes when the page goes (Tauri keeps listeners across page loads) or when the shell lets go.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type BackOutcome, closeTopmostLayer, installSystemBackButton, screenBack, SHELL_BACK_EVENT } from './system-back';
+import {
+  type BackOutcome,
+  closeTopmostLayer,
+  holdUnsavedChanges,
+  installSystemBackButton,
+  screenBack,
+  SHELL_BACK_EVENT,
+} from './system-back';
 
 type FakeOverlay = HTMLElement & { overlayIndex: number; backdropDismiss?: boolean; dismiss: ReturnType<typeof vi.fn> };
 
@@ -64,7 +72,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('gh:hub#1906 — closeTopmostLayer', () => {
+describe('closeTopmostLayer', () => {
   it('dismisses a presented Ionic modal', async () => {
     const modal = presentOverlay('ion-modal');
 
@@ -148,6 +156,118 @@ describe('gh:hub#1906 — closeTopmostLayer', () => {
   });
 });
 
+/** A window's fields inside `overlay`, signed up as holding what the person typed (dirty or not) until it lets go. */
+function unsavedWindow(overlay: HTMLElement, opts: { dirty?: boolean; answer?: boolean } = {}) {
+  const fields = overlay.appendChild(document.createElement('div'));
+  const state = { dirty: opts.dirty ?? true };
+  const confirmDiscard = vi.fn(async () => opts.answer ?? false);
+  const letGo = holdUnsavedChanges({ inside: () => (fields.isConnected ? fields : null), dirty: () => state.dirty, confirmDiscard });
+  return { fields, state, confirmDiscard, letGo };
+}
+
+describe('hub#1015 — a window with unsaved changes asks before Back throws them away', () => {
+  const windows: (() => void)[] = [];
+  const signUp = (...args: Parameters<typeof unsavedWindow>) => {
+    const w = unsavedWindow(...args);
+    windows.push(w.letGo);
+    return w;
+  };
+  afterEach(() => windows.splice(0).forEach((letGo) => letGo()));
+
+  it('holds the press and asks; «Keep editing» leaves the window open', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal, { answer: false });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    expect(form.confirmDiscard).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(form.confirmDiscard.mock.results[0]?.value).resolves.toBe(false));
+    expect(modal.dismiss).not.toHaveBeenCalled();
+  });
+
+  // hub#1023: the window's FormModal asks the same question as its `canDismiss` on any dismissal Ionic sees; the shell
+  // already asked, so it closes it as who asked (Ionic's role `handler`, which skips `canDismiss`) — never a second one.
+  it('«Discard changes» closes the window as who already asked (role `handler`): its own `canDismiss` is not asked again', async () => {
+    const modal = presentOverlay('ion-modal');
+    signUp(modal, { answer: true });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    await vi.waitFor(() => expect(modal.dismiss).toHaveBeenCalledWith(undefined, 'handler'));
+    expect(modal.dismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('with nothing typed it closes at once, without asking', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal, { dirty: false });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(modal.dismiss).toHaveBeenCalledWith(undefined, 'backdrop');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('what is typed is read on the press: put back as it was, Back closes without asking', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal);
+    form.state.dirty = false;
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('a list or a picker opened on top of the window closes first, without asking', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal);
+    const picker = presentOverlay('ion-popover');
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(picker.dismiss).toHaveBeenCalledTimes(1);
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+    expect(modal.dismiss).not.toHaveBeenCalled();
+  });
+
+  it('a window under another one does not take its Back: the one on top closes', async () => {
+    const below = presentOverlay('ion-modal');
+    const form = signUp(below);
+    const top = presentOverlay('ion-modal');
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(top.dismiss).toHaveBeenCalledWith(undefined, 'backdrop');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('a window that let go (closed, gone) asks nothing any more', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = unsavedWindow(modal);
+    form.letGo();
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('a window that cannot be closed (saving) holds the press without asking', async () => {
+    const modal = presentOverlay('ion-modal', { backdropDismiss: false });
+    const form = signUp(modal);
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+    expect(modal.dismiss).not.toHaveBeenCalled();
+  });
+
+  it('a question that could not be asked leaves the window open and says why in the console', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal);
+    const failure = new Error('no dialog');
+    form.confirmDiscard.mockRejectedValueOnce(failure);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+      await vi.waitFor(() => expect(logged).toHaveBeenCalledWith('base: could not ask whether to discard the changes', failure));
+      expect(modal.dismiss).not.toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
+    }
+  });
+});
+
 describe('screenBack — the Back of the screen on view', () => {
   it('is the topbar\'s Back of a detail view', () => {
     const back = screen({ back: true });
@@ -187,7 +307,7 @@ function fakeTauri(opts: { refuses?: boolean; leaveApp?: () => Promise<unknown> 
   return { win, state, addPluginListener, invoke };
 }
 
-describe('gh:hub#1906 — installSystemBackButton (the Android button)', () => {
+describe('installSystemBackButton (the Android button)', () => {
   function setup(opts: { outcome?: BackOutcome; back?: HTMLElement | null; home?: boolean; leaveApp?: () => Promise<unknown> } = {}) {
     const tauri = fakeTauri({ leaveApp: opts.leaveApp });
     const closeTop = vi.fn(async () => opts.outcome ?? 'none');
@@ -333,7 +453,7 @@ describe('gh:hub#1906 — installSystemBackButton (the Android button)', () => {
 // The layers end to end on the real document and window (`window.__TAURI__` as the installed app puts it), every
 // default in place: what is open is closed first, and only an empty screen moves. The shell's barrel registers Ionic's
 // elements, which park an inline overlay hidden once they upgrade: each screen is arranged right before the press.
-describe('gh:hub#1906 — a press on the real document, layer by layer', () => {
+describe('a press on the real document, layer by layer', () => {
   type TauriWindow = { __TAURI__?: unknown };
   let release: (() => void) | null = null;
 

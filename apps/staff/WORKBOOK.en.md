@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0e1c46bd1c2121821eaf9ea7b09b45145e28f41fdde3702662cb56fab64226f4 -->
+<!-- generated from WORKBOOK.md sha256:190cc6f01cc5281aa034580c3ff95bc2afaf7b30c62765cb56e0454466eaa7eb -->
 
 ## What it is for and who it is for
 
@@ -81,8 +81,8 @@ Active, Inactive, On leave), **Bookable**, **Buffer between appointments (min)**
 (%)**. Row actions for the owner and the administrator: **Deactivate** and **Terminate**, both with a
 confirmation. The rate (in the column, in the form and in "My record") is in the business's currency, its
 country's in Settings → Business (euros in Spain, złoty in Poland), with its decimals (the yen has none) and
-its symbol at the end of the field; while the business has not answered, a figure without a symbol, never
-euros.
+its symbol at the end of the field; while the business has not answered, an amount is "—", never euros or guessed
+decimals.
 
 ### Roles
 Table with the search "Search role…" and columns **Role, Description, Members** (how many **Active**
@@ -140,10 +140,16 @@ above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F2
 |---|---|
 | Loading | "Loading…" while the first result arrives; each figure shows "…". |
 | Empty | "No staff members.", "No roles defined.", "No time-off requests." or "This member has no schedules yet."; with a search or a filter, "No results". "Today’s time off" with nobody: "Nobody is away today."; on the **Home**, a panel with nothing to show says "No data". Commissions with nobody who can earn one: "No one on the team can earn a commission yet."; without Sales in the business, "Commissions come from the sales" and "Turn on Sales to see what each professional earned.", without a list. |
-| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed; that of a row action, above the table. |
+| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed, and each refused field says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888), the search pickers too (**Role**, **Hub user** and the **Member** of a time off), as soon as another one is chosen. The refusal of a row action shows above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
@@ -155,7 +161,7 @@ above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F2
 | STAFF-F04 | Create, edit and retire a role | done (server and screen) |
 | STAFF-F05 | Deactivate a professional | done (server and screen) |
 | STAFF-F06 | Terminate a professional | done (server and screen) |
-| STAFF-F07 | Add several professionals at once | done (assistant and API, like the current product) |
+| STAFF-F07 | Add several professionals at once | done (assistant and API) |
 | STAFF-F08 | See my own record and my time off | done (server and screen) |
 | STAFF-F09 | Give the team to other apps | done (the other apps read it) |
 | STAFF-F13 | Create a professional's weekly schedule | done (server and screen) |
@@ -171,8 +177,7 @@ above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F2
 | STAFF-F23 | See the figures of the staff and by role | done (server and screen) |
 | STAFF-F24 | Ask for my own time off | done (server and screen) |
 
-The services each professional performs (STAFF-F10, F11 and F12 of the current product) are in the
-Services app: see "Changes from the current product".
+The services each professional performs are in the Services app (SERVICE-F31, F32 and F33).
 
 ### STAFF-F01 Add a professional
 Status: done (server and screen)
@@ -196,7 +201,9 @@ access to this business." or the account already linked to another record (STAFF
 the pay cannot send it: "Permission “{permission}” is required.". Two records with the same name, email or
 employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
 is checked before the confirmation card: no card shows, the assistant says that role is not available and
-nothing is created.
+which ones there are, and nothing is created. Save (also when editing, STAFF-F02) is grey while the business has not yet said its
+currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up (hub#938).
 Involved: BASE-F97
 
 ### STAFF-F02 Edit a professional's record
@@ -204,14 +211,16 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Staff
 Steps:
-1. Tap the row: **Edit · {name}** opens (the assistant names it by its name).
-2. Change what is needed. **Status** offers Active, Inactive and On leave (the final termination is
-   STAFF-F06). "No role" removes the role, "No Hub access" unlinks the account, and the Hire date can be
-   **cleared**.
+1. Tap the row: **Edit · {name}** opens (the assistant names it by its name) with what the row already
+   says, and "Loading…" while the whole record arrives; Save waits in grey until then.
+2. Change what is needed, also before the record arrives: what was typed or chosen stays, and the record,
+   when it arrives, fills only what has not been touched (hub#1347). **Status** offers Active, Inactive and
+   On leave (the final termination is STAFF-F06). "No role" removes the role, "No Hub access" unlinks the
+   account, and the Hire date can be **cleared**.
 3. Save: only what was sent changes.
 In: the record (and, with the permission, its rate, commission and notes).
 Out: the changed record (`staff.member.updated`). Saving without changing anything does not announce.
-Setting Inactive here does not turn Bookable off, as today; going back to Active does not turn it on
+Setting Inactive here does not turn Bookable off; going back to Active does not turn it on
 either.
 If it fails: the same refusals as when adding; "That staff member does not exist in this business." if it
 is no longer there (also if it was terminated); setting **Inactive** with pending or approved time off not
@@ -238,7 +247,7 @@ Involved: ATTENDANCE-F01, TASK-F03
 
 ### STAFF-F04 Create, edit and retire a role
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Roles
 Steps:
 1. In **Roles**, tap **+**, write the Name (required, up to 100) and, if you want, Description and Color,
@@ -255,7 +264,7 @@ Involved: none
 
 ### STAFF-F05 Deactivate a professional
 Status: done (server and screen)
-Actor: owner, administrator
+Actor: owner, administrator, assistant
 Screen: Staff
 Steps:
 1. In the row, tap **Deactivate** and confirm "Take {name} off the floor? They stop being bookable;
@@ -289,7 +298,7 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
-Status: done (assistant and API, like the current product)
+Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
@@ -355,7 +364,10 @@ If it fails: under each field: "A schedule needs at least one working day with h
 must be before the end time.", "The break needs a start and an end, or neither.", "The break must fall
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
-accepted.
+accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
+as soon as any day changes (ticked, unticked, or an hour typed), without saving again (hub#1448). A day's
+reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
+typed), without saving again; the other days' reasons stay until those days change (hub#1460).
 Involved: none
 
 ### STAFF-F14 Edit a schedule
@@ -369,7 +381,8 @@ Steps:
 In: the schedule and its whole week.
 Out: the changed schedule (`staff.schedule.updated`), with the same "Default" rule and the same rule of
 which schedule rules as when creating it.
-If it fails: the same refusals as when creating, or "That schedule does not exist in this business.".
+If it fails: the same refusals as when creating, which go away the same way when what was refused
+changes, or "That schedule does not exist in this business.".
 Involved: none
 
 ### STAFF-F15 Activate, deactivate or delete a schedule
@@ -425,7 +438,7 @@ Involved: none
 
 ### STAFF-F18 Approve or reject time off
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Time Off
 Steps:
 1. Find the **Pending** time off (the Status filter helps).
@@ -512,6 +525,7 @@ Steps:
 2. Change the start and the end in HH:MM (the end, after the start: a schedule's day does not cross
    midnight) and the break, from 0 (no break) to 480 minutes and shorter than the working day.
 3. Tap **Save**.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: what was sent; the rest stays as it was.
 Out: the business's settings (`staff.settings.updated`), with the hours always in HH:MM. From that moment,
 a new schedule proposes that working day from Monday to Friday, with the break in the middle of the day
@@ -519,9 +533,11 @@ a new schedule proposes that working day from Monday to Friday, with the break i
 If it fails: a value outside its range shows under its field and nothing is saved. A working day that ends
 before it starts says "The start time must be before the end time." under "Working day ends (HH:MM)"
 (under "Working day starts (HH:MM)" if only the start was changed), and a break that does not fit in the
-working day, "The break must fall inside the working hours." under the break; nothing is saved. If the
-settings cannot be read, "The settings could not be loaded" with "Retry", without a form: values that are
-not the business's are never offered to be saved.
+working day, "The break must fall inside the working hours." under the break; nothing is saved. As in the form
+windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
+corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
+try (hub#854). If the settings cannot be read, "The settings could not be loaded" with "Retry", without a
+form: values that are not the business's are never offered to be saved.
 Involved: none
 
 ### STAFF-F23 See the figures of the staff and by role
@@ -666,6 +682,3 @@ the directory for "Who is serving this check" without needing Staff, and Automat
 | Register anyone's time off, approve, reject and cancel it | yes | yes | yes | no | `staff.manage_time_off` |
 | Roles, schedules and settings | yes | yes | yes | no | `staff.manage_settings` |
 | Ask for one's own time off and withdraw one's own pending requests | yes | yes | yes | yes | `staff.request_time_off` |
-
-The cashier of the current product no longer exists as a role: what they saw (the directory) the employee
-sees.

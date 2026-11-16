@@ -7,12 +7,13 @@ left over to the largest remainders, the sum exactly the amount.
 """
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.combo.queries import split_amount
 
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
@@ -21,6 +22,7 @@ from .conftest import (
     DRINK,
     FOOD,
     GENERIC,
+    HUB_DB,
     ctx_for,
     make_combo,
     make_group,
@@ -30,7 +32,7 @@ from .conftest import (
     tax_category,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def menu_of_the_day():
@@ -74,7 +76,7 @@ def pick(*options, quantity=1):
 @pytest.mark.parametrize(
     ("total", "weights", "shares"),
     [
-        # The old module's golden vector: 6,00 € over a 4,50 € sandwich and a 2,00 € beer.
+        # The reference case: 6,00 € over a 4,50 € sandwich and a 2,00 € beer.
         (600, [450, 200], [415, 185]),
         # Odoo's documented example: 120 over 100 and 50.
         (120, [100, 50], [80, 40]),
@@ -199,11 +201,11 @@ def test_a_menu_is_read_with_its_tree_in_as_many_queries_however_big(name):
             options = [make_option(course, make_product(f"Dish {c}.{n}")) for n in range(choices)]
             picks.append({"option_id": str(options[0].id)})
         data = {"id": str(combo.id)} | ({"choices": picks} if name == "combo.combo.resolve" else {})
-        with CaptureQueriesContext(connection) as read:
+        with CaptureQueriesContext(connections[current_alias()]) as read:
             run(name, data)
         return len(read)
 
-    queries(1, 1)  # the business's first read also fills what base keeps per business (its apps off, PLAN-HUB §9)
+    queries(1, 1)  # the business's first read also fills what base keeps per business (its apps off)
     assert queries(3, 3) == queries(1, 1)
 
 
@@ -601,7 +603,7 @@ def test_a_menu_eaten_in_with_a_deactivated_tax_category_is_refused():
     assert refusal(combo, pick(option)).code == "combo.tax_category_missing"
 
 
-# Eaten in or to take away: the menu's setting, unless Ventas says how this line is sold (review 1)
+# Eaten in or to take away: the menu's setting, unless Sales says how this line is sold
 
 
 def sandwich_and_beer(supply_kind="goods", **fields):
@@ -663,7 +665,7 @@ def test_the_takeaway_map_is_explicit():
     assert TAKEAWAY_CATEGORY == {"restaurant.alcohol": "retail.alcohol"}
 
 
-# An open check is charged at what was ordered, even if a dish ran out since (review 2)
+# An open check is charged at what was ordered, even if a dish ran out since
 
 
 def test_charging_an_open_check_does_not_ask_for_availability_again():
@@ -693,7 +695,7 @@ def test_charging_an_open_check_still_checks_the_courses_and_the_tax():
     )
 
 
-# What the till cannot charge is not offered (review 4, 9)
+# What the till cannot charge is not offered
 
 
 def statuses(combo) -> dict[str, str]:
@@ -743,8 +745,8 @@ def test_a_dish_now_sold_by_weight_is_not_offered_nor_charged():
 
 @pytest.mark.parametrize("column", ["price", "sort_order", "is_active", "supply_kind"])
 def test_ties_read_backwards_in_a_descending_list(column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
-    included, and its pages neither repeat nor lose rows."""
+    """hub#768, as in Customers: a descending list is the ascending one read backwards, ties included, and its pages
+    neither repeat nor lose rows."""
     menus = [make_combo("Menu A"), make_combo("Menu A"), make_combo("Menu B"), make_combo("Menu B")]
     expected = sorted(menus, key=lambda menu: (menu.name, menu.id))
     assert_reads_backwards(listed_with(run, "combo.combo.list", column, by_dir=True), [menu.id for menu in expected])

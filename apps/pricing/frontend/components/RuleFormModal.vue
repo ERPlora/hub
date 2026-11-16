@@ -6,21 +6,23 @@
 // Priority (100). A row's Edit opens «Editing rule — {name}» and «Save» sends only what changed: a new
 // type with its value, a new scope with its target (the server empties the old ones). Refusals stay in
 // the dialog, under their field. The amount, and the catalog prices beside the products and services, are in
-// the business's currency (its country's; a bare figure until it answers, and then an untouched amount takes its
-// decimals).
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+// the business's currency (its country's; a dash until it answers, and then an untouched amount takes its
+// decimals). «Create» and «Save» wait in grey until the business has answered its money (the amount is read in it;
+// hub#921); if that read fails, the dialog says so with «Retry» (hub#938).
+import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useGroupChange } from '../../../../base/frontend/lib/group-change';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { quantityFieldText, readDecimal } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
+import { type Money, quantityFieldText, readDecimal } from '../lib/format';
 import { searchCategories, searchGroups, searchProducts, searchServices } from '../lib/pickers';
 import { groupName } from '../lib/rules';
 import type { RuleIn, RuleOut, RuleScope, RuleType } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const TYPES: readonly RuleType[] = ['percent', 'fixed', 'buy_x_get_y', 'tiered'];
 const SCOPES: readonly RuleScope[] = ['all', 'products', 'services', 'category', 'product', 'service'];
@@ -156,27 +158,28 @@ const decimal = (value: string, places: number): string => readDecimal(value, pl
 /** A whole number as the server reads it; as typed when it is not one (the server says why). */
 const whole = (value: string): number => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : (value.trim() as unknown as number));
 const day = (value: string): string | null => value.trim() || null;
-const cents = (value: string): number | null => {
-  const read = parseMoney(value, money.value);
+/** Minor units of an amount in the business's `currency`; `null` when it is not one (the field says why). */
+const cents = (value: string, currency: Money): number | null => {
+  const read = parseMoney(value, { money: currency });
   return read.ok ? read.cents : null;
 };
 
-/** The value(s) of the form's type, as the server takes them. */
-function valueOf(f: Form): Partial<RuleIn> {
+/** The value(s) of the form's type, as the server takes them (an amount in the business's `currency`). */
+function valueOf(f: Form, currency: Money): Partial<RuleIn> {
   if (f.type === 'percent') return { percent: decimal(f.percent, 2) };
-  if (f.type === 'fixed') return { amount: cents(f.amount) ?? 0 };
+  if (f.type === 'fixed') return { amount: cents(f.amount, currency) ?? 0 };
   if (f.type === 'buy_x_get_y') return { buy_quantity: whole(f.buy), get_quantity: whole(f.get) };
   return { tiers: f.tiers.map((tier) => ({ min_quantity: decimal(tier.min, 3), percent: decimal(tier.percent, 2) })) };
 }
 
-/** The whole rule the form says, as the create takes it. */
-function body(f: Form): RuleIn {
+/** The whole rule the form says, as the create takes it (its amount in the business's `currency`). */
+function body(f: Form, currency: Money): RuleIn {
   const target = TARGETS[f.scope];
   return {
     code: f.code.trim(),
     name: f.name.trim(),
     rule_type: f.type,
-    ...valueOf(f),
+    ...valueOf(f, currency),
     applies_to: f.scope,
     ...(target ? { [target]: f.target?.id ?? null } : {}),
     customer_group_id: f.group?.id ?? null,
@@ -189,10 +192,14 @@ function body(f: Form): RuleIn {
 
 const filled = (value: string): boolean => value.trim() !== '';
 const ready = computed(() => {
+  // Nothing is ready before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const currency = money.value;
+  if (!currency) return false;
   const f = form.value;
   const valued = {
     percent: filled(f.percent),
-    fixed: (cents(f.amount) ?? 0) > 0,
+    fixed: (cents(f.amount, currency) ?? 0) > 0,
     buy_x_get_y: filled(f.buy) && filled(f.get),
     tiered: f.tiers.length > 0 && f.tiers.every((tier) => filled(tier.min) && filled(tier.percent)),
   }[f.type];
@@ -203,22 +210,29 @@ function setScope(scope: RuleScope): void {
   if (scope !== form.value.scope) form.value = { ...form.value, scope, target: null };
 }
 
+/** The server refuses the tiers as a whole too (they must rise), on a line under them: a change to them takes it away. */
+const tiersChanged = useGroupChange('tiersGroup');
+
 function setTier(index: number, change: Partial<TierForm>): void {
   form.value = { ...form.value, tiers: form.value.tiers.map((tier, i) => (i === index ? { ...tier, ...change } : tier)) };
+  tiersChanged();
 }
 
 function addTier(): void {
   form.value = { ...form.value, tiers: [...form.value.tiers, { min: '', percent: '' }] };
+  tiersChanged();
 }
 
 function removeTier(index: number): void {
   form.value = { ...form.value, tiers: form.value.tiers.filter((_, i) => i !== index) };
+  tiersChanged();
 }
 
-/** Only the keys whose value the form changed (a new type brings its value, a new scope its target). */
-function patch(rule: RuleOut): Record<string, unknown> {
-  const now = body(form.value) as unknown as Record<string, unknown>;
-  const before = body(fromRule(rule)) as unknown as Record<string, unknown>;
+/** Only the keys whose value the form changed (a new type brings its value, a new scope its target), its amounts in the
+ *  business's `currency`. */
+function patch(rule: RuleOut, currency: Money): Record<string, unknown> {
+  const now = body(form.value, currency) as unknown as Record<string, unknown>;
+  const before = body(fromRule(rule), currency) as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = { id: rule.id };
   for (const [key, value] of Object.entries(now)) {
     if (JSON.stringify(value) !== JSON.stringify(before[key])) out[key] = value;
@@ -227,21 +241,36 @@ function patch(rule: RuleOut): Record<string, unknown> {
 }
 
 async function save(): Promise<void> {
+  // The attempt counts only once the business has answered its money: before that the amount is neither read nor
+  // judged, or its field would call «¥1500» not an amount while the window waits (hub#921).
+  const currency = money.value;
+  if (!currency) return;
   tried.value = true;
   if (!ready.value) return;
   try {
-    if (props.rule) await update.run(patch(props.rule));
-    else await creation.run(body(form.value));
+    if (props.rule) await update.run(patch(props.rule, currency));
+    else await creation.run(body(form.value, currency));
   } catch {
     return; // The dialog paints the error; what was typed stays.
   }
   open.value = false;
 }
+
+// An untouched amount follows the business's money when it answers after the window opened: that is no change.
+const canDismiss = useUnsavedFormOnOpen(
+  'pricing-rule-form',
+  () => {
+    const stored = moneyFieldText(props.rule?.amount ?? null, locale.value, money.value);
+    return { ...form.value, amount: form.value.amount === stored ? null : form.value.amount };
+  },
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="pricing-rule-form"
     :title="title"
     :submit-label="rule ? $t('pricing.rules.form.save') : $t('pricing.rules.form.create')"
@@ -252,9 +281,11 @@ async function save(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="pricing-form">
+        <BusinessMoneyError />
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-code"
+            name="code"
             :value="form.code"
             :label="$t('pricing.rules.form.code')"
             label-placement="floating"
@@ -267,6 +298,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-name"
+            name="name"
             :value="form.name"
             :label="$t('pricing.rules.form.name')"
             label-placement="floating"
@@ -280,6 +312,7 @@ async function save(): Promise<void> {
         </div>
         <ion-select
           data-testid="pricing-rule-form-rule_type"
+          name="rule_type"
           :value="form.type"
           :label="$t('pricing.rules.form.type')"
           label-placement="floating"
@@ -300,6 +333,7 @@ async function save(): Promise<void> {
         <ion-input
           v-if="form.type === 'percent'"
           data-testid="pricing-rule-form-percent"
+          name="percent"
           inputmode="decimal"
           :value="form.percent"
           :label="$t('pricing.rules.form.percent')"
@@ -313,6 +347,7 @@ async function save(): Promise<void> {
         <MoneyInput
           v-else-if="form.type === 'fixed'"
           testid="pricing-rule-form-amount"
+          name="amount"
           :model-value="form.amount"
           :money="money"
           :label="t('pricing.rules.form.amount')"
@@ -326,6 +361,7 @@ async function save(): Promise<void> {
         >
           <ion-input
             data-testid="pricing-rule-form-buy_quantity"
+            name="buy_quantity"
             type="number"
             inputmode="numeric"
             min="1"
@@ -340,6 +376,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-get_quantity"
+            name="get_quantity"
             type="number"
             inputmode="numeric"
             min="1"
@@ -355,6 +392,8 @@ async function save(): Promise<void> {
         </div>
         <fieldset
           v-else
+          ref="tiersGroup"
+          name="tiers"
           class="pricing-form__tiers"
           data-testid="pricing-rule-form-tiers"
         >
@@ -366,6 +405,7 @@ async function save(): Promise<void> {
           >
             <ion-input
               :data-testid="`pricing-rule-form-tier-${index}-min_quantity`"
+              :name="`tiers.${index}.min_quantity`"
               inputmode="decimal"
               :value="tier.min"
               :label="$t('pricing.rules.form.tierFrom')"
@@ -378,6 +418,7 @@ async function save(): Promise<void> {
             />
             <ion-input
               :data-testid="`pricing-rule-form-tier-${index}-percent`"
+              :name="`tiers.${index}.percent`"
               inputmode="decimal"
               :value="tier.percent"
               :label="$t('pricing.rules.form.tierPercent')"
@@ -416,6 +457,7 @@ async function save(): Promise<void> {
         </fieldset>
         <ion-select
           data-testid="pricing-rule-form-applies_to"
+          name="applies_to"
           :value="form.scope"
           :label="$t('pricing.rules.form.appliesTo')"
           label-placement="floating"
@@ -437,6 +479,7 @@ async function save(): Promise<void> {
           v-if="TARGETS[form.scope]"
           :key="form.scope"
           testid="pricing-rule-form-target"
+          :name="TARGETS[form.scope]"
           :model-value="form.target"
           :search="searchTarget"
           :label="t(`pricing.rules.form.${form.scope}`)"
@@ -446,6 +489,7 @@ async function save(): Promise<void> {
         />
         <Combo
           testid="pricing-rule-form-group"
+          name="customer_group_id"
           :model-value="form.group"
           :search="searchGroup"
           :label="t('pricing.rules.form.group')"
@@ -457,6 +501,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-min_quantity"
+            name="min_quantity"
             inputmode="decimal"
             :value="form.minQuantity"
             :label="$t('pricing.rules.form.minQuantity')"
@@ -470,6 +515,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-priority"
+            name="priority"
             type="number"
             inputmode="numeric"
             min="0"
@@ -487,6 +533,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-valid_from"
+            name="valid_from"
             type="date"
             :value="form.validFrom"
             :label="$t('pricing.rules.form.validFrom')"
@@ -499,6 +546,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-valid_until"
+            name="valid_until"
             type="date"
             :value="form.validUntil"
             :label="$t('pricing.rules.form.validUntil')"

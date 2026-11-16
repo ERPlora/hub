@@ -5,31 +5,19 @@
 // (`workerAsks`), which wants to cancel it: nothing is cancelled until the owner says yes in «Waiting for your answer»,
 // whose card says which appointment it is, and then it is cancelled for real.
 // flow: FLOW-F28 FLOW-F12 FLOW-F37 FLOW-F38 APPOINTMENT-F06
-import { aMonday, salonCleanUp } from './appointment-helpers';
-import { execFile, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
-
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
-import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
+import { aMonday, salonCleanUp } from './appointment-helpers';
+import { emptyMonth } from './assistant-real';
+import { A, api, capture, psql, shown } from './helpers';
+import { approve, saveGrantAndSwitchOn, signedIn } from './flow-helpers';
+import { providerSpec, runAndAsk, runFinishes } from './provider-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { post } from './service-helpers';
-import { STACK } from './stack';
 import { pick } from './task-helpers';
 
 const KEY = 'FIX-HUB-FLOW-ASK-ME-FIRST-CANCEL-APPOINTMENT';
 const TAG = 'E2E FlowCancelAppt';
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
-
-let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
-}
-
 const DAY = aMonday();
 
 function cleanUp(): void {
@@ -46,29 +34,10 @@ function cleanUp(): void {
       `delete from customer_customer where name like '${TAG}%'`,
     ].join('; '),
   );
-  saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
+  emptyMonth();
 }
 
-test.beforeAll(async () => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-  cleanUp();
-});
-
-test.afterAll(async () => {
-  cleanUp();
-  await provider?.close();
-});
-
-/** The worker's part of the step (FLOW-F38), as in fix-flow-assistant-step.spec.ts: it never blocks this process,
- *  where the provider the SaaS asks lives. */
-async function workerAsks(flowId: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
-    cwd: HUB_DIR,
-    env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
-  });
-}
+providerSpec(cleanUp);
 
 /** A real appointment of a professional at 10:00 on `DAY`, through each app's own API: `DAY` open from 09:00 to 18:00. */
 async function booked(context: BrowserContext, stamp: string): Promise<{ id: string; customer: string }> {
@@ -127,25 +96,12 @@ for (const viewport of VIEWPORTS) {
       await expect(editor.locator('[data-testid=flow-assistant-askfirst-s1]')).toHaveText(
         'Only after a yes from someone who may do it themselves: «Cancel an appointment».',
       );
-      await editor.locator('[data-testid=flow-editor-save]').click();
-      await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+$/);
-      const flowId = idFromUrl(page);
-
-      // FLOW-F12: what it needs is granted, the cancellation included, only because its step asks first.
-      await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
-      await shown(page).locator('[data-testid=flow-perm-grantall]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: 'Permissions updated.' }).last()).toBeVisible();
-      await shown(page).locator('[data-testid=flow-editor-enabled]').click();
-      await shown(page).locator('[data-testid=flow-editor-save]').click();
-      await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+      // FLOW-F12: saved, what it needs is granted, the cancellation included, only because its step asks first.
+      const flowId = await saveGrantAndSwitchOn(page);
       expect(psql(`select grants::text from flow_flow where id = '${flowId}'`)).toBe('["appointment.appointment.cancel"]');
 
-      await shown(page).locator('[data-testid=flow-editor-run]').click();
-      await confirmDialog(page, 'Run it now?');
-      await expect(page.locator('ion-toast').filter({ hasText: 'the assistant is on it' }).last()).toBeVisible();
-      await workerAsks(flowId);
       // FLOW-F38: the assistant wants to cancel it; nothing is cancelled before a yes.
-      await expect.poll(() => psql(`select count(*) from flow_question where flow_id = '${flowId}' and status = 'pending'`)).toBe('1');
+      await runAndAsk(page, flowId);
       expect(await statusOf(context, appointment.id)).toBe(before);
 
       // FLOW-F29: the card says the action and which appointment, whose and at what time, never its id.
@@ -165,13 +121,10 @@ for (const viewport of VIEWPORTS) {
       if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
       // The owner says yes: the appointment of that professional is cancelled for real.
-      await card.locator('[data-testid^=flow-question-yes-]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
-      await expect(card).toHaveCount(0);
+      await approve(page, card);
       expect(await statusOf(context, appointment.id)).toBe('cancelled');
       // The step goes back to the assistant with what happened, and the run finishes.
-      await workerAsks(flowId);
-      await expect.poll(() => psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('succeeded');
+      await runFinishes(flowId);
     } finally {
       await context.close();
     }

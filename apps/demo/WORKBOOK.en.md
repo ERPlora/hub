@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:edd64b15355bb1bc8f51bdada980e951fa70defa18a8e8e67992b886edea663f -->
+<!-- generated from WORKBOOK.md sha256:4aca80dd64500058619799b3ce91d262130ccfad5ffbaa984afe8f7df9886687 -->
 
 ## What it is for and who it is for
 
@@ -34,11 +34,9 @@ Odoo's "record that no longer exists".
 - You need to sign in with an account that has a role in that business. Demo has no sign-in of its
   own: without a session, it takes you to the ERPlora sign-in, which comes back to the business with
   your role.
-- In phase 1 the business is the **first part of the address** (business `a` and business `b`). In
-  phase 2 each business will have its own data.
-- ⚠️ In phase 1 both businesses **share the items**. What is already kept apart is the **live
-  notice**: saving in `a` only refreshes the screens open in `a`. Those in `b` see the change when they
-  reload or with the next notice of `b`.
+- The business is the **first part of the address** (business `a` and business `b`), and each business
+  has its own data: the items of `a` do not show in `b`, and saving in `a` only refreshes the screens
+  open in `a`.
 
 ## Screens
 
@@ -194,8 +192,21 @@ Involved: none
 
 ## Services: what goes in and what comes out
 
-Everything can be requested through the screens, the assistant (phase 2) and the API, with the same
-rules and the same permissions.
+Everything can be requested through the screens, the assistant and the API, with the same
+rules and the same permissions. Before changing or deleting an item or adding a line to it, the assistant asks for
+confirmation with its card (BASE-F97), which names the item as the screens name it, never by its id: by its name
+("Item: Mesa 4"), and the status by its word ("Open", "Done"). What the person asking cannot see is left out.
+The assistant reaches each of them by what the person says ("¿cuántos elementos abiertos hay en Demo?", "borra Ensayo
+2") and, when they name an item as "the item …", it also offers the list it finds it by its name with.
+The detail and the actions on an item (changing it, deleting it, adding a line to it) take it by its id or by its
+name, as the person says it: the same name, ignoring case, before one that contains it ("borra otoño" finds "Ensayo de
+otoño" when it is the only one that has it), and the card shows the item that will be touched, by its whole name. When
+what was said fits several items, no card comes up: the assistant hears "There are several items called "Ensayo":
+Ensayo 1, Ensayo 2. Say which one." and asks which; when it fits none, "No item is called "Ensayo"". The yes holds only
+for the item the card showed (BASE-F97): if before confirming someone creates one that fits what was said better
+("Mesa" when the card said "Mesa 4") or the item is renamed, nothing is touched and the new card shows; if it was
+deleted, the assistant says so. If the item comes by its id beside another one's name, the card neither reads nor
+shows that name, which the action does not use: it says only the item of the id (hub#1272).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 
@@ -204,6 +215,7 @@ rules and the same permissions.
 | The items, with search by name, a status filter and pages (up to 100 per page) | view | F01–F05 | `demo.item.list` |
 | An item's page with its lines | view | F02–F05 | `demo.item.detail` |
 | The figures: total, open, done and lines | manage | F05 | `demo.item.stats` |
+| How many items are still open (the bell's counter) | view | F05 | `demo.item.open_count` |
 
 ### What it offers: actions (they change data)
 

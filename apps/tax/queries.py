@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
+from babel.numbers import format_percent
 from django.conf import settings
 from django.db.models import Case, CharField, F, Q, QuerySet, Value, When
 from django.db.models.functions import Coalesce
@@ -25,11 +26,11 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
-    DEFAULT_COUNTRY,
+    FACTORY_COUNTRIES,
     REGION_OF_ANOTHER_COUNTRY,
     REGION_TAX_KINDS,
     TAX_REGIONS,
@@ -45,7 +46,9 @@ from apps.tax.schemas import (
     CategoryPage,
     RuleCountriesIn,
     RuleCountriesOut,
+    RuleGetIn,
     RuleListIn,
+    RuleNamedOut,
     RulePage,
     RuleParentIn,
     RuleStatusIn,
@@ -54,6 +57,8 @@ from apps.tax.schemas import (
     TaxSettingsOut,
     normalize_text,
 )
+from base import operations as platform
+from base.business import babel_locale, country_name, country_or_market
 from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
@@ -188,10 +193,14 @@ def _components(root: TaxRule, on: dt.date) -> list[TaxRule]:
 
 def business_jurisdiction() -> tuple[str, str | None]:
     """The business's ``(COUNTRY, REGION or None)``: the one source every calculation that names no country
-    reads (sales, invoice, the API; TAX-F11). The country is Spain until the Hub receives the business's
-    from its ERPlora account; the region is the one it keeps in Taxes' settings."""
+    reads (sales, invoice, the API; TAX-F11). The country is the one erplora.com registered for the business at
+    work, Spain without one (a demo, ERPlora's own hub), read as Customers and VeriFactu read it (hub#996): a
+    country without rules of its own is refused, never charged Spain's. The region is the one it keeps in Taxes'
+    settings, and only while it is one of that country's tax territories."""
+    country = platform.current_business_country()
     settings = TaxSettings.objects.first()
-    return DEFAULT_COUNTRY, (settings.region_code or None) if settings else None
+    region = (settings.region_code or None) if settings else None
+    return country, region if region in TAX_REGIONS.get(country, ()) else None
 
 
 def _jurisdiction(country_code: str | None, region_code: str | None) -> tuple[str, str | None]:
@@ -217,7 +226,7 @@ def own_tax_kind(country_code: str, region_code: str | None) -> str | None:
 def tax_kind_of(country_code: str | None, region_code: str | None) -> str:
     """The tax family of a territory (TAX-F11): IGIC in the Canary Islands, IPSI in Ceuta and Melilla, VAT
     anywhere else. What a line with no category or rule is declared with (``Impuesto`` 03, 02 or 01)."""
-    country, region = _jurisdiction(country_code or DEFAULT_COUNTRY, region_code)
+    country, region = _jurisdiction(country_or_market(country_code or ""), region_code)
     return own_tax_kind(country, region) or DEFAULT_TAX_KIND
 
 
@@ -259,7 +268,7 @@ def resolve_tax(
     return Resolution(root=root, components=_components(root, on))
 
 
-def calculate_tax(
+def calculate_tax(  # noqa: PLR0913
     *,
     amount: int,
     category_key: str,
@@ -324,6 +333,18 @@ def calculate_tax(
     input=CalculateIn,
     output=CalculationOut,
     ai={
+        "asks": {
+            "en": (
+                "how much VAT does a 12 euro meal carry?",
+                "work out the tax of 50 euros at the reduced rate",
+                "calculate base, tax and total for a 30 € book",
+            ),
+            "es": (
+                "¿cuánto IVA lleva un menú de 15 euros?",
+                "calcula el impuesto de 40 € de cerveza con el IVA incluido",
+                "¿qué base y qué total salen de 100 € en la categoría de libros?",
+            ),
+        },
         "description": "Resolve and calculate the tax of an amount in cents for a tax category (its key, name or "
         "alias), in the business's country and region unless a country is named: base, tax, total, the rate and "
         "the fiscal qualification of the operation. Without an applicable rule it fails instead of guessing a rate."
@@ -397,6 +418,18 @@ def current_rates(categories: list[TaxCategory], country_code: str, region_code:
     output=CategoryPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "list the tax categories",
+                "which VAT categories can a product have?",
+                "show me the tax categories with their rate today",
+            ),
+            "es": (
+                "lista las categorías de impuestos",
+                "¿qué categorías fiscales hay y qué tipo tiene cada una?",
+                "muéstrame las categorías de IVA con su porcentaje",
+            ),
+        },
         "description": "List the active tax categories (the key products and services link to), with the "
         "rate each one has today in a country and region (the business's unless a country is named); search by "
         "key, name or description."
@@ -459,6 +492,18 @@ def category_by_reference(text: str) -> TaxCategory | None:
     output=CategoryOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "does the tax category for books exist?",
+                "check that the tax category product.books exists",
+                "what is the Spanish name of the VAT category for food?",
+            ),
+            "es": (
+                "¿existe la categoría fiscal de libros?",
+                "¿cómo se llama en español la categoría de impuestos product.books?",
+                "dame la categoría fiscal de los medicamentos",
+            ),
+        },
         "description": "Get one tax category by its key, its name or an alias, with its name in the reader's "
         "language (to check that a category exists before linking a product or a service to it)."
     },
@@ -501,6 +546,35 @@ def load_rule(rule_id: UUID) -> TaxRule | None:
     return TaxRule.objects.select_related("category").filter(pk=rule_id).first()
 
 
+def rule_label(rule: TaxRule) -> str:
+    """How a person names ``rule``, in the active language: its category, a component's label, its country (and its
+    region) and its rate, as the Rules screen tells one from another («Cervezas · España (ES-CN) · 7 %»)."""
+    language = translation.get_language()
+    place = country_name(rule.country_code, language)
+    if rule.region_code:
+        place = f"{place} ({rule.region_code})"
+    rate = format_percent(rule.rate_pct.normalize() / _HUNDRED, locale=babel_locale(language), decimal_quantization=False)
+    return " · ".join(part for part in (rule.category.display_name, rule.component_label, place, rate) if part)
+
+
+@operation(
+    "tax.rule.get",
+    kind="query",
+    permission="tax.view",
+    input=RuleGetIn,
+    output=RuleNamedOut,
+    ai=INTERNAL,
+)
+def get_rule(ctx: OperationContext, params: RuleGetIn) -> dict:
+    """One rule, active or deactivated, with its name: what names a rule on the assistant's card (``schemas.A_RULE``);
+    the model and the screens read the rules by their list."""
+    rule = load_rule(params.id)
+    if rule is None:
+        raise NotFound(RULE_NOT_FOUND)
+    with translation.override(ctx.language):
+        return {**rule_row(rule), "label": rule_label(rule)}
+
+
 #: By category, country and region; a component right after its root (the screen's default).
 _GROUPED = (
     "category__key",
@@ -519,6 +593,18 @@ _RULE_COLUMNS = {"tax_category_key": "category__key"}
     output=RulePage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "show me the tax rules",
+                "which VAT rates apply in Spain?",
+                "list the deactivated tax rules of Portugal",
+            ),
+            "es": (
+                "muéstrame las reglas de impuestos",
+                "¿a qué tipo está hoy el IVA de los libros en España?",
+                "¿qué porcentaje tiene cada regla de IVA de Portugal y desde cuándo?",
+            ),
+        },
         "description": "List the tax rules (the rate of a category in a country or region between two dates, "
         "with its fiscal qualification: subject, exempt, not subject or reverse charge, and its components such "
         "as the equivalence surcharge). Active ones by default; filter by country, region, category, tax type, "
@@ -583,21 +669,39 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     input=RuleStatusIn,
     output=RuleStatusOut,
     ai={
-        "description": "Whether the business's taxes are configured: how many active root tax rules in force "
-        "today match its country. Zero means the till cannot price what the business sells."
+        "asks": {
+            "en": (
+                "do I have the tax rules the till needs to start selling?",
+                "does the till have the tax rules it needs to sell?",
+                "how many tax rules are in force in Spain today?",
+            ),
+            "es": (
+                "¿le falta alguna regla de impuestos al negocio para poder vender?",
+                "¿hay alguna regla de IVA en vigor para poder cobrar?",
+                "¿cuántas reglas fiscales están en vigor hoy en España?",
+            ),
+        },
+        "description": "Whether the business's taxes are configured: how many active root tax rules of its country "
+        "(or of the one named) are in force today, and whether Taxes brings that country's rules ready (only "
+        "Spain's). Zero means the till cannot price what the business sells until it creates them in Rules."
     },
 )
 def rule_status(ctx: OperationContext, params: RuleStatusIn) -> dict:
-    """Whether the business can price a sale today: an active root rule in force in its country.
+    """Whether the business can price a sale today: an active root rule in force in its country (TAX-F17).
 
-    Any qualification and any tax family count (an exempt physiotherapist, a Canary business). Without
-    a country, every active root rule counts: no false «you are missing your taxes».
+    Any qualification and any tax family count (an exempt physiotherapist, a Canary business). Only that
+    country's: a business of another country also keeps Spain's factory rules, which never price its sales
+    (hub#996), so they never tell it its taxes are set up.
     """
+    country = params.country_code or business_jurisdiction()[0]
     rules = _in_force(TaxRule.objects.filter(parent__isnull=True, is_active=True), business_today())
-    if params.country_code:
-        rules = rules.filter(country_code=params.country_code)
-    matching = rules.count()
-    return {"country_code": params.country_code, "matching_rules": matching, "configured": matching > 0}
+    matching = rules.filter(country_code=country).count()
+    return {
+        "country_code": country,
+        "matching_rules": matching,
+        "configured": matching > 0,
+        "factory_rules": country in FACTORY_COUNTRIES,
+    }
 
 
 def parent_candidates(
@@ -627,6 +731,18 @@ def parent_candidates(
     input=RuleParentIn,
     output=RulePage,
     ai={
+        "asks": {
+            "en": (
+                "which rule can the equivalence surcharge hang from?",
+                "list the main VAT rules a surcharge can go under in Spain",
+                "what parent rules are there for a component of the books category?",
+            ),
+            "es": (
+                "¿bajo qué regla raíz puedo poner el recargo de equivalencia de la cerveza?",
+                "lista las reglas principales que admiten un recargo en España",
+                "¿qué reglas pueden ser padre de un componente de la categoría de libros?",
+            ),
+        },
         "description": "List the root tax rules a component (such as the equivalence surcharge) may hang from "
         "in a country, region and category: the ones tax.rule.create accepts as its parent_id."
     },
@@ -656,7 +772,22 @@ def list_parent_candidates(ctx: OperationContext, params: RuleParentIn) -> dict:
     permission="tax.view",
     input=RuleCountriesIn,
     output=RuleCountriesOut,
-    ai={"description": "List the countries the business has tax rules for (all of them, or only active or deactivated)."},
+    ai={
+        "asks": {
+            "en": (
+                "which countries do I have tax rules for?",
+                "in which countries are my VAT rules deactivated?",
+                "show the countries of my VAT rules",
+            ),
+            "es": (
+                "¿de qué países hay reglas fiscales en el negocio?",
+                "¿qué países tienen alguna regla de IVA desactivada?",
+                "lista los países con impuestos configurados",
+            ),
+        },
+        "description": "List the countries the business has tax rules for (all of them, or only active or "
+        "deactivated).",
+    },
 )
 def rule_countries(ctx: OperationContext, params: RuleCountriesIn) -> dict:
     rules = TaxRule.objects.all()
@@ -690,6 +821,18 @@ _ALIAS_COLUMNS = {"tax_category_key": "category__key"}
     output=AliasPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "list the tax aliases",
+                "which aliases of tax categories does the importer know?",
+                "what words of a spreadsheet does the importer read as a VAT category?",
+            ),
+            "es": (
+                "lista los alias de las categorías fiscales",
+                "¿qué alias de impuestos reconoce el importador de inventario?",
+                "enséñame los alias que el importador traduce a una categoría de IVA",
+            ),
+        },
         "description": "List the active category aliases (an outside text such as «beer» or «IVA 10» → the key "
         "of a tax category) that the CSV importer of inventory recognises."
     },
@@ -752,6 +895,18 @@ def resolve_category_text(text: str) -> tuple[str | None, str | None]:
     output=AliasResolveOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which tax category does the text «IVA 10» mean?",
+                "read «beer» as a tax category",
+                "what VAT category would the importer give to «menú del día»?",
+            ),
+            "es": (
+                "¿qué categoría de impuestos significa el texto «cerveza»?",
+                "el importador ha leído «IVA 10»: ¿qué categoría fiscal es?",
+                "traduce «licor» a una categoría de IVA",
+            ),
+        },
         "description": "Read an outside text (a CSV cell such as «IVA 10», «beer» or «comida») as a tax "
         "category: by its key, its name in any language, or a learned alias. Nothing when nothing matches."
     },
@@ -765,8 +920,8 @@ def resolve_alias(ctx: OperationContext, params: AliasResolveIn) -> dict:
 
 
 def settings_row(settings: TaxSettings | None) -> dict:
-    country, _region = business_jurisdiction()
-    region = (settings.region_code or None) if settings else None
+    """What applies: a region kept that is not one of the business's country's counts as none (TAX-F11)."""
+    country, region = business_jurisdiction()
     return {
         "country_code": country,
         "region_code": region,
@@ -783,6 +938,18 @@ def settings_row(settings: TaxSettings | None) -> dict:
     input=SettingsGetIn,
     output=TaxSettingsOut,
     ai={
+        "asks": {
+            "en": (
+                "which tax region is the business in?",
+                "is the business under VAT, IGIC or IPSI?",
+                "what tax territory does the business operate in?",
+            ),
+            "es": (
+                "¿qué fiscalidad tiene el negocio: península, Canarias, Ceuta o Melilla?",
+                "¿cobro IVA o IGIC?",
+                "dime la región de impuestos del negocio",
+            ),
+        },
         "description": "Read the business's tax region and country: the jurisdiction every sale and invoice is "
         "charged in. ES-CN is the Canary Islands (IGIC), ES-CE Ceuta and ES-ML Melilla (IPSI); empty is the "
         "whole country (VAT). Also the regions it may keep."

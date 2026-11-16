@@ -1,5 +1,5 @@
-// PoC §8.7, second pass: the shell's CSP (nonce + strict-dynamic, Trusted Types, `connect-src` with
-// `ipc:` and `http://ipc.localhost` for Tauri — CLAUDE.md) and ZERO violations while a person goes
+// The shell's CSP (nonce + strict-dynamic, Trusted Types, `connect-src` with
+// `ipc:` and `http://ipc.localhost` for Tauri) and ZERO violations while a person goes
 // through every demo screen in one document: list (search, empty, cards, page-size popover), detail,
 // edit with a 422, the delete alert, «New item» and back. Violations are caught three ways: the
 // `securitypolicyviolation` event, the console («Content Security Policy», «Trusted Type») and the

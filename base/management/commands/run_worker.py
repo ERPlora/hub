@@ -1,4 +1,4 @@
-"""``manage.py run_worker``: the ``worker`` task, long-running (aws-next README, «Contrato app ↔ infra»).
+"""``manage.py run_worker``: the long-running ``worker`` task.
 
 Runs ``base.worker.run`` until SIGTERM (ECS stopping the task; its ``stopTimeout`` is 30 s) or SIGINT
 (Ctrl-C). The handlers only ask the loop to stop, so the current step ends cleanly and the process
@@ -18,7 +18,10 @@ STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 
 
 class Command(BaseCommand):
-    help = "Run the Hub's worker until SIGTERM or SIGINT (phase 1: register the apps, then wait)."
+    help = (
+        "Run the Hub's worker until SIGTERM or SIGINT: register the apps in the SaaS, then, every few seconds, relay "
+        "each hub's outbox and run its due tasks."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(

@@ -8,6 +8,8 @@ import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import type { BookingRow } from '../operations';
 
@@ -18,6 +20,7 @@ const t = useT();
 const locale = useLocale();
 const cancel = useCommand('online_booking.booking.cancel');
 const reason = ref('');
+const canDismiss = useUnsavedFormOnOpen('ob-cancel', reason, open);
 
 watch(open, (isOpen) => {
   if (!isOpen) return;
@@ -47,6 +50,7 @@ async function confirm(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="ob-cancel"
     size="sm"
     role="alertdialog"

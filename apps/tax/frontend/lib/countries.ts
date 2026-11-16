@@ -1,4 +1,4 @@
-// The countries a tax rule may be set for (TAX-F04, taxes#41): a country is CHOSEN, never typed, so
+// The countries a tax rule may be set for (TAX-F04): a country is CHOSEN, never typed, so
 // a code no business can hold («ZZ») never becomes a rule that matches nothing.
 //
 // The codes are the server's: `apps/tax/schemas.py` accepts the 249 officially assigned ISO 3166-1
@@ -75,6 +75,11 @@ export function countryOptions(locale: string): readonly CountryOption[] {
 /** One code as the reader reads it («Portugal (PT)»); a code outside the list stays as it came. */
 export function countryLabel(code: string, locale: string): string {
   return labelOf(code, regionNames(locale));
+}
+
+/** One code as a sentence names it («Portugal»), without its code; a code outside the list stays as it came. */
+export function countryName(code: string, locale: string): string {
+  return (KNOWN.has(code) ? regionNames(locale)?.of(code) : undefined) ?? code;
 }
 
 /** Some codes (those a business has rules for) as a filter offers them: named, sorted by name, once. */

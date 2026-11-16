@@ -1,5 +1,4 @@
-"""Turning on, off, restoring and repairing the factory recipes the apps bring (WORKBOOK FLOW-F33 to F36;
-the old Hub's HUB-F105 to F107 and its ``flow_template_activation_route.rs`` tests).
+"""Turning on, off, restoring and repairing the factory recipes the apps bring (WORKBOOK FLOW-F33 to F36).
 
 - **On** (``flow.recipe.enable``): the first time it builds the automation in the language of whoever turns
   it on, with **exactly** the permissions the recipe asks for — never more, whatever that person may do —
@@ -19,9 +18,9 @@ from live.models import OutboxEvent
 from apps.flow import recipes
 from apps.flow.models import Flow, FlowRun
 
-from .conftest import ctx_for, make_run, run
+from .conftest import A, HUB_DB, ctx_for, make_run, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 REF = "appointment/customer_cancelled"
 TASK = "task.task.create"
@@ -57,7 +56,7 @@ def test_turning_a_recipe_on_builds_it_on_with_exactly_its_permissions():
             "params": {"title": "Fill the gap of appointment {{input.number}}", "priority": "high"},
         }
     ]
-    assert (flow.recipe, flow.recipe_digest) == (REF, recipes.digest(recipes.find(REF)))
+    assert (flow.recipe, flow.recipe_digest) == (REF, recipes.digest(recipes.find(A, REF)))
     assert done.flow.id == flow.id and done.flow.missing_grants == []
     assert [events(name) for name in ("flow.flow.created", "flow.flow.granted", "flow.flow.enabled")] == [1, 1, 1]
 
@@ -131,8 +130,8 @@ def test_a_recipe_set_aside_is_refused_with_its_reason_and_one_no_app_brings_is_
     assert missing.value.code == "flow.recipe_not_found"
     from apps.flow import queries
 
-    active = {label: config for label, config in queries.active_apps().items() if label != "task"}
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    active = {label: config for label, config in queries.active_apps(A).items() if label != "task"}
+    monkeypatch.setattr(queries, "active_apps", lambda _scope: active)
     with pytest.raises(Conflict) as aside:
         run("flow.recipe.enable", {"recipe": REF})
     assert (aside.value.code, aside.value.message) == (
@@ -226,7 +225,7 @@ def test_restoring_brings_todays_recipe_and_exactly_its_permissions_to_the_same_
         True,
     )
     assert flow.steps[0]["operation"] == TASK
-    assert flow.recipe_digest == recipes.digest(recipes.find(REF))
+    assert flow.recipe_digest == recipes.digest(recipes.find(A, REF))
     assert flow.version == version + 1
     assert FlowRun.objects.filter(flow=flow).count() == 1  # its history stays
 

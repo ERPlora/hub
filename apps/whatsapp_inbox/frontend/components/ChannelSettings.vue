@@ -3,7 +3,7 @@
 // configures. The number lives in erplora.com (the WhatsApp Business account and Meta's permission): «Your
 // number» shows what it reports — connected with the number and the name, not connected or to reconnect — and
 // connects, reconnects or disconnects it through erplora.com (NumberConnection); «This month» — messages sent against the plan's,
-// the cap when reached, that the plan includes none (0, ADR-0474), or that erplora.com has not said it yet, and
+// the cap when reached, that the plan includes none (0), or that erplora.com has not said it yet, and
 // «Upgrade plan» (erplora.com's plans) at the cap —; «Meta templates» — the live `whatsapp_inbox.template.list` with
 // Name, Language, Category, Status in Meta (Meta's reason, where it is on its way to Meta, and that one made in
 // WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
@@ -24,9 +24,9 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
 import AutoReplyCards from './AutoReplyCards.vue';
 import NumberConnection from './NumberConnection.vue';
-import PlanUpgradeLink from './PlanUpgradeLink.vue';
 import TemplateFormModal from './TemplateFormModal.vue';
 
 import { useLiveList } from '../composables/useLiveList';
@@ -197,7 +197,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
           class="wa-settings__warning"
           data-testid="whatsapp-inbox-settings-near-cap"
         >
-          {{ $t('whatsapp_inbox.settings.nearCap', { left: left.left, limit: left.limit }) }}
+          {{ $t('whatsapp_inbox.settings.nearCap', { left: left.left, limit: left.limit }, left.left) }}
         </p>
       </template>
       <PlanUpgradeLink
@@ -205,7 +205,9 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
         class="wa-settings__upgrade"
         data-testid="whatsapp-inbox-settings-upgrade"
         :url="channel.plans_url"
-      />
+      >
+        {{ $t('whatsapp_inbox.upgradePlan') }}
+      </PlanUpgradeLink>
     </section>
 
     <!-- «What do you use it for?» (F14–F18): only where an answer can book, so nobody else asks Automatizaciones. -->

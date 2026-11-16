@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The send bar of «Current order» (SALE-F20; Kitchen's KITCHEN-F18): «Send order (N)» and, beside it, the rush
+// The send bar of the check, on «Check» and «Current order» while something waits (SALE-F20, hub#1017; Kitchen's
+// KITCHEN-F18): «Send order (N)» and, beside it, the rush
 // flame. Armed, the button says «Send RUSH (N)» and the round goes urgent; a send disarms it. The page sends
 // (`send`, with whether it is a rush) through Kitchen. It stays pinned at the bottom of what scrolls in the check
 // (PosCart's `pos-cart-middle`) while that leaves room for the tabs and a line; lower, it scrolls with them (hub#787).
@@ -61,8 +62,8 @@ function send(): void {
   background: var(--ion-background-color, #fff);
   border-top: 1px solid var(--ion-border-color, #e6e3db);
 }
-/* Measured: pinned, the bar (67 px) leaves 141 px at this height, the tabs (64 px with their label in two lines) and most
-   of a line (115 px); in less it would sit on what the waiter came to read (hub#787). */
+/* Measured: pinned, the bar (67 px) leaves 141 px at this height, a whole line (139 px); in less it would sit on what the
+   waiter came to read (hub#787). */
 @container pos-cart-middle (max-height: 13rem) {
   .pos-kitchen-bar {
     position: static;

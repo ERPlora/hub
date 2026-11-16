@@ -3,24 +3,24 @@
 // (PLN)» (in the business's currency, its country's, with its decimals; just «Closed price» until the business
 // answers), «How is it sold?» (both consequences always shown, the chosen one stressed: the merchant must not
 // discover it on an invoice), the VAT category (only eaten in; searched in Taxes), the order on the list
-// and «On sale». A menu eaten in without a VAT category, or an amount that is not one, is refused
-// before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
+// and «On sale». «Save» waits in grey until the business has answered its money (the price is read in it;
+// hub#918), and says so with «Retry» if that read fails (hub#938). A menu eaten in without a VAT category, or an amount that is not one, is refused before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
 // like an item's): a library image or a photo of its own, sent once the menu is saved (`set_image`, `upload_image`,
 // «Uploading photo…»); if the menu saved and the photo did not, the dialog says so with «Retry» (only the photo goes
 // again) and the menu keeps the photo it had.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchTaxCategories } from '../lib/pickers';
 import type { ComboIn, ComboOut, ComboPatchIn, SupplyKind } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   /** The menu being edited; `null` = «New menu». */
@@ -135,7 +135,11 @@ function patch(current: ComboOut, full: ComboIn): ComboPatchIn {
 
 async function save(): Promise<void> {
   tried.value = true;
-  const price = parseMoney(form.value.price, { money: money.value });
+  // No price is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#918).
+  const business = money.value;
+  if (!business) return;
+  const price = parseMoney(form.value.price, { money: business });
   if (!price.ok || taxMissing.value) return;
   const full = body(price.cents ?? 0);
   let saved: { id: string };
@@ -157,21 +161,33 @@ function retryPhoto(): void {
   const failed = photo.failure.value;
   if (failed) void savePhoto(failed.id);
 }
+
+// An untouched price follows the business's money when it answers after the window opened: that is no change.
+const canDismiss = useUnsavedFormOnOpen(
+  'combo-menu-form',
+  () => {
+    const stored = props.combo ? moneyFieldText(props.combo.price, locale.value, money.value) : '';
+    return { ...form.value, price: form.value.price === stored ? null : form.value.price, image: image.value };
+  },
+  open,
+);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="combo-menu-form"
     :title="title"
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : $t('combo.save')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim() || !!photo.failure.value"
+    :submit-disabled="!money || !form.name.trim() || !!photo.failure.value"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
       <div class="combo-menu-form">
+        <BusinessMoneyError />
         <InlineFeedback
           v-if="photo.failure.value"
           tone="warning"
@@ -192,6 +208,7 @@ function retryPhoto(): void {
         </InlineFeedback>
         <ion-input
           data-testid="combo-menu-form-name"
+          name="name"
           :value="form.name"
           :label="$t('combo.form.name')"
           label-placement="floating"
@@ -204,6 +221,7 @@ function retryPhoto(): void {
         />
         <ion-input
           data-testid="combo-menu-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('combo.form.kitchenName')"
           :helper-text="$t('combo.form.kitchenNameHelp')"
@@ -218,6 +236,8 @@ function retryPhoto(): void {
         <MoneyInput
           v-model="form.price"
           testid="combo-menu-form-price"
+          name="price"
+          :money="money"
           :label="money ? t('combo.form.priceIn', { currency: money.currency }) : t('combo.form.price')"
           :helper-text="t('combo.form.priceHelp')"
           :error-text="fieldErrors.price"
@@ -257,6 +277,7 @@ function retryPhoto(): void {
         <Combo
           v-if="eatenIn"
           testid="combo-menu-form-tax_category"
+          name="tax_category_key"
           :model-value="form.tax"
           :search="searchTax"
           :label="t('combo.form.taxCategory')"
@@ -267,6 +288,7 @@ function retryPhoto(): void {
         />
         <ion-input
           data-testid="combo-menu-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

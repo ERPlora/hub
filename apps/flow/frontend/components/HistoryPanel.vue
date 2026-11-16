@@ -9,7 +9,7 @@
 import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
-import { IonButton, IonSpinner } from '@ionic/vue';
+import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { useLiveList } from '../composables/useLiveList';
@@ -17,6 +17,7 @@ import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { describeLog, runStatusPill } from '../lib/phrasing';
 import type { CatalogOut, RunOut, RunPageOut, Step } from '../operations';
+import LoadingNote from './LoadingNote.vue';
 
 const props = defineProps<{ flowId: string; steps: readonly Step[]; catalog: CatalogOut | null }>();
 const phrasing = usePhrasing();
@@ -99,12 +100,10 @@ const attentionText = computed(() => {
 
 <template>
   <div class="flow-history">
-    <div
+    <LoadingNote
       v-if="status === 'loading' && !page"
-      class="flow-history__loading"
-    >
-      <IonSpinner name="dots" /> {{ $t('flow.loading') }}
-    </div>
+      data-testid="flow-history-loading"
+    />
     <InlineFeedback
       v-if="error"
       tone="danger"
@@ -237,11 +236,6 @@ const attentionText = computed(() => {
 }
 .flow-history > ion-button {
   align-self: flex-start;
-}
-.flow-history__loading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 .flow-history__muted {
   margin: 0;

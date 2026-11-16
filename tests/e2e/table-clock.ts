@@ -48,7 +48,7 @@ const parts = new Intl.DateTimeFormat('en-CA', {
 const weekdayOf = (date: string): number => (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
 const clock = (minutes: number): string => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
-/** The business's wall clock at `now` (Madrid in phase 1): its date and the minutes since its midnight. */
+/** The business's wall clock at `now` (Madrid, hub `a`'s zone): its date and the minutes since its midnight. */
 function wall(now: Date): { date: string; minutes: number } {
   const part = Object.fromEntries(parts.formatToParts(now).map((found) => [found.type, found.value]));
   const seconds = Number(part.second) + now.getUTCMilliseconds() / 1000;

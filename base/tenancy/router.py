@@ -1,4 +1,4 @@
-"""``TenantRouter``: control's models to ``default``, a hub's to its hub's alias (PLAN-DB §4; plan 2026-10-22, step 5).
+"""``TenantRouter``: control's models to ``default``, a hub's to its hub's alias.
 
 Second in ``DATABASE_ROUTERS``, after ``base.routers.SharedRouter`` (the SaaS's ``shared`` schema). It reads the
 database class of each model from ``base.tenancy.inventory`` and the active context from ``base.tenancy.context``:
@@ -8,21 +8,24 @@ database class of each model from ``base.tenancy.inventory`` and the active cont
   guess;
 - ``contextual`` (the outbox) → the alias of the active context, control's included.
 
-A hub's object related to another hub object already loaded (``instance`` hint) goes where that one is, as Django's
-own default does; a control object's hint (a reverse relation from a user) never decides a hub's model: the context
-does.
+A hub's object related to another hub object already loaded (``instance`` hint: its own save, delete and refresh, and
+every relation read or written from it) goes where that one is, as Django's own default does, with no context (a
+migration's ``RunPython``) or in its own hub's, on that hub's alias or its migrator's ``…__ddl`` (one database). Inside
+another hub's context it is :class:`~base.tenancy.context.HubContextMismatch`, before any SQL: an object kept from one
+hub never reads nor writes that hub's rows while another hub works. A control object's hint (a reverse relation from a
+user) never decides a hub's model: the context does.
 
 A model of a module whose tables the hub's database does not have yet answers :class:`~base.tenancy.context.
-AppNotCreated`, the 404 ``app_inactive`` of a module that is off, before any SQL (PLAN-DB §4; spec 2026-10-11 «tablas al
-activar» §9): what no operation's gate covers, an ``events.py``, the admin, a task. The row the context holds says so
-for free on every query (``base.activation.has_tables``); the migrator's ``…__ddl`` alias, which makes those tables,
-is never asked. Not covered, as that spec says: raw SQL and the JOIN of a ``select_related`` to another app. A delete's
-walk of its relations asks with ``.using()`` and never comes here: :mod:`base.tenancy.deletion` passes those over.
+AppNotCreated`, the 404 ``app_inactive`` of a module that is off, before any SQL: what no operation's gate covers, an
+``events.py``, the admin, a task. The row the context holds says so for free on every query
+(``base.activation.has_tables``); the migrator's ``…__ddl`` alias, which makes those tables, is never asked. Not
+covered: raw SQL and the JOIN of a ``select_related`` to another app. A delete's walk of its relations asks with
+``.using()`` and never comes here: :mod:`base.tenancy.deletion` passes those over.
 
 ``allow_relation`` compares databases, not aliases (``hub_x`` and ``hub_x__ddl`` are one database). ``allow_migrate``:
 control's models (and the outbox's, contextual) on ``default``; a hub's only on a migrator's ``…__ddl`` alias, never on
-``default``: since S5 control holds control's tables alone (phase 1's businesses got their own databases,
-``base.tenancy.cut``; the tables they left in control are never migrated again, ``control/0007`` renames them).
+``default``: control holds control's tables alone (every business got its own database, ``base.tenancy.cut``; the
+tables they left in control are never migrated again, ``control/0007`` renames them).
 """
 
 from django.db import DEFAULT_DB_ALIAS, connections
@@ -51,13 +54,19 @@ def _route(model, hints: dict) -> str | None:
         return None
     related = hints.get("instance")
     if related is not None and related._state.db is not None and inventory.classify(related) != inventory.CONTROL:
-        # A hub's object related to another hub's object lives in that one's database (a migration's RunPython on a
-        # hub's __ddl alias): Django's own rule. A control object's hint (``user.<hub model>_set``) says ``default``,
-        # which is never a hub's: the context decides. On the migrator's alias (not the context's) the tables are being
-        # made: it is never asked what the hub has.
+        # An object related to a loaded hub object lives in that object's database (a migration's RunPython on a hub's
+        # __ddl alias): Django's own rule, as long as no other hub's context is at work. A control object's hint
+        # (``user.<hub model>_set``) says ``default``, which is never a hub's: the context decides. On the migrator's
+        # alias (not the context's) the tables are being made: it is never asked what the hub has.
         active = context.peek()
-        if active is not None and active.kind == context.HUB and active.alias == related._state.db:
-            _refuse_if_not_created(model, active)
+        if active is not None and active.kind == context.HUB:
+            if not _same_database(active.alias, related._state.db):
+                raise context.HubContextMismatch(
+                    f"{model._meta.label} through an object loaded from {related._state.db!r} inside the context of "
+                    f"{active.alias!r}: an object of one hub is never read or written in another hub's context."
+                )
+            if active.alias == related._state.db:
+                _refuse_if_not_created(model, active)
         return related._state.db
     active = context.current()
     if database_class == inventory.HUB and active.kind == context.CONTROL:
@@ -71,7 +80,14 @@ def _route(model, hints: dict) -> str | None:
 
 def _database(alias: str) -> str | None:
     settings = connections.settings.get(alias)
-    return None if settings is None else settings["NAME"]
+    if settings is not None:
+        return settings["NAME"]
+    # The migrator forgets its alias when done, maybe from another thread while this one still works on it.
+    return alias.removesuffix(names.DDL_SUFFIX) if alias.endswith(names.DDL_SUFFIX) else None
+
+
+def _same_database(first: str, second: str) -> bool:
+    return first == second or _database(first) == _database(second)
 
 
 class TenantRouter:
@@ -85,7 +101,7 @@ class TenantRouter:
         first, second = obj1._state.db, obj2._state.db
         if first is None or second is None:
             return None
-        return first == second or _database(first) == _database(second)
+        return _same_database(first, second)
 
     def allow_migrate(self, db: str, app_label: str, model_name: str | None = None, **hints) -> bool | None:
         if model_name is None:

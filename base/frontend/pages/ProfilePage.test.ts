@@ -1,6 +1,3 @@
-// «My profile» (`/profile`, BASE-G125 and G126; the old hub's ProfilePage): the person's name, contact email and photo,
-// their language and appearance (applied at once, saved for them on every device) and their own PIN. The summary is
-// named in the person's language (gh:hub#2589). A profile that cannot be read offers nothing to save, only «Retry».
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
@@ -19,6 +16,7 @@ const PROFILE: Profile = {
   language: '',
   theme_mode: '',
   palette: '',
+  ui_scale: 100,
   role: 'hub_owner',
   has_pin: true,
   pin_length: 4,
@@ -136,12 +134,19 @@ describe('ProfilePage — who I am', () => {
 
 describe('ProfilePage — preferences', () => {
   it('a language is saved for the person and applied at once', async () => {
-    const { wrapper, calls } = await profile();
-    const select = wrapper.get('[data-testid="profile-language"]');
-    select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'es' } }));
-    await flush();
-    expect(calls('/api/me/preferences')).toEqual([{ language: 'es', theme_mode: '', palette: '' }]);
-    expect(wrapper.vm.$i18n.locale).toBe('es');
+    const changed = vi.fn();
+    const stop = onSessionChanged(changed);
+    try {
+      const { wrapper, calls } = await profile();
+      const select = wrapper.get('[data-testid="profile-language"]');
+      select.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'es' } }));
+      await flush();
+      expect(calls('/api/me/preferences')).toEqual([{ language: 'es', theme_mode: '', palette: '', ui_scale: 100 }]);
+      expect(wrapper.vm.$i18n.locale).toBe('es');
+      expect(changed).toHaveBeenCalledOnce();
+    } finally {
+      stop();
+    }
   });
 
   it('a mode and a palette are saved and painted', async () => {
@@ -151,18 +156,34 @@ describe('ProfilePage — preferences', () => {
     await wrapper.get('[data-testid="profile-palette-forest"]').trigger('click');
     await flush();
     expect(calls('/api/me/preferences')).toEqual([
-      { language: '', theme_mode: 'dark', palette: '' },
-      { language: '', theme_mode: 'dark', palette: 'forest' },
+      { language: '', theme_mode: 'dark', palette: '', ui_scale: 100 },
+      { language: '', theme_mode: 'dark', palette: 'forest', ui_scale: 100 },
     ]);
-    expect(shell.applyUserThemePreferences).toHaveBeenLastCalledWith('dark', 'forest');
+    expect(shell.applyUserThemePreferences).toHaveBeenLastCalledWith('dark', 'forest', undefined, 100);
+  });
+
+  it('an interface scale is saved and painted with the current appearance', async () => {
+    const { wrapper, calls } = await profile();
+    const range = wrapper.get('[data-testid="profile-scale"]');
+    expect(wrapper.get('[data-testid="profile-scale-value"]').text()).toBe('100%');
+    range.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 110 } }));
+    await flush();
+    expect(calls('/api/me/preferences')).toEqual([{ language: '', theme_mode: '', palette: '', ui_scale: 110 }]);
+    expect(shell.applyUserThemePreferences).toHaveBeenCalledWith(null, null, undefined, 110);
+    expect(wrapper.get('[data-testid="profile-scale-value"]').text()).toBe('110%');
   });
 
   it('«Use the business’s appearance» undoes the person’s own', async () => {
-    const { wrapper, calls } = await profile({ ...PROFILE, theme_mode: 'dark', palette: 'forest' });
+    const { wrapper, calls } = await profile({ ...PROFILE, theme_mode: 'dark', palette: 'forest', ui_scale: 120 });
     await wrapper.get('[data-testid="profile-appearance-business"]').trigger('click');
     await flush();
-    expect(calls('/api/me/preferences')).toEqual([{ language: '', theme_mode: '', palette: '' }]);
+    expect(calls('/api/me/preferences')).toEqual([{ language: '', theme_mode: '', palette: '', ui_scale: 100 }]);
     expect(shell.resetUserThemePreferences).toHaveBeenCalled();
+  });
+
+  it('a scale override alone keeps «Use the business’s appearance» available', async () => {
+    const { wrapper } = await profile({ ...PROFILE, ui_scale: 120 });
+    expect(wrapper.get('[data-testid="profile-appearance-business"]').attributes('disabled')).toBeUndefined();
   });
 });
 
@@ -225,7 +246,7 @@ describe('ProfilePage — my PIN', () => {
 });
 
 describe('ProfilePage — Spanish', () => {
-  it('names the summary and the cards in Spanish (gh:hub#2589)', async () => {
+  it('names the summary and the cards in Spanish', async () => {
     const { wrapper } = await profile(PROFILE, ok, 'es');
     expect(wrapper.get('[data-testid="profile-summary"]').attributes('aria-label')).toBe('Resumen de la cuenta');
     expect(wrapper.text()).toContain('Datos de la cuenta');
@@ -233,7 +254,7 @@ describe('ProfilePage — Spanish', () => {
     expect(wrapper.text()).toContain('Propietario');
   });
 
-  it('names each palette in Spanish, never by its English id (BASE-G152)', async () => {
+  it('names each palette in Spanish, never by its English id', async () => {
     const { wrapper } = await profile(PROFILE, ok, 'es');
     const names = wrapper.findAll('.profile__palette-name').map((name) => name.text());
     expect(names).toEqual(['ERPlora', 'Terracota', 'Corporativo', 'Minimalista', 'Bosque', 'Océano', 'Violeta']);

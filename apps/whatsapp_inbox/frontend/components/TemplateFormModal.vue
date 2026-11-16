@@ -16,6 +16,8 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { acceptsSample, fileToBase64, formatSize, SAMPLE_RULES } from '../lib/files';
 import type {
@@ -321,11 +323,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen(ID, form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :testid="ID"
     size="md"
     :title="title"
@@ -372,6 +377,7 @@ async function save(): Promise<void> {
               mode="md"
               autocapitalize="off"
               :maxlength="512"
+              name="name"
               :error-text="fieldErrors.name"
               :class="{ 'ion-invalid': !!fieldErrors.name || nameInvalid, 'ion-touched': !!fieldErrors.name || nameInvalid }"
               @ion-input="set('name', text($event.detail.value))"
@@ -519,6 +525,7 @@ async function save(): Promise<void> {
           mode="md"
           :maxlength="60"
           :counter="true"
+          name="header"
           :error-text="fieldErrors.header"
           :class="{ 'ion-invalid': !!fieldErrors.header, 'ion-touched': !!fieldErrors.header }"
           @ion-input="set('header', text($event.detail.value))"
@@ -535,6 +542,7 @@ async function save(): Promise<void> {
           :rows="4"
           :maxlength="1024"
           :counter="true"
+          name="body"
           :error-text="fieldErrors.body"
           :class="{ 'ion-invalid': !!fieldErrors.body, 'ion-touched': !!fieldErrors.body }"
           @ion-input="set('body', text($event.detail.value))"
@@ -556,6 +564,7 @@ async function save(): Promise<void> {
             fill="outline"
             mode="md"
             :maxlength="1024"
+            name="body_examples"
             :error-text="index === 0 ? fieldErrors.body_examples : undefined"
             :class="{ 'ion-invalid': index === 0 && !!fieldErrors.body_examples, 'ion-touched': index === 0 && !!fieldErrors.body_examples }"
             @ion-input="setExample(index, $event.detail.value)"
@@ -570,6 +579,7 @@ async function save(): Promise<void> {
           mode="md"
           :maxlength="60"
           :counter="true"
+          name="footer"
           :error-text="fieldErrors.footer"
           :class="{ 'ion-invalid': !!fieldErrors.footer, 'ion-touched': !!fieldErrors.footer }"
           @ion-input="set('footer', text($event.detail.value))"

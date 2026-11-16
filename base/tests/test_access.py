@@ -1,4 +1,4 @@
-"""The pure rules of the way in to a hub (``base.access``, APP-BASE-3): the PIN, the badge, the device and how long
+"""The pure rules of the way in to a hub (``base.access``): the PIN, the badge, the device and how long
 a session lasts. No database: the ORM side lives in ``base.services``/``base.queries`` and has its own tests."""
 
 import datetime as dt

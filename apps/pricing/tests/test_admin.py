@@ -1,7 +1,7 @@
 """Django admin of the pricing app: full CRUD on every model, for the platform's staff.
 
-Round 12 (PLAN §17, CLAUDE.md «Frontend y admin») gives the Hub admin full CRUD over all of a hub's
-tables. A raw admin write records no event and checks no business rule.
+The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no
+business rule.
 """
 
 import uuid
@@ -14,7 +14,7 @@ from django.test import RequestFactory
 from apps.pricing.admin import DiscountRuleAdmin, PriceItemAdmin, PriceItemInline, PriceListAdmin
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 
-from .conftest import make_item, make_list, make_product, make_rule
+from .conftest import HUB_DB, make_item, make_list, make_product, make_rule
 
 MODELS = {PriceList: PriceListAdmin, PriceItem: PriceItemAdmin, DiscountRule: DiscountRuleAdmin}
 
@@ -36,6 +36,7 @@ def test_every_model_is_registered():
     assert PriceListAdmin.inlines == [PriceItemInline]
 
 
+@HUB_DB
 def test_full_crud_for_the_platform_staff(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -46,10 +47,9 @@ def test_full_crud_for_the_platform_staff(superuser):
         assert model_admin.has_delete_permission(request), model
 
 
-@pytest.mark.django_db
-def test_a_list_is_added_and_changed_from_the_admin(client, superuser):
-    client.force_login(superuser)
-    added = client.post(
+@HUB_DB
+def test_a_list_is_added_and_changed_from_the_admin(hub_staff):
+    added = hub_staff.post(
         "/admin/pricing/pricelist/add/",
         {
             "code": "VIP",
@@ -66,7 +66,7 @@ def test_a_list_is_added_and_changed_from_the_admin(client, superuser):
     assert added.status_code == 302, added.content[:800]
     price_list = PriceList.objects.get()
     group = uuid.uuid7()
-    changed = client.post(
+    changed = hub_staff.post(
         f"/admin/pricing/pricelist/{price_list.pk}/change/",
         {
             "code": "VIP",
@@ -89,12 +89,11 @@ def test_a_list_is_added_and_changed_from_the_admin(client, superuser):
     )
 
 
-@pytest.mark.django_db
-def test_the_pages_render_on_the_platform_host(client, superuser):
+@HUB_DB
+def test_the_pages_render_on_the_platform_host(hub_staff):
     price_list = make_list("VIP", "VIP members")
     item = make_item(price_list, make_product("Shampoo", "SH-1"), price=1234)
     rule = make_rule("TEN", name="Ten off")
-    client.force_login(superuser)
     for url, text in (
         ("/admin/pricing/pricelist/", b"VIP members"),
         (f"/admin/pricing/pricelist/{price_list.pk}/change/", b"1234"),
@@ -104,7 +103,7 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         (f"/admin/pricing/discountrule/{rule.pk}/change/", b"Ten off"),
         ("/admin/pricing/discountrule/add/", b"code"),
     ):
-        response = client.get(url, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url
 
@@ -124,20 +123,19 @@ def rule_form(**fields):
     return data
 
 
-@pytest.mark.django_db
-def test_the_admin_checks_the_tiers_of_a_rule(client, superuser):
-    client.force_login(superuser)
+@HUB_DB
+def test_the_admin_checks_the_tiers_of_a_rule(hub_staff):
     for tiers, message in (
         ('[{"min_quantity": "6", "percent": "10"}, {"min_quantity": "3", "percent": "15"}]', b"higher quantity"),
         ('[{"min_quantity": "3", "percent": "150"}]', b"100"),
         ('[{"min_quantity": "3"}]', b"percent"),
         ('{"min_quantity": "3"}', b"list"),
     ):
-        refused = client.post("/admin/pricing/discountrule/add/", rule_form(tiers=tiers), HTTP_HOST="hubs.localhost")
+        refused = hub_staff.post("/admin/pricing/discountrule/add/", rule_form(tiers=tiers), HTTP_HOST="hubs.localhost")
         assert refused.status_code == 200, tiers
         assert message in refused.content, tiers
     assert not DiscountRule.objects.exists()
-    added = client.post("/admin/pricing/discountrule/add/", rule_form(), HTTP_HOST="hubs.localhost")
+    added = hub_staff.post("/admin/pricing/discountrule/add/", rule_form(), HTTP_HOST="hubs.localhost")
     assert added.status_code == 302, added.content[:800]
     assert DiscountRule.objects.get().tiers == [
         {"min_quantity": "3", "percent": "10"},

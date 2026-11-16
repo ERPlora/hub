@@ -1,7 +1,7 @@
 """The Home's three live queries: ``base.setup.status``, ``base.widget.list`` and ``base.bell.counters``; and the
-device's notices, ``base.notice.list`` (PLAN-HUB round 2026-10-23).
+device's notices, ``base.notice.list``.
 
-PLAN-HUB round 2026-10-21. Each module declares its steps, panels and counters in its ``LiveAppConfig`` and base runs
+Each module declares its steps, panels and counters in its ``LiveAppConfig`` and base runs
 their queries by name, as the person of the request, with the old hub's rules (``setup_status.rs``): only modules on
 in the scope, the hub's country, the person's permission (but a pending ⛔ stays, not actionable), a step whose query
 fails is left out. The stand-in modules here name real operations registered for the test.
@@ -13,19 +13,21 @@ from types import SimpleNamespace
 
 import psycopg
 import pytest
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy
 from live.assistant import description
-from live.context import OperationContext, Scope
+from live.context import OperationContext, system_context
 from live.errors import NotFound
-from live.meta import BellCounter, DeviceNotice, SetupCheck, SetupStep, Widget
+from live.live_registry import live_registry
+from live.meta import BellCounter, DeviceNotice, Nav, SetupCheck, SetupStep, Widget
 from live.operations import Operation, get, registry
 from live.outbox import channel_for
 from live.models import OutboxEvent
 from psycopg.conninfo import make_conninfo
 from pydantic import BaseModel, ConfigDict
 
+from apps.demo.models import Item
+from apps.demo.schemas import ItemIn
 from base.models import EventDelivery, Hub, Membership
 from base.schemas import (
     BellCountersIn,
@@ -34,14 +36,16 @@ from base.schemas import (
     NoticeListOut,
     SetupStatusIn,
     SetupStatusOut,
+    SystemCardsIn,
+    SystemCardsOut,
     WidgetListIn,
     WidgetListOut,
 )
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 
-pytestmark = pytest.mark.django_db
-
-A = Scope("host", "a")
-B = Scope("host", "b")
+__all__ = ["in_business_a"]
+pytestmark = HUB_DB
 HOME = "base.view_home"
 ADMIN = "base.administer_hub"
 
@@ -85,6 +89,7 @@ def modules(monkeypatch, settings):
     def use(*configs, on=None):
         labels = {config.label for config in configs} if on is None else set(on)
         monkeypatch.setattr("base.home.module_configs", lambda: list(configs))
+        monkeypatch.setattr("base.activation.module_configs", lambda: list(configs))
         monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset(labels | {"base"}))
 
     use()
@@ -113,6 +118,11 @@ def setup_status(context):
     return get("base.setup.status")(context, SetupStatusIn()).model_dump(mode="json")
 
 
+def in_b(read, context):
+    with use_hub(Hub.objects.get(slug=B.key)):
+        return read(context)
+
+
 def keys(document):
     return [item["key"] for item in document["items"]]
 
@@ -135,6 +145,7 @@ def step(key="catalog", operation="stock.catalog.status", **fields):
         ("base.widget.list", WidgetListIn, WidgetListOut),
         ("base.bell.counters", BellCountersIn, BellCountersOut),
         ("base.notice.list", NoticeListIn, NoticeListOut),
+        ("base.system.cards", SystemCardsIn, SystemCardsOut),
     ],
 )
 def test_declarations(name, input, output):
@@ -143,7 +154,7 @@ def test_declarations(name, input, output):
 
 
 def test_the_assistant_reads_the_setup_status():
-    """BASE-G128: the assistant gets the same document as a tool; it never takes on a step «not available»."""
+    """The assistant gets the same document as a tool; it never takes on a step «not available»."""
     assert "not available" in description(get("base.setup.status"))
 
 
@@ -152,7 +163,7 @@ def test_the_assistant_reads_the_setup_status():
 
 def test_the_platforms_steps_for_an_administrator(modules, make_user):
     modules(module("sale"))
-    make_user("ana", host="a", role=Membership.Role.OWNER)
+    make_user("ana", host=A.key, role=Membership.Role.OWNER)
 
     document = setup_status(ctx(ADMIN))
 
@@ -198,18 +209,100 @@ def test_your_apps_is_pending_without_an_app_on_and_unavailable_when_none_can_be
 
 def test_your_team_is_done_with_two_active_people_in_this_hub(modules, make_user):
     modules(module("sale"))
-    make_user("ana", host="a", role=Membership.Role.OWNER)
-    make_user("bea", host="b")  # another hub's
-    make_user("cris", host="a", is_active=False)
+    make_user("ana", host=A.key, role=Membership.Role.OWNER)
+    make_user("bea", host=B.key)  # another hub's
+    make_user("cris", host=A.key, is_active=False)
     assert by_key(setup_status(ctx(ADMIN)))["base.team"]["state"] == "pending"
 
-    make_user("dani", host="a")
+    make_user("dani", host=A.key)
     assert by_key(setup_status(ctx(ADMIN)))["base.team"]["state"] == "done"
 
 
 def test_whoever_cannot_administer_the_hub_gets_no_platform_step(modules):
     modules(module("sale"))
     assert setup_status(ctx()) == {"total": 0, "pending": 0, "unavailable": 0, "blocking_pending": 0, "items": []}
+
+
+# --- base.setup.status: the apps a business must have on in its country (hub#997) -----------------------------------
+
+
+def fiscal(countries=("ES",), turns_on=False, **more):
+    """A stand-in app mandatory in ``countries`` (or ``"all"``), declared as its ``LiveAppConfig`` would."""
+    declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": turns_on}
+    navigation = [Nav("records", "Records", "ion:list-outline", "/fiscal/records")]
+    return module("fiscal", mandatory=declared, icon="ion:calculator-outline", navigation=navigation, **more)
+
+
+def test_an_app_the_platform_turns_on_by_itself_is_not_one_of_your_apps_in_its_country(modules, hub_b):
+    """A business is born with it on (hub#997): with it alone its till has nothing to sell, so «Your apps» still asks for
+    one. In a country where the platform does not turn it on, the business chose it: it counts."""
+    modules(module("sale"), fiscal(("PT",), turns_on=True), on=["fiscal"])
+    Hub.objects.filter(slug=A.key).update(country="PT")
+    assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "pending"
+    # B has no country: Spain, where it is no app the platform turns on.
+    assert by_key(in_b(setup_status, ctx(ADMIN, scope=B)))["base.apps"]["state"] == "done"
+
+    modules(module("sale"), fiscal(("PT",), turns_on=True), on=["fiscal", "sale"])
+    assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "done"
+
+
+def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until_it_is_on(modules, make_user):
+    make_user("ana", host=A.key, role=Membership.Role.OWNER)
+    modules(module("sale"), fiscal(), on=["sale"])
+
+    document = setup_status(ctx(ADMIN))
+
+    assert keys(document) == ["base.apps", "base.mandatory.fiscal", "base.team"]
+    step = by_key(document)["base.mandatory.fiscal"]
+    assert {k: step[k] for k in ("app", "state", "level", "required", "actionable", "route", "icon", "title")} == {
+        "app": "base",
+        "state": "pending",
+        "level": "functional",
+        "required": True,
+        "actionable": True,
+        "route": "/apps#all",
+        "icon": "ion:list-outline",
+        "title": "Turn on Fiscal",
+    }
+    assert (document["pending"], document["blocking_pending"]) == (2, 0)
+
+    modules(module("sale"), fiscal(), on=["sale", "fiscal"])
+    assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
+
+
+def test_a_mandatory_app_is_asked_for_only_in_its_countries_each_hub_by_its_own(modules, hub_b):
+    modules(module("sale"), fiscal(), on=["sale"])
+    Hub.objects.filter(slug=A.key).update(country="PL")
+
+    assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
+    # B has no country: it is in ERPlora's market, Spain (hub#682).
+    assert "base.mandatory.fiscal" in keys(in_b(setup_status, ctx(ADMIN, scope=B)))
+
+    modules(module("sale"), fiscal("all"), on=["sale"])
+    assert "base.mandatory.fiscal" in keys(setup_status(ctx(ADMIN)))
+
+
+def test_a_mandatory_app_says_it_in_the_persons_language(modules):
+    modules(module("sale"), fiscal(name=gettext_lazy("Taxes")), on=["sale"])
+    Hub.objects.filter(slug=A.key).update(country="FR")
+    modules(module("sale"), fiscal("all", name=gettext_lazy("Taxes")), on=["sale"])
+
+    step = by_key(setup_status(ctx(ADMIN, language="es")))["base.mandatory.fiscal"]
+
+    assert (step["title"], step["description"]) == ("Activa Impuestos", "Es obligatoria para los negocios de Francia.")
+
+
+def test_only_whoever_turns_apps_on_is_asked_to_turn_a_mandatory_one_on(modules):
+    modules(module("sale"), fiscal(), on=["sale"])
+
+    assert keys(setup_status(ctx())) == []
+
+
+def test_an_app_out_of_the_store_is_never_asked_for_on_a_customers_hub(modules, settings):
+    modules(module("sale"), fiscal(listed=False), on=["sale"])
+    settings.SHOW_UNLISTED_MODULES = False
+
+    assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
 
 
 # --- base.setup.status: the modules' steps ---------------------------------------------------------------
@@ -302,7 +395,7 @@ def test_a_step_needing_a_permission_the_person_lacks_is_not_on_their_list(modul
 
 
 def test_a_pending_wall_stays_for_who_cannot_clear_it_but_not_actionable(modules, declare):
-    """hub#435: the person at the till cannot set the business details up, yet they are what stops the invoice."""
+    """The person at the till cannot set the business details up, yet they are what stops the invoice."""
     answer = {"configured": False}
     declare("invoice.identity.status", lambda c, data: answer, permission="invoice.view_invoice")
     wall = step("business_identity", "invoice.identity.status", permission="invoice.change_settings",
@@ -343,7 +436,7 @@ def test_the_level_is_bases_never_the_modules(modules, declare):
     assert (items["stock.catalog"]["level"], items["stock.photos"]["level"]) == ("functional", "recommended")
 
 
-# --- VeriFactu's way to the AEAT: a wall only where the hub files in production (PLAN-HUB round 2026-10-21) --------
+# --- VeriFactu's way to the AEAT: a wall only where the hub files in production ------------------------------------
 
 ROUTE = "verifactu.sending_route"
 
@@ -377,7 +470,7 @@ def test_in_production_a_way_to_the_aeat_not_ready_is_a_wall_for_everybody(modul
 
 
 def test_in_testing_the_way_stays_functional_and_the_till_sells(modules, declare):
-    """gh:hub#1726: a hub in testing sells without a way to the AEAT, so nothing tells it that it cannot invoice."""
+    """A hub in testing sells without a way to the AEAT, so nothing tells it that it cannot invoice."""
     sending_route(modules, declare, environment="testing", ready=False)
 
     owner = setup_status(ctx("verifactu.configure"))
@@ -396,7 +489,7 @@ def test_in_production_with_the_way_ready_the_step_is_done_and_off_the_strip(mod
 
 
 def test_whoever_may_not_read_the_way_still_has_its_wall_in_production(modules, declare, caplog):
-    """gh:hub#466: a wall whose query the person may not run is read as the system, never dropped. Outside it the
+    """A wall whose query the person may not run is read as the system, never dropped. Outside it the
     step is as any functional one: whoever may not read its query is not told, and the failure is logged."""
     sending_route(modules, declare, environment="production", ready=False, permission="verifactu.view_record")
 
@@ -414,8 +507,8 @@ def test_whoever_may_not_read_the_way_still_has_its_wall_in_production(modules, 
 
 
 def test_in_testing_whoever_may_neither_do_nor_read_the_way_is_skipped_without_a_warning(modules, declare, caplog):
-    """No wall in testing: the person at the till is not told about the step, as before, and that is no failure of
-    its query, so no Home of theirs logs one."""
+    """No wall in testing: the person at the till is not told about the step, and that is no failure of its query,
+    so no Home of theirs logs one."""
     sending_route(modules, declare, environment="testing", ready=False, permission="verifactu.view_record")
 
     with caplog.at_level(logging.WARNING, logger="base.home"):
@@ -435,14 +528,28 @@ def test_only_base_names_the_steps_that_are_walls_in_production(modules, declare
     assert (seen(document, "stock.catalog"), document["blocking_pending"]) == (("functional", "pending", True), 0)
 
 
-def test_a_national_step_shows_only_in_a_hub_of_its_country(modules, declare):
+def test_a_national_step_shows_only_in_a_hub_of_its_country(modules, declare, hub_b):
+    declare("stock.catalog.status", {"n": 1})
+    modules(module("stock", setup=[step(countries=["PT"])]))
+    assert keys(setup_status(ctx())) == []  # the hub has no country: it is in ERPlora's market, Spain
+
+    Hub.objects.filter(slug=A.key).update(country="PT")
+    assert keys(setup_status(ctx())) == ["stock.catalog"]
+    assert keys(in_b(setup_status, ctx(scope=B))) == []
+
+
+def test_a_step_for_spain_shows_in_a_hub_without_a_country_and_not_in_another_country(modules, declare, hub_b):
+    """hub#682: a hub without a country (a demo, ERPlora's own) is in ERPlora's market, Spain, as VeriFactu counts it."""
     declare("stock.catalog.status", {"n": 1})
     modules(module("stock", setup=[step(countries=["ES"])]))
-    assert keys(setup_status(ctx())) == []  # the hub has no country
-
-    Hub.objects.filter(slug="a").update(country="ES")
     assert keys(setup_status(ctx())) == ["stock.catalog"]
-    assert keys(setup_status(ctx(scope=B))) == []
+
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    assert keys(setup_status(ctx())) == []
+    assert keys(in_b(setup_status, ctx(scope=B))) == ["stock.catalog"]  # B has no country
+
+    Hub.objects.filter(slug=A.key).update(country="ES")
+    assert keys(setup_status(ctx())) == ["stock.catalog"]
 
 
 def test_a_module_off_in_the_scope_brings_no_step(modules, declare):
@@ -461,7 +568,7 @@ def test_a_module_out_of_the_store_brings_no_step_to_a_customer(modules, declare
     assert keys(setup_status(ctx())) == []
 
     # A demo's hub shows the reference's example: there it is what the visitor came to see.
-    Hub.objects.filter(slug="a").update(is_demo=True)
+    Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert keys(setup_status(ctx())) == ["demo.first_item"]
 
 
@@ -486,8 +593,6 @@ def test_order_then_key_and_the_titles_in_the_persons_language(modules, declare,
 
 def test_the_demos_example_step_for_real_with_the_setting_on(settings):
     """The real demo app (no stand-in): its step is pending until the hub has an item, then done."""
-    from apps.demo.models import Item
-
     settings.SHOW_UNLISTED_MODULES = True
     owner = ctx(ADMIN, "demo.view", "demo.manage")
     assert by_key(setup_status(owner))["demo.first_item"]["state"] == "pending"
@@ -548,9 +653,8 @@ def test_the_panels_the_person_may_see(modules):
 
 
 def test_the_texts_of_a_panels_options_are_in_the_persons_language(modules):
-    # FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT: a panel's literal props may carry lazy translations (the text under the
-    # figure of a stat, or deeper in a list or a dict); the list gives them in the reader's language and every other
-    # prop as declared.
+    # A panel's literal props may carry lazy translations (the text under the figure of a stat, or deeper in a list or
+    # a dict); the list gives them in the reader's language and every other prop as declared.
     options = {
         "format": "number",
         "label": gettext_lazy("Contingency queue"),
@@ -591,7 +695,7 @@ def test_the_texts_of_a_panels_options_are_in_the_persons_language(modules):
 
 
 def test_a_panel_says_whether_its_operation_is_a_live_query(modules, monkeypatch):
-    # BASE-G168: the Home follows a live query and asks once for one that is not.
+    # The Home follows a live query and asks once for one that is not.
     from live.live_registry import live_registry
 
     modules(module("stock", widgets=[Widget(key="today", title="Today", kind="kpi", operation="stock.item.count"),
@@ -604,7 +708,7 @@ def test_a_panel_of_some_verticals_shows_only_in_a_hub_of_one_of_them(modules):
     modules(module("stock", widgets=[Widget(key="tables", title="Tables", component="Tables", verticals=["restaurant"])]))
     assert widget_list(ctx()) == []
 
-    Hub.objects.filter(slug="a").update(vertical="restaurant")
+    Hub.objects.filter(slug=A.key).update(vertical="restaurant")
     assert [w["key"] for w in widget_list(ctx())] == ["stock.tables"]
 
 
@@ -616,7 +720,7 @@ def test_panels_of_a_module_off_or_out_of_the_store(modules, settings):
     settings.SHOW_UNLISTED_MODULES = False
     assert widget_list(ctx()) == []
 
-    Hub.objects.filter(slug="a").update(is_demo=True)
+    Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert [w["key"] for w in widget_list(ctx())] == ["demo.w"]
 
 
@@ -675,7 +779,7 @@ def test_the_counters_of_a_module_out_of_the_store_only_where_the_setting_says(m
     settings.SHOW_UNLISTED_MODULES = False
     assert bell(ctx()) == []
 
-    Hub.objects.filter(slug="a").update(is_demo=True)
+    Hub.objects.filter(slug=A.key).update(is_demo=True)
     assert [c["key"] for c in bell(ctx())] == ["demo.open"]
 
 
@@ -684,10 +788,9 @@ def refresh_every(context):
 
 
 def test_a_counter_that_changes_with_time_asks_the_bell_to_read_it_again(modules, declare):
-    """FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE: a counter whose figure moves as time passes (a job waiting for
-    a minute with no device alive) names how often the bell reads it again, besides its events. The bell is told the
-    shortest period among the counters the person may see of the apps on, also while they are at zero: it is the time
-    that raises them."""
+    """A counter whose figure moves as time passes (a job waiting for a minute with no device alive) names how often
+    the bell reads it again, besides its events. The bell is told the shortest period among the counters the person
+    may see of the apps on, also while they are at zero: it is the time that raises them."""
     declare("printing.device.coverage", {"count": 0})
     declare("stock.item.count", {"count": 2})
     stalled = counter("stalled", "printing.device.coverage", permission="printing.view_settings")
@@ -717,13 +820,14 @@ def dead_event(scope, status=EventDelivery.Status.DEAD):
     return EventDelivery.objects.create(event=event, app_label="invoice", status=status, next_attempt_at=timezone.now())
 
 
-def test_the_failed_events_of_this_hub_for_an_administrator(modules):
-    """BASE-G137: the bell says how many events between apps the relay gave up on, in this hub only."""
+def test_the_failed_events_of_this_hub_for_an_administrator(modules, hub_b):
+    """The bell says how many events between apps the relay gave up on, in this hub only."""
     modules(module("sale"))
     dead_event(A)
     dead_event(A)
     dead_event(A, EventDelivery.Status.PENDING)
-    dead_event(B)
+    dead_event(B)  # another scope's row in A's database: not A's to count
+    in_b(dead_event, B)
 
     assert bell(ctx(ADMIN)) == [
         {"key": "base.failed_events", "app": "base", "count": 2, "route": "/system#events", "label": "Failed events",
@@ -731,7 +835,7 @@ def test_the_failed_events_of_this_hub_for_an_administrator(modules):
     ]
     assert bell(ctx(ADMIN, language="es"))[0]["label"] == "Eventos caídos"
     assert bell(ctx()) == []  # not an administrator
-    assert [c["count"] for c in bell(ctx(ADMIN, scope=B))] == [1]
+    assert [c["count"] for c in in_b(bell, ctx(ADMIN, scope=B))] == [1]
 
 
 # --- Live: a write in hub B reaches B's channel only, and re-runs base's queries there ----------------------
@@ -761,24 +865,20 @@ def received(session, timeout=1.0, stop_after=None):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(listen):
-    from live.live_registry import live_registry
-
-    from apps.demo.schemas import ItemIn
-
+@HUB_DB_COMMITTED
+def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
-    get_user_model()  # the demo command runs as the person; no user is needed for the system context
-    from live.context import system_context
-
-    get("demo.item.create")(system_context(B), ItemIn(name="In B"))
+    with use_hub(hub_b):
+        get("demo.item.create")(system_context(B), ItemIn(name="In B"))
+        assert list(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == [(B.kind, B.key)]
+    assert not OutboxEvent.objects.exists()  # business A's own database
 
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["demo.item.created"]})]
     assert received(on_a, timeout=0.3) == []
     assert {"base.setup.status", "base.bell.counters"} <= live_registry.affected(["demo.item.created"])
 
 
-# --- base.notice.list (PLAN-HUB round 2026-10-23, APPOINTMENT-F28) ----------------------------------------------
+# --- base.notice.list (APPOINTMENT-F28) -------------------------------------------------------------------------
 
 
 def notice_list(context):
@@ -980,7 +1080,7 @@ def test_the_notices_of_a_module_off_or_out_of_the_store(modules, declare, setti
 
 
 def test_it_says_which_notices_the_person_hears_even_with_nothing_to_tell(modules, declare):
-    """So the shell asks the device's permission only where there is something to be told (hub#2046, HUB_APP-F07)."""
+    """So the shell asks the device's permission only where there is something to be told."""
     declare("stock.item.changes", {"rows": []})
     modules(
         module("stock", permissions=["stock.view"], notices=[notice(), notice("secret", permission="stock.view")]),
@@ -995,3 +1095,51 @@ def test_it_says_which_notices_the_person_hears_even_with_nothing_to_tell(module
         "stock.added",
         "stock.secret",
     ]
+
+
+# --- base.system.cards (hub#683: the cards the apps on put in System › «Usage and plan») --------------------------
+
+
+def system_cards(context):
+    return get("base.system.cards")(context, SystemCardsIn()).model_dump(mode="json")["cards"]
+
+
+PRINTER = {"key": "printer", "component": "SystemPrinterCard", "permission": "stock.view"}
+
+
+def test_the_cards_of_the_apps_on_that_the_person_may_see(modules):
+    modules(module("stock", system_cards=[PRINTER, {"key": "drawer", "component": "DrawerCard"}]), module("sale"))
+
+    assert system_cards(ctx()) == [{"key": "stock.drawer", "app": "stock", "component": "DrawerCard"}]
+    assert system_cards(ctx("stock.view")) == [
+        {"key": "stock.printer", "app": "stock", "component": "SystemPrinterCard"},
+        {"key": "stock.drawer", "app": "stock", "component": "DrawerCard"},
+    ]
+
+
+def test_an_app_off_puts_no_card(modules):
+    modules(module("stock", system_cards=[PRINTER]), on=[])
+
+    assert system_cards(ctx("stock.view")) == []
+
+
+def test_each_business_sees_the_cards_of_its_own_apps(modules, monkeypatch, hub_b):
+    modules(module("stock", system_cards=[PRINTER]))
+    monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset({"base", "stock"} if scope.key == A.key else {"base"}))
+
+    assert [card["key"] for card in system_cards(ctx("stock.view", scope=A))] == ["stock.printer"]
+    assert in_b(system_cards, ctx("stock.view", scope=B)) == []
+
+
+def test_a_module_out_of_the_store_puts_its_card_only_where_it_shows(modules, settings):
+    modules(module("demo", system_cards=[{"key": "w", "component": "W"}], listed=False))
+    assert [card["key"] for card in system_cards(ctx())] == ["demo.w"]
+
+    settings.SHOW_UNLISTED_MODULES = False
+    assert system_cards(ctx()) == []
+
+
+def test_the_cards_follow_an_app_turned_on_or_off():
+    from base.events import APP_EVENTS, HUB_STATE_APPLIED
+
+    assert {HUB_STATE_APPLIED, *APP_EVENTS} <= set(live_registry.subscribable["base.system.cards"])

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4334c66484db081ba3063e2af9d162f3cf8f924411311fe517c8bbec65ef27d1 -->
+<!-- generated from WORKBOOK.md sha256:8385341398e44c45b13a72a246e1027b74800e488556576ab0dabf2838b8ec9e -->
 
 ## What it is for and who it is for
 
@@ -22,7 +22,7 @@ reservation), does not charge (that is **Sales**) and is not the appointment boo
 
 ERPlora does not invent flows: it adopts the ones the market has already proven (OpenTable, Resy,
 SevenRooms, Toast Tables, Square, Lightspeed, TouchBistro, Tablein, TablesReady, CoverManager, TheFork
-Manager, Odoo). The open questions of the current product were resolved like this; the research, with its
+Manager, Odoo). The questions were resolved like this; the research, with its
 sources, is in "Market research", at the end of this manual.
 
 - **Book by day and by service**, with the day's **covers** and how much is left free in the next slot;
@@ -50,8 +50,8 @@ sources, is in "Market research", at the end of this manual.
   were added; when there is room it becomes a reservation in one tap. The market separates the door queue
   (with an estimated wait and SMS) from the list for full days; without messaging, here it is one list for
   both things (see "What is left out").
-- **The phone is required out of the box on the reservation** (question 7), and always the same (the
-  current product did not ask for it until any setting was saved); the email, not. The waitlist asks for
+- **The phone is required out of the box on the reservation** (question 7), and always the same; the
+  email, not. The waitlist asks for
   nothing but the name: the phone only serves to call.
 - **The booking rules are for the customer who books by themselves** (question 8): minimum and maximum
   guests, minimum notice, maximum days and the full slot bind the reservations made online or through
@@ -59,6 +59,9 @@ sources, is in "Market research", at the end of this manual.
   slot knowingly: the system warns and asks "Book anyway".
 - **Table reserved from one hour before** (question 8, decided by Tables, TABLE-F25): before that the
   table stays free and shows "Ana · 21:00".
+- **The pending one nobody confirms is released when its time is up, whatever day it is** (question 9):
+  the window counts from the reservation's time, so the one at 23:55 is released after midnight, although its
+  day is already yesterday.
 
 ## Before you start
 
@@ -102,7 +105,8 @@ with how many reservations are "left" or "Full"; or "No more service today", "No
 "Closed this day"). "Today" is the one of the business's clock, not the device's.
 
 Below, the day's table by time: Date, Time, Guest, Phone (as in Customers: the country prefix and the
-digits in groups), Party, Table, Status; search box "Search guest, phone or email…" that searches the
+digits in groups), Party, Table, Status (a cancelled one says why next to it: "Reason: …" with what was
+typed, or "Released: never confirmed"; a long one, shortened with "…"); search box "Search guest, phone or email…" that searches the
 **whole** book, also by the digits of the phone without the prefix (results by day and time); filters by
 time, guests, table and status; table or cards view. Main action **"New reservation"** and, per row,
 according to its status: "Confirm", "Seat", "Complete", "Cancel", "No-show", "Edit" and "Delete" (the
@@ -116,7 +120,9 @@ inside the form.
 **Reservation form** ("New reservation" / "Edit reservation"): Customer (the Customers search box, by
 name or phone, with "+ New customer"), Guest (the name), Phone, Email, Date, Time, Party, Duration (min),
 Table (the free ones at that time, with their capacity and their zone; the ones that do not fit the party,
-flagged), Booked through (Phone, In person), Guest notes and Internal notes.
+flagged), Booked through (Phone, In person), Guest notes and Internal notes. A reservation already seated,
+completed, cancelled or not shown only changes its notes, and says so on top; a cancelled one, also with its
+whole reason.
 
 ### Waitlist
 Menu **Reservations → Waitlist**. Table, in the order in which they were added (by day and preferred
@@ -141,7 +147,9 @@ Each section paints its own "Loading…" and its error with retry.
 ### Settings
 Tab **Settings** (only for whoever can change them). Minimum and maximum guests, minimum notice (hours,
 for online and WhatsApp), maximum days ahead, default duration, confirm new reservations automatically,
-phone required, email required and the minutes after the time to release a pending one. "Save".
+phone required, email required and the minutes after the time to release a pending one. "Save". On a phone it
+fits whole, in Spanish and in English: a switch's long sentence breaks onto two lines and "Save" shows complete at
+the end (hub#906).
 
 ## States of each screen
 
@@ -153,6 +161,12 @@ phone required, email required and the minutes after the time to release a pendi
 | Settings | "Loading…" | — | message + "Retry" | notice | notice |
 
 While the live connection is recovered, "Reconnecting…" on top, without erasing what is painted.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
@@ -193,12 +207,13 @@ Steps:
 In: day, from, to, maximum of reservations, maximum of guests (optional).
 Out: the slot (announces: `reservation.time_slot.created`, `reservation.time_slot.deleted`).
 If it fails: "To" before or equal to "From": "A slot has to end after it starts."; a slot that overlaps
-another one of the same day: "That slot overlaps another one of the same day (13:00–16:00).".
+another one of the same day: "That slot overlaps another one of the same day (13:00–16:00).". The reason
+of a field goes away as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Block a day or some hours
 Status: done
-Actor: manager
+Actor: manager, assistant
 Screen: Availability → Blocked dates
 Steps:
 1. Tap "Add blocked date", type the date and the reason (holiday, closure, private event).
@@ -208,7 +223,8 @@ Steps:
 In: date, reason, whole day or from–until.
 Out: the block (announces: `reservation.blocked_date.created`, `reservation.blocked_date.deleted`).
 If it fails: without hours when it is not the whole day, or "Until" before "From": the field says so;
-that day already blocked at that time: "That date is already blocked at that time.".
+that day already blocked at that time: "That date is already blocked at that time.". The reason of a
+field goes away as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Adjust the booking rules
@@ -218,10 +234,13 @@ Screen: Settings
 Steps:
 1. Change the minimum and maximum guests, the notice, the default duration, the required phone or email
    and the minutes to release a pending one. "Save".
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 2. The rules apply to new reservations and to changes; the ones already made are not touched.
 In: the rules.
 Out: the saved rules (announces: `reservation.settings.updated`).
-If it fails: minimum guests greater than the maximum: the field says so.
+If it fails: minimum guests greater than the maximum: the field says so. As in the form windows, the notice
+goes as soon as something is changed and a field's reason as soon as that field is corrected; both come back if
+the next try is refused too. A refusal that names no field stays until the next try (hub#873).
 Involved: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Choose whether reservations confirm themselves
@@ -266,7 +285,8 @@ Steps:
 3. The reservation is born Pending (or Confirmed, if they confirm themselves: then it holds its table).
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
    assistant's card says who it is for, by the name of their card, the day and the time ("Create in
-   Reservations: Ana García · 15 Oct 2026 · 21:00"), and carries the table by its number, never by a code.
+   Reservations: Ana García · 15 Oct 2026 · 21:00"), and carries the table with its zone, as Tables names it
+   ("5 (Terrace)": the number repeats across zones), never by a code.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
 one typed with the card already chosen; one written with another country's prefix keeps its own. It is
@@ -288,7 +308,9 @@ time slot covers it."; full slot: "That time slot is fully booked for that date.
 table out of service: "Table 5 cannot be booked: it is blocked or out of service."; table already
 reserved at that time: "Table 5 already has a reservation from 21:00 to 23:00.". Two reservations at once
 on the last place or on the same table and time: one goes in and the other gets its reason (in the full
-slot, the staff can then book anyway; on the table, never).
+slot, the staff can then book anyway; on the table, never). In the window, the reason of a field (the
+Table included) shows under it and goes away as soon as that field is corrected, even if another one says
+the same (hub#888).
 Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
 ### RESERVATION-F07 Confirm a reservation
@@ -318,6 +340,9 @@ Steps:
    party and fills a full slot with "Book anyway". If it was confirmed, Tables moves its hold to the new
    table and time, or releases it if it is left without a table (TABLE-F26).
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
+4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
+   says the reservation by its customer, its day and its time and the new table with its zone, as Tables
+   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
 same number written another way (with spaces or without the prefix) is not a change.
 Out: the changed reservation (announces: `reservation.reservation.updated`).
@@ -334,6 +359,9 @@ Screen: Reservations (row → "Cancel")
 Steps:
 1. "Cancel" on a Pending or Confirmed reservation; type the reason if you want and confirm.
 2. It becomes Cancelled, frees its place and Tables releases its table (TABLE-F27).
+3. Next to "Cancelled", the row, the phone's card and the reservation form say "Reason: …" with what was
+   typed, as typed (a long one, shortened with "…" in the row and whole in the form); without a reason,
+   only "Cancelled".
 In: the reservation and the reason.
 Out: the cancelled reservation (announces: `reservation.reservation.status_changed`).
 If it fails: from another status: "This reservation is seated: it cannot be cancelled.".
@@ -398,12 +426,15 @@ Steps:
 1. Every quarter of an hour, in each business, the reservations still Pending once the minutes of the
    settings (15) have passed since their time are cancelled with the reason "Released: never confirmed" and
    free their place.
-2. The confirmed ones, the seated ones and those of other days are not touched.
+2. The confirmed ones, the seated ones and those of days still to come are not touched. A pending one of an
+   earlier day is released all the same: the one at 23:55 is released at 00:15, although its day is already
+   yesterday.
 3. The Reservations screen that business has open turns them Cancelled at once, without reloading; another
    business's screen hears nothing.
 In: the time.
-Out: the released reservations (announces: `reservation.reservation.unconfirmed_released`, only if it
-released any).
+Out: the released reservations, which say "Released: never confirmed" next to "Cancelled" in the row, the
+phone's card and the form (announces: `reservation.reservation.unconfirmed_released`, only if it released
+any).
 If it fails: a pass that fails changes nothing and the next one tries again.
 Involved: RESERVATION-F03
 
@@ -420,12 +451,14 @@ international format, as in a reservation (RESERVATION-F06), also with the card 
 Out: the entry (announces: `reservation.waitlist.created`).
 If it fails: without a name nor a customer: the form says so; a phone that is not of its country:
 Customers' reason, "This is not a valid phone number of its country: check the digits or write it with
-its international prefix (+44…).", in the Phone field, and nobody is added nor is the card created.
+its international prefix (+44…).", in the Phone field, and nobody is added nor is the card created. The
+reason of a field goes away as soon as that field is corrected, even if another one says the same
+(hub#888).
 Involved: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Mark as contacted or remove from the waitlist
 Status: done
-Actor: employee, manager
+Actor: employee, manager, assistant
 Screen: Waitlist (row → "Contacted", "Remove")
 Steps:
 1. "Contacted" when they are called: the row says "Yes".
@@ -531,7 +564,7 @@ Involved: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 
 ### RESERVATION-F20 Delete a reservation
 Status: done
-Actor: administrator, owner
+Actor: administrator, owner, assistant
 Screen: Reservations (row → "Delete")
 Steps:
 1. "Delete" and confirm. Cancelling is better: it keeps the reason.
@@ -597,7 +630,10 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 own session) and the API, with the same rules and the same permissions. Designed for voice: a reservation
 is named by its id or by the customer's name or phone with its date ("Ana's reservation tomorrow"); a
 table by its id or by its number ("table 5"), with the zone if the number is repeated; a customer by their
-id, their name or their phone. If a reference matches several, it is refused saying which ones (409
+id, their name or their phone; a waitlist entry, by the name or phone of whoever waits; a blocked date, by
+its date or by its reason ("the holiday closure"), which the assistant looks up in the list of blocks.
+Somebody already on the waitlist is booked by the assistant converting their entry (F16), never with a
+separate reservation. If a reference matches several, it is refused saying which ones (409
 `*_ambiguous`). Changing and cancelling can also be asked for on behalf of the customer themselves
 (`on_behalf_of`, their card; today, from WhatsApp): only their reservation, with their customer rules and
 without touching the table, the internal notes nor booking anyway (F18).
@@ -607,8 +643,11 @@ record as the Reservations screens name it, never by its code: a reservation, by
 its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone; with the customer's data
 erased, by the day and the time); a waitlist entry, the same; a slot, by its weekday and its hours
 ("Thursday · 20:00–23:30"); a blocked date, by its day and, if it is not the whole day, its hours; the
-customer, by the name of their card, and the table, by its number. A record that whoever confirms cannot
-see (for example, the card of a customer, without permission to see customers) does not show on the card.
+customer, by the name of their card, and the table, with its zone ("5 (Terrace)"), as Tables names it.
+For a dangerous action, the label says
+what it is: "Reservation", "Time slot", "Blocked date" or "Waitlist entry", never "Record". A record that
+whoever confirms cannot see (for example, the card of a customer, without permission to see customers)
+does not show on the card.
 
 ### What it offers: queries (they read and change nothing)
 
@@ -667,9 +706,8 @@ For the platform only (without a route in the API, as the system): `reservation.
 | `reservation.settings.updated` | Save the rules | the changed fields |
 | `reservation.customer.reassigned`, `reservation.customer.erased` | Reactions to Customers | `id` (and `absorbed_id`) |
 
-`status_changed` and `updated` also carry the customer's name and their card (it was the load with which
-Tables was going to paint the hold); the others, only ids and numbers. Tables no longer listens to these
-notices: it receives the hold through the call of Reservations in the same transaction (TABLE-F25–F28).
+`status_changed` and `updated` also carry the customer's name and their card; the others, only ids and
+numbers. Tables does not listen to these notices: it receives the hold through the call of Reservations in the same transaction (TABLE-F25–F28).
 
 ### What it reacts to
 

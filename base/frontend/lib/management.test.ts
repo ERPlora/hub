@@ -1,4 +1,4 @@
-// «Manage on erplora.com» (BASE-F11) is offered in every copy of the Hub but the Google Play one (gh:hub#1897): a
+// «Manage on erplora.com» (BASE-F11) is offered in every copy of the Hub but the Google Play one: a
 // browser at once; the installed app once it says where its binary came from (`device_context`).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

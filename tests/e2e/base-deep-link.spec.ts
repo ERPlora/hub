@@ -1,4 +1,4 @@
-// flow: BASE-G52 (base/WORKBOOK.md, «Entrar con la cuenta de erplora.com»; APP-BASE-3)
+// flow: BASE-F52 (base/WORKBOOK.md, «Entrar con la cuenta de erplora.com»)
 // A link to a tab of a screen (`/settings#data`, `/system#usage`) opened without a session goes through erplora.com's
 // sign-in and back to that tab: the part after `#` never reaches a server, so the jump must not drop it. At each size,
 // in a fresh browser (no session on the hub nor on erplora.com): the SaaS's form, then the hub, on the address asked.
@@ -18,7 +18,7 @@ const LINKS = [
 ] as const;
 
 for (const size of SIZES) {
-  test(`BASE-G52: a link to a tab opened without a session lands on that tab after erplora.com, at ${size.name}`, async ({
+  test(`a link to a tab opened without a session lands on that tab after erplora.com, at ${size.name}`, async ({
     browser,
   }) => {
     for (const link of LINKS) {

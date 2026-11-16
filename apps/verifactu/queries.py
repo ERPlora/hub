@@ -20,10 +20,12 @@ from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, NotFound, OperationError
 from live.operations import get as get_operation
 from live.operations import operation
+from psycopg import sql
 
 from apps.invoice.models import Invoice, Issuer
 from base import activation
 from base import operations as platform
+from base.business import country_or_market
 from apps.verifactu import (
     certificates,
     chain,
@@ -32,6 +34,7 @@ from apps.verifactu import (
     producer,
     representation,
 )
+from apps.verifactu.apps import SPAIN
 from apps.verifactu.models import (
     AeatRecord,
     Chain,
@@ -76,16 +79,10 @@ RECORD_NOT_FOUND = _("Record not found.")
 INVOICE_NOT_FOUND = _("Invoice not found.")
 #: The waits that are a past attempt's failure, kept on the record (the rest are computed when read).
 ATTEMPT_FAILURES = ("unreachable", "refused", "unknown", "aeat_fault", "xml_invalid")
-#: The wait of a business's record that ERPlora's own hub cannot present yet: it does not know the business's id
-#: (``presenter``, hub#454). Kept on the record by the pass that found it, told until the business is linked.
-UNREGISTERED = "hub_unregistered"
 #: Days before its expiry from which the own certificate is announced (VERIFACTU-F34).
 EXPIRY_WARNING_DAYS = 30
 RECORD_EVENTS_SHOWN = 20
 VIEW = "verifactu.view_record"
-#: VeriFactu binds the taxpayers of Spain alone (RD 1007/2023, Orden HAC/1177/2024); the Canary Islands, Ceuta and
-#: Melilla are regions of ES (the tax territory of PLAN-HUB, round 2026-10-17), not other countries.
-SPAIN = "ES"
 #: The wait of every record of a business outside Spain: none of them is ever sent.
 OUTSIDE_SPAIN = "outside_spain"
 ONLY_IN_SPAIN = _("VeriFactu is only for businesses in Spain.")
@@ -111,10 +108,10 @@ def business_country(scope: Scope | None) -> str:
 
 
 def outside_spain(scope: Scope | None) -> bool:
-    """Whether ``scope``'s business was registered in a country other than Spain: VeriFactu is not for it, so nothing
-    of it is sealed nor sent, as if the app were off (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)."""
-    country = business_country(scope).strip().upper()
-    return bool(country) and country != SPAIN
+    """Whether ``scope``'s business was registered in a country other than Spain: VeriFactu is not for it, so nothing of
+    it is sealed nor sent, as if the app were off. One without a country is in ERPlora's market, Spain: base's one
+    reading of it (``base.business.country_or_market``)."""
+    return country_or_market(business_country(scope)) != SPAIN
 
 
 def refuse_outside_spain(ctx: OperationContext) -> None:
@@ -158,19 +155,19 @@ def issuer_configured() -> bool:
 
 def production_open() -> bool:
     """Whether this server lets a business go live (VERIFACTU-F08): only the ``prod`` deployment, and only once ERPlora
-    opens it there (``VERIFACTU_PRODUCTION_ENABLED``, under Ioan's supervision); ``pre`` always files in testing."""
+    opens it there (``VERIFACTU_PRODUCTION_ENABLED``, a supervised step); ``pre`` always files in testing."""
     return settings.ERPLORA_ENVIRONMENT == "prod" and bool(
         settings.VERIFACTU_PRODUCTION_ENABLED
     )
 
 
 def effective_environment(ctx: OperationContext, config: Config) -> str:
-    """The AEAT environment a new record of this business files in: ERPlora's own hub (PLAN-SAAS §4), its
-    deployment's (``prod``: production; ``pre``: testing), whatever its switch says, but production only once ERPlora
-    opens it on the server (``production_open``, working-rules §15: its own invoices skip no lock); once live there, it
-    stays in production while the server is closed, its records waiting (``production_closed``), so its real invoices
-    never move to the test chain. A demo, always testing (HUB-F315): phase 1 shares the tables, so the configuration
-    it reads may be a business's that went live. Any other business, its configuration's."""
+    """The AEAT environment a new record of this business files in: ERPlora's own hub, its deployment's (``prod``:
+    production; ``pre``: testing), whatever its switch says, but production only once ERPlora opens it on the server
+    (``production_open``: its own invoices skip no lock); once live there, it stays in production while the server is
+    closed, its records waiting (``production_closed``), so its real invoices never move to the test chain. A demo,
+    always testing, whatever its configuration says: it never goes live (``go_live_forbidden``). Any other
+    business, its configuration's."""
     if platform.is_demo_hub(ctx.scope):
         return Environment.TESTING
     if platform.is_platform_hub(ctx.scope):
@@ -221,11 +218,11 @@ def certificate_valid(now: dt.datetime | None = None) -> bool:
     return OwnCertificate.objects.filter(singleton=True, expires_at__gt=now).exists()
 
 
-def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:
+def _route_sending_problem(config: Config, environment: str, scope: Scope | None) -> str:  # noqa: PLR0911
     """What the chosen route itself lacks to carry a record to the AEAT of ``environment``: the own route, its valid
-    certificate (as in the old Hub) and, in production, one this server can open; ERPlora's route in production,
+    certificate and, in production, one this server can open; ERPlora's route in production,
     the approved signed authorisation, but for ERPlora's own records on ERPlora's own hub (``scope``; ``None``, no
-    hub's, never is: saas#2524, a business typing ERPlora's tax ID is no exemption)."""
+    hub's, never is: a business typing ERPlora's tax ID is no exemption)."""
     production = environment == Environment.PRODUCTION
     if config.route == Config.Route.OWN:
         if not certificate_valid():
@@ -240,7 +237,7 @@ def _route_sending_problem(config: Config, environment: str, scope: Scope | None
         and platform.is_platform_hub(scope)
         and issuer_identity()[0] == settings.PLATFORM_ISSUER_TAX_ID
     ):
-        # ERPlora's seal presents ERPlora's own records: it represents nobody (its own hub, PLAN-SAAS §4).
+        # ERPlora's seal presents ERPlora's own records on its own hub: it represents nobody.
         return ""
     if config.representation_status != Config.Representation.APPROVED:
         return "representation_not_approved"
@@ -249,7 +246,7 @@ def _route_sending_problem(config: Config, environment: str, scope: Scope | None
 
 def _server_problem(environment: str) -> str:
     """What this server lacks to carry anything to the AEAT of production: ERPlora's gateway, and the opening of real
-    filing (``production_open``, working-rules §15). Testing lacks nothing here (its waits are ``blockers``')."""
+    filing (``production_open``). Testing lacks nothing here (its waits are ``blockers``')."""
     if environment != Environment.PRODUCTION:
         return ""
     if not gateway.configured():
@@ -259,23 +256,18 @@ def _server_problem(environment: str) -> str:
     return ""
 
 
-def presenter(scope: Scope, config: Config, issuer_nif: str) -> str | None:
-    """Who ERPlora's gateway is told presents ``issuer_nif``'s records (its ``hub``): ``scope``'s business by its slug
-    (saas#29). ERPlora's own hub presents ERPlora's own records only (``PLATFORM_HUB_SLUG``); a business's record its
-    pass sees (the worker's fixed scope while the tables are shared, phase 1) goes as that business, by the id
-    erplora.com gave it (``Config.hub_id``, which the SaaS takes as well as a slug), never as ERPlora: the gateway
-    would refuse it (409 ``nif_mismatch``, hub#454). ``None`` without that id: nothing can be presented yet."""
-    if not platform.is_platform_hub(scope) or issuer_nif == settings.PLATFORM_ISSUER_TAX_ID:
-        return scope.key
-    return str(config.hub_id) if config.hub_id is not None else None
+def presenter(scope: Scope) -> str:
+    """Who ERPlora's gateway is told presents the records of ``scope`` (its ``hub``): ``scope``'s business by its
+    slug, whatever tax ID a record bears. Every business runs its pass in its own database, and ERPlora's own hub's
+    (``PLATFORM_HUB_SLUG``) holds ERPlora's records alone, so it presents ERPlora's own and nobody else's."""
+    return scope.key
 
 
 def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""`` (VERIFACTU-F04, F08):
     the route's own lack first, then the server's in production (no gateway, closed). It keeps the queue waiting
     before the gateway is ever called and, in production, refuses every new sale (``verifactu.record.create``) and
-    going live. No plan gates it (PLAN §30, round 2026-10-22b: VeriFactu on Free; ERPlora's route needs its
-    approved authorisation alone)."""
+    going live. No subscription plan gates it: ERPlora's route needs its approved authorisation alone."""
     return _route_sending_problem(config, environment, scope) or _server_problem(environment)
 
 
@@ -289,7 +281,7 @@ def issue_problem(config: Config, scope: Scope | None) -> str:
 def live_problems(config: Config, scope: Scope) -> list[str]:
     """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can, in
     ``go_live``'s order: the server (closed, no gateway), a demo, the route, the account. Invoicing's issuer is told
-    apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
+    apart. A demo never goes live; whether it is one, the platform says
     (``base.operations.is_demo_hub``). Outside Spain, that alone: nothing else would ever let it."""
     if outside_spain(scope):
         return [OUTSIDE_SPAIN]
@@ -357,7 +349,7 @@ def waiting_of(record: Record, config: Config, scope: Scope | None) -> list[dict
     ).first()
     if control and control.next_send_at and control.next_send_at > timezone.now():
         reasons.append(wait("aeat_wait", at=_local_time(control.next_send_at)))
-    if record.wait_reason in ATTEMPT_FAILURES or (record.wait_reason == UNREGISTERED and config.hub_id is None):
+    if record.wait_reason in ATTEMPT_FAILURES:
         reasons.append(wait(record.wait_reason, record.wait_detail))
     return reasons
 
@@ -480,7 +472,7 @@ def corrections_of(record) -> QuerySet:
 
 def with_corrections(queryset: QuerySet) -> QuerySet:
     """Each record with ``corrected_by``, the id of the record that corrects it, in the same SELECT: no query per
-    row of a list (hub#857)."""
+    row of a list."""
     return queryset.annotate(corrected_by=Subquery(corrections_of(OuterRef("pk"))))
 
 
@@ -580,7 +572,17 @@ def _words(text: str | None) -> list[str]:
         "description": "VeriFactu's configuration: the environment (testing or production), the sending route (ERPlora "
         "files for the business, or its own certificate), the own certificate uploaded here (holder and expiry, never "
         "its material), the signed authorisation's state as the ERPlora account says, the software producer's details, the responsible declaration, and what keeps "
-        "records from leaving now."
+        "records from leaving now.",
+        "asks": {
+            "en": (
+                "which route files our invoices with the AEAT, and are we still in testing?",
+                "what keeps VeriFactu from filing with the AEAT?",
+            ),
+            "es": (
+                "¿con qué vía remitimos a Hacienda y en qué entorno estamos?",
+                "¿por qué no se pueden mandar los registros a la AEAT?",
+            ),
+        },
     },
 )
 def get_config(ctx: OperationContext, data: NoInput) -> ConfigOut:
@@ -613,10 +615,20 @@ SORTS = {
         "rejected), record type, invoice type, environment, issue date and total in cents. Each row says whether a "
         "registration the AEAT rejected or accepted with errors is already corrected (correction_status corrected, "
         "corrected_by_id the record that corrects it) or still to correct (pending); correction_status=pending lists "
-        "only the ones still to correct, correction_status=corrected only the corrected ones."
+        "only the ones still to correct, correction_status=corrected only the corrected ones.",
+        "asks": {
+            "en": (
+                "list the VeriFactu registrations sealed in October",
+                "which rejected registrations still need correcting?",
+            ),
+            "es": (
+                "lista los registros de VeriFactu de octubre",
+                "¿qué registros rechazados quedan por subsanar?",
+            ),
+        },
     },
 )
-def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
+def list_records(ctx: OperationContext, data: RecordListIn) -> dict:  # noqa: C901
     queryset = with_corrections(Record.objects.all())
     text = (data.search or "").strip()
     if text.startswith("#") and text[1:].isdigit():
@@ -669,7 +681,17 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
     ai={
         "description": "One VeriFactu record, by its id or by its invoice's number (e.g. TICKET-2026-000012): its "
         "invoice's figures, its chain (sequence, fingerprint, previous one), its QR link, its XML, the AEAT's answer "
-        "(CSV, code, message), its attempts and why it is not in the AEAT yet."
+        "(CSV, code, message), its attempts and why it is not in the AEAT yet.",
+        "asks": {
+            "en": (
+                "give me the XML and fingerprint of VeriFactu entry 12",
+                "why has the AEAT not taken VeriFactu entry 12?",
+            ),
+            "es": (
+                "dame el XML y la huella del registro 12",
+                "¿qué respondió Hacienda al registro 12?",
+            ),
+        },
     },
 )
 def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
@@ -732,7 +754,17 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
     expose_api=True,
     ai={
         "description": "The VeriFactu record of an invoice (by the invoice's id): its QR link and image, its CSV and "
-        "its status, for the ticket or the invoice; none when the invoice has no record yet."
+        "its status, for the ticket or the invoice; none when the invoice has no record yet.",
+        "asks": {
+            "en": (
+                "what QR does invoice F-2026-0007 carry?",
+                "get me the VeriFactu registration of this invoice",
+            ),
+            "es": (
+                "¿qué QR lleva la factura F-2026-0007?",
+                "dame el registro de VeriFactu de esta factura",
+            ),
+        },
     },
 )
 def by_invoice(ctx: OperationContext, data: ByInvoiceIn) -> ByInvoiceOut:
@@ -774,7 +806,17 @@ def _queue_row(record: Record) -> dict:
     output=Page[QueueRowOut],
     ai={
         "description": "The queue: the VeriFactu records that are not in the AEAT yet (pending, or sent without "
-        "answer), in the order they go out, with their attempts, next attempt and last error."
+        "answer), in the order they go out, with their attempts, next attempt and last error.",
+        "asks": {
+            "en": (
+                "what is queued for the AEAT?",
+                "show me the VeriFactu contingency queue",
+            ),
+            "es": (
+                "¿qué registros esperan en la cola de Hacienda?",
+                "enséñame la contingencia de VeriFactu",
+            ),
+        },
     },
 )
 def list_queue(ctx: OperationContext, data: ContingencyListIn) -> dict:
@@ -803,7 +845,17 @@ def list_queue(ctx: OperationContext, data: ContingencyListIn) -> dict:
     output=Page[EventOut],
     ai={
         "description": "VeriFactu's audit events, newest first, each message in the reader's language: search by the "
-        "words shown (in Spanish or English), filter by type, severity and day."
+        "words shown (in Spanish or English), filter by type, severity and day.",
+        "asks": {
+            "en": (
+                "search VeriFactu's audit trail for errors",
+                "which serious warnings did VeriFactu note down?",
+            ),
+            "es": (
+                "busca errores en el historial de auditoría de VeriFactu",
+                "¿qué incidencias graves ha apuntado VeriFactu?",
+            ),
+        },
     },
 )
 def list_events(ctx: OperationContext, data: EventListIn) -> dict:
@@ -841,7 +893,17 @@ def list_events(ctx: OperationContext, data: EventListIn) -> dict:
     expose_api=True,
     ai={
         "description": "How many VeriFactu records are not in the AEAT yet, rejected, accepted and in total: whether "
-        "everything reached the AEAT."
+        "everything reached the AEAT.",
+        "asks": {
+            "en": (
+                "has everything reached the AEAT?",
+                "is anything rejected or still not with the AEAT?",
+            ),
+            "es": (
+                "¿ha llegado todo a Hacienda o falta algo?",
+                "¿queda algo pendiente o rechazado sin llegar a la AEAT?",
+            ),
+        },
     },
 )
 def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummaryOut:
@@ -860,13 +922,13 @@ def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummar
 
 #: This app's label: what ``base.activation`` names its state by.
 VERIFACTU = "verifactu"
-#: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
+#: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32).
 NEVER_OFF = _("VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.")
 
 
 def enable_refusal(ctx: OperationContext) -> str | None:
     """VERIFACTU-F01: why the app may not go on, in ``ctx``'s language, or ``None``: outside Spain it would seal and send
-    nothing (``outside_spain``), so it does not go on (hub#694). One already on stays as it is, and goes off when asked.
+    nothing (``outside_spain``), so it does not go on. One already on stays as it is, and goes off when asked.
     A business without a country (a demo) is in Spain."""
     if not outside_spain(ctx.scope):
         return None
@@ -878,7 +940,7 @@ def disable_refusal(ctx: OperationContext) -> str | None:
     """VERIFACTU-F32: why the app may not go off, in ``ctx``'s language, or ``None``. In Spain, never once on: from
     then on the business's invoices reach the AEAT, VERI*FACTU binds it at least to the end of the natural year
     (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way of recording them, so whatever its queue holds
-    the answer is the same (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON). A business without a country (a demo) is in Spain.
+    the answer is the same. A business without a country (a demo) is in Spain.
     One that never got on (its tables being made, or making them failed: ``base.activation``) sealed nothing, so
     nothing binds it yet. Outside Spain no record is ever sent, so turning it off stops nothing: never refused (the
     records are kept). Both are read in the hub of the active context, inside ``base.app.disable``'s transaction."""
@@ -889,7 +951,7 @@ def disable_refusal(ctx: OperationContext) -> str | None:
 
 
 def oldest_unsent_at() -> dt.datetime | None:
-    """hub#488: since when the oldest production record not in the AEAT yet (``Record.UNSENT``: pending, its retry
+    """Since when the oldest production record not in the AEAT yet (``Record.UNSENT``: pending, its retry
     waiting included, or sent without an answer) waits, or ``None``: the platform's ``OldestPendingAgeSeconds``, read
     in the database of the active context. A record of the AEAT's test environment files nothing, so it never counts;
     what the AEAT answered is out of the queue."""
@@ -904,7 +966,19 @@ def oldest_unsent_at() -> dt.datetime | None:
     permission=VIEW,
     input=NoInput,
     output=RecordsByStatusOut,
-    ai={"description": "How many VeriFactu records are in each status."},
+    ai={
+        "description": "How many VeriFactu records are in each status.",
+        "asks": {
+            "en": (
+                "break the VeriFactu registrations down by status",
+                "VeriFactu per status: accepted, rejected and queued",
+            ),
+            "es": (
+                "reparto de los registros de VeriFactu por estado",
+                "registros aceptados, rechazados y en espera, por estado",
+            ),
+        },
+    },
 )
 def records_by_status(ctx: OperationContext, data: NoInput) -> RecordsByStatusOut:
     counts = dict(Record.objects.values_list("status").annotate(total=Count("id")))
@@ -923,7 +997,17 @@ def records_by_status(ctx: OperationContext, data: NoInput) -> RecordsByStatusOu
     input=NoInput,
     output=ContingencySummaryOut,
     ai={
-        "description": "The queue in short: how many records wait, how many are due now, and whether it is failing."
+        "description": "The queue in short: how many records wait, how many are due now, and whether it is failing.",
+        "asks": {
+            "en": (
+                "sum up the VeriFactu contingency: is it failing?",
+                "how many filings to the AEAT wait, and how many are due?",
+            ),
+            "es": (
+                "resume la contingencia de VeriFactu: ¿está fallando?",
+                "¿cuántos envíos a Hacienda esperan y cuántos tocan ya?",
+            ),
+        },
     },
 )
 def contingency_summary(ctx: OperationContext, data: NoInput) -> ContingencySummaryOut:
@@ -943,7 +1027,19 @@ def contingency_summary(ctx: OperationContext, data: NoInput) -> ContingencySumm
     permission=VIEW,
     input=EventsRecentIn,
     output=EventsOut,
-    ai={"description": "The latest VeriFactu audit events."},
+    ai={
+        "description": "The latest VeriFactu audit events.",
+        "asks": {
+            "en": (
+                "what has happened lately in VeriFactu?",
+                "show the ten latest fiscal events",
+            ),
+            "es": (
+                "¿qué ha pasado últimamente en VeriFactu?",
+                "dame los diez sucesos fiscales más recientes",
+            ),
+        },
+    },
 )
 def events_recent(ctx: OperationContext, data: EventsRecentIn) -> EventsOut:
     events = Event.objects.select_related("record").order_by("-created_at", "-id")[
@@ -976,7 +1072,17 @@ def aeat_row(row: AeatRecord) -> dict:
     ai={
         "description": "The last photo of what the AEAT holds (from the last «Query AEAT»), the newest first: "
         "search by invoice number, fingerprint or CSV; filter by its state at the AEAT (Correcto, "
-        "AceptadoConErrores, Anulado) and issue date."
+        "AceptadoConErrores, Anulado) and issue date.",
+        "asks": {
+            "en": (
+                "what does the AEAT hold of ours, per the last query?",
+                "show what the AEAT has on file for us",
+            ),
+            "es": (
+                "¿qué registros nuestros constan en la AEAT según la última consulta?",
+                "enséñame lo que dice Hacienda que tiene nuestro",
+            ),
+        },
     },
 )
 def list_aeat_records(ctx: OperationContext, data: AeatRecordListIn) -> dict:
@@ -1025,7 +1131,17 @@ def chain_out(head: Chain) -> ChainOut:
     output=ChainStatusOut,
     ai={
         "description": "The VeriFactu chains of an issuer (Invoicing's issuer by default): last sequence, last "
-        "fingerprint, anchors and the last validation's verdict."
+        "fingerprint, anchors and the last validation's verdict.",
+        "asks": {
+            "en": (
+                "how is the VeriFactu chain doing?",
+                "what is the current fingerprint and sequence?",
+            ),
+            "es": (
+                "¿cómo va la cadena de VeriFactu?",
+                "¿cuál es la huella actual y en qué secuencia vamos?",
+            ),
+        },
     },
 )
 def chain_status(ctx: OperationContext, data: IssuerIn) -> ChainStatusOut:
@@ -1044,7 +1160,19 @@ def chain_status(ctx: OperationContext, data: IssuerIn) -> ChainStatusOut:
     permission=VIEW,
     input=NoInput,
     output=DiagnosticLastOut,
-    ai={"description": "The result of the last VeriFactu connection test, or none."},
+    ai={
+        "description": "The result of the last VeriFactu connection test, or none.",
+        "asks": {
+            "en": (
+                "what did the last connection diagnostic say?",
+                "did the last VeriFactu diagnostic pass?",
+            ),
+            "es": (
+                "¿qué dio el último diagnóstico de conexión con Hacienda?",
+                "¿pasó VeriFactu el último diagnóstico?",
+            ),
+        },
+    },
 )
 def last_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticLastOut:
     event = (
@@ -1138,7 +1266,17 @@ def saas_unreachable() -> OperationError:
         "description": "The official model of the representation authorisation (Anexo I of the AEAT's Convenio "
         "17) with the business's legal name, tax ID and address from Invoicing already written in, a PDF the "
         "business prints and signs by hand, or signs with AutoFirma, before sending it for ERPlora to file on its "
-        "behalf."
+        "behalf.",
+        "asks": {
+            "en": (
+                "download the representation form filled in with our details",
+                "give me the Anexo I to sign for ERPlora",
+            ),
+            "es": (
+                "descarga el modelo de apoderamiento para ERPlora relleno",
+                "dame el Anexo I con nuestros datos para firmarlo",
+            ),
+        },
     },
 )
 def representation_model(ctx: OperationContext, data: NoInput) -> RepresentationModelOut:
@@ -1157,3 +1295,20 @@ def keeps_fiscal_documents() -> bool:
     """Whether this database holds its records for the tax authority (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
     too, for what it asks is whether a database can go, and that cannot be undone."""
     return Record.objects.exists()
+
+
+def record_states(conn) -> dict:
+    """What each production record says of its life at the AEAT (its status, when it was sent, when it last
+    changed), by id, in the database of ``conn``; nothing where the app was never set up. ``conn`` is a direct
+    connection (``fiscal_record_states`` on this app's config: the platform's restore reads the business's database and
+    its copy, both closed to the app, and the copy has no alias), so it is read by its own SQL over the model's names,
+    never the ORM. Only the AEAT's production counts: its test environment files nothing."""
+    table = Record._meta.db_table
+    if conn.execute("SELECT to_regclass(%s)", [table]).fetchone()[0] is None:
+        return {}
+    read, where = ("id", "status", "transmitted_at", "updated_at"), "environment"
+    columns = {field: sql.Identifier(Record._meta.get_field(field).column) for field in (*read, where)}
+    query = sql.SQL("SELECT {} FROM {} WHERE {} = %s").format(
+        sql.SQL(", ").join(columns[field] for field in read), sql.Identifier(table), columns[where]
+    )
+    return {row[0]: tuple(row[1:]) for row in conn.execute(query, [Environment.PRODUCTION])}

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b8a6c4bd9e6ded6893c022ec3a5ede909afe10073bdef2a50a07e48bf4e78767 -->
+<!-- generated from WORKBOOK.md sha256:c4ce5b68e9e70d9cb30ff78a1b87f33bc1cef0d70cfec0560986f7a01572d447 -->
 
 ## What it is for and who it is for
 
@@ -28,8 +28,7 @@ Who uses it:
 The cart and order model of an online shop (Shopify Checkout, WooCommerce, Odoo eCommerce): a cart
 with a session code, an order with a consecutive number and the statuses initiated → paid or failed →
 completed. **Only the status model** is adopted: the public shop, the payment gateway, the taxes,
-shipping and stock of those references **do not exist here**. No new research: it is the same scope as
-the current product.
+shipping and stock of those references **do not exist here**.
 
 ## Before you start
 
@@ -55,13 +54,15 @@ sorting per column, a list or card view and 50 rows
 per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency
 (one created in euros stays in euros even if the business changes country); the Total filter is typed in
 the business's currency ("12" is zł 12.00 in a business in Poland and ¥12 in one in Japan, where there are
-no cents) and compares the amount as it is, without converting currencies. It can be pasted with its
-thousands separators ("1,250.50") or with that currency's symbol or code ("zł 12.50", "PLN 12.50"); an
-amount that cannot be read ("1,250", which may be one thousand two hundred and fifty or one and a quarter,
-or one with another currency's symbol) is warned under its box, "Type an amount, like 12.50" (with the
-decimals of the business's currency: "like 12" in yen), and does not filter. While the business has not
-answered, an amount is read with two decimals and, when it answers, the filter is read again in its
-currency from the first page.
+no cents) and compares the amount as it is, without converting currencies. It is read as in any amount
+field of the Hub and as in the other lists (hub#1196): it can be pasted with its thousands separators
+("1,250.50", "1.250,50", "2 500") or with that currency's symbol or code ("zł 12.50", "PLN 12.50"); one that
+cannot be read does not filter and says so under its box in the words of the amount field: "1,250", which
+may be one thousand two hundred and fifty or one and a quarter, "This amount can be read in two ways…"; one
+with another currency's symbol or with letters, "This is not an amount. Type a figure, for example 12.50.";
+a negative one, "This amount cannot be negative.". While the business has not answered, an amount is read
+with two decimals and nothing is warned; when it answers, the filter is read again in its currency from the
+first page.
 
 The **New cart** button opens the "New cart" form: **Session** (required; "Save" is not enabled
 without it), **Email** and **Name**. Each row offers **Abandon** (only an active cart) and
@@ -86,13 +87,19 @@ born from the flow CART_CHECKOUT-F08.
 |---|---|
 | Loading | "Loading…" while the first result arrives. |
 | Empty | "No carts." or "No orders."; with a search or a filter, "No results". |
-| Error | The table's notice with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed; that of a row action, above the table. |
+| Error | The table's notice with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888); that of a row action, above the table. |
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |
 
 Amounts in the format of the language of whoever looks and in the currency of each row, with that
 currency's decimals (the yen has no cents); quantities without decorative zeros ("2", "0.5").
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
@@ -284,7 +291,7 @@ Steps:
 3. The order becomes **Failed** and shows its whole reason under the status.
 In: the order and the reason (up to 500 characters).
 Out: status Failed, the reason and the time (`cart_checkout.order.failed`). An order already Paid can also
-fail, as today: **it leaves no trace of a refund** (there are no refunds in this app). The cart
+fail: **it leaves no trace of a refund** (there are no refunds in this app). The cart
 stays as it was. The assistant asks for a stronger confirmation and says the order by its number.
 If it fails: a Completed or already Failed order is refused; an empty reason, under its field, without losing
 what was written.
@@ -311,7 +318,7 @@ Steps:
 1. Open **Carts** or **Orders**.
 2. Search by session, email or name (carts) or by order number or email (orders) and sort. To filter
    per column, tap the funnel of the bar: it opens "Filters" with a box per column (the Total, as it is
-   typed or pasted: "12", "12.50", "1,250.50"); **Apply** filters and closes it, and the funnel counts
+   typed or pasted: "12", "12.50", "1,250.50", "2 500"); **Apply** filters and closes it, and the funnel counts
    the filters in use.
 3. The lines of a cart and the detail of an order (addresses, methods, dates, notes) are read with
    the assistant or the API: a cart by its session or by its customer's email or name, an order
@@ -320,7 +327,8 @@ In: the "view carts" permission (the employee has it).
 Out: lists of 50 rows (up to 100 per request). Quantities with their decimals, amounts in the minor
 unit of the row's currency (cents; the yen has none) with the currency and its decimals.
 If it fails: a loading error with "Retry"; without permission, "You do not have permission"; a Total amount that
-cannot be read, "Type an amount, like 12.50" under its box, without filtering.
+cannot be read, what the amount field would say ("This is not an amount. Type a figure, for example 12.50.", or
+the two readings of "1,250") under its box, without filtering.
 Involved: none
 
 ### CART_CHECKOUT-F13 Tell other apps what happens
@@ -331,9 +339,9 @@ Steps:
 1. Each change of the previous flows leaves a notice in the Hub's outbox in its same transaction.
 2. Both screens update by themselves with what changed.
 In: the change that causes it.
-Out: thirteen notices: the twelve of the current product (`cart.created`, `cart.abandoned`, `cart.deleted`,
-`cart.cleared`, `cart.expired`, `item.added`, `item.updated`, `item.removed`, `checkout.initiated`,
-`order.paid`, `order.failed`, `order.completed`) and `customer.erased`, with the prefix `cart_checkout.`.
+Out: thirteen notices (`cart.created`, `cart.abandoned`, `cart.deleted`, `cart.cleared`, `cart.expired`,
+`item.added`, `item.updated`, `item.removed`, `checkout.initiated`, `order.paid`, `order.failed`,
+`order.completed` and `customer.erased`), with the prefix `cart_checkout.`.
 Only Automations listens to them, and it can start an automation with any of them; no
 other app of the Hub listens to them.
 If it fails: a refused change leaves neither the change nor the notice.

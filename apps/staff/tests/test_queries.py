@@ -11,7 +11,7 @@ from live.operations import get
 
 from apps.staff.models import Member, StaffSettings, TimeOff
 from apps.staff.queries import ROLE_UNAVAILABLE
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
 from apps.staff.schemas import (
     AccountListIn,
     AccountPage,
@@ -51,9 +51,9 @@ from apps.staff.schemas import (
 
 from base.tests.ordering import assert_reads_backwards, listed_with
 
-from .conftest import ctx_for, make_member, make_role, make_schedule, make_time_off
+from .conftest import HUB_DB, A, B, ctx_for, make_member, make_role, make_schedule, make_time_off
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TERMINATED = Member.Status.TERMINATED
 # 2026-08-18 22:30 UTC is already 2026-08-19 00:30 in Madrid (the business's zone, settings.TIME_ZONE).
@@ -241,7 +241,7 @@ def _tied_time_off():
     ],
 )
 def test_ties_go_by_id_in_the_lists_own_direction(operation, schema, tied, column):
-    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    """hub#768 (as in Customers): a descending list is the ascending one read backwards, ties
     included, and its pages neither repeat nor lose rows."""
     assert_reads_backwards(listed_with(run, operation, column, schema=schema), sorted(tied()))
 
@@ -1264,13 +1264,13 @@ def accounts(role="hub_admin", **params):
 
 
 def test_the_accounts_with_access_to_this_business(make_user):
-    marta = make_user("saas:1", host="a", role="hub_manager", first_name="Marta")
-    eva = make_user("saas:2", host="a", role="hub_employee")
+    marta = make_user("saas:1", host=A.key, role="hub_manager", first_name="Marta")
+    eva = make_user("saas:2", host=A.key, role="hub_employee")
     eva.email = "eva@shop.es"
     eva.save()
     ensure_hub_user(eva)  # her next entry brings her person up to date
-    make_user("saas:3", host="b", first_name="Other business")
-    gone = make_user("saas:4", host="a", first_name="Deactivated")
+    make_user("saas:3", host=B.key, first_name="Other business")
+    gone = make_user("saas:4", host=A.key, first_name="Deactivated")
     gone.is_active = False
     gone.save()
 
@@ -1286,10 +1286,10 @@ def test_the_accounts_with_access_to_this_business(make_user):
 
 
 def test_one_account_by_its_user_to_name_the_one_a_record_hangs_from(make_user):
-    marta = make_user("saas:1", host="a", role="hub_manager", first_name="Marta")
-    make_user("saas:2", host="a", role="hub_employee", first_name="Eva")
-    elsewhere = make_user("saas:3", host="b", first_name="Other business")
-    gone = make_user("saas:4", host="a", first_name="Deactivated")
+    marta = make_user("saas:1", host=A.key, role="hub_manager", first_name="Marta")
+    make_user("saas:2", host=A.key, role="hub_employee", first_name="Eva")
+    elsewhere = make_user("saas:3", host=B.key, first_name="Other business")
+    gone = make_user("saas:4", host=A.key, first_name="Deactivated")
     gone.is_active = False
     gone.save()
 

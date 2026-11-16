@@ -1,9 +1,9 @@
 """``base.operations.business_currency``: the currency a hub's business charges in, the one question every app that
-charges asks (BASE-F50; FIX-HUB-BASE-BUSINESS-CURRENCY-IN-PYTHON-AND-ERPLORAS-OWN-HUB).
+charges asks (BASE-F50).
 
 It is ``base.business.get``'s currency, read as the platform: an API key holds only the permissions of what it charges,
 so the caller's context never decides whether the currency is known. A hub's business pays in its country's currency;
-ERPlora's own hub (phase 1: no registry row) in the one of its issuer's country, as its invoices; a demo in its row's
+ERPlora's own hub (without a registry row) in the one of its issuer's country, as its invoices; a demo in its row's
 (euros without a country). A scope that is no hub's has no currency: the same ``NotFound`` as the operation, never a
 silent euro. Each hub answers its own, never another's.
 """
@@ -40,7 +40,7 @@ def test_a_hub_s_business_charges_in_its_country_s_currency_never_another_hub_s(
 
 
 def test_erplora_s_own_hub_charges_in_its_issuer_s_country_s_currency():
-    assert not Hub.objects.filter(slug="erplora").exists()  # phase 1: no registry row
+    assert not Hub.objects.filter(slug="erplora").exists()  # without a registry row
     assert business_currency(ERPLORA) == "EUR"
     with override_settings(PLATFORM_ISSUER_COUNTRY="GB"):
         assert business_currency(ERPLORA) == "GBP"

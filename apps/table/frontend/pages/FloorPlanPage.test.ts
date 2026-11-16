@@ -77,7 +77,7 @@ describe('FloorPlanPage · service', () => {
     expect(s.net.streams.length).toBe(1);
   });
 
-  it('the zone strip fades the edge with more zones behind it (tables#97)', async () => {
+  it('the zone strip fades the edge with more zones behind it', async () => {
     const s = await setup();
     await s.show();
     const strip = s.el('zones').element;

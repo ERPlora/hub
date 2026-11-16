@@ -1,4 +1,4 @@
-"""Django admin of the kitchen app: full CRUD on every table for support (round 12, PLAN §17).
+"""Django admin of the kitchen app: full CRUD on every table, for support.
 
 A second write path, for the staff only on hubs.erplora.com: it does not go through the operations' rules
 (a station's name taken twice: the database's own constraints still refuse it) and it leaves no event. The

@@ -1,6 +1,3 @@
-// The screen's own error report (BASE-G95, G13; the old hub's lib/error-report.ts, HUB_SHELL-F149): what nobody
-// caught goes to `POST /api/error-report` by itself, without a window nor a confirmation, an identical error once
-// every 30 s and at most 50 different ones remembered; a report that cannot leave is lost, never another report.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {

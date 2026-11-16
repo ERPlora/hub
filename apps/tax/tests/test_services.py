@@ -1,8 +1,8 @@
 """Write operations of the tax app: one transaction each, with its event in the outbox.
 
-The cases are those of the current product's batteries: overlapping rules refused (taxes#66),
-concurrently too (taxes#69); no rate on a class that charges no tax and coherent components
-(taxes#9, #59); a closed jurisdiction (taxes#41); end, deactivate and reactivate (taxes#52).
+The cases are those of the current product's batteries: overlapping rules refused,
+concurrently too; no rate on a class that charges no tax and coherent components; a closed
+jurisdiction; end, deactivate and reactivate.
 """
 
 import json
@@ -13,11 +13,10 @@ from decimal import Decimal
 
 import psycopg
 import pytest
-from django.db import connection, transaction
 from django.utils import timezone
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 from live.outbox import channel_for
 
 from apps.tax import events
@@ -37,7 +36,10 @@ from apps.tax.schemas import (
     TaxSettingsOut,
 )
 
-from .conftest import A, B, ctx_for
+from base.tenancy.context import use_hub
+from base.tenancy.tests.concurrency import in_a_thread
+
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for
 
 WAIT = 1.0
 QUIET = 0.3
@@ -101,14 +103,14 @@ def test_declarations(name, input, output, expose_api, risk):
     assert (
         op.ai["description"].strip()
         and op.ai["risk"] == risk
-        and set(op.ai) == {"description", "risk"}
+        and set(op.ai) == {"asks", "description", "risk"}  # asks: what a person says to ask for it (hub#1094)
     )
 
 
 # tax.category.create (TAX-F02)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_create_an_own_category(no_seed):
     created = run(
         "tax.category.create",
@@ -126,11 +128,11 @@ def test_create_an_own_category(no_seed):
         "is_active": True,
     }
     assert outbox() == [
-        (events.CATEGORY_CREATED, "a", {"id": str(books.id), "key": "product.books"})
+        (events.CATEGORY_CREATED, A.key, {"id": str(books.id), "key": "product.books"})
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_may_be_marked_as_system(no_seed):
     assert (
         run(
@@ -140,7 +142,7 @@ def test_a_category_may_be_marked_as_system(no_seed):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_repeated_key_is_refused_on_its_field(no_seed):
     category("product.books")
     error = refused(
@@ -157,7 +159,7 @@ def test_a_repeated_key_is_refused_on_its_field(no_seed):
 # tax.alias.create (TAX-F14)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_create_an_alias_naming_the_category_by_voice(no_seed):
     food = category("restaurant.food", "Restaurant — food", is_system=True)
     created = run(
@@ -179,7 +181,7 @@ def test_create_an_alias_naming_the_category_by_voice(no_seed):
     assert outbox() == [
         (
             events.ALIAS_CREATED,
-            "a",
+            A.key,
             {
                 "id": str(alias.id),
                 "alias": "comida casera",
@@ -189,7 +191,7 @@ def test_create_an_alias_naming_the_category_by_voice(no_seed):
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_repeated_alias_is_refused_on_its_field(no_seed):
     food = category("restaurant.food")
     TaxAlias.objects.create(alias="beer", category=food)
@@ -207,7 +209,7 @@ def test_a_repeated_alias_is_refused_on_its_field(no_seed):
     assert outbox() == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_alias_of_an_unknown_category_is_refused_on_its_field(no_seed):
     error = refused(
         InvalidPayload,
@@ -223,7 +225,7 @@ def test_an_alias_of_an_unknown_category_is_refused_on_its_field(no_seed):
 # tax.rule.create (TAX-F04, F05, F06, F11)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_create_a_root_rule(no_seed):
     generic = category()
     created = create_rule(valid_from="2026-01-01")
@@ -248,7 +250,7 @@ def test_create_a_root_rule(no_seed):
     assert outbox() == [
         (
             events.RULE_CREATED,
-            "a",
+            A.key,
             {
                 "id": str(rule.id),
                 "country_code": "ES",
@@ -261,7 +263,7 @@ def test_create_a_root_rule(no_seed):
     assert OutboxEvent.objects.get().actor == "tester"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_category_of_a_rule_is_found_by_name_or_alias(no_seed):
     food = category("restaurant.food", "Restaurant — food", is_system=True)
     TaxAlias.objects.create(alias="meal", category=food)
@@ -275,7 +277,7 @@ def test_the_category_of_a_rule_is_found_by_name_or_alias(no_seed):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_rule_of_an_unknown_category_is_refused_on_its_field(no_seed):
     error = refused(
         InvalidPayload, lambda: create_rule(tax_category_key="nothing.here")
@@ -284,7 +286,7 @@ def test_a_rule_of_an_unknown_category_is_refused_on_its_field(no_seed):
     assert not TaxRule.objects.exists() and outbox() == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_exempt_rule_keeps_its_cause_and_another_class_drops_it(no_seed):
     category("service.health"), category()
     exempt = create_rule(
@@ -305,16 +307,16 @@ def test_an_exempt_rule_keeps_its_cause_and_another_class_drops_it(no_seed):
     )  # a cause only means something on an exempt rule
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_regional_rule_with_its_tax_family(no_seed):
     category()
     canary = create_rule(region_code="ES-CN", rate_pct="7", tax_type="igic")
     assert (canary.region_code, canary.tax_type) == ("ES-CN", "igic")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_rule_without_its_tax_family_takes_the_one_of_its_territory(no_seed):
-    # TAX-F11 (pm#629 VF-17): said by voice or through the API without «IGIC», a Canary rule is still IGIC;
+    # TAX-F11: said by voice or through the API without «IGIC», a Canary rule is still IGIC;
     # a family said out loud is kept.
     category()
     canary = create_rule(region_code="ES-CN", rate_pct="7")
@@ -324,10 +326,10 @@ def test_a_rule_without_its_tax_family_takes_the_one_of_its_territory(no_seed):
     assert [rule.tax_type for rule in (canary, melilla, national, said)] == ["igic", "ipsi", "vat", "vat"]
 
 
-# Components (taxes#9, #59)
+# Components
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_component_hangs_from_a_coherent_root(no_seed):
     category()
     root = create_rule()
@@ -343,7 +345,7 @@ def test_a_component_hangs_from_a_coherent_root(no_seed):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_incoherent_component_is_refused(no_seed):
     generic, food = category(), category("restaurant.food")
     root = TaxRule.objects.create(
@@ -386,7 +388,7 @@ def test_an_incoherent_component_is_refused(no_seed):
     )
 
 
-# Overlaps (taxes#66): two active root rules of one slot are never in force the same day
+# Overlaps: two active root rules of one slot are never in force the same day
 
 
 def overlap(**fields):
@@ -396,7 +398,7 @@ def overlap(**fields):
     return error
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_case_of_the_issue_is_refused(no_seed):
     # «PT · general 23 %» with no end, and «PT · general 25 % from 2027-01-01» on top of it.
     category()
@@ -409,7 +411,7 @@ def test_the_case_of_the_issue_is_refused(no_seed):
     assert TaxRule.objects.count() == 1 and outbox() == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_inside_or_starting_the_same_day_is_an_overlap(no_seed):
     category()
     create_rule(valid_from="2026-01-01", valid_to="2026-12-31")
@@ -419,7 +421,7 @@ def test_inside_or_starting_the_same_day_is_an_overlap(no_seed):
     overlap(valid_from="2026-12-31")  # from its last day on
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_contiguous_ranges_are_the_way_to_change_a_rate(no_seed):
     category()
     create_rule(valid_to="2026-12-31")
@@ -427,7 +429,7 @@ def test_contiguous_ranges_are_the_way_to_change_a_rate(no_seed):
     assert TaxRule.objects.count() == 2
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_other_slots_are_no_overlap(no_seed):
     category(), category("restaurant.food")
     root = create_rule()
@@ -440,7 +442,7 @@ def test_other_slots_are_no_overlap(no_seed):
     assert TaxRule.objects.count() == 5
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_deactivated_rule_does_not_count(no_seed):
     generic = category()
     TaxRule.objects.create(
@@ -455,7 +457,7 @@ def test_a_deactivated_rule_does_not_count(no_seed):
 # tax.rule.bulk_create (TAX-F12): every check of a single rule, all or none
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_bulk_creates_every_rule(no_seed):
     for key in ("product.generic", "product.reduced", "product.super_reduced"):
         category(key)
@@ -477,7 +479,7 @@ def test_bulk_creates_every_rule(no_seed):
     assert [name for name, _scope, _payload in outbox()] == [events.RULE_CREATED] * 3
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_bulk_with_an_unknown_category_saves_nothing(no_seed):
     category()
     rows = [
@@ -493,7 +495,7 @@ def test_bulk_with_an_unknown_category_saves_nothing(no_seed):
     assert not TaxRule.objects.exists() and outbox() == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_bulk_overlapping_an_existing_rule_or_itself_saves_nothing(no_seed):
     category(), category("restaurant.food")
     create_rule(country_code="PT", rate_pct="23")
@@ -526,7 +528,7 @@ def test_bulk_overlapping_an_existing_rule_or_itself_saves_nothing(no_seed):
 # tax.rule.end (TAX-F07)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_end_a_rule_and_schedule_the_next_rate(no_seed):
     category()
     current = create_rule(valid_from="2012-09-01")
@@ -534,14 +536,14 @@ def test_end_a_rule_and_schedule_the_next_rate(no_seed):
     ended = run("tax.rule.end", RuleEndIn(id=current.id, valid_to="2026-12-31"))
     assert ended.valid_to == date(2026, 12, 31)
     assert outbox() == [
-        (events.RULE_ENDED, "a", {"id": str(current.id), "valid_to": "2026-12-31"})
+        (events.RULE_ENDED, A.key, {"id": str(current.id), "valid_to": "2026-12-31"})
     ]
     create_rule(
         rate_pct="22", valid_from="2027-01-01"
     )  # the day after: contiguous, allowed
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_end_a_rule_named_by_its_slot(no_seed):
     category("restaurant.food", "Restaurant — food", is_system=True)
     current = create_rule(tax_category_key="restaurant.food", rate_pct="10")
@@ -553,7 +555,7 @@ def test_end_a_rule_named_by_its_slot(no_seed):
     assert run("tax.rule.end", data).id == current.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_end_before_the_start_is_refused(no_seed):
     category()
     rule = create_rule(valid_from="2026-06-01")
@@ -571,7 +573,7 @@ def test_an_end_before_the_start_is_refused(no_seed):
     ).valid_to == date(2026, 6, 1)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_end_that_runs_into_the_next_rule_is_refused(no_seed):
     category()
     old = create_rule(valid_to="2026-12-31")
@@ -584,7 +586,7 @@ def test_an_end_that_runs_into_the_next_rule_is_refused(no_seed):
     assert TaxRule.objects.get(pk=old.id).valid_to == date(2026, 12, 31)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_same_end_again_changes_nothing(no_seed):
     category()
     rule = create_rule(valid_to="2026-12-31")
@@ -595,7 +597,7 @@ def test_the_same_end_again_changes_nothing(no_seed):
     assert outbox() == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_ending_a_missing_rule(no_seed):
     error = refused(
         NotFound,
@@ -614,7 +616,7 @@ def test_ending_a_missing_rule(no_seed):
 # tax.rule.deactivate and tax.rule.activate (TAX-F08)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_deactivate_and_bring_back(no_seed):
     category()
     root = create_rule()
@@ -628,12 +630,12 @@ def test_deactivate_and_bring_back(no_seed):
     on = run("tax.rule.activate", RuleRefIn(id=root.id))
     assert (on.is_active, on.rate_pct, on.valid_from) == (True, Decimal("21.00"), None)
     assert outbox() == [
-        (events.RULE_DEACTIVATED, "a", {"id": str(root.id)}),
-        (events.RULE_ACTIVATED, "a", {"id": str(root.id)}),
+        (events.RULE_DEACTIVATED, A.key, {"id": str(root.id)}),
+        (events.RULE_ACTIVATED, A.key, {"id": str(root.id)}),
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_named_by_voice_deactivate_takes_the_rule_in_force_and_activate_the_latest_deactivated(
     no_seed,
 ):
@@ -657,7 +659,7 @@ def test_named_by_voice_deactivate_takes_the_rule_in_force_and_activate_the_late
     assert run("tax.rule.activate", by_slot).id == current.id
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_twice_is_refused(no_seed):
     category()
     rule = create_rule()
@@ -674,13 +676,13 @@ def test_twice_is_refused(no_seed):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_rule_is_not_found(no_seed):
     for name in ("tax.rule.deactivate", "tax.rule.activate"):
         refused(NotFound, lambda name=name: run(name, RuleRefIn(id=uuid.uuid7())))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_bringing_back_a_rule_that_now_overlaps_is_refused(no_seed):
     category()
     old = create_rule(rate_pct="18")
@@ -694,7 +696,7 @@ def test_bringing_back_a_rule_that_now_overlaps_is_refused(no_seed):
 # Permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_cannot_write(no_seed):
     category()
     rule = create_rule()
@@ -737,56 +739,28 @@ def test_an_employee_cannot_write(no_seed):
     assert TaxRule.objects.get().is_active and outbox() == []
 
 
-# Two people saving at the same instant (taxes#69): the second waits for the first, then is refused
+# Two people saving at the same instant: the second waits for the first, then is refused
 
 
 def _in_thread(target):
-    outcome = {}
-
-    def body():
-        try:
-            outcome["result"] = target()
-        except Exception as error:  # the outcome is asserted by the test
-            outcome["error"] = error
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=body)
+    """``target`` in its own thread and session of the business at work; its outcome in the list once it ends."""
+    outcome = [None]
+    thread = in_a_thread(target, outcome)
     thread.start()
     return thread, outcome
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_overlapping_rules_saved_at_once_keep_one():
+@HUB_DB_COMMITTED
+def test_two_overlapping_rules_saved_at_once_keep_one(plan_with_room):
     TaxCategory.objects.create(key="product.race", name="Race")
     rule = {"country_code": "FR", "tax_category_key": "product.race"}
-    first_saved, release = threading.Event(), threading.Event()
 
-    def first():
-        with transaction.atomic():  # stays open, holding what it wrote, until released
-            created = create_rule(**rule, rate_pct="20")
-            first_saved.set()
-            release.wait(5)
-        return created
-
-    holder, held = _in_thread(first)
-    assert first_saved.wait(5)
-    second, outcome = _in_thread(
-        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01")
+    waited, outcome = _race(
+        lambda: create_rule(**rule, rate_pct="20"),
+        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01"),
     )
-    second.join(QUIET)
-    assert (
-        second.is_alive()
-    )  # it waits for the first one, it does not run its check blind
-    release.set()
-    holder.join(5)
-    second.join(5)
 
-    assert "result" in held
-    assert (
-        isinstance(outcome.get("error"), Conflict)
-        and outcome["error"].code == "tax.rule_overlaps"
-    )
+    _overlap_refused(waited, outcome)
     assert list(
         TaxRule.objects.filter(category__key="product.race").values_list(
             "rate_pct", flat=True
@@ -794,27 +768,17 @@ def test_two_overlapping_rules_saved_at_once_keep_one():
     ) == [Decimal("20.00")]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_two_rules_that_do_not_overlap_saved_at_once_are_both_kept():
+@HUB_DB_COMMITTED
+def test_two_rules_that_do_not_overlap_saved_at_once_are_both_kept(plan_with_room):
     TaxCategory.objects.create(key="product.race", name="Race")
     rule = {"country_code": "FR", "tax_category_key": "product.race"}
-    first_saved, release = threading.Event(), threading.Event()
 
-    def first():
-        with transaction.atomic():
-            create_rule(**rule, rate_pct="20", valid_to="2026-12-31")
-            first_saved.set()
-            release.wait(5)
-
-    holder, _held = _in_thread(first)
-    assert first_saved.wait(5)
-    second, outcome = _in_thread(
-        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01")
+    _waited, outcome = _race(
+        lambda: create_rule(**rule, rate_pct="20", valid_to="2026-12-31"),
+        lambda: create_rule(**rule, rate_pct="25", valid_from="2027-01-01"),
     )
-    release.set()
-    holder.join(5)
-    second.join(5)
-    assert "result" in outcome
+
+    assert isinstance(outcome[0], RuleOut)
     assert TaxRule.objects.filter(category__key="product.race").count() == 2
 
 
@@ -843,12 +807,14 @@ def received(session, timeout=WAIT, stop_after=None):
     ]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_rule_saved_in_b_notifies_the_channel_of_b_only(listen):
-    TaxCategory.objects.create(key="product.notify", name="Notify")
+@HUB_DB_COMMITTED
+def test_a_rule_saved_in_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
 
-    create_rule(country_code="FR", tax_category_key="product.notify", scope=B)
+    with use_hub(hub_b):
+        TaxCategory.objects.create(key="product.notify", name="Notify")
+        create_rule(country_code="FR", tax_category_key="product.notify", scope=B)
+        assert [(name, scope) for name, scope, _ in outbox()] == [(events.RULE_CREATED, B.key)]
 
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.RULE_CREATED]})
@@ -856,21 +822,22 @@ def test_a_rule_saved_in_b_notifies_the_channel_of_b_only(listen):
     assert received(on_a, timeout=QUIET) == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_refused_rule_notifies_nobody(listen):
-    TaxCategory.objects.create(key="product.notify", name="Notify")
-    create_rule(country_code="FR", tax_category_key="product.notify", scope=B)
-    on_b = listen(B)
+@HUB_DB_COMMITTED
+def test_a_refused_rule_notifies_nobody(listen, hub_b):
+    with use_hub(hub_b):
+        TaxCategory.objects.create(key="product.notify", name="Notify")
+        create_rule(country_code="FR", tax_category_key="product.notify", scope=B)
+        on_b = listen(B)
 
-    with pytest.raises(Conflict):
-        create_rule(
-            country_code="FR", tax_category_key="product.notify", rate_pct="25", scope=B
-        )
+        with pytest.raises(Conflict):
+            create_rule(
+                country_code="FR", tax_category_key="product.notify", rate_pct="25", scope=B
+            )
 
     assert received(on_b, timeout=QUIET) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_reactivating_by_slot_brings_the_most_recently_deactivated(no_seed):
     # Review: it used to bring the one with the newest start (R2, a future rate), not the one the
     # owner just deactivated by mistake (R1, today's) — the WORKBOOK and the ai text say «the last one».
@@ -896,7 +863,7 @@ def _race(first_write, second_write):
     first_saved, release = threading.Event(), threading.Event()
 
     def first():
-        with transaction.atomic():
+        with atomic():
             first_write()
             first_saved.set()
             release.wait(5)
@@ -909,17 +876,18 @@ def _race(first_write, second_write):
     release.set()
     holder.join(5)
     second.join(5)
-    assert "error" not in held, held
+    assert not (holder.is_alive() or second.is_alive())
+    assert not isinstance(held[0], Exception), held
     return waited, outcome
 
 
 def _overlap_refused(waited, outcome):
     assert waited  # it waits for the first one, it does not run its check blind
-    assert isinstance(outcome.get("error"), Conflict) and outcome["error"].code == "tax.rule_overlaps", outcome
+    assert isinstance(outcome[0], Conflict) and outcome[0].code == "tax.rule_overlaps", outcome
 
 
-@pytest.mark.django_db(transaction=True)
-def test_bringing_back_a_rule_while_an_overlapping_one_is_saved_keeps_one():
+@HUB_DB_COMMITTED
+def test_bringing_back_a_rule_while_an_overlapping_one_is_saved_keeps_one(plan_with_room):
     race = TaxCategory.objects.create(key="product.race", name="Race")
     old = TaxRule.objects.create(category=race, country_code="FR", rate_pct=Decimal("18"), is_active=False)
 
@@ -932,8 +900,8 @@ def test_bringing_back_a_rule_while_an_overlapping_one_is_saved_keeps_one():
     assert list(TaxRule.objects.filter(category=race, is_active=True).values_list("pk", flat=True)) == [old.pk]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_moving_an_end_while_an_overlapping_rule_is_saved_keeps_them_apart():
+@HUB_DB_COMMITTED
+def test_moving_an_end_while_an_overlapping_rule_is_saved_keeps_them_apart(plan_with_room):
     race = TaxCategory.objects.create(key="product.race", name="Race")
     old = TaxRule.objects.create(category=race, country_code="FR", rate_pct=Decimal("20"), valid_to=date(2026, 12, 31))
 
@@ -946,8 +914,8 @@ def test_moving_an_end_while_an_overlapping_rule_is_saved_keeps_them_apart():
     assert TaxRule.objects.filter(category=race).count() == 1
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_batch_and_an_overlapping_rule_saved_at_once_keep_one():
+@HUB_DB_COMMITTED
+def test_a_batch_and_an_overlapping_rule_saved_at_once_keep_one(plan_with_room):
     TaxCategory.objects.create(key="product.race", name="Race")
     batch = RuleBulkIn(rules=[{"country_code": "FR", "tax_category_key": "product.race", "rate_pct": "20"}])
 
@@ -962,7 +930,7 @@ def test_a_batch_and_an_overlapping_rule_saved_at_once_keep_one():
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_twin_of_a_deactivated_rule_is_refused_on_its_first_day(no_seed):
     # Review (the current product's natural key): the deactivated rule keeps its key; bring it back
     # or start the new one another day.
@@ -980,7 +948,7 @@ def test_a_twin_of_a_deactivated_rule_is_refused_on_its_first_day(no_seed):
     create_rule(rate_pct="22", valid_from="2026-01-02")  # another first day is another rule
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_batch_with_a_twin_saves_nothing(no_seed):
     category()
     TaxRule.objects.create(
@@ -993,7 +961,7 @@ def test_a_batch_with_a_twin_saves_nothing(no_seed):
     assert TaxRule.objects.count() == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_batch_with_twin_rows_is_refused_as_an_overlap_not_a_crash(no_seed):
     # Two identical rows (or a row identical to an active rule) overlap: refused with its field,
     # never a database error on the natural key.
@@ -1007,21 +975,21 @@ def test_a_batch_with_twin_rows_is_refused_as_an_overlap_not_a_crash(no_seed):
     assert TaxRule.objects.count() == 1
 
 
-# tax.settings.update (TAX-F11, pm#629 VF-17): the business keeps its region
+# tax.settings.update (TAX-F11): the business keeps its region
 
 
 def keep(region, role="hub_admin", scope=A):
     return run("tax.settings.update", TaxSettingsIn(region_code=region), role, scope)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_keep_change_and_clear_the_business_region():
     kept = keep("es-cn")
     # The tax of the territory comes back with it: the screen renames every tax at once (TAX-F11).
     assert (kept.country_code, kept.region_code, kept.tax_kind) == ("ES", "ES-CN", "igic")
     settings = TaxSettings.objects.get()
     assert (settings.region_code, settings.updated_by) == ("ES-CN", "tester")
-    assert outbox() == [(events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": "ES-CN"})]
+    assert outbox() == [(events.SETTINGS_UPDATED, A.key, {"country_code": "ES", "region_code": "ES-CN"})]
     OutboxEvent.objects.all().delete()
     # The same region again changes nothing: no event re-prices the open tills.
     assert keep("ES-CN").region_code == "ES-CN" and outbox() == []
@@ -1029,12 +997,12 @@ def test_keep_change_and_clear_the_business_region():
     cleared = keep(None)
     assert (cleared.region_code, cleared.tax_kind, TaxSettings.objects.get().region_code) == (None, "vat", "")
     assert outbox() == [
-        (events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": "ES-ML"}),
-        (events.SETTINGS_UPDATED, "a", {"country_code": "ES", "region_code": None}),
+        (events.SETTINGS_UPDATED, A.key, {"country_code": "ES", "region_code": "ES-ML"}),
+        (events.SETTINGS_UPDATED, A.key, {"country_code": "ES", "region_code": None}),
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("region", ["PT-20", "ES-MD"])
 def test_only_a_tax_territory_of_the_business_country_is_kept(region):
     # PT-20 is of another country; Madrid is Spain but charges the national VAT: no rule of its own.
@@ -1044,17 +1012,19 @@ def test_only_a_tax_territory_of_the_business_country_is_kept(region):
     assert not TaxSettings.objects.exists() and outbox() == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_only_who_manages_taxes_changes_the_region():
     refused(PermissionDenied, lambda: keep("ES-CN", role="hub_employee"))
     assert not TaxSettings.objects.exists() and outbox() == []
 
 
-@pytest.mark.django_db(transaction=True)
-def test_the_region_kept_on_b_notifies_the_channel_of_b_only(listen):
+@HUB_DB_COMMITTED
+def test_the_region_kept_on_b_notifies_the_channel_of_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
 
-    keep("ES-CN", scope=B)
+    with use_hub(hub_b):
+        keep("ES-CN", scope=B)
+        assert [(name, scope) for name, scope, _ in outbox()] == [(events.SETTINGS_UPDATED, B.key)]
 
     assert received(on_b, stop_after=1) == [
         (channel_for(B), {"events": [events.SETTINGS_UPDATED]})

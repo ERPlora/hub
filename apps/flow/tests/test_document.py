@@ -172,7 +172,7 @@ def test_the_failed_comparisons_are_named():
 
 
 def test_a_comparison_can_read_another_datum():
-    # hub#1712: «only if the total is what the event brought» — the value is a path or a template, read
+    # «Only if the total is what the event brought» — the value is a path or a template, read
     # like any other value; a datum that is not there never matches.
     data = {
         "input": {"total": 12500, "paid": 12500, "name": "Ana", "greeting": "Hola Ana"},
@@ -194,7 +194,7 @@ def test_an_empty_condition_always_holds():
 
 
 def test_a_condition_is_readable_only_with_paths_to_known_comparisons():
-    # hub#1766: what the engine cannot read is said, never evaluated as «does not hold».
+    # What the engine cannot read is said, never evaluated as «does not hold».
     assert doc.readable({}) is True
     assert doc.readable({"input.total": {"gt": 100, "lte": 500}}) is True
     assert doc.readable({"input.total": {"bigger": 100}}) is False

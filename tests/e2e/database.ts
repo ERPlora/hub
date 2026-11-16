@@ -1,6 +1,6 @@
 // The e2e database of a stack beside the shared one (`stack.ts`): its own copy of the Hub's control
-// database, where phase 1 keeps the business of every hub (`a`, `b`…), so that two runs at once never
-// write into each other's (on 2026-10-16 the cash sale of one run fell into the other's open shift).
+// database, with its own database for each of its hubs (`a`, `b`…), so that two runs at once never
+// write into each other's: one run's cash sale could fall into the other's open shift.
 //
 //   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts          creates it when missing, migrates it, seeds `a`/`b`
 //   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts --drop   drops it once its runserver is stopped

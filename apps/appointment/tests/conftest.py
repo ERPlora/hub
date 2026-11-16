@@ -2,6 +2,10 @@
 a fixed business day in the future, and builders of the data a test starts from (straight to the models
 of each app: the operations are under test).
 
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
+of B asks for ``hub_b`` and enters it.
+
 The builders import the models lazily, so that the tests of apps.py and engine.py still collect while
 models.py does not exist.
 """
@@ -18,11 +22,22 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
+from apps.flow.tests.test_relay import worker_loop
+from apps.whatsapp_inbox.tests.test_migrations import database
 from base.models import Membership
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases (the factory data a committed test plants again, the
+#: platform staff with business A chosen in the Hub admin, business A on a plan with room for several sessions, the
+#: worker's real loop over them, a business's database cloned from the template for a migration's round trip) that
+#: these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "database", "factory_data", "hub_staff", "in_business_a",
+    "plan_with_room", "worker_loop",
+]
+
 MADRID = ZoneInfo("Europe/Madrid")
 
 
@@ -80,7 +95,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
     ):
         user = get_user_model().objects.create_user(username=username, password="pw")
@@ -95,7 +110,7 @@ def make_user(db):
 
 @pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
     params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],
@@ -143,13 +158,19 @@ def pin_clock(monkeypatch, instant: dt.datetime) -> None:
 # Builders: Schedules (the business's hours)
 
 
-@pytest.fixture
-def anytime(db):
-    """No rule of hours at all (the seeded default week taken away): the business never refuses on hours."""
+def without_hours():
+    """No rule of hours at all in the business at work (the seeded default week taken away): it never refuses on
+    hours."""
     from apps.schedule.models import ScheduleSettings, WeekDay
 
     WeekDay.objects.all().delete()
     ScheduleSettings.objects.all().delete()
+
+
+@pytest.fixture
+def anytime(db):
+    """Business A without any rule of hours (``without_hours``)."""
+    without_hours()
 
 
 def make_day(weekday: int, *intervals: tuple[str, str], closed: bool = False):
@@ -363,9 +384,8 @@ def make_block(
     )
 
 
-@pytest.fixture
-def salon(db):
-    """The usual cast: a customer, a cut and a colour (taxed), and Ana, who performs both."""
+def make_salon():
+    """The usual cast: a customer, a cut and a colour (taxed), Ana and Bea; in the hub in use."""
     tax = make_tax()
     cut = make_service("Haircut", price=2000, duration=30, tax=tax)
     colour = make_service("Colour", price=4500, duration=60, tax=tax)
@@ -384,3 +404,9 @@ def salon(db):
             "lucia": lucia,
         },
     )
+
+
+@pytest.fixture
+def salon(db):
+    """The usual cast (``make_salon``)."""
+    return make_salon()

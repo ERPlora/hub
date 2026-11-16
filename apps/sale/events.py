@@ -8,8 +8,8 @@ each live query. ``sale.sale.completed`` and ``sale.sale.voided`` carry what Inv
 
 Reactions: two customer cards merged move the absorbed card's sales to the one that stays; a document
 Invoicing issued later than the charge (no issuer yet at the till, INVOICE-F06) gives the sale its
-number. Each through an operation of this app run as the system, in its own transaction. The outbox relay (phase 2, in the
-worker) hands each delivered event to ``react``; the operation is idempotent.
+number. Each through an operation of this app run as the system, in its own transaction. The worker's outbox relay hands
+each delivered event to ``react``; the operation is idempotent.
 """
 
 from typing import Any
@@ -24,6 +24,7 @@ SALE_REFUNDED = "sale.sale.refunded"
 SALE_REASSIGNED = "sale.sale.reassigned"
 SALE_INVOICED = "sale.sale.invoiced"
 SALE_VOUCHER_LINE_CHANGED = "sale.sale.voucher_line_changed"
+VOUCHER_SESSION_RECORDED = "sale.voucher_session.recorded"
 ORDER_OPENED = "sale.order.opened"
 ORDER_CHANGED = "sale.order.changed"
 ORDER_FIRED = "sale.order.fired"
@@ -49,6 +50,7 @@ ALL = [
     SALE_REASSIGNED,
     SALE_INVOICED,
     SALE_VOUCHER_LINE_CHANGED,
+    VOUCHER_SESSION_RECORDED,
     ORDER_OPENED,
     ORDER_CHANGED,
     ORDER_FIRED,

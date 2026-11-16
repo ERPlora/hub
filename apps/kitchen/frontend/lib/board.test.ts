@@ -60,7 +60,7 @@ describe('the station of this device', () => {
   });
 });
 
-// KITCHEN-F06 (kitchen#57): a menu is the run of its dishes under its header; a dish ordered on its own is
+// KITCHEN-F06: a menu is the run of its dishes under its header; a dish ordered on its own is
 // itself. Two menus of the same name on one ticket are two menus (two lines of the check).
 describe('groupMenus', () => {
   const dish = (id: string, menu: string | null, name = 'MENU') =>

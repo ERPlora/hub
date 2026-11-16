@@ -4,8 +4,7 @@ Alcance MVP: transversal (peluquería y restaurante: la página del negocio en s
 Estado de la app: completa (2026-10-23)
 Lo que no entra todavía: ver «Lo que queda fuera» y «Lo que NO hace, a propósito».
 
-> Manual de usuario y especificación de la app `website`. Nace en la ronda 2026-10-21 (PLAN §29, con su ampliación del
-> 2026-10-22): no es un porte del producto actual, que no tenía página pública por negocio. Cada flujo está `hecho`
+> Manual de usuario y especificación de la app `website` (PLAN §29). Cada flujo está `hecho`
 > con sus tests de servidor, de pantalla y de punta a punta en verde; dónde están, en «Para quien lo mantiene».
 
 ## Para qué sirve y para quién
@@ -66,7 +65,8 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
   (barra oscura, cabecera a todo el ancho en el color principal, con la foto teñida de ese color, mayúsculas enormes y
   botones fuertes). Las cuatro sirven para un restaurante, una peluquería, una tienda o un servicio.
 - **Colores**: ocho paletas en tarjetas con sus colores sobre el fondo claro y el oscuro, la elegida resaltada:
-  **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**. Debajo, dos
+  **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**; hasta tres por
+  fila, y dos cuando así no cabe el nombre entero (un móvil de 375 px): el nombre nunca se parte a mitad de palabra. Debajo, dos
   campos de color (**Color principal** y **Color secundario**) con los de la paleta elegida: cambiarlos hace tuya la
   paleta, y entonces aparece **Restablecer colores**, que vuelve a los de la paleta. Elegir otra paleta muestra los
   suyos (los cambios de la anterior se descartan). Cada paleta trae su versión clara y oscura y se lee bien en las dos
@@ -107,7 +107,7 @@ dirección abre la app (para ver la página: el móvil o una ventana privada) y,
 la dirección aún lleva al acceso del equipo.
 
 ### La página pública
-La plantilla elegida con lo publicado, en la dirección del negocio (rediseño moderno del 2026-10-22): barra superior
+La plantilla elegida con lo publicado, en la dirección del negocio: barra superior
 fija y translúcida con el logotipo, el nombre, el menú de secciones (plegado en un móvil) y **Entrar** (botón de
 contorno redondeado); cabecera con la foto de portada (o, sin foto, un degradado suave de la paleta, nunca vacía), el
 título en letra grande, el lema y dos botones redondeados: **Escríbenos por WhatsApp** (o **Contáctanos**, a la
@@ -167,7 +167,6 @@ propietario, tal cual.
 | WEBSITE-F12 | Mostrar las reseñas de Google | hecho |
 
 ### WEBSITE-F01 Rellenar y guardar el borrador
-<!-- origen: nuevo (editor de secciones fijas con borrador y autoguardado, como Square Online, Wix, Squarespace y Shopify; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -189,7 +188,6 @@ la página web de este negocio: vuelve a subirla.».
 Implicados: WEBSITE-F02, WEBSITE-F03, WEBSITE-F04, WEBSITE-F11, WEBSITE-F12
 
 ### WEBSITE-F02 Elegir el diseño, la paleta y el fondo
-<!-- origen: nuevo (plantillas intercambiables sin perder el contenido y paletas claras y oscuras, como Squarespace, Wix y Square Online; ampliación de PLAN §29 del 2026-10-22) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -207,7 +205,6 @@ Si falla: un color mal escrito no se guarda y el campo lo dice:
 Implicados: WEBSITE-F01, WEBSITE-F06
 
 ### WEBSITE-F03 Mostrar u ocultar una sección
-<!-- origen: nuevo (secciones fijas que se ocultan en vez de borrarse, como las de Square Online y Wix; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -224,7 +221,6 @@ Si falla: como al guardar (WEBSITE-F01); ocultar nunca borra lo escrito.
 Implicados: WEBSITE-F01, WEBSITE-F10
 
 ### WEBSITE-F04 Subir una imagen
-<!-- origen: nuevo (imágenes en el almacén de ficheros del negocio, servidas desde su dirección; PLAN §29 y PLAN-HUB bloque 7) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, API
 Pantalla: Página web
@@ -236,7 +232,8 @@ Pasos:
 Entra: un archivo jpeg, png o webp de hasta 5 MB y 8000 píxeles por lado; se comprueba su contenido, no solo su
 nombre.
 Sale: la imagen guardada en el almacén de ficheros del negocio bajo un nombre sacado de su contenido (la misma imagen
-dos veces es un solo fichero), servida desde la propia dirección del negocio y guardada un año en el navegador. Aviso
+dos veces es un solo fichero), servida desde la propia dirección del negocio y guardada un año en el navegador; se
+guarda también el nombre del archivo con el que se subió la primera vez, que es como la nombra el asistente. Aviso
 `website.image.uploaded`.
 Si falla: bajo el campo: «El archivo no llegó entero: vuelve a elegirlo.», «El archivo está vacío.», «La imagen puede
 pesar 5 MB como mucho.», «Este archivo no es una imagen PNG.» (o JPEG, WEBP), «La imagen puede medir 8000 píxeles
@@ -246,7 +243,6 @@ antes no ocupa más y se acepta igual.
 Implicados: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Mostrar el catálogo
-<!-- origen: nuevo (el catálogo de la web sale de los productos y servicios del TPV, como en Square Online y Shopify; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -270,7 +266,6 @@ nunca un error; si las categorías no se pueden leer, «No se pudieron cargar la
 Implicados: INVENTORY-F27, SERVICE-F10, WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F06 Ver la vista previa
-<!-- origen: nuevo (vista previa real al lado del editor y en su pestaña en el móvil, como Squarespace, Wix y Shopify; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador
 Pantalla: Página web
@@ -287,7 +282,6 @@ previa**.
 Implicados: WEBSITE-F01, WEBSITE-F02, WEBSITE-F05, WEBSITE-F12
 
 ### WEBSITE-F07 Publicar
-<!-- origen: nuevo (borrador frente a lo publicado, con confirmación, como Square Online, Wix y Squarespace; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -304,7 +298,6 @@ Si falla: «No se pudo publicar la página web» y lo publicado sigue como estab
 Implicados: WEBSITE-F05, WEBSITE-F10, WEBSITE-F12
 
 ### WEBSITE-F08 Desconectar la página
-<!-- origen: nuevo (despublicar sin perder nada, como «Unpublish» de Wix y Square Online; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente, API
 Pantalla: Página web
@@ -320,7 +313,6 @@ Si falla: «No se pudo desconectar la página web» y la página sigue en línea
 Implicados: WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F09 Compartir la dirección y el QR
-<!-- origen: nuevo (QR para imprimir y enlace para copiar, como el QR de Square y el de Toast; PLAN §29) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, responsable, API
 Pantalla: Compartir y QR
@@ -334,10 +326,9 @@ Sale: la dirección pública del negocio, la suya en erplora.com tal y como la v
 dispositivo la dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en
 línea, de que aún lleva al acceso del equipo.
 Si falla: si no se puede copiar, «No se pudo copiar el enlace: selecciónalo y cópialo a mano.».
-Implicados: WEBSITE-F07, WEBSITE-F10
+Implicados: WEBSITE-F07, WEBSITE-F10, BASE-F112 (dentro de la app)
 
 ### WEBSITE-F10 Visitar la página pública
-<!-- origen: nuevo (la web del negocio en su propia dirección, con «Entrar» para el equipo; PLAN §29, decisión de Ioan del 21/10) -->
 Estado: hecho (servidor, página pública y e2e)
 Actor: cualquiera, sin cuenta
 Pantalla: La página pública
@@ -349,14 +340,15 @@ Pasos:
    siempre.
 Entra: la dirección del negocio.
 Sale: la página publicada, con su propia política de seguridad (sin scripts del usuario: solo el paquete de la
-página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre.
+página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre. La
+página le dice al buscador cuál es su dirección principal: el dominio propio del negocio si se abre en él (BASE-F110),
+también desde esta dirección, que no redirige porque sigue siendo la entrada del equipo; sin dominio propio, esta.
 Si falla: sin publicar, desconectada o con la app apagada, la dirección lleva al acceso del equipo; quien hace más de
 60 lecturas por minuto desde una misma conexión espera un momento. Por el dominio propio del negocio (BASE-F110) es la
 misma página: **Entrar** lleva a su dirección de erplora.com y, sin página que enseñar, el dominio dice que no hay nada ahí.
 Implicados: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Mostrar una galería de fotos
-<!-- origen: nuevo (galería de trabajos del salón, como las de Fresha, Booksy y Square Online; ampliación de PLAN §29 del 2026-10-22) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente (ordenar o quitar fotos ya subidas), API
 Pantalla: Página web
@@ -374,7 +366,6 @@ página web de este negocio: vuelve a subirla.» bajo la galería.
 Implicados: WEBSITE-F04, WEBSITE-F10
 
 ### WEBSITE-F12 Mostrar las reseñas de Google
-<!-- origen: nuevo (valoración y reseñas del Perfil de Empresa de Google con «Escribir una reseña», como Fresha, Square Online y Wix; ampliación de PLAN §29 del 2026-10-22) -->
 Estado: hecho (servidor, pantalla y e2e)
 Actor: propietario, administrador, asistente (el enlace), API
 Pantalla: Página web
@@ -411,6 +402,8 @@ las mismas reglas y los mismos permisos.
 | El borrador, su estado de publicación y la dirección pública (se sigue en vivo) | ver | F01–F03, F07, F08 | `website.site.get` |
 | El borrador pintado como la página pública (HTML, para la vista previa) | gestionar | F06 | `website.site.preview` |
 | Las categorías de Inventario o de Servicios para elegir | gestionar | F05 | `website.catalog.categories` |
+| Una imagen subida por el nombre de su archivo: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | ver | F04, F11 | `website.image.get` |
+| Una categoría de Inventario o de Servicios por su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | gestionar | F05 | `website.category.get` |
 | El QR de la dirección pública, en PNG o SVG | ver | F09 | `website.qr.get` |
 | Lo publicado, sin las secciones ocultas (sin sesión) | cualquiera | F10 | `website.public.site` |
 | El catálogo publicado, leído en ese momento y con los precios en el idioma de quien pregunta y en la moneda del negocio (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
@@ -439,7 +432,14 @@ borrador, pone en `contact.hours` los cinco días con la franja `09:00`–`20:00
 `website.site.save`; si además dice «y publícala», `website.site.publish`. No son herramientas del asistente, a
 propósito: la vista previa (`website.site.preview`, una página HTML), la subida de imágenes (`website.image.upload`,
 un fichero en base64 de hasta 5 MB) y el QR (`website.qr.get`, una imagen en base64), que se usan desde la pantalla, ni
-las tres lecturas públicas de los visitantes (`website.public.*`).
+las tres lecturas públicas de los visitantes (`website.public.*`), ni las dos con las que su tarjeta nombra una imagen
+o una categoría (`website.image.get` y `website.category.get`).
+
+Antes de guardar, el asistente pide confirmar con su tarjeta (BASE-F97), que resume lo que cambia con las palabras del
+editor, nunca volcando la web entera ni sus códigos: el diseño («Moderna»), el tema (la paleta «Bosque», los colores
+propios si los hay y el fondo «Oscuro»), cada sección que se oculta o se muestra («Galería: se oculta») y, por sus
+nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Contacto»). Si el borrador no cambia, dice
+«Sin cambios».
 
 ### Lo que avisa
 
@@ -479,32 +479,38 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   `reviews.ts` sin pedir nada, su catálogo se lee al pintarla (`queries.live_catalog`, nunca la instantánea de la
   publicación) y se guarda un minuto, lo que la API guarda ese catálogo, en vez de una hora; su CSP no lleva `report-uri`,
   porque `/csp-report/` tampoco está. Sin página que enseñar, 404.
+- **La dirección principal** (hub#818, `public_home.main_address`): las dos direcciones llevan en el `<head>` un
+  `<link rel="canonical">` absoluto a `https://<dominio>/` mientras la puerta abre la web en ese dominio
+  (`base.custom_domains.served_on`: el de la fila del negocio, si el mapa se lo da a él; uno que nombran dos negocios no
+  es de nadie), y si no a `https://<slug>.<dominio del Hub>/`. Sin redirección, como el dominio integrado de Squarespace:
+  la dirección de erplora.com sigue siendo la entrada del equipo. La página se guarda con la dirección que nombra
+  (`{"main": …, "html": …}`) y se vuelve a pintar si ya no es la de ahora, así que un cambio de dominio no espera a que
+  caduque; las claves y `forget_cached` no cambian. La vista previa no nombra ninguna (`render_site(canonical="")`).
 - **La barra y el pie de las cuatro plantillas** son componentes (`templates/website/_topbar.html`, `_footer.html`, y sus
   piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
   una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.
 
-- **Una fila por hub (andamiaje de la fase 1, PLAN §29)**: hasta la fase 2 las tablas las comparten todos los hubs,
-  así que `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro, `base.operations.hub_id`; sin clave foránea,
-  porque en la fase 2 el registro vive en la BD de control). `Site.hub_id` es único: un hub tiene una sola web. Toda
-  operación lee y escribe solo la fila del hub de la petición (guardar, publicar, desconectar, subir, previsualizar,
+- **Una fila por hub (PLAN §29)**: `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro,
+  `base.operations.hub_id`; sin clave foránea, porque el registro vive en la BD de control). `Site.hub_id` es único:
+  un hub tiene una sola web. Toda operación lee y escribe solo la fila del hub de la petición (guardar, publicar, desconectar, subir, previsualizar,
   leer), y `/` y la API pública solo enseñan la web publicada de su propio hub: lo que publica un hub nunca sale en
   otro, y el equipo de un hub no lee ni cambia la web de otro. La primera escritura de un hub crea su fila
   (`get_or_create` y después `select_for_update`): dos primeras escrituras a la vez no fallan, la segunda espera a la
-  primera. En la fase 2 cada BD de hub guarda su única fila y la columna se queda, siempre con el mismo valor. Las
-  claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
+  primera. Cada BD de hub guarda su única fila, así que la columna lleva siempre el mismo valor; retirarla
+  del estado es hub#689. Las claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
-- **El catálogo, solo de una app activa** (APP-WEBSITE, 2026-10-22): `queries._source_on` pregunta a
-  `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: en la fase 1 toda
-  app instalada está activa, y en la fase 2 una app apagada en el hub no tiene sus tablas creadas. Con la fuente
+- **El catálogo, solo de una app activa**: `queries._source_on` pregunta a
+  `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
+  app instalada puede estar apagada en el negocio (BASE-F23), y una que nunca encendió no tiene sus tablas. Con la fuente
   apagada, `read_catalog` y `website.catalog.categories` devuelven vacío, nunca un error, y el editor lista la fuente
   guardada sin dejar elegirla, con la nota `fields.sourceOff*` (`WebsitePage.test.ts`, «a catalog saved from an app
   that is off…»).
-- **El icono de la página** (APP-WEBSITE, 2026-10-22): `render._icon` escribe `<link rel="icon">` con el logotipo o,
+- **El icono de la página**: `render._icon` escribe `<link rel="icon">` con el logotipo o,
   sin él, la inicial en un SVG `data:` con los colores de la paleta (la inicial, escapada). Sin él, el navegador pedía
   `/favicon.ico` al hub, que es la SPA de `base` y le dejaba una cookie `csrftoken` al visitante: la página dejaba de
   ser «sin cookies» (lo cazó `website-flows.spec.ts`, WEBSITE-F10).
 - **Una sola guarda para lo público**: `/` (`public_home.is_published`) y la API pública (`website.public.*`) pasan por
-  `queries._live`: el módulo encendido en el hub (en la fase 1, toda app instalada, `base.relay.active_apps`; con él
+  `queries._live`: el módulo encendido en el hub (`base.relay.active_apps`; con él
   apagado la API responde 404 `app_inactive` y `/` salta al login) y una publicación en línea de ese hub (si no,
   404 `website.not_published`).
 - Anatomía completa: `apps.py`, `models.py`, `schemas.py`, `render.py`, `csp.py`, `public_home.py`, `storage.py`,
@@ -553,8 +559,7 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   (`public_media` de `apps.py`); el almacén guarda también documentos privados de otros módulos, que nunca salen por ahí;
   un nombre que es una carpeta en disco responde 404. Al guardar, cada imagen del contenido tiene que ser una subida de este hub y su URL la escribe el
   servidor.
-- **Reseñas de Google** (`reviews.py`, ronda 2026-10-22, decisión de Ioan: del servidor, sin JS de terceros, que la
-  CSP prohíbe): `reviews.parse` lee la entrada (Place ID `ChIJ…`; enlace de Google Maps con `place_id=`,
+- **Reseñas de Google** (`reviews.py`; del servidor, sin JS de terceros, que la CSP prohíbe): `reviews.parse` lee la entrada (Place ID `ChIJ…`; enlace de Google Maps con `place_id=`,
   `query_place_id=`, `q=place_id:` o `!19sChIJ…`; `/maps/place/<nombre>/@lat,lng`, `/maps/search/<texto>/`, `q=<texto>`
   o `query=<texto>`, que se buscan por nombre; enlace corto `maps.app.goo.gl` o `goo.gl/maps`) y `schemas` rechaza lo
   demás. `reviews.load` pregunta con `httpx` (5 s por llamada): el enlace corto se
@@ -581,19 +586,33 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
 - **Migración 0004** (`0004_site_reviews_snapshot`, reversible): añade `Site.reviews_snapshot` (JSON, `{}` por defecto).
 - La subida va en base64 dentro del JSON de la operación (como el certificado de VeriFactu), con
   `accept_body_up_to(7 100 000)` en su ruta: una sola puerta para la SPA, las API keys y el asistente.
-- El QR es `qrcode` (la misma librería del QR de VeriFactu), corrección media y zona tranquila de cuatro módulos. No
-  `segno`, que nombraban PLAN §29 y el diseño de referencia: una sola librería de QR en el Hub (ronda CLOSE-WEBSITE de
-  PLAN-HUB).
+- El QR es `qrcode` (la misma librería del QR de VeriFactu: una sola librería de QR en el Hub), corrección media y
+  zona tranquila de cuatro módulos.
 - El admin del Hub (`hubs.erplora.com/admin`) es de solo lectura salvo `is_live` (desconectar una página por
   soporte): no se añade ni se borra nada desde allí, y esa escritura no deja aviso.
 - Asistente: las cinco operaciones que usa (`website.site.get`, `website.site.save`, `website.site.publish`,
   `website.site.unpublish` y `website.catalog.categories`) declaran `ai={"description"…}`, con `risk` `normal` en las
-  acciones; las seis que no son herramienta, a propósito, no lo llevan: la vista previa (HTML para el marco del
-  editor), el QR (una imagen en base64), la subida (un fichero en base64 de hasta 5 MB) y las tres lecturas públicas de
-  los visitantes, sin sesión. Esas seis esperan al marcador `INTERNAL` y al check `live.E017` de la ronda 2026-10-22b
-  (PLAN §30), que aún no existen en `packages/live`. Lo comprueba `tests/test_apps.py`, que también exige descripción
-  en cada campo de `SaveIn`.
-- **Paletas** (`palettes.json` + `palettes.py`, ronda 2026-10-22): las ocho paletas, cada una con su juego claro y
+  acciones, y sus `asks`: lo que una persona escribe para pedir cada una, en `en` y `es` (hub#1093; `website` está en
+  `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada frase traiga su herramienta
+  entre las diez primeras, por rol). Sin ellos, guardar y desconectar quedaban fuera de las 40 herramientas que se
+  ofrecen en un turno y el asistente decía que no podía. `tests/test_assistant_asks.py` mide con las frases reales de
+  la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-website-2026-11-08.json`), nunca con los propios `asks`, y que el
+  encargado solo recibe `website.site.get` y el empleado nada. «Borrador» no lleva sinónimo propio (`assistant_synonyms`):
+  su raíz es la del verbo «borrar» y convertiría cada «borra …» en una mención del borrador. Las ocho que no son
+  herramienta, a propósito, declaran `ai=INTERNAL` (`live.E017` exige a toda operación su `ai=`): la vista previa
+  (HTML para el marco del editor), el QR (una imagen en base64), la subida (un fichero en base64 de hasta 5 MB), las
+  tres lecturas públicas de los visitantes, sin sesión, y las dos con las que la tarjeta nombra una imagen o una
+  categoría. Lo comprueba `tests/test_apps.py`, que también exige descripción en cada campo de `SaveIn`.
+- La tarjeta de confirmación del asistente (BASE-F97, hub#679 y hub#693): `base.assistant.cards._card_details` traduce el
+  detalle con las marcas `refers` de `schemas.py`, leídas como quien pregunta (cada imagen por `website.image.get` y
+  cada categoría por `website.category.get`, las dos `INTERNAL`, sin ruta ni consulta viva) y las listas cerradas de
+  `choices.py` (`WebsiteConfig.choices`). Después, el `summary` que `website.site.save` declara en su `ai=`
+  (`services._save_summary`) lo sustituye por una sola línea que compara el borrador enviado con el guardado: diseño,
+  tema, secciones que se ocultan o se muestran y nombres de las demás secciones cambiadas. `SECTION_LABELS` de
+  `choices.py` da esos nombres con las palabras del editor en `en` y `es` (`tests/test_choices.py`). Sin permiso, de
+  otro negocio o que ya no está: el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el
+  trinquete de `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca o una lista sin etiqueta.
+- **Paletas** (`palettes.json` + `palettes.py`): las ocho paletas, cada una con su juego claro y
   oscuro (principal, página, franjas, texto, enlaces y bordes) y el color secundario; el editor lee el mismo fichero.
   `tests/test_palettes.py` comprueba WCAG AA (4,5:1) en los dos modos para texto, texto atenuado, enlaces, botones y
   el color secundario; los dos colores del propietario sobre cualquier paleta (`custom`) se derivan en `palettes._derived` (fondo blanco y uno oscuro teñido
@@ -633,7 +652,7 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   Django propias. **Clásica**, de «Business Casual» de Start Bootstrap; **Moderna**, de «Agency» de Start Bootstrap y
   de los ejemplos «Heroes» y «Features» de Bootstrap; **Minimalista**, de «Clean Blog» de Start Bootstrap;
   **Llamativa**, de «Grayscale» y «One Page Wonder» de Start Bootstrap. Licencia MIT en todos (Start Bootstrap LLC;
-  The Bootstrap Authors); registro en `docs/licences.md` de la raíz de erplora-next.
+  The Bootstrap Authors); registro en `knowledge/wiki/topics/licences.md` de la raíz de erplora-next.
 - **Migración 0002** (`0002_theme_palettes`, reversible, solo JSON): el tema de antes `{primary, accent, mode}` del
   borrador y de lo publicado pasa a `{palette: "custom", custom: {primary, accent}, mode}`, así que ninguna página
   cambia de colores; a la inversa, una paleta vuelve a sus dos colores (congelados en la migración) y automático a
@@ -642,12 +661,11 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   `{palette: "custom", custom}` pasa a `ocean` con los mismos dos colores (se pinta igual: la página sale de ellos sea
   cual sea la paleta) y los colores que una paleta guardaba para un «Tus colores» posterior se descartan (nunca se
   pintaron y ahora se pintarían). Borrador y publicado por igual.
-- **Escribir en el editor** (regresión de 2026-10-22): el grupo de secciones (`ion-accordion-group`) guarda las
-  abiertas en el estado de la página (`openSections`) y solo atiende a su propio `ionChange`. Antes llevaba un valor
-  fijo y Vue lo volvía a poner en cada pulsación: la sección abierta se plegaba, el campo perdía el foco y la página
-  saltaba. Lo cubren `WebsitePage.test.ts` («a section opened by hand stays open…») y la e2e, que escribe tecla a
+- **Escribir en el editor**: el grupo de secciones (`ion-accordion-group`) guarda las abiertas en el estado de la
+  página (`openSections`) y solo atiende a su propio `ionChange`; con un valor fijo, Vue lo vuelve a poner en cada
+  pulsación: la sección abierta se pliega, el campo pierde el foco y la página salta. Lo cubren `WebsitePage.test.ts` («a section opened by hand stays open…») y la e2e, que escribe tecla a
   tecla y cruza un autoguardado.
-- **Tests por flujo** (cierre de la migración, APP-WEBSITE): servidor en `apps/website/tests/` (un `test_<fichero>.py`
+- **Tests por flujo**: servidor en `apps/website/tests/` (un `test_<fichero>.py`
   por fichero), pantallas en `frontend/**/*.test.ts` y, de punta a punta, `tests/e2e/website-flows.spec.ts` (un test
   por flujo con su clave en el título, en 390, 834 y 1440 px, capturas `APP-WEBSITE-<clave>-<ancho>`) y
   `tests/e2e/website.spec.ts` (las cuatro plantillas en claro y oscuro, la paleta y la regresión de escribir tecla a
@@ -656,20 +674,8 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
 
 ## Lo que queda fuera
 
-- **`ai=` en las seis operaciones que no son herramienta del asistente** (`website.site.preview`, `website.qr.get`,
-  `website.image.upload`, `website.public.site`, `website.public.catalog` y `website.public.reviews`): PLAN §30 pide
-  `ai=` en toda operación, y estas seis esperan al marcador `INTERNAL` y al check `live.E017`, que aún no existen en
-  `packages/live` (ver «Asistente» en «Para quien lo mantiene»). El QR no hace falta como herramienta:
-  `website.site.get` ya da la dirección pública.
-- **Dos arreglos fuera de la app** (`TODO.md`, vistos en APP-WEBSITE):
-  - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`), hecho: en el host de un hub, `/favicon.ico`,
-    `/robots.txt` o cualquier ruta que nombra un fichero y no tiene URL propia recibe un 404 sin la SPA ni cookie
-    (antes, la SPA con 200 y `csrftoken`). Un buscador ya no lee HTML como `robots.txt`: el 404 es «sin reglas» y la
-    web sigue indexable. Detalle en «Para quien lo mantiene» de `base/WORKBOOK.md`.
-  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`), en la cola: en `ImageUpload` la miniatura y su
-    texto se tocan, sin hueco, en los tres tamaños (logotipo, portada, Sobre nosotros y galería).
-- **La fuente del catálogo apagada no se ve en la e2e**: en la fase 1 toda app instalada está activa, así que ese caso
-  de WEBSITE-F05 lo cubren pytest (servidor) y Vitest (editor), no Playwright.
+- **La fuente del catálogo apagada no se ve en la e2e**: ese caso de WEBSITE-F05 lo cubren pytest (servidor) y
+  Vitest (editor), no Playwright.
 
 ## Lo que NO hace, a propósito
 
@@ -686,7 +692,6 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   inicial). Sin la clave de Google en el servidor no se pregunta nada.
 - La firma «© <año> ERPlora» del pie no se quita ni se cambia: el nombre y los datos legales del negocio van en la
   línea del pie.
-- La activación real del módulo por negocio (`AppActivation`) llega en la fase 2.
 
 ## Cómo son las páginas (para quien lo mantiene)
 

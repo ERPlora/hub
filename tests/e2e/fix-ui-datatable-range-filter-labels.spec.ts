@@ -1,18 +1,12 @@
-// flow: UI DataTable etiquetas de rango — FIX-UI-DATATABLE-RANGE-FILTER-LABELS (seen by the worker of
-// APP-CART_CHECKOUT, hub#110): in the filter row the other filters read as their column («Order», «Email»,
-// «Payment»), but the two ends of a range only said «From» / «To» («Desde» / «Hasta»): nobody could tell what they
-// filter, and with two ranges in one list (Payments: Date and Amount) they looked the same. A date range said even
-// less: its ends are native date fields that paint «dd/mm/yyyy», never a placeholder. As in the market (Shopify,
-// Odoo: a range filter carries the name of its field) the column now heads its pair on screen in the row, at 1440
-// and 834 px, in English and in Spanish. Behind the funnel (a `filterable` list such as Invoices, and every list on
-// a phone, ui#28) each range already had its column as a title: there it is said once, «From» / «To» below it.
-// The ends keep their widths (ui#29) and nothing runs past the row, the panel or the sheet.
-// Since FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL Payments is `filterable` as the old list: its two ranges are
-// measured in its panel at every size; since FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL Orders is too, so
-// its Total is measured in its panel as well. No list with a range keeps the filter row on a desk any more: the
-// column heading a range in the row and the ends' widths there (ui#29) are covered today by the Vitest of ui
-// (`DataTable.filters.test.ts` «FIX-UI-DATATABLE-RANGE-FILTER-LABELS: a range says its column on screen» and
-// `DataTable.visual.test.ts`); this spec measures the panel and the sheet.
+// flow: UI DataTable range labels — the two ends of a range filter say which column they filter (hub#110): «From» /
+// «To» («Desde» / «Hasta») alone would not tell two ranges of one list apart (Payments: Date and Amount), and a date
+// range's ends are native date fields that paint «dd/mm/yyyy», never a placeholder. As in the market (Shopify, Odoo),
+// a range filter carries the name of its field, in English and in Spanish. Behind the funnel (a `filterable` list
+// such as Invoices, and every list on a phone) each range has its column as a title, said once, «From» / «To» below
+// it. The ends keep their widths and nothing runs past the row, the panel or the sheet.
+// Payments and Orders are `filterable`: their ranges are measured in their panels at every size. No list with a range
+// keeps the filter row on a desk: the column heading a range in the row and the ends' widths there are covered by
+// ui's Vitest (`DataTable.filters.test.ts` and `DataTable.visual.test.ts`); this spec measures the panel and the sheet.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, untilStill } from './helpers';
@@ -59,7 +53,7 @@ const HINTS: Record<Language, [string, string]> = { en: ['From', 'To'], es: ['De
 const SIZES = [
   { label: '1440', width: 1440, height: 900 },
   { label: '834', width: 834, height: 1112 },
-  // A phone paints cards: every list folds its filters into the sheet behind the funnel (ui#28).
+  // A phone paints cards: every list folds its filters into the sheet behind the funnel.
   { label: '390', width: 390, height: 844 },
 ] as const;
 
@@ -154,7 +148,7 @@ for (const size of SIZES) {
             // Its ends still say «From» / «To» (a date field paints its own «dd/mm/yyyy»).
             expect(own.ends.map((end) => end.placeholder), `${what}: the ends' example texts`).toEqual(HINTS[language]);
             expect(own.ends.map((end) => end.type), `${what}: the ends' fields`).toEqual([range.field, range.field]);
-            // Nothing runs past the panel or the sheet (saas#558).
+            // Nothing runs past the panel or the sheet.
             for (const box of [own.box!, ...own.ends]) {
               expect(box.x, `${what}: starts inside the panel`).toBeGreaterThanOrEqual(area.x - 0.5);
               expect(box.x + box.width, `${what}: ends inside the panel`).toBeLessThanOrEqual(area.x + area.width + 0.5);

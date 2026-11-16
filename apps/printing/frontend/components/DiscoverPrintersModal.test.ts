@@ -1,7 +1,7 @@
 // «Search printers» (PRINTING-F02): inside the app it asks the device what printers it reaches and lists
 // them, each with «Add» (the draft of «New printer») or «Already added»; it says why it found nothing —
 // a browser cannot look, the device denied the permission, the app is not linked to this business, the
-// scan failed, or nothing answered — and always offers «Add by its address» (hub#1924).
+// scan failed, or nothing answered — and always offers «Add by its address».
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -78,7 +78,7 @@ describe('DiscoverPrintersModal', () => {
     expect(again.findComponent(HubIcon).props('name')).toBe('ion:refresh-outline');
   });
 
-  it('says the device denied the permission, never «no printers» (hub#1773)', async () => {
+  it('says the device denied the permission, never «no printers»', async () => {
     inApp(async () => ({ status: 'local_network_permission_denied', permission: 'NEARBY_WIFI_DEVICES' }));
     const s = await setup();
     expect(s.find('printing-discover-denied').text()).toBe(

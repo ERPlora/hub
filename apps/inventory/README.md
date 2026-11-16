@@ -41,7 +41,7 @@ sin redondear. Es la carta del restaurante y los productos de venta de la peluqu
 | Quién la lee | Ventas (catálogo de venta y bajada de stock), Cocina, Menús y combos, Modificadores, Tarifas, Caja, Facturación, Clientes, Personal, Mesas, Impresión, Web, Automatizaciones y VeriFactu; la plataforma (plantillas, copias, Inicio) |
 | Pantallas | `/inventory/dashboard`, `/inventory/products`, `/inventory/movements`, `/inventory/categories` y `/inventory/settings` |
 | Inicio | el paso «Tu catálogo» (`inventory.stock.get_summary`, obligatorio) y cuatro paneles: stock bajo, valor del stock a coste, productos con stock y los de menos stock |
-| Operaciones | 13 consultas (`queries.py`) y 21 acciones (`services.py`), todas con `ai=`; 31 rutas en `/api/inventory/…` |
+| Operaciones | 14 consultas (`queries.py`) y 21 acciones (`services.py`), todas con `ai=`; 31 rutas en `/api/inventory/…` (sin ruta: las tres reacciones `inventory.stock.*` y `inventory.category.get`) |
 | Eventos | 11, `inventory.product.{created,updated,deleted,categorized,uncategorized}`, `inventory.category.{created,updated,deleted}`, `inventory.stock.{changed,threshold_crossed}` e `inventory.config.updated` (`events.py`); reacciona a `sale.sale.completed`, `sale.sale.voided` y `sale.sale.refunded` |
 | Migraciones | `0001_initial` … `0005_product_image` |
 | Admin | Django admin en `hubs.erplora.com`, con todas las tablas editables para soporte: avisa, no impide (no pasa por las reglas de las operaciones); los ids y las fechas, solo lectura |
@@ -69,7 +69,8 @@ CI=1 pnpm e2e tests/e2e/inventory-products.spec.ts tests/e2e/inventory-flows.spe
 
 ## Qué queda fuera
 
-- **hub#526** — La tarjeta de confirmación del asistente no dice qué registro toca una escritura.
+- Ya no está fuera: hub#526 (la tarjeta de confirmación del asistente no decía qué registro toca una escritura) se
+  cerró el 2026-11-07.
 - Lo que no hace a propósito (almacenes, lotes, recetas, variantes, cobrar…): «Lo que NO hace, a propósito» del
   WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

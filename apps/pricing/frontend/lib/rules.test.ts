@@ -1,4 +1,4 @@
-// What the rules table paints: the VALUE of a rule with its unit (the old module's pricing#28: one column,
+// What the rules table paints: the VALUE of a rule with its unit (one column,
 // «10 %», «0,50 € por unidad», never a bare 0), what it applies to (with its group), and the tax basis of
 // a price list (an empty one follows the business, and says so).
 import { createShellI18n } from '@erplora/ui/shell';
@@ -32,10 +32,10 @@ describe('ruleValueLabel', () => {
     expect(ruleValueLabel(rule({ rule_type: 'fixed', percent: null, amount: 50 }), translator('en'), 'en', EUR)).toBe('€0.50 per unit');
   });
 
-  it('an amount per unit is in the business’s currency: in Poland, zlotys; a bare figure until it answers', () => {
+  it('an amount per unit is in the business’s currency: in Poland, zlotys; a dash until it answers', () => {
     const fixed = rule({ rule_type: 'fixed', percent: null, amount: 50 });
     expect(ruleValueLabel(fixed, translator('es'), 'es', { currency: 'PLN', decimals: 2 })).toBe('0,50\u00a0zł por unidad');
-    expect(ruleValueLabel(fixed, translator('en'), 'en')).toBe('0.50 per unit');
+    expect(ruleValueLabel(fixed, translator('en'), 'en')).toBe('— per unit');
   });
 });
 

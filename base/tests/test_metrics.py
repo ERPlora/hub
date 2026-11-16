@@ -1,4 +1,4 @@
-"""The worker's CloudWatch metrics (hub#488; PLAN-AWS §8; PLAN-DB §6 and §8).
+"""The worker's CloudWatch metrics (hub#488).
 
 Once a minute, in a thread of its own (the worker's tick never waits for it), the worker measures and publishes:
 
@@ -8,7 +8,7 @@ Once a minute, in a thread of its own (the worker's tick never waits for it), th
 - ``ERPlora/Fiscal``: ``OldestPendingAgeSeconds``, since when the oldest production record waits to reach the tax
   authority, asked to every app that keeps such a queue (``fiscal_pending_since`` on its ``LiveAppConfig``: VeriFactu)
   in each hub with its own database where the app is on, a time budget per pass and the hubs in turn, each one's last
-  reading kept. Since S5 there is no shared database: a business still without its own is never read.
+  reading kept. There is no shared database: a business still without its own is never read.
 
 Every value carries the ``Environment`` dimension (prod, pre). A measure that fails is logged and missing from that
 pass (its alarm treats missing data as breaching); CloudWatch refusing a namespace is logged and never stops the
@@ -29,8 +29,9 @@ from django.utils import timezone
 
 from apps.verifactu.models import Environment, Record
 from apps.verifactu.tests.test_fiscal_backlog import record
-from base import metrics, relay
-from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric
+from base import activation, metrics, queries, relay
+from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric, StuckActivations
+from base.models import AppActivation
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from control.models import Hub
@@ -53,6 +54,12 @@ def never() -> threading.Event:
 
 def by_name(found: list[Metric]) -> dict[str, Metric]:
     return {metric.name: metric for metric in found}
+
+
+def logged_once_with_its_trace(caplog, said: str) -> None:
+    """``said`` was logged once, as an error with its trace."""
+    (logged,) = [record for record in caplog.records if record.getMessage() == said]
+    assert (logged.levelname, logged.exc_info is not None) == ("ERROR", True)
 
 
 # ── The registry's measures ─────────────────────────────────────────────────────────────────────────────────────────
@@ -120,8 +127,8 @@ def test_with_no_record_to_send_anywhere_the_backlog_is_zero(hub_a, hub_b):
 @hub_db
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_business_still_without_its_own_database_is_never_read(hub_a, hub_b, caplog):
-    """Since S5 there is no shared database to read: a business the cut has not reached yet answers 503 and keeps no
-    records anywhere the worker reads; were it read, its failure would wait since then and page (``_failed``)."""
+    """There is no shared database to read: a business still without its own answers 503 and keeps no records
+    anywhere the worker reads; were it read, its failure would wait since then and page (``_failed``)."""
     now = timezone.now()
     with use_control():
         Hub.objects.create(slug="not-cut-yet", status=Hub.Status.READY)
@@ -234,9 +241,9 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
 
-    said = f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays."
-    (logged,) = [record for record in caplog.records if record.getMessage() == said]
-    assert (logged.levelname, logged.exc_info is not None) == ("ERROR", True)
+    logged_once_with_its_trace(
+        caplog, f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays."
+    )
 
 
 @hub_db
@@ -244,7 +251,7 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
 def test_a_busy_free_hub_never_read_waits_since_its_first_failure_and_pages_once_that_ages(
     hub_a, hub_b, monkeypatch, caplog
 ):
-    """Review of hub#598: a Free hub (one place of its database in this process) whose place is taken, with a
+    """hub#598: a Free hub (one place of its database in this process) whose place is taken, with a
     production record waiting for 20 minutes, read by a backlog just made (a worker restarted): nothing read yet is no
     «nothing to send». It waits since the first failure, so the alarm pages once that is older than 5 minutes; read at
     last, the real reading replaces it. Busy is the plan's limit doing its work: said as a warning, without a trace."""
@@ -321,12 +328,12 @@ def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_registry_that_cannot_be_read_leaves_the_measure_out(hub_a, hub_b, monkeypatch):
     """Without the list of the businesses to read, a reading of none would say nothing waits and hide them all."""
-    from base import services
+    from base.services import provisioning
 
     def broken(now):
         raise RuntimeError("database gone")
 
-    monkeypatch.setattr(services, "hubs_to_serve", broken)
+    monkeypatch.setattr(provisioning, "hubs_to_serve", broken)
 
     with pytest.raises(RuntimeError):
         FiscalBacklog()(timezone.now(), never())
@@ -354,6 +361,105 @@ def test_every_app_that_keeps_a_fiscal_queue_is_asked_and_the_oldest_answer_wins
     assert metrics.fiscal_pending_since() == NOW - dt.timedelta(minutes=9)
     assert metrics.fiscal_pending_since({"verifactu", "sale"}) == NOW - dt.timedelta(minutes=3)
     assert metrics.fiscal_pending_since({"sale"}) is None
+
+
+# ── The apps stuck turning on (hub#610) ─────────────────────────────────────────────────────────────────────────────
+
+
+def waiting(hub: Hub, app: str, state: str, since: dt.datetime) -> None:
+    """``app`` of ``hub``'s business, in its own database, ``state`` since ``since`` (``changed_at``: when it was asked
+    for while ``creating``; its last failure while ``failed``)."""
+    with use_hub(hub):
+        AppActivation.objects.filter(host=hub.slug, app=app).update(state=state, changed_at=since)
+
+
+def stuck_count(found: list[Metric]) -> float:
+    (metric,) = found
+    assert (metric.namespace, metric.name, metric.unit) == (HUBS_NAMESPACE, "AppsActivationStuck", "Count")
+    return metric.value
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_with_every_app_on_or_off_the_count_is_zero(hub_a, hub_b):
+    now = timezone.now()
+    waiting(hub_a, "website", activation.OFF, now - dt.timedelta(hours=2))
+
+    assert stuck_count(StuckActivations()(now, never())) == 0.0
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_an_app_making_its_tables_for_over_10_minutes_or_failed_counts_in_every_business(hub_a, hub_b):
+    """Asked 11 minutes ago and still ``creating``: stuck. Asked 9 minutes ago: still within its time. ``failed``: an
+    error the business already sees, counted at once (each retry moves its ``changed_at``). ``on``: never. Each
+    business is read in its own database and the counts add up."""
+    now = timezone.now()
+    waiting(hub_a, "website", activation.CREATING, now - dt.timedelta(minutes=11))
+    waiting(hub_a, "printing", activation.CREATING, now - dt.timedelta(minutes=9))
+    waiting(hub_a, "flow", activation.FAILED, now - dt.timedelta(minutes=1))
+    waiting(hub_a, "payment", activation.ON, now - dt.timedelta(hours=1))
+    waiting(hub_b, "website", activation.CREATING, now - dt.timedelta(minutes=30))
+
+    assert stuck_count(StuckActivations()(now, never())) == 3.0
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_business_that_left_is_never_counted(hub_a, hub_b):
+    """A business that left keeps its database while its records still go to the tax authority (``hubs_to_serve``),
+    but nobody waits there for an app."""
+    now = timezone.now()
+    waiting(hub_b, "website", activation.FAILED, now - dt.timedelta(hours=3))
+    Hub.objects.filter(pk=hub_b.pk).update(status=Hub.Status.CANCELLED)
+
+    assert stuck_count(StuckActivations()(now, never())) == 0.0
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_an_app_no_longer_in_the_code_never_counts(hub_a, hub_b):
+    now = timezone.now()
+    with use_hub(hub_a):
+        AppActivation.objects.create(host=hub_a.slug, app="gone_app", state=activation.FAILED, chosen=True)
+
+    assert stuck_count(StuckActivations()(now, never())) == 0.0
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a, hub_b, monkeypatch, caplog):
+    now = timezone.now()
+    waiting(hub_a, "website", activation.FAILED, now)
+    counted = StuckActivations()
+    assert stuck_count(counted(now, never())) == 1.0
+    real = queries.activations_stuck
+
+    def broken(host, at):
+        if host == hub_a.slug:
+            raise RuntimeError("database gone")
+        return real(host, at)
+
+    monkeypatch.setattr(queries, "activations_stuck", broken)
+    with caplog.at_level(logging.ERROR, logger="base.metrics"):
+        assert stuck_count(counted(now, never())) == 1.0
+
+    logged_once_with_its_trace(
+        caplog, f"worker: the count of stuck apps of the hub {hub_a.slug} could not be read; its last reading stays."
+    )
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_business_never_read_that_cannot_be_read_counts_nothing(hub_a, hub_b, monkeypatch):
+    """Unlike the fiscal backlog, a business that cannot be read is no stuck app: that alarm already pages for it."""
+
+    def broken(host, at):
+        raise RuntimeError("database gone")
+
+    monkeypatch.setattr(queries, "activations_stuck", broken)
+
+    assert stuck_count(StuckActivations()(timezone.now(), never())) == 0.0
 
 
 # ── Publishing ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -492,12 +598,13 @@ def test_the_cloudwatch_client_is_the_tasks_region_with_short_timeouts(monkeypat
     assert metrics.cloudwatch_client().meta.region_name == "eu-west-1"
 
 
-def test_the_measures_are_the_registrys_and_the_fiscal_backlog():
+def test_the_measures_are_the_registrys_the_fiscal_backlog_and_the_stuck_apps():
     collectors = metrics.default_collectors()
 
     assert collectors[0] is metrics.registry_metrics
     assert isinstance(collectors[1], FiscalBacklog)
-    assert len(collectors) == 2
+    assert isinstance(collectors[2], StuckActivations)
+    assert len(collectors) == 3
 
 
 # ── When a pass starts ──────────────────────────────────────────────────────────────────────────────────────────

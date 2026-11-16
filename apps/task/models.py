@@ -1,11 +1,10 @@
 """Models of the task app: projects, tasks with their subtasks, comments and the per-day counter.
 
-Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
-are per scope. Phase 2 moves them to each hub's database. The assignee and a project's owner are
-staff records (``staff.Member``, the app's only requirement); the creator of a task and the author of
-a comment hang from the person in the business's own database (``base.HubUser``), like ``staff.TimeOff``'s
-approver, never from control's user (tenancy W10): their columns ``*_hub_user_id`` are new, the old ones wait empty
-for a later deploy to drop them (``migrations/0002_hub_users``).
+Each business keeps these tables in its own database. The assignee and a project's owner are staff records
+(``staff.Member``, the app's only requirement); the creator of a task and the author of a comment hang from the person
+in the business's own database (``base.HubUser``), like ``staff.TimeOff``'s approver, never from control's user: their
+columns ``*_hub_user_id`` are new, the old ones wait empty for a later deploy to drop them
+(``migrations/0002_hub_users``).
 """
 
 from django.db import models
@@ -17,7 +16,7 @@ from live.models import UUIDModel
 
 from apps.staff.models import Member
 
-#: Longest title, description and comment (the old module's JSON Schema).
+#: Longest title, description and comment.
 TITLE_MAX_LENGTH = 255
 TEXT_MAX_LENGTH = 5000
 
@@ -114,13 +113,13 @@ class Task(UUIDModel):
         blank=True,
         related_name="+",
         db_column="created_by_hub_user_id",
-        verbose_name=_("created by"),
+        verbose_name=pgettext_lazy("task", "created by"),
     )
     due_date = models.DateField(_("due date"), null=True, blank=True)
     completed_at = models.DateTimeField(_("completed at"), null=True, blank=True)
     tags = models.JSONField(_("tags"), default=list, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    created_at = models.DateTimeField(pgettext_lazy("task", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("task", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("task")

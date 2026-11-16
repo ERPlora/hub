@@ -7,11 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flush, mountBase } from '../__tests__/mount-base';
 import ApprovalsExportButton from './ApprovalsExportButton.vue';
 
-const mocks = vi.hoisted(() => ({ saveFile: vi.fn() }));
-vi.mock('../lib/data', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/data')>()),
-  saveFile: mocks.saveFile,
-}));
+const mocks = vi.hoisted(() => ({ saveFile: vi.fn(async () => true) }));
+vi.mock('../lib/download', () => ({ saveFile: mocks.saveFile }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastError: vi.fn(() => Promise.resolve()),
@@ -39,8 +36,10 @@ describe('ApprovalsExportButton', () => {
     const url = new URL(urls[0], 'http://a.localhost');
     expect([url.pathname, Object.fromEntries(url.searchParams)]).toEqual(['/api/approvals/export', query]);
     expect(mocks.saveFile).toHaveBeenCalledOnce();
-    const [name, blob] = mocks.saveFile.mock.calls[0] as [string, Blob];
+    const [name, blob, t] = mocks.saveFile.mock.calls[0] as unknown as [string, Blob, (key: string, values: object) => string];
     expect([name, blob.type]).toEqual(['approvals.csv', 'text/csv']);
+    // The page's translator, so that inside the installed app it says where the file was saved (hub#1041).
+    expect(t('base.download.savedTo', { path: 'Download/x' })).toBe('Saved to Download/x');
     expect(await blob.text()).toBe(`﻿${FILE.csv}`);
   });
 

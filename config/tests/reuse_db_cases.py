@@ -4,8 +4,9 @@ Not named ``test_*.py``: the suite does not collect them, and a run that names t
 """
 
 import pytest
+from django.db import connection
 
-from apps.tax.models import TaxCategory
+from config import testing
 
 
 @pytest.mark.django_db(transaction=True)
@@ -15,4 +16,7 @@ def test_a_transactional_test():
 
 @pytest.mark.django_db
 def test_finds_the_factory_data():
-    assert TaxCategory.objects.exists()
+    """The test database ``--reuse-db`` kept: its table that speaks for the factory data has rows."""
+    with connection.cursor() as cursor:
+        cursor.execute(f"SELECT EXISTS (SELECT FROM {connection.ops.quote_name(testing.FACTORY_TABLE)})")
+        assert cursor.fetchone()[0]

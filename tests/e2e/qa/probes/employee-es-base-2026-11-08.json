@@ -1,0 +1,12 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.base.docs.search","app":"base","tool":"base.docs.search","role":"employee","language":"es","phrase":"¿cómo tengo que proceder para dividir una cuenta cuando dos clientes quieren pagar por separado?","expect":"docs"},
+    {"id":"qa20261108.employee.es.base.api_doc.settings","app":"base","tool":"base.api_doc.settings","role":"employee","language":"es","phrase":"¿está visible para mí la documentación de conexión con otros sistemas?","expect":"read"},
+    {"id":"qa20261108.employee.es.base.catalog_image.get","app":"base","tool":"base.catalog_image.get","role":"employee","language":"es","phrase":"¿qué dibujo es catalog:hospitality/cafe_con_leche y cómo se titula en español?","expect":"read"},
+    {"id":"qa20261108.employee.es.base.profile.avatar_remove","app":"base","tool":"base.profile.avatar_remove","role":"employee","language":"es","phrase":"quita mi foto del perfil, prefiero que se vean mis iniciales","expect":"card","decide":"cancel"},
+    {"id":"qa20261108.employee.es.base.api_key.revoke","app":"base","tool":"base.api_key.revoke","role":"employee","language":"es","phrase":"anula la primera clave de integración de la lista y corta ya su acceso","expect":"refused"},
+    {"id":"qa20261108.employee.es.base.device.mode_set","app":"base","tool":"base.device.mode_set","role":"employee","language":"es","phrase":"cambia este ordenador a modo de caja compartida para que pida PIN","expect":"refused"},
+    {"id":"qa20261108.employee.es.base.person.badge_remove","app":"base","tool":"base.person.badge_remove","role":"employee","language":"es","phrase":"desactiva la tarjeta de acceso de la otra empleada porque la ha perdido","expect":"refused"}
+  ]
+}

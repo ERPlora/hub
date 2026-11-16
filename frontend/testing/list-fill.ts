@@ -1,4 +1,4 @@
-// What keeps a list page from filling its page between the topbar and the tabbar (FIX-DATATABLE-HUB): the
+// What keeps a list page from filling its page between the topbar and the tabbar: the
 // page's test asserts `expect(listFillProblems(wrapper)).toEqual([])`. The height chain (polish.css) needs
 // AppPage `content-layout="fill"`, a DataTable `fill`, and only `.page-fill` stacks between the two.
 import { DataTable } from '@erplora/ui/components';

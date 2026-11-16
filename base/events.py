@@ -1,7 +1,7 @@
 """Events of base (``<app>.<entity>.<fact>``): recorded by base.services in the transaction of their operation.
 
-The registry of hubs (plan 2026-10-17, §1.5) and its demos (§1.6, §1.7): no live query of base reacts to them yet;
-the outbox keeps them as the record of what the SaaS asked of the registry and of what the reaper purged.
+The events of the registry of hubs and of its demos are kept in the outbox as the record of what the SaaS asked of the
+registry and of what the reaper purged.
 """
 
 HUB_REGISTERED = "base.hub.registered"
@@ -9,7 +9,7 @@ HUB_STATE_APPLIED = "base.hub.state_applied"
 HUB_CANCELLED = "base.hub.cancelled"
 HUB_RESTORED = "base.hub.restored"
 HUB_PURGED = "base.hub.purged"
-#: A business of phase 1 got its own database (S5, ``cut_shared_hubs``): how (its mode), where, the rows copied into
+#: A business that shared a database got its own (``cut_shared_hubs``): how (its mode), where, the rows copied into
 #: it and the copy of control taken before; recorded in control's outbox, the record of the cut.
 HUB_CUT = "base.hub.cut"
 DEMO_CREATED = "base.demo.created"
@@ -17,9 +17,9 @@ DEMO_CREATED = "base.demo.created"
 DEMO_CODE_CREATED = "base.demo.code_created"
 DEMO_EXPIRED = "base.demo.expired"
 DEMO_PURGED = "base.demo.purged"
-#: Someone chose or changed their PIN (APP-BASE-3): the grid of «Switch user» has another face. Names nobody.
+#: Someone chose or changed their PIN: the grid of «Switch user» has another face. Names nobody.
 PIN_SET = "base.pin.set"
-#: An administrator made a device shared or personal, named it, removed it, or removed the unused ones (APP-BASE-3).
+#: An administrator made a device shared or personal, named it, removed it, or removed the unused ones.
 DEVICE_MODE_CHANGED = "base.device.mode_changed"
 DEVICE_RENAMED = "base.device.renamed"
 DEVICE_REMOVED = "base.device.removed"
@@ -29,23 +29,23 @@ ACCESS_SETTINGS_CHANGED = "base.access.settings_changed"
 #: Someone changed their own profile (name, contact email, photo, preferences). Names nobody else.
 PROFILE_UPDATED = "base.profile.updated"
 
-# ── Data: blueprints, imports and reset (APP-BASE-2) ──
-#: A blueprint was loaded (BASE-G105): its load's id and how it went. The Home and the loads read themselves again.
+# ── Data: blueprints, imports and reset ───────────────
+#: A blueprint was loaded: its load's id and how it went. The Home and the loads read themselves again.
 BLUEPRINT_IMPORTED = "base.blueprint.imported"
-#: A load was undone (BASE-G108): its id.
+#: A load was undone: its id.
 IMPORT_UNDONE = "base.import.undone"
-#: Every row of the apps named was removed (BASE-G109).
+#: Every row of the apps named was removed.
 HUB_DATA_RESET = "base.hub.data_reset"
-#: What Settings › Data does to the business: the Home's queries follow them (BASE-G131).
+#: What Settings › Data does to the business: the Home's queries follow them.
 DATA_EVENTS = (BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET)
-#: A reset moved on (asked, copying, emptying, failed) or a copy of the business's data was made (round 2026-10-30 of
-#: PLAN-DB, decision 2): told to the hub's live queries after the COMMIT in control, never recorded in the outbox (the
-#: worker writes it in control, outside any operation of the hub).
+#: A reset moved on (asked, copying, emptying, failed) or a copy of the business's data was made: told to the hub's
+#: live queries after the COMMIT in control, never recorded in the outbox (the worker writes it in control, outside any
+#: operation of the hub).
 HUB_RESET_PROGRESSED = "base.hub.reset_progressed"
 #: The nightly measurement kept the business's use of yesterday (``base.usage``): told after its COMMIT, as above.
 HUB_USAGE_MEASURED = "base.hub.usage_measured"
 
-# ── System (APP-BASE-7) ───────────────────────────────────────────────────────────────────────────────────────
+# ── System ────────────────────────────────────────────────────────────────────────────────────────────────────
 #: The relay gave up on a delivery (its last attempt, or past the deepest level): told to the hub's live queries after
 #: the COMMIT, never recorded in the outbox (a listener of every event failing on it would feed itself).
 FAILED_EVENT_CREATED = "base.failed_event.created"
@@ -54,7 +54,7 @@ FAILED_EVENT_RETRIED = "base.failed_event.retried"
 #: Who runs the business discarded a failed event: closed for good, kept for the audit.
 FAILED_EVENT_DISCARDED = "base.failed_event.discarded"
 
-# ── People and permissions (APP-BASE-5) ──────────────────────────────────────────────────────────────────────────
+# ── People and permissions ───────────────────────────────────────────────────────────────────────────────────────
 #: Whoever runs the business took a person's PIN away (``person``: their id in the hub).
 PERSON_PIN_REMOVED = "base.person.pin_removed"
 #: Whoever runs the business gave a person a badge, or took it away.
@@ -73,27 +73,27 @@ APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED)
 #: Whoever runs the business showed or hid the documentation of its API.
 API_DOC_SETTINGS_CHANGED = "base.api_doc.settings_changed"
 
-# ── Files (APP-BASE-8) ──
-#: A file went up to the business's files (BASE-G83): its path.
+# ── Files ───────────────
+#: A file went up to the business's files: its path.
 FILE_UPLOADED = "base.file.uploaded"
-#: A new, empty folder (BASE-G83): its path.
+#: A new, empty folder: its path.
 FILE_FOLDER_CREATED = "base.file.folder_created"
-#: A file or folder got another name (BASE-G85): its new path and the old one.
+#: A file or folder got another name: its new path and the old one.
 FILE_RENAMED = "base.file.renamed"
-#: A file or folder went to another folder (BASE-G85): its new path and the old one.
+#: A file or folder went to another folder: its new path and the old one.
 FILE_MOVED = "base.file.moved"
-#: A file, or a folder and everything in it, was deleted (BASE-G86): its path and whether it was a folder.
+#: A file, or a folder and everything in it, was deleted: its path and whether it was a folder.
 FILE_DELETED = "base.file.deleted"
 #: What changes the business's files: Files' listing follows them.
 FILE_EVENTS = (FILE_UPLOADED, FILE_FOLDER_CREATED, FILE_RENAMED, FILE_MOVED, FILE_DELETED)
 
-# ── Apps turned on and off by the business (PLAN-HUB §9) ──
+# ── Apps turned on and off by the business ──
 #: Whoever runs the business turned an app on (``app``) and, with it, what it needs that was off (``along``).
 APP_ENABLED = "base.app.enabled"
 #: Whoever runs the business turned an app off (``app``) and, with it, what only it needed (``along``).
 APP_DISABLED = "base.app.disabled"
 #: An app (``app``, with what it needs: ``along``) was turned on in a hub whose own database lacks its tables, or tried
-#: again after failing: ``creating`` until the worker makes them (S3; PLAN-DB §7), then ``base.app.enabled``.
+#: again after failing: ``creating`` until the worker makes them, then ``base.app.enabled``.
 APP_ACTIVATION_REQUESTED = "base.app.activation_requested"
 #: Making the tables of the apps ``apps`` failed (``error``, its kind): ``failed``, tried again later or by hand.
 APP_ACTIVATION_FAILED = "base.app.activation_failed"

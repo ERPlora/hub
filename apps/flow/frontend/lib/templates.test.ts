@@ -18,6 +18,7 @@ function phrasing(locale: 'en' | 'es' = 'en'): Phrasing {
 }
 
 const EVERYTHING: CatalogOut = {
+  off_apps: [],
   events: [
     'customer.customer.created',
     'sale.sale.completed',
@@ -113,7 +114,7 @@ describe('the gallery', () => {
   });
 
   it('has a word for every app a card may need, so the hidden ones never name an app by its internal name (hub#476)', () => {
-    const needed = missingApps(TEMPLATES, { events: [], actions: [] });
+    const needed = missingApps(TEMPLATES, { events: [], actions: [], off_apps: [] });
     expect(needed).toEqual(expect.arrayContaining(['task', 'verifactu', 'reservation']));
     // Read from each catalog itself: the Spanish one falls back to the English word, which would hide a missing one.
     for (const [locale, words] of [['en', en.flow.gallery.apps], ['es', es.flow.gallery.apps]] as const) {
@@ -133,7 +134,7 @@ describe('the gallery', () => {
     );
   });
 
-  it('a card on the clock is known by its schedule and its actions, whatever it is called (flows#68)', () => {
+  it('a card on the clock is known by its schedule and its actions, whatever it is called', () => {
     const weekly = templateById('weekReview')!;
     const morning = templateById('morning')!;
     const onFridays = { kind: 'schedule' as const, every: 'week' as const, weekday: 4, time: '19:30' };
@@ -154,7 +155,7 @@ describe('the gallery', () => {
   });
 });
 
-describe('the words of the cards (flows#164)', () => {
+describe('the words of the cards', () => {
   it('every datum a card fills or reads has its word in Spanish', () => {
     const p = phrasing('es');
     const words = (es as { flow: { fields: Record<string, string> } }).flow.fields;

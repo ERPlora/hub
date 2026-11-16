@@ -20,8 +20,9 @@ from live.models import OutboxEvent
 from apps.customer.models import Customer
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import (
-    A,
     B,
+    HUB_DB,
+    A,
     NOW,
     card,
     connect,
@@ -31,8 +32,9 @@ from apps.whatsapp_inbox.tests.conftest import (
     system,
     template,
 )
+from base.tenancy.context import current_alias, use_hub
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SAAS = "http://saas.test"
 SEND = f"{SAAS}/internal/whatsapp/send"
@@ -291,7 +293,7 @@ def test_a_number_on_exactly_one_card_joins_the_conversation_to_it():
 
 
 def test_a_number_that_keeps_its_leading_zero_abroad_is_recognised():
-    """gh:whatsapp_inbox#201: an Italian landline keeps its 0 after +39, on the card and on WhatsApp."""
+    """An Italian landline keeps its 0 after +39, on the card and on WhatsApp."""
     gianni = card("Gianni Rossi", "+39 06 1234 5678")
     receive("wamid.1", "390612345678")
     assert (conv().phone, conv().customer_id) == ("+390612345678", gianni.id)
@@ -414,42 +416,59 @@ def channel_of(scope):
     return run("whatsapp_inbox.channel.get", {}, ctx_for(scope=scope))
 
 
-def test_each_business_keeps_its_own_number_and_its_own_version():
-    # The row was one for every business: B's newer photo said «not connected» for A too.
-    assert connect(version=50).applied is True
-    b = {"version": 120, "status": "not_connected", "phone_number": "", "display_name": ""}
-    assert system("whatsapp_inbox.channel.sync", b, B).applied is True
+@HUB_DB
+def test_each_business_keeps_its_own_number_and_its_own_version(hub_a, hub_b):
+    from live.context import Scope
 
-    a_now, b_now = channel_of(A), channel_of(B)
-    assert (a_now.status, a_now.phone_number, a_now.monthly_limit) == ("connected", "+34910000000", 150)
-    assert (b_now.status, b_now.phone_number, b_now.monthly_limit) == ("not_connected", "", 0)
-    # Each version is its own business's: A's 60 is newer than A's 50, whatever B's is.
-    assert connect(version=60, status="reconnect_needed").applied is True
-    assert system("whatsapp_inbox.channel.sync", {**b, "version": 110}, B).applied is False
-    assert (channel_of(A).status, channel_of(B).status) == ("reconnect_needed", "not_connected")
-    assert set(Channel.objects.values_list("host", "version")) == {("a", 60), ("b", 120)}
+    with use_hub(hub_a):
+        assert system("whatsapp_inbox.channel.sync", {"version": 50, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150}, Scope("host", hub_a.slug)).applied is True
+        assert system("whatsapp_inbox.channel.sync", {"version": 60, "status": "reconnect_needed", "phone_number": "+34910000000", "monthly_limit": 150}, Scope("host", hub_a.slug)).applied is True
+    with use_hub(hub_b):
+        b = {"version": 120, "status": "not_connected", "phone_number": "", "display_name": ""}
+        assert system("whatsapp_inbox.channel.sync", b, Scope("host", hub_b.slug)).applied is True
+        assert system("whatsapp_inbox.channel.sync", {**b, "version": 110}, Scope("host", hub_b.slug)).applied is False
+        assert Channel.objects.get().version == 120
+
+    with use_hub(hub_a):
+        a_now = channel_of(Scope("host", hub_a.slug))
+        assert (a_now.status, a_now.phone_number, a_now.monthly_limit) == ("reconnect_needed", "+34910000000", 150)
+    with use_hub(hub_b):
+        b_now = channel_of(Scope("host", hub_b.slug))
+        assert (b_now.status, b_now.phone_number, b_now.monthly_limit) == ("not_connected", "", 0)
 
 
-def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own():
-    connect(version=1, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
-    receive("wamid.1", "34600111222")
-    ref = {"id": str(conv().id)}
-    a = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=A))
-    b = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=B))
+@HUB_DB
+def test_only_the_business_with_its_number_connected_may_send_and_its_month_is_its_own(hub_a, hub_b):
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        system(
+            "whatsapp_inbox.channel.sync",
+            {"version": 1, "status": "connected", "phone_number": "+34910000000", "monthly_limit": 150, "monthly_usage": 150, "usage_month": "2026-10"},
+            Scope("host", hub_a.slug),
+        )
+        conversation = receive("wamid.1", "34600111222", scope=Scope("host", hub_a.slug))
+        ref = {"id": str(conversation.conversation_id)}
+        a = run("whatsapp_inbox.conversation.detail", ref, ctx_for(scope=Scope("host", hub_a.slug)))
+        a_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=Scope("host", hub_a.slug)))
+    with use_hub(hub_b):
+        other = receive("wamid.2", "34600222111", scope=Scope("host", hub_b.slug))
+        b = run(
+            "whatsapp_inbox.conversation.detail",
+            {"id": str(other.conversation_id)},
+            ctx_for(scope=Scope("host", hub_b.slug)),
+        )
+        b_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=Scope("host", hub_b.slug)))
     assert (a.send_blocked, b.send_blocked) == ("cap_reached", "not_connected")
-    a_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=A))
-    b_month = run("whatsapp_inbox.conversation.summary", {}, ctx_for(scope=B))
     assert (a_month.cap_reached, b_month.cap_reached) == (True, False)
 
 
-def test_each_business_s_photo_keeps_its_own_number(client, settings):
-    # Two businesses with the inbox on: A's photo v50 says connected, B's v120 not connected.
-    from base.models import Hub
+@HUB_DB
+def test_each_business_s_photo_keeps_its_own_number(client, settings, hub_a, hub_b):
     from base.tests.test_internal import SECRET, signed
 
     settings.INTERNAL_SHARED_SECRET, settings.INTERNAL_SHARED_SECRET_PREVIOUS = SECRET, ""
-    # The registry has the local hubs ``a`` and ``b`` (the root conftest, as ``seed_local_hubs``).
-    a_id, b_id = (str(Hub.objects.get(slug=slug).id) for slug in ("a", "b"))
+    a_id, b_id = str(hub_a.id), str(hub_b.id)
     block = {"status": "connected", "phone_number": "+34910000000", "display_name": "Ana", "version": 1}
 
     def photo(hub_id, slug, version, **whatsapp):
@@ -459,8 +478,12 @@ def test_each_business_s_photo_keeps_its_own_number(client, settings):
     assert photo(a_id, "a", 50).json() == {"applied": True, "version": 50}
     assert photo(b_id, "b", 120, status="not_connected", phone_number="", display_name="").json()["applied"] is True
 
-    assert (channel_of(A).status, channel_of(A).phone_number) == ("connected", "+34910000000")
-    assert (channel_of(B).status, channel_of(B).phone_number) == ("not_connected", "")
+    from live.context import Scope
+
+    with use_hub(hub_a):
+        assert (channel_of(Scope("host", hub_a.slug)).status, channel_of(Scope("host", hub_a.slug)).phone_number) == ("connected", "+34910000000")
+    with use_hub(hub_b):
+        assert (channel_of(Scope("host", hub_b.slug)).status, channel_of(Scope("host", hub_b.slug)).phone_number) == ("not_connected", "")
 
 
 def test_templates_are_replaced_by_the_list_and_the_missing_ones_stay_deleted():
@@ -526,7 +549,7 @@ def delivered(django_capture_on_commit_callbacks):
     """Run a write and then what it left for after its COMMIT (the delivery to erplora.com)."""
 
     def run_and_deliver(write):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
             out = write()
         return out
 
@@ -543,13 +566,13 @@ def test_a_text_is_kept_queued_and_leaves_only_after_the_commit(make_user, djang
     luis = make_user("luis", first_name="Luis", last_name="Gil")
     route = answering()
     k = key()
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         out = send({"id": str(c.id), "text": "Sí, mañana a las 10", "client_message_id": k}, ctx_for("hub_employee", actor=luis))
         # Inside the operation's transaction nothing has been asked to erplora.com.
         assert route.call_count == 0
         assert (out.status, out.wa_message_id, out.sent_by_name) == ("queued", None, "Luis Gil")
     request = route.calls.last.request
-    assert json.loads(request.content) == {"hub": "a", "to": "+34600111222", "type": "text", "text": "Sí, mañana a las 10"}
+    assert json.loads(request.content) == {"hub": A.key, "to": "+34600111222", "type": "text", "text": "Sí, mañana a las 10"}
     assert request.headers["Idempotency-Key"] == k
     message = stored(out)
     assert (message.direction, message.origin, message.status, message.wa_message_id, message.sent_by) == (
@@ -634,7 +657,7 @@ def test_with_the_month_s_messages_spent_nothing_is_kept():
 
 
 def test_with_the_month_s_messages_spent_what_customers_write_still_arrives():
-    """gh:whatsapp_inbox#287, gh:hub#2726: the cap only limits what the business sends."""
+    """The cap only limits what the business sends."""
     c = ready()
     connect(version=5, monthly_limit=150, monthly_usage=150, usage_month="2026-10")
     out = receive("wamid.AFTER", text="¿Tenéis hora el viernes?")
@@ -906,7 +929,7 @@ def test_a_template_to_a_number_that_never_wrote_opens_its_conversation():
 
 @pytest.mark.parametrize("typed", ["600222333", "600 222 333", "+34 600 222 333", "0034600222333"])
 def test_a_number_typed_by_hand_goes_to_that_person_never_to_another_country(typed):
-    """gh:whatsapp_inbox#279: a number written on a card or by voice is national unless it says its country."""
+    """A number written on a card or by voice is national unless it says its country."""
     connect(templates=[template("recordatorio")])
     send({"to": typed, "template": {"name": "recordatorio", "variables": ["Ana", "lunes"]}})
     assert list(Conversation.objects.values_list("phone", flat=True)) == ["+34600222333"]
@@ -1066,7 +1089,7 @@ def test_without_the_assign_permission_nobody_takes_it_from_somebody_else(make_u
 
 def test_only_people_of_this_business_are_assigned(make_user):
     receive("wamid.1")
-    stranger = make_user("pepe", host="b")
+    stranger = make_user("pepe", host=B.key)
     with pytest.raises(InvalidPayload) as excinfo:
         run(
             "whatsapp_inbox.conversation.assign",
@@ -1206,7 +1229,7 @@ ERASE = f"{SAAS}/internal/whatsapp/erase"
 
 @respx.mock
 def test_no_notice_of_the_app_keeps_her_number_her_name_or_what_was_said(delivered):
-    """gh:hub#2474, #2467, #2477: the internal history keeps the notices for days after an erasure; they
+    """The internal history keeps the notices for days after an erasure; they
     carry identifiers only, so erasing the conversation leaves nothing of her there."""
     c = ready(contact_name="Ana Secreta", text="Mi alergia es al tinte")
     answering()
@@ -1227,13 +1250,13 @@ def test_erasing_asks_erplora_to_forget_the_number_after_the_commit(django_captu
     receive("wamid.2")
     c = conv()
     route = respx.post(ERASE).mock(return_value=httpx.Response(200, json={"erased": True}))
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("whatsapp_inbox.conversation.erase", {"id": str(c.id)})
         assert route.call_count == 0
         c.refresh_from_db()
         assert (c.phone, c.erase_status, c.erase_phone) == ("", "pending", "+34600111222")
     assert json.loads(route.calls.last.request.content) == {
-        "hub": "a",
+        "hub": A.key,
         "phone": "+34600111222",
         "wa_message_ids": ["wamid.1", "wamid.2"],
     }

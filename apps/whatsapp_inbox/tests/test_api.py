@@ -1,10 +1,8 @@
 """The WhatsApp inbox's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. What erplora.com pushes has no route here: ``base`` mounts ``/internal/whatsapp/*``.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction (``get`` and
+``post`` are Automatizaciones' own: the same business, the same API). What erplora.com pushes has no route here: ``base`` mounts ``/internal/whatsapp/*``.
 """
-
-import json
 
 import httpx
 import pytest
@@ -12,9 +10,12 @@ import respx
 from django.conf import settings
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.whatsapp_inbox.api import router
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import connect, receive
+from apps.whatsapp_inbox.tests.conftest import A, HUB_DB, connect, receive
+from base.tests.routes import spa_routes
+from base.tenancy.context import current_alias
 from config.api import api
 
 ROUTES = {
@@ -115,26 +116,16 @@ SYSTEM_ONLY = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
     client.force_login(
-        make_user("luis", host="a", role="hub_employee", first_name="Luis")
+        make_user("luis", host=A.key, role="hub_employee", first_name="Luis")
     )
     return client
 
@@ -159,19 +150,10 @@ def test_the_api_keeps_parity():
 
 
 def test_the_spa_s_route_map_names_every_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("whatsapp_inbox.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("whatsapp_inbox.") == ROUTES
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_inbox_over_http(employee_client):
     receive("wamid.1", contact_name="Ana")
     page = get(employee_client, "/whatsapp_inbox/conversations", search="600 111 222")
@@ -190,7 +172,7 @@ def test_the_inbox_over_http(employee_client):
     assert (note.status_code, note.json()["author_name"]) == (201, "Luis")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_who_waits_for_an_answer_over_http(employee_client):
     # WHATSAPP_INBOX-F09: the bell's count and the device's notices, for an integration as for the Hub.
     receive("wamid.1", contact_name="Ana")
@@ -202,7 +184,7 @@ def test_who_waits_for_an_answer_over_http(employee_client):
     assert get(employee_client, "/whatsapp_inbox/conversations/notices", limit=101).status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_message_is_read_and_its_conversation_marked_over_http(employee_client):
     # WHATSAPP_INBOX-F20, F21: what the automatic answers read and mark, for an integration as for Automatizaciones.
     receive("wamid.1", contact_name="Ana")
@@ -216,7 +198,7 @@ def test_a_message_is_read_and_its_conversation_marked_over_http(employee_client
     assert (marked.status_code, marked.json()["flagged"]) == (200, True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @respx.mock
 def test_sending_over_http_is_201_queued_and_a_closed_window_is_a_409(employee_client, django_capture_on_commit_callbacks):
     connect()
@@ -224,7 +206,7 @@ def test_sending_over_http_is_201_queued_and_a_closed_window_is_a_409(employee_c
     conversation = get(employee_client, "/whatsapp_inbox/conversations").json()["rows"][0]["id"]
     respx.post("http://saas.test/internal/whatsapp/send").mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.OUT"}))
     key = "0199e000-0000-7000-8000-0000000000bb"
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         sent = post(employee_client, "/whatsapp_inbox/messages/send", {"id": conversation, "text": "¡Hola!", "client_message_id": key})
     assert (sent.status_code, sent.json()["status"]) == (201, "queued")
     assert Message.objects.get(pk=sent.json()["id"]).status == "sent"
@@ -240,14 +222,14 @@ def test_sending_over_http_is_201_queued_and_a_closed_window_is_a_409(employee_c
     assert refused.json()["error"]["code"] == "whatsapp_inbox.window_closed"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_422_names_its_field(admin_client):
     response = post(admin_client, "/whatsapp_inbox/messages/send", {"text": "Hola", "client_message_id": "0199e000-0000-7000-8000-0000000000bd"})
     assert response.status_code == 422
     assert set(response.json()["error"]["fields"]) == {"conversation"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_neither_erases_nor_opens_the_settings_reads_of_others(
     employee_client,
 ):
@@ -264,7 +246,7 @@ def test_an_employee_neither_erases_nor_opens_the_settings_reads_of_others(
     assert get(employee_client, "/whatsapp_inbox/channel").status_code == 200
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_session_nothing_is_read(client):
     assert get(client, "/whatsapp_inbox/conversations").status_code in (401, 403)
 
@@ -272,7 +254,7 @@ def test_without_a_session_nothing_is_read(client):
 # Templates (WHATSAPP_INBOX-F29…F31)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @respx.mock
 def test_templates_over_http_are_201_registered_after_the_commit_and_422_under_their_field(
     admin_client, django_capture_on_commit_callbacks
@@ -289,7 +271,7 @@ def test_templates_over_http_are_201_registered_after_the_commit_and_422_under_t
         "body_examples": ["Ana"],
         "submit_key": "0199e000-0000-7000-8000-0000000000c1",
     }
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         made = post(admin_client, "/whatsapp_inbox/templates", body)
     assert (made.status_code, made.json()["status"], made.json()["submit_state"]) == (201, "DRAFT", "queued")
     listed = get(admin_client, "/whatsapp_inbox/templates").json()["rows"]
@@ -312,7 +294,7 @@ def hub_files(settings):
     storages._storages.pop("hub_files", None)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_header_video_bigger_than_djangos_ceiling_still_uploads(admin_client, hub_files):
     """F29: a 16 MB MP4 is far above the 2.5 MB every other route takes; its file comes back as the template's."""
     import base64
@@ -332,14 +314,14 @@ def test_a_header_video_bigger_than_djangos_ceiling_still_uploads(admin_client, 
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_header_file_past_the_largest_is_refused_before_it_is_read(admin_client):
     response = post(admin_client, "/whatsapp_inbox/templates/samples", {"content_base64": "A" * 36_100_000})
 
     assert (response.status_code, response.json()["error"]["code"]) == (413, "payload_too_large")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_picks_templates_and_keeps_a_header_file_but_neither_makes_nor_deletes_them(employee_client, hub_files):
     connect(templates=[{"name": "recordatorio", "language": "es", "body": "Hola", "meta_id": "m"}])
     [row] = get(employee_client, "/whatsapp_inbox/templates", sendable="true").json()["rows"]
@@ -351,7 +333,7 @@ def test_an_employee_picks_templates_and_keeps_a_header_file_but_neither_makes_n
     assert post(employee_client, "/whatsapp_inbox/templates/samples", sample).status_code == 201
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_header_file_is_read_by_its_id_over_http(employee_client, hub_files):
     sample = {"header_format": "IMAGE", "name": "carta.jpg", "content_base64": "/9j/4AAQ"}
     kept = post(employee_client, "/whatsapp_inbox/templates/samples", sample).json()

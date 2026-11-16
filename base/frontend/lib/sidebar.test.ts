@@ -1,6 +1,3 @@
-// The side menu's `visible` (APP-BASE-5; FIX-UI-SIDEBAR-SYSTEM-VISIBLE-TO-EMPLOYEE): an entry shows only to whoever may
-// open its screen (Square, Toast: the menu never offers what the person cannot open), and «API» only while the business
-// shows its API's documentation — followed live, and asked only with a session (an anonymous stream is refused: 401).
 import { createShellSession, type SessionMe, SESSION_KEY } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY } from '@erplora/ui/sdk';
 import { mount } from '@vue/test-utils';

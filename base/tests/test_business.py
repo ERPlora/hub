@@ -1,4 +1,4 @@
-"""The business's own data as the Hub shows it (APP-BASE-6, BASE-G97…G99): what ``base.business`` derives and names.
+"""The business's own data as the Hub shows it: what ``base.business`` derives and names.
 
 The SaaS owns the country, the time zone and the language (it pushes them in ``PUT /internal/hubs/{id}``); the
 currency is not chosen anywhere: it is the one the country pays in (CLDR, through Babel), as Square, SumUp or Zettle
@@ -35,6 +35,16 @@ def test_without_a_country_it_knows_the_currency_is_the_euro(country):
     assert business.currency_of(country, today=TODAY) == "EUR"
 
 
+@pytest.mark.parametrize(
+    ("country", "read"),
+    [("ES", "ES"), ("PL", "PL"), ("pl", "PL"), (" PT ", "PT"), ("", "ES"), ("  ", "ES")],
+)
+def test_a_business_without_a_country_is_in_erploras_market_spain(country, read):
+    """hub#682: a demo, or ERPlora's own hub without its row, is in ERPlora's market, Spain, for every rule by country
+    (the Home's national steps, VeriFactu); a business with one is in its own, whatever its case."""
+    assert business.country_or_market(country) == read
+
+
 def test_a_currency_that_has_no_cents_says_so():
     assert (business.currency_decimals("EUR"), business.currency_decimals("HUF"), business.currency_decimals("JPY")) == (
         2,
@@ -69,8 +79,8 @@ def test_a_code_it_does_not_know_is_shown_as_it_is():
 #: What the browser writes for the same amount (``new Intl.NumberFormat(language, {style: "currency", currency})``, Node
 #: 26), copied as it prints: a currency written in letters is kept off the figure by a no-break space (U+00A0, CLDR's
 #: currency spacing), a sign of its own («€», «¥», «$») touches it. Babel's ``format_currency`` skips that spacing and
-#: glues «PLN15.50». In Spanish the thousands are grouped from four digits, as every screen of the Hub paints them
-#: (hub#1090), where Intl's default would not.
+#: glues «PLN15.50». In Spanish the thousands are grouped from four digits, as every screen of the Hub paints them,
+#: where Intl's default would not.
 AS_INTL = [
     (1550, "PLN", "en", "PLN\xa015.50"),
     (1550, "CHF", "en", "CHF\xa015.50"),

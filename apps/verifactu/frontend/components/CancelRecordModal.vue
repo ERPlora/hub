@@ -10,6 +10,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonTextarea } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
 
@@ -19,6 +21,7 @@ const open = defineModel<boolean>('open', { required: true });
 const t = useT();
 const command = useCommand('verifactu.record.cancel');
 const reason = shallowRef('');
+const canDismiss = useUnsavedFormOnOpen('verifactu-cancel', reason, open);
 const missing = shallowRef(false);
 
 watch(
@@ -55,6 +58,7 @@ async function cancel(): Promise<void> {
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="verifactu-cancel"
     role="alertdialog"
     submit-color="danger"

@@ -1,6 +1,6 @@
 """The flow app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction. The engine (react and the two scheduled tasks) has no route: no person and no API key
 reaches it.
 """
@@ -8,16 +8,16 @@ reaches it.
 import json
 
 import pytest
-from django.conf import settings
 from live.models import OutboxEvent
 from live.ninja import ensure_api_parity
 
 from apps.flow.api import router
 from apps.flow.models import Flow
 from apps.task.models import Task
+from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import TASK_STEP, make_draft, make_flow
+from .conftest import HOST, HUB_DB, TASK_STEP, A, make_draft, make_flow
 
 ROUTES = {
     ("GET", "/flow/flows", "flow.flow.list"),
@@ -54,11 +54,11 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
+def get(client, path, host=HOST, **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data, host="a.localhost"):
+def post(client, path, data, host=HOST):
     return client.post(
         f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
     )
@@ -66,13 +66,13 @@ def post(client, path, data, host="a.localhost"):
 
 @pytest.fixture
 def owner_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_owner"))
+    client.force_login(make_user("boss", host=A.key, role="hub_owner"))
     return client
 
 
 @pytest.fixture
 def manager_client(client, make_user):
-    client.force_login(make_user("mia", host="a", role="hub_manager"))
+    client.force_login(make_user("mia", host=A.key, role="hub_manager"))
     return client
 
 
@@ -93,9 +93,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_openapi_describes_the_flow_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -106,28 +106,20 @@ def test_the_openapi_describes_the_flow_routes(client):
 
 
 def test_the_spas_route_map_names_every_flow_route():
-    spa = json.loads(
-        (settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text()
-    )
-    mine = {
-        (route["method"].upper(), route["path"].removeprefix("/api"), op)
-        for op, route in spa.items()
-        if op.startswith("flow.")
-    }
-    assert mine == ROUTES
+    assert spa_routes("flow.") == ROUTES
 
 
 # Who may
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (get(client, "/flow/flows"), post(client, "/flow/flows", {})):
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_manager_neither_sees_nor_changes_automations(manager_client):
     for response in (
         get(manager_client, "/flow/flows"),
@@ -140,7 +132,7 @@ def test_a_manager_neither_sees_nor_changes_automations(manager_client):
 # The flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_create_grant_turn_on_and_run_by_hand(owner_client):
     created = post(
         owner_client,
@@ -172,7 +164,7 @@ def test_create_grant_turn_on_and_run_by_hand(owner_client):
     assert (runs["total"], runs["failed"]) == (1, 0)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_step_that_names_what_is_not_here_is_a_422_by_field(owner_client):
     response = post(
         owner_client,
@@ -192,7 +184,7 @@ def test_a_step_that_names_what_is_not_here_is_a_422_by_field(owner_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_try_reads_its_document_as_json_text(owner_client):
     OutboxEvent.objects.create(
         scope_kind="host",
@@ -217,7 +209,7 @@ def test_try_reads_its_document_as_json_text(owner_client):
     assert Task.objects.count() == 0
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_list_detail_copy_delete_and_the_catalog(owner_client):
     flow = make_flow("Welcome")
     page = get(owner_client, "/flow/flows", search="welc").json()
@@ -243,7 +235,7 @@ def test_list_detail_copy_delete_and_the_catalog(owner_client):
     assert status.json() == {"total": 0, "enabled": 0, "unfinished": 1}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_drafts_over_http(owner_client):
     proposed = post(
         owner_client,
@@ -280,7 +272,7 @@ def test_drafts_over_http(owner_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_sample_of_this_business_only(owner_client):
     OutboxEvent.objects.create(
         scope_kind="host",
@@ -296,7 +288,7 @@ def test_the_sample_of_this_business_only(owner_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_recipes_over_http_list_on_off_restore_and_repair(owner_client):
     gap = "appointment/customer_cancelled"
     listed = get(owner_client, "/flow/recipes")
@@ -324,7 +316,7 @@ def test_the_recipes_over_http_list_on_off_restore_and_repair(owner_client):
     assert (never.status_code, never.json()["error"]["code"]) == (404, "flow.recipe_not_on")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_manager_neither_reads_nor_turns_on_recipes(manager_client):
     for response in (
         get(manager_client, "/flow/recipes"),

@@ -130,7 +130,7 @@ describe('AvailabilityPage', () => {
     expect([s.tprop('reservation-availability-slots', 'filterable'), s.tprop('reservation-availability-blocked', 'filterable')]).toEqual([true, true]);
   });
 
-  it('names each «Add» for what it adds, so a screen reader tells them apart (reservations#75)', async () => {
+  it('names each «Add» for what it adds, so a screen reader tells them apart', async () => {
     const s = await setup();
     const add = (testid: string) => (s.tprop(testid, 'labels') as { add: string }).add;
     expect([add('reservation-availability-slots'), add('reservation-availability-blocked')]).toEqual(['Add slot', 'Add blocked date']);

@@ -1,19 +1,14 @@
-"""Models of the cart_checkout app: carts, their lines, the orders made from them and the counter that
-numbers the orders by day.
-
-- ``Cart`` is a shopping cart of a person (email and name, free text: no link to Customers) or of an
+"""- ``Cart`` is a shopping cart of a person (email and name, free text: no link to Customers) or of an
   anonymous visit, told apart by its session code. Its totals (items and amount) are the sum of its
   lines, kept by services.py. Deleting it is logical (``deleted_at``): its orders keep pointing at it,
   and its code is unique only among the carts not deleted.
 - ``CartItem`` is one line: a product named in free text (no link to Inventory), a quantity with three
   decimals and a unit price in the minor unit of the cart's currency, with its total.
-- ``Order`` (the old module's checkout session) is an order made from a cart, with its number
+- ``Order`` is an order made from a cart, with its number
   ``OS-YYYYMMDD-NNNN``, the cart's total copied when it was initiated and its status: initiated →
   paid or failed → completed. «Paid» is a mark a person sets; nothing here charges.
 - ``OrderCounter`` holds the last number given on a business day; services.py raises it with
   ``UPDATE … RETURNING`` in the transaction of the order (never a sequence).
-
-Phase 1 has no tenancy (like ``apps.demo``): phase 2 moves these tables to each hub's database.
 
 A name other apps' catalogues also have and say their way («order» is an «orden» there, a «pedido» here) carries the
 context ``cart_checkout`` (``OWN``), or the Spanish of the app installed first would win.
@@ -165,7 +160,7 @@ class Order(Audited):
     )
     # Empty once the customer's personal data was erased (CART_CHECKOUT-F14).
     customer_email = models.CharField(_("customer email"), max_length=EMAIL_MAX_LENGTH, blank=True)
-    # Free fields (line1, city, postal_code, country…), as the old module kept them.
+    # Free fields (line1, city, postal_code, country…).
     shipping_address = models.JSONField(_("shipping address"), default=dict, blank=True)
     billing_address = models.JSONField(_("billing address"), default=dict, blank=True)
     shipping_method = models.CharField(_("shipping method"), max_length=METHOD_MAX_LENGTH, blank=True)

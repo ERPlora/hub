@@ -4,7 +4,7 @@
 // the message. The one refusal a stack causes by itself: erplora.com links an attachment on its
 // `WHATSAPP_MEDIA_BASE_URL` (`http://localhost:8001` when unset, with DEBUG) and this Hub takes only its SAAS_URL's
 // origin (`_from_erplora` in apps/whatsapp_inbox/schemas.py), so a run whose erplora.com is elsewhere gets a 422 and
-// a thread that never fills (FIX-HUB-WHATSAPP-INBOX-MEDIA-E2E-NEEDS-SAAS-MEDIA-URL). No Playwright and no I/O here:
+// a thread that never fills. No Playwright and no I/O here:
 // whatsapp-helpers.ts reads the rows.
 
 /** One message erplora.com took from Meta's webhook and pushed to this Hub (door 1), as its database recorded it. */

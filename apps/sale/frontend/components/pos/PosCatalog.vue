@@ -1,19 +1,17 @@
 <script setup lang="ts">
-// The till's catalogue column (WORKBOOK «Vender»; SALE-F01 step 1, F07): the category strip with the
-// magnifier, the «Speak» key (the assistant by voice, PLAN §30) and the ⋮ screen menu, the notices, and the grid. Everything comes from Inventory's own
-// operations: the categories by name, the count of «All», and the articles of the category in use in
-// windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too.
-// The grid and the search show what is sold out in Inventory too, greyed (SALE-F07), and the counts count
-// what the grid shows (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the
-// grid and in a toast, and adds nothing. That notice follows the refused product or service live and goes, with its
-// toast, the moment the reason no longer holds (back on sale, or given its tax category), and on leaving the till
-// (hub#442, hub#719).
-// Inventory off: the grid explains it and the open price stays. With products hidden by the
-// till settings, only the open price is offered. With the services of Services (SALE-F38,
-// `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
-// hidden; «All» keeps the open price); a sellable service goes up (`service`), the search finds them too.
-// With the menus of Menus (SALE-F12, `showCombos`), «All» shows them first in the grid; a tap goes up (`combo`).
-// With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
+// The till's catalogue column (WORKBOOK «Vender»; SALE-F01 step 1, F07): the category strip with the magnifier, the
+// «Speak» key (the assistant by voice) and the ⋮ screen menu, the notices, and the grid. Everything comes from
+// Inventory's own operations: the categories by name, the count of «All», and the articles of the category in use in
+// windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too. The grid and the
+// search show what is sold out in Inventory too, greyed (SALE-F07), and the counts count what the grid shows
+// (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the grid and in a toast,
+// and adds nothing. That notice follows the refused product or service live and goes, with its toast, the moment the
+// reason no longer holds (back on sale, or given its tax category), and on leaving the till. Inventory off: the grid
+// explains it and the open price stays. With products hidden by the till settings, only the open price is offered. With
+// the services of Services (SALE-F38, `showServices`), «Services» follows «All» in the strip and shows their grid
+// (first, when products are hidden; «All» keeps the open price); a sellable service goes up (`service`), the search
+// finds them too. With the menus of Menus (SALE-F12, `showCombos`), «All» shows them first in the grid; a tap goes up
+// (`combo`). With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, dismissToast, toast } from '@erplora/ui/shell';
@@ -186,9 +184,9 @@ watch(
           :services-count="servicesCount"
           @load-more="categories.loadMore()"
         />
-        <button
+        <ion-button
           v-if="showProducts"
-          type="button"
+          fill="outline"
           class="pos-catalog__search"
           data-testid="pos-search-trigger"
           :aria-label="$t('sale.pos.search')"
@@ -196,8 +194,11 @@ watch(
           :aria-pressed="searching ? 'true' : 'false'"
           @click="searching = !searching"
         >
-          <HubIcon name="ion:search-outline" />
-        </button>
+          <HubIcon
+            slot="icon-only"
+            name="ion:search-outline"
+          />
+        </ion-button>
       </template>
       <span
         v-else
@@ -293,21 +294,18 @@ watch(
   flex: 1;
 }
 .pos-catalog__search {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
   width: 3rem;
   height: 3.65rem;
+  margin: 0;
   font-size: 1.25rem;
-  color: var(--ion-color-primary, #0091ce);
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 12px;
-  cursor: pointer;
+  --color: var(--ion-color-primary);
+  --background: var(--ion-card-background);
+  --border-radius: 12px;
 }
 .pos-catalog__search[aria-pressed='true'] {
-  border-color: var(--ion-color-primary, #0091ce);
+  --border-color: var(--ion-color-primary);
+  --background: var(--ep-primary-tint);
 }
 @media (max-width: 820px) {
   .pos-catalog {

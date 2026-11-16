@@ -1,4 +1,4 @@
-// «Waiting for your answer» (WORKBOOK FLOW-F29; the old module's flows-f24): every question an automation asked and
+// «Waiting for your answer» (WORKBOOK FLOW-F29): every question an automation asked and
 // waits on that this person may answer, live — its words, who it was asked of, what a no and silence do —,
 // a note, and «Approve» or «No». A refusal (too late, someone already answered, paused…) stays on its card.
 import { describe, expect, it, vi } from 'vitest';
@@ -60,6 +60,22 @@ function data(m: Awaited<ReturnType<typeof setup>>, id: string): string[] {
 }
 
 describe('QuestionInbox', () => {
+  // hub#950: until then the page says «Loading…» above the gallery instead of showing it alone.
+  it('says once when its first answer is in, or its failure', async () => {
+    const m = await mountFlow(QuestionInbox);
+    await m.live();
+    expect(m.wrapper.emitted('ready')).toBeUndefined();
+    await m.result(OP, { rows: [] });
+    await m.result(OP, { rows: [Q] }, {}, 2);
+    expect(m.wrapper.emitted('ready')).toHaveLength(1);
+
+    const failed = await mountFlow(QuestionInbox);
+    const call = await failed.live();
+    call.push(errorFrame(failed.subId(OP), 'internal_error'));
+    await settle();
+    expect(failed.wrapper.emitted('ready')).toHaveLength(1);
+  });
+
   it("says when silence counts on the business's clock (hub#687)", async () => {
     const m = await setup();
     await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2, timezone: 'Atlantic/Canary' });

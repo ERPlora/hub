@@ -1,4 +1,4 @@
-"""The client of ERPlora's fiscal gateway, which lives in the SaaS (PLAN §16.5; WORKBOOK «Contrato con el SaaS»).
+"""The client of ERPlora's fiscal gateway, which lives in the SaaS (WORKBOOK «Contrato con el SaaS»).
 
 The Hub validates everything fiscal (chain, fingerprint, schema, QR) and hands the gateway the exact bytes to
 present; the gateway (saas-next ``fiscal_gateway/``) presents them to the AEAT with ERPlora's seal or, on the
@@ -47,7 +47,7 @@ TIMEOUT = httpx.Timeout(45.0, connect=5.0)
 LONGEST_WAIT_SECONDS = round(TIMEOUT.connect + TIMEOUT.write + TIMEOUT.read) + 5
 #: Statuses whose contract error says the gateway will never present this call as it is.
 REFUSALS = (409, 413, 422)
-#: The one 404 that is a refusal (saas#29): any other 404 is a door not there yet, tried again.
+#: The one 404 that is a refusal: any other 404 is a door not there yet, tried again.
 UNKNOWN_HUB = "hub_unknown"
 
 ANSWERED = "answered"
@@ -135,7 +135,7 @@ def _refusal(response: httpx.Response, error: dict | None) -> Reply:
     return Reply(kind=REFUSED, code=str(error["code"]), message=message)
 
 
-def _reply(path: str, payload: dict) -> Reply:
+def _reply(path: str, payload: dict) -> Reply:  # noqa: PLR0911
     failure, response, message = _post(path, payload)
     if response is None:
         return Reply(kind=failure, message=message)
@@ -180,7 +180,7 @@ def _reply(path: str, payload: dict) -> Reply:
     )
 
 
-def _body(
+def _body(  # noqa: PLR0913, PLR0917
     hub: str,
     nif: str,
     environment: str,
@@ -199,7 +199,7 @@ def _body(
     return body
 
 
-def submit(
+def submit(  # noqa: PLR0913
     *,
     hub: str,
     nif: str,
@@ -212,7 +212,7 @@ def submit(
     return _reply(SUBMIT_PATH, _body(hub, nif, environment, route, certificate, envelope))
 
 
-def query(
+def query(  # noqa: PLR0913
     *,
     hub: str,
     nif: str,

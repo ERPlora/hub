@@ -1,4 +1,4 @@
-"""Guardrail 3, «alias único» (PLAN-DB §14.2; plan 2026-10-22-fase-2-tenencia §2.3 and §4, step 9).
+"""Guardrail: a hub only ever reaches its own alias.
 
 Two hubs with a database of their own, each with its rows. Whatever runs as A (an operation, a request, a live
 re-run in the executor's thread) reaches A's database and never B's, watched on every alias at once; a write in B
@@ -171,7 +171,7 @@ def test_bs_api_key_on_as_host_is_no_caller_and_never_reaches_b(client, hub_a, h
         refused = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost", **key)
 
     assert refused.status_code == 401
-    # A looked for it in its own database, where no key of B exists, and never in phase 1's shared tables.
+    # A looked for it in its own database, where no key of B exists, and never in the old shared tables.
     assert touches(sent, hubs.HUB_A_ALIAS, "base_apikey")
     assert not touches(sent, "default", "base_apikey")
     # The key is good on its own host: only A refuses it.
@@ -187,7 +187,7 @@ def test_the_watch_fails_a_block_that_reaches_any_other_hub(hub_a, hub_b):
         with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
             listed(hub_b)
 
-    # What phase 1 left in control's tables is no hub's own either: a hub's table read there fails it.
+    # What the old shared stage left in control's tables is no hub's own either: a hub's table read there fails it.
     with pytest.raises(AssertionError, match="demo_item"):
         with hubs.assert_only_alias(hubs.HUB_A_ALIAS), use_legacy():
             list(Item.objects.all())
@@ -195,7 +195,7 @@ def test_the_watch_fails_a_block_that_reaches_any_other_hub(hub_a, hub_b):
 
 @HUB_DB
 def test_a_key_planted_in_the_shared_tables_never_opens_a_hub_with_its_own_database(client, hub_a):
-    # A key row left in control's tables by phase 1 (by hand, or by a business before its cut) is nobody's: A looks
+    # A key row left in control's shared tables (by hand, or by a business before its cut) is nobody's: A looks
     # for its keys in its own database only.
     token = api_keys.new_token()
     with use_legacy():

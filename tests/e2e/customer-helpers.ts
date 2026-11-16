@@ -1,7 +1,7 @@
 // Shared steps of the customer e2e (customer-*.spec.ts): the app's API for setup and server-side
 // evidence (never the check itself), readiness of its lists, and the cleanup every spec runs in its
-// `afterAll`: what a run creates is named `e2e.…` and its ids are recorded, so it is deleted from the
-// hub's database (phase 1: hubs `a` and `b` share it) even after an erasure renamed the card.
+// `afterAll`: what a run creates is named `e2e.…` and its ids are recorded, so it is deleted from
+// hub `a`'s own database even after an erasure renamed the card.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, psql, shown } from './helpers';
@@ -65,6 +65,14 @@ export const inputOf = (scope: Page | Locator, testid: string): Locator => scope
 
 const quoted = (ids: Iterable<string>): string => [...ids].map((id) => `'${id.replace(/'/g, '')}'`).join(',');
 
+/** The statements that delete the cards `cards` (a `select id …`) with the rows that hang from them. */
+export const cardDeletes = (cards: string): string[] => [
+  ...['customer_activity', 'customer_consent', 'customer_customer_groups', 'customer_customer_tags', 'customer_customfieldvalue', 'customer_orderlink', 'customer_purchase'].map(
+    (table) => `delete from ${table} where customer_id in (${cards})`,
+  ),
+  `delete from customer_customer where id in (${cards})`,
+];
+
 /** Deletes what the specs created: the recorded cards, any `e2e.` card, group, tag and field. */
 export function cleanUp(): void {
   const named = psql(`select string_agg(id::text, ',') from customer_customer where name like '${PREFIX}%'`);
@@ -87,7 +95,7 @@ export function cleanUp(): void {
   createdIds.clear();
 }
 
-/** The three sizes every flow of the app is seen at (brief APP-CUSTOMER): a phone, a tablet and a desk. */
+/** The three sizes every flow of the app is seen at: a phone, a tablet and a desk. */
 export const FLOW_VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },

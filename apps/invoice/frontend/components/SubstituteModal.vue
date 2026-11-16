@@ -10,6 +10,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { type Recipient, recipientComplete, recipientFrom, recipientPayload } from '../lib/recipient';
 import { refusal } from '../lib/refusal';
@@ -51,11 +53,14 @@ async function issue(): Promise<void> {
   open.value = false;
   emit('substituted', answer.invoice);
 }
+
+const canDismiss = useUnsavedFormOnOpen('invoice-substitute', recipient, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="invoice-substitute"
     :title="$t('invoice.substitute.title', { number: ticket?.number ?? '' })"
     :submit-label="$t('invoice.substitute.submit')"

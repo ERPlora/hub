@@ -6,14 +6,9 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { shots } from './sale-helpers';
 
 const CLEANUP = ["delete from sale_quicknote where text like 'e2e %'", "delete from sale_department where name like 'e2e %'"].join('; ');
-
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 let headerBefore: string | null = null;
 
@@ -35,13 +30,9 @@ async function listReady(page: Page, testid: string): Promise<void> {
   await shown(page).locator(`[data-testid=${testid}-row], [data-testid=${testid}-empty]`).first().waitFor({ state: 'visible' });
 }
 
-async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await ready(page);
-    await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
-  }
-}
+/** The three sizes' screenshots, the page left at the desk's size as the last one did. */
+const threeShots = (page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> =>
+  shots(page, name, ready, { width: 1440, height: 900 });
 
 test('SALE-F36: the owner prepares a quick note, changes it and deletes it', async ({ page }) => {
   await login(page, A, '/sale/quick-notes');
@@ -64,7 +55,7 @@ test('SALE-F36: the owner prepares a quick note, changes it and deletes it', asy
   await type(page, 'sale-quick-note-form-text', 'e2e very rare');
   await form.locator('[data-testid=sale-quick-note-form-submit]').click();
   await expect(shown(page).locator('[data-testid=sale-quick-notes-row]').filter({ hasText: 'e2e very rare' })).toBeVisible();
-  await shots(page, 'sale-quick-notes', (p) => listReady(p, 'sale-quick-notes'));
+  await threeShots(page, 'sale-quick-notes', (p) => listReady(p, 'sale-quick-notes'));
   await page.setViewportSize({ width: 1280, height: 860 });
 
   await shown(page).locator(`[data-testid=sale-quick-notes-row-${id}-delete]`).first().click();
@@ -93,7 +84,7 @@ test('SALE-F35: the owner adds a department at a VAT found on the server and see
   await expect(row).toBeVisible();
   // The rate comes from the server (tax's rule in force today for Spain): 4 %.
   await expect(row).toContainText(/4\s?%/);
-  await shots(page, 'sale-departments', (p) => listReady(p, 'sale-departments'));
+  await threeShots(page, 'sale-departments', (p) => listReady(p, 'sale-departments'));
 });
 
 test('SALE-F34: the owner saves the till settings', async ({ page, context }) => {
@@ -109,7 +100,7 @@ test('SALE-F34: the owner saves the till settings', async ({ page, context }) =>
   await expect.poll(async () => (await api<{ receipt_header: string }>(context, A, 'GET', '/sale/settings')).data.receipt_header).toBe(
     'e2e Bar Manolo\nC/ Mayor 1',
   );
-  await shots(page, 'sale-settings', async (p) => {
+  await threeShots(page, 'sale-settings', async (p) => {
     await shown(p).locator('[data-testid=sale-settings-form]').waitFor();
   });
 });

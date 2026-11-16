@@ -1,5 +1,5 @@
 // The modifier app's entries of the hub's op → route map (frontend/generated/operations.json, written by
-// hand until V3 generates it): the seventeen routed operations of apps/modifier/api.py, queries by GET and
+// hand): the seventeen routed operations of apps/modifier/api.py, queries by GET and
 // commands by POST; the two reactions to Inventory have no route.
 import { describe, expect, it } from 'vitest';
 

@@ -1,5 +1,4 @@
-"""Cancelling a booking only with a person's yes first (FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION;
-WORKBOOK FLOW-F12, FLOW-F28, FLOW-F37, FLOW-F38).
+"""Cancelling a booking only with a person's yes first (WORKBOOK FLOW-F12, FLOW-F28, FLOW-F37, FLOW-F38).
 
 What needs a person in front (``ai.risk == "high"``) is never an automation's, with one exception the market makes:
 cancelling a reservation may be granted to an «Ask the assistant» step that asks first («Ask me first»), so a guest
@@ -23,14 +22,12 @@ from apps.flow import queries, recipes
 from apps.flow.models import Flow, FlowRun, Question
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
-from .conftest import A, ctx_for, make_flow, run
+from .conftest import A, CHAT, HUB_DB, QUOTA, ctx_for, make_flow, run
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("no_pauses")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("no_pauses")]
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
-CHAT = "/internal/assistant/chat"
-QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 CANCEL = "reservation.reservation.cancel"
 #: Whoever manages automations and may cancel a reservation, and whoever manages them but may not.
 MAY_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation", "reservation.change_reservation"}
@@ -147,8 +144,8 @@ def test_whoever_grants_a_cancellation_may_cancel_themselves():
     ],
 )
 def test_what_is_not_cancelling_a_booking_needs_a_person_in_front_even_asking_first(name):
-    # Seating is done at the door (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED); erasing, a no-show (it may charge
-    # the deposit) and money or fiscal records are never decided from an inbox.
+    # Seating is done at the door; erasing, a no-show (it may charge the deposit) and money or fiscal records are never
+    # decided from an inbox.
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=[name])))
     assert refused.value.code in ("flow.high_risk", "invalid_payload")
@@ -159,12 +156,12 @@ def test_what_is_not_cancelling_a_booking_needs_a_person_in_front_even_asking_fi
 
 
 def test_what_is_done_in_person_stays_out_even_were_it_listed_to_ask_first(monkeypatch):
-    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED stays: the exception only reaches what is high risk, never seating.
+    # The exception only reaches what is high risk, never seating.
     monkeypatch.setattr(queries, "ASK_FIRST", queries.ASK_FIRST | {"reservation.reservation.seat"})
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=["reservation.reservation.seat"])))
     assert refused.value.code == "flow.high_risk"
-    assert "reservation.reservation.seat" not in queries.ask_first_catalog()
+    assert "reservation.reservation.seat" not in queries.ask_first_catalog(A)
 
 
 def test_a_recipe_whose_assistant_asks_first_to_cancel_is_offered_and_turned_on(monkeypatch):
@@ -177,9 +174,9 @@ def test_a_recipe_whose_assistant_asks_first_to_cancel_is_offered_and_turned_on(
         "steps": [assistant()],
         "grants": {CANCEL: "Cancels the table after your yes."},
     }
-    reservation = queries.active_apps()["reservation"]
-    monkeypatch.setattr(recipes, "declarations", lambda: [(reservation, declared)])
-    offered, set_aside = recipes.shelf()
+    reservation = queries.active_apps(A)["reservation"]
+    monkeypatch.setattr(recipes, "declarations", lambda _scope=None: [(reservation, declared)])
+    offered, set_aside = recipes.shelf(A)
     assert ([recipe.ref for recipe in offered], set_aside) == (["reservation/cancel_by_message"], [])
     done = run("flow.recipe.enable", {"recipe": "reservation/cancel_by_message"})
     assert done.created is True

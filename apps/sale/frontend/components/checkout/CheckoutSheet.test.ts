@@ -5,7 +5,7 @@
 // to the till (also when the lost answer's lookup found it).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, flush, mountSale, resultFrame } from '../../__tests__/mount-sale';
+import { business, click, flush, mountSale, resultFrame } from '../../__tests__/mount-sale';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut } from '../../operations';
 import { ionModalStubOf } from '../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub';
 import CheckoutPanel from './CheckoutPanel.vue';
@@ -38,6 +38,7 @@ const PREVIEW: PreviewOut = {
   lines: [],
   cash_limit: 100000,
   ticket_limit: 300000,
+  limits_currency: 'EUR',
 };
 const CARD: PaymentMethodOut = { id: 'm-card', name: 'card', display_name: 'Card', type: 'card', sort_order: 0, requires_change: false, allowed: true };
 const SALE = { id: 's1', number: '20261014-0001', total: 1000, already: false } as SaleOut;
@@ -55,7 +56,7 @@ async function setup() {
     await m.wrapper.setProps({ open: true });
     await flush();
   }
-  /** Opens it and gives it a total and a card to charge with. */
+  /** Opens it and gives it a total, a card to charge with and the business's money (the charge waits for it, hub#921). */
   async function openReady() {
     await open();
     await m.clock.advance(150);
@@ -66,6 +67,7 @@ async function setup() {
       ['sale.checkout.preview', PREVIEW],
       ['sale.payment_method.list', { rows: [CARD], total: 1, limit: 100, offset: 0 }],
       ['sale.pos_settings.get', { default_document_type: 'ticket' }],
+      ['base.business.get', business()],
     ] as const) {
       call.push(resultFrame(m.client.stream.subscriptions(op)[0].id, data, 1));
     }

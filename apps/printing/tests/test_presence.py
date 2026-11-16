@@ -1,7 +1,7 @@
-"""The device's presence through base's /ws/print, for real (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF; the old hub's
-``print_hosts::heartbeat``): Printing declares ``printing.device.seen`` as ``print_presence``, and the socket runs it at
-the device's hello and at its beats as the device's user, with the permissions that user really has. Whoever is signed
-in at the till prints, an employee too: its till is seen, and the bell stops ringing for it.
+"""The device's presence through base's /ws/print, for real: Printing declares ``printing.device.seen`` as
+``print_presence``, and the socket runs it at the device's hello and at its beats as the device's user, with the
+permissions that user really has. Whoever is signed in at the till prints, an employee too: its till is seen, and the
+bell stops ringing for it.
 
 Driven through ``config.asgi.application`` with base's own socket client (``base/tests/test_ws_print.py``).
 """
@@ -9,7 +9,6 @@ Driven through ``config.asgi.application`` with base's own socket client (``base
 import datetime as dt
 import logging
 
-import pytest
 from django.utils import timezone
 
 from apps.printing.models import PrintDevice
@@ -25,9 +24,13 @@ from base.tests.test_ws_print import (  # noqa: F401 (fresh_live, session and so
     sockets,
 )
 
-pytestmark = pytest.mark.django_db(transaction=True)
+from .conftest import A, HUB_DB_COMMITTED
+
+pytestmark = HUB_DB_COMMITTED
 
 DEVICE = "till-1"
+#: Business A's host, where its till opens the socket.
+TILL_HOST = f"{A.key}.localhost:8000"
 
 
 def seen_at(device_id: str = DEVICE):
@@ -43,13 +46,13 @@ def went_quiet(minutes: int = 10):
 
 async def test_an_employees_till_is_seen_at_its_hello_and_at_every_beat(sockets, session, monkeypatch, caplog):
     monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
-    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
-    till = await db(printer)
-    await db(set_up, DEVICE, till)
+    cookie = await db(session, "eva", host=A.key, role=Membership.Role.EMPLOYEE)
+    till = await db(printer, scope=A)
+    await db(set_up, DEVICE, till, scope=A)
     quiet = await db(went_quiet)
 
     with caplog.at_level(logging.WARNING, logger="base.ws_print"):
-        socket = await ready_socket(sockets, cookie, [till])
+        socket = await ready_socket(sockets, cookie, [till], host=TILL_HOST)
         assert await db(seen_at) > quiet, "its hello is news"
 
         quiet = await db(went_quiet)
@@ -63,9 +66,9 @@ async def test_an_employees_till_is_seen_at_its_hello_and_at_every_beat(sockets,
 async def test_a_till_seen_by_the_socket_quiets_the_bell(sockets, session):
     from apps.printing.tests.conftest import ctx_for, run
 
-    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
-    till = await db(printer)
-    await db(set_up, DEVICE, till)
+    cookie = await db(session, "eva", host=A.key, role=Membership.Role.EMPLOYEE)
+    till = await db(printer, scope=A)
+    await db(set_up, DEVICE, till, scope=A)
     await db(went_quiet)
 
     def queued_a_minute_ago():
@@ -79,5 +82,5 @@ async def test_a_till_seen_by_the_socket_quiets_the_bell(sockets, session):
 
     await db(queued_a_minute_ago)
     assert await db(count) == 1, "the till is off: nobody is printing the receipt"
-    await ready_socket(sockets, cookie, [till])
+    await ready_socket(sockets, cookie, [till], host=TILL_HOST)
     assert await db(count) == 0, "the till is back"

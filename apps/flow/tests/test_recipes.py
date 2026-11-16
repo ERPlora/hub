@@ -1,5 +1,4 @@
-"""The factory recipes of the apps (WORKBOOK FLOW-F33 to F36; the old Hub's HUB-F104 and its
-``crates/runtime/src/flows/templates.rs``): what ``apps.flow.recipes`` reads from each active app's
+"""The factory recipes of the apps (WORKBOOK FLOW-F33 to F36): what ``apps.flow.recipes`` reads from each active app's
 ``recipes.py`` and offers, and what it sets aside, with why.
 
 A recipe is data its app declares (``RECIPES``): an id, its words, its trigger, its steps and the
@@ -14,9 +13,9 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.flow import queries, recipes
 
-from .conftest import make_flow
+from .conftest import A, HUB_DB, make_flow
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TASK = "task.task.create"
 DAY = "reservation.availability.day"
@@ -61,18 +60,22 @@ def declared(monkeypatch):
     """``declared(*declarations)``: what the apps declare, instead of their recipes.py (by app label)."""
 
     def plant(*found: tuple[str, dict]) -> None:
-        apps = queries.active_apps()
+        apps = queries.active_apps(A)
         monkeypatch.setattr(
-            recipes, "declarations", lambda: [(apps[label], recipe) for label, recipe in found]
+            recipes, "declarations", lambda _scope=None: [(apps[label], recipe) for label, recipe in found]
         )
 
     return plant
 
 
 def without(monkeypatch, *labels: str) -> None:
-    """This business without the apps ``labels``."""
-    active = {label: config for label, config in queries.active_apps().items() if label not in labels}
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
+    """The business at work without the apps ``labels``."""
+    real = queries.active_apps
+    monkeypatch.setattr(
+        queries,
+        "active_apps",
+        lambda scope: {label: config for label, config in real(scope).items() if label not in labels},
+    )
 
 
 # ── What the apps bring ──────────────────────────────────────────────────────────────────────────────
@@ -80,7 +83,7 @@ def without(monkeypatch, *labels: str) -> None:
 
 def test_an_app_brings_its_recipes_and_automations_offers_them(declared):
     declared(("appointment", declaration()))
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert [(recipe.app.label, recipe.id, recipe.ref) for recipe in offered] == [
         ("appointment", "gap", "appointment/gap")
     ]
@@ -89,7 +92,7 @@ def test_an_app_brings_its_recipes_and_automations_offers_them(declared):
 
 def test_the_apps_recipes_py_is_where_they_come_from():
     # The real ones: an app declares its RECIPES in its own recipes.py; an app without one brings none.
-    found = {(config.label, recipe["id"]) for config, recipe in recipes.declarations()}
+    found = {(config.label, recipe["id"]) for config, recipe in recipes.declarations(A)}
     assert ("appointment", "customer_cancelled") in found
     assert ("online_booking", "booked_online") in found
     assert not any(label == "customer" for label, _ in found)
@@ -97,13 +100,13 @@ def test_the_apps_recipes_py_is_where_they_come_from():
 
 def test_every_recipe_the_apps_bring_is_offered():
     # Guard: a recipe an app ships that this business cannot offer with every app on is a bug of that app.
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert [(item.ref, item.code, item.message) for item in set_aside] == []
     assert {recipe.ref for recipe in offered} >= {"appointment/customer_cancelled", "online_booking/booked_online"}
 
 
 def test_a_recipe_is_built_in_the_language_it_is_asked_in():
-    recipe = recipes.find("appointment/customer_cancelled")
+    recipe = recipes.find(A, "appointment/customer_cancelled")
     english, spanish = recipes.build(recipe, "en"), recipes.build(recipe, "es")
     assert english["name"] == "Fill the gap when a customer cancels"
     assert spanish["name"] == "Cubrir el hueco cuando un cliente cancela"
@@ -122,10 +125,10 @@ def test_finding_one_no_app_brings_is_a_not_found_and_one_set_aside_says_why(dec
 
     declared(("appointment", declaration()), ("appointment", declaration(id="wide", grants={})))
     with pytest.raises(NotFound) as missing:
-        recipes.find("appointment/nothing")
+        recipes.find(A, "appointment/nothing")
     assert missing.value.code == "flow.recipe_not_found"
     with pytest.raises(Conflict) as aside:
-        recipes.find("appointment/wide")
+        recipes.find(A, "appointment/wide")
     assert aside.value.code == "flow.recipe_invalid"
 
 
@@ -135,7 +138,7 @@ def test_finding_one_no_app_brings_is_a_not_found_and_one_set_aside_says_why(dec
 def test_a_recipe_that_needs_an_app_this_business_does_not_have_is_set_aside_naming_it(declared, monkeypatch):
     declared(("appointment", declaration()))
     without(monkeypatch, "task")
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert offered == []
     assert [(item.ref, item.code, item.apps) for item in set_aside] == [
         ("appointment/gap", "flow.recipe_needs_apps", ("task",))
@@ -149,7 +152,7 @@ def test_a_recipe_whose_assistant_uses_a_tool_of_an_app_this_business_does_not_h
     # to turn on, never «it is wrong».
     declared(("appointment", asking(DAY)))
     without(monkeypatch, "reservation")
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert offered == []
     assert [(item.ref, item.code, item.apps, item.message) for item in set_aside] == [
         (
@@ -163,7 +166,7 @@ def test_a_recipe_whose_assistant_uses_a_tool_of_an_app_this_business_does_not_h
 
 def test_with_that_app_on_the_recipe_whose_assistant_uses_its_tool_is_offered(declared):
     declared(("appointment", asking(DAY)))
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert [recipe.ref for recipe in offered] == ["appointment/ask"]
     assert set_aside == []
 
@@ -172,7 +175,7 @@ def test_an_app_named_by_a_step_and_by_a_tool_is_needed_once(declared, monkeypat
     get = {"id": "s1", "kind": "query", "operation": "reservation.reservation.get", "params": {"id": "input.id"}}
     declared(("appointment", asking(DAY, before=(get,))))
     without(monkeypatch, "reservation", "task")
-    _, set_aside = recipes.shelf()
+    _, set_aside = recipes.shelf(A)
     assert [(item.code, item.apps) for item in set_aside] == [("flow.recipe_needs_apps", ("reservation",))]
 
 
@@ -194,7 +197,7 @@ def test_an_app_named_by_a_step_and_by_a_tool_is_needed_once(declared, monkeypat
 def test_an_app_named_only_by_the_trigger_or_by_a_step_that_reads_is_needed(declared, monkeypatch, more):
     declared(("appointment", declaration(**more)))
     without(monkeypatch, "reservation")
-    _, set_aside = recipes.shelf()
+    _, set_aside = recipes.shelf(A)
     assert [(item.code, item.apps) for item in set_aside] == [("flow.recipe_needs_apps", ("reservation",))]
 
 
@@ -214,7 +217,7 @@ def test_a_name_of_no_app_this_business_can_turn_on_needs_no_app_and_is_set_asid
     else:
         step = {"id": "s1", "kind": "query", "operation": name, "params": {}}
     declared(("appointment", declaration(steps=[step], grants={name: "Looks it up."})))
-    _, set_aside = recipes.shelf()
+    _, set_aside = recipes.shelf(A)
     assert [(item.code, item.apps, item.message) for item in set_aside] == [
         ("flow.recipe_invalid", (), f"That action does not exist in this business: «{name}».")
     ]
@@ -222,14 +225,14 @@ def test_a_name_of_no_app_this_business_can_turn_on_needs_no_app_and_is_set_asid
 
 def test_the_recipes_of_an_app_that_is_off_are_not_offered_at_all(monkeypatch):
     without(monkeypatch, "appointment")
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert not any(recipe.app.label == "appointment" for recipe in offered)
     assert not any(item.app.label == "appointment" for item in set_aside)
 
 
 def test_a_recipe_asking_for_a_permission_its_steps_do_not_use_is_set_aside(declared):
     declared(("appointment", declaration(grants={TASK: "x", "customer.note.add": "y"})))
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert offered == []
     assert [(item.code, item.message) for item in set_aside] == [
         ("flow.recipe_invalid", "It asks for permissions its steps do not use: «customer.note.add».")
@@ -238,7 +241,7 @@ def test_a_recipe_asking_for_a_permission_its_steps_do_not_use_is_set_aside(decl
 
 def test_a_recipe_whose_steps_use_a_permission_it_does_not_ask_for_is_set_aside(declared):
     declared(("appointment", declaration(grants={})))
-    _, set_aside = recipes.shelf()
+    _, set_aside = recipes.shelf(A)
     assert [(item.code, item.message) for item in set_aside] == [
         ("flow.recipe_invalid", "Its steps use permissions it does not ask for: «task.task.create».")
     ]
@@ -247,7 +250,7 @@ def test_a_recipe_whose_steps_use_a_permission_it_does_not_ask_for_is_set_aside(
 def test_a_recipe_with_an_action_that_needs_a_person_is_set_aside(declared):
     void = {"id": "s1", "kind": "command", "operation": "sale.order.void", "params": {"order_id": "input.id"}}
     declared(("appointment", declaration(steps=[void], grants={"sale.order.void": "Voids it."})))
-    _, set_aside = recipes.shelf()
+    _, set_aside = recipes.shelf(A)
     assert [(item.code, item.message) for item in set_aside] == [
         ("flow.recipe_invalid", "«sale.order.void» needs a person in front: an automation cannot do it.")
     ]
@@ -257,7 +260,7 @@ def test_a_recipe_that_does_not_read_as_an_automation_is_set_aside_and_the_other
     broken = declaration(id="broken", steps=[{"id": "s1", "kind": "teleport"}])
     nameless = {"id": "nameless"}
     declared(("appointment", broken), ("appointment", nameless), ("appointment", declaration()))
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert [recipe.ref for recipe in offered] == ["appointment/gap"]
     assert [(item.ref, item.code) for item in set_aside] == [
         ("appointment/broken", "flow.recipe_invalid"),
@@ -267,44 +270,44 @@ def test_a_recipe_that_does_not_read_as_an_automation_is_set_aside_and_the_other
 
 def test_two_recipes_with_the_same_id_in_one_app_keep_the_first_and_set_the_other_aside(declared):
     declared(("appointment", declaration()), ("appointment", declaration(summary="Another one.")))
-    offered, set_aside = recipes.shelf()
+    offered, set_aside = recipes.shelf(A)
     assert [recipe.ref for recipe in offered] == ["appointment/gap"]
     assert [(item.ref, item.code) for item in set_aside] == [("appointment/gap", "flow.recipe_invalid")]
 
 
-# ── The fingerprint: what it does, never how it is explained (hub#2059) ──────────────────────────────
+# ── The fingerprint: what it does, never how it is explained ────────────────────────────────────────
 
 
 def test_the_same_recipe_always_has_the_same_fingerprint(declared):
     declared(("appointment", declaration()))
-    recipe = recipes.find("appointment/gap")
-    assert recipes.digest(recipe) == recipes.digest(recipes.find("appointment/gap"))
+    recipe = recipes.find(A, "appointment/gap")
+    assert recipes.digest(recipe) == recipes.digest(recipes.find(A, "appointment/gap"))
     assert len(recipes.digest(recipe)) == 64
 
 
 def test_other_words_in_its_steps_or_its_name_are_another_recipe(declared):
     declared(("appointment", declaration()))
-    before = recipes.digest(recipes.find("appointment/gap"))
+    before = recipes.digest(recipes.find(A, "appointment/gap"))
     reworded = declaration()
     reworded["steps"][0]["params"]["title"] = "Fill the hole of {{input.number}}"
     declared(("appointment", reworded))
-    assert recipes.digest(recipes.find("appointment/gap")) != before
+    assert recipes.digest(recipes.find(A, "appointment/gap")) != before
     declared(("appointment", declaration(name="Fill the gap")))
-    assert recipes.digest(recipes.find("appointment/gap")) != before
+    assert recipes.digest(recipes.find(A, "appointment/gap")) != before
 
 
 def test_another_permission_or_trigger_is_another_recipe(declared):
     declared(("appointment", declaration()))
-    before = recipes.digest(recipes.find("appointment/gap"))
+    before = recipes.digest(recipes.find(A, "appointment/gap"))
     declared(("appointment", declaration(trigger={"kind": "event", "event": "appointment.appointment.cancelled"})))
-    assert recipes.digest(recipes.find("appointment/gap")) != before
+    assert recipes.digest(recipes.find(A, "appointment/gap")) != before
 
 
 def test_rewording_its_summary_or_a_permissions_sentence_is_not_another_recipe(declared):
     declared(("appointment", declaration()))
-    before = recipes.digest(recipes.find("appointment/gap"))
+    before = recipes.digest(recipes.find(A, "appointment/gap"))
     declared(("appointment", declaration(summary="Other words.", description="More words.", grants={TASK: "New."})))
-    assert recipes.digest(recipes.find("appointment/gap")) == before
+    assert recipes.digest(recipes.find(A, "appointment/gap")) == before
 
 
 # ── A fault its app already fixed (FLOW-F36) ─────────────────────────────────────────────────────────
@@ -312,7 +315,7 @@ def test_rewording_its_summary_or_a_permissions_sentence_is_not_another_recipe(d
 
 def test_an_automation_built_from_an_older_version_lacks_the_clauses_its_app_added(declared):
     declared(("appointment", declaration()))
-    recipe = recipes.find("appointment/gap")
+    recipe = recipes.find(A, "appointment/gap")
     older = make_flow(
         trigger_event="appointment.appointment.cancelled",
         trigger_filter={},
@@ -324,11 +327,11 @@ def test_an_automation_built_from_an_older_version_lacks_the_clauses_its_app_add
 
 def test_nothing_to_repair_when_it_has_the_clauses_or_starts_otherwise(declared):
     declared(("appointment", declaration()))
-    recipe = recipes.find("appointment/gap")
+    recipe = recipes.find(A, "appointment/gap")
     current = recipes.digest(recipe)
     event = "appointment.appointment.cancelled"
     # Built from today's version and its clause taken off: it still lacks it. A clause of its app counts whenever it
-    # was built (FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE): before, this was «the owner's choice».
+    # was built, never as «the owner's choice».
     taken_off = make_flow(trigger_event=event, trigger_filter={}, recipe_digest=current)
     assert recipes.missing_clauses(recipe, taken_off) == {"input.by_customer": {"eq": True}}
     # It already has the clause (the owner's own value of it is kept: only a missing clause is a fault).

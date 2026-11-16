@@ -47,10 +47,13 @@ from apps.customer.queries import (
     find_field,
     find_group,
     find_tag,
+    has_live_twin,
     HEALTH_PURPOSE,
     health_consent,
     load_detail,
     load_health,
+    lost_since_copy,
+    named,
 )
 from apps.customer.schemas import (
     OPTIONS_MISSING,
@@ -62,7 +65,10 @@ from apps.customer.schemas import (
     CustomerDetailOut,
     CustomerIn,
     CustomerPatchIn,
+    CustomerRecoveredOut,
+    CustomerRecoverIn,
     CustomerRefIn,
+    CustomerRestoreIn,
     DeletedOut,
     EraseIn,
     ErasedOut,
@@ -71,7 +77,9 @@ from apps.customer.schemas import (
     FieldRefIn,
     FieldRow,
     FieldValueIn,
+    FieldValueOfCopyIn,
     GroupIn,
+    GroupOfCopyIn,
     GroupPatchIn,
     GroupRefIn,
     GroupRow,
@@ -95,11 +103,13 @@ from apps.customer.schemas import (
     SetGroupsIn,
     SetTagsIn,
     TagIn,
+    TagOfCopyIn,
     TagPatchIn,
     TagRefIn,
     TagRow,
 )
 from base.business import business_zone
+from base.recovery import LeftOut
 
 PHONE_INVALID = _(
     "This is not a valid phone number of its country: check the digits or write it with its "
@@ -113,6 +123,9 @@ FIELD_INVALID_OPTION = _("Choose one of the options.")
 FIELD_HAS_VALUES = _(
     "This field already has values on some cards: its type cannot change."
 )
+FIELD_INACTIVE_LEFT = _('came back without its value of the field "%(field)s": deactivated in Customers')
+FIELD_OPTION_LEFT = _('came back without its value of the field "%(field)s": no longer one of its options')
+FIELD_TYPE_LEFT = _('came back without its value of the field "%(field)s": no longer of its type')
 GROUP_NAME_TAKEN = _("There is already a group with that name. Choose another name.")
 TAG_NAME_TAKEN = _("There is already a tag with that name. Choose another name.")
 FIELD_NAME_TAKEN = _("There is already a field with that name. Choose another name.")
@@ -201,7 +214,7 @@ def _save_named(instance, message, code: str) -> None:
         raise Conflict(message, code=code, fields={"name": message}) from None
 
 
-# ── Custom field values (customers#13) ──────────────────────────────────────────────────────────
+# ── Custom field values ─────────────────────────────────────────────────────────────────────────
 
 
 def _field_problem(field: CustomField, value: str) -> tuple[str, str, str] | None:
@@ -242,12 +255,13 @@ def _kept(field: CustomField, value: str) -> str:
 
 
 def _validated_field_values(
-    customer: Customer, sent: list[FieldValueIn]
+    customer: Customer, sent: list[FieldValueIn], *, required: bool = True
 ) -> dict[UUID, str]:
     """The values to keep per field, or ``InvalidPayload`` with every problem under its field.
 
     Only active fields count: an unknown or inactive one is unavailable. Every required field must
-    end up with a value, the one sent or the one stored.
+    end up with a value, the one sent or the one stored, unless ``required`` is false: a card made
+    again from a separate copy is made as the till makes one, without them (``recover_customer``).
     """
     # The fields written are held until the COMMIT and read after: one deleted meanwhile is unavailable.
     lock_rows(CustomField, [item.field_id for item in sent])
@@ -270,7 +284,7 @@ def _validated_field_values(
             problems[key] = problem
             continue
         kept[field.id] = _kept(field, item.value)
-    for field in fields.values():
+    for field in fields.values() if required else ():
         if field.is_required and not kept.get(field.id, stored.get(field.id, "")):
             problems.setdefault(
                 f"field_values.{field.id}", ("customer.field_required", FIELD_REQUIRED)
@@ -349,6 +363,7 @@ def lock_customers(ids) -> list[UUID]:
 @operation(
     "customer.customer.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=CustomerIn,
     output=CustomerDetailOut,
@@ -382,6 +397,7 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
 @operation(
     "customer.customer.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=CustomerPatchIn,
     output=CustomerDetailOut,
@@ -400,7 +416,7 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
     ),
 )
 def update_customer(ctx: OperationContext, data: CustomerPatchIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(ctx, data.id, data.customer, lock=True)
     sent = {
         field: value
         for field, value in data.model_dump(
@@ -481,25 +497,10 @@ def _import_row(
     return values, {}, warnings
 
 
-def _already_imported(values: dict) -> bool:
-    """A live card with the same name, phone and email: the row was imported before (services#152).
-
-    Only the three together: two people may share a phone or an email (CUSTOMER-F12).
-    """
-    return (
-        Customer.objects.live()
-        .filter(
-            name__iexact=values["name"],
-            phone=values["phone"],
-            email__iexact=values["email"],
-        )
-        .exists()
-    )
-
-
 @operation(
     "customer.customer.import",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=ImportIn,
     output=ImportOut,
@@ -518,7 +519,7 @@ def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     for index, row in enumerate(data.rows):
         values, errors, warnings = _import_row(row, ctx)
         customer_id = None
-        if not errors and _already_imported(values):
+        if not errors and has_live_twin(values["name"], values["phone"], values["email"]):
             errors = {"name": str(ALREADY_IMPORTED)}
         if not errors:
             customer = Customer.objects.create(**values)
@@ -546,22 +547,17 @@ class MembersUnavailable(InvalidPayload):
         return envelope
 
 
-def _named_ids(
+def _named_ids(  # noqa: PLR0913, PLR0917
     model, ids: list[UUID], names: list[str], missing, code: str, field: str
 ) -> set[UUID]:
     """The ids of the groups or tags sent by id or by name, held until the COMMIT; one that does not exist
     (or that was deleted meanwhile) saves nothing, and the refusal names the ids that are gone."""
     wanted = set(ids)
     for name in names:
-        match = (
-            model.objects.filter(name__iexact=name)
-            .order_by("-is_active", "id")
-            .values_list("id", flat=True)
-            .first()
-        )
+        match = named(model, name)
         if match is None:
             raise InvalidPayload(missing, code=code, fields={field: missing})
-        wanted.add(match)
+        wanted.add(match.id)
     gone = wanted - set(lock_rows(model, wanted))
     if gone:
         raise MembersUnavailable(
@@ -584,6 +580,7 @@ def _set_members(
 @operation(
     "customer.customer.set_groups",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=SetGroupsIn,
     output=CustomerDetailOut,
@@ -597,7 +594,7 @@ def _set_members(
     ),
 )
 def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(ctx, data.id, data.customer, lock=True)
     ids = _named_ids(
         CustomerGroup,
         data.group_ids,
@@ -612,6 +609,7 @@ def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
 @operation(
     "customer.customer.set_tags",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=SetTagsIn,
     output=CustomerDetailOut,
@@ -625,7 +623,7 @@ def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
     ),
 )
 def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(ctx, data.id, data.customer, lock=True)
     ids = _named_ids(
         CustomerTag,
         data.tag_ids,
@@ -640,6 +638,7 @@ def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
 @operation(
     "customer.customer.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.delete",
     input=CustomerRefIn,
     output=DeletedOut,
@@ -655,7 +654,7 @@ def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
     ),
 )
 def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True, live=False)
+    customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
     if customer.deleted_at is None:
         customer.deleted_at = timezone.now()
         customer.is_active = False
@@ -664,26 +663,169 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     return {"id": customer.id}
 
 
+# Not an assistant tool, and declared by no app: only the system holds its permission, as the purchase commands. Its
+# one door is the recovery from a separate copy (BASE-F114): no screen of the business undoes a deletion.
+@operation(
+    "customer.customer.restore",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="customer.restore",
+    input=CustomerRestoreIn,
+    output=CustomerRecoveredOut,
+    ai=INTERNAL,
+)
+def restore_customer(ctx: OperationContext, data: CustomerRestoreIn) -> dict:
+    """CUSTOMER-F33: a deleted card back in every list, the same card with all that hangs from it (deleting keeps it,
+    CUSTOMER-F07). Merged into another or erased it never comes back: its history lives on in the other card, or its
+    personal data is gone. Repeating it on a card already back answers well and announces again, as deleting does.
+
+    hub#1356: what hung from it in the separate copy it comes back from and the business deleted since (``data``, each
+    by its id there) hangs from it again, as from a card made again from the copy (``_hang_from_copy``); what the
+    business still has stays as it is, the card in it or not. A value that cannot come back does not keep the card
+    deleted: the output says it came back without it, and why (``left_out``)."""
+    customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
+    if customer.merged_into_id is not None or customer.erased_at is not None:
+        raise NotFound(CUSTOMER_UNAVAILABLE, code=CUSTOMER_UNAVAILABLE_CODE)
+    if customer.deleted_at is not None:
+        customer.deleted_at = None
+        customer.is_active = True
+        customer.save(update_fields=["deleted_at", "is_active", "updated_at"])
+    record_event(ctx, events.CUSTOMER_RESTORED, {"id": str(customer.id)})
+    left_out = _hang_from_copy(
+        ctx,
+        customer,
+        groups=lost_since_copy(CustomerGroup, data.groups),
+        tags=lost_since_copy(CustomerTag, data.tags),
+        field_values=lost_since_copy(CustomField, data.field_values),
+    )
+    return load_detail(customer) | {"left_out": left_out}
+
+
+# Not an assistant tool, and declared by no app, as the restore: its one door is the recovery from a separate copy
+# (BASE-F114), for a card the business no longer has at all.
+@operation(
+    "customer.customer.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="customer.restore",
+    input=CustomerRecoverIn,
+    output=CustomerRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_customer(ctx: OperationContext, data: CustomerRecoverIn) -> dict:
+    """hub#1285: a card of a separate copy the business no longer has, made again by ``customer.customer.create`` with
+    what hung from it there (``_hang_from_copy``), all or nothing; the output says the values it came back without,
+    and why (``left_out``)."""
+    made = create_customer(ctx, CustomerIn.model_validate(data.model_dump(include=set(CustomerIn.model_fields))))
+    customer = Customer.objects.get(pk=made.id)
+    left_out = _hang_from_copy(ctx, customer, groups=data.groups, tags=data.tags, field_values=data.field_values)
+    return load_detail(customer) | {"left_out": left_out}
+
+
+def _hang_from_copy(
+    ctx: OperationContext,
+    customer: Customer,
+    *,
+    groups: list[GroupOfCopyIn],
+    tags: list[TagOfCopyIn],
+    field_values: list[FieldValueOfCopyIn],
+) -> list[LeftOut]:
+    """What hung from ``customer`` in a separate copy hung from it again, each by the operation its screen uses: the
+    card put in its groups and tags besides those it is in (``set_groups``, ``set_tags``), each the business's own of
+    that name (``queries.named``, the active one first) or, if it has none, made again as the copy had it by the Groups
+    or Tags screen's create (and deactivated if it was); its values of the custom fields as the card's screen checks
+    them (CUSTOMER-F04), each field the business's own of that name or one made again by the Fields screen's create.
+    Neither a value of a field the business deactivated (it shows on no card) nor one its field no longer takes comes
+    back: the card comes back without it, and each is returned with why. One of a field the card holds a value of
+    already does not either, and is nothing left out: the card keeps its own. A required field it has no value of
+    does not keep it out, as the till makes a card without one (CUSTOMER-F01)."""
+    for relation, items in (("groups", groups), ("tags", tags)):
+        if items:
+            _join_named(ctx, customer, relation, items)
+    held = set(customer.field_values.values_list("field_id", flat=True))
+    values = []
+    left_out = []
+    for value in field_values:
+        field = named(CustomField, value.name) or create_field(
+            ctx, FieldIn.model_validate(value.model_dump(exclude={"id", "value"}))
+        )
+        if field.id in held:
+            continue
+        why = _why_left_out(field, value.value)
+        if why is None:
+            values.append(FieldValueIn(field_id=field.id, value=value.value))
+        else:
+            left_out.append(why)
+    if values:
+        _apply_field_values(customer, _validated_field_values(customer, values, required=False))
+    return left_out
+
+
+def _why_left_out(field: CustomField, value: str) -> LeftOut | None:
+    """Why a card's ``value`` in a separate copy does not come back to ``field``: deactivated, or no longer one of its
+    options or of its type, said by the field's name and never by the value, which is the customer's own; ``None``
+    when it comes back."""
+    if not field.is_active:
+        return LeftOut(code="customer.field_inactive", message=FIELD_INACTIVE_LEFT % {"field": field.name})
+    problem = _field_problem(field, value)
+    if problem is None:
+        return None
+    code = problem[0]
+    said = FIELD_OPTION_LEFT if code == "customer.field_invalid_option" else FIELD_TYPE_LEFT
+    return LeftOut(code=code, message=said % {"field": field.name})
+
+
+def _join_named(ctx: OperationContext, customer: Customer, relation: str, items: list) -> None:
+    """``customer`` put by its screen's operation in the groups or tags (``relation``) named as ``items`` of the copy,
+    besides those it is in (see ``_hang_from_copy``)."""
+    model, create, update, put, ids_field = {
+        "groups": (CustomerGroup, create_group, update_group, set_groups, "group_ids"),
+        "tags": (CustomerTag, create_tag, update_tag, set_tags, "tag_ids"),
+    }[relation]
+    wanted = set(getattr(customer, relation).values_list("id", flat=True))
+    for item in items:
+        found = named(model, item.name)
+        if found is None:
+            found = create(ctx, create.input.model_validate(item.model_dump(exclude={"id", "is_active"})))
+            if not item.is_active:
+                update(ctx, update.input(id=found.id, is_active=False))
+        wanted.add(found.id)
+    put(ctx, put.input(id=customer.id, **{ids_field: sorted(wanted)}))
+
+
 @operation(
     "customer.customer.merge",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.merge",
     input=MergeIn,
     output=CustomerDetailOut,
     ai=AI(
-        "Merges a duplicate card (absorbed) into the one that stays: the survivor keeps its data and fills only its "
-        "empty fields, notes are appended and figures summed; activity, custom values, groups, tags, purchases, "
-        "orders and consent move to it, and the duplicate is retired. Cannot be undone.",
+        "Use this tool once both cards are known; do not stop at reading or explaining the merge. `customer` is the "
+        "card that stays and `absorbed` is the duplicate merged into it: for «merge A into B», B is `customer` and A "
+        "is `absorbed`. Pass an exact name, phone or email in either field or, once customer.customer.by_phone or "
+        "customer.customer.list found the cards, their ids in `id` and `absorbed_id`; never ask the person for an "
+        "internal id. The survivor keeps its data and fills only its empty fields, notes are appended and figures "
+        "summed; activity, custom values, groups, tags, purchases, orders and consent move to it, and the duplicate is "
+        "retired. Cannot be undone.",
         risk="high",
         asks={
-            "en": ("merge the two Marta cards", "Ana's in there twice, combine them"),
-            "es": ("Ana López está repetida, júntala con la otra", "tengo a Marta duplicada, únelas"),
+            "en": (
+                "merge the two Marta cards",
+                "Ana's in there twice, combine them",
+                "merge the card for 611 222 444 into the one for 611 222 333",
+            ),
+            "es": (
+                "Ana López está repetida, júntala con la otra",
+                "tengo a Marta duplicada, únelas",
+                "junta la ficha del 611 222 444 dentro de la del 611 222 333",
+            ),
         },
     ),
 )
 def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
-    survivor_id = find_customer(data.id, data.customer).id
-    absorbed_id = find_customer(data.absorbed_id, data.absorbed).id
+    survivor_id = find_customer(ctx, data.id, data.customer).id
+    absorbed_id = find_customer(ctx, data.absorbed_id, data.absorbed).id
     if survivor_id == absorbed_id:
         raise InvalidPayload(
             SAME_CUSTOMER,
@@ -789,6 +931,7 @@ def _merge_health(survivor: Customer, absorbed: Customer) -> None:
 @operation(
     "customer.customer.erase",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.erase",
     input=EraseIn,
     output=ErasedOut,
@@ -804,7 +947,7 @@ def _merge_health(survivor: Customer, absorbed: Customer) -> None:
     ),
 )
 def erase_customer(ctx: OperationContext, data: EraseIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True, live=False)
+    customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
     # The same person's duplicates merged into this card keep their own data (CUSTOMER-F13):
     # erasing the person erases them too, however deep the chain, all locked in this transaction.
     cards, pending = [customer], [customer.id]
@@ -859,6 +1002,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
 @operation(
     "customer.note.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=NoteIn,
     output=ActivityRow,
@@ -880,7 +1024,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
     ),
 )
 def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     entry = Activity.objects.create(
         customer=customer,
         kind=Activity.Kind.NOTE_ADDED,
@@ -899,6 +1043,7 @@ def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
 @operation(
     "customer.activity.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.record_activity",
     input=ActivityIn,
     output=ActivityRow,
@@ -918,7 +1063,7 @@ def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
     ),
 )
 def add_activity(ctx: OperationContext, data: ActivityIn) -> Activity:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     entry = Activity.objects.create(
         customer=customer,
         kind=data.kind,
@@ -937,7 +1082,7 @@ def add_activity(ctx: OperationContext, data: ActivityIn) -> Activity:
     return entry
 
 
-# ── Consent (customers#10) ──────────────────────────────────────────────────────────────────────
+# ── Consent ─────────────────────────────────────────────────────────────────────────────────────
 
 
 def _contact_point(customer: Customer, channel: str) -> str:
@@ -953,7 +1098,7 @@ def _contact_point(customer: Customer, channel: str) -> str:
 
 
 def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     now = timezone.now()
     occurred_at = data.occurred_at or now
     if occurred_at > now + CLOCK_SKEW:
@@ -1008,6 +1153,7 @@ def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
 @operation(
     "customer.consent.grant",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=ConsentGrantIn,
     output=ConsentRow,
@@ -1033,6 +1179,7 @@ def grant_consent(ctx: OperationContext, data: ConsentGrantIn) -> Consent:
 @operation(
     "customer.consent.withdraw",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=ConsentWithdrawIn,
     output=ConsentRow,
@@ -1112,13 +1259,14 @@ def _health_fact(
 @operation(
     "customer.health.grant",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=HealthGrantIn,
     output=HealthOut,
     ai=INTERNAL,
 )
 def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     _health_fact(ctx, data, customer, Consent.State.GRANTED)
     return load_health(customer)
 
@@ -1127,13 +1275,14 @@ def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
 @operation(
     "customer.health.withdraw",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=HealthWithdrawIn,
     output=HealthOut,
     ai=INTERNAL,
 )
 def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     _health_fact(ctx, data, customer, Consent.State.WITHDRAWN)
     # Withdrawing the only ground to keep them erases them in the same step (GDPR arts. 7.3, 17.1.b).
     HealthRecord.objects.filter(customer=customer).delete()
@@ -1144,13 +1293,14 @@ def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
 @operation(
     "customer.health.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=HealthIn,
     output=HealthOut,
     ai=INTERNAL,
 )
 def update_health(ctx: OperationContext, data: HealthIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     fact = health_consent(customer)
     if fact is None or fact.state != Consent.State.GRANTED:
         raise Conflict(HEALTH_CONSENT_REQUIRED, code="customer.health_consent_required")
@@ -1200,6 +1350,7 @@ def update_health(ctx: OperationContext, data: HealthIn) -> dict:
 @operation(
     "customer.order.link",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.manage",
     input=OrderLinkIn,
     output=OrderCustomerOut,
@@ -1216,7 +1367,7 @@ def link_order(ctx: OperationContext, data: OrderLinkIn) -> dict:
     unlinking = data.customer_id is None and not (data.customer or "").strip()
     # The card before the link, the order a merge takes them in (cards, then what hangs from them).
     customer = (
-        None if unlinking else find_customer(data.customer_id, data.customer, lock=True)
+        None if unlinking else find_customer(ctx, data.customer_id, data.customer, lock=True)
     )
     link = OrderLink.objects.select_for_update().filter(order_id=data.order_id).first()
     if customer is None:
@@ -1498,6 +1649,7 @@ def _with_count(instance):
 @operation(
     "customer.group.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=GroupIn,
     output=GroupRow,
@@ -1519,6 +1671,7 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
 @operation(
     "customer.group.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=GroupPatchIn,
     output=GroupRow,
@@ -1542,6 +1695,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
 @operation(
     "customer.group.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.delete",
     input=GroupRefIn,
     output=DeletedOut,
@@ -1565,6 +1719,7 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
 @operation(
     "customer.tag.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=TagIn,
     output=TagRow,
@@ -1586,6 +1741,7 @@ def create_tag(ctx: OperationContext, data: TagIn) -> dict:
 @operation(
     "customer.tag.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=TagPatchIn,
     output=TagRow,
@@ -1608,6 +1764,7 @@ def update_tag(ctx: OperationContext, data: TagPatchIn) -> dict:
 @operation(
     "customer.tag.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.delete",
     input=TagRefIn,
     output=DeletedOut,
@@ -1631,6 +1788,7 @@ def delete_tag(ctx: OperationContext, data: TagRefIn) -> dict:
 @operation(
     "customer.field.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=FieldIn,
     output=FieldRow,
@@ -1656,6 +1814,7 @@ def create_field(ctx: OperationContext, data: FieldIn) -> CustomField:
 @operation(
     "customer.field.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=FieldPatchIn,
     output=FieldRow,
@@ -1663,10 +1822,10 @@ def create_field(ctx: OperationContext, data: FieldIn) -> CustomField:
         "Updates a custom field, by its id or current name; its type cannot change once cards have values, and a "
         "select keeps at least one option.",
         asks={
-            "en": ("make the shoe size field required", "add an XL option to the size field"),
+            "en": ("make the shoe size field required", "let the size field also take XL"),
             "es": (
                 "haz obligatorio el campo talla",
-                "añade la opción XL al campo talla",
+                "pon XL entre los valores del campo talla",
                 "cambia el nombre del campo mascota",
             ),
         },
@@ -1702,6 +1861,7 @@ def update_field(ctx: OperationContext, data: FieldPatchIn) -> CustomField:
 @operation(
     "customer.field.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="customer.configure",
     input=FieldRefIn,
     output=DeletedOut,

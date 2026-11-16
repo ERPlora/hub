@@ -13,7 +13,7 @@ from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import atomic, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.inventory import queries as inventory_queries
@@ -43,6 +43,8 @@ from apps.modifier.schemas import (
     GroupIn,
     GroupOut,
     GroupPatchIn,
+    GroupRecoveredOut,
+    GroupRecoverIn,
     GroupRefIn,
     LinkIn,
     LinkOut,
@@ -50,10 +52,12 @@ from apps.modifier.schemas import (
     OptionIn,
     OptionOut,
     OptionPatchIn,
+    OptionRecoveredOut,
     OptionRefIn,
 )
 from apps.tax.models import TaxCategory
 from apps.tax.queries import resolve_category_text
+from base.recovery import LeftOut
 
 GROUP_NAME_TAKEN = _("There is already a group with that name.")
 OPTION_NAME_TAKEN = _("This group already has an option with that name.")
@@ -64,8 +68,15 @@ OWN_LINE_NOT_POSITIVE = _(
     "An option with its own tax category is billed on a line of its own: its supplement must be more than zero."
 )
 LINK_EXISTS = _("This group already applies there.")
+#: What a group made again from a separate copy came back without, said by the option's name and why its create
+#: refused it (``modifier.group.recover``).
+OPTION_LEFT = _('came back without its option "%(option)s": %(why)s')
+#: Why an option chosen by default in a separate copy came back not chosen: its group already comes with as many as
+#: it takes, the business's own (``modifier.option.recover``).
+DEFAULT_KEPT = _('came back not chosen by default: its group already comes with "%(chosen)s"')
 
-#: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
+#: Run only by the platform (events.py, and the recovery from a separate copy): no role holds it, so no person and no
+#: API key reaches it.
 SYSTEM = "modifier.system"
 
 _CONSTRAINTS = {
@@ -94,6 +105,7 @@ _CHECKS = {
 @operation(
     "modifier.group.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=GroupIn,
     output=GroupOut,
@@ -101,6 +113,16 @@ _CHECKS = {
         "description": "Create a modifier group (e.g. «Sauces», «Doneness») with how many options must be chosen "
         "(a minimum of 1 or more makes it required; a maximum of 0 is no ceiling) and whether one can repeat.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a sauces group for the pizzas",
+                "new Doneness group, required, one choice only",
+            ),
+            "es": (
+                "crea un grupo de salsas para las pizzas",
+                "nuevo grupo Punto de la carne, obligatorio y de una sola opción",
+            ),
+        },
     },
 )
 def create_group(ctx: OperationContext, data: GroupIn) -> dict:
@@ -116,12 +138,24 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
 @operation(
     "modifier.group.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=GroupPatchIn,
     output=GroupOut,
     ai={
         "description": "Change a modifier group, named by its id or its name; what is not sent is kept.",
         "risk": "normal",
+        "check": "modifier.group.get",
+        "asks": {
+            "en": (
+                "make the Sauces group required",
+                "change Extras so up to three can be picked",
+            ),
+            "es": (
+                "haz que el grupo Salsas sea obligatorio",
+                "cambia el grupo Extras para que se puedan elegir hasta tres",
+            ),
+        },
     },
 )
 def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
@@ -160,6 +194,7 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
 @operation(
     "modifier.group.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=GroupRefIn,
     output=DeletedOut,
@@ -167,6 +202,17 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
         "description": "Delete a modifier group, named by its id or its name, with all its options and the "
         "products and categories it applied to; what was already ordered keeps its copy.",
         "risk": "high",
+        "check": "modifier.group.get",
+        "asks": {
+            "en": (
+                "delete the Sauces group and all its choices",
+                "remove the Doneness modifier group",
+            ),
+            "es": (
+                "borra el grupo Salsas con todas sus opciones y asignaciones",
+                "elimina el grupo de suplementos Punto de la carne, los tiques antiguos no cambian",
+            ),
+        },
     },
 )
 def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
@@ -177,12 +223,39 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     return {"id": group_id}
 
 
+# Not an assistant tool: its one door is the recovery from a separate copy (BASE-F114, MODIFIER-F10), for a group the
+# business no longer has at all (deleting one deletes it with its options).
+@operation(
+    "modifier.group.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=GroupRecoverIn,
+    output=GroupRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_group(ctx: OperationContext, data: GroupRecoverIn) -> dict:
+    """A group of a separate copy made again by ``modifier.group.create`` with its options there, each added by
+    ``modifier.option.create``, all in one; an option its create refuses today does not come back, and the output says
+    which and why (``left_out``)."""
+    made = create_group(ctx, GroupIn.model_validate(data.model_dump(include=set(GroupIn.model_fields))))
+    left_out = []
+    for option in data.options:
+        try:
+            create_option(ctx, OptionIn.model_validate(option.model_dump() | {"group_id": made.id}))
+        except (InvalidPayload, Conflict) as refused:
+            message = OPTION_LEFT % {"option": option.name, "why": refused.message}
+            left_out.append(LeftOut(code=refused.code, message=message))
+    return load_group(made.id) | {"left_out": left_out}
+
+
 # Options (MODIFIER-F04)
 
 
 @operation(
     "modifier.option.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=OptionIn,
     output=OptionOut,
@@ -191,6 +264,16 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
         "(negative is a discount, 0 is free); a tax category of its own only when it taxes differently from the "
         "dish; optionally chosen by default.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "add barbecue sauce to the Sauces group for 50 cents",
+                "add Double cheese to Extras at one euro",
+            ),
+            "es": (
+                "mete una opción gratis de salsa de yogur en Salsas",
+                "que Salsas tenga una opción nueva, Alioli, que venga por defecto",
+            ),
+        },
     },
 )
 def create_option(ctx: OperationContext, data: OptionIn) -> dict:
@@ -217,16 +300,54 @@ def create_option(ctx: OperationContext, data: OptionIn) -> dict:
     return load_option(option.id)
 
 
+# Not an assistant tool: its one door is the recovery from a separate copy (BASE-F114, MODIFIER-F10), for an option a
+# group the business keeps no longer has.
+@operation(
+    "modifier.option.recover",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission=SYSTEM,
+    input=OptionIn,
+    output=OptionRecoveredOut,
+    ai=INTERNAL,
+)
+def recover_option(ctx: OperationContext, data: OptionIn) -> dict:
+    """An option of a separate copy added again by ``modifier.option.create``. One chosen by default there comes back
+    chosen only while its group has room for one more: it never takes it from those the business chose, and the output
+    says why it came back without (``left_out``)."""
+    group = find_group(data.group_id, data.group, lock=True)
+    chosen = _defaults_in_full(group) if data.is_default else []
+    left_out = []
+    if chosen:
+        data = data.model_copy(update={"is_default": False})
+        left_out.append(LeftOut(code="modifier.default_kept", message=DEFAULT_KEPT % {"chosen": ", ".join(chosen)}))
+    made = create_option(ctx, data)
+    return load_option(made.id) | {"left_out": left_out}
+
+
 @operation(
     "modifier.option.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=OptionPatchIn,
     output=OptionOut,
     ai={
-        "description": "Change an option, named by its id or its name (and its group when two have one so named); "
-        "what is not sent is kept; an empty tax category gives it back the dish's.",
+        "description": "Change an option, named by its id or its name (and its group when two have one so named): "
+        "its name, its supplement, its own tax category or whether it comes chosen by default; what is not sent is "
+        "kept, and an empty tax category gives it back the dish's.",
         "risk": "normal",
+        "check": "modifier.option.get",
+        "asks": {
+            "en": (
+                "raise the extra cheese to one euro",
+                "the house sauce should no longer come preselected",
+            ),
+            "es": (
+                "sube a un euro el extra de queso",
+                "que la opción Sin gluten deje de ser la predeterminada",
+            ),
+        },
     },
 )
 def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
@@ -265,6 +386,7 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
 @operation(
     "modifier.option.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=OptionRefIn,
     output=DeletedOut,
@@ -272,6 +394,17 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
         "description": "Delete an option, named by its id or its name (and its group when two have one so named); "
         "what was already ordered keeps its copy.",
         "risk": "high",
+        "check": "modifier.option.get",
+        "asks": {
+            "en": (
+                "remove barbecue sauce from the Sauces group",
+                "delete the Gluten free option from Extras",
+            ),
+            "es": (
+                "quita la salsa barbacoa del grupo Salsas",
+                "borra la opción Sin gluten de Extras, lo ya enviado se queda como está",
+            ),
+        },
     },
 )
 def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
@@ -288,6 +421,7 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
 @operation(
     "modifier.link.attach",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=LinkIn,
     output=LinkOut,
@@ -295,6 +429,16 @@ def delete_option(ctx: OperationContext, data: OptionRefIn) -> dict:
         "description": "Apply a modifier group (named by its id or name) to a product (by its id, SKU or name) or to "
         "a category (by its id or name), so that the till asks for it when that is sold.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "make the till ask for doneness with the sirloin",
+                "apply the Sauces group to the whole Pizzas category",
+            ),
+            "es": (
+                "que el TPV pregunte siempre la salsa al vender una pizza",
+                "aplica el grupo Salsas a toda la familia Pizzas",
+            ),
+        },
     },
 )
 def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
@@ -320,6 +464,7 @@ def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
 @operation(
     "modifier.link.detach",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="modifier.manage",
     input=LinkRefIn,
     output=DeletedOut,
@@ -327,6 +472,17 @@ def attach_link(ctx: OperationContext, data: LinkIn) -> dict:
         "description": "Stop applying a modifier group to a product or a category: by the link's id, or by the group "
         "and the product (id, SKU or name) or category (id or name). It can be applied again later.",
         "risk": "normal",
+        "check": "modifier.link.get",
+        "asks": {
+            "en": (
+                "stop asking for sauces with the pizza",
+                "unlink the Extras group from the sirloin",
+            ),
+            "es": (
+                "deja de preguntar las salsas con la pizza",
+                "suelta el grupo Extras del entrecot pero consérvalo para los demás productos",
+            ),
+        },
     },
 )
 def detach_link(ctx: OperationContext, data: LinkRefIn) -> dict:
@@ -469,6 +625,15 @@ def _make_room_for_a_default(
             record_event(ctx, events.OPTION_UPDATED, _option_payload(previous))
     elif group.max_choices and others.count() + 1 > group.max_choices:
         raise _too_many_defaults("is_default")
+
+
+def _defaults_in_full(group: ModifierGroup) -> list[str]:
+    """The names of ``group``'s options chosen by default when they are as many as it takes, in its order; none while
+    it has room for one more. The group's row is locked by the caller."""
+    if not group.max_choices:
+        return []
+    chosen = list(group.options.filter(is_default=True).order_by("sort_order", "name").values_list("name", flat=True))
+    return chosen if len(chosen) >= group.max_choices else []
 
 
 def _target(data, *, hold: bool = False):

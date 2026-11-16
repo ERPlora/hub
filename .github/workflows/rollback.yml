@@ -47,7 +47,7 @@ jobs:
             exit 1
           fi
           if [ -z "$AWS_REGION" ]; then
-            echo "::error::empty repository variables: AWS_REGION (aws-next README, step 19)"
+            echo "::error::empty repository variables: AWS_REGION (ERPlora/aws README, step 19)"
             exit 1
           fi
 

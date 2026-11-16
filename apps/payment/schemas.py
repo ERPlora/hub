@@ -13,6 +13,7 @@ from uuid import UUID
 
 import pycountry
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 from stdnum import iban as iban_number
@@ -23,6 +24,7 @@ from apps.payment.models import (
     INVOICE_REF_MAX_LENGTH,
     NAME_MAX_LENGTH,
 )
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -41,6 +43,16 @@ SAY_WHICH_PAYMENT = _("Say which payment: its id, or its reference.")
 REASON_REQUIRED = _(
     "Say why this payment is cancelled: the reason stays on the payment."
 )
+
+# The assistant's card names the record a write acts on as the screens name it, read as whoever asks and never by its
+# id (base/assistant/cards.py ``REFERS``): a method by its name («Editing method — BBVA account»), a payment by its reference
+# («Cancel payment — PAY-20261014-0003»), each under the word its list calls one.
+#: The word the methods list calls one («Método»).
+T_METHOD = gettext_noop("Method")
+#: The word the payments list calls one («Pago»).
+T_PAYMENT = gettext_noop("Payment")
+A_METHOD = names("payment.method.get")
+A_PAYMENT = names("payment.payment.get", name=("reference",))
 
 MethodType = Literal["cash", "transfer", "card", "sepa", "check", "other"]
 PaymentStatus = Literal["draft", "approved", "sent", "completed", "cancelled"]
@@ -122,7 +134,9 @@ class Page(Schema, Generic[T]):
 
 
 class MethodRefIn(In):
-    id: UUID | None = Field(None, description="The payment method's id.")
+    id: UUID | None = Field(
+        None, title=T_METHOD, description="The payment method's id.", json_schema_extra=A_METHOD
+    )
     method: Said | None = Field(
         None,
         description="The payment method's name, when its id is not known (e.g. said aloud).",
@@ -206,7 +220,9 @@ class MethodPage(Page[MethodOut]):
 
 
 class PaymentRefIn(In):
-    id: UUID | None = Field(None, description="The payment's id.")
+    id: UUID | None = Field(
+        None, title=T_PAYMENT, description="The payment's id.", json_schema_extra=A_PAYMENT
+    )
     reference: Said | None = Field(
         None,
         description="The payment's reference (e.g. PAY-20261014-0003), when its id is not known.",
@@ -297,7 +313,9 @@ class PaymentListIn(PageIn):
 
 class PaymentIn(In):
     method_id: UUID | None = Field(
-        None, description="The id of the active payment method the money leaves from."
+        None,
+        description="The id of the active payment method the money leaves from.",
+        json_schema_extra=A_METHOD,
     )
     method: Said | None = Field(
         None,
@@ -379,7 +397,7 @@ class PaymentOut(Schema):
     method_id: UUID = Field(description="The id of the method it is paid from.")
     method_name: str = Field(description="The name of that method.")
     payment_date: dt.date = Field(description="The day of the payment.")
-    amount: int = Field(description="The amount in minor units of its currency.")
+    amount: int = Field(description="The amount in minor units of its currency.", json_schema_extra={"money": True})
     currency: str = Field(description="Its currency (ISO 4217).")
     currency_decimals: int = Field(
         description="The decimals of its currency as the server counts them (2 in EUR and HUF, 0 in JPY)."

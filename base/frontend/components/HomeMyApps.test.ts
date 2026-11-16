@@ -1,6 +1,3 @@
-// «My apps» on the Home (BASE-G165, hub#367): one tile per app this person can open (the list of the topbar's
-// «My apps»), the most opened in this browser first; «Add apps» last, to Apps, once that screen exists; on a
-// phone with six apps or more, four and «View all apps». Never «no apps» when the list could not be read.
 import { HubIcon, type SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,6 +30,8 @@ describe('HomeMyApps', () => {
     const first = m.wrapper.get('[data-testid="home-my-app"]');
     expect(first.attributes('title')).toBe('App demo');
     expect(first.attributes('href')).toBe('/demo/home');
+    expect(m.wrapper.get('.my-apps').classes()).toContain('ep-surface');
+    expect(first.get('.my-app-icon').classes()).toContain('ep-icon-tile');
     // A bare name of the menu is Ionicons (`iconName`).
     expect(m.wrapper.findAllComponents(HubIcon).map((icon) => icon.props('name'))).toEqual([
       'ion:flask-outline',

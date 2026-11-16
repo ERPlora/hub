@@ -33,7 +33,9 @@ describe('FlowEditorPage', () => {
   it('follows the automation of the link and opens the editor on its tab', async () => {
     const s = await setup();
     expect(s.params('flow.flow.detail')).toEqual([{ id: 'f1' }]);
-    expect(s.find('flow-editor-loading').exists()).toBe(true);
+    // «Loading…» read out as a status, the one LoadingNote of flow (hub#969).
+    expect(s.find('flow-editor-loading').text()).toBe('Loading…');
+    expect(s.find('flow-editor-loading').attributes('role')).toBe('status');
     await s.result('flow.flow.detail', FLOW);
     const editor = s.wrapper.findComponent(FlowEditor);
     expect(editor.props()).toMatchObject({ flow: FLOW, tab: 'permissions', draft: null });

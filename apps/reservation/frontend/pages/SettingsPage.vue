@@ -3,18 +3,20 @@
 // whoever may save them (`reservation.manage_settings`; the old module had no screen). The rules for every
 // reservation — default duration, automatic confirmation, phone and email required, minutes after which an
 // unconfirmed one is released — and those for the bookings the guest makes herself (online, WhatsApp) —
-// fewest and most guests, notice and days ahead. The values come live (the factory ones until saved); a
-// change saved elsewhere repaints every field not touched, and «Save» sends only the fields touched and
-// changed (`reservation.settings.update`). A refusal goes under its field.
-import { InlineFeedback } from '@erplora/ui/components';
+// fewest and most guests, notice and days ahead. The values come live (the factory ones until saved). The form
+// is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere repaints every field not
+// touched, «Save» sends only the fields touched and changed (`reservation.settings.update`), and a refusal
+// says itself as a FormModal does: its notice goes as soon as something is changed, each field's message as
+// soon as that field is (hub#873), and the next refusal says it all again.
+import { InlineFeedback, SettingsFormFooter, SettingsNumberField, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { IonSpinner, IonToggle } from '@ionic/vue';
+import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
-import type { SettingsIn, SettingsOut } from '../operations';
+import type { SettingsOut } from '../operations';
 import { reservationTabs } from '../tabs';
 
 const STAFF_NUMBERS = ['default_duration_minutes', 'no_show_window_minutes'] as const;
@@ -41,12 +43,12 @@ const t = useT();
 const canManage = computed(() => session.can('reservation.manage_settings'));
 
 const { data, status, error } = useLive('reservation.settings.get', {});
-const { run, pending, error: saveError } = useCommand('reservation.settings.update');
-
-const form = ref<Form | null>(null);
-const original = ref<Form | null>(null);
-const touched = ref<ReadonlySet<keyof Form>>(new Set());
-const saved = ref(false);
+const settingsForm = useSettingsForm(
+  data,
+  useCommand('reservation.settings.update'),
+  { toForm, numbers: [...STAFF_NUMBERS, ...GUEST_NUMBERS] },
+);
+const { form, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -60,61 +62,6 @@ function toForm(settings: SettingsOut): Form {
     require_phone: settings.require_phone,
     require_email: settings.require_email,
   };
-}
-
-const changes = computed<SettingsIn>(() => {
-  const now = form.value;
-  const was = original.value;
-  if (!now || !was) return {};
-  const out: Record<string, unknown> = {};
-  for (const key of touched.value) {
-    const value = now[key];
-    const text = typeof value === 'string' ? value.trim() : value;
-    if (text === was[key]) continue;
-    out[key] = typeof text === 'string' && /^\d+$/.test(text) ? Number(text) : text;
-  }
-  return out as SettingsIn;
-});
-const dirty = computed(() => Object.keys(changes.value).length > 0);
-
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(
-          Object.keys(fresh).map((key) => [key, touched.value.has(key as keyof Form) ? current[key as keyof Form] : fresh[key as keyof Form]]),
-        ) as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set<K extends keyof Form>(field: K, value: Form[K]): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-}
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-
-async function save(): Promise<void> {
-  if (!dirty.value || pending.value) return;
-  try {
-    const answer = await run(changes.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
 }
 </script>
 
@@ -157,7 +104,8 @@ async function save(): Promise<void> {
         v-else
         class="reservation-settings"
         data-testid="reservation-settings"
-        @submit.prevent="save"
+        novalidate
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="reservation-settings__title">
           {{ $t('reservation.settings.title') }}
@@ -165,21 +113,14 @@ async function save(): Promise<void> {
         <h3 class="reservation-settings__group">
           {{ $t('reservation.settings.staff') }}
         </h3>
-        <ion-input
+        <SettingsNumberField
           v-for="field in STAFF_NUMBERS"
           :key="field"
-          :data-testid="`reservation-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`reservation-settings-${field}`"
           :label="t(LABELS[field])"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          min="0"
         />
         <div
           v-for="field in TOGGLES"
@@ -204,45 +145,22 @@ async function save(): Promise<void> {
         <h3 class="reservation-settings__group">
           {{ $t('reservation.settings.guest') }}
         </h3>
-        <ion-input
+        <SettingsNumberField
           v-for="field in GUEST_NUMBERS"
           :key="field"
-          :data-testid="`reservation-settings-${field}`"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          :value="form[field]"
+          :settings="settingsForm"
+          :field="field"
+          :testid="`reservation-settings-${field}`"
           :label="t(LABELS[field])"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :error-text="fieldErrors[field]"
-          :class="invalid(fieldErrors[field])"
-          @ion-input="set(field, text($event.detail.value))"
+          min="0"
         />
-        <InlineFeedback
-          v-if="saveError"
-          tone="danger"
-          data-testid="reservation-settings-save-error"
-          :heading="$t('reservation.settings.saveError')"
-        >
-          {{ saveError.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="reservation-settings-saved"
-        >
-          {{ $t('reservation.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="reservation-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('reservation.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="reservation-settings"
+          :save-label="$t('reservation.settings.save')"
+          :saved-label="$t('reservation.settings.saved')"
+          :error-heading="$t('reservation.settings.saveError')"
+        />
       </form>
     </template>
   </AppPage>

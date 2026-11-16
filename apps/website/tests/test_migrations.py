@@ -1,4 +1,4 @@
-"""Migrations 0002 and 0003 of the website app's theme (round 2026-10-22).
+"""Migrations 0002 and 0003 of the website app's theme.
 
 0002: the two free colours of before become the custom palette.
 
@@ -16,15 +16,16 @@ custom palette. The functions of the ``RunPython`` are called the way the migrat
 import uuid
 from importlib import import_module
 
-import pytest
 from django.apps import apps as global_apps
-from django.db import connection
+from django.db import connections
 
 from apps.website.models import Site
 from apps.website.palettes import PALETTES
 from apps.website.schemas import Theme
+from apps.website.tests.conftest import HUB_DB
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 migration = import_module("apps.website.migrations.0002_theme_palettes")
 overrides = import_module("apps.website.migrations.0003_theme_overrides")
@@ -39,7 +40,7 @@ def site(theme: dict, published_theme: dict | None = None) -> Site:
 
 
 def run(function) -> None:
-    with connection.schema_editor() as editor:
+    with connections[current_alias()].schema_editor() as editor:
         function(global_apps, editor)
 
 

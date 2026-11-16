@@ -1,4 +1,4 @@
-// flow: SALE-F29 — the document of a charged sale carries VeriFactu's QR (VERIFACTU-F19, sales#411), against the real
+// flow: SALE-F29 — the document of a charged sale carries VeriFactu's QR (VERIFACTU-F19), against the real
 // Invoicing and VeriFactu, no mocks: the charge issues its ticket and VeriFactu seals its record in that emission (in
 // the AEAT's testing environment: nothing is sent); in Sales, «Document» shows the paper with «Tax QR:», the QR,
 // «VERI*FACTU» and how to check the receipt at the AEAT. In 390×844, 834×1194 and 1440×900. What a run creates — its
@@ -44,7 +44,7 @@ async function documentReady(page: Page): Promise<void> {
   await page.locator('[data-testid=sale-document-modal] [data-testid=sale-receipt-qr] img').waitFor({ state: 'visible' });
 }
 
-test('SALE-F29: the ticket of a charged sale carries VeriFactu’s QR, «VERI*FACTU» and how to check it', async ({ page, context }) => {
+test('SALE-F29: the ticket of a charged sale carries VeriFactu’s QR, «VERI*FACTU» and how to check it @smoke', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/sale/sales');
   const sale = await chargeByApi(context, { lines: [{ product: product.sku }], payments: [{ method: 'card' }] });

@@ -1,9 +1,8 @@
-"""SharedRouter: the models of ``shared`` live on the ``shared`` alias, and nothing else does (round 16).
+"""SharedRouter: the models of ``shared`` live on the ``shared`` alias, and nothing else does.
 
-PLAN §21 and spec §3.3: the Hub's mirror of the SaaS's ``shared`` schema reads and writes only on the
-``shared`` alias; every other model is left to the next router (phase 2's ``TenantRouter``) or to
-``default``; nothing relates across the two; and the Hub never migrates anything there, nor the
-``shared`` app anywhere, also in the tests.
+The Hub's mirror of the SaaS's ``shared`` schema reads and writes only on the ``shared`` alias; every
+other model is left to the next router (``TenantRouter``) or to ``default``; nothing relates across the
+two; and the Hub never migrates anything there, nor the ``shared`` app anywhere, also in the tests.
 """
 
 import re

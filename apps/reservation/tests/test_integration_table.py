@@ -13,6 +13,7 @@ from apps.sale.models import Order
 from apps.table.models import Hold, TableSession
 
 from .conftest import (
+    HUB_DB,
     MADRID,
     THURSDAY,
     book,
@@ -27,7 +28,7 @@ from .conftest import (
     set_rules,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 EMPLOYEE = "hub_employee"
 
@@ -243,7 +244,7 @@ def test_a_hold_for_a_reservation_with_a_slot_of_another_day(terrace):
     assert Hold.objects.filter(table=terrace, status="held").count() == 1
 
 
-# ── Review of 2026-10-15 ─────────────────────────────────────────────────────────────────────────
+# ── Holds the floor plan spends, and tables out of service ───────────────────────────────────────
 
 
 def test_a_reservation_whose_hold_the_floor_plan_spent_is_refused_not_hung_on_another_check(terrace, monkeypatch):

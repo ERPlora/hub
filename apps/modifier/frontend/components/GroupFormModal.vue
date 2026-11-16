@@ -9,6 +9,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { GroupIn, GroupOut, GroupPatchIn } from '../operations';
 
@@ -104,11 +106,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('modifier-group-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     testid="modifier-group-form"
     :title="title"
     :submit-label="group ? $t('modifier.groups.form.save') : $t('modifier.groups.form.create')"
@@ -121,6 +126,7 @@ async function save(): Promise<void> {
       <div class="modifier-form">
         <ion-input
           data-testid="modifier-group-form-name"
+          name="name"
           :value="form.name"
           :label="$t('modifier.groups.form.name')"
           label-placement="floating"
@@ -133,6 +139,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="modifier-group-form-kitchen_name"
+          name="kitchen_name"
           :value="form.kitchenName"
           :label="$t('modifier.groups.form.kitchenName')"
           :helper-text="$t('modifier.groups.form.kitchenHint')"
@@ -147,6 +154,7 @@ async function save(): Promise<void> {
         <div class="modifier-form__pair">
           <ion-input
             data-testid="modifier-group-form-min_choices"
+            name="min_choices"
             type="number"
             inputmode="numeric"
             min="0"
@@ -162,6 +170,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="modifier-group-form-max_choices"
+            name="max_choices"
             type="number"
             inputmode="numeric"
             min="0"
@@ -187,6 +196,7 @@ async function save(): Promise<void> {
         </ion-toggle>
         <ion-input
           data-testid="modifier-group-form-sort_order"
+          name="sort_order"
           type="number"
           inputmode="numeric"
           min="0"

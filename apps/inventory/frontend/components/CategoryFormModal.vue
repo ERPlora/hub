@@ -9,6 +9,8 @@ import { type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { errorFields } from '../lib/errors';
 import TaxCategorySelect from './TaxCategorySelect.vue';
@@ -83,11 +85,14 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+const canDismiss = useUnsavedFormOnOpen('inventory-category-form', form, open);
 </script>
 
 <template>
   <FormModal
     v-model:open="open"
+    :can-dismiss="canDismiss"
     :title="title"
     testid="inventory-category-form"
     :submit-label="editing ? $t('inventory.common.saveChanges') : $t('inventory.common.save')"

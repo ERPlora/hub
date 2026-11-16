@@ -2,8 +2,12 @@
 // The quantity selector of a cart line: minus, the field and plus. It only says what was asked
 // (`change`, as the server reads a decimal: «0.532»); the line keeps showing what the server keeps, so
 // a refused quantity puts the field back by itself. Minus from one asks zero: the page removes the
-// line. A product sold by weight or time types its quantity («0,532») and shows its unit. The signs are
-// glyphs: `ion:remove-outline` is not registered yet (UI-REQUESTS.md, «POS»).
+// line. A product sold by weight or time types its quantity («0,532») and shows its unit. The field holds the figure
+// as a person types it: ungrouped («1500», where the line writes «1.500» with the platform's `formatQuantity`), as a
+// till's quantity field does (hub#974). The signs are glyphs: `ion:remove-outline` is not registered yet
+// (UI-REQUESTS.md, «POS»).
+import { decimalMark } from '@erplora/ui/components';
+import { IonButton } from '@ionic/vue';
 import { computed, useTemplateRef, watch } from 'vue';
 
 import { useLocale } from '../../composables/useT';
@@ -14,10 +18,10 @@ const emit = defineEmits<{ change: [quantity: string] }>();
 const locale = useLocale();
 const field = useTemplateRef<HTMLInputElement>('field');
 
-const number = computed(() => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 3, useGrouping: false }));
-const shown = computed(() => number.value.format(Number(props.quantity)));
 /** The locale's decimal separator, as typed («,» in Spanish). */
-const separator = computed(() => number.value.formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.');
+const separator = computed(() => decimalMark(locale.value));
+/** The quantity as typed: the server's decimal («1500.000») without its trailing zeros, the locale's mark, ungrouped. */
+const shown = computed(() => String(Number(props.quantity)).replace('.', separator.value));
 
 function reset(): void {
   if (field.value) field.value.value = shown.value;
@@ -47,16 +51,18 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
     class="pos-qty"
     @click.stop
   >
-    <button
-      type="button"
+    <ion-button
+      fill="clear"
       class="pos-qty__btn"
       data-testid="pos-qty-minus"
       :aria-label="$t('sale.pos.decrease')"
       :disabled="disabled"
       @click="step(-1)"
     >
-      <span aria-hidden="true">−</span>
-    </button>
+      <span
+        aria-hidden="true"
+      >−</span>
+    </ion-button>
     <input
       ref="field"
       class="pos-qty__field"
@@ -73,16 +79,18 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
       class="pos-qty__unit"
       data-testid="pos-qty-unit"
     >{{ unit }}</span>
-    <button
-      type="button"
+    <ion-button
+      fill="clear"
       class="pos-qty__btn"
       data-testid="pos-qty-plus"
       :aria-label="$t('sale.pos.increase')"
       :disabled="disabled"
       @click="step(1)"
     >
-      <span aria-hidden="true">+</span>
-    </button>
+      <span
+        aria-hidden="true"
+      >+</span>
+    </ion-button>
   </span>
 </template>
 
@@ -91,31 +99,28 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
   display: inline-flex;
   align-items: center;
   overflow: hidden;
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  border: 1px solid var(--ion-border-color, #e6e3db);
+  background: var(--ion-card-background);
+  border: 1px solid var(--ep-border);
   border-radius: 10px;
 }
+/* As high as the field: Ionic's iOS button is at least 3.1em high otherwise (57 px), which beats a `height`. */
 .pos-qty__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--ion-text-color, #1c1b18);
-  background: none;
-  border: none;
-  cursor: pointer;
+  --color: var(--ion-text-color);
+  --padding-start: 0;
+  --padding-end: 0;
 }
 .pos-qty__btn:disabled {
   opacity: 0.4;
-  cursor: default;
 }
 .pos-qty__field {
   width: 2.3rem;
-  height: 2rem;
+  height: 2.75rem;
   padding: 0;
   font: inherit;
   font-weight: 700;
@@ -123,11 +128,11 @@ const step = (by: number) => ask(Math.max(0, Number(props.quantity) + by));
   color: inherit;
   background: transparent;
   border: none;
-  border-inline: 1px solid var(--ion-border-color, #e6e3db);
+  border-inline: 1px solid var(--ep-border);
 }
 .pos-qty__unit {
   padding: 0 0.25rem;
   font-size: 0.72rem;
-  color: var(--ion-color-medium, #8b897f);
+  color: var(--ion-color-medium);
 }
 </style>

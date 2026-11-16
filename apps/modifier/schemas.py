@@ -22,8 +22,9 @@ from pydantic import (
     model_validator,
 )
 
-from apps.modifier.models import MAX_CHOICES, MAX_DELTA, NAME_MAX_LENGTH
-from base.schemas import names
+from apps.modifier.models import MAX_CHOICES, MAX_DELTA, MAX_OPTIONS, NAME_MAX_LENGTH
+from base.recovery import RecoveredOut
+from base.schemas import names, unless_given
 
 T = TypeVar("T")
 
@@ -43,15 +44,37 @@ GROUP = gettext_noop("Group")
 OPTION = gettext_noop("Option")
 APPLIES_TO = gettext_noop("Applies to")
 OWN_TAX_CATEGORY = gettext_noop("Own tax category")
+#: The forms' name for it; the model's own, «kitchen name», is the Django admin's (hub#958).
+KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
 # two groups may have an option with one name; a link by its group and what it hangs from.
 A_GROUP = names("modifier.group.get")
+# A group said by its name, when its id is not known: a group belongs to nothing, so the card reads it by that name
+# alone, as the write will find it, and shows the group the write acts on («Salsas picantes» when the person said
+# «salsa», hub#1218); words it cannot read (two groups fit, none does) it says as said, never off the card, so adding
+# an option or applying a group, which cannot check it, reads it too (hub#1245). Beside the id the write takes its
+# record by instead (the group's, or the link's), the card neither reads nor shows the name, which the write does not
+# use (``unless_given``, hub#1250); an option by its id is looked for in the group said, so that one is read. Beside
+# a link's id the card neither reads nor shows the group, the product or the category whose id comes with it: letting
+# the link go takes it by its id alone (hub#1278).
+A_GROUP_BY_NAME = names("modifier.group.get", by="group", as_said=True)
 AN_OPTION = names("modifier.option.get", name=("label",))
+# An option said by its name: two groups may have an option with one name, so the card reads it with its group when it
+# is told, as the write finds it, and says it as said when it cannot (hub#1245).
+AN_OPTION_BY_NAME = names(
+    "modifier.option.get", by="option", within=("group_id", "group"), name=("label",), as_said=True
+)
 A_LINK = names("modifier.link.get", name=("label",))
 A_PRODUCT = names("inventory.product.get")
 A_CATEGORY = names("modifier.category.get")
+# A product or a category said by its name, when a group is applied to it or let go from it: the card reads it by those
+# words, as the write will find it (a product by its SKU or its name, a category by its name), so it shows the one the
+# write acts on, and says it as said when it cannot read it (hub#1291). Beside the id the write takes its record by
+# instead (the product's or the category's or, letting a group go, the link's), it neither reads nor shows it.
+A_PRODUCT_BY_NAME = names("inventory.product.get", by="product", as_said=True)
+A_CATEGORY_BY_NAME = names("modifier.category.get", by="category", as_said=True)
 
 GroupSort = Literal[
     "name",
@@ -122,7 +145,9 @@ class Page(Schema, Generic[T]):
 class GroupRefIn(_Input):
     id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Sauces»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "id"),
     )
 
     @model_validator(mode="after")
@@ -137,7 +162,9 @@ class _OwningGroup(_Input):
 
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Extras»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Extras»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -184,7 +211,7 @@ class GroupIn(_Input):
         description="The group's name, unique in the business (e.g. «Sauces»)."
     )
     kitchen_name: KitchenName = Field(
-        "", description="Its name on the kitchen ticket; empty = the name."
+        "", title=KITCHEN_TICKET_NAME, description="Its name on the kitchen ticket; empty = the name."
     )
     min_choices: Choices = Field(
         0,
@@ -215,7 +242,7 @@ class GroupPatchIn(GroupRefIn):
 
     name: Name | None = Field(None, description="New name.")
     kitchen_name: KitchenName | None = Field(
-        None, description="New kitchen name; empty = the name."
+        None, title=KITCHEN_TICKET_NAME, description="New kitchen name; empty = the name."
     )
     min_choices: Choices | None = Field(
         None, description="New minimum; 1 or more makes it required."
@@ -252,6 +279,7 @@ class OptionRefIn(_Input):
         None,
         title=OPTION,
         description="The option's name, when its id is not known (e.g. «No onion»).",
+        json_schema_extra=unless_given(AN_OPTION_BY_NAME, "id"),
     )
     group_id: UUID | None = Field(
         None,
@@ -261,6 +289,7 @@ class OptionRefIn(_Input):
     group: Said | None = Field(
         None,
         description="Its group's name, when two groups have an option with that name.",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -270,12 +299,15 @@ class OptionRefIn(_Input):
         return self
 
 
-class OptionIn(_OwningGroup):
+class _OptionFields(_Input):
+    """What an option is, its group aside."""
+
     name: Name = Field(
         description="The option's name, unique in its group (e.g. «Cheese»)."
     )
     kitchen_name: KitchenName = Field(
         "",
+        title=KITCHEN_TICKET_NAME,
         description="Its name on the kitchen ticket (e.g. «+CHEESE»); empty = the name.",
     )
     price_delta: Delta = Field(
@@ -296,12 +328,30 @@ class OptionIn(_OwningGroup):
     )
 
 
+# Bases in this order keep the group's fields first in the schema, as they have always come.
+class OptionIn(_OptionFields, _OwningGroup):
+    pass
+
+
+class OptionOfCopyIn(_OptionFields):
+    """An option of a group of a separate copy, as ``modifier.option.create`` takes it but its group."""
+
+
+class GroupRecoverIn(GroupIn):
+    """A group of a separate copy the business no longer has: what ``modifier.group.create`` takes and its options
+    there."""
+
+    options: list[OptionOfCopyIn] = Field(
+        [], max_length=MAX_OPTIONS, description="Its options in the copy, in the order they were added."
+    )
+
+
 class OptionPatchIn(OptionRefIn):
     """Only the fields sent are changed; ``null`` leaves one as it is; ``tax_category_key: ""`` clears it."""
 
     name: Name | None = Field(None, description="New name.")
     kitchen_name: KitchenName | None = Field(
-        None, description="New kitchen name; empty = the name."
+        None, title=KITCHEN_TICKET_NAME, description="New kitchen name; empty = the name."
     )
     price_delta: Delta | None = Field(
         None, description="New supplement in cents (negative = a discount)."
@@ -334,11 +384,15 @@ class LinkListIn(PageIn):
 class _Target(_Input):
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None, description="The product's SKU or name, when its id is not known."
+        None,
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "product_id"),
     )
     category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
-        None, description="The category's name, when its id is not known."
+        None,
+        description="The category's name, when its id is not known.",
+        json_schema_extra=unless_given(A_CATEGORY_BY_NAME, "category_id"),
     )
 
     def _targets(self) -> int:
@@ -350,7 +404,9 @@ class _Target(_Input):
 class LinkIn(_Target):
     group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known (e.g. «Sauces»)."
+        None,
+        description="The group's name, when its id is not known (e.g. «Sauces»).",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "group_id"),
     )
 
     @model_validator(mode="after")
@@ -363,10 +419,28 @@ class LinkIn(_Target):
 
 
 class LinkRefIn(_Target):
+    product_id: UUID | None = Field(
+        None, description="The product's id.", json_schema_extra=unless_given(A_PRODUCT, "id")
+    )
+    product: Said | None = Field(
+        None,
+        description="The product's SKU or name, when its id is not known.",
+        json_schema_extra=unless_given(A_PRODUCT_BY_NAME, "id", "product_id"),
+    )
+    category_id: UUID | None = Field(
+        None, description="The category's id.", json_schema_extra=unless_given(A_CATEGORY, "id")
+    )
+    category: Said | None = Field(
+        None,
+        description="The category's name, when its id is not known.",
+        json_schema_extra=unless_given(A_CATEGORY_BY_NAME, "id", "category_id"),
+    )
     id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
-    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
+    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=unless_given(A_GROUP, "id"))
     group: Said | None = Field(
-        None, description="The group's name, when its id is not known."
+        None,
+        description="The group's name, when its id is not known.",
+        json_schema_extra=unless_given(A_GROUP_BY_NAME, "id", "group_id"),
     )
 
     @model_validator(mode="after")
@@ -440,6 +514,10 @@ class GroupOut(Schema):
     updated_at: datetime = Field(description="When it was last changed.")
 
 
+class GroupRecoveredOut(GroupOut, RecoveredOut):
+    """A group made again from a separate copy, and the options it came back without."""
+
+
 class OptionOut(Schema):
     id: UUID = Field(description="The option's id.")
     group_id: UUID = Field(description="Its group.")
@@ -448,7 +526,10 @@ class OptionOut(Schema):
     kitchen_name: str = Field(
         description="Name on the kitchen ticket; empty = the name."
     )
-    price_delta: int = Field(description="Supplement in cents; negative = a discount.")
+    price_delta: int = Field(
+        description="Supplement in cents; negative = a discount.",
+        json_schema_extra={"money": True},
+    )
     tax_category_key: str | None = Field(
         description="Key of its own tax category; null = the dish's."
     )
@@ -459,6 +540,10 @@ class OptionOut(Schema):
     sort_order: int = Field(description="Order in its group.")
     created_at: datetime = Field(description="When it was created.")
     updated_at: datetime = Field(description="When it was last changed.")
+
+
+class OptionRecoveredOut(OptionOut, RecoveredOut):
+    """An option added again from a separate copy, and why it came back without being chosen by default."""
 
 
 class LinkOut(Schema):
@@ -568,7 +653,8 @@ class ResolveOut(Schema):
         description="Each choice, valued, in the order it was chosen."
     )
     folded_delta: int = Field(
-        description="Cents to add to the line's unit price: the picks not on a line of their own."
+        description="Cents to add to the line's unit price: the picks not on a line of their own.",
+        json_schema_extra={"money": True},
     )
     own_lines: list[OwnLineOut] = Field(
         description="The child lines of the dish line: one per option that taxes differently, with its quantity "

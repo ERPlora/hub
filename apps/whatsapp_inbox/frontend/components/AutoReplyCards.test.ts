@@ -1,7 +1,7 @@
 // Settings → «What do you use it for?» (WHATSAPP_INBOX-F14 to F18): the cards «Book appointments» and «Book a table»
 // turn the inbox's automatic answer and its notice on and off in Automatizaciones (`flow.recipe.*`), one answer at a
-// time on the number (whatsapp_inbox#284); the switch of how the bookings confirm writes Citas' or Reservas' rule
-// (F16), in full words on a phone (whatsapp_inbox#285); a newer version is offered with «Update» (F18). Without Citas
+// time on the number; the switch of how the bookings confirm writes Citas' or Reservas' rule
+// (F16), in full words on a phone; a newer version is offered with «Update» (F18). Without Citas
 // (or Reservas) its card does not show; without Automatizaciones it says so with «See apps».
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';

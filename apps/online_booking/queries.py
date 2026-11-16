@@ -260,7 +260,7 @@ def _with_service(text: str) -> Exists:
     )
 
 
-def _person(text: str) -> Q:
+def _person(ctx: OperationContext, text: str) -> Q:
     """The appointments whose customer is ``text``: part of her name (with or without accents), her phone or
     her email."""
     if "@" in text:
@@ -268,15 +268,15 @@ def _person(text: str) -> Q:
     found = Q(customer_name__icontains=text) | Q(
         customer__search_text__contains=normalize(text)
     )
-    numbers = candidates(text, business_country())
+    numbers = candidates(text, business_country(ctx))
     return found | Q(customer_phone__in=numbers) if numbers else found
 
 
-def _searched(rows: QuerySet, text: str) -> QuerySet:
+def _searched(ctx: OperationContext, rows: QuerySet, text: str) -> QuerySet:
     digits = "".join(char for char in text if char.isdigit())
     found = (
         Q(number__icontains=text)
-        | _person(text)
+        | _person(ctx, text)
         | Q(customer_email__icontains=text)
         | Q(staff_name__icontains=text)
         | _with_service(text)
@@ -304,6 +304,16 @@ SORT_COLUMNS = {
     output=BookingPage,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "which bookings have customers made themselves this week?",
+                "show me the self-booking inbox",
+            ),
+            "es": (
+                "¿qué reservas han hecho las clientas desde internet?",
+                "enséñame la bandeja de reservas de internet",
+            ),
+        },
         "description": "List the bookings customers made online (appointments of the diary booked through the "
         "booking page), the newest first: search by number, customer, phone, email, service or professional, and "
         "filter by status (pending = waiting to be confirmed), day or professional."
@@ -312,11 +322,11 @@ SORT_COLUMNS = {
 def list_bookings(ctx: OperationContext, params: BookingListIn) -> dict:
     rows = _with_page(online(ctx))
     if params.search:
-        rows = _searched(rows, params.search)
+        rows = _searched(ctx, rows, params.search)
     if params.number:
         rows = rows.filter(number__icontains=params.number)
     if params.customer_name:
-        rows = rows.filter(_person(params.customer_name))
+        rows = rows.filter(_person(ctx, params.customer_name))
     if params.service:
         rows = rows.filter(_with_service(params.service))
     if params.staff_name:
@@ -364,7 +374,7 @@ def find_booking(ctx: OperationContext, ref: BookingRefIn) -> Appointment:
                 str(BOOKING_NOT_FOUND), code="online_booking.booking_not_found"
             )
         return found
-    rows = rows.filter(_person(ref.customer))
+    rows = rows.filter(_person(ctx, ref.customer))
     if ref.date is not None:
         start, end = day_bounds(ref.date, ref.date)
         rows = rows.filter(start__gte=start, start__lt=end)
@@ -398,6 +408,16 @@ def find_booking(ctx: OperationContext, ref: BookingRefIn) -> Appointment:
     output=BookingOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "what did Ainhoa book by herself for Wednesday?",
+                "who made the self-booking APT-20261120-0004?",
+            ),
+            "es": (
+                "¿qué ha reservado Ainhoa por internet para el miércoles?",
+                "¿quién hizo la reserva de internet APT-20261120-0004?",
+            ),
+        },
         "description": "One online booking, by its number (APT-…) or as a person says it: the customer (name, phone "
         "or email) and the day (e.g. Ana's booking of tomorrow); without a day, her next one."
     },
@@ -418,6 +438,16 @@ def get_booking(ctx: OperationContext, data: BookingRefIn) -> dict:
     output=SettingsOut,
     expose_api=True,
     ai={
+        "asks": {
+            "en": (
+                "how is my self-booking set up?",
+                "do customers have to give an email to book by themselves?",
+            ),
+            "es": (
+                "¿cómo tengo puesta la reserva por internet?",
+                "¿la web de reservas obliga a dejar el email?",
+            ),
+        },
         "description": "The booking page's settings (on or off, title, texts, colour, logo, email required, choose "
         "the professional, notes, upcoming bookings per customer) and the diary's booking rules it uses (minimum "
         "notice, maximum advance, slot interval, auto-confirm, customer cancellation and its notice)."
@@ -437,6 +467,16 @@ def get_settings(ctx: OperationContext, data: NoIn) -> dict:
     input=NoIn,
     output=PageOut,
     ai={
+        "asks": {
+            "en": (
+                "what do customers see when they open my booking link?",
+                "show me the welcome text and colour of the self-booking screen",
+            ),
+            "es": (
+                "¿qué aspecto tiene mi web de reservas para las clientas?",
+                "enséñame el logo y la bienvenida que ve quien reserva por internet",
+            ),
+        },
         "description": "What the public booking page shows: its title, texts, colour, logo and booking rules."
     },
 )
@@ -512,6 +552,16 @@ def _professionals(members: list[Member]) -> list[dict]:
     input=PublicServicesIn,
     output=PublicServicePage,
     ai={
+        "asks": {
+            "en": (
+                "which services can customers book by themselves?",
+                "what can someone pick when booking through my link, and at what price?",
+            ),
+            "es": (
+                "¿qué servicios se pueden reservar desde internet?",
+                "¿qué tratamientos ofrece la web de reservas y cuánto valen?",
+            ),
+        },
         "description": "The services the public booking page offers, with price and duration when shown."
     },
 )
@@ -565,6 +615,16 @@ def public_services(ctx: OperationContext, params: PublicServicesIn) -> dict:
     input=PublicSlotsIn,
     output=PublicSlotsOut,
     ai={
+        "asks": {
+            "en": (
+                "which free times can customers pick by themselves on Saturday?",
+                "when could anyone book a manicure through my link this week?",
+            ),
+            "es": (
+                "¿qué huecos libres ve cualquiera que reserve por la web el sábado?",
+                "¿a qué horas puede coger cualquiera una manicura por internet el jueves?",
+            ),
+        },
         "description": "The free times of a day for the services chosen on the public booking page."
     },
 )
@@ -659,6 +719,16 @@ def public_booking_out(appointment: Appointment) -> dict:
     input=TokenIn,
     output=PublicBookingOut,
     ai={
+        "asks": {
+            "en": (
+                "what does Leire see on the link of her booking?",
+                "can Leire cancel it from her own link?",
+            ),
+            "es": (
+                "¿qué ve Leire con el enlace de su reserva?",
+                "¿Leire todavía puede anular desde su enlace?",
+            ),
+        },
         "description": "The booking behind a customer's personal link, and whether she may still cancel it."
     },
 )

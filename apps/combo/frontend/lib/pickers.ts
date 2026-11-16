@@ -1,7 +1,7 @@
 // The searches behind the combo pickers (`Combo` of @erplora/ui): each asks the server for what the
 // person types, 20 at a time, and turns every row into an option. A choice is an active product of
 // Inventory, sold out today or not (INVENTORY-F29: only the till hides it) (by id, with its SKU and its price in the
-// business's currency, a bare figure until it answers); a menu's VAT category, a Taxes key named by its name
+// business's currency, a dash until it answers); a menu's VAT category, a Taxes key named by its name
 // and its rate in force; a category of Inventory (by id, with how many products it has) narrows «Add
 // several» to it. The required apps' lists are read through their own operations.
 import type { ComboOption, ComboSearch } from '@erplora/ui/components';

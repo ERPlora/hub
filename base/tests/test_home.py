@@ -1,4 +1,4 @@
-"""The Home's rules (PLAN-HUB round 2026-10-21), as the old hub's ``setup_status.rs`` had them.
+"""The Home's rules, as the old hub's ``setup_status.rs`` had them.
 
 The cases are those of its tests (``crates/runtime/src/setup_status.rs`` at ``9dd38215``): which row a step reads,
 when a condition passes, which countries a step applies to, its level and the counters of the document.
@@ -7,6 +7,7 @@ when a condition passes, which countries a step applies to, its level and the co
 from types import SimpleNamespace
 
 import pytest
+from django.utils.translation import override
 from live.meta import BellCounter, SetupCheck
 
 from base import home
@@ -110,7 +111,10 @@ def test_configured_needs_a_row_and_every_condition():
         ([" ES "], "es", True),
         (["ES", "PT"], "PT", True),
         (["ES"], "FR", False),
-        (["ES"], "", False),  # a hub without a country gets no national step
+        # hub#682: a hub without a country (a demo, ERPlora's own) is in ERPlora's market, Spain
+        (["ES"], "", True),
+        (["es"], "", True),
+        (["PT"], "", False),
     ],
 )
 def test_a_step_applies_to_its_countries(countries, hub_country, applies):
@@ -201,7 +205,7 @@ def test_the_setting_is_off_in_production_and_on_with_debug():
     assert settings.SHOW_UNLISTED_MODULES is True  # the suite runs with the development settings
 
 
-# --- The bell by the clock (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE) --------------------------------------
+# --- The bell by the clock ----------------------------------------------------------------------------------------
 
 UNSET = object()
 
@@ -335,3 +339,245 @@ def test_the_check_of_the_bells_clock_runs_with_the_others(monkeypatch):
 
     monkeypatch.setattr("base.home.all_live_app_configs", lambda: [bell_module({"other": 60})])
     assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E007"] == ["base.E007"]
+
+
+# ── The cards an app puts in System (hub#683: the old hub's «Your printer» in Resources) ─────────────────────────────
+
+
+def carded(*cards, permissions=("things.view",), path="/nowhere"):
+    return SimpleNamespace(label="things", path=path, permissions=list(permissions), system_cards=list(cards))
+
+
+def person(*permissions):
+    from live.context import OperationContext, Scope
+
+    return OperationContext(scope=Scope("host", "a"), actor="ana", permissions=frozenset(permissions), language="en")
+
+
+def test_a_card_is_its_apps_component_named_by_the_app():
+    card = {"key": "printer", "component": "ThingsCard"}
+
+    assert home.system_cards(person(), [carded(card)]) == [
+        {"key": "things.printer", "app": "things", "component": "ThingsCard"}
+    ]
+
+
+def test_an_app_that_declares_no_card_brings_none():
+    assert home.system_cards(person(), [SimpleNamespace(label="things")]) == []
+
+
+def test_a_card_with_a_permission_only_for_whoever_has_it_in_the_order_declared():
+    first = {"key": "printer", "component": "ThingsCard", "permission": "things.view"}
+    second = {"key": "drawer", "component": "DrawerCard"}
+
+    assert [card["key"] for card in home.system_cards(person(), [carded(first, second)])] == ["things.drawer"]
+    assert [card["key"] for card in home.system_cards(person("things.view"), [carded(first, second)])] == [
+        "things.printer",
+        "things.drawer",
+    ]
+
+
+@pytest.fixture
+def components(tmp_path):
+    """An app's folder with ``frontend/components/ThingsCard.vue``."""
+    folder = tmp_path / "frontend" / "components"
+    folder.mkdir(parents=True)
+    (folder / "ThingsCard.vue").write_text("<template><p /></template>\n")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    ("cards", "errors"),
+    [
+        (None, 0),
+        ([], 0),
+        ([{"key": "printer", "component": "ThingsCard"}], 0),
+        ([{"key": "printer", "component": "ThingsCard", "permission": "things.view"}], 0),
+        ({"key": "printer", "component": "ThingsCard"}, 1),  # one card, not a list of them
+        (["ThingsCard"], 1),
+        ([{"component": "ThingsCard"}], 1),  # no key
+        ([{"key": "", "component": "ThingsCard"}], 1),
+        ([{"key": "printer"}], 1),  # no component
+        ([{"key": "printer", "component": "MissingCard"}], 1),  # no such file: the card would never mount
+        ([{"key": "printer", "component": "../ThingsCard"}], 1),  # a name, never a path
+        ([{"key": "printer", "component": "../components/ThingsCard"}], 1),  # a file, but the SPA would never mount it
+        ([{"key": "printer", "component": "ThingsCard", "permission": "other.view"}], 1),  # not the app's
+        ([{"key": "printer", "component": "ThingsCard", "permision": "things.view"}], 1),  # a field misspelt
+        ([{"key": "printer", "component": "ThingsCard"}, {"key": "printer", "component": "ThingsCard"}], 1),
+    ],
+)
+def test_what_an_app_declares_as_its_cards_is_checked_at_start(components, cards, errors):
+    declared = SimpleNamespace(label="things", path=str(components), permissions=["things.view"])
+    if cards is not None:
+        declared.system_cards = cards
+
+    found = home.system_card_errors([declared])
+
+    assert len(found) == errors
+    assert all(error.id == "base.E015" for error in found)
+
+
+def test_the_check_of_the_cards_runs_with_the_others(monkeypatch):
+    from django.core import checks
+
+    monkeypatch.setattr("base.home.all_live_app_configs", lambda: [carded({"key": "printer"})])
+
+    assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == ["base.E015"]
+
+
+# ── The apps a business must have on in its country (hub#997) ──────────────────────────────────────────────────────
+
+
+def obliged(label="fiscal", countries=("PT",), platform_turns_on=False, **more):
+    """A stand-in app that declares where it is mandatory, as tax and verifactu do; base never names a real one. Its
+    store icon is not the shell's: the shell paints an app with its first menu entry's."""
+    from live.meta import Nav
+
+    declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": platform_turns_on}
+    more.setdefault("navigation", [Nav("records", "Records", "ion:list-outline", f"/{label}/records")])
+    return SimpleNamespace(label=label, verbose_name=label.capitalize(), icon="ion:calculator-outline", mandatory=declared, **more)
+
+
+@pytest.mark.parametrize(
+    ("countries", "hub_country", "mandatory"),
+    [
+        ("all", "PT", True),
+        ("all", "JP", True),
+        ("all", "", True),
+        (["PT"], "PT", True),
+        (["pt"], "PT", True),
+        (["PT", "ES"], "ES", True),
+        (["PT"], "FR", False),
+        ([], "PT", False),  # a slip the check refuses (base.E016) never reads as «every country»
+        # A business without a country (a demo, ERPlora's own) is in ERPlora's market, Spain (hub#682).
+        (["ES"], "", True),
+        (["PT"], "", False),
+    ],
+)
+def test_an_app_is_mandatory_in_the_countries_it_declares(countries, hub_country, mandatory):
+    assert home.mandatory_in(obliged(countries=countries), hub_country) is mandatory
+
+
+def test_an_app_that_declares_nothing_is_mandatory_nowhere():
+    assert home.mandatory_in(SimpleNamespace(label="things"), "ES") is False
+
+
+def test_a_mandatory_app_off_is_a_step_of_the_platform_to_turn_it_on():
+    with override("en"):
+        steps = home.mandatory_steps([obliged()], on=frozenset(), hub_country="PT")
+
+    assert steps == [
+        {
+            "key": "base.mandatory.fiscal",
+            "app": "base",
+            "state": "pending",
+            "required": True,
+            "level": "functional",
+            "actionable": True,
+            "title": "Turn on Fiscal",
+            "description": "It is mandatory for businesses in Portugal.",
+            "icon": "ion:list-outline",
+            "route": "/apps#all",
+            "order": 15,
+        }
+    ]
+
+
+def test_the_step_says_the_app_and_the_country_in_the_persons_language():
+    from django.utils.translation import gettext_lazy
+
+    app = obliged(countries=["ES"])
+    app.verbose_name = gettext_lazy("Taxes")
+
+    with override("es"):
+        (step,) = home.mandatory_steps([app], on=frozenset(), hub_country="")
+
+    assert (step["title"], step["description"]) == ("Activa Impuestos", "Es obligatoria para los negocios de España.")
+
+
+def test_the_step_goes_once_the_app_is_on_and_never_comes_for_another_country():
+    apps = [obliged("fiscal", ["PT"]), obliged("ledger", "all"), obliged("seal", ["FR"]), SimpleNamespace(label="things")]
+
+    assert [step["key"] for step in home.mandatory_steps(apps, on=frozenset(), hub_country="PT")] == [
+        "base.mandatory.fiscal",
+        "base.mandatory.ledger",
+    ]
+    assert [step["key"] for step in home.mandatory_steps(apps, on=frozenset({"fiscal"}), hub_country="PT")] == [
+        "base.mandatory.ledger"
+    ]
+    assert home.mandatory_steps(apps, on=frozenset({"fiscal", "ledger"}), hub_country="PT") == []
+
+
+def test_the_step_has_the_icon_the_shell_paints_for_the_app_never_its_store_one():
+    """The store's icon is baked apart, and HubIcon refuses a name the shell has not registered: the step paints the
+    app as «My apps» and the launcher do, by its first menu entry, or the shell's own for an app without a menu."""
+    assert home.mandatory_steps([obliged()], on=frozenset(), hub_country="PT")[0]["icon"] == "ion:list-outline"
+    assert home.mandatory_steps([obliged(navigation=[])], on=frozenset(), hub_country="PT")[0]["icon"] == "ion:apps-outline"
+
+
+@pytest.mark.parametrize(
+    ("declared", "errors"),
+    [
+        (None, 0),
+        ({"countries": "all", "platform_turns_on": True}, 0),
+        ({"countries": ["ES"], "platform_turns_on": False}, 0),
+        ({"countries": ("ES", "PT"), "platform_turns_on": False}, 0),
+        (["ES"], 1),  # the countries alone, not what the platform may do
+        ({"countries": [], "platform_turns_on": False}, 1),  # mandatory nowhere: an empty list must not read as «all»
+        ({"countries": "ES", "platform_turns_on": False}, 1),  # a code, not a list of them
+        ({"countries": ["Spain"], "platform_turns_on": False}, 1),  # ISO 3166-1 alpha-2, never a name
+        ({"countries": ["es"], "platform_turns_on": False}, 1),  # upper-case, as the business's country comes
+        ({"countries": ["ES", "ES"], "platform_turns_on": False}, 1),
+        ({"countries": "all"}, 1),  # it must say whether the platform turns it on by itself
+        ({"countries": "all", "platform_turns_on": "yes"}, 1),
+        ({"countries": "all", "platform_turns_on": True, "verticals": ["restaurant"]}, 1),  # a field misspelt or not ours
+    ],
+)
+def test_what_an_app_declares_as_mandatory_is_checked_at_start(declared, errors):
+    app = SimpleNamespace(label="things")
+    if declared is not None:
+        app.mandatory = declared
+
+    found = home.mandatory_errors([app])
+
+    assert len(found) == errors
+    assert all(error.id == "base.E016" for error in found)
+
+
+def test_the_check_of_the_mandatory_apps_runs_with_the_others(monkeypatch):
+    from django.core import checks
+
+    monkeypatch.setattr("base.home.all_live_app_configs", lambda: [SimpleNamespace(label="things", mandatory=["ES"])])
+
+    assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E016"] == ["base.E016"]
+
+
+def test_base_names_no_app_where_it_reads_the_mandatory_ones():
+    """Modularity (hub#997): which apps are mandatory, and where, only their own ``LiveAppConfig`` says. No literal of the
+    code that reads it names an app, nor one of its operations or steps (``"verifactu"``, ``"tax.rules"``)."""
+    import ast
+    import inspect
+
+    from live.meta import module_configs
+    from live.operations import get
+
+    from base import queries
+
+    labels = {config.label for config in module_configs()}
+    readers = [
+        home.mandatory_in,
+        home.mandatory_steps,
+        home.mandatory_problems,
+        home.mandatory_errors,
+        get("base.setup.status").fn,
+        queries._platform_steps,
+    ]
+    named = sorted(
+        node.value
+        for reader in readers
+        for node in ast.walk(ast.parse(inspect.getsource(inspect.unwrap(reader)).lstrip()))
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and (node.value in labels or node.value.split(".")[0] in labels)
+    )
+    assert labels and named == []

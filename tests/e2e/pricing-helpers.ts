@@ -3,16 +3,12 @@
 // `cleanPricing()` removes exactly that, in every app it touched, before and after the spec.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, psql, shot, shown } from './helpers';
+import { A, api, capture, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
 
 export const TAG = 'E2E Pricing';
 export const CODE = 'E2EPF';
 
-export const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
+export { VIEWPORTS };
 export const DESKTOP = { width: 1280, height: 860 };
 
 /** A unique suffix for this run's data. */
@@ -142,17 +138,4 @@ export async function pick(page: Page, testid: string, query: string, text: stri
     await page.locator(`[data-testid=${testid}-retry]`).click();
   }
   await option.click();
-}
-
-/** Runs a row action: its button, or the same entry inside «⋮» when the row folds its actions. */
-export async function rowAction(page: Page, table: string, id: string, action: string): Promise<void> {
-  const button = shown(page).locator(`[data-testid=${table}-row-${id}-${action}]`);
-  const menu = shown(page).locator(`[data-testid=${table}-row-${id}-menu]`);
-  await button.or(menu).first().waitFor({ state: 'visible' });
-  if (await button.isVisible()) {
-    await button.click();
-    return;
-  }
-  await menu.click();
-  await page.locator(`ion-popover [data-testid=${table}-row-${id}-${action}]`).click();
 }

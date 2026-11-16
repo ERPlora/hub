@@ -37,7 +37,7 @@ COUNT_SOMETHING = _("Count the drawer: give its notes and coins or its total.")
 #: How «Open session» and the drawers of the settings name a drawer (the assistant's card names the datum by it).
 DRAWER = gettext_noop("Drawer")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a session by its number, as the sessions' list and every window of a shift («Cash count ·
 # S-…»); a drawer by its name, as «Open session» and the drawers of the settings. Every till role reads both.
 A_SESSION = names("cash_register.session.get", by="session_id", name=("number",))
@@ -287,14 +287,15 @@ class SessionRow(Schema):
     register_name: str = Field(description="Its drawer's name.")
     opened_at: datetime = Field(description="When it opened.")
     opened_by: str = Field(description="Who opened it.")
-    opening_balance: int = Field(description="Opening float, in cents.")
+    opening_balance: int = Field(description="Opening float, in cents.", json_schema_extra={"money": True})
     closed_at: datetime | None = Field(description="When it closed.")
     closed_by: str = Field(description="Who closed it; empty = closed by itself.")
-    closing_balance: int | None = Field(description="Counted cash, in cents.")
+    closing_balance: int | None = Field(description="Counted cash, in cents.", json_schema_extra={"money": True})
     expected_balance: int | None = Field(
-        description="Expected cash in cents: live while open (empty when a blind count hides it), frozen once closed."
+        description="Expected cash in cents: live while open (empty when a blind count hides it), frozen once closed.",
+        json_schema_extra={"money": True},
     )
-    difference: int | None = Field(description="Counted − expected, in cents.")
+    difference: int | None = Field(description="Counted − expected, in cents.", json_schema_extra={"money": True})
     auto_closed: bool = Field(description="It closed by itself at the cut-off.")
     expected_hidden: bool = Field(
         description="A blind count hides its expected cash from the reader."
@@ -309,25 +310,41 @@ SessionPage = Page[SessionRow]
 
 class SessionSummary(Schema):
     movement_count: int = Field(description="Lines of the session.")
-    opening_balance: int = Field(description="Opening float, in cents.")
-    total_sales: int | None = Field(description="Sales of every payment method, in cents (empty when hidden).")
-    cash_sales: int | None = Field(description="Sales in cash (empty when hidden).")
-    card_sales: int | None = Field(description="Sales by card (empty when hidden).")
-    other_sales: int | None = Field(
-        description="Sales by transfer or other methods (empty when hidden)."
+    opening_balance: int = Field(description="Opening float, in cents.", json_schema_extra={"money": True})
+    total_sales: int | None = Field(
+        description="Sales of every payment method, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
     )
-    total_refunds: int | None = Field(description="Refunds and voids, every method, in cents (empty when hidden).")
-    total_cash_in: int | None = Field(description="Money brought in by hand, in cents (empty when hidden).")
-    total_cash_out: int | None = Field(description="Money taken out by hand, in cents (empty when hidden).")
+    cash_sales: int | None = Field(description="Sales in cash (empty when hidden).", json_schema_extra={"money": True})
+    card_sales: int | None = Field(description="Sales by card (empty when hidden).", json_schema_extra={"money": True})
+    other_sales: int | None = Field(
+        description="Sales by transfer or other methods (empty when hidden).", json_schema_extra={"money": True}
+    )
+    total_refunds: int | None = Field(
+        description="Refunds and voids, every method, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
+    )
+    total_cash_in: int | None = Field(
+        description="Money brought in by hand, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
+    )
+    total_cash_out: int | None = Field(
+        description="Money taken out by hand, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
+    )
     total_gifts: int | None = Field(
-        description="Comps of the shift at cost, in cents, not cash (empty when hidden)."
+        description="Comps of the shift at cost, in cents, not cash (empty when hidden).",
+        json_schema_extra={"money": True},
     )
     expected_cash: int | None = Field(
-        description="Expected cash, in cents (empty when hidden)."
+        description="Expected cash, in cents (empty when hidden).", json_schema_extra={"money": True}
     )
-    counted: int | None = Field(description="Counted cash, in cents (closed sessions).")
+    counted: int | None = Field(
+        description="Counted cash, in cents (closed sessions).",
+        json_schema_extra={"money": True},
+    )
     difference: int | None = Field(
-        description="Counted − expected, in cents (closed sessions)."
+        description="Counted − expected, in cents (closed sessions).", json_schema_extra={"money": True}
     )
 
 
@@ -351,7 +368,7 @@ class CurrentOut(Schema):
         description="Sale lines that fell in no shift: with the drawer closed, after a forgotten shift's cut-off, or confirmed while the last one was closing."
     )
     unassigned_cash: int = Field(
-        description="Their cash, in cents (what they put in or took out)."
+        description="Their cash, in cents (what they put in or took out).", json_schema_extra={"money": True}
     )
 
 
@@ -416,9 +433,10 @@ class ClosingSummaryOut(Schema):
     register_name: str = Field(title=DRAWER, description="Its drawer's name; empty = no drawer.")
     opened_at: datetime = Field(description="When it opened.")
     opened_by: str = Field(description="Who opened it.")
-    opening_balance: int = Field(description="Its opening float, in cents.")
+    opening_balance: int = Field(description="Its opening float, in cents.", json_schema_extra={"money": True})
     closing_balance: int | None = Field(
-        description="The counted cash said, in cents; none = closing without a count."
+        description="The counted cash said, in cents; none = closing without a count.",
+        json_schema_extra={"money": True},
     )
     expected_balance: int | None = Field(
         title=gettext_noop("Expected in the drawer"),
@@ -495,9 +513,10 @@ class MovementRow(Schema):
     )
     session_id: UUID | None = Field(description="Its session; empty = it fell in none.")
     type: MovementType = Field(description="in, out, sale, refund or void.")
-    amount: int = Field(description="Amount in cents, never negative.")
+    amount: int = Field(description="Amount in cents, never negative.", json_schema_extra={"money": True})
     signed_amount: int = Field(
-        description="With its sign: out, refunds and voids are negative."
+        description="With its sign: out, refunds and voids are negative.",
+        json_schema_extra={"money": True, "signed": True},
     )
     method_type: MethodType = Field(
         description="cash, card, transfer or other: only cash is in the drawer."
@@ -507,7 +526,7 @@ class MovementRow(Schema):
     sale_id: UUID | None = Field(description="The sale of a sale, void or refund line.")
     sale_number: str = Field(description="That sale's number.")
     document_type: str = Field(description="That sale's document: ticket or invoice.")
-    gift_total: int = Field(description="Comps of that sale at cost, in cents.")
+    gift_total: int = Field(description="Comps of that sale at cost, in cents.", json_schema_extra={"money": True})
     created_at: datetime = Field(description="When.")
     created_by: str = Field(description="Who.")
 
@@ -564,7 +583,7 @@ class CountOut(Schema):
     id: UUID = Field(description="The count's id.")
     session_id: UUID = Field(description="Its session.")
     type: CountType = Field(description="opening or closing.")
-    total: int = Field(description="Total counted, in cents.")
+    total: int = Field(description="Total counted, in cents.", json_schema_extra={"money": True})
     denominations: dict = Field(description="The notes and coins counted.")
     notes: str = Field(description="Notes.")
     counted_at: datetime = Field(description="When.")

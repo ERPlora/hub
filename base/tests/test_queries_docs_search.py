@@ -33,6 +33,8 @@ EXCERPT = {
     "score": 0.91,
     "lang": "es",
 }
+#: The excerpt as the model reads it: with the line its answer cites it by, in the person's language (hub#1079).
+CITED = {**EXCERPT, "cite": "Fuente: Caja > Abrir la caja"}
 
 
 def ctx(language="es", permissions=frozenset({"base.view_home"}), actor="ana"):
@@ -63,7 +65,7 @@ class TestTheOperation:
 
         found = search()
 
-        assert found == {"results": [EXCERPT]}
+        assert found == {"results": [CITED]}
         [seen] = gateway.sent(DOCS)
         assert seen.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
         assert signed(seen)
@@ -95,6 +97,22 @@ class TestTheOperation:
         gateway.reply(DOCS, json={"results": []})
 
         assert search() == {"results": []}
+
+    @pytest.mark.parametrize(
+        ("language", "cite"), [("es", "Fuente: Caja > Abrir la caja"), ("en", "Source: Caja > Abrir la caja")]
+    )
+    def test_each_excerpt_brings_the_line_the_answer_cites_it_by_in_the_persons_language(self, gateway, language, cite):
+        """hub#1079: asked how to turn a ticket into an invoice, the answer gave the steps but named no excerpt they
+        came from. Each excerpt brings the line the answer ends with (``cite``): «Source» in the person's language and
+        the headings it sits under, for the model to write as it comes, never to compose nor to translate."""
+        gateway.reply(DOCS, json={"results": [EXCERPT]})
+
+        assert [excerpt["cite"] for excerpt in search(language)["results"]] == [cite]
+
+    def test_an_excerpt_without_headings_is_cited_by_its_path(self, gateway):
+        gateway.reply(DOCS, json={"results": [{**EXCERPT, "heading": ""}]})
+
+        assert search()["results"][0]["cite"] == "Fuente: app_doc:cash_register"
 
     @pytest.mark.parametrize(
         "reply",
@@ -142,17 +160,17 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, json={"results": [EXCERPT]})
         pending = calls(HOW_TO)
 
-        with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)):
+        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)):
             found = search()
 
-        assert found == {"results": [EXCERPT]}
+        assert found == {"results": [CITED]}
         assert len(gateway.sent(DOCS)) == 1
 
     def test_a_search_that_failed_while_prepared_is_refused_without_asking_again(self, gateway):
         gateway.reply(DOCS, status=503, json={"error": {"code": "assistant.provider_unavailable", "message": "x"}})
         pending = calls(HOW_TO)
 
-        with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
+        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
             search()
 
         assert caught.value.code == "base.assistant_unavailable"
@@ -168,29 +186,29 @@ class TestPreparedBeforeTheTurn:
         ],
     )
     def test_only_the_documentation_searches_the_model_asked_for_are_prepared(self, gateway, pending):
-        assert assistant.prepare_docs(ctx(), pending) == {}
+        assert assistant.gateway.prepare_docs(ctx(), pending) == {}
         assert gateway.requests == []
 
     @pytest.mark.parametrize(("actor", "permissions"), [(None, {"base.view_home"}), ("ana", set())])
     def test_nobody_who_may_not_search_makes_erplora_com_search(self, gateway, actor, permissions):
         pending = calls(HOW_TO)
 
-        assert assistant.prepare_docs(ctx(actor=actor, permissions=permissions), pending) == {}
+        assert assistant.gateway.prepare_docs(ctx(actor=actor, permissions=permissions), pending) == {}
         assert gateway.requests == []
 
 
 @pytest.mark.django_db(transaction=True)
 def test_waiting_for_the_documentation_holds_no_transaction(gateway, monkeypatch):
-    """Up to 15 s of waiting inside a transaction would hold the hub's connection (PLAN §14.2), as for every door of
+    """Up to 15 s of waiting inside a transaction would hold the hub's connection, as for every door of
     the gateway (``test_services_assistant.test_waiting_for_erplora_com_holds_no_transaction``)."""
     gateway.reply(DOCS, json={"results": []})
     seen = []
-    post = assistant._post
+    post = assistant.gateway._post
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     search()
     assert seen == [False]

@@ -1,6 +1,6 @@
-// The assistant's card for a write of Time clock (FIX-HUB-ATTENDANCE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half
-// is hub#416, BASE-F97): the person a clocking acts on and the working day a correction rewrites, by the name the screens
-// give them, never by the id the model sent (and, since hub#416, never left out for whoever may read them). End to end
+// The assistant's card for a write of Time clock (BASE-F97): the person a clocking acts on and the working day a
+// correction rewrites, by the name the screens give them, never by the id the model sent, and never left out for
+// whoever may read them. End to end
 // with the stack's SaaS gateway and the e2e's provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be
 // seeded with it (README of this folder, «El asistente»). The owner, in Spanish, asks to clock someone of the team in
 // (ATTENDANCE-F12) and to correct that person's day (ATTENDANCE-F08, dangerous): each card names her; cancelled, nothing

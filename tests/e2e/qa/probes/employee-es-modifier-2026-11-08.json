@@ -1,0 +1,11 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {"id":"qa20261108.employee.es.modifier.group.get","app":"modifier","tool":"modifier.group.get","role":"employee","language":"es","phrase":"¿cuántas opciones hay que elegir en Endulzante QA y se puede repetir?","expect":"read","lookups":["modifier.group.list"]},
+    {"id":"qa20261108.employee.es.modifier.link.list","app":"modifier","tool":"modifier.link.list","role":"employee","language":"es","phrase":"¿a qué productos se les pregunta algún extra antes de añadirlos?","expect":"read"},
+    {"id":"qa20261108.employee.es.modifier.selection.resolve","app":"modifier","tool":"modifier.selection.resolve","role":"employee","language":"es","phrase":"¿cuánto cuesta un Café con Sin azúcar QA y qué nota manda a cocina?","expect":"read","lookups":["modifier.group.for_target","modifier.option.list","inventory.product.list"]},
+    {"id":"qa20261108.employee.es.modifier.group.delete","app":"modifier","tool":"modifier.group.delete","role":"employee","language":"es","phrase":"borra el grupo Endulzante QA y todas sus opciones","expect":"refused"},
+    {"id":"qa20261108.employee.es.modifier.link.detach","app":"modifier","tool":"modifier.link.detach","role":"employee","language":"es","phrase":"quita Endulzante QA del Café para que no vuelva a preguntarlo","expect":"refused"},
+    {"id":"qa20261108.employee.es.modifier.option.create","app":"modifier","tool":"modifier.option.create","role":"employee","language":"es","phrase":"añade «Con miel QA» a Endulzante QA con un suplemento de 0,30 €","expect":"refused"}
+  ]
+}

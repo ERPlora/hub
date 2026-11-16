@@ -1,21 +1,20 @@
 """The schedule app's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction.
 """
 
-import json
-
 import pytest
-from django.conf import settings
 from django.utils import translation
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.schedule.api import router
 from apps.schedule.models import SpecialDay
+from base.tests.routes import spa_routes
 from config.api import api
 
-from .conftest import make_override, make_special_day
+from .conftest import HOST, HUB_DB, make_override, make_special_day
 
 ROUTES = {
     ("GET", "/schedule/week", "schedule.week.get"),
@@ -37,29 +36,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", role="hub_employee"))
     return client
 
 
@@ -80,9 +65,9 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_openapi_describes_the_schedule_routes(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
+    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
     served = {
         (method.upper(), path.removeprefix("/api"), op["operationId"])
         for path, methods in paths.items()
@@ -95,7 +80,7 @@ def test_the_openapi_describes_the_schedule_routes(client):
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/schedule/week"),
@@ -105,7 +90,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_but_does_not_write(employee_client):
     for path in (
         "/schedule/week",
@@ -131,7 +116,7 @@ def test_an_employee_reads_but_does_not_write(employee_client):
 # Flows over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_set_a_day_and_read_the_week(admin_client):
     response = post(
         admin_client,
@@ -152,7 +137,7 @@ def test_set_a_day_and_read_the_week(admin_client):
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_bad_day_is_a_422_under_its_field(admin_client):
     response = post(
         admin_client,
@@ -171,13 +156,14 @@ def test_a_bad_day_is_a_422_under_its_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_422_speaks_the_requests_language(admin_client):
     with translation.override("es"):
-        response = post(
-            admin_client,
-            "/schedule/week/set_day",
+        response = admin_client.post(
+            "/api/schedule/week/set_day",
             {"weekday": 0, "intervals": []},
+            content_type="application/json",
+            HTTP_HOST=HOST,
             HTTP_ACCEPT_LANGUAGE="es",
         )
     assert response.json()["error"]["fields"] == {
@@ -185,7 +171,7 @@ def test_the_422_speaks_the_requests_language(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_special_day_create_a_duplicate_409_update_and_delete(admin_client):
     created = post(
         admin_client,
@@ -216,7 +202,7 @@ def test_a_special_day_create_a_duplicate_409_update_and_delete(admin_client):
     assert deleted.status_code == 200 and not SpecialDay.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_unknown_reference_is_a_404(admin_client):
     response = post(
         admin_client, "/schedule/special_days/delete", {"special_day": "Easter"}
@@ -227,7 +213,7 @@ def test_an_unknown_reference_is_a_404(admin_client):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_bulk_over_http(admin_client):
     make_special_day("2026-01-01", "New Year")
     response = post(
@@ -244,7 +230,7 @@ def test_the_bulk_over_http(admin_client):
     assert [skip["code"] for skip in response.json()["skipped"]] == ["already_exists"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_temporary_change_overlapping_another_is_a_409_under_the_start(admin_client):
     make_override("2026-08-01", "2026-08-31", "Holidays")
     response = post(
@@ -281,7 +267,7 @@ def test_a_temporary_change_overlapping_another_is_a_409_under_the_start(admin_c
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_settings_is_open_and_hours_over_http(admin_client):
     saved = post(admin_client, "/schedule/settings", {"week_starts_on": 7})
     assert (saved.status_code, saved.json()["week_starts_on"]) == (200, 7)
@@ -308,13 +294,10 @@ def test_settings_is_open_and_hours_over_http(admin_client):
 
 
 def test_the_spas_route_map_names_every_schedule_route():
-    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
-    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
-    mine = {(route["method"].upper(), route["path"].removeprefix("/api"), op) for op, route in spa.items() if op.startswith("schedule.")}
-    assert mine == ROUTES
+    assert spa_routes("schedule.") == ROUTES
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("path", "params", "field"),
     [

@@ -31,6 +31,8 @@ describe('QtyStepper', () => {
 
   it('plus and minus ask one unit more or less; minus from one asks zero (the line goes)', async () => {
     const m = await setup({ quantity: '1.000' });
+    expect(m.find('pos-qty-plus').element.tagName.toLowerCase()).toBe('ion-button');
+    expect(m.find('pos-qty-minus').element.tagName.toLowerCase()).toBe('ion-button');
     await click(m.find('pos-qty-plus').element);
     await click(m.find('pos-qty-minus').element);
     expect(m.wrapper.emitted('change')).toEqual([['2'], ['0']]);
@@ -45,6 +47,18 @@ describe('QtyStepper', () => {
     expect(m.wrapper.emitted('change')).toEqual([['0.532']]);
     await type(m.field(), '0,5');
     expect(m.wrapper.emitted('change')).toEqual([['0.532']]);
+  });
+
+  // hub#974: the line writes «1.500» as every screen does, but the field holds what a person types and edits: ungrouped,
+  // as a till's quantity field (Square, Shopify POS) and a typed figure on every screen of the Hub («1.500» typed in
+  // Spanish would read one and a half).
+  it('shows a quantity of four digits ungrouped, as typed, and sends a typed one as is', async () => {
+    const m = await setup({ quantity: '1500.000' }, 'es');
+    expect(m.field().value).toBe('1500');
+    const weight = await setup({ quantity: '1250.500', unit: 'kg' }, 'es');
+    expect(weight.field().value).toBe('1250,5');
+    await type(m.field(), '2500');
+    expect(m.wrapper.emitted('change')).toEqual([['2500']]);
   });
 
   it('something that is not a quantity puts the field back and asks nothing', async () => {
@@ -62,7 +76,7 @@ describe('QtyStepper', () => {
 
   it('can be locked while a write is in flight', async () => {
     const m = await setup({ disabled: true });
-    expect(m.find('pos-qty-plus').attributes('disabled')).toBeDefined();
-    expect(m.find('pos-qty-minus').attributes('disabled')).toBeDefined();
+    expect((m.find('pos-qty-plus').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
+    expect((m.find('pos-qty-minus').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
   });
 });

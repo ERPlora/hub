@@ -68,11 +68,6 @@
       "noTaxCategory": "A menu eaten in needs its own VAT category: without it, it cannot be billed.",
       "photoNotSaved": "The menu has been saved, but the photo has not: {reason}"
     },
-    "money": {
-      "notAmount": "This is not an amount. Type a figure, for example 12.50.",
-      "negative": "A menu price cannot be below zero. To make a choice cheaper, give it a negative supplement instead.",
-      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt."
-    },
     "builder": {
       "back": "All menus",
       "serviceWarning": "This menu is billed as a single service: one line at its VAT category, whatever the components are taxed at.",
@@ -150,7 +145,7 @@
       "open": "Add several",
       "title": "Add products to this course",
       "search": "Search a product…",
-      "addCount": "Add {n} selected",
+      "addCount": "Add {n} selected | Add {n} selected",
       "already": "Already in this course",
       "none": "Tick at least one product first.",
       "empty": "No products in the catalogue yet.",

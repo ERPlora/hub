@@ -1,13 +1,14 @@
-"""The assistant's card for a write of staff (FIX-HUB-STAFF-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258):
-in Spanish, every datum it sends by the name the Personal screens give it, never by the title pydantic makes up from
-the field («Days», «Members»). The card is base's (``base.assistant.card``); the names are staff's: the titles of its
-schemas and the ``verbose_name`` of its models, with their Spanish in its catalog."""
+"""The assistant's card for a write of staff (base's half is hub#258): in Spanish, every datum it sends by the name the
+Personal screens give it, never by the title pydantic makes up from the field («Days», «Members»). The card is base's
+(``base.assistant.cards.card``); the names are staff's: the titles of its schemas and the ``verbose_name`` of its models, with
+their Spanish in its catalog."""
 
 import json
 from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live import assistant as shared
 from live.context import OperationContext
 from live.operations import get, registry
 
@@ -15,7 +16,7 @@ from apps.staff.models import Member
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
-from .conftest import ctx_for, make_role
+from .conftest import HUB_DB, ctx_for, make_role
 
 SCREENS = json.loads((Path(apps.get_app_config("staff").path) / "frontend/locale/es.json").read_text())["staff"]
 
@@ -31,7 +32,7 @@ def labels(card: dict) -> list[str]:
 
 
 def staff_writes() -> list:
-    return [op for op in registry.values() if op.app_label == "staff" and op.kind == "command" and assistant.is_tool(op)]
+    return [op for op in registry.values() if op.app_label == "staff" and op.kind == "command" and assistant.tools.is_tool(op)]
 
 
 def test_no_datum_of_a_write_of_staff_reaches_a_spanish_card_by_its_technical_name():
@@ -43,7 +44,7 @@ def test_no_datum_of_a_write_of_staff_reaches_a_spanish_card_by_its_technical_na
     technical: dict[str, list[str]] = {}
     for op in writes:
         props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             name, label = field["name"], field["label"]
             if name in SPELLED_ALIKE:
                 assert label == SPELLED_ALIKE[name], (op.name, name)
@@ -55,21 +56,21 @@ def test_no_datum_of_a_write_of_staff_reaches_a_spanish_card_by_its_technical_na
 def test_the_card_names_a_schedules_week_as_its_form_does():
     week = [{"weekday": 0, "start_time": "09:00", "end_time": "17:00"}]
     for name in ("staff.schedule.create", "staff.schedule.update"):
-        assert labels(assistant.card(get(name), {"days": week}, "es")) == [SCREENS["schedules"]["form"]["week"]]
-        assert labels(assistant.card(get(name), {"days": week}, "en")) == ["Week"]
+        assert labels(assistant.cards.card(get(name), {"days": week}, "es")) == [SCREENS["schedules"]["form"]["week"]]
+        assert labels(assistant.cards.card(get(name), {"days": week}, "en")) == ["Week"]
 
 
 def test_the_card_names_the_people_of_a_batch_as_the_directory_does():
-    batch = assistant.card(get("staff.member.bulk_create"), {"members": [{"first_name": "Ana", "last_name": "Gil"}]}, "es")
+    batch = assistant.cards.card(get("staff.member.bulk_create"), {"members": [{"first_name": "Ana", "last_name": "Gil"}]}, "es")
     assert labels(batch) == ["Miembros del personal"]
-    english = assistant.card(get("staff.member.bulk_create"), {"members": [{"first_name": "Ana"}]}, "en")
+    english = assistant.cards.card(get("staff.member.bulk_create"), {"members": [{"first_name": "Ana"}]}, "en")
     assert labels(english) == ["Staff members"]
 
 
 def test_the_card_names_a_members_bio_and_colour_as_the_record_does():
     arguments = {"first_name": "Ana", "color": "#AABBCC", "bio": "Colorista."}
     record = SCREENS["members"]["form"]
-    assert labels(assistant.card(get("staff.member.create"), arguments, "es")) == [
+    assert labels(assistant.cards.card(get("staff.member.create"), arguments, "es")) == [
         record["firstName"],
         record["color"],
         record["bio"],
@@ -81,7 +82,7 @@ def test_the_card_paints_a_members_hourly_rate_as_money():
     (the platform reads «in cents» so), and the card paints it as money in that currency with its decimals, never as
     the bare figure («1250» for 12,50 zł)."""
     for name in ("staff.member.create", "staff.member.update"):
-        card = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
+        card = assistant.cards.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
         rate = next(field for field in card["fields"] if field["name"] == "hourly_rate")
         assert (name, rate["kind"], rate["value"]) == (name, "money", 1250)
 
@@ -91,9 +92,9 @@ def test_the_card_names_the_hourly_rate_as_the_record_does_without_naming_cents(
     not always the cent (groszy in Poland, whole yen in Japan): its name is the record's, «Tarifa por hora», never
     «Tarifa por hora (céntimos)» beside «12,50 zł»."""
     for name in ("staff.member.create", "staff.member.update"):
-        spanish = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
+        spanish = assistant.cards.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
         assert [f["label"] for f in spanish["fields"] if f["name"] == "hourly_rate"] == [SCREENS["members"]["form"]["hourlyRate"]]
-        english = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "en")
+        english = assistant.cards.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "en")
         assert [f["label"] for f in english["fields"] if f["name"] == "hourly_rate"] == ["Hourly rate"]
 
 
@@ -104,7 +105,7 @@ LUIS = {"first_name": "Luis", "last_name": "QA", "role": "cajero"}
 
 
 def call(name: str, arguments: dict, call_id: str = "c1") -> dict:
-    return {"call_id": call_id, "name": assistant.tool_name(name), "arguments": json.dumps(arguments)}
+    return {"call_id": call_id, "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
 
 
 def asked(*calls: dict) -> dict:
@@ -138,13 +139,13 @@ def test_a_new_member_tells_the_model_where_the_roles_are_and_checks_its_role_be
     """The tool invites the model to read the business's roles first (``staff.role.list``), and the write names the
     read that checks its role before its card (``staff.role.resolve``, with the write's own permission)."""
     create = get("staff.member.create")
-    assert "staff.role.list" in assistant.description(create)
-    assert assistant.check_of(create) == "staff.role.resolve"
+    assert "staff.role.list" in shared.description(create)
+    assert assistant.cards.check_of(create) == "staff.role.resolve"
     resolve = get("staff.role.resolve")
-    assert (resolve.kind, assistant.is_tool(resolve), resolve.permission) == ("query", False, create.permission)
+    assert (resolve.kind, assistant.tools.is_tool(resolve), resolve.permission) == ("query", False, create.permission)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "role",
     [
@@ -167,13 +168,13 @@ def test_a_new_member_with_a_role_the_business_does_not_have_gets_no_card_and_th
     assert not Member.objects.exists()
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_new_member_with_a_role_the_business_has_gets_its_card_and_the_yes_creates_it():
     """Positive control: the role exists (named in any case): the card comes, and the yes creates the member with it."""
     cashier = make_role("Cajero")
     luis = call("staff.member.create", LUIS)
     plan = turn(luis)
     assert (plan["confirm"]["operation"], plan["executed"]) == ("staff.member.create", [])
-    done = turn(luis, decision={"call_id": "c1", "accepted": True, "typed": ""})
+    done = turn(*plan["pending"], decision={"call_id": "c1", "accepted": True, "typed": ""})
     assert [(row["outcome"], row["code"]) for row in done["executed"]] == [("ok", "")]
     assert list(Member.objects.values_list("first_name", "role_id")) == [("Luis", cashier.id)]

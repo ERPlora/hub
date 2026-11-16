@@ -55,7 +55,7 @@ from apps.task.schemas import (
     TaskPatchIn,
     TaskRefIn,
 )
-from base.services import acting_hub_user
+from base.services.sessions import acting_hub_user
 
 TASK_ALREADY_CLOSED = _("That task is already closed, so it was left as it was.")
 MEMBER_INACTIVE = _("That person is not active in the team.")
@@ -180,6 +180,16 @@ def _set_status(ctx: OperationContext, task: Task, status: str) -> None:
         "description": "Create a task for the team («clean the store room tomorrow, assign it to Ana»), "
         "optionally inside a project or as a subtask of another task. It is born to do, numbered TSK-…",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a task to clean the store room tomorrow",
+                "add a task for Ana: call the technician",
+            ),
+            "es": (
+                "crea una tarea: limpiar el almacén mañana",
+                "apunta una tarea para Ana: llamar al técnico",
+            ),
+        },
     },
 )
 def create_task(ctx: OperationContext, data: TaskIn) -> dict:
@@ -218,6 +228,7 @@ def create_task(ctx: OperationContext, data: TaskIn) -> dict:
 @operation(
     "task.task.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=TaskPatchIn,
     output=TaskOut,
@@ -226,6 +237,17 @@ def create_task(ctx: OperationContext, data: TaskIn) -> dict:
         "description": "Change a task's title, description, priority, due date, project or tags; only the "
         "fields sent change (null clears the due date or the project).",
         "risk": "normal",
+        "check": "task.task.detail",
+        "asks": {
+            "en": (
+                "move the due date of the task order ice to Friday",
+                "raise task TSK-0042 to high priority",
+            ),
+            "es": (
+                "cambia la fecha límite de la tarea pedir hielo al viernes",
+                "sube la prioridad de la tarea TSK-0042 a alta",
+            ),
+        },
     },
 )
 def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
@@ -258,6 +280,7 @@ def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
 @operation(
     "task.task.set_status",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=SetStatusIn,
     output=TaskOut,
@@ -266,6 +289,17 @@ def update_task(ctx: OperationContext, data: TaskPatchIn) -> dict:
         "description": "Change a task's status: todo, in_progress (start it), blocked, done or cancelled. "
         "Done stamps the completion date and leaving done clears it.",
         "risk": "normal",
+        "check": "task.task.detail",
+        "asks": {
+            "en": (
+                "put the task tidy the cold room in progress, I have started it",
+                "set task TSK-0042 to blocked",
+            ),
+            "es": (
+                "pon en curso la tarea de ordenar la cámara",
+                "la tarea TSK-0042 está bloqueada, cámbiale el estado",
+            ),
+        },
     },
 )
 def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
@@ -279,6 +313,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
 @operation(
     "task.task.complete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=TaskRefIn,
     output=TaskOut,
@@ -287,6 +322,17 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
         "description": "Mark an open task as done («complete the task clean the store room»). A task "
         "already done or cancelled is left as it was.",
         "risk": "normal",
+        "check": "task.task.detail",
+        "asks": {
+            "en": (
+                "complete the task scrub the patio",
+                "task TSK-0042 is finished, tick it off as done",
+            ),
+            "es": (
+                "da por hecha la tarea de fregar el patio",
+                "ya he terminado la TSK-0042, márcala como hecha",
+            ),
+        },
     },
 )
 def complete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
@@ -301,6 +347,7 @@ def complete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
 @operation(
     "task.task.assign",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=AssignIn,
     output=TaskOut,
@@ -309,6 +356,17 @@ def complete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
         "description": "Assign a task to a person of the team (by id or name, or to the caller with "
         "to_me), or unassign it when no person is given.",
         "risk": "normal",
+        "check": "task.task.detail",
+        "asks": {
+            "en": (
+                "assign the task restock the napkins to Ana",
+                "leave task TSK-0042 with nobody assigned",
+            ),
+            "es": (
+                "asigna a Ana la tarea de reponer servilletas",
+                "deja la tarea TSK-0042 sin nadie asignado",
+            ),
+        },
     },
 )
 def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
@@ -335,6 +393,7 @@ def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
 @operation(
     "task.task.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.delete",
     input=TaskRefIn,
     output=DeletedOut,
@@ -342,6 +401,17 @@ def assign_task(ctx: OperationContext, data: AssignIn) -> dict:
     ai={
         "description": "Delete a task for good, with its subtasks and its comments.",
         "risk": "high",
+        "check": "task.task.detail",
+        "asks": {
+            "en": (
+                "delete the task hang the poster",
+                "remove task TSK-0042 for good",
+            ),
+            "es": (
+                "borra la tarea de colgar el cartel",
+                "quita del todo la tarea TSK-0042",
+            ),
+        },
     },
 )
 def delete_task(ctx: OperationContext, data: TaskRefIn) -> dict:
@@ -385,6 +455,7 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
 @operation(
     "task.comment.add",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.change",
     input=CommentIn,
     output=CommentOut,
@@ -392,6 +463,16 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
     ai={
         "description": "Add a comment to a task's thread, signed by the caller.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "comment on the boiler task that the technician comes on Monday",
+                "leave a comment on task TSK-0042: waiting for parts",
+            ),
+            "es": (
+                "comenta en la tarea de la caldera que el técnico viene el lunes",
+                "deja un comentario en la TSK-0042: faltan piezas",
+            ),
+        },
     },
 )
 def add_comment(ctx: OperationContext, data: CommentIn) -> dict:
@@ -448,6 +529,7 @@ def _project_exists() -> Conflict:
 @operation(
     "task.project.create",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.manage_project",
     input=ProjectIn,
     output=ProjectOut,
@@ -456,6 +538,16 @@ def _project_exists() -> Conflict:
         "description": "Create a project to group related tasks, with a unique code, a name and an "
         "optional colour and owner.",
         "risk": "normal",
+        "asks": {
+            "en": (
+                "create a project called Refit with the code REF",
+                "new task project Opening, in orange",
+            ),
+            "es": (
+                "da de alta el proyecto Reformas, código REF",
+                "nuevo proyecto de tareas Apertura, de color naranja",
+            ),
+        },
     },
 )
 def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
@@ -474,6 +566,7 @@ def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
 @operation(
     "task.project.update",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.manage_project",
     input=ProjectPatchIn,
     output=ProjectOut,
@@ -482,6 +575,17 @@ def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
         "description": "Change a project's name, colour or owner, or take it out of use (is_active false) "
         "and back; only the fields sent change. The code never changes.",
         "risk": "normal",
+        "check": "task.project.detail",
+        "asks": {
+            "en": (
+                "rename the Opening project to Summer opening",
+                "make the Refit project green",
+            ),
+            "es": (
+                "cambia el nombre del proyecto Apertura a Apertura de verano",
+                "pon el proyecto Reformas en verde",
+            ),
+        },
     },
 )
 def update_project(ctx: OperationContext, data: ProjectPatchIn) -> dict:
@@ -512,6 +616,7 @@ def update_project(ctx: OperationContext, data: ProjectPatchIn) -> dict:
 @operation(
     "task.project.delete",
     kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="task.manage_project",
     input=ProjectRefIn,
     output=DeletedOut,
@@ -519,6 +624,17 @@ def update_project(ctx: OperationContext, data: ProjectPatchIn) -> dict:
     ai={
         "description": "Delete a project for good; its tasks stay, without a project.",
         "risk": "high",
+        "check": "task.project.detail",
+        "asks": {
+            "en": (
+                "delete the Opening project",
+                "get rid of the Refit project but keep its tasks",
+            ),
+            "es": (
+                "borra el proyecto Apertura",
+                "elimina el proyecto Reformas y deja sus tareas sueltas",
+            ),
+        },
     },
 )
 def delete_project(ctx: OperationContext, data: ProjectRefIn) -> dict:

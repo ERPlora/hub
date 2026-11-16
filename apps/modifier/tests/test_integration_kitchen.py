@@ -7,8 +7,8 @@ fires the round (``sale.order.fired``); one tick of the worker's real loop hands
 is called by hand, and what Modifiers changes afterwards —an option renamed or deleted— never rewrites what the
 cook already has. A round fired in hub B is heard in B only.
 
-Traps of the old product: hub#1156 (the paper lost the options that the row had) and hub#1138 (the options
-went chained in the note and, with several, the indent was lost: here a list, one line each).
+Traps of the old product: the paper lost the options that the row had, and the options
+went chained in the note and, with several, the indent was lost; here a list, one line each.
 """
 
 import pytest
@@ -17,8 +17,12 @@ from live.meta import all_live_app_configs
 
 from apps.kitchen.models import TicketItem
 from apps.printing.models import PrintJob
+from base.tenancy.context import use_hub
 
-from .conftest import FOOD, GENERIC, REGISTERED, A, B, heard, make_product, one_tick, run
+from .conftest import FOOD, GENERIC, HUB_DB_COMMITTED, A, B, heard, make_product, run
+
+#: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
+pytestmark = HUB_DB_COMMITTED
 
 
 def as_admin_of(scope, name: str, data: dict | None = None):
@@ -51,7 +55,7 @@ def kitchen_sheets() -> list[PrintJob]:
 
 
 @pytest.fixture
-def burger(db):
+def burger(factory_data):
     """A burger with «Extras» (cheese «+CHEESE» that may repeat, no onion «-ONION», a soda on a line of its own at
     21 %) and «Doneness» (rare, well done: no kitchen name, the cook reads its name)."""
     make_product("Burger", "BUR", 800, FOOD)
@@ -127,21 +131,21 @@ def test_a_dish_without_options_carries_none_on_card_or_paper(tick, burger):
     assert sheet.document["items"] == [{"name": "Fries", "quantity": 1.0}]
 
 
-def test_a_round_with_options_fired_in_hub_b_is_heard_in_b_only(listen, monkeypatch):
-    from base import catalog
-
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+def test_a_round_with_options_fired_in_hub_b_is_heard_in_b_only(listen, worker_loop, factory_data_b, hub_b):
     on_a, on_b = listen(A), listen(B)
-    as_admin_of(B, "inventory.product.create", {"name": "Burger", "sku": "BUR-B", "price": 800, "tax_category_key": FOOD})
-    as_admin_of(B, "modifier.group.create", {"name": "Extras B"})
-    cheese = option("Extras B", "Cheese", scope=B, kitchen_name="+CHEESE", price_delta=100)
-    as_admin_of(B, "modifier.link.attach", {"group": "Extras B", "product": "BUR-B"})
-    fired("BUR-B", cheese, scope=B)
+    with use_hub(hub_b):
+        as_admin_of(B, "inventory.product.create", {"name": "Burger", "sku": "BUR-B", "price": 800, "tax_category_key": FOOD})
+        as_admin_of(B, "modifier.group.create", {"name": "Extras B"})
+        cheese = option("Extras B", "Cheese", scope=B, kitchen_name="+CHEESE", price_delta=100)
+        as_admin_of(B, "modifier.link.attach", {"group": "Extras B", "product": "BUR-B"})
+        fired("BUR-B", cheese, scope=B)
     heard(on_a), heard(on_b)  # the setup's and the round's own notices
 
-    one_tick()
+    worker_loop()
 
-    (item,) = TicketItem.objects.all()
+    with use_hub(hub_b):
+        (item,) = TicketItem.objects.all()
     assert item.modifiers == ["+CHEESE"]
+    assert not TicketItem.objects.exists()
     assert any(name.startswith("kitchen.") for name in heard(on_b))
     assert heard(on_a) == set()
