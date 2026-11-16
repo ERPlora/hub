@@ -7,13 +7,13 @@ no event of another one.
 
 import re
 
-import pytest
-
 from live.models import OutboxEvent
 from live.operations import NAME_RE
 
 from apps.cart_checkout import events
 from base import relay
+
+from .conftest import HUB_DB, A
 
 #: A fact in the past: «-ed», or «paid» (irregular, the old module's own word).
 PAST_FACT = re.compile(r"^cart_checkout\.(cart|item|checkout|order|customer)\.([a-z_]+ed|paid)$")
@@ -76,8 +76,8 @@ def test_it_listens_to_nobody():
     assert not getattr(events, "REACTIONS", None)
 
 
-@pytest.mark.django_db  # which apps are on in the business is read from its rows (base.activation)
+@HUB_DB  # which apps are on in the business is read from its rows (base.activation)
 def test_only_flow_hears_its_events():
     # CART_CHECKOUT-F13: the relay hands them to flow («*», FLOW-F21) and to no other app.
     for name in events.ALL:
-        assert relay.listeners(OutboxEvent(scope_kind="host", scope_key="a", name=name)) == ["flow"], name
+        assert relay.listeners(OutboxEvent(scope_kind="host", scope_key=A.key, name=name)) == ["flow"], name

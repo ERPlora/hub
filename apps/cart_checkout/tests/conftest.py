@@ -1,26 +1,36 @@
-"""Fixtures of the cart_checkout tests: contexts per role and scope, users with a role on a host, a raw
-DSN, a fixed clock, and builders of the data a test starts from (straight to the models: the operations
-are under test).
+"""Fixtures of the cart_checkout tests: contexts per role and scope, a fixed clock, and builders of the data a test
+starts from (straight to the models: the operations are under test).
 
-The builders import the models lazily, so that the tests of apps.py still collect while models.py does
-not exist.
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+
+The builders import the models lazily, so that the tests of apps.py still collect while models.py does not exist.
 """
 
 import datetime as dt
 from decimal import Decimal
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.db import connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
-from psycopg.conninfo import make_conninfo
 
-from base.models import Membership
+from apps.cash_register.tests.conftest import across_a_change_of_zone
+from apps.flow.tests.test_relay import listen
+from apps.invoice.tests.conftest import catalog_of
+from apps.sale.tests.conftest import db_dsn, make_user, night_elsewhere
+from apps.sale.tests.test_business_currency import platform
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, users with a role on a host, the raw DSN of
+#: control's database and business A at night in another zone as Sales makes them, ERPlora's own hub as business B
+#: (Sales'), business A across a change of zone (Cash register's), the assistant's catalogue of a person of business A
+#: (Invoicing's) and a raw session listening on a business's channel (Automations'), that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "across_a_change_of_zone", "catalog_of", "db_dsn", "hub_staff",
+    "in_business_a", "listen", "make_user", "night_elsewhere", "plan_with_room", "platform",
+]
 
 #: The moment every test lives in (no real clock): 14 October 2026, 10:00 in Madrid.
 NOW = dt.datetime(2026, 10, 14, 8, 0, tzinfo=dt.UTC)
@@ -61,35 +71,6 @@ def clock(monkeypatch):
     frozen = Clock()
     monkeypatch.setattr(timezone, "now", lambda: frozen.now)
     return frozen
-
-
-@pytest.fixture
-def make_user(db):
-    def make(
-        username: str = "ana",
-        *,
-        host: str | None = "a",
-        role: str = Membership.Role.ADMIN,
-    ):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        return user
-
-    return make
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
 
 
 # Builders
