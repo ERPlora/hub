@@ -7,13 +7,12 @@ payload; ``test_relay.py`` runs each one end to end through the worker's real re
 import re
 import uuid
 
-import pytest
 from live.operations import NAME_RE, registry
 
 from apps.pricing import events
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 
-from .conftest import A, make_category, make_item, make_list, make_product, make_rule, make_service
+from .conftest import A, HUB_DB, make_category, make_item, make_list, make_product, make_rule, make_service
 
 PAST_FACT = re.compile(r"^pricing\.[a-z_]+\.[a-z_]+ed$")
 
@@ -69,7 +68,7 @@ def test_it_reacts_to_what_deletes_restores_or_renames_what_it_points_at():
         assert registry[operation_name].permission == "pricing.system", operation_name
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_runs_each_reaction_as_the_platform():
     product = make_product()
     make_item(make_list("VIP"), product)

@@ -15,11 +15,13 @@ import pytest
 from django.conf import settings
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_offered_with_room, comparable, english_coverage_test, english_words_test
 from base.tests.test_assistant_asks import offered_to, own_words_test, probe_phrases
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: Every write of Price lists is ``pricing.manage``, which an employee lacks (they only read the prices,
 #: ``pricing.view``): an employee's assistant is never offered one.
@@ -121,7 +123,7 @@ def test_pricing_offers_its_twenty_tools():
     assert {name for name, _ in OWN_WORDS} == tools  # one phrase of a person's own words for each tool
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_manages_the_prices_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -137,13 +139,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_pricing_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "instead"), CHOSEN_INSTEAD)
 def test_the_reported_request_to_bring_back_offers_its_tool_before_the_one_the_model_ran(catalog_of, name, instead):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -154,7 +156,7 @@ def test_the_reported_request_to_bring_back_offers_its_tool_before_the_one_the_m
     assert instead not in names or names.index(name) < names.index(instead), names[:10]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's twenty phrases of layer 2, the ones the model answered right too: a tool of Price lists that a new
@@ -163,7 +165,7 @@ def test_every_probe_of_price_lists_offers_its_tool_without_being_one_of_its_ask
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Price lists that needs one, neither
@@ -190,5 +192,5 @@ OWN_WORDS_EN = [
     ("pricing.rule.list", "what's running now in the shop that applies by itself?"),
     ("pricing.rule.update", "raise what the summer one takes off to a quarter"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("pricing", OWN_WORDS_EN)
