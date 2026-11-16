@@ -7,12 +7,14 @@ import psycopg
 import pytest
 from django.db import connections
 from live.live_registry import live_registry
+from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
 from apps.website import events
-from apps.website.tests.conftest import A, B, ctx_for, full_content
+from apps.website.tests.conftest import HUB_DB_COMMITTED, A, B, ctx_for, full_content
+from base.tenancy.context import use_hub
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
 
@@ -70,18 +72,28 @@ def received(session, timeout=WAIT, stop_after=None):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_saving_and_publishing_in_hub_b_tells_the_editors_of_b_only(listen):
+def recorded() -> list[tuple[str, str, str]]:
+    """The website's events in the outbox of the business at work, with the scope each one names."""
+    rows = OutboxEvent.objects.filter(name__startswith="website.").order_by("created_at")
+    return list(rows.values_list("name", "scope_kind", "scope_key"))
+
+
+@HUB_DB_COMMITTED
+def test_saving_and_publishing_in_hub_b_tells_the_editors_of_b_only(listen, hub_b):
     # flow: WEBSITE-F01, WEBSITE-F07 — another hub's editor never re-reads this hub's site.
     on_a, on_b = listen(A), listen(B)
     save = get("website.site.save")
-    save(ctx_for(scope=B), save.input(template="classic", theme={}, content=full_content()))
-    assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.SITE_UPDATED]})]
-    assert received(on_a, timeout=QUIET) == []
     publish = get("website.site.publish")
-    publish(ctx_for(scope=B), publish.input())
-    assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.SITE_PUBLISHED]})]
-    assert received(on_a, timeout=QUIET) == []
+    with use_hub(hub_b):
+        save(ctx_for(scope=B), save.input(template="classic", theme={}, content=full_content()))
+        assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.SITE_UPDATED]})]
+        assert received(on_a, timeout=QUIET) == []
+        publish(ctx_for(scope=B), publish.input())
+        assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.SITE_PUBLISHED]})]
+        assert received(on_a, timeout=QUIET) == []
+        # What B wrote names B, in B's own outbox, and nothing of it reaches A's.
+        assert recorded() == [(events.SITE_UPDATED, B.kind, B.key), (events.SITE_PUBLISHED, B.kind, B.key)]
+    assert recorded() == []
     # Positive control: the same listener of A hears a save made in A.
     save(ctx_for(scope=A), save.input(template="modern", theme={}, content=full_content()))
     assert received(on_a, stop_after=1) == [(channel_for(A), {"events": [events.SITE_UPDATED]})]

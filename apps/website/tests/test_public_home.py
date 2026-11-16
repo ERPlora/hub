@@ -21,14 +21,28 @@ from apps.website.models import Site
 from apps.website.queries import page_cache_key
 from apps.website.render import local_day
 from apps.website import reviews
-from apps.website.tests.conftest import PLACE_ID, B, WEBSITE_JS, ctx_for, full_content, google_reviews
+from apps.website.tests.conftest import (
+    HOST,
+    HUB_DB,
+    PLACE_ID,
+    WEBSITE_JS,
+    A,
+    B,
+    ctx_for,
+    full_content,
+    google_reviews,
+)
 from base.models import Hub
+from base.tenancy.context import current_alias, use_hub
 from base.tests.test_middleware import jump_target
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("website_manifest")]
+pytestmark = [HUB_DB, pytest.mark.usefixtures("website_manifest")]
 
 HTML = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 SAAS = "http://localhost:8001"
+#: The addresses of business A and of business B on the Hub, as a visitor's browser asks for them.
+A_HOST = f"{HOST}:8000"
+B_HOST = f"{B.key}.localhost:8000"
 
 
 @pytest.fixture(autouse=True)
@@ -47,7 +61,7 @@ def publish(template="classic", ctx=None, **overrides):
     return run("website.site.publish", ctx=ctx)
 
 
-def visit(client, method="get", language="en", host="a.localhost:8000", **headers):
+def visit(client, method="get", language="en", host=A_HOST, **headers):
     return getattr(client, method)("/", HTTP_HOST=host, HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE=language, **headers)
 
 
@@ -82,8 +96,8 @@ def test_the_page_varies_on_the_cookie_so_a_browser_never_shows_it_to_whoever_ju
     assert {value.strip() for value in response["Vary"].split(",")} >= {"Accept-Language", "Cookie"}
     assert response["Cache-Control"] == "public, max-age=60"
     # The page says so itself, whether or not a middleware read the session on the way.
-    request = RequestFactory().get("/", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT_LANGUAGE="en")
-    request.hub = Hub.objects.get(slug="a")
+    request = RequestFactory().get("/", HTTP_HOST=A_HOST, HTTP_ACCEPT_LANGUAGE="en")
+    request.hub = Hub.objects.get(slug=A.key)
     own = public_home.respond(request)
     assert {value.strip() for value in own["Vary"].split(",")} == {"Accept-Language", "Cookie"}
 
@@ -99,8 +113,8 @@ def test_the_page_speaks_the_visitors_language_and_each_language_is_kept_apart(c
     assert "Log in" in visit(client, language="en-GB").content.decode()
     # A language the Hub does not speak gets the source.
     assert "Log in" in visit(client, language="de").content.decode()
-    assert cache.get(page_cache_key("a", 1, "es", local_day(""), "EUR")) is not None
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "EUR")) is not None
+    assert cache.get(page_cache_key(A.key, 1, "es", local_day(""), "EUR")) is not None
+    assert cache.get(page_cache_key(A.key, 1, "en", local_day(""), "EUR")) is not None
 
 
 def test_the_page_is_rendered_once_per_publication_and_a_new_one_shows_at_once(client, django_capture_on_commit_callbacks):
@@ -109,7 +123,7 @@ def test_the_page_is_rendered_once_per_publication_and_a_new_one_shows_at_once(c
     # Nobody but a publication changes what is kept: a row edited by hand waits for the next one.
     Site.objects.update(published_content={**Site.objects.get().published_content, "template": "bold"})
     assert "ws-classic" in visit(client).content.decode()
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         publish(template="minimal", hero={"title": "New season"})
     page = visit(client).content.decode()
     assert "ws-minimal" in page and "New season" in page
@@ -129,9 +143,9 @@ def test_a_new_deploy_renders_the_page_again_for_its_bundle(client, settings):
     publish()
     settings.APP_VERSION = "abc"
     visit(client)
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "EUR")) is not None
+    assert cache.get(page_cache_key(A.key, 1, "en", local_day(""), "EUR")) is not None
     settings.APP_VERSION = "def"
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "EUR")) is None
+    assert cache.get(page_cache_key(A.key, 1, "en", local_day(""), "EUR")) is None
 
 
 def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_country(client):
@@ -140,13 +154,13 @@ def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_
     from apps.service.models import Service
 
     Service.objects.create(name="Cut", price=1500, duration_minutes=30)
-    Hub.objects.filter(slug="a").update(country="ES")
+    Hub.objects.filter(slug=A.key).update(country="ES")
     publish()
     assert "€15.00" in visit(client).content.decode()
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
     page = visit(client).content.decode()
     assert "PLN\xa015.00" in page and "€" not in page
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "PLN")) is not None
+    assert cache.get(page_cache_key(A.key, 1, "en", local_day(""), "PLN")) is not None
 
 
 def test_a_visit_served_from_the_cache_opens_no_transaction_of_its_own(client):
@@ -156,12 +170,16 @@ def test_a_visit_served_from_the_cache_opens_no_transaction_of_its_own(client):
     from apps.service.models import Service
 
     Service.objects.create(name="Cut", price=1500, duration_minutes=30)
-    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
     publish()
     assert "PLN" in visit(client).content.decode()
-    with CaptureQueriesContext(connections["default"]) as captured:
+    # Counted on control's connection and on the business's own, where the website's rows are.
+    with (
+        CaptureQueriesContext(connections["default"]) as on_control,
+        CaptureQueriesContext(connections[current_alias()]) as on_the_business,
+    ):
         assert "PLN" in visit(client).content.decode()
-    statements = [query["sql"] for query in captured.captured_queries]
+    statements = [query["sql"] for query in on_control.captured_queries + on_the_business.captured_queries]
     assert not any("SET TRANSACTION" in statement or "SAVEPOINT" in statement for statement in statements), statements
     # The host's row, then the live check (`is_published` and `respond`, each the row's id and the publication).
     assert len(statements) <= 5, statements
@@ -172,15 +190,15 @@ def today_row(page: str) -> str:
 
 
 def test_the_page_marks_today_in_the_hubs_time_zone_and_keeps_each_day_apart(client, monkeypatch):
-    Hub.objects.filter(slug="a").update(timezone="America/New_York")
+    Hub.objects.filter(slug=A.key).update(timezone="America/New_York")
     publish()
     # 2026-10-19 02:30 UTC is still Sunday in New York: the kept page is Sunday's; at 14:00 UTC it is Monday's.
     monkeypatch.setattr("django.utils.timezone.now", lambda: datetime(2026, 10, 19, 2, 30, tzinfo=UTC))
     assert "Sunday" in today_row(visit(client).content.decode())
     monkeypatch.setattr("django.utils.timezone.now", lambda: datetime(2026, 10, 19, 14, 0, tzinfo=UTC))
     assert "Monday" in today_row(visit(client).content.decode())
-    assert cache.get(page_cache_key("a", 1, "en", "sun", "EUR")) is not None
-    assert cache.get(page_cache_key("a", 1, "en", "mon", "EUR")) is not None
+    assert cache.get(page_cache_key(A.key, 1, "en", "sun", "EUR")) is not None
+    assert cache.get(page_cache_key(A.key, 1, "en", "mon", "EUR")) is not None
 
 
 def test_without_a_publication_the_root_jumps_to_the_login(client):
@@ -196,7 +214,7 @@ def test_a_site_taken_offline_jumps_to_the_login_again(client):
 
 def test_a_signed_in_person_gets_the_shell(client, make_user):
     publish()
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     response = visit(client)
     assert response.status_code == 200
     assert "Fresh food every day" not in response.content.decode()
@@ -204,20 +222,22 @@ def test_a_signed_in_person_gets_the_shell(client, make_user):
 
 def test_other_paths_still_jump_to_the_login(client):
     publish()
-    response = client.get("/website", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=HTML)
+    response = client.get("/website", HTTP_HOST=A_HOST, HTTP_ACCEPT=HTML)
     assert jumps_to_the_login(response)
 
 
-def test_a_site_published_by_one_hub_is_not_the_home_page_of_another(client):
+def test_a_site_published_by_one_hub_is_not_the_home_page_of_another(client, hub_b):
     publish()
-    assert jumps_to_the_login(visit(client, host="b.localhost:8000"))
-    assert public_home.is_published(Hub.objects.get(slug="b")) is False
+    assert jumps_to_the_login(visit(client, host=B_HOST))
+    with use_hub(hub_b):
+        assert public_home.is_published(Hub.objects.get(slug=B.key)) is False
 
 
-def test_each_hub_shows_its_own_site_on_its_root(client):
+def test_each_hub_shows_its_own_site_on_its_root(client, hub_b):
     publish()
-    publish(template="bold", ctx=ctx_for(scope=B), hero={"title": "Bea's barber shop"})
-    a_page, b_page = visit(client).content.decode(), visit(client, host="b.localhost:8000").content.decode()
+    with use_hub(hub_b):
+        publish(template="bold", ctx=ctx_for(scope=B), hero={"title": "Bea's barber shop"})
+    a_page, b_page = visit(client).content.decode(), visit(client, host=B_HOST).content.decode()
     assert "Fresh food every day" in a_page and "ws-classic" in a_page and "Bea" not in a_page
     assert "Bea&#x27;s barber shop" in b_page and "ws-bold" in b_page and "Fresh food every day" not in b_page
 
@@ -231,9 +251,9 @@ def test_with_the_module_off_in_the_hub_neither_the_root_nor_the_public_api_show
     on = relay.active_apps
     monkeypatch.setattr(relay, "active_apps", lambda scope: on(scope) - {"website"})
     assert jumps_to_the_login(visit(client))
-    assert public_home.is_published(Hub.objects.get(slug="a")) is False
+    assert public_home.is_published(Hub.objects.get(slug=A.key)) is False
     for path in ("/api/website/public/site", "/api/website/public/catalog"):
-        response = client.get(path, HTTP_HOST="a.localhost:8000")
+        response = client.get(path, HTTP_HOST=A_HOST)
         assert (response.status_code, response.json()["error"]["code"]) == (404, "app_inactive"), path
 
 
@@ -242,14 +262,14 @@ def test_a_site_switched_live_by_hand_without_a_publication_is_not_shown(client)
     # so `/` still jumps to the login and the public reads are not found (never a page of an empty publication).
     run("website.site.save", {"template": "classic", "theme": {}, "content": full_content()})
     Site.objects.filter().update(is_live=True)
-    assert public_home.is_published(Hub.objects.get(slug="a")) is False
+    assert public_home.is_published(Hub.objects.get(slug=A.key)) is False
     assert jumps_to_the_login(visit(client))
-    public = client.get("/api/website/public/site", HTTP_HOST="a.localhost:8000")
+    public = client.get("/api/website/public/site", HTTP_HOST=A_HOST)
     assert (public.status_code, public.json()["error"]["code"]) == (404, "website.not_published")
 
 
 def test_is_published_says_whether_a_publication_is_live():
-    hub = Hub.objects.get(slug="a")
+    hub = Hub.objects.get(slug=A.key)
     assert public_home.is_published(hub) is False
     publish()
     assert public_home.is_published(hub) is True
