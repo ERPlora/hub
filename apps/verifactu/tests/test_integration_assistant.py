@@ -1,6 +1,6 @@
 """The assistant's card for a write of verifactu (base's half is hub#258): in Spanish, every datum it sends by the name
 the VeriFactu screens give it, never by the title pydantic makes up from the field («Invoice Id», «Issuer Nif»,
-«Month»). The card is base's (``base.assistant.card``); the names are verifactu's: the titles of its schemas and the
+«Month»). The card is base's (``base.assistant.cards.card``); the names are verifactu's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog.
 
 And which writes are tools at all: a write that takes a secret (the certificate and its password, the signed

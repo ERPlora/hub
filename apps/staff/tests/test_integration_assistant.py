@@ -1,6 +1,6 @@
 """The assistant's card for a write of staff (base's half is hub#258): in Spanish, every datum it sends by the name the
 Personal screens give it, never by the title pydantic makes up from the field («Days», «Members»). The card is base's
-(``base.assistant.card``); the names are staff's: the titles of its schemas and the ``verbose_name`` of its models, with
+(``base.assistant.cards.card``); the names are staff's: the titles of its schemas and the ``verbose_name`` of its models, with
 their Spanish in its catalog."""
 
 import json

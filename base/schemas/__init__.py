@@ -28,7 +28,7 @@ def names(  # noqa: PLR0913
     as_said: bool = False,
     unless: tuple[str, ...] = (),
 ) -> dict:
-    """The mark of a datum that names a record by its id (base/assistant.py ``REFERS``): the assistant's card names it
+    """The mark of a datum that names a record by its id (base/assistant/cards.py ``REFERS``): the assistant's card names it
     as ``read`` answers it (the first of ``name`` not empty), never by the id. ``within``: the data of its own object
     ``read`` takes beside it, when the record is found inside another (a course by its name with its menu; hub#1245).
     ``as_said``: a datum the person says in words, which the card says as said when it cannot be read (several fit,
@@ -52,7 +52,7 @@ def unless_given(mark: dict, *data: str) -> dict:
 
 
 def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
-    """The mark of a datum that names a record in a currency of its own, a cart or a price list (base/assistant.py
+    """The mark of a datum that names a record in a currency of its own, a cart or a price list (base/assistant/cards.py
     ``CURRENCY``): the assistant's card says the amounts beside it in the currency ``read`` answers (its ``code``)."""
     return {"currency": {"read": read, "by": by, "code": code}}
 

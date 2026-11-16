@@ -74,7 +74,7 @@ def test_the_reported_reservation_request_offers_its_existing_operation(catalog_
 
 
 #: What a description must never tell the model: the card of a write is the person's confirmation
-#: (``base.assistant.instructions``: «call its tool: the person sees a card and confirms it before it runs»), so a tool
+#: (``base.assistant.prompt.instructions``: «call its tool: the person sees a card and confirms it before it runs»), so a tool
 #: that says to ask first is asked about in the chat and never shows its card (hub#1105: cancelling, deleting,
 #: unblocking and taking off the waitlist were offered 4th to 10th and the model answered without the card).
 ASK_FIRST = re.compile(r"\bask\b[^.]*\b(?:first|before)\b", re.IGNORECASE)

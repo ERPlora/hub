@@ -2,9 +2,9 @@
 model and no network, in every pull request.
 
 Every tool of an app listed in ``LIVE_ASSISTANT_ASKS_REQUIRED`` says what a person types to ask for it (its ``asks``,
-``live.E020``), and each of those phrases, ranked exactly as a chat turn ranks (``base.assistant.ranking``: the same
+``live.E020``), and each of those phrases, ranked exactly as a chat turn ranks (``base.assistant.relevance.ranking``: the same
 ``ALWAYS`` first, the same ``APP_WORDS``, the Hub's own words and ``HOWTO``), brings its tool among the first ten
-offered, against the real catalogue of each role of the Hub (``base.assistant.catalog`` of a member of business ``a``,
+offered, against the real catalogue of each role of the Hub (``base.assistant.tools.catalog`` of a member of business ``a``,
 which has every module on: the largest catalogue a role can have). What a role may not run is not in its catalogue at
 all. An app joins the list in the same pull request that completes its asks, and stays in it while any of its tools
 says one; the ones still missing are reported per app (``AsksBacklog``), never failed. How many asks of each listed
@@ -189,7 +189,7 @@ def catalog_of(make_user):
 
 
 def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
-    """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.ranking`` ranks them,
+    """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.relevance.ranking`` ranks them,
     or with what ``ranking`` puts in its place (``synonyms=``…)."""
     return [
         op.name for op in shared.relevant(tools, [phrase], language, **{**assistant.relevance.ranking(tools), **ranking})
@@ -198,7 +198,7 @@ def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", *
 
 def assert_its_words_name(label: str, cases: Iterable[tuple[str, str]]) -> None:
     """That in each ``(phrase, stem)`` of ``cases`` the words app ``label`` declares (its ``assistant_synonyms``) name
-    ``stem``, and that neither the platform's own words (``base.assistant.SYNONYMS``) nor live alone do: the app's words
+    ``stem``, and that neither the platform's own words (``base.assistant.relevance.SYNONYMS``) nor live alone do: the app's words
     are what names it."""
     own = apps.get_app_config(label).assistant_synonyms
     for phrase, wanted in cases:
@@ -336,7 +336,7 @@ def assert_its_asks_lift(tools: dict[str, Operation], name: str, phrase: str, la
 
 def said_only_in_english(op: Operation) -> list[str]:
     """The words of ``op``'s English asks that nothing else of it says: no Spanish ask, nor its description or name,
-    names what they name (the Hub's words, ``base.assistant.synonyms``, included). Where there are none, no English
+    names what they name (the Hub's words, ``base.assistant.relevance.synonyms``, included). Where there are none, no English
     phrase depends on its English asks, so no ranking can see them change; filler written over them is such a word."""
     asks = shared.asks_of(op)
     name = op.name.replace(".", " ").replace("_", " ")
@@ -442,7 +442,7 @@ def probes_test(probes: list[dict], label: str) -> Callable:
 
 def by_group_test(cases: list) -> Callable:
     """The test that each ``(name, phrase, word)`` of ``cases``, a request in Spanish, brings its tool among the first
-    ``TOP`` by the group of the Hub's words (``base.assistant.ranking``) that says ``word``, and not without that
+    ``TOP`` by the group of the Hub's words (``base.assistant.relevance.ranking``) that says ``word``, and not without that
     group."""
 
     @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
@@ -676,7 +676,7 @@ REPORTED = [
 
 
 def test_the_hub_reads_a_placa_as_a_badge_and_an_employee_as_a_person():
-    """``base.assistant.SYNONYMS``: «la placa» is the badge of ``base.person.badge_*`` and «la empleada» a
+    """``base.assistant.relevance.SYNONYMS``: «la placa» is the badge of ``base.person.badge_*`` and «la empleada» a
     ``base.person``, so a request in the words of the till's screens reaches those tools without their own asks."""
     concepts = shared.asked(["quita la placa de la empleada"], assistant.relevance.SYNONYMS).concepts
     assert any(shared.stem("badge") in concept for concept in concepts)
@@ -720,8 +720,8 @@ SAMPLE = [
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("language", "name", "phrase"), SAMPLE)
 def test_the_layer_ranks_each_phrase_where_a_turn_of_the_hub_offers_its_tool(context_of, language, name, phrase):
-    """``misses`` is given the turn's own ranking (``base.assistant.ranking``): the place it gives a tool is the one
-    the turn (``base.assistant.relevant``) offers it at, so a turn that ranks otherwise fails here."""
+    """``misses`` is given the turn's own ranking (``base.assistant.relevance.ranking``): the place it gives a tool is the one
+    the turn (``base.assistant.relevance.relevant``) offers it at, so a turn that ranks otherwise fails here."""
     tools = assistant.tools.catalog(context_of(Membership.Role.OWNER, language))
     assert phrase in shared.asks_of(tools[name])[language]  # positive control: the phrase is one of its asks
     turn = [op.name for op in assistant.relevance.relevant(tools, [phrase], language)]

@@ -59,7 +59,7 @@ COMBO_LINES = gettext_noop("Menus")
 # A counter sale's fixed ticket discount, named as an open check's (its model's name is the sale's total, «Discounts»).
 FIXED_DISCOUNT = gettext_noop("Fixed-amount discount")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a sale by its number, a customer by their card, and the rest by ``sale.record.get``, the one
 # door to what Sales names itself and to the apps it does not require (``base.E009`` lets a mark name only its own or
 # a required app's read).

@@ -45,7 +45,7 @@ REASON_REQUIRED = _(
 )
 
 # The assistant's card names the record a write acts on as the screens name it, read as whoever asks and never by its
-# id (base/assistant.py ``REFERS``): a method by its name («Editing method — BBVA account»), a payment by its reference
+# id (base/assistant/cards.py ``REFERS``): a method by its name («Editing method — BBVA account»), a payment by its reference
 # («Cancel payment — PAY-20261014-0003»), each under the word its list calls one.
 #: The word the methods list calls one («Método»).
 T_METHOD = gettext_noop("Method")

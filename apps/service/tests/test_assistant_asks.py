@@ -361,7 +361,7 @@ NAMES_AN_ASSIGNMENT = re.compile(r"\basign", re.IGNORECASE)
 
 
 def without_services_groups() -> tuple[tuple[str, ...], ...]:
-    """The Hub's words (``base.assistant.synonyms``) without the groups Services says: «bono» and «asignación»."""
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the groups Services says: «bono» and «asignación»."""
     every = assistant.relevance.synonyms()
     kept = tuple(group for group in every if not {"bono", "asignacion"} & set(group))
     assert len(every) - len(kept) == 2  # positive control: both of Services' groups are there

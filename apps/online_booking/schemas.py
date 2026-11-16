@@ -42,7 +42,7 @@ NOT_AN_ADDRESS = _("Write a web address that starts with http:// or https://.")
 SAME_SERVICE_TWICE = _("Each service only once.")
 
 # The assistant's card names the record a write acts on as the diary (Citas) names it, read as whoever asks and never
-# by its id (base/assistant.py ``REFERS``): a booking is an appointment of it, so it goes by its customer, day, hour and
+# by its id (base/assistant/cards.py ``REFERS``): a booking is an appointment of it, so it goes by its customer, day, hour and
 # professional, as the inbox's «Cancel …'s booking (…)?» dialog says it; a service and a professional, by their names.
 #: The word the bookings list calls one («Reserva»).
 T_BOOKING = gettext_noop("Booking")

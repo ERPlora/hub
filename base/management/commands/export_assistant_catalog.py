@@ -4,7 +4,7 @@ real model: the QA reads it to write its own phrases
 and to check which tool the model calls, which card a write shows and what the role is refused.
 
 It names no business: the catalogue is a member's of a business with every app on (the e2e business ``a``), as a
-chat turn builds it (``base.assistant.catalog``, with the role's permissions); ``--apps`` narrows it to those apps.
+chat turn builds it (``base.assistant.tools.catalog``, with the role's permissions); ``--apps`` narrows it to those apps.
 """
 
 import json

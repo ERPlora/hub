@@ -51,7 +51,7 @@ REASON_REQUIRED = _("Say why the order failed: the reason stays on the order.")
 SAY_WHICH_CART = _("Say which cart: its id, its session code, or its customer's email or name.")
 SAY_WHICH_ORDER = _("Say which order: its id, or its number.")
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a cart by its session code, as the Carts list and «Delete the cart …?» say it; a line by its
 # product; an order by its number, as the Orders list.
 A_CART = names("cart_checkout.cart.get", by="cart_id", name=("session_token",))

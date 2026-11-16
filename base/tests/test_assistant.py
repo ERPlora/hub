@@ -1,4 +1,4 @@
-"""The Hub's assistant without the ORM (``base/assistant.py``): which operations are its tools
+"""The Hub's assistant without the ORM (``base/assistant/``): which operations are its tools
 for this person, the few it offers in a turn, how a write is shown before it runs, how a tool runs as the person, and
 the signed calls to erplora.com's gateway (``/internal/assistant/*``, ``/internal/speech/transcribe``).
 
@@ -553,7 +553,7 @@ def test_each_screen_a_receipt_names_by_its_key_is_named_alike_by_the_screen(lan
 
 
 def card_catalogues() -> dict[str, dict]:
-    """``base.assistant.card`` of base's catalogues, per language."""
+    """``base.assistant.cards.card`` of base's catalogues, per language."""
     locale = Path(settings.BASE_DIR) / "base/frontend/locale"
     return {
         language: json.loads((locale / f"{language}.json").read_text())["base"]["assistant"]["card"]

@@ -73,10 +73,10 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
 
 
 def test_the_hub_reads_a_tarea_as_a_task_a_proyecto_as_a_project_and_a_comentario_as_a_comment():
-    """``TaskConfig.assistant_synonyms`` (gathered by ``base.assistant.synonyms``): «la tarea», «el proyecto»
+    """``TaskConfig.assistant_synonyms`` (gathered by ``base.assistant.relevance.synonyms``): «la tarea», «el proyecto»
     and «comenta» name what Tasks' operations are of (``task.task``, ``task.project``, ``task.comment``), so the owner's
     words reach those tools by their entity and not only by the words of their asks; the platform's own words
-    (``base.assistant.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive control)."""
+    (``base.assistant.relevance.SYNONYMS``) do not say it, and without the Hub's groups none of them does (positive control)."""
     task, project, comment = shared.stem("task"), shared.stem("project"), shared.stem("comment")
     assert_its_words_name(
         "task",

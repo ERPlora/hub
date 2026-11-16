@@ -1,6 +1,6 @@
-"""What a word means in the Hub: the platform says its own words (``base.assistant.SYNONYMS``) and each app says its own
-in its ``LiveAppConfig`` (``base.assistant.SYNONYMS_ATTRIBUTE``); ``base.assistant.synonyms`` gathers them, and a turn
-ranks with the ones that count for the tools it may offer (``base.assistant.ranking``). A malformed declaration is said
+"""What a word means in the Hub: the platform says its own words (``base.assistant.relevance.SYNONYMS``) and each app says its own
+in its ``LiveAppConfig`` (``base.assistant.relevance.SYNONYMS_ATTRIBUTE``); ``base.assistant.relevance.synonyms`` gathers them, and a turn
+ranks with the ones that count for the tools it may offer (``base.assistant.relevance.ranking``). A malformed declaration is said
 at start (``base.E018``) and never read."""
 
 import unicodedata

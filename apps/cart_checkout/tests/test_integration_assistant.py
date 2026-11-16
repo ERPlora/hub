@@ -1,7 +1,7 @@
 """The assistant's confirmation card names each datum of a write of Cart & checkout by a name of the app's own (base's
 half is hub#258): in Spanish, never by the title pydantic makes up from the field («Item Id», «Order Id»), nor by a word
 another app's catalog happens to lend («Customer» → «Cliente», from Tables'). The card is base's
-(``base.assistant.card``); the names are cart_checkout's: the titles of its schemas and the ``verbose_name`` of its
+(``base.assistant.cards.card``); the names are cart_checkout's: the titles of its schemas and the ``verbose_name`` of its
 models, with their Spanish in its catalog.
 
 The record a write names by its id (base's half is hub#416): the cart by its session code, as the Carts list and «Delete

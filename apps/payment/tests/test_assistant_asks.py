@@ -193,7 +193,7 @@ def test_the_hub_reads_a_bank_account_as_where_the_business_pays_from(words):
 
 
 def without_the_bank_account():
-    """The Hub's words (``base.assistant.synonyms``) without the group of where the business pays from."""
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the group of where the business pays from."""
     every = assistant.relevance.synonyms()
     kept = tuple(group for group in every if not set(BANK_ACCOUNT) & set(group))
     assert len(kept) == len(every) - 1  # positive control: the group is there, and only one

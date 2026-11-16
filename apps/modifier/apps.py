@@ -30,7 +30,7 @@ class ModifierConfig(LiveAppConfig):
     # A link points at a product or a category of Inventory; an option at a tax category of Taxes.
     requires = ["inventory", "tax"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). The «predeterminada» option is the one a
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). The «predeterminada» option is the one a
     # group brings chosen, its default (is_default), as the descriptions say it in English. Never «por defecto»: it is
     # also the default of a shift, a working day or a threshold (Staff's and Inventory's settings), whose asks would
     # then rank the options of a group.

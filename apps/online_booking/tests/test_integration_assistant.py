@@ -1,7 +1,7 @@
 """The assistant's confirmation card names each datum of a write of Online booking by a name of the app's own (base's
 half is hub#258): in Spanish, never by the title pydantic makes up from the field («Slot Interval», «Allow Customer
 Cancellation»), nor by a word another app's catalog happens to lend («Number» → «Número», from Customers'). The card is
-base's (``base.assistant.card``); the names are online_booking's: the titles of its schemas and the ``verbose_name`` of
+base's (``base.assistant.cards.card``); the names are online_booking's: the titles of its schemas and the ``verbose_name`` of
 its models, with their Spanish in its catalog, as its screens (the bookings list, the booking page's settings and its
 preview) say them."""
 

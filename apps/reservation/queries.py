@@ -242,7 +242,7 @@ def blocked_out(block: BlockedDate) -> dict:
 
 
 # ── How the book names a record (a read by id's ``label``) ──────────────────────────────────────
-# In the words the assistant's card says a day and a time (base/assistant.py: CLDR's medium day and short
+# In the words the assistant's card says a day and a time (base/assistant/cards.py: CLDR's medium day and short
 # time, as the screens' formatters), in the caller's language: «Ana García · 15 oct 2026 · 21:00».
 
 

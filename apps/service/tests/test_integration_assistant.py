@@ -6,7 +6,7 @@ such a field must hand it to the card as money, or the AI could send 65 for «65
 
 And by its name (base's half is hub#258): in Spanish, every datum a write of Services sends reaches the card by the name
 the Services screens give it, never by the title pydantic makes up from the field («Absorbed Id», «Tax Category Key»,
-«Items»). The card is base's (``base.assistant.card``); the names are service's: the titles of its schemas and the
+«Items»). The card is base's (``base.assistant.cards.card``); the names are service's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import dataclasses

@@ -1,6 +1,6 @@
 """The assistant's confirmation card names each datum of a write of Tasks by a name of the app's own (base's half is
 hub#258): in Spanish, never by the title pydantic makes up from the field («Assignee», «Member Id», «To Me»), nor by a
-word another app's catalog happens to lend. The card is base's (``base.assistant.card``); the names are task's: the
+word another app's catalog happens to lend. The card is base's (``base.assistant.cards.card``); the names are task's: the
 titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog, as its screens (the
 task form, the task sheet and the projects) say them."""
 

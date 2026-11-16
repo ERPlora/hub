@@ -498,7 +498,7 @@ MAX_ASSISTANT_TURN_BODY = 32 * 1024 * 1024
 MAX_ASSISTANT_AUDIO_BODY = 3_000_000
 
 
-# The 200 is a stream (text/event-stream) of the turn's frames (base/assistant.py ``turn_frames``), not the JSON of
+# The 200 is a stream (text/event-stream) of the turn's frames (base/assistant/gateway.py ``turn_frames``), not the JSON of
 # its operation's output, which is what the stream is made of.
 @bind(router, "base.assistant.turn", "/assistant/turn")
 @decorate_view(accept_body_up_to(MAX_ASSISTANT_TURN_BODY))

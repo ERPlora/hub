@@ -287,7 +287,7 @@ papel en ningún negocio.
 - Cada operación es una herramienta del asistente: `ai=` con su descripción, sus `asks` (las frases en `en` y `es`
   con que una persona la pide; `live.E020`: Demo está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1095) y, en las
   acciones, su `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace). Los
-  `SYNONYMS` del Hub (`base/assistant.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
+  `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «elemento» como `item`, así que «el elemento X» nombra lo que
   tocan sus operaciones y trae la lista que lo busca por su nombre. Las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/*-es-demo-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno
   (`tests/test_assistant_asks.py`), y las que nombran el elemento solo por su nombre («elimina Ejemplo QA…») llegan a
@@ -299,7 +299,7 @@ papel en ningún negocio.
   `called` y no como `item`: el turno sube 1 punto a cada herramienta que toma un dato que la frase nombra
   (`live.assistant.relevant`), e «item»/«elemento» nombran también las cosas de Carrito y Tarifas; con `item`, tres
   `asks` de `inventory.product.bulk_create` bajaban del 4.º al 8.º, y con `called` no se mueve ningún `ask` ni sonda
-  del Hub. Las tres escrituras declaran `check: demo.item.detail` (`base.assistant.checked`): antes de dibujar la
+  del Hub. Las tres escrituras declaran `check: demo.item.detail` (`base.assistant.cards.checked`): antes de dibujar la
   tarjeta, el turno busca el elemento como lo hará la escritura, y un nombre que encaja con varios o con ninguno
   vuelve al modelo en lugar de una tarjeta que fallaría tras el sí.
 - La tarjeta de confirmación del asistente (BASE-F97, hub#670) nombra el elemento que una escritura señala por su id

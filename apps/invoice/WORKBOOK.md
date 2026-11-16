@@ -1124,7 +1124,7 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   «Construcciones» comparte raíz con «conste»), las que nombran la factura por su número sin decir «factura» (cada
   palabra de las `asks` suma a toda frase que la diga, y con ella las 13 `invoice.invoice.*` empatan por delante de las
   de VeriFactu), y los `SYNONYMS` del Hub
-  (`base/assistant.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
+  (`base/assistant/relevance.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
   a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
   llegan a su operación desde el chat: las frases reales de la QA del asistente
   (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,

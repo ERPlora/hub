@@ -101,7 +101,7 @@ D_OVERRIDE_ID = (
     "The id of the temporary change; or say it by reason or date in override."
 )
 D_OVERRIDE_REF = "The temporary change by its reason (Summer hours) or a date it covers (YYYY-MM-DD), when the id is not given."
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a special day by its name and a temporary change by its reason, as the screens' «Delete»
 # dialog says them.
 A_SPECIAL_DAY = names("schedule.special_day.get")

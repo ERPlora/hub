@@ -1,6 +1,6 @@
 """The assistant's card for a write of attendance (base's half is hub#258): in Spanish, every datum it sends by the name
 the Time tracking screens give it, never by the title pydantic makes up from the field («Lat», «Lng», «Accuracy M»). The
-card is base's (``base.assistant.card``); the names are attendance's: the titles of its schemas and the ``verbose_name``
+card is base's (``base.assistant.cards.card``); the names are attendance's: the titles of its schemas and the ``verbose_name``
 of its models, with their Spanish in its catalog.
 
 The record a write names by its id (base's half is hub#416): the person clocked, whose break starts or ends or whose day

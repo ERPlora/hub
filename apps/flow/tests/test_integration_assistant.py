@@ -1,6 +1,6 @@
 """The assistant's card names every datum a write of Automations sends (base's half is hub#258): in Spanish, by the name
 the Automations screens give it, never by the title pydantic makes up from the field («Actor», «Draft Id», «Event Id»).
-The card is base's (``base.assistant.card``); the names are flow's: the titles of its schemas and the ``verbose_name``
+The card is base's (``base.assistant.cards.card``); the names are flow's: the titles of its schemas and the ``verbose_name``
 of its models, with their Spanish in its catalog. Where the editor already has words for the datum
 (``flow.fields.<name>``, ``frontend/locale/{en,es}.json``), the card says the same.
 

@@ -1005,7 +1005,7 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
             "never takes personal data (customers); a backup takes them. People, PINs and fiscal data never."
         ),
         risk="high",
-        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # Only for live.E020 (it checks the whole app): base.assistant.tools.NOT_FROM_CHAT keeps this out of the chat
         # (pinned by base/tests/test_assistant.py).
         asks={
             "en": ("make a backup of the whole business", "export my menu as a template for the other bar"),

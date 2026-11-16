@@ -272,7 +272,7 @@ def test_a_charge_of_the_till_is_never_read_as_a_paid_invoice(phrase):
 
 
 def without_the_paid_group():
-    """The Hub's words (``base.assistant.synonyms``) without the group of a paid invoice."""
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the group of a paid invoice."""
     every = assistant.relevance.synonyms()
     kept = tuple(group for group in every if not set(PAID) & set(group))
     assert len(kept) == len(every) - 1  # positive control: the group is there, and only one

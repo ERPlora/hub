@@ -1,6 +1,6 @@
 """The assistant's card for a write of invoice: in Spanish, every datum it sends by the name the Facturas screens give
 it, never by the title pydantic makes up from the field («Duplicate», «Lines», «Next Number»). The card is base's
-(``base.assistant.card``); the names are invoice's: the titles of its schemas and the ``verbose_name`` of its models,
+(``base.assistant.cards.card``); the names are invoice's: the titles of its schemas and the ``verbose_name`` of its models,
 with their Spanish in its catalog."""
 
 import datetime as dt

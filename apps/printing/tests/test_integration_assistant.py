@@ -1,6 +1,6 @@
 """The assistant's card for a write of printing (base's half is hub#258): in Spanish, every datum it sends by the name
 the Printing screens give it, never by the title pydantic makes up from the field («Job Id», «Attempt», «Source Ref»).
-The card is base's (``base.assistant.card``); the names are printing's: the titles of its schemas and the
+The card is base's (``base.assistant.cards.card``); the names are printing's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import json

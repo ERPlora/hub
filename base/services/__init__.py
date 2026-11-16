@@ -499,7 +499,7 @@ def has_own_database(hub: Hub | None) -> bool:
             "copy."
         ),
         risk="high",
-        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # Only for live.E020 (it checks the whole app): base.assistant.tools.NOT_FROM_CHAT keeps this out of the chat
         # (pinned by base/tests/test_assistant.py).
         asks={
             "en": ("wipe all the data and start over", "empty the business, I want to start from scratch"),
@@ -2910,7 +2910,7 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542).
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542).
     ai={
         "description": "Turns on one of this business's apps (by its name as the person says it, or its id), with the "
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
@@ -3011,7 +3011,7 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542).
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542).
     ai={
         "description": "Turns off one of this business's apps (by its name as the person says it, or its id): it "
         "leaves everyone's menu and its screens stop opening; the apps that came along only with it go off too. Nothing "
@@ -3083,7 +3083,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542, hub#539).
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542, hub#539).
     ai={
         "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
         "«failed» in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "

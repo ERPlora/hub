@@ -603,7 +603,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   (HTML para el marco del editor), el QR (una imagen en base64), la subida (un fichero en base64 de hasta 5 MB), las
   tres lecturas públicas de los visitantes, sin sesión, y las dos con las que la tarjeta nombra una imagen o una
   categoría. Lo comprueba `tests/test_apps.py`, que también exige descripción en cada campo de `SaveIn`.
-- La tarjeta de confirmación del asistente (BASE-F97, hub#679 y hub#693): `base.assistant._card_details` traduce el
+- La tarjeta de confirmación del asistente (BASE-F97, hub#679 y hub#693): `base.assistant.cards._card_details` traduce el
   detalle con las marcas `refers` de `schemas.py`, leídas como quien pregunta (cada imagen por `website.image.get` y
   cada categoría por `website.category.get`, las dos `INTERNAL`, sin ruta ni consulta viva) y las listas cerradas de
   `choices.py` (`WebsiteConfig.choices`). Después, el `summary` que `website.site.save` declara en su `ai=`
