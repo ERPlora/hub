@@ -53,11 +53,6 @@ from apps.invoice.schemas import (
     LineDefaultsOut,
     NumberingStatusIn,
     NumberingStatusOut,
-    PlatformDocumentOut,
-    PlatformHealthIn,
-    PlatformHealthOut,
-    PlatformInvoiceOut,
-    PlatformRefIn,
     RectificationPreviewIn,
     RectificationPreviewOut,
     RefundGetIn,
@@ -67,6 +62,9 @@ from apps.invoice.schemas import (
     SeriesPage,
     SeriesPeekIn,
     SeriesPeekOut,
+)
+from apps.invoice.schemas.platform import (
+    PlatformDocumentOut, PlatformHealthIn, PlatformHealthOut, PlatformInvoiceOut, PlatformRefIn,
 )
 from apps.sale.models import Refund
 from apps.sale.queries import find_sale

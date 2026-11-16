@@ -990,8 +990,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
-  `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,
-  formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma), `fiscal.py`
+  (aritmética pura: cierre por clave fiscal, prorrateo, formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el
