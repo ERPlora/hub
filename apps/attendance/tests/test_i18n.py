@@ -5,7 +5,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.translation import gettext_lazy
@@ -24,6 +23,8 @@ from base.tests.po import (
     po_entries,
     untranslated,
 )
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("attendance").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Record, Break, Correction, AttendanceSettings)
@@ -142,13 +143,13 @@ def test_a_working_day_is_a_jornada_in_spanish_and_a_working_day_in_english():
         assert names() == ["working day", "working days", "working day", "working day", "ended at", "slot"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.get(
         "/api/attendance/records/detail",
         {"id": "0199c8a0-0000-7000-8000-000000000000"},
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

@@ -21,6 +21,8 @@ from apps.attendance.schemas import (
     SettingsIn,
 )
 
+from .conftest import HUB_DB
+
 ID = uuid.uuid7()
 MADRID = ZoneInfo("Europe/Madrid")
 
@@ -126,6 +128,7 @@ def test_times_with_any_offset_are_the_same_instant():
     assert data.clock_out_at == dt.datetime(2026, 10, 6, 16, 30, tzinfo=dt.UTC)
 
 
+@HUB_DB
 def test_a_time_without_offset_is_the_business_wall_clock():
     # The assistant says «at nine»: the business's nine (Europe/Madrid here).
     data = CorrectIn(record_id=ID, clock_in_at="2026-10-06T09:00", reason="At nine")

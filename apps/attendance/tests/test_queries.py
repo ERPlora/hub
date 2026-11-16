@@ -30,9 +30,9 @@ from apps.attendance.schemas import (
 )
 from apps.staff.models import Member
 
-from .conftest import ctx_for, make_member, run, utc
+from .conftest import HUB_DB, ctx_for, make_member, run, utc
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 NOW = "2026-10-06T10:30"  # 12:30 in Madrid (UTC+2 in October)
 
