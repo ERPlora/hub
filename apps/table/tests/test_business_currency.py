@@ -5,9 +5,11 @@ or «¥150», never a euro fixed in the app nor the browser's Intl decimals. Not
 
 import pytest
 
-from base.models import Hub
+from apps.sale.tests.test_business_currency import business_in, taxed_in
 
 from .conftest import (
+    HUB_DB,
+    B,
     add_line,
     charge,
     make_session,
@@ -17,12 +19,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
+pytestmark = HUB_DB
 
 
 @pytest.fixture
@@ -51,6 +48,8 @@ def money(session) -> tuple:
 )
 def test_a_charged_check_says_the_currency_it_was_charged_in_and_its_decimals(coffee, country, currency, decimals):
     business_in(country)
+    if country != "ES":
+        taxed_in(country)
     session = seated()
     add_line(session.order_id, coffee)
     charge(session.order_id, key=f"currency-{country}")
@@ -59,6 +58,7 @@ def test_a_charged_check_says_the_currency_it_was_charged_in_and_its_decimals(co
 
 def test_nothing_charged_says_no_currency_and_a_voided_charge_takes_it_away(coffee):
     business_in("PL")
+    taxed_in("PL")
     session = seated()
     assert money(session) == (None, None, None)
     first = add_line(session.order_id, coffee).lines[0]
@@ -79,9 +79,10 @@ def test_what_was_charged_keeps_its_currency_when_the_business_s_changes(coffee)
     assert money(session) == (150, "EUR", 2)
 
 
-def test_another_hub_s_country_does_not_change_this_one_s_check(coffee):
-    business_in("PL", "a")
-    business_in("JP", "b")
+def test_another_hub_s_country_does_not_change_this_one_s_check(coffee, hub_b):
+    business_in("PL")
+    taxed_in("PL")
+    business_in("JP", B.key)
     session = seated()
     add_line(session.order_id, coffee)
     charge(session.order_id, key="currency-hub-b")

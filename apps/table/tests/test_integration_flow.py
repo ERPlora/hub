@@ -14,9 +14,9 @@ from live.errors import InvalidPayload
 from apps.sale.models import Order
 from apps.table.models import TableSession
 
-from .conftest import A, add_line, make_session, make_table, open_check, run
+from .conftest import HUB_DB, A, add_line, make_session, make_table, open_check, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: What is done at the table, with a step that names what it acts on by the run's input.
 AT_THE_TABLE = {
