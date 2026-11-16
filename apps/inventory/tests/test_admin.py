@@ -23,6 +23,8 @@ from apps.inventory.admin import (
 )
 from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement
 
+from .conftest import HUB_DB
+
 MODELS = {
     Product: ProductAdmin,
     Category: CategoryAdmin,
@@ -57,6 +59,7 @@ def test_every_model_is_registered_and_products_show_their_categories():
     assert ProductCategoryInline.model is ProductCategory
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -69,15 +72,14 @@ def test_full_crud_for_a_superuser(superuser):
     assert inline.has_add_permission(request, None) and inline.has_change_permission(request)
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff):
     product = Product.objects.create(name="Coffee", sku="CAF", price=150, stock=Decimal("3"))
     category = Category.objects.create(name="Drinks")
     ProductCategory.objects.create(product=product, category=category)
     movement = StockMovement.objects.create(product=product, movement_type="initial", qty=3, stock_after=3)
-    client.force_login(superuser)
 
-    # The admin lives only on the platform host.
+    # The admin lives only on the platform host, with the business chosen.
     for path, text in (
         ("/admin/inventory/product/", b"Coffee"),
         (f"/admin/inventory/product/{product.pk}/change/", b"Drinks"),
@@ -92,14 +94,13 @@ def test_changelists_and_change_pages_render(client, superuser):
         ("/admin/inventory/settings/add/", b"track_stock"),
         ("/admin/inventory/salestock/add/", b"sale_id"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_support_can_repair_a_row_through_the_admin(client, superuser):
+@HUB_DB
+def test_support_can_repair_a_row_through_the_admin(hub_staff):
     category = Category.objects.create(name="Drnks", slug="drnks")
-    client.force_login(superuser)
     data = {
         "name": "Drinks",
         "slug": "drinks",
@@ -115,7 +116,7 @@ def test_support_can_repair_a_row_through_the_admin(client, superuser):
         "updated_by": "",
     }
 
-    response = client.post(f"/admin/inventory/category/{category.pk}/change/", data, HTTP_HOST="hubs.localhost")
+    response = hub_staff.post(f"/admin/inventory/category/{category.pk}/change/", data, HTTP_HOST="hubs.localhost")
 
     assert response.status_code == 302, response.content[:2000]
     category.refresh_from_db()

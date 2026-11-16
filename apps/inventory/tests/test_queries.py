@@ -47,9 +47,9 @@ from apps.inventory.schemas import (
 from base.tests.ordering import assert_reads_backwards, listed_with
 from apps.tax.models import TaxCategory
 
-from .conftest import ctx_for, ctx_with
+from .conftest import HUB_DB, ctx_for, ctx_with
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin"):

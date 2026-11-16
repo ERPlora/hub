@@ -3240,7 +3240,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (`Lower("name")`), y la nombrada dos veces cuenta donde aparece primero. Una app no escribe su propia copia; solo
   Facturación y Verifactu conservan la suya, en zona fiscal validada (hub#789). Sus pruebas por lista usan
   `base/tests/ordering.py`.
-- Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
+- Las tres consultas vivas del Inicio son de `base/queries/`, con permiso `base.view_home` y ruta ninja en
   `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
   `base/home.py` (sin ORM).
@@ -3538,7 +3538,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
   «Datos y copias» de Ajustes); a quien no
   administra no se le monta ningún componente que pida lo que el Hub le negaría (gh:hub#2519).
-- Consultas (`base/queries.py`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
+- Consultas (`base/queries/`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
   `shared`/`own` según `Hub.db_name`, `version` y `released_at` de `base/system.py`, que lee `APP_VERSION` y
   `APP_RELEASED_AT` del entorno del despliegue; sin ellos, `dev` y `null`), `base.event.list` (`GET /api/system/events`:
   las 50 últimas `live.OutboxEvent` del host con su `EventDelivery` resumida y traducida; nunca el `payload`) y
@@ -3654,7 +3654,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
   mientras su sesión vive (BASE-F13, `tests/e2e/helpers-login-hub-session.spec.ts`). `/auth/logout` en una caja con
   pinpad vuelve a `/login`.
-- Operaciones (`base/queries.py`, `base/services/`; rutas en `base/api.py` y `frontend/generated/operations.json`):
+- Operaciones (`base/queries/`, `base/services/`; rutas en `base/api.py` y `frontend/generated/operations.json`):
   `base.access.door` (sin sesión: la cookie decide; nunca da caras a quien el PIN no dejaría entrar, ni correos:
   `queries.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y

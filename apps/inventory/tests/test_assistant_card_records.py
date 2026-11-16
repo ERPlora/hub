@@ -11,10 +11,9 @@ from live.context import OperationContext, Scope
 from live.operations import INTERNAL, get, registry
 
 from apps.inventory.models import Category, Product
-from apps.inventory.tests.conftest import A, ctx_for
+from apps.inventory.tests.conftest import A, HUB_DB, ctx_for
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -78,7 +77,7 @@ def no_id(said) -> bool:
 # ── A product by its name, a category by its name ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PRODUCT)
 def test_a_write_on_a_product_says_it_by_its_name(write, datum):
     """The case the issue names, «inventory.product.delete:id»: «Product: Vino tinto», never its id nor its SKU."""
@@ -86,14 +85,14 @@ def test_a_write_on_a_product_says_it_by_its_name(write, datum):
     assert shown(write, {datum: str(product.id)})[datum] == "Vino tinto"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_CATEGORY)
 def test_a_write_on_a_category_says_it_by_its_name(write, datum):
     category = make_category()
     assert shown(write, {datum: str(category.id)})[datum] == "Bebidas"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_CATEGORIES)
 def test_the_categories_of_a_product_are_said_by_their_names_in_their_order(write, datum):
     """«Categories: Bebidas, Vinos»: each one by its name, in the order sent, said in words (``named``) — never
@@ -106,7 +105,7 @@ def test_the_categories_of_a_product_are_said_by_their_names_in_their_order(writ
     assert (field["value"], field.get("named")) == (["Vinos", "Bebidas"], True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_receipt_says_each_product_it_receives_beside_its_quantity():
     wine, water = make_product(), make_product("Agua mineral", "AG-50", "8410000000024")
     items = [{"product_id": str(wine.id), "qty": "6"}, {"product_id": str(water.id), "qty": "2"}]
@@ -117,7 +116,7 @@ def test_a_receipt_says_each_product_it_receives_beside_its_quantity():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("language", "product", "category"), [("en", "Product", "Category"), ("es", "Producto", "Categoría")]
 )
@@ -137,7 +136,7 @@ def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_langua
     ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own record, never another of the list (the first, the last)."""
     products = [make_product(), make_product("Agua mineral", "AG-50", "8410000000024")]
@@ -156,7 +155,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
         assert [each["category_id"] for each in linked] == [c.name for c in listed]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     """The name is the record's as it is now, before the write runs: a rename says the old name under «Product» and
     the new one under its own datum."""
@@ -172,7 +171,7 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PRODUCT)
 def test_a_product_is_left_out_for_whoever_may_not_see_the_products(write, datum):
     """Whoever may not see the products (``inventory.view_product``) is told no product, never its id."""
@@ -184,7 +183,7 @@ def test_a_product_is_left_out_for_whoever_may_not_see_the_products(write, datum
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_CATEGORY)
 def test_a_category_is_left_out_for_whoever_may_not_see_the_categories(write, datum):
     category = make_category()
@@ -195,7 +194,7 @@ def test_a_category_is_left_out_for_whoever_may_not_see_the_categories(write, da
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PRODUCT + ON_A_CATEGORY)
 def test_what_does_not_exist_is_left_out(write, datum):
     said = shown(write, {datum: A_MISSING_ID})
@@ -203,7 +202,7 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_deleted_meanwhile_is_left_out():
     """A product or a category the screens deleted (soft delete) is no longer there for the card either."""
     wine, drinks = make_product(), make_category()
@@ -215,7 +214,7 @@ def test_a_record_deleted_meanwhile_is_left_out():
     assert shown("inventory.category.delete", {"id": str(drinks.id)}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     wine = make_product()
@@ -223,7 +222,7 @@ def test_nobody_behind_the_request_reads_no_record():
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Vino de la casa"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@HUB_DB
 @pytest.mark.usefixtures("no_test_fallback")
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
@@ -255,7 +254,7 @@ def test_the_read_that_names_a_category_is_no_tool_route_nor_live_query():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_that_names_a_category_finds_it_by_its_id_or_its_name():
     drinks = make_category()
     read = get("inventory.category.get")

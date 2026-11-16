@@ -5,7 +5,8 @@ from decimal import Decimal
 from fractions import Fraction
 
 import pytest
-from django.db import IntegrityError, connection, models, transaction
+from django.db import IntegrityError, connections, models
+from live.operations import atomic
 
 from apps.inventory.models import (
     UNIT_SPECS,
@@ -21,8 +22,11 @@ from apps.inventory.models import (
     increment_of,
 )
 from apps.inventory.schemas import UnitCode
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB
+
+pytestmark = HUB_DB
 
 
 def make(sku="CAF-1", name="Coffee", **fields):
@@ -30,7 +34,7 @@ def make(sku="CAF-1", name="Coffee", **fields):
 
 
 def rejected(constraint, action):
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+    with pytest.raises(IntegrityError) as excinfo, atomic():
         action()
     assert constraint in str(excinfo.value)
 
@@ -85,7 +89,7 @@ def test_a_product_written_by_code_that_does_not_know_the_sold_out_mark_is_on_sa
     """Expand/contract: while a deploy rolls, a process still on the previous code inserts products
     without the column; the database gives it its default instead of refusing the row."""
     product_id = uuid.uuid7()
-    with connection.cursor() as cursor:
+    with connections[current_alias()].cursor() as cursor:
         cursor.execute(
             "INSERT INTO inventory_product (id, name, sku, description, product_type, price, cost, stock,"
             " low_stock_threshold, unit, price_quantity, pricing_unit, is_active, is_deleted, created_at,"
@@ -157,9 +161,9 @@ def test_products_without_ean13_never_collide():
 
 
 def test_price_and_cost_are_never_negative():
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make(price=-1)
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make("B", cost=-1)
 
 

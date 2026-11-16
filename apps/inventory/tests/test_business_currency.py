@@ -8,7 +8,6 @@ import io
 
 import pytest
 from django.utils import translation
-from live.context import Scope
 from live.operations import get
 
 from apps.inventory.models import Product
@@ -17,15 +16,16 @@ from apps.printing.models import PrintJob
 from apps.tax.models import TaxCategory
 from base import operations as base_operations
 from base.models import Hub
+from base.tenancy.context import use_hub
 
-from .conftest import B, ctx_for, ctx_with
+from .conftest import A, B, HUB_DB, ctx_for, ctx_with
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 TAX = "product.generic"
 
 
-def business_in(country: str, slug: str = "a") -> None:
+def business_in(country: str, slug: str = A.key) -> None:
     """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
     Hub.objects.filter(slug=slug).update(country=country)
 
@@ -80,15 +80,16 @@ def test_a_business_in_poland_does_not_take_a_euro_amount_for_a_zloty_one():
     assert (report.created, report.failed) == (0, 1)
 
 
-def test_each_hub_reads_amounts_in_its_own_business_s_currency():
-    business_in("PL", "a")
-    business_in("ES", "b")
+def test_each_hub_reads_amounts_in_its_own_business_s_currency(hub_b):
+    business_in("PL", A.key)
+    business_in("ES", B.key)
     a = run("inventory.product.bulk_create", ProductImportIn(rows=[{"line": 2, "name": "A", "sku": "A1", "price": "PLN12.50", "tax_category_key": TAX}]))
-    b = run(
-        "inventory.product.bulk_create",
-        ProductImportIn(rows=[{"line": 2, "name": "B", "sku": "B1", "price": "PLN12.50", "tax_category_key": TAX}]),
-        ctx_for(scope=B),
-    )
+    with use_hub(hub_b):
+        b = run(
+            "inventory.product.bulk_create",
+            ProductImportIn(rows=[{"line": 2, "name": "B", "sku": "B1", "price": "PLN12.50", "tax_category_key": TAX}]),
+            ctx_for(scope=B),
+        )
     assert (a.created, b.created, b.failed) == (1, 0, 1)
 
 
@@ -111,14 +112,15 @@ ISSUER_COUNTRIES = {
 
 
 @pytest.fixture(params=sorted(ISSUER_COUNTRIES))
-def erplora(request, settings):
-    """ERPlora's own hub with its issuer in the country of ``request.param``. It has no business on erplora.com (no
-    registry row, create_platform_hub): its catalog is in the currency of its issuer's country, as its sales, invoices
-    and price lists are."""
-    settings.PLATFORM_HUB_SLUG = "erplora"
+def erplora(request, settings, hub_b):
+    """ERPlora's own hub, here business B's (``PLATFORM_HUB_SLUG``), with its issuer in the country of ``request.param``,
+    the test at work inside it. It has no business on erplora.com: its catalog is in the currency of its issuer's
+    country, as its sales, invoices and price lists are."""
+    settings.PLATFORM_HUB_SLUG = hub_b.slug
     settings.PLATFORM_ISSUER_COUNTRY = request.param
     amounts, label = ISSUER_COUNTRIES[request.param]
-    return ctx_for(scope=Scope("host", "erplora")), amounts, label
+    with use_hub(hub_b):
+        yield ctx_for(scope=B), amounts, label
 
 
 def test_erploras_own_hub_imports_prices_and_costs_in_the_currency_of_its_issuer_s_country(erplora):
@@ -190,16 +192,17 @@ def test_each_amount_takes_the_currency_base_answers(caller, monkeypatch):
 
 
 @pytest.mark.parametrize("caller", sorted(IN_YEN))
-def test_erploras_own_hub_takes_its_currency_from_base_business_get_too(caller, settings, monkeypatch):
+def test_erploras_own_hub_takes_its_currency_from_base_business_get_too(caller, settings, monkeypatch, hub_b):
     # ``base.business.get`` answers ERPlora's own hub (hub#329): inventory asks it there as anywhere else, never a second
     # source of the same currency (here, an answer other than the one of ``PLATFORM_ISSUER_COUNTRY``).
-    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_HUB_SLUG = hub_b.slug
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     business = get(base_operations.BUSINESS)
     answer = business.fn
     monkeypatch.setattr(business, "fn", lambda ctx, data: {**answer(ctx, data), "currency": "JPY"})
     through, in_yen, _permissions = IN_YEN[caller]
-    assert through(ctx_for(scope=Scope("host", "erplora"))) == in_yen
+    with use_hub(hub_b):
+        assert through(ctx_for(scope=B)) == in_yen
 
 
 @pytest.mark.parametrize("caller", sorted(IN_YEN))

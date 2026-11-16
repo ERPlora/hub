@@ -2213,7 +2213,7 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "shared.ToolOut
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):  # noqa: C901, PLR0911
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card, shown)``: the card
     when the write still waits for its answer, with what it will do when its app declares a preview (BASE-F98), and
-    the fingerprint of what it shows (``shown``, ``assistant.fingerprint``); one that cannot be read is the write's
+    the fingerprint of what it shows (``shown``, ``assistant.cards.fingerprint``); one that cannot be read is the write's
     outcome, and no card is shown. Neither is one for data the write would refuse: the model hears which
     (``invalid_payload``) and asks again with them corrected. The yes is for the card it answers (hub#1208): drawn
     again, a card that no longer shows what ``call.shown`` says — a record found by its name is another, a name or what
@@ -2289,7 +2289,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     only on what that card showed (hub#1208: the call it waits on goes back with its ``shown``); a tool this person
     was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
     and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
-    read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
+    read again, in ``setup``). Past ``shared.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.tools.catalog(ctx)
@@ -2343,7 +2343,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         business=business.get("name") or "",
         screens=_assistant_screens(ctx),
         role=_assistant_role(ctx),
-        # What is offered without its permission is a write a manager may approve (``assistant.catalog``).
+        # What is offered without its permission is a write a manager may approve (``assistant.tools.catalog``).
         approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
     if data.setup:
