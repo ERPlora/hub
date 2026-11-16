@@ -27,6 +27,7 @@ import respx
 from django.db import connections
 from django.utils import timezone
 
+from apps.flow.tests.test_relay import heard_by_hub_b
 from apps.whatsapp_inbox import gateway
 from apps.whatsapp_inbox.models import Conversation, Message, Template
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, B, card, connect, ctx_for, receive, run, system, template
@@ -65,20 +66,6 @@ def answering_late(monkeypatch, name: str) -> SimpleNamespace:
 
     monkeypatch.setattr(gateway, name, late)
     return SimpleNamespace(timeline=timeline, held=held, answer=answer, armed=armed)
-
-
-def heard_by_hub_b(monkeypatch, late: SimpleNamespace) -> None:
-    """Every delivery of hub B goes on the timeline, and the first one lets erplora.com answer."""
-    real = relay.deliver
-
-    def deliver(app_label, event):
-        done = real(app_label, event)
-        if event.scope_key == B.key:
-            late.timeline.append(f"{app_label} got {event.name} in b")
-            late.answer.set()
-        return done
-
-    monkeypatch.setattr(relay, "deliver", deliver)
 
 
 def hub_b_writes(hub_b) -> None:

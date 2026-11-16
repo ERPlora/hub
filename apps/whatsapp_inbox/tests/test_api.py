@@ -1,10 +1,8 @@
 """The WhatsApp inbox's routes: each bound to its operation, and the flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. What erplora.com pushes has no route here: ``base`` mounts ``/internal/whatsapp/*``.
+Requests go to business A's host with Django's sync test client, which sees the test's transaction (``get`` and
+``post`` are Automatizaciones' own: the same business, the same API). What erplora.com pushes has no route here: ``base`` mounts ``/internal/whatsapp/*``.
 """
-
-import json
 
 import httpx
 import pytest
@@ -12,9 +10,10 @@ import respx
 from django.conf import settings
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.whatsapp_inbox.api import router
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, connect, receive
+from apps.whatsapp_inbox.tests.conftest import A, HUB_DB, connect, receive
 from base.tests.routes import spa_routes
 from base.tenancy.context import current_alias
 from config.api import api
@@ -115,16 +114,6 @@ SYSTEM_ONLY = {
     "whatsapp_inbox.template.claim_delete",
     "whatsapp_inbox.template.record_delete",
 }
-
-
-def get(client, path, host=HOST, **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host=HOST):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
 
 
 @pytest.fixture
