@@ -17,7 +17,7 @@ from live.operations import INTERNAL, get, registry
 from apps.combo.tests.conftest import HUB_DB, A, ctx_for, make_combo, make_group, make_option, make_product
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 

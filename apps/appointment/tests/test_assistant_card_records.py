@@ -19,7 +19,7 @@ from live.operations import get, registry
 from apps.schedule.queries import day_label
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tests.test_assistant_card_values import AN_ID, list_field
+from base.tests.test_assistant_card_values_references import AN_ID, list_field
 
 from .conftest import A, HUB_DB, MONDAY, at, ctx_for, make_appointment, make_block, make_salon, make_series, run
 

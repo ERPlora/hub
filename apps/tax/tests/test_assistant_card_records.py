@@ -21,7 +21,7 @@ from apps.tax.tests.conftest import A, ctx_for
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 

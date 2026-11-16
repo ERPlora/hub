@@ -25,7 +25,7 @@ from base import assistant
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import named_by_the_screen
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 APP = Path(apps.get_app_config("flow").path)
 SCREENS = json.loads((APP / "frontend/locale/es.json").read_text())["flow"]

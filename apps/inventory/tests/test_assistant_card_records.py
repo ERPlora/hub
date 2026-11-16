@@ -14,7 +14,7 @@ from apps.inventory.models import Category, Product
 from apps.inventory.tests.conftest import A, HUB_DB, ctx_for
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 

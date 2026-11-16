@@ -568,7 +568,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   lleva su título («Día especial», «Cambio temporal»), nunca «Registro». Sin persona detrás, sin `schedule.view`, con
   un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id
   (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Horarios no tiene listas cerradas en
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. Horarios no tiene listas cerradas en
   sus escrituras.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17), con
   los tramos como líneas de su día; ids y fechas de auditoría, de solo lectura. Una escritura cruda del

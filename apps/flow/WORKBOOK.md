@@ -1477,7 +1477,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`QuestionRefIn.id`, `AnswerIn`), `flow.question.get` por su `title`, que pide `flow.answer` y además
   `can_answer` de su rol (`flow.question_not_yours`) y solo da una que espera (`flow.question_closed`), como la
   bandeja. Un registro que la persona no puede leer, o de otro negocio, no sale. El trinquete de
-  `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca. Además (hub#499), los ids de las
+  `base/tests/test_assistant_card_values_references.py` no deja entrar uno sin marca. Además (hub#499), los ids de las
   escrituras peligrosas llevan `title`: «Automation», «Automation run» y «Question», con «Automatización»,
   «Ejecución» y «Pregunta» en el catálogo `es`; el mismo trinquete, extendido a `flow`, no deja una sin título.
 - **Con qué actúa**: el motor solo llama a las operaciones de la lista `grants`, que fija un propietario
