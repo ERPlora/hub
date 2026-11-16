@@ -6,6 +6,8 @@ import datetime as dt
 import uuid
 
 import pytest
+from django.db import connections
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
@@ -53,22 +55,15 @@ from apps.service.schemas import (
     VoidCheckOut,
 )
 
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
-    A,
-    ctx_for,
-    make_category,
-    make_customer,
-    make_grant,
-    make_member,
-    make_package,
-    make_redemption,
-    make_service,
-    make_tax,
+    HUB_DB, A, ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_redemption,
+    make_service, make_tax,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data=None, role="hub_admin", **ctx):
@@ -906,16 +901,13 @@ def test_a_session_of_the_movements_says_the_professional_who_did_it(tax):
 def test_naming_the_professional_of_each_session_costs_no_query_per_row(tax):
     # hub#1236: the professional is read with her session (select_related), so a voucher with many sessions done by
     # many professionals reads in as many queries as one with a single session.
-    from django.db import connection
-    from django.test.utils import CaptureQueriesContext
-
     cut = make_service("Cut", tax=tax)
     package = make_package("Bono", [cut], max_uses=10)
     grant = make_grant(package, make_customer("Lucía"), days_ago=1)
     make_redemption(grant, cut, member=make_member("Ana", "López"))
 
     def reads() -> int:
-        with CaptureQueriesContext(connection) as queries:
+        with CaptureQueriesContext(connections[current_alias()]) as queries:
             run("service.movement.list", MovementListIn(package_id=package.id))
         return len(queries)
 

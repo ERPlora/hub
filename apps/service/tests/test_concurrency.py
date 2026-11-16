@@ -24,10 +24,10 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib import admin
-from django.db import connection, transaction
+from django.db import connections
 from django.test import RequestFactory
 from live.errors import OperationError
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.customer.models import Customer
 from apps.service.models import (
@@ -43,50 +43,21 @@ from apps.service.models import (
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once, in_a_thread, meanwhile
 
 from .conftest import (
-    ctx_for,
-    make_category,
-    make_customer,
-    make_grant,
-    make_member,
-    make_package,
-    make_service,
+    HUB_DB_COMMITTED, ctx_for, make_category, make_customer, make_grant, make_member, make_package, make_service,
     make_tax,
 )
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def run(name, data):
     op = get(name)
     return op(ctx_for("hub_admin"), op.input.model_validate(data))
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def codes(results) -> list[str]:
@@ -257,7 +228,7 @@ def test_a_till_delivering_a_session_waits_for_the_other_to_read_what_is_left_of
         )
 
     def first_till():
-        with transaction.atomic():
+        with atomic():
             deliver(first)
             delivered.set()
             finish.wait(10)
@@ -327,8 +298,8 @@ def delete(target, how: str) -> None:
     """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds. The
     lock timeout is the transaction's (SET LOCAL): a session-level one would go back with the connection and
     reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
+    with atomic():
+        with connections[current_alias()].cursor() as cursor:
             cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
         remove(target, how)
 
@@ -345,7 +316,7 @@ def deleted_just_before(statement: str, target, how: str):
             deletions.extend(at_once(lambda: delete(target, how)))
         return execute(sql, params, many, context)
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
@@ -359,7 +330,7 @@ def held_in_flight(target, *, made: Callable = lambda: None, then: Callable = la
 
     def write():
         try:
-            with transaction.atomic():
+            with atomic():
                 type(target).objects.select_for_update().get(pk=target.pk)
                 made()
                 holds.set()
@@ -370,9 +341,8 @@ def held_in_flight(target, *, made: Callable = lambda: None, then: Callable = la
             writes.append(error)
         finally:
             holds.set()
-            connection.close()
 
-    thread = threading.Thread(target=write)
+    thread = in_a_thread(write, [None])
 
     def wrapper(execute, sql, params, many, context):
         if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
@@ -381,7 +351,7 @@ def held_in_flight(target, *, made: Callable = lambda: None, then: Callable = la
         return execute(sql, params, many, context)
 
     try:
-        with connection.execute_wrapper(wrapper):
+        with connections[current_alias()].execute_wrapper(wrapper):
             yield writes
     finally:
         if thread.ident is not None:
@@ -660,36 +630,10 @@ def deleted_once_locked(target):
     return deleted_once(target, lambda sql: 'FROM "service_service"' in sql and "FOR UPDATE" in sql)
 
 
-@contextmanager
 def deleted_once(target, holding: Callable[[str], bool]):
     """The business's «Delete» of the category ``target`` started in another session right after the first statement
-    of this one for which ``holding`` holds, and left to run a moment before this one goes on."""
-    deletions: list = []
-
-    def deletion():
-        try:
-            run("service.category.delete", {"id": str(target.pk)})
-            deletions.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            deletions.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if thread.ident is None and holding(sql):
-            thread.start()
-            time.sleep(IN_FLIGHT)
-        return result
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
+    of this one for which ``holding`` holds, and left to run until it waits for this one (or has ended)."""
+    return meanwhile(holding, lambda: run("service.category.delete", {"id": str(target.pk)}))
 
 
 def test_moving_a_service_while_its_old_category_is_deleted_never_waits_in_a_circle(world):
@@ -713,37 +657,10 @@ def test_moving_a_service_while_its_old_category_is_deleted_never_waits_in_a_cir
 # order the deletion of the service takes them.
 
 
-@contextmanager
 def admin_deleting(target, how: str, after: Callable):
     """The Hub admin's «Delete» of ``target`` started in another session right before the first statement of
-    this one for which ``after`` holds, and left to run a moment before this one goes on."""
-    deletions: list = []
-
-    def deletion():
-        try:
-            with transaction.atomic():
-                admin_delete(target, how)
-            deletions.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            deletions.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and after(sql):
-            thread.start()
-            time.sleep(IN_FLIGHT)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "the deletion never started"
+    this one for which ``after`` holds, and left to run until it waits for this one (or has ended)."""
+    return meanwhile(after, lambda: atomic(admin_delete)(target, how), first=True)
 
 
 ADMIN_DELETIONS = ["delete_model", "delete_queryset"]
@@ -914,7 +831,7 @@ def deleted_after_the_first_read_of(target, how: str):
             deletions.extend(at_once(lambda: delete(target, how)))
         return result
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield deletions
 
 
