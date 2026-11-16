@@ -32,14 +32,21 @@ from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.identity import HubIdentityMismatch
 from base.tenancy.tests import hubs
+from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED
 from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_internal import HUB_ID, PATH as STATE_PATH, SECRET, code, signed
+from base.tests.test_session_revoke import acme
+
+__all__ = ["acme"]
+
+#: The doors open the named business's database themselves: each test enters it only to read it.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
 
 INBOUND = "/internal/whatsapp/inbound"
 STATUS = "/internal/whatsapp/status"
 CHANNEL = "/internal/whatsapp/channel"
-ACME = Scope("host", "acme")
-OTHER = Scope("host", "other")
+ACME = A
+OTHER = B
 
 
 @pytest.fixture(autouse=True)
@@ -49,21 +56,17 @@ def secret(settings):
 
 
 @pytest.fixture
-def acme(db, every_app_on):
-    """A business with WhatsApp on (a new one is born with every app off)."""
-    hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
-    every_app_on("acme")
-    return hub
+def other(hub_b):
+    return hub_b
 
 
-@pytest.fixture
-def other(db, every_app_on):
-    hub = Hub.objects.create(id="0199c4b0-0000-7000-8000-000000000002", slug="other", status="ready")
-    every_app_on("other")
-    return hub
+def nothing_kept(hub: Hub) -> bool:
+    """Whether ``hub`` keeps no WhatsApp message and no number in its own database."""
+    with use_hub(hub):
+        return not Message.objects.exists() and not Channel.objects.exists()
 
 
-def message(wa_id: str = "wamid.1", hub: str = "acme", **fields) -> dict:
+def message(wa_id: str = "wamid.1", hub: str = A.key, **fields) -> dict:
     """What erplora.com sends to ``/internal/whatsapp/inbound`` for a customer's text (door 1)."""
     return {
         "hub": hub,
@@ -97,7 +100,7 @@ def channel_state(version: int = 42, **fields) -> dict:
     }
 
 
-def status(wa_id: str, new: str = "read", hub: str = "acme", **fields) -> dict:
+def status(wa_id: str, new: str = "read", hub: str = A.key, **fields) -> dict:
     return {"hub": hub, "wa_message_id": wa_id, "status": new, "status_at": "2026-10-15T10:00:05Z", **fields}
 
 
@@ -106,7 +109,7 @@ def post(client, path: str, body, **kwargs):
     return signed(client, method, path, body, **kwargs)
 
 
-def door_body(path: str, hub: str = "acme") -> dict:
+def door_body(path: str, hub: str = A.key) -> dict:
     if path == INBOUND:
         return message(hub=hub)
     if path == STATUS:
@@ -116,7 +119,8 @@ def door_body(path: str, hub: str = "acme") -> dict:
 
 def channel_now():
     op = get_operation("whatsapp_inbox.channel.get")
-    return op(system_context(ACME), op.input.model_validate({}))
+    with use_hub(Hub.objects.get(slug=ACME.key)):
+        return op(system_context(ACME), op.input.model_validate({}))
 
 
 DOORS = [INBOUND, STATUS, CHANNEL]
@@ -129,12 +133,13 @@ def test_inbound_stores_the_message_in_the_named_business(client, acme):
     answer = post(client, INBOUND, message())
 
     assert answer.status_code == 200
-    stored = Message.objects.get(wa_message_id="wamid.1")
+    with use_hub(acme):
+        stored = Message.objects.get(wa_message_id="wamid.1")
+        received = OutboxEvent.objects.get(name="whatsapp_inbox.message.received")
     assert answer.json() == {"id": str(stored.id), "conversation_id": str(stored.conversation_id), "created": True}
     assert (stored.direction, stored.body) == ("inbound", "Hola, ¿tenéis hora mañana?")
     # The operation ran on the business of the body: its event is recorded in that hub's scope.
-    received = OutboxEvent.objects.get(name="whatsapp_inbox.message.received")
-    assert (received.scope_kind, received.scope_key) == ("host", "acme")
+    assert (received.scope_kind, received.scope_key) == ("host", A.key)
 
 
 def test_the_same_whatsapp_id_again_is_200_and_not_created(client, acme):
@@ -143,7 +148,8 @@ def test_the_same_whatsapp_id_again_is_200_and_not_created(client, acme):
 
     assert again.status_code == 200
     assert again.json() == {**first.json(), "created": False}
-    assert Message.objects.filter(wa_message_id="wamid.1").count() == 1
+    with use_hub(acme):
+        assert Message.objects.filter(wa_message_id="wamid.1").count() == 1
 
 
 # Door 2: Meta's status of a message the Hub sent
@@ -156,7 +162,8 @@ def test_status_moves_a_message_sent_from_the_business(client, acme):
     answer = post(client, STATUS, status("wamid.echo", "read"))
 
     assert answer.status_code == 200 and answer.json() == {"updated": True, "status": "read"}
-    assert Message.objects.get(wa_message_id="wamid.echo").status == "read"
+    with use_hub(acme):
+        assert Message.objects.get(wa_message_id="wamid.echo").status == "read"
 
 
 def test_the_status_of_an_unknown_message_is_200_and_not_updated(client, acme):
@@ -169,7 +176,7 @@ def test_the_status_of_an_unknown_message_is_200_and_not_updated(client, acme):
 
 
 def test_channel_applies_the_numbers_state(client, acme):
-    answer = post(client, CHANNEL, {"hub": "acme", **channel_state(42)})
+    answer = post(client, CHANNEL, {"hub": A.key, **channel_state(42)})
 
     assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 42}
     shown = channel_now()
@@ -177,16 +184,16 @@ def test_channel_applies_the_numbers_state(client, acme):
 
 
 def test_an_older_channel_state_is_not_applied(client, acme):
-    post(client, CHANNEL, {"hub": "acme", **channel_state(42)})
+    post(client, CHANNEL, {"hub": A.key, **channel_state(42)})
 
-    answer = post(client, CHANNEL, {"hub": "acme", **channel_state(41, status="reconnect_needed")})
+    answer = post(client, CHANNEL, {"hub": A.key, **channel_state(41, status="reconnect_needed")})
 
     assert answer.status_code == 200 and answer.json() == {"applied": False, "version": 42}
     assert channel_now().status == "connected"
 
 
 def test_channel_is_only_put(client, acme):
-    answer = signed(client, "post", CHANNEL, {"hub": "acme", **channel_state()})
+    answer = signed(client, "post", CHANNEL, {"hub": A.key, **channel_state()})
     assert answer.status_code == 405
 
 
@@ -205,14 +212,14 @@ def test_an_unsigned_call_is_401(client, acme, path):
     answer = getattr(client, method)(path, raw, content_type="application/json", HTTP_HOST="hubs.localhost")
 
     assert answer.status_code == 401 and code(answer) == "internal.unsigned"
-    assert not Message.objects.exists() and not Channel.objects.exists()
+    assert nothing_kept(acme)
 
 
 @pytest.mark.parametrize("path", DOORS)
 def test_another_secret_or_a_stale_timestamp_is_401(client, acme, path):
     assert post(client, path, door_body(path), secret="other").status_code == 401
     assert post(client, path, door_body(path), ts=int(time.time()) - 400).status_code == 401
-    assert not Message.objects.exists() and not Channel.objects.exists()
+    assert nothing_kept(acme)
 
 
 @pytest.mark.parametrize("path", DOORS)
@@ -232,11 +239,11 @@ def test_a_business_the_registry_does_not_know_is_404(client, acme, path):
     answer = post(client, path, door_body(path, hub="nobody"))
 
     assert answer.status_code == 404 and code(answer) == "not_found"
-    assert not Message.objects.exists() and not Channel.objects.exists()
+    assert nothing_kept(acme)
 
 
 @pytest.mark.parametrize("path", DOORS)
-@pytest.mark.parametrize("hub", [None, "", 7, ["acme"]])
+@pytest.mark.parametrize("hub", [None, "", 7, [A.key]])
 def test_a_body_without_a_business_is_422(client, acme, path, hub):
     body = door_body(path)
     if hub is None:
@@ -265,7 +272,7 @@ def test_a_business_that_does_not_open_answers_as_its_host(client, acme, path, c
     answer = post(client, path, door_body(path))
 
     assert answer.status_code == status_code and code(answer) == error
-    assert not Message.objects.exists() and not Channel.objects.exists()
+    assert nothing_kept(acme)
 
 
 # The app in that business
@@ -273,17 +280,19 @@ def test_a_business_that_does_not_open_answers_as_its_host(client, acme, path, c
 
 @pytest.mark.parametrize("path", DOORS)
 def test_the_app_off_in_the_business_is_404_app_inactive(client, acme, path, monkeypatch):
-    every = relay.active_apps(ACME)
+    with use_hub(acme):
+        every = relay.active_apps(ACME)
     monkeypatch.setattr(relay, "active_apps", lambda scope: every - {"whatsapp_inbox"})
 
     answer = post(client, path, door_body(path))
 
     assert answer.status_code == 404 and code(answer) == "app_inactive"
-    assert not Message.objects.exists() and not Channel.objects.exists()
+    assert nothing_kept(acme)
 
 
 def test_the_app_is_asked_about_the_business_of_the_body(client, acme, other, monkeypatch):
-    every = relay.active_apps(ACME)
+    with use_hub(acme):
+        every = relay.active_apps(ACME)
     asked = []
 
     def active(scope):
@@ -292,8 +301,8 @@ def test_the_app_is_asked_about_the_business_of_the_body(client, acme, other, mo
 
     monkeypatch.setattr(relay, "active_apps", active)
 
-    assert post(client, INBOUND, message(hub="other")).status_code == 404
-    assert post(client, INBOUND, message(hub="acme")).status_code == 200
+    assert post(client, INBOUND, message(hub=OTHER.key)).status_code == 404
+    assert post(client, INBOUND, message(hub=ACME.key)).status_code == 200
     assert asked == [OTHER, ACME]
 
 
@@ -354,12 +363,13 @@ def test_the_app_off_in_its_rows_is_404_app_inactive_with_the_cache_cold(hub_a, 
 
 
 @pytest.mark.parametrize("path", DOORS)
-def test_a_business_without_its_own_database_is_503_and_runs_nothing(acme, production, path):
+def test_a_business_without_its_own_database_is_503_and_runs_nothing(db, production, path):
     """A business still on control's database is not served: erplora.com keeps the message and tries again once it has
     its own."""
+    Hub.objects.create(slug="acme", status="ready")
     door = production()
 
-    answer = post(door, path, door_body(path), host=PRIVATE_NAME)
+    answer = post(door, path, door_body(path, hub="acme"), host=PRIVATE_NAME)
 
     assert answer.status_code == 503 and code(answer) == "base.hub_maintenance"
     with use_legacy():
@@ -458,8 +468,8 @@ def test_a_body_that_is_no_object_is_422(client, acme, path, raw):
         (INBOUND, message(direction="sideways"), "direction"),
         (INBOUND, message(media={"url": "https://elsewhere.example/x.jpg"}), "media.url"),
         (STATUS, status("wamid.1", "seen"), "status"),
-        (CHANNEL, {"hub": "acme", **channel_state(-1)}, "version"),
-        (CHANNEL, {"hub": "acme", **channel_state(status="maybe")}, "status"),
+        (CHANNEL, {"hub": A.key, **channel_state(-1)}, "version"),
+        (CHANNEL, {"hub": A.key, **channel_state(status="maybe")}, "status"),
     ],
 )
 def test_fields_out_of_contract_are_422_with_their_field(client, acme, path, body, field):
@@ -467,21 +477,22 @@ def test_fields_out_of_contract_are_422_with_their_field(client, acme, path, bod
 
     assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
     assert field in answer.json()["error"]["fields"]
-    assert not Message.objects.exists() and not Channel.objects.exists()
+    assert nothing_kept(acme)
 
 
 def test_a_number_that_is_no_number_is_422(client, acme):
     answer = post(client, INBOUND, message(**{"from": "0000"}))
 
     assert answer.status_code == 422 and "from" in answer.json()["error"]["fields"]
-    assert not Message.objects.exists()
+    with use_hub(acme):
+        assert not Message.objects.exists()
 
 
 # Door 4: the photo's ``whatsapp``
 
 
 def photo(version: int, **fields) -> dict:
-    return {"hub_id": HUB_ID, "slug": "acme", "version": version, "status": "active", **fields}
+    return {"hub_id": HUB_ID, "slug": A.key, "version": version, "status": "active", **fields}
 
 
 def test_the_photo_applies_its_whatsapp_with_its_own_version(client, acme):
@@ -489,18 +500,20 @@ def test_the_photo_applies_its_whatsapp_with_its_own_version(client, acme):
     answer = signed(client, "put", STATE_PATH, photo(7, whatsapp={**channel_state(1), "display_name": "Ana"}))
 
     assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 7}
-    assert Channel.objects.get().version == 7
+    with use_hub(acme):
+        assert Channel.objects.get().version == 7
     shown = channel_now()
     assert (shown.status, shown.display_name) == ("connected", "Ana")
 
 
 def test_a_photo_without_whatsapp_leaves_the_channel_alone(client, acme):
-    post(client, CHANNEL, {"hub": "acme", **channel_state(3)})
+    post(client, CHANNEL, {"hub": A.key, **channel_state(3)})
 
     answer = signed(client, "put", STATE_PATH, photo(9))
 
     assert answer.json() == {"applied": True, "version": 9}
-    assert Channel.objects.get().version == 3
+    with use_hub(acme):
+        assert Channel.objects.get().version == 3
 
 
 def test_an_older_photo_does_not_apply_its_whatsapp(client, acme):
@@ -513,7 +526,8 @@ def test_an_older_photo_does_not_apply_its_whatsapp(client, acme):
 
 
 def test_with_the_app_off_the_photo_applies_and_its_whatsapp_is_ignored(client, acme, monkeypatch):
-    every = relay.active_apps(ACME)
+    with use_hub(acme):
+        every = relay.active_apps(ACME)
     monkeypatch.setattr(relay, "active_apps", lambda scope: every - {"whatsapp_inbox"})
 
     answer = signed(client, "put", STATE_PATH, photo(5, whatsapp=channel_state()))
@@ -521,7 +535,8 @@ def test_with_the_app_off_the_photo_applies_and_its_whatsapp_is_ignored(client, 
     assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 5}
     acme.refresh_from_db()
     assert acme.state_version == 5
-    assert not Channel.objects.exists()
+    with use_hub(acme):
+        assert not Channel.objects.exists()
 
 
 @pytest.mark.parametrize(
@@ -535,7 +550,8 @@ def test_a_whatsapp_out_of_contract_keeps_nothing_of_the_photo(client, acme, blo
     assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
     acme.refresh_from_db()
     assert (acme.state, acme.state_version) == ({}, 0)
-    assert not Channel.objects.exists()
+    with use_hub(acme):
+        assert not Channel.objects.exists()
 
 
 # Two businesses: a write in one never reaches the other
@@ -564,18 +580,22 @@ def heard(session, timeout: float = 1.0) -> set[str]:
     return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_a_message_for_one_business_tells_only_that_business(client, acme, other, listening):
     on_acme, on_other = listening(ACME), listening(OTHER)
 
-    assert post(client, INBOUND, message(hub="other")).status_code == 200
+    assert post(client, INBOUND, message(hub=OTHER.key)).status_code == 200
 
     assert "whatsapp_inbox.message.received" in heard(on_other)
     assert heard(on_acme, timeout=0.5) == set()
-    assert set(OutboxEvent.objects.values_list("scope_key", flat=True)) == {"other"}
+    # Recorded in the other business's own database, in its scope; nothing in this one's.
+    with use_hub(other):
+        assert set(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == {("host", OTHER.key)}
+    with use_hub(acme):
+        assert not OutboxEvent.objects.exists()
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_the_photos_whatsapp_tells_the_business_of_the_photo_after_its_commit(client, acme, other, listening):
     on_acme, on_other = listening(ACME), listening(OTHER)
 

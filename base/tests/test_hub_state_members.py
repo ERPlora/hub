@@ -16,27 +16,20 @@ import psycopg
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from live.context import Scope
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
-from base.models import Hub, Membership
+from base.models import Membership
+from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED
 from base.tests.test_internal import HUB_ID, PATH, code, signed
-from base.tests.test_session_revoke import alive, login
+from base.tests.test_session_revoke import acme, alive, beta, login
+
+__all__ = ["acme", "beta"]
+
+pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 ANA = "0199c4b0-0000-7000-8000-00000000a0a0"
 OLGA = "0199c4b0-0000-7000-8000-00000000b0b0"
-BETA_ID = "0199c4b0-0000-7000-8000-0000000000a2"
-
-
-@pytest.fixture
-def acme(db):
-    return Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
-
-
-@pytest.fixture
-def beta(db):
-    return Hub.objects.create(id=BETA_ID, slug="beta", status="ready")
 
 
 def member(saas_id: str, role: str) -> dict:
@@ -44,16 +37,16 @@ def member(saas_id: str, role: str) -> dict:
 
 
 def photo(version: int, *members: dict) -> dict:
-    return {"hub_id": HUB_ID, "slug": "acme", "version": version, "members": list(members)}
+    return {"hub_id": HUB_ID, "slug": A.key, "version": version, "members": list(members)}
 
 
-def role_of(saas_id: str, slug: str = "acme") -> str | None:
+def role_of(saas_id: str, slug: str = A.key) -> str | None:
     return (
         Membership.objects.filter(user__username=f"saas:{saas_id}", host=slug).values_list("role", flat=True).first()
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 class TestTheMembersOfThePhoto:
     def test_a_new_role_applies_now_and_ends_that_person_s_sessions_in_this_business_only(self, client, acme, beta):
         ana_here, ana_on_beta = login(ANA, acme, "hub_employee"), login(ANA, beta, "hub_employee")
@@ -62,7 +55,7 @@ class TestTheMembersOfThePhoto:
         answer = signed(client, "put", PATH, photo(1, member(OLGA, "hub_owner"), member(ANA, "hub_manager")))
 
         assert answer.json() == {"applied": True, "version": 1}
-        assert (role_of(ANA), role_of(ANA, "beta"), role_of(OLGA)) == ("hub_manager", "hub_employee", "hub_owner")
+        assert (role_of(ANA), role_of(ANA, B.key), role_of(OLGA)) == ("hub_manager", "hub_employee", "hub_owner")
         assert not alive(ana_here)
         assert alive(ana_on_beta) and alive(olga_here)
 
@@ -73,7 +66,7 @@ class TestTheMembersOfThePhoto:
         signed(client, "put", PATH, photo(1, member(OLGA, "hub_owner")))
 
         assert role_of(ANA) is None and not alive(ana_here)
-        assert role_of(ANA, "beta") == "hub_employee" and alive(ana_on_beta)
+        assert role_of(ANA, B.key) == "hub_employee" and alive(ana_on_beta)
         assert role_of(OLGA) == "hub_owner" and alive(olga_here)
 
     def test_a_handover_makes_the_new_owner_and_gives_the_former_one_the_photo_s_role(self, client, acme):
@@ -102,7 +95,7 @@ class TestTheMembersOfThePhoto:
     def test_a_photo_without_members_changes_no_one(self, client, acme):
         ana_here = login(ANA, acme, "hub_employee")
 
-        answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": "acme", "version": 1})
+        answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": A.key, "version": 1})
 
         assert answer.json() == {"applied": True, "version": 1}
         assert role_of(ANA) == "hub_employee" and alive(ana_here)
@@ -117,13 +110,13 @@ class TestTheMembersOfThePhoto:
         assert role_of(ANA) == "hub_employee" and alive(ana_here)
 
     def test_a_photo_with_nobody_removes_the_saas_s_members_but_not_the_demo_s_owner(self, client, acme):
-        demo = get_user_model().objects.create(username="demo:acme")
-        Membership.objects.create(user=demo, host="acme", role="hub_owner")
+        demo = get_user_model().objects.create(username=f"demo:{A.key}")
+        Membership.objects.create(user=demo, host=A.key, role="hub_owner")
         ana_here = login(ANA, acme, "hub_employee")
 
         signed(client, "put", PATH, photo(1))
 
-        assert Membership.objects.filter(user=demo, host="acme").exists()
+        assert Membership.objects.filter(user=demo, host=A.key).exists()
         assert role_of(ANA) is None and not alive(ana_here)
 
     @pytest.mark.parametrize(
@@ -139,7 +132,7 @@ class TestTheMembersOfThePhoto:
     def test_members_out_of_contract_are_422_and_change_nothing(self, client, acme, members):
         ana_here = login(ANA, acme, "hub_employee")
 
-        answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": "acme", "version": 1, "members": members})
+        answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": A.key, "version": 1, "members": members})
 
         assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
         assert role_of(ANA) == "hub_employee" and alive(ana_here)
@@ -161,16 +154,15 @@ class TestTheMembersOfThePhoto:
         assert role_of(ANA) == "hub_employee" and alive(ana_here)
 
 
-@pytest.mark.django_db(transaction=True)
-def test_the_open_apps_of_the_business_hear_it_after_the_commit(client):
-    hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
-    login(ANA, hub, "hub_employee")
+@HUB_DB_COMMITTED
+def test_the_open_apps_of_the_business_hear_it_after_the_commit(client, acme):
+    login(ANA, acme, "hub_employee")
     params = connections["default"].settings_dict
     dsn = make_conninfo(
         dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
     )
     with psycopg.connect(dsn, autocommit=True) as listener:
-        listener.execute(f"LISTEN {channel_for(Scope('host', 'acme'))}")
+        listener.execute(f"LISTEN {channel_for(A)}")
 
         signed(client, "put", PATH, photo(1, member(ANA, "hub_manager")))
 
@@ -178,7 +170,7 @@ def test_the_open_apps_of_the_business_hear_it_after_the_commit(client):
     assert "*" in heard
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_session_that_noted_no_host_ends_too_when_the_photo_changes_that_person(client, acme, beta):
     """A session from before the sessions noted their host is valid on every host, this business's too: the photo
     ends it as ``/internal/sessions/revoke`` with the business does, and leaves another person's alone."""

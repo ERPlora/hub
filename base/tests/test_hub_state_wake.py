@@ -18,17 +18,17 @@ from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
 from base.events import HUB_STATE_APPLIED
-from base.models import Hub
+from base.tenancy.tests.business import A, B, HUB_DB_COMMITTED
 from base.tests.test_internal import HUB_ID, PATH, signed
 
-pytestmark = pytest.mark.django_db(transaction=True)
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("no_test_fallback")]
 
-ACME = Scope("host", "acme")
+ACME = A
 
 
 @pytest.fixture
-def acme():
-    return Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+def acme(hub_a):
+    return hub_a
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def heard(session, timeout: float = 1.0) -> set[str]:
 def test_the_photo_that_suspends_a_business_wakes_its_open_apps(client, acme, listening):
     on_acme = listening(ACME)
 
-    answer = signed(client, "put", PATH, {"slug": "acme", "version": 1, "status": "suspended"})
+    answer = signed(client, "put", PATH, {"slug": A.key, "version": 1, "status": "suspended"})
 
     assert answer.json() == {"applied": True, "version": 1}
     assert "*" in heard(on_acme)
@@ -67,19 +67,19 @@ def test_the_photo_that_suspends_a_business_wakes_its_open_apps(client, acme, li
 def test_a_photo_that_keeps_the_business_open_wakes_nobody(client, acme, listening):
     on_acme = listening(ACME)
 
-    signed(client, "put", PATH, {"slug": "acme", "version": 1, "status": "past_due"})
-    signed(client, "put", PATH, {"slug": "acme", "version": 2, "status": "active"})
+    signed(client, "put", PATH, {"slug": A.key, "version": 1, "status": "past_due"})
+    signed(client, "put", PATH, {"slug": A.key, "version": 2, "status": "active"})
 
     assert "*" not in heard(on_acme, timeout=0.5)
 
 
 def test_a_photo_already_seen_or_still_suspended_wakes_nobody_again(client, acme, listening):
     on_acme = listening(ACME)
-    signed(client, "put", PATH, {"slug": "acme", "version": 1, "status": "suspended"})
+    signed(client, "put", PATH, {"slug": A.key, "version": 1, "status": "suspended"})
     assert "*" in heard(on_acme)
 
-    signed(client, "put", PATH, {"slug": "acme", "version": 1, "status": "suspended"})  # already seen
-    signed(client, "put", PATH, {"slug": "acme", "version": 2, "status": "suspended"})  # still suspended
+    signed(client, "put", PATH, {"slug": A.key, "version": 1, "status": "suspended"})  # already seen
+    signed(client, "put", PATH, {"slug": A.key, "version": 2, "status": "suspended"})  # still suspended
 
     assert "*" not in heard(on_acme, timeout=0.5)
 
@@ -102,12 +102,12 @@ def test_every_new_photo_reaches_the_live_queries_of_its_business_only(client, a
     # channel only and nothing of the business moved until a reload. Now it reaches the business after the COMMIT,
     # and no other business hears it; a photo already seen tells nobody.
     on_acme = listening(ACME)
-    on_other = listening(Scope("host", "other"))
+    on_other = listening(B)
     plan = {"slug": "starter", "max_users": 3, "max_devices": 2}
 
-    assert signed(client, "put", PATH, {"slug": "acme", "version": 1, "plan": plan}).json()["applied"] is True
+    assert signed(client, "put", PATH, {"slug": A.key, "version": 1, "plan": plan}).json()["applied"] is True
     assert HUB_STATE_APPLIED in heard(on_acme)
     assert heard(on_other, timeout=0.5) == set()
 
-    assert signed(client, "put", PATH, {"slug": "acme", "version": 1, "plan": plan}).json()["applied"] is False
+    assert signed(client, "put", PATH, {"slug": A.key, "version": 1, "plan": plan}).json()["applied"] is False
     assert heard(on_acme, timeout=0.5) == set()
