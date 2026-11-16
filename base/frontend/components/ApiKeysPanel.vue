@@ -490,6 +490,10 @@ async function confirmRevoke(): Promise<void> {
   font-size: 0.875rem;
 }
 
+.api-key-form .api-keys-hint {
+  flex: none;
+}
+
 .api-keys-error {
   margin: 0;
   color: var(--ion-color-danger);
