@@ -107,11 +107,16 @@ def test_a_ready_business_without_its_own_database_is_not_served_until_its_cut()
     assert registry.refusal(Hub(slug="acme", db_name="", status="cancelled")).status == 410
 
 
-def test_under_the_suite_s_fallback_a_business_without_its_own_database_is_served_on_control_s_test_database():
-    hub = Hub(slug="acme", db_name="", status="ready", ready_at=timezone.now())
+def test_a_ready_business_without_its_own_database_is_among_no_databases_made():
+    """What the migrator and the worker take (``own_database_made``) agrees with ``database_is_made``: a business
+    still without its own database is none of them, even ready."""
+    Hub.objects.create(slug="acme", db_name="", status="ready", ready_at=timezone.now())
+    Hub.objects.create(slug="made", db_name="hub_x", status="ready", ready_at=timezone.now())
 
-    assert registry.refusal(hub) is None
-    assert registry.database_is_made(hub)
+    made = set(Hub.objects.filter(registry.own_database_made(), slug__in=("acme", "made")).values_list("slug", flat=True))
+
+    assert made == {"made"}
+    assert not registry.database_is_made(Hub.objects.get(slug="acme"))
 
 
 def test_a_hub_is_closed_while_its_database_is_copied_moved_or_restored():
