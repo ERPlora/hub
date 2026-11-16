@@ -17,6 +17,7 @@ from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
+    HUB_DB,
     MONDAY,
     TESTER,
     assign,
@@ -35,7 +36,7 @@ from .conftest import (
     wall,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 TUESDAY = MONDAY + dt.timedelta(days=1)
 
 

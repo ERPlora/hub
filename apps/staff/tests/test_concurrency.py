@@ -8,26 +8,22 @@ The admin enters through the record (``lock_members``), so it waits for the writ
 the write left.
 """
 
-import threading
-import time
 from collections.abc import Callable
-from contextlib import contextmanager
 
 import pytest
 from django.contrib import admin
-from django.db import connection, transaction
 from django.test import RequestFactory
 from live.errors import OperationError
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.staff.models import Member, Schedule, ScheduleDay, TimeOff
+from base.tenancy.tests.concurrency import meanwhile
 
-from .conftest import ctx_for, make_member, make_schedule, make_time_off
+from .conftest import HUB_DB_COMMITTED, ctx_for, make_member, make_schedule, make_time_off
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Two sessions of the business at once, each committing: its plan has room for both.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
-#: How long the deletion runs on its own before the write goes on: long enough to reach the record.
-IN_FLIGHT = 0.5
 ADMIN_DELETIONS = ["delete_model", "delete_queryset"]
 WEEK = [{"weekday": 1, "start_time": "10:00", "end_time": "14:00"}]
 
@@ -48,37 +44,10 @@ def admin_delete(member: Member, how: str) -> None:
         model_admin.delete_model(request, Member.objects.get(pk=member.pk))
 
 
-@contextmanager
 def admin_deleting(member: Member, how: str, after: Callable[[str], bool]):
     """The Hub admin's «Delete» of ``member`` started in another session right before the first statement
-    of this one for which ``after`` holds, and left to run a moment before this one goes on."""
-    deletions: list = []
-
-    def deletion():
-        try:
-            with transaction.atomic():
-                admin_delete(member, how)
-            deletions.append("ok")
-        except Exception as error:  # a deadlock, reported to the test
-            deletions.append(error)
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and after(sql):
-            thread.start()
-            time.sleep(IN_FLIGHT)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-    assert thread.ident is not None, "the deletion never started"
+    of this one for which ``after`` holds, and left to run until it waits for this one (or has ended)."""
+    return meanwhile(after, lambda: atomic(admin_delete)(member, how), first=True)
 
 
 def deleted(deletions) -> list[str]:

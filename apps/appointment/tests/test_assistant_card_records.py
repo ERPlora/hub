@@ -19,10 +19,9 @@ from live.operations import get, registry
 from apps.schedule.queries import day_label
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values import AN_ID, list_field
 
-from .conftest import A, MONDAY, at, ctx_for, make_appointment, make_block, make_salon, make_series, run
+from .conftest import A, HUB_DB, MONDAY, at, ctx_for, make_appointment, make_block, make_salon, make_series, run
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -146,7 +145,7 @@ def professional_of(write: str, diary: Diary) -> dict:
     return sent
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("write", NAME_A_PROFESSIONAL)
 def test_every_write_that_names_a_professional_says_them_by_their_name(salon, write, language):
@@ -161,7 +160,7 @@ def test_every_write_that_names_a_professional_says_them_by_their_name(salon, wr
 # ── An appointment of a bulk delete, a series and a block, by their names ─────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_a_bulk_delete_says_each_appointment_as_the_agenda_tells_it_and_how_many(salon, language):
     """Whoever confirms deleting several appointments sees which ones they are, never «Ids» with nothing in it."""
@@ -181,7 +180,7 @@ def test_a_bulk_delete_says_each_appointment_as_the_agenda_tells_it_and_how_many
     assert no_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("write", ON_A_SERIES)
 def test_a_write_on_a_series_says_it_as_the_series_list_titles_one(salon, write, language):
@@ -193,7 +192,7 @@ def test_a_write_on_a_series_says_it_as_the_series_list_titles_one(salon, write,
     assert (field.get("value"), field.get("label")) == (said[language], word(language, "series", "entity", "one"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     ("frequency", "said"),
     [
@@ -208,7 +207,7 @@ def test_a_series_says_its_weekday_only_when_it_repeats_by_the_week(salon, frequ
     assert shown("appointment.recurring.deactivate", {"id": str(series.id)}) == {"id": said}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_series_whose_customer_was_erased_and_whose_professional_left_still_says_its_repetition(salon):
     series = make_series(salon)
     series.customer_name = ""
@@ -216,7 +215,7 @@ def test_a_series_whose_customer_was_erased_and_whose_professional_left_still_sa
     assert shown("appointment.recurring.delete", {"id": str(series.id)}) == {"id": "Every week · Monday · 10:00"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_removing_a_block_says_its_title_its_day_its_hour_and_whose_it_is(salon, language):
     """A blocked period by its title, as the Agenda paints it, its day and hour and its professional; a whole day says no
@@ -231,7 +230,7 @@ def test_removing_a_block_says_its_title_its_day_its_hour_and_whose_it_is(salon,
     assert holiday == {"id": f"Local holiday · {day_label(MONDAY + dt.timedelta(days=1), language)}"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names(salon):
     """Each id names its own record, never another of the list (the first, the last, the newest)."""
     diary = make_diary(salon)
@@ -250,7 +249,7 @@ def test_among_several_the_card_says_the_one_the_write_names(salon):
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_professional_the_person_may_not_read_is_left_out_never_said_by_their_id(salon):
     """The professional is read by Staff's own read (``staff.view``): without it, the card names nobody."""
     diary = make_diary(salon)
@@ -261,7 +260,7 @@ def test_a_professional_the_person_may_not_read_is_left_out_never_said_by_their_
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ON_A_SERIES)
 def test_a_series_the_person_may_not_read_is_left_out(salon, write):
     diary = make_diary(salon)
@@ -273,7 +272,7 @@ def test_a_series_the_person_may_not_read_is_left_out(salon, write):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_no_series_of_somebody_else(salon):
     """An employee sees only their own diary (``visible``): somebody else's series is not theirs to read."""
     diary = make_diary(salon)
@@ -281,7 +280,7 @@ def test_an_employee_reads_no_series_of_somebody_else(salon):
     assert shown("appointment.recurring.deactivate", {"id": str(diary.series.id)}, ctx=employee) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_block_the_person_may_not_read_is_left_out(salon):
     diary = make_diary(salon)
     arguments = {"id": str(diary.training.id)}
@@ -290,7 +289,7 @@ def test_a_block_the_person_may_not_read_is_left_out(salon):
     assert said == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_appointments_the_person_may_not_read_are_counted_never_named_nor_said_by_their_id(salon):
     """A list says how many it carries even when none can be named for this person (live.assistant ``said``)."""
     diary = make_diary(salon)
@@ -301,14 +300,14 @@ def test_appointments_the_person_may_not_read_are_counted_never_named_nor_said_b
     assert no_id(card)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("write", ["appointment.blocked_time.delete", *ON_A_SERIES])
 def test_a_record_that_does_not_exist_is_left_out(salon, write):
     make_diary(salon)
     assert shown(write, {"id": A_MISSING_ID}) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record(salon):
     """An automation's card (no person at hand) names no professional, series nor block: nothing is read."""
     diary = make_diary(salon)
@@ -324,8 +323,7 @@ def test_nobody_behind_the_request_reads_no_record(salon):
         assert {"id", "staff_id"}.isdisjoint(field["name"] for field in card["fields"]), write
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
+@HUB_DB
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
     in_a, in_b = as_admin(scope=Scope("host", hub_a.slug)), as_admin(scope=Scope("host", hub_b.slug))
@@ -345,7 +343,7 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
 # ── The reads that name a series and a block ──────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_series_is_named_in_the_language_of_whoever_reads_it_whatever_the_one_active(salon):
     """The model and the API read a series too (``appointment.recurring.get``): its name is in the caller's language,
     not in the one the server happens to have active (English here)."""
@@ -354,7 +352,7 @@ def test_a_series_is_named_in_the_language_of_whoever_reads_it_whatever_the_one_
     assert spanish.label == "Lucía Pérez · Cada semana · Lunes · 10:00"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_block_is_named_in_the_language_of_whoever_reads_it_whatever_the_one_active(salon):
     diary = make_diary(salon)
     spanish = run("appointment.blocked_time.get", {"id": str(diary.holiday.id)}, language="es")
@@ -371,7 +369,7 @@ def test_the_read_that_names_a_block_is_no_tool_nor_route():
 # ── Titles: every record by a word of its own ─────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 def test_every_record_a_write_names_is_titled_with_the_screens_word_in_each_language(salon, language):
     """Every datum of a write of Appointments that names a record, sent with a real one, is called as its list calls one

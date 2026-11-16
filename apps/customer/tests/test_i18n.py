@@ -21,7 +21,7 @@ from base.tests.po import (
     untranslated,
 )
 
-from .conftest import run
+from .conftest import HOST, HUB_DB, run
 
 LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -102,14 +102,14 @@ def test_spanish_texts():
         assert str(models.HealthRecord.TestResult.NEGATIVE.label) == "Negativa"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/customer/customers",
         json.dumps({"name": "Ana", "phone": "600111"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 422
@@ -140,7 +140,7 @@ def test_what_an_earlier_app_also_translates_says_the_same_here():
     ) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field():
     """CUSTOMER-F04 «Si falla»: what the person reads in Spanish under each field."""
     visits = models.CustomField.objects.create(name="Visits", field_type="number")
