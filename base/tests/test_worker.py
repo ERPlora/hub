@@ -218,7 +218,7 @@ def nobody_without_a_database(monkeypatch) -> list:
     """Stands in for the registry's businesses still on control's database (``services.hubs_on_control``), read once at
     start: none here (``test_it_names_each_ready_business_without_its_own_database``)."""
     waiting: list = []
-    monkeypatch.setattr(worker.services, "hubs_on_control", lambda: waiting)
+    monkeypatch.setattr(worker.services.hub_registry, "hubs_on_control", lambda: waiting)
     return waiting
 
 

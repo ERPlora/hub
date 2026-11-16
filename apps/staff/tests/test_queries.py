@@ -11,7 +11,7 @@ from live.operations import get
 
 from apps.staff.models import Member, StaffSettings, TimeOff
 from apps.staff.queries import ROLE_UNAVAILABLE
-from base.services import ensure_hub_user
+from base.services.sessions import ensure_hub_user
 from apps.staff.schemas import (
     AccountListIn,
     AccountPage,

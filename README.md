@@ -12,6 +12,7 @@ uv run python manage.py migrate && uv run python manage.py seed_local_hubs   # d
 uv run python manage.py runserver    # Django en a.localhost:8000 y Vite (`pnpm run dev`)
 uv run pytest -q                     # Postgres de compose.yaml (`docker compose up -d`)
 uv run lint-imports                  # cada app importa solo lo que requiere; contratos en pyproject.toml (la suite lo corre)
+uv run complexipy                    # complejidad cognitiva ≤ 15; lo de antes, congelado en complexipy-snapshot.json (la suite lo corre)
 ```
 
 `DEBUG` está apagado si no se define: sin `DEBUG=True` en `.env` (o en el entorno), los ajustes
@@ -160,7 +161,7 @@ del Hub» de erplora-next.
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
   Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
   la fila sin entrar en ella (`registry.database_is_made`). Cada paso escribe
-  control en una transacción corta (`base/services/`, «The provisioning's writes in control») y se puede repetir. Un
+  control en una transacción corta (`base/services/provisioning.py`) y se puede repetir. Un
   fallo deja `failed` con `attempts`, `last_error` (`<código>: <motivo>`: `no_cluster_available`, `template_missing`,
   `clone_failed`, `schema_failed`, `photo_moving`, `unexpected`) y `next_attempt_at` (1 min, 5 min, 15 min y luego cada hora). La
   puerta del host responde 503 en todos esos estados. `CREATE`/`DROP DATABASE` van por `base/tenancy/ops.py`: conexión
@@ -487,7 +488,7 @@ Control guarda el usuario de la sesión (`auth.User`, la copia `saas:<id>` de la
 (`Membership`); la BD del hub guarda a la persona del negocio, `base.HubUser`: `username` (`saas:<id>`, `demo:<slug>`),
 `account_id` (la cuenta de erplora.com; ninguna para el dueño de una demo), nombre, correo, `is_active` y su alta. Nunca
 se borra: quien se va conserva su nombre en lo que firmó y deja de estar activo. Se crea o se pone al día en cada
-entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.ensure_hub_user`), en la primera escritura de quien
+entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.sessions.ensure_hub_user`), en la primera escritura de quien
 aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`; la de un negocio cuya BD aún se prepara, en
 su siembra). Las
 apps enlazan a ella, nunca a `settings.AUTH_USER_MODEL` (lint «(h)»): `staff` (registro y aprobación de ausencias),

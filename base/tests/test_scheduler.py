@@ -297,7 +297,7 @@ def test_a_task_that_raises_is_logged_rolled_back_and_the_others_still_run(
     fake_operation(monkeypatch, "test.task.boom", boom)
     scheduler.sync(at(9, 59), declared=[task("boom"), task("tick")])
 
-    with caplog.at_level(logging.ERROR, logger="base.services"):
+    with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
         assert scheduler.run_due(at(10, 0)) == ["test.tick"]
 
     assert len(ticks) == 1
@@ -315,7 +315,7 @@ def test_a_task_that_raises_is_logged_rolled_back_and_the_others_still_run(
 def test_a_task_whose_operation_is_gone_is_logged_and_rescheduled(caplog):
     scheduler.sync(at(9, 59), declared=[task("vanished")])
 
-    with caplog.at_level(logging.ERROR, logger="base.services"):
+    with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
         assert scheduler.run_due(at(10, 0)) == []
 
     assert "test.vanished" in caplog.text

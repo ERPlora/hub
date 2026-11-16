@@ -112,10 +112,10 @@ class TestExpireNow:
         assert "a is no demo" in html.lower() and "1 demo ended" in html
 
     def test_read_only_staff_neither_see_it_nor_run_it(self, client, make_user, demo):
-        from base import services
+        from base.services import sessions
 
         support = make_user("support", is_staff=True)
-        support.groups.add(services._support_group())
+        support.groups.add(sessions._support_group())
         client.force_login(support)
         assert "expire_now" not in client.get("/admin/control/hub/", HTTP_HOST=PLATFORM).content.decode()
         self.expire_now(client, demo)

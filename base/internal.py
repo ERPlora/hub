@@ -102,11 +102,10 @@ from live.errors import OperationError
 from live.operations import get as get_operation
 from pydantic import ValidationError
 
-from base import registry, relay
+from base import registry, relay, services
 from base.registry import REGISTRY_SCOPE
 from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.identity import HubIdentityMismatch
-from base.services import DEMO_FULL_RETRY_AFTER_SECONDS, WHATSAPP_APP
 from base.throttle import AttemptLimit, RateLimited, client_key
 
 # ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
@@ -286,7 +285,7 @@ def demos(request: HttpRequest) -> HttpResponse:
     answer, refused = _operation_call("base.demo.create", body, _registry_context())
     if refused is not None:
         if refused.status_code == 503:
-            refused["Retry-After"] = str(DEMO_FULL_RETRY_AFTER_SECONDS)
+            refused["Retry-After"] = str(services.demos.DEMO_FULL_RETRY_AFTER_SECONDS)
         return refused
     return JsonResponse(answer.model_dump(mode="json"), status=202 if answer.created else 200)
 
@@ -342,7 +341,7 @@ def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:  # noqa: PL
     try:
         with use_hub(hub):
             # Which apps are on is the business's (its database): asked inside it, as the photo asks it.
-            if WHATSAPP_APP not in relay.active_apps(scope):
+            if services.photo.WHATSAPP_APP not in relay.active_apps(scope):
                 return refuse(404, "app_inactive", "WhatsApp is not on in this business.")
             answer, refused = _operation_call(name, body, system_context(scope))
     except HubIdentityMismatch:

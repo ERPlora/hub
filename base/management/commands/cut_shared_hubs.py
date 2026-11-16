@@ -15,7 +15,7 @@ Once ``control/0007`` renamed control's tables of the hubs' apps, ``--copy-all``
 
 from django.core.management.base import BaseCommand, CommandError
 
-from base import services
+from base.services import hub_registry, provisioning
 from base.tenancy import cut, dumps
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
@@ -56,7 +56,7 @@ class Command(BaseCommand):
     def handle(self, *args, dry_run=False, copy_all=None, recreate=(), skip=(), no_dump=False, **options):  # noqa: C901
         modes = self._modes(copy_all, recreate, skip)
         with use_control():
-            on_control = services.hubs_on_control()
+            on_control = hub_registry.hubs_on_control()
             refusals = self._refusals(modes)
             self._print_plan(on_control, modes, no_dump)
         for line in refusals:
@@ -69,7 +69,7 @@ class Command(BaseCommand):
         if not modes:
             raise CommandError("There is no business to cut: name each with --copy-all, --recreate or --skip.")
         with use_control():
-            rows = {slug: services.registry_row_by_slug(slug) for slug in modes}
+            rows = {slug: provisioning.registry_row_by_slug(slug) for slug in modes}
         to_cut = [
             slug
             for slug in sorted(modes, key=lambda slug: (modes[slug] != cut.COPY_ALL, slug))
@@ -116,9 +116,9 @@ class Command(BaseCommand):
     @staticmethod
     def _refusals(modes: dict[str, str]) -> list[str]:
         refusals = []
-        went_to = services.copy_all_went_to()
+        went_to = hub_registry.copy_all_went_to()
         for slug, mode in sorted(modes.items()):
-            hub = services.registry_row_by_slug(slug)
+            hub = provisioning.registry_row_by_slug(slug)
             if hub is None:
                 refusals.append(f"{slug}: no business has this name.")
             elif hub.is_demo:
@@ -139,7 +139,7 @@ class Command(BaseCommand):
         named = {hub.slug: hub for hub in on_control}
         for slug in modes:
             if slug not in named:
-                found = services.registry_row_by_slug(slug)
+                found = provisioning.registry_row_by_slug(slug)
                 if found is not None:
                     named[slug] = found
         self.stdout.write(f"Businesses on control's database: {len(on_control)}")

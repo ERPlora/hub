@@ -311,7 +311,7 @@ def platform_pass(on_the_platform_hub, settings):
 
 
 def linked(version: int = 1) -> None:
-    """erplora.com's photo of ERPlora's own hub, with its id (``base.services._sync_verifactu``)."""
+    """erplora.com's photo of ERPlora's own hub, with its id (``base.services.photo._sync_verifactu``)."""
     run("verifactu.config.sync", {"version": version, "hub_id": BUSINESS_ID}, system_context(PLATFORM))
 
 

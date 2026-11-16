@@ -32,7 +32,8 @@ import pytest
 from django.utils import timezone
 from psycopg import sql
 
-from base import registry, services
+from base import registry
+from base.services import provisioning, sessions
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, identity, move, names, restore
 from base.tenancy.context import use_control
@@ -207,16 +208,16 @@ class TestACopyAside:
         real = move._restore_from_bucket
 
         def restoring(key, name, cluster, heartbeat, cancelled=None):
-            held.append((services.claim_hub(hub.id, timezone.now(), restore.LEASE, owner="other:1") is not None,
+            held.append((provisioning.claim_hub(hub.id, timezone.now(), restore.LEASE, owner="other:1") is not None,
                          fresh(aside).lease_owner))
-            services.release_hub(hub.id, timezone.now(), owner="other:1")
+            provisioning.release_hub(hub.id, timezone.now(), owner="other:1")
             return real(key, name, cluster, heartbeat, cancelled)
 
         monkeypatch.setattr(move, "_restore_from_bucket", restoring)
 
         run(asides)
 
-        assert held == [(True, services.LEASE_OWNER)]
+        assert held == [(True, provisioning.LEASE_OWNER)]
 
 
 def aside_absent(aside: RestoredCopy) -> bool:
@@ -259,7 +260,7 @@ class TestSendingToTheTaxAuthorityIsOffInTheCopy:
         # No row of the registry names it, so the worker never serves it (VeriFactu's queue runs on the hubs served).
         assert not Hub.objects.filter(db_name=name).exists()
         with use_control():
-            assert name not in {served.db_name for served in services.hubs_to_serve(timezone.now())}
+            assert name not in {served.db_name for served in provisioning.hubs_to_serve(timezone.now())}
         # The app's roles do not reach it (they still reach the business's own database).
         assert (hubs.reaches(app_role, name), hubs.reaches(app_role, hub.db_name)) == (False, True)
         # Nor does any process of the app: even a row that named it would get no alias of it.
@@ -423,7 +424,7 @@ class TestTheCopyGoesThroughTheBucket:
             if not meanwhile:
                 meanwhile.append(control_services.claim_copy(second.pk, timezone.now(), restore.LEASE, OTHER_WORKER))
                 with monkeypatch.context() as patched:
-                    patched.setattr(services, "LEASE_OWNER", OTHER_WORKER)
+                    patched.setattr(provisioning, "LEASE_OWNER", OTHER_WORKER)
                     restore.make_aside(meanwhile[0], now=AT, source=lambda copied: other_moment)
                 control_services.release_copy(second.pk, OTHER_WORKER)
             return real(*args, **kwargs)
@@ -663,7 +664,7 @@ def staff(client, *, superuser: bool):
         else:
             # Support, as its sign-in makes it: staff in the group with every ``view_*`` permission.
             user = model.objects.create_user(username=name, password="pw", is_staff=True)
-            user.groups.add(services._support_group())
+            user.groups.add(sessions._support_group())
         client.force_login(user)
     return user
 
