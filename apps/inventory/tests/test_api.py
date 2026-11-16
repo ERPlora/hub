@@ -1,6 +1,6 @@
 """The inventory app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, its own database) with Django's sync test client, which sees the test's
 transaction. No path parameters: a product or a category travels in the input (query string on GET,
 body on POST), by its id or by its SKU or name.
 """
@@ -16,6 +16,8 @@ from apps.inventory.tests.test_product_image import IMAGE_ROUTES
 from apps.tax.models import TaxCategory
 from base.tests.routes import spa_routes
 from config.api import api
+
+from .conftest import A, B, HOST, HUB_DB
 
 ROUTES = {
     ("GET", "/inventory/products", "inventory.product.list"),
@@ -50,11 +52,11 @@ ROUTES = {
 TAX = "test.general"
 
 
-def get(client, path, host="a.localhost", **params):
+def get(client, path, host=HOST, **params):
     return client.get(f"/api{path}", params, HTTP_HOST=host)
 
 
-def post(client, path, data, host="a.localhost"):
+def post(client, path, data, host=HOST):
     return client.post(f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host)
 
 
@@ -65,13 +67,13 @@ def tax(db):
 
 @pytest.fixture
 def admin_client(client, make_user, tax):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user, tax):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     return client
 
 
@@ -122,14 +124,14 @@ def test_the_spas_route_map_names_every_inventory_route():
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (get(client, "/inventory/products"), post(client, "/inventory/products", {"name": "x"})):
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_but_does_not_write(employee_client):
     for path in ("/inventory/products", "/inventory/categories", "/inventory/movements", "/inventory/stock/summary"):
         assert get(employee_client, path).status_code == 200, path
@@ -144,15 +146,15 @@ def test_an_employee_reads_but_does_not_write(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/inventory/products", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/inventory/products", host=f"{B.key}.localhost").status_code == 403
 
 
 # Validation and refusals
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_product_is_422_per_field(admin_client):
     response = post(admin_client, "/inventory/products", {"name": "", "sku": "X", "price": -1, "tax_category_key": TAX, "unit": "lb"})
     assert response.status_code == 422
@@ -161,19 +163,19 @@ def test_an_invalid_product_is_422_per_field(admin_client):
     assert set(error["fields"]) == {"name", "price", "unit"}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_sku_is_not_editable(admin_client):
     response = post(admin_client, "/inventory/products/update", {"product": "X", "sku": "NEW"})
     assert (response.status_code, set(response.json()["error"]["fields"])) == (422, {"sku"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/inventory/products", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (422, {"limit"})
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_domain_refusal_is_a_409_with_its_code_and_field(admin_client):
     product = {"name": "Coffee", "sku": "CAF", "price": 150, "tax_category_key": TAX}
     assert post(admin_client, "/inventory/products", product).status_code == 201
@@ -186,7 +188,7 @@ def test_a_domain_refusal_is_a_409_with_its_code_and_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_product_is_404_and_a_product_not_named_is_422(admin_client):
     missing = get(admin_client, "/inventory/products/detail", id=str(uuid.uuid7()))
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "not_found")
@@ -194,7 +196,7 @@ def test_a_missing_product_is_404_and_a_product_not_named_is_422(admin_client):
     assert unnamed.status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_sold_out_article_leaves_what_the_till_asks_for_until_it_is_back_on_sale(admin_client):
     product = {"name": "Croquettes", "sku": "CRO", "price": 150, "tax_category_key": TAX}
     assert post(admin_client, "/inventory/products", product).status_code == 201
@@ -210,7 +212,7 @@ def test_a_sold_out_article_leaves_what_the_till_asks_for_until_it_is_back_on_sa
     assert get(admin_client, "/inventory/products", is_active="true").json()["total"] == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_inventory_f25_the_label_is_asked_for_over_http_and_lands_in_the_print_queue(admin_client):
     from apps.printing.models import PrintJob
 
@@ -225,7 +227,7 @@ def test_inventory_f25_the_label_is_asked_for_over_http_and_lands_in_the_print_q
     assert post(admin_client, "/inventory/products/print_label", {}).status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_marking_sold_out_without_saying_which_is_422(admin_client):
     assert post(admin_client, "/inventory/products/sold_out", {"product": "CRO"}).status_code == 422
     assert post(admin_client, "/inventory/products/sold_out", {"sold_out": True}).status_code == 422
@@ -234,7 +236,7 @@ def test_marking_sold_out_without_saying_which_is_422(admin_client):
 # The whole app over HTTP
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_round_trip(admin_client):
     drinks = post(admin_client, "/inventory/categories", {"name": "Drinks"})
     assert drinks.status_code == 201

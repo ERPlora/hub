@@ -20,9 +20,9 @@ from base.models import Hub, Membership
 from base.permissions import permissions_for
 from base.tests.test_image_catalog import image_library  # noqa: F401 - the library fixture
 
-from .conftest import A
+from .conftest import A, HUB_DB
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 LATTE = "catalog:hospitality/cafe_con_leche"
 ASKED = "ponle foto al café con leche"
