@@ -14,13 +14,7 @@ from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.reservation.models import (
-    BlockedDate,
-    Reservation,
-    Settings,
-    TimeSlot,
-    WaitlistEntry,
-)
+from apps.reservation.models import BlockedDate, Reservation, Settings, TimeSlot, WaitlistEntry
 
 from .conftest import (
     A,
