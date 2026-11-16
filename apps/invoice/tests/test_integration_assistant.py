@@ -21,7 +21,7 @@ from apps.invoice.tests.conftest import HUB_DB, ISSUER, ctx_for, run
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 from base.tests.test_services_assistant import answered, waiting
 
 LOCALE = Path(apps.get_app_config("invoice").path) / "frontend/locale"
