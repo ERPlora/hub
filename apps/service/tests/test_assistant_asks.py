@@ -18,6 +18,9 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, Operation, registry
 
+from apps.invoice.tests.conftest import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+from apps.invoice.tests.conftest import in_hubs
+from apps.service.tests.conftest import HUB_DB
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
@@ -26,7 +29,6 @@ from base.tests.test_assistant_asks import assert_reported_are_owner_probes, com
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test, probes_test
 from base.tests.test_assistant_asks import reported_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
 
 PROBES_DIR = Path(settings.BASE_DIR) / "tests" / "e2e" / "qa" / "probes"
 
@@ -203,15 +205,15 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     assert_reported_are_owner_probes(REPORTED)
 
 
-test_the_reported_service_request_offers_its_existing_operation = reported_test(REPORTED)
+test_the_reported_service_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
 
 
 #: The owner's forty-six phrases of layer 2, the ones the model answered right too: a tool of Services that a new ask
 #: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
-test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = probes_test(PROBES, "service")
+test_every_probe_of_services_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "service"))
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "probe", [probe for probe in PROBES if probe["tool"] in FIRST_TEN], ids=lambda probe: probe["id"]
 )
@@ -226,7 +228,7 @@ def test_the_close_probes_are_probes_of_services():
     assert FIRST_TEN <= {probe["tool"] for probe in PROBES}  # positive control: no name of the list is mistyped
 
 
-test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_owners_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Services that needs one, neither
@@ -279,7 +281,7 @@ OWN_WORDS_EN = [
     ("service.settings.get", "how much buffer do we leave by default?"),
     ("service.settings.update", "I want fifteen minutes between them by default"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("service", OWN_WORDS_EN)
 
 
@@ -289,7 +291,7 @@ def test_every_tool_of_services_has_its_own_words():
     assert {name for name, _ in OWN_WORDS} == tools
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize(("name", "language", "ask"), MOVED)
 def test_services_leaves_room_to_the_asks_of_other_apps_it_moves(catalog_of, name, language, ask):
     assert ask in shared.asks_of(registry[name])[language]  # positive control: it is still that tool's ask
@@ -335,7 +337,7 @@ BY_THE_GROUPS = [
 ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), BY_THE_GROUPS)
 def test_the_groups_of_services_bring_a_new_request_to_its_tool(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
@@ -384,7 +386,7 @@ def lost_places(before: list[str], now: list[str], name: str) -> set[str] | None
     return None if after is None else after - then
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
     """Each request of Appointments and of Sales' checks of layer 2 that a turn offers its tool for keeps it ahead of
     the same vouchers, sessions and assignments of Services whether their tools say their asks or not: none climbs past
@@ -403,7 +405,7 @@ def test_services_asks_take_no_place_from_sales_nor_appointments(catalog_of):
     assert lost == {}
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_services_groups_take_no_place_from_sales_nor_appointments(catalog_of):
     """The same requests, with and without the Hub's groups of Services («bono», «asignación»): none loses its place to
     a voucher, a session or an assignment of Services, unless the request names an assignment itself."""

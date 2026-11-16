@@ -26,18 +26,11 @@ from apps.service.schemas import (
 )
 
 from .conftest import (
-    A,
-    ctx_for,
-    make_customer,
-    make_grant,
-    make_package,
-    make_redemption,
-    make_service,
-    make_tax,
+    HUB_DB, A, ctx_for, make_customer, make_grant, make_package, make_redemption, make_service, make_tax,
 )
 from live.context import system_context
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin", **ctx):

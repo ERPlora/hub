@@ -1,6 +1,10 @@
 """Fixtures of the service tests: contexts per role and scope, users with a role on a host, a raw DSN,
 and builders of the data a test starts from (straight to the models: the operations are under test).
 
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
+of B asks for ``hub_b`` and enters it.
+
 The builders import the models lazily, so that the tests of apps.py still collect while models.py
 does not exist.
 """
@@ -15,20 +19,20 @@ from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from psycopg.conninfo import make_conninfo
 
+from apps.flow.tests.test_relay import worker_loop
+from apps.sale.tests.conftest import night_elsewhere
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
-
-
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database (the tests
-    with the hubs ``hub_a`` and ``hub_b`` of the root conftest, each with its own database)."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
+#: The marks, scopes and fixtures of the businesses' own databases (the platform staff with business A chosen in the Hub
+#: admin, business A at night in another zone or on a plan with room for several sessions, the worker's real loop over
+#: them) that these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "hub_staff", "in_business_a", "night_elsewhere", "plan_with_room",
+    "worker_loop",
+]
 
 
 def ctx_for(
@@ -58,7 +62,7 @@ def make_user(db):
     def make(
         username: str = "ana",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.ADMIN,
     ):
         user = get_user_model().objects.create_user(username=username, password="pw")
@@ -73,7 +77,7 @@ def make_user(db):
 
 @pytest.fixture
 def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    """DSN of control's test database, where the live notices go after the COMMIT, for raw psycopg sessions."""
     params = connections["default"].settings_dict
     return make_conninfo(
         dbname=params["NAME"],

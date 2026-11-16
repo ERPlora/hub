@@ -7,7 +7,8 @@ The operations check every rule first, with their own messages; these constraint
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.service.models import (
     parent_problem,
@@ -22,23 +23,17 @@ from apps.service.models import (
     ServiceSettings,
 )
 from apps.service.tests.conftest import (
-    make_category,
-    make_customer,
-    make_grant,
-    make_member,
-    make_package,
-    make_service,
-    make_tax,
+    HUB_DB, make_category, make_customer, make_grant, make_member, make_package, make_service, make_tax,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(**create) -> bool:
     """Whether creating ``model(**fields)`` breaks a constraint (inside its own savepoint)."""
     model, fields = create.pop("model"), create
     try:
-        with transaction.atomic():
+        with atomic():
             model.objects.create(**fields)
     except IntegrityError:
         return True
@@ -107,7 +102,7 @@ def test_a_live_category_name_is_unique_ignoring_case_and_a_deleted_one_frees_it
 def test_a_category_is_not_its_own_parent():
     hair = make_category("Hair")
     hair.parent = hair
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         hair.save()
 
 
