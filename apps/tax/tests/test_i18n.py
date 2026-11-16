@@ -4,7 +4,6 @@ import gettext
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
@@ -21,6 +20,8 @@ from base.tests.po import (
     operation_titles,
     untranslated,
 )
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("tax").path) / "locale" / "es" / "LC_MESSAGES"
 SCREENS = Path(apps.get_app_config("tax").path) / "frontend" / "locale" / "es.json"
@@ -130,14 +131,14 @@ def test_each_model_says_active_and_when_in_its_own_gender():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/tax/categories",
         json.dumps({"key": "restaurant.food", "name": "x"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409

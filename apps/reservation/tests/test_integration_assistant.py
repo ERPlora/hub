@@ -16,7 +16,7 @@ from base import assistant
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import technical_names
-from base.tests.test_assistant_card_values import AN_ID
+from base.tests.test_assistant_card_values_references import AN_ID
 
 from .conftest import (
     HUB_DB,

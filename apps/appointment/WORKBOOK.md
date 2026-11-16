@@ -922,7 +922,7 @@ agenda tuya que enseñar.».
   y no el de otra app.
 - **Cómo se nombra el resto en una tarjeta** (BASE-F97, hub#635): cada id de una escritura de Citas lleva su marca
   `refers` de `schemas.py`, leída como quien pregunta y con su permiso; el trinquete de
-  `base/tests/test_assistant_card_values.py` deja Citas a 0. El profesional (`staff_id` de reservar varias, editar,
+  `base/tests/test_assistant_card_values_references.py` deja Citas a 0. El profesional (`staff_id` de reservar varias, editar,
   bloquear y crear o editar una serie; `A_MEMBER`) por su nombre con `staff.member.detail` (`staff.view`); cada cita
   de `bulk_delete` (`ids`, título «Citas») con `AN_APPOINTMENT`, y la tarjeta dice cuántas aunque no pueda nombrar
   ninguna; la serie (`SeriesId` de pausar, reactivar, borrar, reservar y editar; título «Cita periódica»;

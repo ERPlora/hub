@@ -5,11 +5,14 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.utils import translation
+from live.operations import atomic
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule, TaxSettings
+
+from .conftest import HUB_DB
 
 CANONICAL_KEYS = {
     "restaurant.food",
@@ -37,7 +40,7 @@ def rule(cat, rate="21", country="ES", **fields):
 
 
 def violates(constraint, create):
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+    with pytest.raises(IntegrityError) as excinfo, atomic():
         create()
     return constraint in str(excinfo.value)
 
@@ -45,7 +48,7 @@ def violates(constraint, create):
 # Keys and defaults
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_keys_are_uuid7(no_seed):
     cat = category()
     root = rule(cat)
@@ -53,7 +56,7 @@ def test_keys_are_uuid7(no_seed):
     assert (cat.pk.version, root.pk.version, alias.pk.version) == (7, 7, 7)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_defaults(no_seed):
     cat = category()
     root = rule(cat)
@@ -91,12 +94,13 @@ def test_choices():
 # TaxCategory: the linkable key of inventory and service
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_key_is_unique(no_seed):
     category("product.books")
     assert violates("tax_taxcategory_key", lambda: category("product.books", "Other"))
 
 
+@HUB_DB  # full_clean checks the model's constraints in the database
 @pytest.mark.parametrize(
     "key", ["Product", "1product", "product-books", "product books", "", "x" * 81]
 )
@@ -106,6 +110,7 @@ def test_a_key_has_the_canonical_shape(key):
     assert "key" in excinfo.value.message_dict
 
 
+@HUB_DB  # full_clean checks the model's constraints in the database
 @pytest.mark.parametrize("key", ["product.books", "a", "service.health_2", "x" * 80])
 def test_canonical_keys_are_valid(key):
     TaxCategory(key=key, name="x").full_clean(validate_unique=False)
@@ -145,7 +150,7 @@ def test_an_own_category_keeps_the_text_that_was_typed():
         assert own_food.display_name == "Comida de la casa"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_category_with_rules_or_aliases_is_never_deleted(no_seed):
     with_rule, with_alias = category("product.a"), category("product.b")
     rule(with_rule)
@@ -158,21 +163,21 @@ def test_a_category_with_rules_or_aliases_is_never_deleted(no_seed):
 # TaxRule: what the database refuses whatever door the row comes through
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_rate_keeps_two_decimals(no_seed):
     surcharge = rule(category(), rate="5.2")
     surcharge.refresh_from_db()
     assert surcharge.rate_pct == Decimal("5.20")
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("rate", ["-0.01", "100.01"])
 def test_the_rate_is_between_0_and_100(no_seed, rate):
     cat = category()
     assert violates("tax_rule_rate_range", lambda: rule(cat, rate=rate))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_0_and_100_are_rates(no_seed):
     cat = category()
     rule(cat, rate="0", valid_to=date(2020, 1, 1))
@@ -180,7 +185,7 @@ def test_0_and_100_are_rates(no_seed):
     assert cat.rules.count() == 2
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "operation_class",
     ["subject_reverse", "exempt", "not_subject", "not_subject_location"],
@@ -194,7 +199,7 @@ def test_a_class_that_charges_no_tax_has_no_rate(no_seed, operation_class):
     rule(cat, rate="0", operation_class=operation_class)  # at 0 % it is legitimate
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_validity_range_runs_forwards(no_seed):
     cat = category()
     backwards = {"valid_from": date(2026, 2, 1), "valid_to": date(2026, 1, 31)}
@@ -222,7 +227,7 @@ def test_in_force_on_is_inclusive_and_open_when_empty(
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_root_with_components_is_never_deleted(no_seed):
     cat = category()
     root = rule(cat)
@@ -244,7 +249,7 @@ def test_a_component_is_labelled_by_its_label_or_its_tax_type():
 # TaxAlias
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_alias_is_unique(no_seed):
     cat = category()
     TaxAlias.objects.create(alias="books", category=cat)
@@ -254,7 +259,7 @@ def test_an_alias_is_unique(no_seed):
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_how_a_rule_reads(no_seed):
     cat = category("restaurant.food")
     assert str(rule(cat, rate="7", region_code="ES-CN")) == "ES ES-CN · restaurant.food · 7 %"
@@ -265,14 +270,14 @@ def test_how_a_rule_reads(no_seed):
 # country, region, category and first day, deactivated ones included.
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_root_twin_of_a_deactivated_root_is_refused(no_seed):
     cat = category()
     rule(cat, valid_from=date(2026, 1, 1), is_active=False)
     assert violates("tax_rule_root_natural_key", lambda: rule(cat, rate="22", valid_from=date(2026, 1, 1)))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_since_always_twice_is_the_same_root(no_seed):
     # An empty first day means «since always»: two of them are the same key (NULLs not distinct).
     cat = category()
@@ -280,7 +285,7 @@ def test_since_always_twice_is_the_same_root(no_seed):
     assert violates("tax_rule_root_natural_key", lambda: rule(cat, rate="22"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_other_first_days_regions_countries_and_components_are_other_keys(no_seed):
     cat = category()
     root = rule(cat, valid_from=date(2026, 1, 1), is_active=False)
@@ -306,7 +311,7 @@ def test_the_two_alcohol_categories_say_where_the_drink_is_drunk():
 # The business's tax settings (TAX-F11): one row at most, the whole country until a region is kept
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_tax_settings_are_one_row_of_the_whole_country():
     kept = TaxSettings.objects.create()
     assert (kept.pk.version, kept.region_code, kept.updated_by) == (7, "", "")

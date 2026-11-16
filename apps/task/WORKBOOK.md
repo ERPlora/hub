@@ -529,7 +529,7 @@ cliente o a un compañero).
   con la palabra de su lista («Tarea», «Proyecto»), nunca «Registro». Sin persona detrás, sin `task.view` (o sin
   `staff.view` para una persona), una tarea que el empleado no ve, un id de otro negocio o algo que ya no está: el
   registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Dicho por su nombre, el `task` de
+  `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. Dicho por su nombre, el `task` de
   `TaskRefIn` y el `project` de `ProjectRefIn` llevan la misma marca leída por ese nombre (`A_TASK_BY_NAME`,
   `A_PROJECT_BY_NAME`: una tarea se busca sola por su número o su título y un proyecto solo por su código o su nombre),
   y las siete escrituras cuya entrada es una de ellas declaran su `check` (`base.assistant.cards.checked`):

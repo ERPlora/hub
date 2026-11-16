@@ -793,7 +793,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   catálogo de la app), nunca «Registro»; `combo_id`, `group_id` y `product_id` ya salen así por el `verbose_name`
   de la clave del modelo. Sin persona detrás, sin `combo.view` o `inventory.view_product`, con un id de otro negocio
   o de algo retirado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete
-  `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Dicho por
+  `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values_references.py` impide que entre un dato sin marca. Dicho por
   su nombre, el `combo` de `ComboRefIn` lleva la misma marca leída por ese nombre (`A_MENU_BY_NAME`), y las cuatro
   herramientas cuya entrada es `ComboRefIn` (`combo.combo.update`, `combo.combo.delete`, `combo.combo.set_image` y
   `combo.group.reorder`; `combo.combo.upload_image` no es herramienta) declaran `check: combo.combo.get`

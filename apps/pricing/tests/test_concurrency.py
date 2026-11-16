@@ -12,50 +12,41 @@ admin's (the row's delete()) are landed there.
 The detail of a price list that a deletion lands in the middle of answers what it read or 404, never a 500.
 """
 
-import threading
-import time
 from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
-from django.db import connection, transaction
+from django.db import connections
 from live.errors import OperationError
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.customer.models import CustomerGroup
-from apps.inventory.models import Category, Product
+from apps.customer.schemas import GroupRefIn
+from apps.inventory.models import Category
+from apps.inventory.tests import test_concurrency as inventory
+from apps.inventory.tests.test_concurrency import (
+    DELETIONS,
+    LOCK_TIMEOUT,
+    attempt,
+    deleted,
+    deleted_after_the_first_read_of,
+    deleted_in_flight,
+    deleted_just_before,
+    held,
+)
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
+from base.tenancy.context import current_alias
+from base.tenancy.tests.concurrency import at_once
 
-from .conftest import ctx_for, make_category, make_group, make_item, make_list, make_product, make_rule
+from .conftest import HUB_DB_COMMITTED, ctx_for, make_category, make_group, make_item, make_list, make_product, make_rule
 
-pytestmark = pytest.mark.django_db(transaction=True)
+#: Several sessions of the business at once, each committing: its plan has room for them all.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def run(name, data):
     op = get(name)
     return op(ctx_for("hub_admin"), op.input.model_validate(data))
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except Exception as error:  # an expected refusal or an unexpected failure, both reported
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
 
 
 def test_two_lists_made_general_at_once_leave_one_general_list():
@@ -102,116 +93,11 @@ def test_the_same_price_at_once_is_put_once():
 # A row another write names, deleted at the same time
 
 
-DELETIONS = ["operation", "row"]
-#: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).
-LOCK_TIMEOUT = "300ms"
-#: Postgres' ``lock_not_available``: the deletion found the row held.
-LOCK_NOT_AVAILABLE = "55P03"
-#: How long a deletion under way holds its row before it commits.
-IN_FLIGHT = 0.5
-#: The business's «Delete» of each kind of row; the Hub admin's is the row's delete().
-DELETE_OPERATIONS = {
-    Category: "inventory.category.delete",
-    Product: "inventory.product.delete",
-    CustomerGroup: "customer.group.delete",
-}
-
-
-def remove(target, how: str) -> None:
-    if how == "operation":
-        run(DELETE_OPERATIONS[type(target)], {"id": str(target.id)})
-    else:
-        # What the Hub admin's «Delete» does: ModelAdmin.delete_model is the row's delete().
-        type(target).objects.get(pk=target.pk).delete()
-
-
-def delete(target, how: str) -> None:
-    """Deletes ``target`` in this session, giving up after LOCK_TIMEOUT on a row another session holds. The
-    lock timeout is the transaction's (SET LOCAL): a session-level one would go back with the connection and
-    reach the tests after this one (the autouse fixture of conftest.py fails a test that leaves it)."""
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
-        remove(target, how)
-
-
-@contextmanager
-def deleted_just_before(statement: str, target, how: str):
-    """Deletes ``target`` in another session right before the first statement of this one that starts with
-    ``statement`` (the write that names it): between the read that found it and the write, every time. It
-    commits, or waits for this session when it holds the row (and gives up)."""
-    deletions: list = []
-
-    def wrapper(execute, sql, params, many, context):
-        if not deletions and sql.lstrip().startswith(statement):
-            deletions.extend(at_once(lambda: delete(target, how)))
-        return execute(sql, params, many, context)
-
-    with connection.execute_wrapper(wrapper):
-        yield deletions
-
-
-@contextmanager
-def deleted_in_flight(target, how: str):
-    """A deletion of ``target`` under way in another session when this one first reads its table: it holds
-    the row, as a deletion takes it first, and commits a moment later while this one goes on."""
-    table = f'FROM "{type(target)._meta.db_table}"'
-    holds = threading.Event()
-    deletions: list = []
-
-    def deletion():
-        try:
-            with transaction.atomic():
-                type(target).objects.select_for_update().get(pk=target.pk)
-                holds.set()
-                time.sleep(IN_FLIGHT)
-                remove(target, how)
-            deletions.append("ok")
-        except Exception as error:  # reported to the test, which fails on it
-            deletions.append(repr(error))
-        finally:
-            holds.set()
-            connection.close()
-
-    thread = threading.Thread(target=deletion)
-
-    def wrapper(execute, sql, params, many, context):
-        if thread.ident is None and sql.lstrip().upper().startswith("SELECT") and table in sql:
-            thread.start()
-            holds.wait(5)
-        return execute(sql, params, many, context)
-
-    try:
-        with connection.execute_wrapper(wrapper):
-            yield deletions
-    finally:
-        if thread.ident is not None:
-            thread.join(30)
-
-
-def deleted(deletions) -> list[str]:
-    return ["ok" if not isinstance(result, Exception) else repr(result) for result in deletions]
-
-
-def sqlstate(error) -> str | None:
-    while error is not None:
-        if getattr(error, "sqlstate", None):
-            return error.sqlstate
-        error = error.__cause__ or error.__context__
-    return None
-
-
-def held(deletions) -> bool:
-    """The deletion waited for the row this write holds (and gave up)."""
-    return len(deletions) == 1 and sqlstate(deletions[0]) == LOCK_NOT_AVAILABLE
-
-
-def attempt(call):
-    """What ``call`` answers: its result, or the error it is refused with (a 500 is raised as it comes)."""
-    try:
-        return call()
-    except OperationError as error:
-        return error
+@pytest.fixture(autouse=True)
+def the_business_deletes_a_customer_group_too(monkeypatch):
+    """Inventory's deletion helpers delete a product or a category as the business does; a customer group the same
+    way, with Customers' «Delete»."""
+    monkeypatch.setitem(inventory.DELETE_OPERATIONS, CustomerGroup, ("customer.group.delete", GroupRefIn))
 
 
 @pytest.fixture
@@ -374,23 +260,6 @@ def test_a_customer_group_being_deleted_when_a_write_names_it_is_refused(world, 
 # The detail of a price list: a deletion that lands in the middle of a read
 
 
-@contextmanager
-def deleted_after_the_first_read_of(target, how: str):
-    """Commits the deletion of ``target`` (``how``, as ``remove``) in another session right after the first
-    statement of this one that reads its table: a deletion landing in the middle of a read, every time."""
-    table = f'FROM "{type(target)._meta.db_table}"'
-    deletions: list = []
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
-            deletions.extend(at_once(lambda: delete(target, how)))
-        return result
-
-    with connection.execute_wrapper(wrapper):
-        yield deletions
-
-
 @pytest.fixture
 def vip_list(world):
     """A list of the VIP group with one price: what its detail shows beyond its own columns."""
@@ -427,7 +296,7 @@ def test_find_list_refuses_to_lock_the_rows_it_is_given(vip_list):
     # of the caller, told as such and not as a database error.
     from apps.pricing.queries import _lists, find_list
 
-    with transaction.atomic(), pytest.raises(TypeError, match="rows"):
+    with atomic(), pytest.raises(TypeError, match="rows"):
         find_list(vip_list.pk, None, lock=True, rows=_lists())
 
 
@@ -442,8 +311,8 @@ def changed_by_hand_just_before(statement: str, rule):
     changes: list = []
 
     def change():
-        with transaction.atomic():
-            with connection.cursor() as cursor:
+        with atomic():
+            with connections[current_alias()].cursor() as cursor:
                 cursor.execute(f"SET LOCAL lock_timeout = '{LOCK_TIMEOUT}'")
             run("pricing.rule.update", {"id": str(rule.id), "name": "Renamed by hand"})
 
@@ -452,7 +321,7 @@ def changed_by_hand_just_before(statement: str, rule):
             changes.extend(at_once(change))
         return execute(sql, params, many, context)
 
-    with connection.execute_wrapper(wrapper):
+    with connections[current_alias()].execute_wrapper(wrapper):
         yield changes
 
 
