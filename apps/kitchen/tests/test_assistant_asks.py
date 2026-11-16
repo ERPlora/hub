@@ -24,7 +24,8 @@ from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, offered_place, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB, in_hubs
 
 #: What only who runs the kitchen holds (``KitchenConfig.role_permissions``): cancelling or deleting a ticket, the
 #: stations and their routing, and the display's settings. An employee moves tickets and dishes, never these.
@@ -147,7 +148,7 @@ def test_kitchen_offers_at_least_29_tools():
     assert len(tools) >= 29
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_runs_the_kitchen_may_do(catalog_of):
     owner = catalog_of(Membership.Role.OWNER, "es")
     employee = catalog_of(Membership.Role.EMPLOYEE, "es")
@@ -163,13 +164,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_kitchen_request_is_offered_its_tool_without_being_its_asks(catalog_of, role, name, phrase):
     assert_offered_with_room(catalog_of(ROLES[role], "es"), name, phrase, "es")
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Kitchen that
@@ -185,7 +186,7 @@ def test_every_probe_of_kitchen_offers_its_tool_to_who_may_run_it(catalog_of, pr
     assert_offered_with_room(tools, name, phrase, probe["language"])
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("phrase", "name"), KITCHEN_WORDS, ids=[name for _, name in KITCHEN_WORDS])
 def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(catalog_of, phrase, name):
     tools = catalog_of(ROLES["owner"], "es")
@@ -193,8 +194,8 @@ def test_the_kitchens_own_words_bring_the_tool_they_mean_among_the_first_ten(cat
     assert_offered_with_room(tools, name, phrase, "es", room=TOP)
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(
-    OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS]
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(
+    own_words_test(OWN_WORDS, ids=[name for _, name, _ in OWN_WORDS])
 )
 
 
@@ -228,12 +229,12 @@ OWN_WORDS_EN = [
     ("kitchen.ticket.serve", "number 9 has left the pass, it's gone out"),
     ("kitchen.ticket.set_rush", "number 9 has to go first, they're in a hurry"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 ENGLISH_ABOVE = [name for language, name, _ in OWN_WORDS if language == "en"]
 test_each_tool_has_its_own_english_words = english_coverage_test("kitchen", OWN_WORDS_EN, ENGLISH_ABOVE)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("role", list(Membership.Role))
 def test_kitchen_takes_no_place_from_who_has_been_serving_tables(catalog_of, role):
     """«Serving» names ``kitchen.ticket.serve``, whose asks say «servida»: Tables' «who has been serving tables?» came
