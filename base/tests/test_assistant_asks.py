@@ -177,19 +177,6 @@ def probe_phrases() -> dict[str, str]:
 WITH_ROOM = 20
 
 
-@pytest.fixture
-def catalog_of(make_user):
-    """The real catalogue of the assistant of a person with ``role`` in business A, in ``language``. Its people are
-    not ``context_of``'s, so a test may take both: an app's test imports this one alone, and its ``make_user`` is the
-    one of the app's ``conftest.py``."""
-    context_of = members(make_user, "asker")
-
-    def of(role: str, language: str) -> dict[str, Operation]:
-        return assistant.tools.catalog(context_of(role, language))
-
-    return of
-
-
 def offered_to(tools: dict[str, Operation], phrase: str, language: str = "es", **ranking) -> list[str]:
     """The tools a turn in ``language`` offers for ``phrase``, best first, as ``base.assistant.relevance.ranking`` ranks them,
     or with what ``ranking`` puts in its place (``synonyms=``…)."""
