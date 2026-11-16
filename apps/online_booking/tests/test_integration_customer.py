@@ -2,13 +2,12 @@
 merged and a customer's data erased reach the inbox through the worker's real relay: ``test_relay.py``.
 """
 
-import pytest
 
 from apps.customer.models import Customer
 
-from .conftest import booking_data, public, run
+from .conftest import HUB_DB, booking_data, public, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_a_new_mobile_is_a_new_card_that_customers_finds_by_its_number(salon):

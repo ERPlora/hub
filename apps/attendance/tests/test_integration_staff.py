@@ -9,9 +9,9 @@ from apps.attendance import events
 from apps.attendance.models import Correction, Record
 from apps.staff.models import Member
 
-from .conftest import A, ctx_for, run
+from .conftest import HUB_DB, A, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture

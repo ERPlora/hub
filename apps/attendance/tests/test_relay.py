@@ -1,52 +1,30 @@
 """The time clock hears Staff through the worker's outbox relay, end to end (ATTENDANCE-F13).
 
 Staff's real operation terminates a person and records ``staff.member.terminated`` in the outbox; one tick of the
-worker's real loop (``base.worker.run`` → ``base.relay``) hands it to the time clock, and the person's open day (and
-its running break) is closed with a correction of the system — once: a second tick, or the same event handed over
-again, changes nothing. A person who leaves in hub B closes B's day only, and the notice is heard in B only.
+worker's real loop (``base.worker.run`` → ``base.relay``, ``worker_loop``) hands it to the time clock, and the person's
+open day (and its running break) is closed with a correction of the system — once: a second tick, or the same event
+handed over again, changes nothing. A person who leaves in hub B closes B's day only, and the notice is heard in B only.
+
+The worker's real loop serves each business in its own database and releases its connections once it has served it:
+what these tests write is committed.
 """
 
-import json
-import threading
 
-import psycopg
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone, translation
 from live.models import OutboxEvent
-from live.outbox import channel_for
 
 from apps.attendance import events
 from apps.attendance.models import Correction
-from base import catalog, worker
-from base.catalog import RegisterResult
+from apps.flow.tests.test_relay import heard
 from base.models import EventDelivery
+from base.tenancy.context import use_hub
 
-from .conftest import A, B, ctx_for, run
+from .conftest import HUB_DB_COMMITTED, A, B, ctx_for, run
 
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
+pytestmark = HUB_DB_COMMITTED
+
 TERMINATED = "staff.member.terminated"
-
-
-def one_tick() -> None:
-    """One tick of the worker's real loop."""
-    stop = threading.Event()
-
-    def wait(_seconds: float) -> bool:
-        stop.set()
-        return True
-
-    now = timezone.now()
-    assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now) == 0
-
-
-@pytest.fixture
-def tick(db, monkeypatch):
-    """``one_tick`` without the SaaS (``register_apps``) and, inside the test's transaction, without releasing
-    the connections (that would close the test's own)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    return one_tick
 
 
 def delivery_to_attendance() -> tuple[str, int]:
@@ -85,7 +63,7 @@ def ana_on_a_break(person, clock):
     return ana, ana_ctx, ana_day, bea_day
 
 
-def test_a_person_terminated_in_staff_has_their_open_day_closed_through_the_relay(tick, ana_on_a_break):
+def test_a_person_terminated_in_staff_has_their_open_day_closed_through_the_relay(worker_loop, ana_on_a_break):
     ana, ana_ctx, ana_day, bea_day = ana_on_a_break
 
     run("staff.member.terminate", {"id": str(ana.id), "reason": "End of contract"}, ctx_for("hub_admin"))
@@ -93,7 +71,7 @@ def test_a_person_terminated_in_staff_has_their_open_day_closed_through_the_rela
     assert day(ana_day.id).status == "open"
     assert Correction.objects.count() == 0
 
-    tick()
+    worker_loop()
 
     assert delivery_to_attendance() == ("delivered", 1)
     closed = day(ana_day.id)
@@ -123,14 +101,14 @@ def test_a_person_terminated_in_staff_has_their_open_day_closed_through_the_rela
     assert day(ana_day.id).member_name == "Ana López"
 
 
-def test_a_second_tick_or_the_same_notice_handed_over_again_changes_nothing(tick, ana_on_a_break):
+def test_a_second_tick_or_the_same_notice_handed_over_again_changes_nothing(worker_loop, ana_on_a_break):
     ana, _ana_ctx, ana_day, _bea_day = ana_on_a_break
     run("staff.member.terminate", {"id": str(ana.id)}, ctx_for("hub_admin"))
-    tick()
+    worker_loop()
     closed = day(ana_day.id)
     written = (notices(events.RECORD_CORRECTED), notices(events.BREAK_ENDED))
 
-    tick()
+    worker_loop()
     assert delivery_to_attendance() == ("delivered", 1)
 
     # The same notice handed to the time clock again, as if its delivery had been lost: the relay runs it once more.
@@ -138,7 +116,7 @@ def test_a_second_tick_or_the_same_notice_handed_over_again_changes_nothing(tick
     EventDelivery.objects.filter(event_id=event.id, app_label="attendance").update(
         status=EventDelivery.Status.PENDING, delivered_at=None, next_attempt_at=timezone.now()
     )
-    tick()
+    worker_loop()
 
     assert delivery_to_attendance() == ("delivered", 2)
     assert Correction.objects.count() == 1
@@ -146,7 +124,7 @@ def test_a_second_tick_or_the_same_notice_handed_over_again_changes_nothing(tick
     assert day(ana_day.id) == closed
 
 
-def test_a_person_without_an_open_day_leaves_and_nothing_happens(tick, person, clock):
+def test_a_person_without_an_open_day_leaves_and_nothing_happens(worker_loop, person, clock):
     clock("2026-10-06T07:00")
     ana, ana_ctx = person("Ana", "López")
     ana_day = run("attendance.record.clock_in", {}, ana_ctx)
@@ -154,58 +132,41 @@ def test_a_person_without_an_open_day_leaves_and_nothing_happens(tick, person, c
     run("attendance.record.clock_out", {}, ana_ctx)
 
     run("staff.member.terminate", {"id": str(ana.id)}, ctx_for("hub_admin"))
-    tick()
+    worker_loop()
 
     assert delivery_to_attendance() == ("delivered", 1)
     assert Correction.objects.count() == 0
     assert day(ana_day.id).clock_out_at.isoformat() == "2026-10-06T15:00:00+00:00"
 
 
-# ── Two hubs, on committed data ──────────────────────────────────────────────────────────────
+# ── Two hubs ─────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def listen(transactional_db, db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 0.5) -> set[str]:
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
-
-
-def test_a_person_who_leaves_hub_b_has_b_day_closed_only_and_is_heard_in_b_only(listen, person, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+def test_a_person_who_leaves_hub_b_has_b_day_closed_only_and_is_heard_in_b_only(listen, person, worker_loop, hub_b):
     on_a, on_b = listen(A), listen(B)
     ana, ana_ctx = person("Ana", "López", scope=A)
     a_day = run("attendance.record.clock_in", {}, ana_ctx)
-    bea, bea_ctx = person("Bea", "Ruiz", scope=B)
-    b_day = run("attendance.record.clock_in", {}, bea_ctx)
+    with use_hub(hub_b):
+        bea, bea_ctx = person("Bea", "Ruiz", scope=B)
+        b_day = run("attendance.record.clock_in", {}, bea_ctx)
     heard(on_a), heard(on_b)  # the clock-ins' own notices
 
-    run("staff.member.terminate", {"id": str(bea.id)}, ctx_for("hub_admin", scope=B))
+    with use_hub(hub_b):
+        run("staff.member.terminate", {"id": str(bea.id)}, ctx_for("hub_admin", scope=B))
     heard(on_b)  # the termination's own notice
-    one_tick()
+    worker_loop()
 
-    assert day(b_day.id, B).status == "closed"
+    with use_hub(hub_b):
+        assert day(b_day.id, B).status == "closed"
+        reaction = OutboxEvent.objects.get(name=events.RECORD_CORRECTED, payload__id=str(b_day.id))
     assert events.RECORD_CORRECTED in heard(on_b)
     assert heard(on_a) == set()
     assert day(a_day.id, A).status == "open"
-    reaction = OutboxEvent.objects.get(name=events.RECORD_CORRECTED, payload__id=str(b_day.id))
     assert (reaction.scope_kind, reaction.scope_key) == (B.kind, B.key)
     # The positive control: a person who leaves hub A has A's day closed, heard in A.
     run("staff.member.terminate", {"id": str(ana.id)}, ctx_for("hub_admin", scope=A))
     heard(on_a)
-    one_tick()
+    worker_loop()
     assert day(a_day.id, A).status == "closed"
     assert events.RECORD_CORRECTED in heard(on_a)
     assert heard(on_b) == set()

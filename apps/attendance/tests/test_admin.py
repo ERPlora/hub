@@ -20,7 +20,7 @@ from apps.attendance.admin import (
 )
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
 
-from .conftest import make_member, utc
+from .conftest import HUB_DB, make_member, utc
 
 
 @pytest.fixture
@@ -45,6 +45,7 @@ def test_the_models_are_registered():
     assert Break not in admin.site._registry
 
 
+@HUB_DB
 def test_settings_have_full_crud(superuser):
     request = request_by(superuser)
     model_admin = admin.site._registry[AttendanceSettings]
@@ -53,7 +54,7 @@ def test_settings_have_full_crud(superuser):
     assert model_admin.has_delete_permission(request)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_working_days_are_read_only_but_their_note(superuser):
     request = request_by(superuser)
     model_admin = admin.site._registry[Record]
@@ -76,6 +77,7 @@ def test_working_days_are_read_only_but_their_note(superuser):
         assert set(inline.get_readonly_fields(request, day)) >= set(inline.fields)
 
 
+@HUB_DB
 def test_corrections_are_never_written_in_the_admin(superuser):
     request = request_by(superuser)
     model_admin = admin.site._registry[Correction]
@@ -85,8 +87,8 @@ def test_corrections_are_never_written_in_the_admin(superuser):
     assert model_admin.has_view_permission(request)
 
 
-@pytest.mark.django_db
-def test_the_pages_render(client, superuser):
+@HUB_DB
+def test_the_pages_render(hub_staff):
     day = Record.objects.create(
         member=make_member(),
         clock_in_at=utc("2026-10-06T07:00"),
@@ -94,7 +96,6 @@ def test_the_pages_render(client, superuser):
     )
     Break.objects.create(record=day, started_at=utc("2026-10-06T09:00"))
     AttendanceSettings.objects.create()
-    client.force_login(superuser)
     host = {"HTTP_HOST": "hubs.localhost"}
     for url in (
         "/admin/attendance/record/",
@@ -102,7 +103,7 @@ def test_the_pages_render(client, superuser):
         "/admin/attendance/correction/",
         "/admin/attendance/attendancesettings/",
     ):
-        response = client.get(url, **host)
+        response = hub_staff.get(url, **host)
         assert response.status_code == 200, url
-    page = client.get(f"/admin/attendance/record/{day.id}/change/", **host)
+    page = hub_staff.get(f"/admin/attendance/record/{day.id}/change/", **host)
     assert b"Ana L" in page.content and b"2026-10-06" in page.content

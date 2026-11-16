@@ -5,7 +5,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from django.utils import translation
 
@@ -30,6 +29,8 @@ from base.tests.po import (
     po_entries,
     untranslated,
 )
+
+from .conftest import HOST, HUB_DB
 
 LOCALE = Path(apps.get_app_config("schedule").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -133,14 +134,14 @@ def test_placeholders_survive_the_translation():
         ), msgid
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     response = client.post(
         "/api/schedule/special_days/delete",
         json.dumps({"special_day": "Easter"}),
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 404

@@ -11,9 +11,9 @@ from live.errors import Conflict
 
 from apps.appointment.models import Appointment
 
-from .conftest import TUESDAY, at, booking_data, make_day, make_rules, public, run
+from .conftest import HUB_DB, TUESDAY, at, booking_data, make_day, make_rules, public, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def times(salon, staff=None) -> list[str]:
