@@ -5,12 +5,13 @@ import datetime as dt
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
-from apps.whatsapp_inbox.tests.conftest import NOW
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def conversation(phone="+34600111222", **fields):
@@ -24,7 +25,7 @@ def message(conv, wa_id="wamid.1", **fields):
 
 
 def violates(constraint, create):
-    with pytest.raises(IntegrityError) as excinfo, transaction.atomic():
+    with pytest.raises(IntegrityError) as excinfo, atomic():
         create()
     return constraint in str(excinfo.value)
 

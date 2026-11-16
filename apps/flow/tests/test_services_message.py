@@ -14,14 +14,14 @@ from live.errors import InvalidPayload
 
 from apps.flow import queries
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import receive, template
+from apps.whatsapp_inbox.tests.conftest import connect, receive, template
 from apps.whatsapp_inbox.tests.conftest import ctx_for as inbox_ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from apps.whatsapp_inbox.tests.test_template_header_file import upload
 
 from base.tenancy.context import use_hub
 
-from .conftest import A, HUB_DB, ctx_for, run, whatsapp_connected
+from .conftest import A, HUB_DB, ctx_for, run
 
 pytestmark = HUB_DB
 
@@ -63,7 +63,7 @@ def test_granting_it_is_allowed_and_granting_the_inbox_s_send_still_needs_a_pers
 
 
 def test_a_run_sends_to_the_customer_s_conversation_and_a_refusal_is_its_reason_in_the_history():
-    whatsapp_connected()
+    connect()
     receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
     flow_id = automation()
 
@@ -98,7 +98,7 @@ def photo_automation(template_params: dict, ctx=None) -> str:
 
 @pytest.mark.usefixtures("hub_files")
 def test_a_template_with_a_photo_at_the_top_goes_with_the_file_the_step_chose():
-    whatsapp_connected([template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
+    connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
     receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
     chosen = upload(name="carta-otono.jpg", ctx=inbox_ctx_for(scope=A))
     flow_id = photo_automation(
@@ -119,7 +119,7 @@ def test_a_template_with_a_photo_at_the_top_goes_with_the_file_the_step_chose():
 
 @pytest.mark.usefixtures("hub_files")
 def test_without_the_file_it_asks_for_nothing_is_sent_and_the_history_says_why():
-    whatsapp_connected([template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
+    connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
     receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=A)
     flow_id = photo_automation({"name": MANAGER_PHOTO, "language": "es", "variables": ["Ana"]})
 
@@ -139,7 +139,7 @@ def test_a_file_of_another_business_is_never_sent(hub_a, hub_b):
     with use_hub(hub_b):
         theirs = upload(ctx=inbox_ctx_for(scope=theirs_scope))
     with use_hub(hub_a):
-        whatsapp_connected([template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
+        connect(templates=[template(MANAGER_PHOTO, header_format="IMAGE", body="¡Hola {{1}}!", variables=1)])
         receive("wamid.IN", sent_at=(timezone.now() - dt.timedelta(minutes=10)).isoformat(), scope=ours)
         flow_id = photo_automation(
             {"name": MANAGER_PHOTO, "language": "es", "variables": ["Ana"], "header_sample": str(theirs.id)},

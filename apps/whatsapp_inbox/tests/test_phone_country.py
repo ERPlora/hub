@@ -7,25 +7,27 @@ import pytest
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.queries import e164
 from base.models import Hub
+from base.tenancy.context import use_hub
 
-from .conftest import B, ctx_for, run
+from .conftest import HUB_DB, B, ctx_for, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 #: A Polish mobile written as a Pole types it: no prefix, in groups of three.
 POLISH = "512 345 678"
 
 
 @pytest.fixture
-def in_poland():
-    """The business ``a`` registered in Poland; ``b`` in Spain."""
-    Hub.objects.filter(slug="a").update(country="PL")
-    Hub.objects.update_or_create(slug="b", defaults={"status": "ready", "country": "ES"})
+def in_poland(hub_a, hub_b):
+    """Business A registered in Poland; B in Spain."""
+    Hub.objects.filter(pk=hub_a.pk).update(country="PL")
+    Hub.objects.filter(pk=hub_b.pk).update(country="ES")
 
 
-def test_a_typed_number_without_prefix_is_one_of_the_business_s_country_never_another_business_s(in_poland):
+def test_a_typed_number_without_prefix_is_one_of_the_business_s_country_never_another_business_s(in_poland, hub_b):
     assert e164(POLISH, ctx_for()) == "+48512345678"
-    assert e164(POLISH, ctx_for(scope=B)) == "+34512345678"
+    with use_hub(hub_b):
+        assert e164(POLISH, ctx_for(scope=B)) == "+34512345678"
 
 
 def test_a_conversation_is_named_by_its_digits_without_prefix(in_poland):

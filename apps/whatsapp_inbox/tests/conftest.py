@@ -1,27 +1,40 @@
 """Fixtures of the WhatsApp inbox tests: contexts per role, a fixed clock, people of the hub and helpers
-that run the app's (and Customers') real operations."""
+that run the app's (and Customers') real operations.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
+"""
 
 import datetime as dt
 import json
+import threading
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from django.utils import translation
+from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
+from apps.invoice.tests.conftest import catalog_of
+from base import catalog, worker
+from base.catalog import RegisterResult
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
 from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, and the assistant's catalogue of a person of
+#: business A, that these tests take from here.
+__all__ = ["B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "hub_staff", "in_business_a", "plan_with_room"]
 
 #: The fixed «now» of every test: Thursday 15 October 2026, 10:00 UTC (12:00 in Madrid).
 NOW = dt.datetime(2026, 10, 15, 10, 0, tzinfo=dt.UTC)
+#: What the worker's start would register in erplora.com's catalogue: nothing, in these tests.
+REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 
 
 def ctx_for(
@@ -85,8 +98,8 @@ def receive(
     )
 
 
-def connect(version: int = 1, templates: list | None = None, **fields):
-    """erplora.com says the number is connected (and, when given, which templates Meta has)."""
+def connect(version: int = 1, templates: list | None = None, scope: Scope = A, **fields):
+    """erplora.com says ``scope``'s number is connected (and, when given, which templates Meta has)."""
     body = {
         "version": version,
         "status": "connected",
@@ -98,7 +111,7 @@ def connect(version: int = 1, templates: list | None = None, **fields):
         "templates": templates,
     }
     body.update(fields)
-    return system("whatsapp_inbox.channel.sync", body)
+    return system("whatsapp_inbox.channel.sync", body, scope)
 
 
 def template(name: str = "recordatorio", **fields) -> dict:
@@ -148,11 +161,30 @@ def fixed_clock(monkeypatch):
 
 
 @pytest.fixture
+def tick(monkeypatch):
+    """``tick(later)``: one turn of the worker's real loop over every business in its own database, its clock ``later``
+    than now (a second by default), without erplora.com's catalogue, as a fresh process (no business served yet, A
+    first) whose pass serves every business however slow the machine. The worker closes each business's connection
+    after serving it, so a test that ticks is committed (``HUB_DB_COMMITTED``)."""
+    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(worker, "_synced", set())
+    monkeypatch.setattr(worker, "_next_hub", None)
+    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
+
+    def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:
+        stop = threading.Event()
+        at = timezone.now() + later
+        assert worker.run(stop, tick_seconds=0, wait=lambda _seconds: stop.set() or True, clock=lambda: at) == 0
+
+    return run_once
+
+
+@pytest.fixture
 def make_user(db):
     def make(
         username: str = "luis",
         *,
-        host: str | None = "a",
+        host: str | None = A.key,
         role: str = Membership.Role.EMPLOYEE,
         **fields,
     ):

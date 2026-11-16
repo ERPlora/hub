@@ -17,9 +17,10 @@ import respx
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Message
-from apps.whatsapp_inbox.tests.conftest import NOW, connect, receive, run, template
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, receive, run, template
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 SEND = "http://saas.test/internal/whatsapp/send"
 
@@ -27,7 +28,7 @@ SEND = "http://saas.test/internal/whatsapp/send"
 def asked(django_capture_on_commit_callbacks, wamid: str, **template_fields) -> Message:
     """The Hub sends a reminder template (with its quick replies) and Meta gives it ``wamid``."""
     respx.post(SEND).mock(return_value=httpx.Response(200, json={"wa_message_id": wamid}))
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         out = run(
             "whatsapp_inbox.message.send",
             {

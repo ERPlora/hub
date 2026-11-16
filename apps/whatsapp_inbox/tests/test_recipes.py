@@ -12,9 +12,10 @@ from apps.flow.models import Flow
 from apps.flow.tests.test_recipes import without
 from apps.whatsapp_inbox import recipes as inbox_recipes
 from apps.whatsapp_inbox.recipes import RECIPES
-from apps.whatsapp_inbox.tests.conftest import A, ctx_for, run
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, A, ctx_for, run
+from base.tenancy.context import current_alias
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 REF = "whatsapp_inbox/appointment_confirmed"
 RESERVATION_REF = "whatsapp_inbox/reservation_confirmed"
@@ -504,7 +505,7 @@ def test_what_the_booking_answer_fixes_holds_while_whatsapp_is_off(django_captur
     fixed = next(step for step in flow.steps if step["kind"] == "assistant")["pinned"]
     flow.steps = [{key: value for key, value in step.items() if key != "pinned"} for step in flow.steps]
     flow.save(update_fields=["steps"])
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
         run("base.app.disable", {"app": "whatsapp_inbox"})
     assert "whatsapp_inbox" not in queries.active_apps(A)
 
