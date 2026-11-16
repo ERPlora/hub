@@ -7,16 +7,17 @@ import json
 import uuid
 from decimal import Decimal
 
-import psycopg
 import pytest
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
+from base.tenancy.context import use_hub
 
 from .conftest import (
+    HUB_DB,
+    HUB_DB_COMMITTED,
     A,
     B,
     ctx_for,
@@ -29,7 +30,7 @@ from .conftest import (
     make_service,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin", actor="tester"):
@@ -533,29 +534,19 @@ def test_a_reaction_is_no_person_s(name):
 # Notifications: after the COMMIT, on the channel of the command's scope only
 
 
-@pytest.fixture
-def listen(db_dsn):
-    sessions = []
-
-    def open_session(scope):
-        session = psycopg.connect(db_dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
 def received(session, timeout=1.0, stop_after=None):
     return [json.loads(note.payload) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
 
 
-@pytest.mark.django_db(transaction=True)
-def test_a_write_in_scope_b_notifies_b_only(listen):
+@HUB_DB_COMMITTED
+def test_a_write_in_scope_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     op = get("pricing.price_list.create")
-    op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
+    with use_hub(hub_b):
+        op(ctx_for("hub_admin", B), op.input.model_validate({"code": "VIP", "name": "VIP", "is_default": True}))
     assert received(on_b, stop_after=1) == [{"events": ["pricing.price_list.created", "pricing.price_list.default_changed"]}]
     assert received(on_a, timeout=0.3) == []
+    # The channel is the command's scope; the rows of the outbox carry theirs, and B's database holds them all.
+    with use_hub(hub_b):
+        assert set(OutboxEvent.objects.values_list("scope_kind", "scope_key")) == {(B.kind, B.key)}
+    assert not OutboxEvent.objects.exists()
