@@ -7,12 +7,13 @@ left over to the largest remainders, the sum exactly the amount.
 """
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.combo.queries import split_amount
 
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
@@ -21,6 +22,7 @@ from .conftest import (
     DRINK,
     FOOD,
     GENERIC,
+    HUB_DB,
     ctx_for,
     make_combo,
     make_group,
@@ -30,7 +32,7 @@ from .conftest import (
     tax_category,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def menu_of_the_day():
@@ -199,7 +201,7 @@ def test_a_menu_is_read_with_its_tree_in_as_many_queries_however_big(name):
             options = [make_option(course, make_product(f"Dish {c}.{n}")) for n in range(choices)]
             picks.append({"option_id": str(options[0].id)})
         data = {"id": str(combo.id)} | ({"choices": picks} if name == "combo.combo.resolve" else {})
-        with CaptureQueriesContext(connection) as read:
+        with CaptureQueriesContext(connections[current_alias()]) as read:
             run(name, data)
         return len(read)
 

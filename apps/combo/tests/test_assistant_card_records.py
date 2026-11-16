@@ -14,10 +14,9 @@ from django.apps import apps
 from live.context import OperationContext, Scope
 from live.operations import INTERNAL, get, registry
 
-from apps.combo.tests.conftest import A, ctx_for, make_combo, make_group, make_option, make_product
+from apps.combo.tests.conftest import HUB_DB, A, ctx_for, make_combo, make_group, make_option, make_product
 from base import assistant
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values_references import AN_ID
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -165,7 +164,7 @@ def name_of(menu: Menu, write: str, datum: str) -> str:
 # ── A menu, a course, a choice and a product by their names ───────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_MENU + ON_A_COURSE + ON_A_CHOICE + ON_A_PRODUCT)
 def test_a_write_says_the_record_it_names_by_its_name(write, datum):
     """The case the issue names, «combo.combo.delete:id»: «Menu: Menú del día», never its id nor its kitchen name; a
@@ -174,7 +173,7 @@ def test_a_write_says_the_record_it_names_by_its_name(write, datum):
     assert shown(write, {datum: id_of(menu, write, datum)})[datum] == name_of(menu, write, datum)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_among_several_the_card_says_the_one_the_write_names():
     """Each id names its own record, never another one of the business (the first, the last)."""
     menus = [make_menu(), make_menu("Menú infantil", "Segundos", "Croquetas", "CRO-02", "8410000000024")]
@@ -184,7 +183,7 @@ def test_among_several_the_card_says_the_one_the_write_names():
             assert said == [name_of(menu, write, datum) for menu in listed], f"{write}:{datum}"
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum", "kind"), ON_SEVERAL)
 def test_the_records_a_write_puts_in_order_are_said_by_their_names_in_that_order(write, datum, kind):
     """«Courses: Segundos, Primeros»: each one by its name, in the order sent, said in words (``named``) — never «2
@@ -203,7 +202,7 @@ def test_the_records_a_write_puts_in_order_are_said_by_their_names_in_that_order
     assert (field["value"], field.get("named")) == (records[1], True)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize(("write", "datum"), list(TITLES))
 def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_language(write, datum, language):
@@ -216,7 +215,7 @@ def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_langua
     assert field["label"] == words(language)[TITLES[(write, datum)]]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     """The name is the record's as it is now, before the write runs: a rename says the old name under «Menu» and the
     new one under its own datum; a choice changed for another product says both."""
@@ -235,7 +234,7 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_MENU + ON_A_COURSE + ON_A_CHOICE)
 def test_a_menu_course_or_choice_is_left_out_for_whoever_may_not_see_the_menus(write, datum):
     """Whoever may not see the menus (``combo.view``) is told no menu, course nor choice, never its id."""
@@ -247,7 +246,7 @@ def test_a_menu_course_or_choice_is_left_out_for_whoever_may_not_see_the_menus(w
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_PRODUCT)
 def test_a_product_is_left_out_for_whoever_may_not_see_the_products(write, datum):
     """Whoever may not see Inventory's products (``inventory.view_product``) is told no product, never its id."""
@@ -259,7 +258,7 @@ def test_a_product_is_left_out_for_whoever_may_not_see_the_products(write, datum
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("write", "datum"), ON_A_MENU + ON_A_COURSE + ON_A_CHOICE + ON_A_PRODUCT)
 def test_what_does_not_exist_is_left_out(write, datum):
     said = shown(write, {datum: A_MISSING_ID})
@@ -267,7 +266,7 @@ def test_what_does_not_exist_is_left_out(write, datum):
     assert no_id(said)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_record_removed_meanwhile_is_left_out():
     """A choice, a course or a menu the builder removed is no longer there for the card either."""
     menu = make_menu()
@@ -283,7 +282,7 @@ def test_a_record_removed_meanwhile_is_left_out():
         assert shown(write, {datum: str(record.id)}) == {}, write
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     menu = make_menu()
@@ -291,8 +290,7 @@ def test_nobody_behind_the_request_reads_no_record():
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Menú de noche"}
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-@pytest.mark.usefixtures("no_test_fallback")
+@HUB_DB
 def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
     """Each business in its own database, as production: an id of A names nothing in B."""
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
@@ -321,7 +319,7 @@ def test_the_read_that_names_a_course_is_no_tool_route_nor_live_query():
     assert (read.kind, read.permission, read.ai, read.expose_api) == ("query", "combo.view", INTERNAL, False)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_read_that_names_a_course_finds_it_by_its_id_or_its_name_in_its_menu():
     menu, other = make_menu(), make_menu("Menú infantil", "Primeros", "Croquetas", "CRO-02", "8410000000024")
     read = get("combo.group.get")

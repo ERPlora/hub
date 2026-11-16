@@ -6,13 +6,12 @@ its payload; test_relay.py goes through the worker's real tick.
 
 import re
 
-import pytest
 from live.operations import NAME_RE
 
 from apps.combo import events
 from apps.combo.models import ChoiceOption
 
-from .conftest import A, make_combo, make_group, make_option, make_product
+from .conftest import A, HUB_DB, make_combo, make_group, make_option, make_product
 
 PAST_FACT = re.compile(r"^combo\.[a-z_]+\.[a-z_]+ed$")
 
@@ -62,7 +61,7 @@ def test_it_reacts_only_to_a_product_deleted_in_inventory():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_react_runs_the_reaction_as_the_platform():
     flan = make_product("Flan", sku="FLAN")
     make_option(make_group(make_combo()), flan)
