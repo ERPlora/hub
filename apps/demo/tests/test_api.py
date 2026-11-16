@@ -6,14 +6,13 @@ transaction.
 
 import json
 import uuid
-from pathlib import Path
 
 import pytest
-from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.demo.api import router
 from apps.flow.tests.test_api import get, post
+from base.tests.routes import bound_routes, published_routes, spa_routes
 from config.api import api
 
 from .conftest import HOST, HUB_DB, A, B
@@ -27,8 +26,6 @@ ROUTES = {
     ("POST", "/demo/items/delete", "demo.item.delete"),
     ("POST", "/demo/items/add_line", "demo.item.add_line"),
 }
-# The SPA's op → route map (written by hand: nothing generates it from the OpenAPI).
-SPA_ROUTES = settings.BASE_DIR / "frontend" / "generated" / "operations.json"
 
 
 @pytest.fixture
@@ -47,13 +44,7 @@ def employee_client(client, make_user):
 
 
 def test_seven_routes_each_bound_to_its_operation():
-    routes = {
-        (method, path, route.operation_id)
-        for path, view in router.path_operations.items()
-        for route in view.operations
-        for method in route.methods
-    }
-    assert routes == ROUTES
+    assert bound_routes(router) == ROUTES
 
 
 def test_the_api_keeps_parity():
@@ -62,15 +53,7 @@ def test_the_api_keeps_parity():
 
 @HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_matches_the_spa_route_map(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST=HOST).json()["paths"]
-    served = {
-        op["operationId"]: {"method": method, "path": path}
-        for path, methods in paths.items()
-        for method, op in methods.items()
-        if op["operationId"].startswith("demo.")
-    }
-    expected = {name: route for name, route in json.loads(Path(SPA_ROUTES).read_text()).items() if name.startswith("demo.")}
-    assert served == expected
+    assert published_routes(client, "demo.", HOST) == spa_routes("demo.") == ROUTES
 
 
 # Authentication and permissions
