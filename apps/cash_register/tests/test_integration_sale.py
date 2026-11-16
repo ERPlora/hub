@@ -13,10 +13,10 @@ from django.utils import timezone
 from apps.cash_register.models import Movement, Session
 from live.errors import Conflict
 
-from apps.cash_register.tests.conftest import charge, drawer_lock_off, open_session, refund, run, void
+from apps.cash_register.tests.conftest import HUB_DB, charge, drawer_lock_off, open_session, refund, run, void
 from apps.sale.models import PaymentMethod, Sale
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def summary(session):
