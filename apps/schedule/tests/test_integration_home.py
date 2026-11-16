@@ -19,8 +19,9 @@ from live.operations import get
 from live.outbox import channel_for
 
 from apps.schedule.models import ScheduleSettings, WeekDay
-from apps.schedule.tests.conftest import A, B
+from apps.schedule.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B
 from base.schemas import SetupStatusIn
+from base.tenancy.context import use_hub
 
 STEP = "schedule.hours"
 WAIT = 1.0
@@ -53,7 +54,7 @@ def schedule_app():
     return apps.get_app_config("schedule")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hub_with_the_default_week_has_confirm_your_opening_hours_pending_and_it_leads_to_the_week():
     # The week migration 0002 planted is there, nobody confirmed it.
     assert WeekDay.objects.count() == 7
@@ -75,7 +76,7 @@ def test_a_hub_with_the_default_week_has_confirm_your_opening_hours_pending_and_
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_in_spanish_it_says_the_old_words():
     item = step(person(language="es"))
     assert (item["title"], item["description"]) == (
@@ -86,20 +87,20 @@ def test_in_spanish_it_says_the_old_words():
     )
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_confirming_the_week_ticks_it():
     run("schedule.week.confirm", {})
     assert step()["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_saving_a_day_ticks_it_even_as_closed():
     # «We do not open on Mondays» is a decision about the business, not the absence of one.
     run("schedule.week.set_day", {"weekday": 0, "is_closed": True})
     assert step()["state"] == "done"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_first_day_of_the_week_a_special_day_or_a_temporary_change_do_not_confirm_the_week():
     run("schedule.settings.update", {"week_starts_on": 7})
     run("schedule.special_day.create", {"date": "2026-12-25", "name": "Christmas", "is_closed": True})
@@ -107,7 +108,7 @@ def test_the_first_day_of_the_week_a_special_day_or_a_temporary_change_do_not_co
     assert step()["state"] == "pending"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_whoever_changes_the_hours_is_told_and_who_only_reads_them_is_not():
     # Recommended, never ⛔: who cannot change the hours is not told (base's rule). The employee only looks.
     assert step(person("hub_admin"))["state"] == "pending"
@@ -117,14 +118,15 @@ def test_whoever_changes_the_hours_is_told_and_who_only_reads_them_is_not():
     assert step(person(permissions=reader)) is None
 
 
-@pytest.mark.django_db
-def test_with_schedules_off_the_home_does_not_ask_to_confirm_the_hours():
+@HUB_DB
+def test_with_schedules_off_the_home_does_not_ask_to_confirm_the_hours(hub_b):
     # base brings only the steps of the modules on in the scope: Schedules off (after the apps that need it), no step.
     administrator = OperationContext(scope=A, actor="ana", permissions=frozenset({"*"}))
     for app in ("online_booking", "appointment", "reservation", "schedule"):
         run("base.app.disable", {"app": app}, administrator)
     assert step() is None
-    assert step(person(scope=B))["state"] == "pending"
+    with use_hub(hub_b):
+        assert step(person(scope=B))["state"] == "pending"
 
 
 def confirm():
@@ -139,7 +141,7 @@ def save_a_day():
 CHANGES = {"schedule.week.updated": [confirm, save_a_day]}
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "event,change",
     [(event, change) for event, cases in CHANGES.items() for change in cases],
@@ -154,7 +156,7 @@ def test_each_change_of_the_step_records_an_event_that_refreshes_it(event, chang
     assert recorded & set(schedule_app().setup[0].refresh_on) == {event}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_confirming_a_confirmed_week_records_nothing_and_it_stays_done():
     # SCHEDULE-F03: confirming twice changes nothing and says nothing.
     confirm()
@@ -195,12 +197,16 @@ def received(session, timeout=WAIT):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
 
 
-# Transactional: the notice leaves after a real COMMIT. The week planted again: a transactional test run before this
-# one (the suite runs them last, in any order) flushed the seeded one away, and there is nothing to confirm without it.
-@pytest.mark.django_db(transaction=True)
-def test_a_week_confirmed_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, default_week):
+# Committed: the notice leaves after a real COMMIT. The week planted again in B: a committed test run before this one
+# (the suite runs them last, in any order) emptied B's database, and there is nothing to confirm without it.
+@HUB_DB_COMMITTED
+def test_a_week_confirmed_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, default_week_b, hub_b):
     on_a, on_b = listen(A), listen(B)
-    run("schedule.week.confirm", {}, person("hub_manager", B))
+    with use_hub(hub_b):
+        run("schedule.week.confirm", {}, person("hub_manager", B))
+        recorded_in_b = list(OutboxEvent.objects.values_list("name", "scope_kind", "scope_key"))
+    assert recorded_in_b == [("schedule.week.updated", B.kind, B.key)]
+    assert not OutboxEvent.objects.exists()
 
     notes = received(on_b)
     assert {channel for channel, _ in notes} == {channel_for(B)}

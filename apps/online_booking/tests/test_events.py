@@ -5,16 +5,15 @@ announced by Citas. It reacts to ``customer.customer.erased`` (the customer's li
 own operation, run as the system. The other events it hears change nothing here: the booking is the diary's.
 """
 
-import pytest
 from live.models import OutboxEvent
 
 from apps.online_booking import events
 from apps.online_booking.models import Booking
 from base import relay
 
-from .conftest import TUESDAY, A, booking_data, public
+from .conftest import HUB_DB, TUESDAY, A, booking_data, public
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def test_the_events_it_announces():
@@ -33,7 +32,7 @@ def test_it_reacts_only_to_an_erasure():
 def test_only_flows_hears_what_it_announces():
     # WORKBOOK «Para quien lo mantiene»: no app reacts to these notices but Flows, which hears them all.
     for name in events.ALL:
-        event = OutboxEvent(scope_kind="host", scope_key="a", name=name)
+        event = OutboxEvent(scope_kind=A.kind, scope_key=A.key, name=name)
         assert relay.listeners(event) == ["flow"], name
 
 

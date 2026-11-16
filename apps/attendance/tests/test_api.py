@@ -1,19 +1,21 @@
 """The attendance app's routes: each bound to its operation, and the main flows over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
+Requests go to business A's host (``HOST``, scope ``A``) with Django's sync test client, which sees the test's
 transaction. No path parameters: ids (or a person's name) travel in the input. The two system
 operations (the scheduled review and the reaction to a termination) have no route.
 """
-
-import json
 
 import pytest
 from live.ninja import ensure_api_parity
 
 from apps.attendance.api import router
 from apps.attendance.models import Correction, Record
+from apps.flow.tests.test_api import get, post
 from apps.staff.models import Member
+from base.tests.routes import bound_routes, published_routes
 from config.api import api
+
+from .conftest import HOST, HUB_DB, B
 
 ROUTES = {
     ("GET", "/attendance/current", "attendance.record.current"),
@@ -33,20 +35,6 @@ ROUTES = {
     ("GET", "/attendance/settings", "attendance.settings.get"),
     ("POST", "/attendance/settings", "attendance.settings.update"),
 }
-
-
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost", **headers):
-    return client.post(
-        f"/api{path}",
-        json.dumps(data),
-        content_type="application/json",
-        HTTP_HOST=host,
-        **headers,
-    )
 
 
 @pytest.fixture
@@ -70,35 +58,22 @@ def boss(client, make_user):
 
 
 def test_every_route_is_bound_to_its_operation():
-    routes = {
-        (method, path, route.operation_id)
-        for path, view in router.path_operations.items()
-        for route in view.operations
-        for method in route.methods
-    }
-    assert routes == ROUTES
+    assert bound_routes(router) == ROUTES
 
 
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db  # the host gate reads the registry's row of the hub (base.middleware)
+@HUB_DB  # the host gate reads the registry's row of the hub (base.middleware)
 def test_openapi_publishes_the_operations_with_their_ids(client):
-    paths = client.get("/api/openapi.json", HTTP_HOST="a.localhost").json()["paths"]
-    served = {
-        (method.upper(), path.removeprefix("/api"), op["operationId"])
-        for path, methods in paths.items()
-        for method, op in methods.items()
-        if op["operationId"].startswith("attendance.")
-    }
-    assert served == ROUTES
+    assert published_routes(client, "attendance.", HOST) == ROUTES
 
 
 # Authentication and permissions
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/attendance/current"),
@@ -108,7 +83,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_clocks_a_whole_day_over_http(ana, client):
     assert get(client, "/attendance/current").json()["open"] is None
     opened = post(client, "/attendance/clock_in", {})
@@ -122,7 +97,7 @@ def test_an_employee_clocks_a_whole_day_over_http(ana, client):
     assert page["total"] == 1 and page["rows"][0]["break_count"] == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_is_the_409_envelope_with_its_code(ana, client):
     post(client, "/attendance/clock_in", {})
     response = post(client, "/attendance/clock_in", {})
@@ -130,7 +105,7 @@ def test_a_refusal_is_the_409_envelope_with_its_code(ana, client):
     assert response.json()["error"]["code"] == "attendance.already_clocked_in"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_neither_corrects_nor_sees_the_team_nor_saves_settings(ana, client):
     Member.objects.create(first_name="Marta", last_name="Jefa")
     day = Record.objects.create(
@@ -166,7 +141,7 @@ def test_an_employee_neither_corrects_nor_sees_the_team_nor_saves_settings(ana, 
     assert get(client, "/attendance/settings").status_code == 200
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_person_by_id_is_the_employees_own_and_anyone_for_the_manager(ana, client, make_user):
     marta = Member.objects.create(first_name="Marta", last_name="Jefa")
     own = Member.objects.get(user=ana.person)
@@ -179,12 +154,12 @@ def test_a_person_by_id_is_the_employees_own_and_anyone_for_the_manager(ana, cli
     assert get(client, "/attendance/people/detail", id=str(marta.id)).json()["name"] == "Marta Jefa"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(ana, client):
-    assert get(client, "/attendance/current", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(ana, client, hub_b):
+    assert get(client, "/attendance/current", host=f"{B.key}.localhost").status_code == 403
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_correction_over_http_and_its_history(boss, client, make_user):
     worker = make_user("bea", role="hub_employee")
     bea = Member.objects.create(first_name="Bea", last_name="Ruiz", user=worker.person)
@@ -212,7 +187,7 @@ def test_a_correction_over_http_and_its_history(boss, client, make_user):
     assert Correction.objects.count() == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_correction_is_422_per_field(boss, client):
     response = post(
         client,
@@ -232,13 +207,13 @@ def test_an_invalid_correction_is_422_per_field(boss, client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_limit_over_100_or_an_unknown_sort_is_422(boss, client):
     for params in ({"limit": 101}, {"sort": "salary"}):
         assert get(client, "/attendance/records", **params).status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_export_comes_as_csv_text(boss, client):
     response = get(
         client,
@@ -252,13 +227,13 @@ def test_the_export_comes_as_csv_text(boss, client):
     assert body["csv"].startswith("date,user,clock_in")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refusal_follows_the_language_of_the_request(ana, client):
     response = client.post(
         "/api/attendance/clock_out",
         "{}",
         content_type="application/json",
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.status_code == 409

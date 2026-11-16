@@ -6,10 +6,8 @@ corrections of the port (SCHEDULE-F13, freed dates).
 """
 
 import datetime as dt
-import threading
 
 import pytest
-from django.db import connection, transaction
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
@@ -34,11 +32,12 @@ from apps.schedule.schemas import (
     SpecialDayRefIn,
 )
 
-from .conftest import B, ctx_for, make_day, make_override, make_special_day
+from apps.staff.tests.test_services import _race
+from base.tenancy.context import use_hub
 
-pytestmark = pytest.mark.django_db
+from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_day, make_override, make_special_day
 
-QUIET = 0.3
+pytestmark = HUB_DB
 
 
 def run(name, data, role="hub_admin", **ctx):
@@ -160,7 +159,7 @@ def test_saving_a_day_replaces_its_intervals_sorted_and_confirms_the_week():
     )
     assert confirmed()
     assert [i.open_time for i in week.days[0].intervals] == [t("10:00"), t("17:00")]
-    assert outbox() == [("schedule.week.updated", "a", {"weekday": 0})]
+    assert outbox() == [("schedule.week.updated", A.key, {"weekday": 0})]
     # Saving again replaces, never adds.
     run(
         "schedule.week.set_day",
@@ -188,9 +187,12 @@ def test_a_closed_day_keeps_no_interval_and_an_unset_day_is_created():
     assert stored(4) == (False, [(0, t("22:00"), t("02:00"))])
 
 
-def test_the_live_notice_goes_to_the_callers_scope_only():
-    run("schedule.week.set_day", SetDayIn(weekday=1, is_closed=True), scope=B)
-    assert outbox() == [("schedule.week.updated", "b", {"weekday": 1})]
+def test_the_live_notice_goes_to_the_callers_scope_only(hub_b):
+    with use_hub(hub_b):
+        run("schedule.week.set_day", SetDayIn(weekday=1, is_closed=True), scope=B)
+        assert outbox() == [("schedule.week.updated", B.key, {"weekday": 1})]
+        assert set(OutboxEvent.objects.values_list("scope_kind", flat=True)) == {B.kind}
+    assert outbox() == []
 
 
 def test_confirming_the_default_week_changes_no_hour():
@@ -240,7 +242,7 @@ def test_a_special_day_with_a_split_shift_is_one_day_and_two_intervals():
         (1, t("17:00")),
     ]
     assert outbox() == [
-        ("schedule.special_day.created", "a", {"id": str(eve.id), "date": "2026-12-24"})
+        ("schedule.special_day.created", A.key, {"id": str(eve.id), "date": "2026-12-24"})
     ]
 
 
@@ -274,7 +276,7 @@ def test_a_deleted_special_day_frees_its_date():
     )
     assert deleted.id == christmas.id
     assert outbox() == [
-        ("schedule.special_day.deleted", "a", {"id": str(christmas.id)})
+        ("schedule.special_day.deleted", A.key, {"id": str(christmas.id)})
     ]
     again = run(
         "schedule.special_day.create", SpecialDayIn(date="2026-12-25", name="Christmas")
@@ -309,7 +311,7 @@ def test_correcting_a_special_day_changes_only_what_is_sent():
     assert outbox() == [
         (
             "schedule.special_day.updated",
-            "a",
+            A.key,
             {"id": str(christmas.id), "date": "2026-12-25"},
         )
     ]
@@ -450,7 +452,7 @@ def test_a_temporary_change_with_its_intervals():
     assert outbox() == [
         (
             "schedule.override.created",
-            "a",
+            A.key,
             {
                 "id": str(summer.id),
                 "start_date": "2026-08-01",
@@ -509,7 +511,7 @@ def test_correcting_a_temporary_change():
     assert outbox() == [
         (
             "schedule.override.updated",
-            "a",
+            A.key,
             {
                 "id": str(summer.id),
                 "start_date": "2026-07-01",
@@ -539,7 +541,7 @@ def test_deleting_a_temporary_change_by_a_date_it_covers():
     summer = make_override("2026-07-01", "2026-08-31", "Summer", ("10:00", "14:00"))
     run("schedule.override.delete", OverrideRefIn(override="2026-08-15"))
     assert not Override.objects.exists()
-    assert outbox() == [("schedule.override.deleted", "a", {"id": str(summer.id)})]
+    assert outbox() == [("schedule.override.deleted", A.key, {"id": str(summer.id)})]
     with pytest.raises(NotFound):
         run("schedule.override.delete", OverrideRefIn(override="Summer"))
 
@@ -567,47 +569,8 @@ def test_saving_the_settings_never_touches_the_confirmation():
 # ── Two people at the same instant ─────────────────────────────────────────────────────────────
 
 
-def _in_thread(target):
-    outcome = {}
-
-    def body():
-        try:
-            outcome["result"] = target()
-        except Exception as error:  # the outcome is asserted by the test
-            outcome["error"] = error
-        finally:
-            connection.close()
-
-    thread = threading.Thread(target=body)
-    thread.start()
-    return thread, outcome
-
-
-def _race(first, second):
-    """Run ``first`` in a transaction kept open until ``second`` (another thread) is blocked on it."""
-    done, release = threading.Event(), threading.Event()
-
-    def held():
-        with transaction.atomic():
-            result = first()
-            done.set()
-            release.wait(5)
-        return result
-
-    holder, held_outcome = _in_thread(held)
-    assert done.wait(5)
-    waiter, outcome = _in_thread(second)
-    waiter.join(QUIET)
-    waited = waiter.is_alive()
-    release.set()
-    holder.join(5)
-    waiter.join(5)
-    assert "result" in held_outcome, held_outcome
-    assert waited, "the second call did not wait for the first one's lock"
-    return outcome
-
-
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_two_overlapping_temporary_changes_at_once_keep_one():
     def create(start, end, reason):
         return lambda: run(
@@ -626,31 +589,16 @@ def test_two_overlapping_temporary_changes_at_once_keep_one():
     assert list(Override.objects.values_list("reason", flat=True)) == ["First"]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_two_special_days_on_the_same_date_at_once_keep_one():
-    # No lock to wait for: the unique date stops the second at its COMMIT-time insert, same 409.
+    # No lock of the settings: the second waits at its insert of the same date until the first commits, same 409.
     def create(name):
         return lambda: run(
             "schedule.special_day.create", SpecialDayIn(date="2026-12-25", name=name)
         )
 
-    done, release = threading.Event(), threading.Event()
-
-    def held():
-        with transaction.atomic():
-            result = create("First")()
-            done.set()
-            release.wait(5)
-        return result
-
-    holder, held_outcome = _in_thread(held)
-    assert done.wait(5)
-    waiter, outcome = _in_thread(create("Second"))
-    waiter.join(QUIET)
-    release.set()
-    holder.join(5)
-    waiter.join(5)
-    assert "result" in held_outcome, held_outcome
+    outcome = _race(create("First"), create("Second"))
     assert (
         isinstance(outcome.get("error"), Conflict)
         and outcome["error"].code == "schedule.special_day_exists"
@@ -674,7 +622,8 @@ def test_a_day_of_the_bulk_with_thirteen_intervals_is_skipped_and_the_rest_go_in
     assert list(SpecialDay.objects.values_list("name", flat=True)) == ["Christmas"]
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
 def test_a_day_of_the_bulk_taken_at_the_same_time_is_skipped_not_the_whole_list():
     def first():
         return run("schedule.special_day.create", SpecialDayIn(date="2026-12-25", name="First"))
@@ -685,23 +634,7 @@ def test_a_day_of_the_bulk_taken_at_the_same_time_is_skipped_not_the_whole_list(
             BulkSpecialDayIn(special_days=[{"date": "2026-12-25", "name": "Christmas"}, {"date": "2026-12-26", "name": "Boxing day"}]),
         )
 
-    done, release = threading.Event(), threading.Event()
-
-    def held():
-        with transaction.atomic():
-            result = first()
-            done.set()
-            release.wait(5)
-        return result
-
-    holder, held_outcome = _in_thread(held)
-    assert done.wait(5)
-    waiter, outcome = _in_thread(bulk)
-    waiter.join(QUIET)
-    release.set()
-    holder.join(5)
-    waiter.join(5)
-    assert "result" in held_outcome, held_outcome
+    outcome = _race(first, bulk)
     assert "result" in outcome, outcome
     assert [(s.index, s.code) for s in outcome["result"].skipped] == [(0, "already_exists")]
     assert sorted(SpecialDay.objects.values_list("name", flat=True)) == ["Boxing day", "First"]

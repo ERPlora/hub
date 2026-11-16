@@ -7,52 +7,26 @@ booking twice at once waits on its card's lock, so its limit of upcoming booking
 A booking's detail that a deletion lands in the middle of answers what it read or 404, never a 500.
 """
 
-import threading
-from contextlib import contextmanager
-
 import pytest
-from django.contrib import admin
-from django.db import connection
-from django.test import RequestFactory
 from live.errors import OperationError
 
 from apps.appointment.models import Appointment
+from apps.appointment.tests.test_concurrency import deleted_after_the_first_read_of
 from apps.online_booking.models import Booking
+from base.tenancy.tests.concurrency import at_once
 
-from .conftest import TUESDAY, at, booking_data, make_appointment, make_page, public, run
+from .conftest import HUB_DB_COMMITTED, TUESDAY, at, booking_data, make_appointment, make_page, public, run
 
-pytestmark = pytest.mark.django_db(transaction=True)
-
-
-def at_once(*calls):
-    """Runs every ``call`` in its own thread and session, released together; their results or errors."""
-    barrier = threading.Barrier(len(calls))
-    results: list = [None] * len(calls)
-
-    def worker(index, call):
-        try:
-            barrier.wait(5)
-            results[index] = call()
-        except OperationError as error:
-            results[index] = error
-        except Exception as error:  # an unexpected failure is reported by the test
-            results[index] = error
-        finally:
-            connection.close()
-
-    threads = [
-        threading.Thread(target=worker, args=(i, call)) for i, call in enumerate(calls)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(30)
-    return results
+#: Several sessions of business A at once, on a plan with room for them: on Free's one transaction at a time the second
+#: booking would wait for its turn, never for the first one's lock.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("plan_with_room")]
 
 
 def codes(results) -> list[str]:
+    """Each call's refusal code, or «ok» for an answer: an error with no code, or a call that never ended, is said as
+    itself and fails the comparison."""
     return sorted(
-        getattr(result, "code", "ok") if isinstance(result, Exception) else "ok"
+        getattr(result, "code", repr(result)) if result is None or isinstance(result, Exception) else "ok"
         for result in results
     )
 
@@ -148,36 +122,6 @@ REFS = {
 }
 
 
-def delete(appointment: Appointment, how: str) -> None:
-    """Takes ``appointment`` away in this session, ``how`` it says (see ``DELETIONS``), as the staff run it."""
-    if how == "operation":
-        run("online_booking.booking.delete", {"id": str(appointment.pk)})
-        return
-    model_admin = admin.site._registry[Appointment]
-    request = RequestFactory().post("/admin/")
-    if how == "delete_queryset":
-        model_admin.delete_queryset(request, Appointment.objects.filter(pk=appointment.pk))
-    else:
-        model_admin.delete_model(request, Appointment.objects.get(pk=appointment.pk))
-
-
-@contextmanager
-def deleted_after_the_first_read_of(appointment: Appointment, how: str):
-    """Commits the deletion of ``appointment`` in another session right after the first statement of this one
-    that reads its table: a deletion landing in the middle of a read, every time. Yields its outcome."""
-    table = f'FROM "{Appointment._meta.db_table}"'
-    deletions: list = []
-
-    def wrapper(execute, sql, params, many, context):
-        result = execute(sql, params, many, context)
-        if not deletions and sql.lstrip().upper().startswith("SELECT") and table in sql:
-            deletions.extend(at_once(lambda: delete(appointment, how)))
-        return result
-
-    with connection.execute_wrapper(wrapper):
-        yield deletions
-
-
 @pytest.mark.parametrize("how", sorted(DELETIONS))
 @pytest.mark.parametrize("ref", sorted(REFS))
 def test_a_booking_deleted_while_its_detail_is_read_is_never_a_server_error(salon, ref, how):
@@ -185,7 +129,7 @@ def test_a_booking_deleted_while_its_detail_is_read_is_never_a_server_error(salo
     booked = make_appointment(salon.lucia, salon.ana, [salon.cut], at(TUESDAY, "10:00"))
     if via_page:
         Booking.objects.create(appointment=booked, token_hash="a" * 64)
-    with deleted_after_the_first_read_of(booked, how) as deletions:
+    with deleted_after_the_first_read_of(booked, how, "online_booking.booking.delete") as deletions:
         shown = run("online_booking.booking.get", REFS[ref](booked))
     assert deletions == [None]
     assert (shown.id, shown.number, shown.customer_name, shown.status, shown.via_page) == (
