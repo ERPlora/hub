@@ -30,13 +30,20 @@ from django.test import Client
 from django.utils.dateparse import parse_datetime
 
 from apps.verifactu.models import Config
-from base.services import hub_registry, provisioning
-from base.tenancy import names
-from control.models import HubDue
 from base.models import DemoCode, Hub
+from base.services import hub_registry, provisioning
 from base.signing import verify_signed
+from base.tenancy import names
+from base.tenancy.context import use_control, use_hub
+from base.tenancy.tests import hubs
+from base.tenancy.tests.business import A, HUB_DB
+from control.models import HubDue
 
-HUB_ID = "0199c4b0-0000-7000-8000-000000000001"
+#: The door opens no database context of its own: each test enters a business's database only to read it.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
+
+#: The business the SaaS registered: ``hub_a``, on its own database as every business is.
+HUB_ID = str(hubs.HUB_A_ID)
 PATH = f"/internal/hubs/{HUB_ID}/state"
 SECRET = "local-internal-shared-secret"
 APPROVED = {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}
@@ -87,15 +94,15 @@ def code(answer) -> str:
 
 
 @pytest.fixture(autouse=True)
-def registered(request):
-    """The business of ``HUB_ID`` in the registry (``acme``), with VeriFactu on (every app on, as hubs created before
-    new hubs started with every app off had), for the tests that use the database."""
-    if "db" not in request.fixturenames:
-        return None
-    request.getfixturevalue("db")
-    hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
-    request.getfixturevalue("every_app_on")("acme")
-    return hub
+def registered(hub_a):
+    """The business of ``HUB_ID`` in the registry, with VeriFactu on (every app on)."""
+    return hub_a
+
+
+def configs(hub_id: str = HUB_ID) -> list[Config]:
+    """The VeriFactu configurations in the own database of the business ``hub_id``."""
+    with use_hub(Hub.objects.get(pk=hub_id)):
+        return list(Config.objects.all())
 
 
 # The signature
@@ -169,7 +176,7 @@ def test_v2_binds_the_signature_to_its_path(client, db):
     assert answer.status_code == 401
 
 
-@pytest.mark.parametrize("host", ["hubs.localhost", "hub.localhost", "a.localhost"])
+@pytest.mark.parametrize("host", ["hubs.localhost", "hub.localhost", f"{A.key}.localhost"])
 def test_the_signature_opens_the_door_on_any_host(client, db, host):
     # The platform host (no session: it would go to the SaaS admin), the private name (`hub`, reserved) and a hub's.
     answer = signed(client, "put", PATH, {"slug": "a", "version": 1}, host=host)
@@ -252,7 +259,7 @@ def test_the_state_is_only_put(client, db):
 # The photo
 
 
-def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
+def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db, hub_b):
     answer = signed(
         client,
         "put",
@@ -269,12 +276,14 @@ def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
         "applied": True,
         "version": 3,
     }
-    config = Config.objects.get()
+    [config] = configs()
     assert (
         config.hub_status,
         config.representation_status,
         config.synced_version,
     ) == ("active", "approved", 3)
+    # Applied in that business's own database, never in another one's.
+    assert configs(str(hub_b.id)) == []
 
 
 @pytest.mark.parametrize(
@@ -291,11 +300,11 @@ def test_a_key_of_the_verifactu_block_the_hub_does_not_read_never_refuses_the_ph
     # The Hub does not read ``live_paid`` (hub#205) and the SaaS no longer sends it. A photo from an older SaaS that
     # still carries it, or one carrying a key added later, applies whole: the door only checks that the block is an
     # object, and ``verifactu.config.sync`` ignores what it does not know.
-    answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": "acme", "version": 2, "verifactu": block})
+    answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": A.key, "version": 2, "verifactu": block})
     assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 2}
     registered.refresh_from_db()
     assert registered.state_version == 2
-    config = Config.objects.get()
+    [config] = configs()
     # The retired column is written by nobody, whatever the photo says of it.
     assert (config.representation_status, config.synced_version, config.live_paid) == ("approved", 2, False)
 
@@ -303,15 +312,16 @@ def test_a_key_of_the_verifactu_block_the_hub_does_not_read_never_refuses_the_ph
 def test_the_business_status_travels_on_its_own(client, db):
     body = {"slug": "a", "version": 4, "status": "past_due"}
     assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 4}
-    assert Config.objects.get().hub_status == "past_due"
+    [config] = configs()
+    assert config.hub_status == "past_due"
 
 
 def test_the_photo_that_reactivates_a_suspended_business_opens_it_again(client, db):
     # The way back of a suspended business is this photo, which its own 402 never blocks.
     Hub.objects.filter(id=HUB_ID).update(state={"status": "suspended"}, state_version=1)
-    host = "acme.localhost:8000"
+    host = f"{A.key}.localhost:8000"
     assert client.get("/api/me", HTTP_HOST=host).status_code == 402
-    body = {"slug": "acme", "version": 2, "status": "active"}
+    body = {"slug": A.key, "version": 2, "status": "active"}
     assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 2}
     assert client.get("/api/me", HTTP_HOST=host).status_code == 200  # served again, as any open hub
 
@@ -320,7 +330,8 @@ def test_the_photo_tells_the_hub_its_id_in_erplora(client, db):
     # Where the signed authorisation is sent (verifactu.representation.submit): POST /internal/hubs/{id}/representation.
     body = {"slug": "a", "version": 5, "status": "active"}
     assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 5}
-    assert str(Config.objects.get().hub_id) == HUB_ID
+    [config] = configs()
+    assert str(config.hub_id) == HUB_ID
 
 
 def test_an_older_photo_is_ignored(client, db):
@@ -340,13 +351,14 @@ def test_an_older_photo_is_ignored(client, db):
         "applied": False,
         "version": 5,
     }
-    assert Config.objects.get().representation_status == "approved"
+    [config] = configs()
+    assert config.representation_status == "approved"
 
 
 def test_without_the_block_verifactu_is_left_alone(client, db, registered):
     answer = signed(client, "put", PATH, {"slug": "a", "version": 1})
     assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 1}
-    assert not Config.objects.exists()
+    assert configs() == []
 
 
 def test_a_photo_of_a_hub_the_registry_does_not_know_is_404(client, db):
@@ -354,11 +366,11 @@ def test_a_photo_of_a_hub_the_registry_does_not_know_is_404(client, db):
     other = "/internal/hubs/0199c4b0-0000-7000-8000-0000000000ff/state"
     answer = signed(client, "put", other, {"slug": "a", "version": 1, "status": "active"})
     assert answer.status_code == 404 and code(answer) == "not_found"
-    assert not Config.objects.exists()
+    assert configs() == []
 
 
 def test_the_photo_is_kept_on_the_registry_as_it_came(client, db, registered):
-    body = {"hub_id": HUB_ID, "slug": "acme", "version": 2, "status": "active", "plan": {"slug": "starter"}}
+    body = {"hub_id": HUB_ID, "slug": A.key, "version": 2, "status": "active", "plan": {"slug": "starter"}}
     assert signed(client, "put", PATH, body).json() == {"applied": True, "version": 2}
     registered.refresh_from_db()
     assert (registered.state, registered.state_version) == (body, 2)
@@ -383,7 +395,7 @@ def test_the_photo_is_kept_on_the_registry_as_it_came(client, db, registered):
 def test_a_photo_out_of_contract_is_422(client, db, body, registered):
     answer = signed(client, "put", PATH, body)
     assert answer.status_code == 422 and code(answer) == "internal.payload_invalid"
-    assert not Config.objects.exists()
+    assert configs() == []
     registered.refresh_from_db()
     assert (registered.state, registered.state_version) == ({}, 0)
 
@@ -604,7 +616,7 @@ def test_a_slug_no_business_may_take_is_422(client, db, slug):
 
 
 def test_the_slug_of_another_hub_is_409(client, db):
-    answer = signed(client, "put", HUB_PATH, {**REGISTRY, "slug": "acme"})
+    answer = signed(client, "put", HUB_PATH, {**REGISTRY, "slug": A.key})
     assert answer.status_code == 409 and code(answer) == "base.slug_taken"
 
 
@@ -626,7 +638,7 @@ def test_a_registration_out_of_contract_is_422(client, db, raw):
 def test_get_answers_the_status_the_saas_waits_for(client, db):
     answer = signed(client, "get", f"/internal/hubs/{HUB_ID}", b"", with_v2=True)
     assert answer.status_code == 200
-    assert (answer.json()["id"], answer.json()["slug"], answer.json()["status"]) == (HUB_ID, "acme", "ready")
+    assert (answer.json()["id"], answer.json()["slug"], answer.json()["status"]) == (HUB_ID, A.key, "ready")
 
 
 def test_get_tells_the_real_maintenance_and_recovers_after_it_is_lifted(client, db):
@@ -652,14 +664,16 @@ def test_get_tells_the_real_maintenance_and_recovers_after_it_is_lifted(client, 
     assert maintenance["frozen"] is True and maintenance["reason"] == "Aurora upgrade"
     assert parse_datetime(maintenance["since"]) is not None
     assert Hub.objects.get(pk=HUB_ID).state_version == 7
-    assert OutboxEvent.objects.filter(name="control.freeze.started").count() == 1
+    with use_control():
+        assert OutboxEvent.objects.filter(name="control.freeze.started").count() == 1
 
     freeze_set(platform, FreezeIn(frozen=False))
     recovered = signed(client, "get", path, b"", with_v2=True)
 
     assert recovered.status_code == 200 and recovered.json()["maintenance"] is None
     assert recovered.json()["state_version"] == 7
-    assert OutboxEvent.objects.filter(name="control.freeze.lifted").count() == 1
+    with use_control():
+        assert OutboxEvent.objects.filter(name="control.freeze.lifted").count() == 1
 
 
 @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])
@@ -694,7 +708,7 @@ def test_delete_of_an_unknown_hub_is_404(client, db):
 
 def test_restore_brings_a_cancelled_hub_back(client, db, registered):
     # With its own database, made and kept while it was away.
-    Hub.objects.filter(pk=HUB_ID).update(db_name="hub_x", ready_at=Hub.objects.get(pk=HUB_ID).created_at)
+    Hub.objects.filter(pk=HUB_ID).update(ready_at=Hub.objects.get(pk=HUB_ID).created_at)
     signed(client, "delete", f"/internal/hubs/{HUB_ID}", {"id": HUB_ID})
     answer = signed(client, "post", f"/internal/hubs/{HUB_ID}/restore", {"id": HUB_ID}, with_v2=True)
     assert answer.status_code == 200 and answer.json()["status"] == "ready"
@@ -707,6 +721,7 @@ def test_restore_of_a_business_without_its_own_database_makes_one_from_nothing(c
     from base.tenancy import connections as tenancy_connections
     from base.tenancy import names
 
+    Hub.objects.filter(pk=HUB_ID).update(db_name="", ready_at=None)
     signed(client, "delete", f"/internal/hubs/{HUB_ID}", {"id": HUB_ID})
     HubDue.objects.filter(pk=HUB_ID).delete()
 
@@ -880,7 +895,7 @@ def test_a_code_of_a_demo_that_ended_is_410_hub_gone(client, db):
     assert (answer.status_code, code(answer)) == (410, "base.hub_gone")
 
 
-@pytest.mark.parametrize("slug", ["demo-00000000", "acme"])
+@pytest.mark.parametrize("slug", ["demo-00000000", A.key])
 def test_a_code_of_no_demo_is_404(client, db, slug):
     answer = demo_code(client, slug)
     assert (answer.status_code, code(answer)) == (404, "not_found")
