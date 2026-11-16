@@ -14,16 +14,13 @@ photo's own version.
 import json
 import time
 
-import psycopg
 import pytest
-from django.db import OperationalError, connections
+from django.db import OperationalError
 from django.test import Client
-from live.context import Scope, system_context
+from live.context import system_context
 from live.errors import OperationError
 from live.models import OutboxEvent
 from live.operations import get as get_operation
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
 
 from apps.whatsapp_inbox.models import Channel, Message
 from base import activation, internal, relay
@@ -34,10 +31,11 @@ from base.tenancy.identity import HubIdentityMismatch
 from base.tenancy.tests import hubs
 from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED
 from base.tenancy.tests.legacy import use_legacy
+from base.tests.test_hub_state_wake import heard, listening
 from base.tests.test_internal import HUB_ID, PATH as STATE_PATH, SECRET, code, signed
 from base.tests.test_session_revoke import acme
 
-__all__ = ["acme"]
+__all__ = ["acme", "listening"]
 
 #: The doors open the named business's database themselves: each test enters it only to read it.
 pytestmark = [HUB_DB, pytest.mark.usefixtures("no_test_fallback")]
@@ -555,29 +553,6 @@ def test_a_whatsapp_out_of_contract_keeps_nothing_of_the_photo(client, acme, blo
 
 
 # Two businesses: a write in one never reaches the other
-
-
-@pytest.fixture
-def listening():
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
-    )
-    sessions = []
-
-    def open_session(scope: Scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 1.0) -> set[str]:
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
 
 
 @HUB_DB_COMMITTED

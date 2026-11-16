@@ -20,15 +20,13 @@ from psycopg.conninfo import make_conninfo
 from base.events import HUB_STATE_APPLIED
 from base.tenancy.tests.business import A, B, HUB_DB_COMMITTED
 from base.tests.test_internal import HUB_ID, PATH, signed
+from base.tests.test_session_revoke import acme
+
+__all__ = ["acme"]
 
 pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("no_test_fallback")]
 
 ACME = A
-
-
-@pytest.fixture
-def acme(hub_a):
-    return hub_a
 
 
 @pytest.fixture
