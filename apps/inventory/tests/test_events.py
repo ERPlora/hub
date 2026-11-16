@@ -8,16 +8,15 @@ import re
 import uuid
 from decimal import Decimal
 
-import pytest
-from live.context import Scope
 from live.operations import NAME_RE
 
 from apps.inventory import events
 from apps.inventory.models import Product, StockMovement
 from apps.tax.models import TaxCategory
 
+from .conftest import A, HUB_DB
+
 PAST_FACT = re.compile(r"^inventory\.[a-z_]+\.[a-z_]+ed$")
-A = Scope("host", "a")
 
 
 def declared():
@@ -64,7 +63,7 @@ def test_it_reacts_to_a_paid_sale_a_voided_one_and_a_refund():
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_paid_sale_and_its_void_reach_the_stock_as_the_system():
     tax = TaxCategory.objects.create(key="test.general", name="General")
     coffee = Product.objects.create(name="Coffee", sku="CAF", price=100, tax_category=tax, stock=Decimal("10"))
@@ -82,7 +81,7 @@ def test_a_paid_sale_and_its_void_reach_the_stock_as_the_system():
     assert Product.objects.get().stock == Decimal("10")
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_event_it_does_not_react_to_does_nothing():
     assert events.react(A, "sale.sale.reassigned", {"sale_id": str(uuid.uuid7())}) is None
     assert events.react(A, "customer.customer.created", {}) is None
@@ -105,7 +104,7 @@ def _last_payload(name: str) -> dict:
     return OutboxEvent.objects.filter(name=name).order_by("-created_at", "-id").first().payload
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_refund_puts_the_returned_units_back_once_as_the_system():
     from live.context import system_context
     from live.operations import get

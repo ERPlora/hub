@@ -13,7 +13,8 @@ from live.operations import AI, registry
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_its_words_name
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable, place_of_no_ask, probe_phrases
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 #: The requests of the real-model QA (``qa20261108.owner.es.inventory.*``), as the owner said them: each is offered its
 #: existing operation (among the ``MAX_TOOLS`` a turn offers, so the model can choose it), without being one of its
@@ -63,7 +64,7 @@ def test_the_hub_reads_units_as_units_and_a_delivery_note_as_goods_received():
     )
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_inventory_request_offers_its_existing_operation(catalog_of, name, phrase):
     assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
@@ -78,7 +79,7 @@ GOODS_IN = [
 ]
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(("name", "phrase"), GOODS_IN)
 def test_goods_received_in_the_hubs_words_bring_the_reception_among_the_first_ten(catalog_of, name, phrase):
     assert comparable(phrase) not in probe_phrases()

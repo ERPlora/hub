@@ -6,10 +6,10 @@
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import { formatDateTime } from '../../packages/ui/src/components/format/dateTime';
+import { type Figures, figuresAt, shownFigures, watchFigures } from './demo-figures';
 import { A, api, createItem, decodeSubs, listReady, login, record, rowOf, shot, shown } from './helpers';
 
 type Sub = { op: string; params: Record<string, unknown> };
-type Figures = { open: number; done: number; lines: number };
 
 /** Every `/api/live` the page opens, with its subscriptions decoded. */
 function trackSubscriptions(page: Page): Sub[][] {
@@ -60,35 +60,6 @@ async function filterBy(page: Page, label: 'All' | 'Open' | 'Done'): Promise<voi
   await panel.getByTestId('demo-items-filters-apply').click();
   await expect(panel).toBeHidden();
 }
-
-/** The figures the page paints (the chips' `data-value`). */
-async function shownFigures(page: Page): Promise<Figures> {
-  const value = async (name: keyof Figures) =>
-    Number(await shown(page).locator(`[data-testid=demo-stats-${name}]`).getAttribute('data-value'));
-  return { open: await value('open'), done: await value('done'), lines: await value('lines') };
-}
-
-/** In-page probe: the `Date.now()` at which the figures first read `wanted` (see `figuresAt`). */
-async function watchFigures(page: Page, wanted: Figures): Promise<void> {
-  await page.evaluate((target) => {
-    const w = window as unknown as { __figuresAt?: number };
-    delete w.__figuresAt;
-    const read = (name: string) =>
-      Number(document.querySelector(`.ion-page:not(.ion-page-hidden) [data-testid=demo-stats-${name}]`)?.getAttribute('data-value'));
-    const check = (): boolean => {
-      const ok = read('open') === target.open && read('done') === target.done && read('lines') === target.lines;
-      if (ok && w.__figuresAt === undefined) w.__figuresAt = Date.now();
-      return ok;
-    };
-    if (check()) return;
-    const observer = new MutationObserver(() => {
-      if (check()) observer.disconnect();
-    });
-    observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-value'] });
-  }, wanted);
-}
-
-const figuresAt = (page: Page) => page.evaluate(() => (window as unknown as { __figuresAt?: number }).__figuresAt);
 
 test('status filter on the server and the «Updated» column painted by the shared formatter', async ({ page, context }) => {
   await login(page, A);

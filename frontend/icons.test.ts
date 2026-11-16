@@ -27,6 +27,18 @@ const SOURCES = [
 /** A Python string that names an icon of one of the sets the shell bakes (`"ion:grid-outline"`). */
 const ICON_LITERAL = /"((?:ion|material-symbols|mdi|heroicons|tabler|lucide|fa):[a-z0-9-]+)"/g;
 
+/** The folders of base whose Python paints nothing: its tests name made-up icons, and the frontend holds none. */
+const NOT_PAINTED = new Set(['tests', 'frontend']);
+
+/** Every Python file under `folder`, its packages included (`base/queries/`), but what `NOT_PAINTED` names. */
+function pythonOf(folder: string): string[] {
+  return readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(folder, entry.name);
+    if (entry.isDirectory()) return NOT_PAINTED.has(entry.name) ? [] : pythonOf(path);
+    return entry.name.endsWith('.py') ? [path] : [];
+  });
+}
+
 describe('guardrail: every icon the hub names is registered', () => {
   // It reads each of the ~1,500 sources once, from the disk, so its time is the machine's: with several test runs on
   // one machine (load 20–40) and every opened file scanned, it took up to 7.5 s, against Vitest's 5 s.
@@ -39,10 +51,9 @@ describe('guardrail: every icon the hub names is registered', () => {
   // counter, `DEFAULT_STEP_ICON`), which `scanIcons` does not read; HubIcon throws on an unknown one, so a typo
   // there would take the whole Home down.
   it('every icon base names in its Python is registered', () => {
-    const base = join(HUB_DIR, 'base');
-    const names = readdirSync(base)
-      .filter((file) => file.endsWith('.py'))
-      .flatMap((file) => [...readFileSync(join(base, file), 'utf8').matchAll(ICON_LITERAL)].map((m) => m[1]));
+    const names = pythonOf(join(HUB_DIR, 'base')).flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(ICON_LITERAL)].map((m) => m[1]),
+    );
     expect(names.length).toBeGreaterThanOrEqual(4);
     expect(names.filter((name) => !isRegisteredIcon({ kind: 'icon', name }))).toEqual([]);
   });
