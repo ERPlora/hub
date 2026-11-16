@@ -7,8 +7,8 @@ refused by Postgres itself.
 
 import uuid
 
-import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from live.operations import atomic
 
 from apps.modifier.models import (
     MAX_CHOICES,
@@ -19,14 +19,14 @@ from apps.modifier.models import (
 )
 from apps.tax.models import TaxCategory
 
-from .conftest import FOOD, make_category, make_product
+from .conftest import FOOD, HUB_DB, make_category, make_product
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make) -> bool:
     try:
-        with transaction.atomic():
+        with atomic():
             make()
     except IntegrityError:
         return True

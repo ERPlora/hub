@@ -1,20 +1,20 @@
 """The modifier app's routes: each bound to its operation, and the whole app over HTTP.
 
-Requests go to ``a.localhost`` (scope ``a``) with Django's sync test client, which sees the test's
-transaction. No path parameters: a group, an option or a link travels in the input (query string on
+Requests go to business A's host (scope A, in its own database) with Django's sync test client, which sees the
+test's transaction. No path parameters: a group, an option or a link travels in the input (query string on
 GET, body on POST), by its id or as a person names it.
 """
 
-import json
 import uuid
 
 import pytest
 from live.ninja import ensure_api_parity
 
+from apps.flow.tests.test_api import get, post
 from apps.modifier.api import router
 from config.api import api
 
-from .conftest import GENERIC, make_category, make_product
+from .conftest import GENERIC, HOST, HUB_DB, B, make_category, make_product
 
 ROUTES = {
     ("GET", "/modifier/groups", "modifier.group.list"),
@@ -37,25 +37,15 @@ ROUTES = {
 }
 
 
-def get(client, path, host="a.localhost", **params):
-    return client.get(f"/api{path}", params, HTTP_HOST=host)
-
-
-def post(client, path, data, host="a.localhost"):
-    return client.post(
-        f"/api{path}", json.dumps(data), content_type="application/json", HTTP_HOST=host
-    )
-
-
 @pytest.fixture
 def admin_client(client, make_user):
-    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    client.force_login(make_user("boss", role="hub_admin"))
     return client
 
 
 @pytest.fixture
 def employee_client(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    client.force_login(make_user("ana", role="hub_employee"))
     return client
 
 
@@ -85,7 +75,7 @@ def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_anonymous_gets_the_401_envelope(client):
     for response in (
         get(client, "/modifier/groups"),
@@ -95,7 +85,7 @@ def test_anonymous_gets_the_401_envelope(client):
         assert response.json()["error"]["code"] == "unauthorized"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_reads_but_does_not_write(employee_client):
     for path in ("/modifier/groups", "/modifier/options", "/modifier/links"):
         assert get(employee_client, path).status_code == 200, path
@@ -109,12 +99,12 @@ def test_an_employee_reads_but_does_not_write(employee_client):
         assert response.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.django_db
-def test_a_role_on_a_is_no_role_on_b(admin_client):
-    assert get(admin_client, "/modifier/groups", host="b.localhost").status_code == 403
+@HUB_DB
+def test_a_role_on_a_is_no_role_on_b(admin_client, hub_b):
+    assert get(admin_client, "/modifier/groups", host=f"{B.key}.localhost").status_code == 403
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_invalid_group_is_422_per_field(admin_client):
     response = post(
         admin_client,
@@ -136,7 +126,7 @@ def test_an_invalid_group_is_422_per_field(admin_client):
     assert get(admin_client, "/modifier/groups", limit=101).status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_domain_refusal_is_a_409_with_its_code_and_field(admin_client):
     assert post(admin_client, "/modifier/groups", {"name": "Sauces"}).status_code == 201
     response = post(admin_client, "/modifier/groups", {"name": "SAUCES"})
@@ -148,14 +138,14 @@ def test_a_domain_refusal_is_a_409_with_its_code_and_field(admin_client):
     }
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_missing_group_is_404_and_a_group_not_named_is_422(admin_client):
     missing = get(admin_client, "/modifier/groups/detail", id=str(uuid.uuid7()))
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "not_found")
     assert get(admin_client, "/modifier/groups/detail").status_code == 422
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_round_trip(admin_client):
     burger = make_product("Burger", "BUR-01")
     mains = make_category("Mains")
@@ -271,7 +261,7 @@ def test_round_trip(admin_client):
             "product": "BUR-01",
             "option_ids": [mayo.json()["id"], rare.json()["id"], soda.json()["id"]],
         },
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
     )
     assert valued.status_code == 200, valued.content
     assert (valued.json()["folded_delta"], valued.json()["kitchen_text"]) == (
@@ -323,12 +313,12 @@ def test_round_trip(admin_client):
     assert get(admin_client, "/modifier/groups/detail", id=group_id).status_code == 404
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_error_message_follows_the_language_of_the_request(admin_client):
     response = admin_client.get(
         "/api/modifier/groups/detail",
         {"id": str(uuid.uuid7())},
-        HTTP_HOST="a.localhost",
+        HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
     )
     assert response.json()["error"]["message"] == "Este grupo no existe."

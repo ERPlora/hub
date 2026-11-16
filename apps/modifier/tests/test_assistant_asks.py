@@ -18,12 +18,14 @@ from django.conf import settings
 from live import assistant as shared
 from live.operations import AI, registry
 
+from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
 from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
-from base.tests.test_assistant_asks import catalog_of  # noqa: F401 (a fixture: the tests below take it by name)
+
+from .conftest import HUB_DB
 
 OWNER, ADMIN, MANAGER, EMPLOYEE = (
     Membership.Role.OWNER,
@@ -118,7 +120,7 @@ def test_modifier_offers_its_seventeen_tools():
     assert sorted(name for name, _ in OWN_WORDS) == sorted(tools)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 def test_an_employee_is_never_offered_what_only_who_runs_the_menu_may_do(catalog_of):
     owner = catalog_of(OWNER, "es")
     employee = catalog_of(EMPLOYEE, "es")
@@ -135,13 +137,13 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of, role, name, phrase):
     assert_offered_with_room(catalog_of(role, "es"), name, phrase)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Modifiers
@@ -164,7 +166,7 @@ def test_the_probes_of_modifiers_are_read():
     assert len(PROBES) == 23  # the owner's seventeen, one per tool, and six of the employee's
 
 
-test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = own_words_test(OWN_WORDS, "es")
+test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
 #: What the owner says in English in words of their own for each tool of Modifiers that needs one, neither
@@ -188,7 +190,7 @@ OWN_WORDS_EN = [
     ("modifier.option.update", "extra cheese now costs one fifty, change it"),
     ("modifier.selection.resolve", "if I add double cheese to the pizza, how much more is it?"),
 ]
-test_a_request_in_english_is_lifted_by_its_english_asks = english_words_test(OWN_WORDS_EN)
+test_a_request_in_english_is_lifted_by_its_english_asks = in_hubs(english_words_test(OWN_WORDS_EN))
 test_each_tool_has_its_own_english_words = english_coverage_test("modifier", OWN_WORDS_EN)
 
 
@@ -200,7 +202,7 @@ def test_the_hub_reads_predeterminada_as_the_default():
     assert any({shared.stem("predeterminada"), shared.stem("default")} <= concept for concept in said)
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hubs_synonyms(catalog_of):
     tools = catalog_of(OWNER, "es")
     assert comparable(BY_DEFAULT) not in probe_phrases()
@@ -213,7 +215,7 @@ def test_a_request_with_predeterminada_reaches_the_change_of_an_option_by_the_hu
     assert unread is None or unread > TOP, unread
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("role", [OWNER, ADMIN, MANAGER])
 def test_changing_a_category_of_inventory_comes_before_the_category_modifiers_look_up(catalog_of, role, language):
@@ -238,7 +240,7 @@ def test_changing_a_category_of_inventory_comes_before_the_category_modifiers_lo
 ROOM = 2
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("language", ["en", "es"])
 @pytest.mark.parametrize("role", [OWNER, ADMIN, MANAGER, EMPLOYEE])
 def test_the_group_behind_a_price_list_keeps_its_room_beside_the_groups_of_modifiers(catalog_of, role, language):

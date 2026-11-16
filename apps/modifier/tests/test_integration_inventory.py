@@ -10,9 +10,9 @@ from live.errors import NotFound
 from apps.modifier import events
 from apps.modifier.models import ModifierLink
 
-from .conftest import A, GENERIC, make_category, make_product, run
+from .conftest import GENERIC, HUB_DB, A, make_category, make_product, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 @pytest.fixture

@@ -17,16 +17,14 @@ unread beside the id the write takes its record by instead (hub#1291).
 import json
 
 import pytest
-from live.context import Scope
 from live.operations import get, registry
 
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
-from apps.modifier.tests.conftest import GENERIC, ctx_for, make_category, make_product, run
+from apps.modifier.tests.conftest import GENERIC, HUB_DB, A, B, ctx_for, make_category, make_product, run
 from apps.modifier.tests.test_integration_assistant import TITLES, modifier_writes
 from base import assistant
 from base.schemas import names
 from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
 from base.tests.test_assistant_yes_for_its_card import (
     read_as,
     said,
@@ -38,7 +36,7 @@ from base.tests.test_assistant_yes_for_its_card import (
 )
 from base.tests.test_services_assistant import call
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 BY_ITS_NAME = ("modifier.group.delete", {"group": "salsa"})
 
@@ -636,11 +634,10 @@ def test_the_card_says_the_product_the_yes_applies_the_group_to(said, product):
     assert ModifierLink.objects.get().product.name == product
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_words_that_fit_a_product_or_a_category_of_another_business_are_said_as_said(hub_a, hub_b, no_fallback):
+def test_words_that_fit_a_product_or_a_category_of_another_business_are_said_as_said(hub_a, hub_b):
     """Each business in its own database: «pizz» and «postr» name «Pizza» and «Postres» in A, nothing in B."""
-    in_a = ctx_for("hub_admin", scope=Scope("host", hub_a.slug), language="es")
-    in_b = ctx_for("hub_admin", scope=Scope("host", hub_b.slug), language="es")
+    in_a = ctx_for("hub_admin", scope=A, language="es")
+    in_b = ctx_for("hub_admin", scope=B, language="es")
 
     def shown(ctx) -> dict:
         return {

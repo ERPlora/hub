@@ -19,7 +19,7 @@ from apps.modifier.admin import (
 )
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 
-from .conftest import make_product
+from .conftest import HUB_DB, make_product
 
 MODELS = {
     ModifierGroup: ModifierGroupAdmin,
@@ -52,6 +52,7 @@ def test_every_model_is_registered_and_a_group_shows_its_options_and_links():
     assert ModifierGroupAdmin.inlines == [OptionInline, LinkInline]
 
 
+@HUB_DB
 def test_full_crud_for_a_superuser(superuser):
     request = request_by(superuser)
     for model in MODELS:
@@ -62,14 +63,13 @@ def test_full_crud_for_a_superuser(superuser):
         assert model_admin.has_delete_permission(request), model
 
 
-@pytest.mark.django_db
-def test_changelists_and_change_pages_render(client, superuser):
+@HUB_DB
+def test_changelists_and_change_pages_render(hub_staff):
     group = ModifierGroup.objects.create(name="Sauces", kitchen_name="SAUCE")
     option = ModifierOption.objects.create(group=group, name="Mayo", price_delta=30)
     link = ModifierLink.objects.create(
         group=group, product_id=make_product("Burger", "BUR-01").id
     )
-    client.force_login(superuser)
 
     # The admin lives only on the platform host.
     for path, text in (
@@ -83,24 +83,21 @@ def test_changelists_and_change_pages_render(client, superuser):
         ("/admin/modifier/modifieroption/add/", b"is_default"),
         ("/admin/modifier/modifierlink/add/", b"category"),
     ):
-        response = client.get(path, HTTP_HOST="hubs.localhost")
+        response = hub_staff.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200 and text in response.content, path
 
 
-@pytest.mark.django_db
-def test_a_group_and_an_option_read_modifiers_own_spanish_in_the_admin(
-    client, superuser
-):
+@HUB_DB
+def test_a_group_and_an_option_read_modifiers_own_spanish_in_the_admin(hub_staff):
     """Support reading a group or an option in Spanish sees its kitchen name as «Nombre en la comanda», as the
     Suplementos forms say it; not Menús' «Nombre de cocina» (hub#663)."""
     group = ModifierGroup.objects.create(name="Salsas", kitchen_name="SALSA")
     option = ModifierOption.objects.create(group=group, name="Alioli")
-    client.force_login(superuser)
     for path in (
         f"/admin/modifier/modifiergroup/{group.pk}/change/",
         f"/admin/modifier/modifieroption/{option.pk}/change/",
     ):
-        response = client.get(
+        response = hub_staff.get(
             path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
         )
         page = response.content.decode()
@@ -111,10 +108,9 @@ def test_a_group_and_an_option_read_modifiers_own_spanish_in_the_admin(
         ), path
 
 
-@pytest.mark.django_db
-def test_support_can_repair_a_group_through_the_admin(client, superuser):
+@HUB_DB
+def test_support_can_repair_a_group_through_the_admin(hub_staff):
     group = ModifierGroup.objects.create(name="Sacues")
-    client.force_login(superuser)
     data = {
         "name": "Sauces",
         "kitchen_name": "",
@@ -128,7 +124,7 @@ def test_support_can_repair_a_group_through_the_admin(client, superuser):
         "links-TOTAL_FORMS": "0",
         "links-INITIAL_FORMS": "0",
     }
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/modifier/modifiergroup/{group.pk}/change/",
         data,
         HTTP_HOST="hubs.localhost",
