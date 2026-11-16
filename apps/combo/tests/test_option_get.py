@@ -8,7 +8,7 @@ import pytest
 from live.errors import NotFound, PermissionDenied
 from live.operations import get
 
-from apps.combo.tests.conftest import ctx_for
+from apps.combo.tests.conftest import HUB_DB, ctx_for
 from base import assistant
 
 
@@ -28,16 +28,19 @@ def lentils(db):
     return run("combo.option.create", {"combo": "Menu of the day", "group": "Starters", "product": "LEN"})
 
 
+@HUB_DB
 def test_a_choice_is_named_by_its_product(lentils):
     found = run("combo.option.get", {"id": str(lentils.id)}, ctx_for("hub_employee"))
     assert (found.id, found.product_name) == (lentils.id, "Lentils")
 
 
+@HUB_DB
 def test_a_choice_that_is_not_there_is_not_found(db):
     with pytest.raises(NotFound):
         run("combo.option.get", {"id": str(uuid.uuid4())})
 
 
+@HUB_DB
 def test_it_needs_the_right_to_see_menus(lentils):
     # Everything but this right, so it is this one the read asks for.
     everything = ctx_for()

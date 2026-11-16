@@ -16,6 +16,7 @@ from .conftest import (
     A,
     DRINK,
     FOOD,
+    HUB_DB,
     ctx_for,
     make_combo,
     make_group,
@@ -24,7 +25,7 @@ from .conftest import (
     run,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def events(name: str) -> list[dict]:

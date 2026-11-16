@@ -6,11 +6,10 @@ Key»). The card is base's (``base.assistant.cards.card``); the names are combo'
 import json
 from pathlib import Path
 
-import pytest
 from django.apps import apps
 from live.operations import get, registry
 
-from apps.combo.tests.conftest import ctx_for, make_combo
+from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo
 from base import assistant
 from base.tests.test_assistant import technical_names
 
@@ -39,7 +38,7 @@ def test_no_datum_of_a_write_of_combo_reaches_a_spanish_card_by_its_technical_na
     assert technical_names(writes) == {}
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_the_card_names_the_courses_of_a_menu_put_in_a_new_order():
     """Dragging the courses of a menu: the builder's «Platos», never «Group Ids». The menu said by its name is read as
     the person asks, as the write will find it (hub#1217): a card with nobody at hand reads no record."""

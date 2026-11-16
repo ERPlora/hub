@@ -1,24 +1,37 @@
-"""Fixtures of the combo tests: contexts per role and scope, users with a role on a host, a raw DSN, and
-builders of the data a test starts from (straight to the models: the operations are under test).
+"""Fixtures of the combo tests: contexts per role and scope, and builders of the data a test starts from (straight to
+the models: the operations are under test).
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
 
 The components of a menu are real products of the Inventory app and its tax category a real category
 of the Taxes app (the two ``requires``): no doubles. The builders import the models lazily, so that
 the tests of apps.py still collect while models.py does not exist.
 """
 
+import psycopg
 import pytest
-from django.contrib.auth import get_user_model
-from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
-from psycopg.conninfo import make_conninfo
+from live.outbox import channel_for
 
-from base.models import Membership
+from apps.flow.tests.test_relay import worker_loop
+from apps.invoice.tests.conftest import catalog_of
+from apps.inventory.tests.test_relay import tick
+from apps.sale.tests.conftest import db_dsn, make_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, factory_data_b, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+#: The marks, scopes and fixtures of the businesses' own databases, users with a role on a host and the raw DSN of
+#: control's database as Sales makes them, the assistant's catalogue of a person of business A, and one tick of the
+#: worker's real loop over every business with the factory data planted again (Inventory's, on Automations' loop), that
+#: these tests take from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "factory_data", "factory_data_b", "hub_staff",
+    "in_business_a", "make_user", "plan_with_room", "tick", "worker_loop",
+]
 
 #: Factory categories of the Taxes app (its migration 0002): 10 % on the premises, 21 % to take away.
 FOOD = "restaurant.food"
@@ -57,32 +70,19 @@ def english():
 
 
 @pytest.fixture
-def make_user(db):
-    def make(
-        username: str = "ana",
-        *,
-        host: str | None = "a",
-        role: str = Membership.Role.ADMIN,
-    ):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        return user
+def listen(db_dsn):
+    """``listen(scope)``: a raw session LISTENing on the channel of ``scope``; it hears only what is committed."""
+    sessions = []
 
-    return make
+    def open_session(scope):
+        session = psycopg.connect(db_dsn, autocommit=True)
+        sessions.append(session)
+        session.execute(f"LISTEN {channel_for(scope)}")
+        return session
 
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
+    yield open_session
+    for session in sessions:
+        session.close()
 
 
 # Builders

@@ -20,14 +20,14 @@ from live.operations import AI, registry
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU
-from apps.combo.tests.conftest import ctx_for, make_combo, make_group, make_option, make_product
+from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, make_option, make_product
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
 from base.schemas import names
 from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
 from base.tests.test_services_assistant import call
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 DELETE_BY_ITS_NAME = ("combo.combo.delete", {"combo": "menú"})
 

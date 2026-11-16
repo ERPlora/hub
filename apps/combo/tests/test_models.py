@@ -8,13 +8,15 @@ offered once per course. Deleting a menu takes its courses and their choices wit
 import uuid
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import ProtectedError
+from live.operations import atomic
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 
 from .conftest import (
     FOOD,
+    HUB_DB,
     make_combo,
     make_group,
     make_option,
@@ -22,11 +24,11 @@ from .conftest import (
     tax_category,
 )
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 
 def refused(make) -> None:
-    with pytest.raises(IntegrityError), transaction.atomic():
+    with pytest.raises(IntegrityError), atomic():
         make()
 
 
