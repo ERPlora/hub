@@ -4,6 +4,9 @@ of the data a test starts from, straight to the models of each app (the operatio
 The clock never depends on the real one: ``clock`` fixes ``django.utils.timezone.now`` (which Citas reads
 for its rules and the models for their timestamps) on Monday 4 March 2030, 08:00 in Madrid. The builders
 import the models lazily, so that the tests of apps.py still collect while models.py does not exist.
+
+Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
+``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
 """
 
 import datetime as dt
@@ -16,8 +19,21 @@ from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+from apps.flow.tests.test_relay import listen, worker_loop
+from apps.invoice.tests.conftest import catalog_of, in_hubs
+from apps.sale.tests.conftest import db_dsn, make_user
+from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
+from base.tenancy.tests.concurrency import hub_staff, plan_with_room
+
+#: The marks, scopes and fixtures of the businesses' own databases, users with a role on a host and the raw DSN of
+#: control's database as Sales makes them, the assistant's catalogue of a person of business A as Invoicing makes it,
+#: and the worker's real loop and a listener of a business's notices as Automations runs them, that these tests take
+#: from here.
+__all__ = [
+    "B", "HOST", "HUB_DB", "HUB_DB_COMMITTED", "catalog_of", "db_dsn", "hub_staff", "in_business_a", "in_hubs",
+    "listen", "make_user", "plan_with_room", "worker_loop",
+]
+
 MADRID = ZoneInfo("Europe/Madrid")
 #: «Now» in every test: Monday 4 March 2030, 08:00 on the business's clock.
 NOW = dt.datetime(2030, 3, 4, 8, 0, tzinfo=MADRID)
@@ -113,13 +129,18 @@ def clock(monkeypatch):
 # Builders: Schedules, Services, Staff, Customers, Citas
 
 
-@pytest.fixture
-def anytime(db):
-    """No rule of hours at all (the seeded default week taken away): the business never refuses on hours."""
+def no_rule_of_hours() -> None:
+    """The seeded default week taken away: the business at work never refuses on hours."""
     from apps.schedule.models import ScheduleSettings, WeekDay
 
     WeekDay.objects.all().delete()
     ScheduleSettings.objects.all().delete()
+
+
+@pytest.fixture
+def anytime(db):
+    """No rule of hours at all in business A."""
+    no_rule_of_hours()
 
 
 def make_day(weekday: int, *intervals: tuple[str, str], closed: bool = False):
@@ -227,7 +248,13 @@ def make_appointment(
 
 @pytest.fixture
 def salon(db, anytime):
-    """The usual cast: a cut and a colour that Ana and Bea perform, a customer, and the page switched on."""
+    """The usual cast of business A."""
+    return open_salon()
+
+
+def open_salon():
+    """The usual cast of the business at work: a cut and a colour that Ana and Bea perform, a customer, and the page
+    switched on."""
     cut = make_service("Haircut", price=2000, duration=30)
     colour = make_service("Colour", price=4500, duration=60)
     ana = make_member("Ana", "López")
@@ -257,38 +284,3 @@ def booking_data(
     }
     data.update(fields)
     return data
-
-
-@pytest.fixture
-def make_user(db):
-    """A user with ``role`` on ``host`` (a Membership), for the routes' tests."""
-    from django.contrib.auth import get_user_model
-
-    from base.models import Membership
-    from base.services.sessions import ensure_hub_user
-
-    def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN):
-        user = get_user_model().objects.create_user(username=username, password="pw")
-        if host is not None:
-            Membership.objects.create(user=user, host=host, role=role)
-        # Who they are in the business's database, as their entry makes it: what a record hangs from.
-        user.person = ensure_hub_user(user)
-        return user
-
-    return make
-
-
-@pytest.fixture
-def db_dsn(django_db_setup):
-    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
-    from django.db import connections
-    from psycopg.conninfo import make_conninfo
-
-    params = connections["default"].settings_dict
-    return make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
