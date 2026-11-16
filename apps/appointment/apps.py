@@ -38,7 +38,7 @@ class AppointmentConfig(LiveAppConfig):
     # (The README's and the erplora-apps skill's example omit `schedule`: the diary reads the hours.)
     requires = ["customer", "service", "staff", "schedule"]
     default_auto_field = "django.db.models.BigAutoField"
-    # What these words mean to the Hub's assistant (base.assistant.synonyms). A «bloqueo» of the agenda is its blocked
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). A «bloqueo» of the agenda is its blocked
     # period (appointment.blocked_time), as «block» says in English; a «cita fija», a «serie semanal» or a «cita que se
     # repite» is a repeating appointment (appointment.recurring), named by its phrases and never by «serie» alone, which
     # is also an invoice's series; whether someone «puede atender» or there is a «hueco libre» asks for the availability

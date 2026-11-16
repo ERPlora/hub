@@ -162,7 +162,7 @@ def no_way_out(monkeypatch):
 
 
 def verifactu_tools() -> list[str]:
-    return sorted(name for name, op in registry.items() if op.app_label == "verifactu" and assistant.is_tool(op))
+    return sorted(name for name, op in registry.items() if op.app_label == "verifactu" and assistant.tools.is_tool(op))
 
 
 def test_nothing_here_reaches_the_aeat():

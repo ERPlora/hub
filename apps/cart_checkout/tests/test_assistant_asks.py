@@ -215,9 +215,9 @@ def test_the_hub_reads_a_cesta_as_a_cart_and_units_as_a_quantity():
     concepts = shared.asked(["cambia la cesta a tres unidades"], own_words).concepts
     assert any(shared.stem("cart") in concept for concept in concepts)
     assert any(shared.stem("quantity") in concept for concept in concepts)
-    every = shared.asked(["cambia la cesta a tres unidades"], assistant.synonyms()).concepts
+    every = shared.asked(["cambia la cesta a tres unidades"], assistant.relevance.synonyms()).concepts
     assert any(shared.stem("unit") in concept for concept in every)  # «unidades» still names the unit of measure
-    quantity = shared.asked(["cambia la cantidad"], assistant.synonyms()).concepts
+    quantity = shared.asked(["cambia la cantidad"], assistant.relevance.synonyms()).concepts
     assert any(shared.stem("quantity") in concept for concept in quantity)
     assert not any(shared.stem("unit") in concept for concept in quantity)
     assert not any(shared.stem("cart") in concept for concept in shared.asked(["la cesta"]).concepts)  # the Hub's own

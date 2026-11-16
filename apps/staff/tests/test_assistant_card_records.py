@@ -24,7 +24,7 @@ A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for(language=language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -301,4 +301,4 @@ def test_the_reads_refuse_no_id(name):
 @pytest.mark.parametrize("name", ["staff.role.detail", "staff.time_off.get"])
 def test_the_reads_are_no_tool_of_the_assistant(name):
     """The model finds them in its lists; only the card reads them."""
-    assert not assistant.is_tool(get(name))
+    assert not assistant.tools.is_tool(get(name))

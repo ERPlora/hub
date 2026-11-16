@@ -85,7 +85,7 @@ TENDERS = [
 
 def test_payment_offers_its_thirteen_tools():
     """Payments' tools are its thirteen operations (``AI``, never ``INTERNAL``): a silent drop of tools fails."""
-    tools = {name for name, op in registry.items() if op.app_label == "payment" and assistant.is_tool(op)}
+    tools = {name for name, op in registry.items() if op.app_label == "payment" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
     assert len(tools) == 13
 
@@ -193,8 +193,8 @@ def test_the_hub_reads_a_bank_account_as_where_the_business_pays_from(words):
 
 
 def without_the_bank_account():
-    """The Hub's words (``base.assistant.synonyms``) without the group of where the business pays from."""
-    every = assistant.synonyms()
+    """The Hub's words (``base.assistant.relevance.synonyms``) without the group of where the business pays from."""
+    every = assistant.relevance.synonyms()
     kept = tuple(group for group in every if not set(BANK_ACCOUNT) & set(group))
     assert len(kept) == len(every) - 1  # positive control: the group is there, and only one
     return kept
@@ -232,7 +232,7 @@ OWN_WORDS = [
 
 def test_each_tool_of_payments_has_its_own_words():
     assert sorted(name for _, name, _ in OWN_WORDS) == sorted(
-        name for name, op in registry.items() if op.app_label == "payment" and assistant.is_tool(op)
+        name for name, op in registry.items() if op.app_label == "payment" and assistant.tools.is_tool(op)
     )
 
 

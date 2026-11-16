@@ -602,7 +602,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   `asks`, las frases en `en` y `es` con que una persona la pide (`live.E020`: Suplementos está en
   `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1092), con platos y opciones de ejemplo que ninguna otra app usa (pizzas,
   salsas, el punto de la carne; nunca «Café» ni «hamburguesa», que ya dicen las frases y sondas de Ventas), y los
-  `SYNONYMS` del Hub (`base/assistant.py`) leen «predeterminada» como el `default` de una opción (nunca «por defecto»,
+  `SYNONYMS` del Hub (`base/assistant/relevance.py`) leen «predeterminada» como el `default` de una opción (nunca «por defecto»,
   que también es el de un turno o un umbral). Así consultar los grupos, las opciones y los enganches, engancharlos y
   soltarlos, y cambiar o borrar grupos y opciones desde el chat (MODIFIER-F03 a F07) llegan a su operación: las frases
   reales de la QA del asistente (`tests/e2e/qa/probes/*-es-modifier-2026-11-08.json`, del dueño y del empleado) quedan
@@ -617,7 +617,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   con un enganche a algo borrado, el registro queda fuera, nunca su id (hub#672). Dicho por su nombre, el `group` de
   `GroupRefIn`, `OptionRefIn` y `LinkRefIn` lleva la misma marca leída por ese nombre (`A_GROUP_BY_NAME`, un grupo no
   pertenece a nada: se busca solo por su nombre), y las cinco escrituras cuya entrada es una de ellas declaran su
-  `check` (`base.assistant.checked`): `modifier.group.update` y `modifier.group.delete`, `modifier.group.get`;
+  `check` (`base.assistant.cards.checked`): `modifier.group.update` y `modifier.group.delete`, `modifier.group.get`;
   `modifier.option.update` y `modifier.option.delete`, `modifier.option.get`; `modifier.link.detach`,
   `modifier.link.get` (su `id` es la opción o el enganche: `modifier.group.get` lo leería como el de un grupo). Antes
   de dibujar la tarjeta, el turno busca el registro como lo hará la escritura, un nombre que encaja con varios grupos o

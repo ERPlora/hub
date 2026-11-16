@@ -160,7 +160,7 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, json={"results": [EXCERPT]})
         pending = calls(HOW_TO)
 
-        with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)):
+        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)):
             found = search()
 
         assert found == {"results": [CITED]}
@@ -170,7 +170,7 @@ class TestPreparedBeforeTheTurn:
         gateway.reply(DOCS, status=503, json={"error": {"code": "assistant.provider_unavailable", "message": "x"}})
         pending = calls(HOW_TO)
 
-        with assistant.prepared_docs(assistant.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
+        with assistant.gateway.prepared_docs(assistant.gateway.prepare_docs(ctx(), pending)), pytest.raises(OperationError) as caught:
             search()
 
         assert caught.value.code == "base.assistant_unavailable"
@@ -186,14 +186,14 @@ class TestPreparedBeforeTheTurn:
         ],
     )
     def test_only_the_documentation_searches_the_model_asked_for_are_prepared(self, gateway, pending):
-        assert assistant.prepare_docs(ctx(), pending) == {}
+        assert assistant.gateway.prepare_docs(ctx(), pending) == {}
         assert gateway.requests == []
 
     @pytest.mark.parametrize(("actor", "permissions"), [(None, {"base.view_home"}), ("ana", set())])
     def test_nobody_who_may_not_search_makes_erplora_com_search(self, gateway, actor, permissions):
         pending = calls(HOW_TO)
 
-        assert assistant.prepare_docs(ctx(actor=actor, permissions=permissions), pending) == {}
+        assert assistant.gateway.prepare_docs(ctx(actor=actor, permissions=permissions), pending) == {}
         assert gateway.requests == []
 
 
@@ -203,12 +203,12 @@ def test_waiting_for_the_documentation_holds_no_transaction(gateway, monkeypatch
     the gateway (``test_services_assistant.test_waiting_for_erplora_com_holds_no_transaction``)."""
     gateway.reply(DOCS, json={"results": []})
     seen = []
-    post = assistant._post
+    post = assistant.gateway._post
 
     def probe(*args, **kwargs):
         seen.append(any(connection.in_atomic_block for connection in connections.all()))
         return post(*args, **kwargs)
 
-    monkeypatch.setattr(assistant, "_post", probe)
+    monkeypatch.setattr(assistant.gateway, "_post", probe)
     search()
     assert seen == [False]

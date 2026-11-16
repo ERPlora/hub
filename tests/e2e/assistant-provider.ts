@@ -2,7 +2,7 @@
 // (`/v1/models`, streamed `/v1/chat/completions`, `/v1/embeddings`, `/v1/audio/transcriptions`). erplora.com's gateway
 // of the run's SaaS talks to it (`assistant_seed.py gateway http://127.0.0.1:<port>/v1`, README «El asistente»): no test
 // reaches a real provider nor writes a real key. It answers in the language the Hub asks for, as a real model does: the
-// Hub's system message says «Answer in English» or «Answer in Spanish» (base/assistant.py `instructions`, the person's
+// Hub's system message says «Answer in English» or «Answer in Spanish» (base/assistant/prompt.py `instructions`, the person's
 // language or, for an automation, the one it was saved in); each text is exported in both (`DONE.en`, `DONE.es`), English
 // its source and the language of a turn that says none (hub#1025). What it answers depends on the question, by a marker
 // the spec writes:
@@ -245,7 +245,7 @@ function textOf(content: unknown): string {
 }
 
 /** Whether a tool's result says it did not run: the Hub's envelope for a tool cancelled, refused or failed
- *  (`error_content` of base/assistant.py, `{"error": {"code": …, "message": …}}`). What ran answers its own output,
+ *  (`error_content` of live.assistant, `{"error": {"code": …, "message": …}}`). What ran answers its own output,
  *  whatever words its data carry (a print job is `cancellable`), or comes cut for the model (` …(cut)`). */
 function refused(result: string): boolean {
   try {

@@ -74,7 +74,7 @@ def without(permissions: set[str], language: str = "en") -> OperationContext:
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or as_admin(language))
+    card = assistant.cards.card(get(write), arguments, language, ctx or as_admin(language))
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -219,10 +219,10 @@ def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no booking, service nor professional: nothing is read."""
     salon = make_salon()
     op = get("online_booking.booking.cancel")
-    card = assistant.card(op, {"id": str(salon.lucias.id), "reason": "Llamó"}, "en")
+    card = assistant.cards.card(op, {"id": str(salon.lucias.id), "reason": "Llamó"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"reason": "Llamó"}
     book = get("online_booking.public.book")
-    card = assistant.card(book, {"service_ids": [str(salon.cut.id)], "staff_id": str(salon.ana.id)}, "en")
+    card = assistant.cards.card(book, {"service_ids": [str(salon.cut.id)], "staff_id": str(salon.ana.id)}, "en")
     assert no_id(card) and "staff_id" not in {field["name"] for field in card["fields"]}
 
 

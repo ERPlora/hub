@@ -6,7 +6,7 @@ such a field must hand it to the card as money, or the AI could send 65 for «65
 
 And by its name (base's half is hub#258): in Spanish, every datum a write of Services sends reaches the card by the name
 the Services screens give it, never by the title pydantic makes up from the field («Absorbed Id», «Tax Category Key»,
-«Items»). The card is base's (``base.assistant.card``); the names are service's: the titles of its schemas and the
+«Items»). The card is base's (``base.assistant.cards.card``); the names are service's: the titles of its schemas and the
 ``verbose_name`` of its models, with their Spanish in its catalog."""
 
 import dataclasses
@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import formats, timezone, translation
+from live import assistant as shared
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, Conflict, PermissionDenied
 from live.meta import all_live_app_configs, permissions_for_role
@@ -43,14 +44,14 @@ SCREENS = json.loads((APP / "frontend/locale/es.json").read_text())["service"]
 SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["service"]
 
 #: The writes of Services the assistant calls, by name.
-TOOLS = sorted(name for name, op in registry.items() if op.app_label == "service" and op.kind == "command" and assistant.is_tool(op))
+TOOLS = sorted(name for name, op in registry.items() if op.app_label == "service" and op.kind == "command" and assistant.tools.is_tool(op))
 
 
 def money_fields(name: str) -> list[str]:
     """The fields of the input of ``name`` that are an amount (``Cents``: at most ``MAX_CENTS``)."""
-    schema = assistant._schema(get(name))
+    schema = shared.input_schema(get(name))
     defs = schema.get("$defs", {})
-    return [field for field, prop in schema.get("properties", {}).items() if assistant._resolved(prop, defs).get("maximum") == MAX_CENTS]
+    return [field for field, prop in schema.get("properties", {}).items() if shared.resolved(prop, defs).get("maximum") == MAX_CENTS]
 
 
 def test_the_writes_with_an_amount_are_found():
@@ -63,7 +64,7 @@ def test_the_writes_with_an_amount_are_found():
 @pytest.mark.parametrize("name", TOOLS)
 def test_every_amount_of_a_write_reaches_the_card_as_money(name, language):
     fields = money_fields(name)
-    card = assistant.card(get(name), {field: 1500 for field in fields}, language)
+    card = assistant.cards.card(get(name), {field: 1500 for field in fields}, language)
     assert {field["name"]: field["kind"] for field in card["fields"]} == dict.fromkeys(fields, "money")
 
 
@@ -75,12 +76,12 @@ def named_by_service(op, name: str, title: str | None) -> bool:
     """Whether service itself names the datum ``name`` of ``op``: by its schema's own title, by the ``verbose_name`` of
     one of its models, or by its own catalog. A title pydantic made up that another app's catalog happens to translate
     («Reference» → «Referencia», from Printing's) is not a name of Services: it changes if that app's text changes."""
-    made_up = assistant._generated_title(name)
+    made_up = shared.generated_title(name)
     with (APP / "locale/es/LC_MESSAGES/django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     return (
         bool(title and title != made_up)
-        or assistant._verbose_name("service", op.name.split(".")[1], name) is not None
+        or shared.verbose_name("service", op.name.split(".")[1], name) is not None
         or own.gettext(made_up) != made_up
     )
 
@@ -94,8 +95,8 @@ def test_no_datum_of_a_write_of_service_reaches_a_spanish_card_by_its_technical_
     technical: dict[str, list[str]] = {}
     for name in TOOLS:
         op = get(name)
-        props = assistant._schema(op).get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+        props = shared.input_schema(op).get("properties", {})
+        for field in assistant.cards.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_service(op, datum, props[datum].get("title")):
                 technical.setdefault(name, []).append(datum)
@@ -105,33 +106,33 @@ def test_no_datum_of_a_write_of_service_reaches_a_spanish_card_by_its_technical_
 def test_the_card_names_the_duplicate_customer_whose_vouchers_move():
     """Customers merges a duplicate card into the one that stays: the duplicate as its merge screen calls it."""
     reassign = get("service.grant.reassign")
-    assert labels(assistant.card(reassign, {"absorbed_id": "x"}, "es")) == ["Ficha duplicada"]
-    assert labels(assistant.card(reassign, {"absorbed_id": "x"}, "en")) == ["Duplicate customer"]
+    assert labels(assistant.cards.card(reassign, {"absorbed_id": "x"}, "es")) == ["Ficha duplicada"]
+    assert labels(assistant.cards.card(reassign, {"absorbed_id": "x"}, "en")) == ["Duplicate customer"]
 
 
 def test_the_card_names_the_tax_category_of_a_service_as_its_form():
     for name in ("service.service.create", "service.service.update"):
         arguments = {"tax_category_key": "general"}
-        assert labels(assistant.card(get(name), arguments, "es")) == [SCREENS["services"]["form"]["tax"]]
-        assert labels(assistant.card(get(name), arguments, "en")) == [SCREENS_EN["services"]["form"]["tax"]]
+        assert labels(assistant.cards.card(get(name), arguments, "es")) == [SCREENS["services"]["form"]["tax"]]
+        assert labels(assistant.cards.card(get(name), arguments, "en")) == [SCREENS_EN["services"]["form"]["tax"]]
     settings = get("service.settings.update")
     arguments = {"default_tax_category_key": "general"}
-    assert labels(assistant.card(settings, arguments, "es")) == [SCREENS["settings"]["defaultTax"]]
-    assert labels(assistant.card(settings, arguments, "en")) == [SCREENS_EN["settings"]["defaultTax"]]
+    assert labels(assistant.cards.card(settings, arguments, "es")) == [SCREENS["settings"]["defaultTax"]]
+    assert labels(assistant.cards.card(settings, arguments, "en")) == [SCREENS_EN["settings"]["defaultTax"]]
 
 
 def test_the_card_names_the_services_a_package_includes_as_its_form():
     create = get("service.package.create")
     arguments = {"items": [{"service": "Corte"}]}
-    assert labels(assistant.card(create, arguments, "es")) == [SCREENS["packages"]["form"]["lines"]]
-    assert labels(assistant.card(create, arguments, "en")) == [SCREENS_EN["packages"]["form"]["lines"]]
+    assert labels(assistant.cards.card(create, arguments, "es")) == [SCREENS["packages"]["form"]["lines"]]
+    assert labels(assistant.cards.card(create, arguments, "en")) == [SCREENS_EN["packages"]["form"]["lines"]]
 
 
 def test_the_card_titles_the_refund_or_void_that_gives_sessions_back_by_services_own_words():
     """Sales gives back the sessions spent in a sale it refunds or voids: the card titles that document by what it is,
     with service's own words, not with the «Referencia» another app's catalog lends to pydantic's «Reference» (the
     card that names a real refund under it: test_a_write_of_services_names_the_sale_the_lines_the_appointment_…)."""
-    reference = assistant._schema(get("service.session.return"))["properties"]["reference"]
+    reference = shared.input_schema(get("service.session.return"))["properties"]["reference"]
     assert named_by_service(get("service.session.return"), "reference", reference.get("title"))
     with translation.override("es"):
         assert translation.gettext(reference["title"]) == "Devolución o anulación"
@@ -237,7 +238,7 @@ def references(op) -> set[str]:
     """The data of ``op``'s input its schema declares an id of (``format: uuid``)."""
     schema = op.input.model_json_schema()
     props = schema.get("properties", {})
-    return {name for name, prop in props.items() if assistant._resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
+    return {name for name, prop in props.items() if shared.resolved(prop, schema.get("$defs", {})).get("format") == "uuid"}
 
 
 def values(card: dict) -> dict:
@@ -386,7 +387,7 @@ def said_at_the_till(till: dict, language: str = "es") -> dict:
 def till_cards(till: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``TILL`` naming every record of Sales or Appointments it names by its id."""
     return {
-        write: assistant.card(get(write), {datum: str(till[kind]) for datum, kind in data.items()}, language, ctx)
+        write: assistant.cards.card(get(write), {datum: str(till[kind]) for datum, kind in data.items()}, language, ctx)
         for write, data in TILL.items()
     }
 
@@ -399,7 +400,7 @@ def named_at_the_till(till: dict, language: str = "es") -> dict:
 def cards(salon: dict, ctx: OperationContext | None, language: str = "es") -> dict:
     """The card of each write of ``NAMED`` naming every record it names by its id, as ``ctx``'s person would confirm it."""
     return {
-        write: assistant.card(get(write), {datum: str(salon[kind]) for datum, kind in data.items()}, language, ctx)
+        write: assistant.cards.card(get(write), {datum: str(salon[kind]) for datum, kind in data.items()}, language, ctx)
         for write, data in NAMED.items()
     }
 
@@ -468,7 +469,7 @@ def test_the_sessions_a_void_gives_back_name_the_sale_voided(language, said, hub
     """SERVICE-F27: Sales gives back the sessions of a sale it voids with the sale itself as the document."""
     with use_hub(hub_a):
         till = a_till(hub_a, a_salon())
-        card = assistant.card(
+        card = assistant.cards.card(
             get("service.session.return"), {"reference": str(till["voided"])}, language, person(hub_a, language=language)
         )
     assert values(card) == {"reference": said.format(till["voided_number"])}
@@ -637,10 +638,10 @@ def test_the_records_inside_a_list_are_named_too(language, hub_a):
     with use_hub(hub_a):
         salon = a_salon()
         ctx = person(hub_a, language=language)
-        package = assistant.card(
+        package = assistant.cards.card(
             get("service.package.create"), {"items": [{"service_id": str(salon["service"]), "sessions": 5}]}, language, ctx
         )
-        bulk = assistant.card(
+        bulk = assistant.cards.card(
             get("service.service.bulk_create"),
             {"services": [{"name": "Tinte", "category_id": str(salon["category"])}]},
             language,
@@ -661,7 +662,7 @@ def test_a_write_over_several_sessions_names_each_and_says_how_many(write, langu
         second_service = make_service("Peinado")
         grant = Grant.objects.get(pk=salon["grant"])
         second = make_redemption(grant, second_service)
-        card = assistant.card(
+        card = assistant.cards.card(
             get(write), {"ids": [str(salon["session"]), str(second.id)]}, language, person(hub_a, language=language)
         )
     field = list_field(card, "ids")
@@ -736,7 +737,7 @@ def test_two_equal_vouchers_of_a_customer_are_told_apart_by_the_day_they_were_so
         later = sold(package, customer, on=dt.datetime(2026, 10, 20, 12, tzinfo=dt.UTC))
         admin = person(hub_a)
         void = get("service.grant.void")
-        said_of = [values(assistant.card(void, {"id": str(grant)}, "es", admin))["id"] for grant in (salon["grant"], later.id)]
+        said_of = [values(assistant.cards.card(void, {"id": str(grant)}, "es", admin))["id"] for grant in (salon["grant"], later.id)]
     assert said_of == ["Bono 5 cortes · Lucía Pérez · 3 oct 2026", "Bono 5 cortes · Lucía Pérez · 20 oct 2026"]
 
 
@@ -746,8 +747,8 @@ def test_who_may_not_see_customers_reads_the_voucher_without_its_owner(hub_a):
     with use_hub(hub_a):
         salon = a_salon()
         ctx = person(hub_a, without=frozenset({"customer.view"}))
-        grant = values(assistant.card(get("service.grant.void"), {"id": str(salon["grant"])}, "es", ctx))["id"]
-        session = values(assistant.card(get("service.session.release"), {"id": str(salon["session"])}, "es", ctx))["id"]
+        grant = values(assistant.cards.card(get("service.grant.void"), {"id": str(salon["grant"])}, "es", ctx))["id"]
+        session = values(assistant.cards.card(get("service.session.release"), {"id": str(salon["session"])}, "es", ctx))["id"]
     assert grant == "Bono 5 cortes · 3 oct 2026"
     assert session == "Bono 5 cortes · Corte"
 
@@ -771,8 +772,8 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
             defs = schema.get("$defs", {})
             for datum, kind in data.items():
                 checked += 1
-                prop = assistant._resolved(schema["properties"][datum], defs)
-                marked = assistant.refers_of(assistant._resolved(prop["items"], defs) if "items" in prop else prop)
+                prop = shared.resolved(schema["properties"][datum], defs)
+                marked = shared.refers_of(shared.resolved(prop["items"], defs) if "items" in prop else prop)
                 reads = [marked["read"]] if marked else []
                 # What Sales or Appointments name, by the read of theirs that Services' own read asks.
                 reads += [BEHIND_OF[kind]] if kind in BEHIND_OF else []

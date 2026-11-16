@@ -84,7 +84,7 @@ D_LNG = (
 D_ACCURACY = "Accuracy of that position, in metres, as the device reports it."
 D_SEARCH_PEOPLE = "Text to look for in the person's name."
 
-# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id; and each datum by the name the screens give it: «Person», as the Records column, and «Working
 # day», as «Correct working day» says it.
 A_PERSON = names("attendance.person.detail")

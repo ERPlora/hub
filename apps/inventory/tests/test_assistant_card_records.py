@@ -56,7 +56,7 @@ def make_category(name: str = "Bebidas", slug: str = "bar-drinks") -> Category:
 
 
 def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.card(get(write), arguments, language, ctx or ctx_for())
+    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for())
     return {field["name"]: field for field in card["fields"]}
 
 
@@ -218,7 +218,7 @@ def test_a_record_deleted_meanwhile_is_left_out():
 def test_nobody_behind_the_request_reads_no_record():
     """An automation's card (no person at hand) names no record: nothing is read for anybody."""
     wine = make_product()
-    card = assistant.card(get("inventory.product.update"), {"id": str(wine.id), "name": "Vino de la casa"}, "en")
+    card = assistant.cards.card(get("inventory.product.update"), {"id": str(wine.id), "name": "Vino de la casa"}, "en")
     assert {field["name"]: field["value"] for field in card["fields"]} == {"name": "Vino de la casa"}
 
 
