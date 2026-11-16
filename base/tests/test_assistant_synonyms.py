@@ -14,7 +14,10 @@ from live.operations import registry
 
 from base import assistant
 from base.models import Membership
+from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.test_assistant_asks import members, offered_place
+
+__all__ = ["in_business_a"]
 
 #: The words of an item («elemento»), a word only Demo says (``demo.item``), in requests of other apps' tools.
 ELEMENT_REQUESTS = [
@@ -138,13 +141,13 @@ def test_a_turn_ranks_with_the_words_that_count_for_its_tools():
 
 @pytest.fixture
 def owner_tools(make_user):
-    """The owner's catalogue in business ``a`` (every app on), in Spanish, without Demo's tools: a customer's."""
+    """The owner's catalogue in business A (every app on), in Spanish, without Demo's tools: a customer's."""
     tools = assistant.tools.catalog(members(make_user, "words")(Membership.Role.OWNER, "es"))
     assert any(op.app_label == "demo" for op in tools.values())  # positive control: there were some to leave out
     return {name: op for name, op in tools.items() if op.app_label != "demo"}
 
 
-@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), ELEMENT_REQUESTS)
 def test_an_element_in_a_customers_words_brings_their_tool_and_not_demos_items(owner_tools, name, phrase):
     """With Demo's words, these came 30th and 18th: «elemento» brought a cart's items and a price list's first."""
