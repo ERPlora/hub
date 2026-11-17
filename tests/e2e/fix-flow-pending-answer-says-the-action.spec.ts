@@ -15,6 +15,7 @@ import { manualFlow, ownerOnAutomations } from './flow-helpers';
 import { providerSpec, workerAsks } from './provider-helpers';
 import { bookingOn, cleanUpTagged, madridDay, reservationStatus } from './reservation-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION';
 const TAG = 'E2E FlowAction';
@@ -67,7 +68,7 @@ for (const viewport of VIEWPORTS) {
 
       // «No»: nothing is cancelled and the card leaves.
       await card.locator('[data-testid^=flow-question-reject-]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: 'Contestada que no.' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'Contestada que no.')).toBeVisible();
       await expect(card).toHaveCount(0);
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('cancelled');
       expect(await reservationStatus(context, reservation)).toBe('pending');

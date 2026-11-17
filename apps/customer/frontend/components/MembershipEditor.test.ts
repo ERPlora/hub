@@ -12,7 +12,7 @@ import MembershipEditor from './MembershipEditor.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
 }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),

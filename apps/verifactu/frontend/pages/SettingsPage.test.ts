@@ -20,7 +20,7 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
 }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
 }));
 beforeEach(() => {
   mocks.confirm.mockReset();

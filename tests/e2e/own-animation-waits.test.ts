@@ -2,7 +2,7 @@
 // flow: e2e-capture — the e2e harness's one wait for «nothing moves»
 // Every wait for «nothing moves» in the e2e goes through the one detector of helpers.ts (`settled`, `untilStill`,
 // `movingInPage`), which asks every open shadow root too. `document.getAnimations()` leaves shadow roots out, and Ionic
-// animates its toasts, dialogs and popovers there: a spec that asks for animations itself lets a toast still
+// animates its dialogs and popovers there: a spec that asks for animations itself lets a dialog still
 // entering pass for still. The per-app guardrails (`<app>-wait.test.ts`)
 // keep the copies out of their own app's files; this one keeps them out of every file of the e2e, as a ratchet:
 // `own-animation-waits.json` holds, for each file that still asks for animations itself, how many times; a file can only
@@ -36,10 +36,10 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * The files that ask for animations on purpose, and how many times: the detector itself (`movingInPage`), and the two
- * specs that measure it from outside — every root, and the document against a toast's shadow root (`settled.spec.ts`), and
+ * specs that measure it from outside — every root, and a toast's own entrance once `settled()` returned (`settled.spec.ts`), and
  * a toast still entering once `capture()` returned (`helpers-capture.spec.ts`). They read; they never wait.
  */
-const ALLOWED: Record<string, number> = { 'helpers-capture.spec.ts': 1, 'helpers.ts': 1, 'settled.spec.ts': 3 };
+const ALLOWED: Record<string, number> = { 'helpers-capture.spec.ts': 1, 'helpers.ts': 1, 'settled.spec.ts': 2 };
 
 /** What is left of the specs' own waits, by file: it only goes down. */
 const RATCHET = JSON.parse(readFileSync(join(E2E_DIR, 'own-animation-waits.json'), 'utf8')) as Record<string, number>;
@@ -195,8 +195,8 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-    expect(staleInTheRatchet({ ...ALLOWED, ...RATCHET, 'settled.spec.ts': 2 })).toEqual([
-      'settled.spec.ts: 2 getAnimations reads, the ratchet says 3',
+    expect(staleInTheRatchet({ ...ALLOWED, ...RATCHET, 'settled.spec.ts': 1 })).toEqual([
+      'settled.spec.ts: 1 getAnimations reads, the ratchet says 2',
     ]);
   });
 

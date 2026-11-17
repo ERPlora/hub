@@ -54,7 +54,7 @@ export async function saveFile(filename: string, blob: Blob, t: Translate, win: 
     const dataBase64 = bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
     const saved = (await bridge.invoke(SAVE_DOWNLOAD_COMMAND, { name: filename, dataBase64 })) as { path?: unknown } | null;
     if (typeof saved?.path === 'string' && saved.path !== '') {
-      void toastSuccess(t('base.download.savedTo', { path: saved.path }));
+      toastSuccess(t('base.download.savedTo', { path: saved.path }));
       return true;
     }
     console.error('hub: save_download answered no place', saved);
@@ -63,6 +63,6 @@ export async function saveFile(filename: string, blob: Blob, t: Translate, win: 
     console.error('hub: save_download refused', error);
     refusal = refusalOf(error instanceof Error ? error.message : String(error));
   }
-  void toastError(t(`base.download.refusal.${refusal}`));
+  toastError(t(`base.download.refusal.${refusal}`));
   return false;
 }

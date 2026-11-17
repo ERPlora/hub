@@ -1,21 +1,22 @@
 // flow: SALE-F01, SALE-F20
 // hub#732: «Charge» with dishes not sent yet sends the round and opens the charge sheet at once, so the notice «Order N
 // sent to the kitchen.» shares the screen with the keypad. Left at the bottom on a low phone it lay over the last row
-// of keys (`,` `0` `C`) for its 2.6 s, and a tap there fell on the notice: the amount did not change. Here, with the
+// of keys (`,` `0` `C`) while it showed, and a tap there fell on the notice: the amount did not change. Here, with the
 // notice on screen, the middle of every key answers with that key, the notice covers none of the keypad, and the taps
 // type the amount. The notice is told to stay until it has been read: where it sits is the point, not how long it
-// lasts, and a sheet opening on a cold Vite takes longer than its 2.6 s. What a run creates, the product
+// lasts, and a sheet opening on a cold Vite takes longer than its 3 s. What a run creates, the product
 // `E2E-KNOTICE-<run>`, its checks and their kitchen tickets, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, psql, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-732-NOTICE';
 const RUN = stamp();
-/** The default of `toast()`. */
-const NOTICE_MS = 2600;
+/** How long a success toast lasts by default. */
+const NOTICE_MS = 3000;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', sent: 'Order 1 sent to the kitchen.', separator: '.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', sent: 'Comanda 1 enviada a cocina.', separator: ',' },
@@ -66,7 +67,7 @@ async function chargeUnsentDish(page: Page, context: BrowserContext, lang: strin
   return page.locator('[data-testid=sale-checkout-modal]');
 }
 
-/** What the middle of each key answers to, the keys' boxes and the notice's own (its host fills the screen), all in one read. */
+/** What the middle of each key answers to, the keys' boxes and the notice's, all in one read. */
 async function read(sheet: Locator, notice: Locator): Promise<{ answers: Record<string, string>; keypad: Box; toast: Box }> {
   const toast = await noticeBox(notice);
   const { answers, keypad } = await sheet.locator('[data-testid=sale-checkout-keypad]').evaluate((pad) => {
@@ -91,7 +92,7 @@ for (const { name, lang, locale, sent, separator } of LANGUAGES) {
   test.describe(`SALE-F01, SALE-F20: in ${name}, the kitchen's notice leaves the keypad of the charge sheet free`, () => {
     eachNoticeSize(locale, async (page, context, size) => {
       const sheet = await chargeUnsentDish(page, context, lang);
-      const notice = page.locator('ion-toast').filter({ hasText: sent });
+      const notice = toastSaying(page, sent);
       await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
       await expect(notice, 'the notice is on screen with the sheet').toBeVisible();
       await untilStill(page);

@@ -11,6 +11,7 @@ import { type CDPSession, expect, type Page, test } from '@playwright/test';
 import { A, capture, exposeMovingInPage, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanUp, FLOW_VIEWPORTS, named, post, rowOf, signedIn, snap, VIEWPORTS } from './task-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-TASK-E2E-WAIT-COUNTS-ONLY-OVERLAYS';
 
@@ -65,7 +66,7 @@ test('task-e2e-wait: after snap() the «Task started» notice has stopped enteri
       await untilStill(page);
       await playbackRate(devtools, 0.2);
       release();
-      const notice = page.locator('ion-toast').filter({ hasText: 'Task started' });
+      const notice = toastSaying(page, 'Task started');
       await expect(notice).toBeVisible();
       await snap(page, 'E2E-WAIT', width);
       expect.soft(await moving(page), `still moving after snap() at ${width}`).toEqual([]);
@@ -74,6 +75,8 @@ test('task-e2e-wait: after snap() the «Task started» notice has stopped enteri
       await page.unroute(SET_STATUS);
       await playbackRate(devtools, 1);
       await expect(rowOf(page, 'task-tasks', title)).toContainText('In Progress');
+      // Off the stack: with the pointer over it, its toasts stay until the pointer leaves.
+      await page.mouse.move(0, 0);
       await expect(notice).toBeHidden({ timeout: 15_000 });
     }
   } finally {

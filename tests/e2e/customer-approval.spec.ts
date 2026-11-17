@@ -19,6 +19,7 @@ import {
   spanishMobile,
 } from './customer-helpers';
 import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown } from './helpers';
+import { toastSaying } from './toast-helpers';
 
 const OWNER_PIN = '2468';
 
@@ -90,7 +91,7 @@ for (const viewport of FLOW_VIEWPORTS) {
     await capture(page, `CLOSE-CUSTOMER-${viewport.label}`);
     await ownerApproves(page);
     await expect(dialog).toBeHidden();
-    await expect(page.locator('ion-toast').last()).toContainText(duplicate.name);
+    await expect(toastSaying(page, duplicate.name)).toBeVisible();
     expect((await cardOf(owner.context, duplicate.id)).status).toBe(404);
     expect((await cardOf(owner.context, stays.id)).status).toBe(200);
   });

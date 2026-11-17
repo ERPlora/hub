@@ -363,10 +363,10 @@ export async function holdNotices(page: Page, ms: number): Promise<void> {
   }, ms);
 }
 
-/** The notice's own box: the host of an `ion-toast` fills the screen. */
+/** The notice's box on screen, where its stack moves it (`translate` and `scale` included). */
 export function noticeBox(notice: Locator): Promise<Box> {
   return notice.evaluate((el) => {
-    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
   });
 }

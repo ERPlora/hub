@@ -13,7 +13,7 @@ import source from './ItemDetailPage.vue?raw';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastError: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(),
 }));
 
 const LINE = { id: 'l1', text: 'Water', qty: '2.000', position: 1, client_line_id: 'c0' };

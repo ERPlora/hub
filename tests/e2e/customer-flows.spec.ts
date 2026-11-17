@@ -25,6 +25,7 @@ import {
   spanishMobile,
 } from './customer-helpers';
 import { A, api, login, psql, shot, shown } from './helpers';
+import { toastSaying, toasts } from './toast-helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -42,8 +43,6 @@ async function threeShots(page: Page, key: string, target: () => Locator): Promi
     await page.screenshot({ path: shot(`APP-CUSTOMER-${key}-${vp.label}`) });
   }
 }
-
-const toast = (page: Page): Locator => page.locator('ion-toast').last();
 
 async function openCard(page: Page, id: string): Promise<Locator> {
   await page.goto(`/customer/customers/${id}`);
@@ -138,7 +137,7 @@ test('CUSTOMER-F04: «Edit» turns the data into the form; «Save» says «Custo
   await inputOf(form, 'customer-form-city').fill('Sevilla');
   await threeShots(page, 'CUSTOMER-F04', () => shown(page).locator('[data-testid=customer-edit-save]'));
   await shown(page).locator('[data-testid=customer-edit-save]').click();
-  await expect(toast(page)).toContainText(/Customer updated|Cliente actualizado/);
+  await expect(toastSaying(page, /Customer updated|Cliente actualizado/)).toBeVisible();
   await expect.poll(async () => (await cardOf(context, card.id)).data).toMatchObject({ id: card.id });
   expect(((await cardOf(context, card.id)).data as unknown as { city: string }).city).toBe('Sevilla');
 });
@@ -193,7 +192,7 @@ test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date on
     await expect(number.locator('.error-text')).toHaveText('Introduce un número.');
     await expect(date.locator('.error-text')).toHaveText('Introduce una fecha válida.');
     await expect(number).toHaveClass(/ion-invalid/);
-    await expect(toast(page)).toHaveCount(0);
+    await expect(toasts(page)).toHaveCount(0);
     for (const vp of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(async () => {
@@ -219,7 +218,7 @@ test('CUSTOMER-F05: a note goes on top of the activity, with who and when', asyn
   const form = shown(page).locator('[data-testid=customer-note-form]');
   await form.locator('[data-testid=customer-note-text] textarea').fill('Allergic to latex gloves');
   await form.locator('[data-testid=customer-note-add]').click();
-  await expect(toast(page)).toContainText(/Note added|Nota añadida/);
+  await expect(toastSaying(page, /Note added|Nota añadida/)).toBeVisible();
   const item = shown(page).locator('[data-testid=customer-activity-item]').first();
   await expect(item).toContainText('Allergic to latex gloves');
   await threeShots(page, 'CUSTOMER-F05', () => shown(page).locator('[data-testid=customer-activity-item]').first());
@@ -235,11 +234,11 @@ test('CUSTOMER-F06: groups and tags are ticked on the card and saved', async ({ 
   const groups = shown(page).locator('[data-testid=customer-groups]');
   await groups.locator(`[data-testid=customer-groups-item-${group}]`).click();
   await groups.locator('[data-testid=customer-groups-save]').click();
-  await expect(toast(page)).toContainText(/Groups assigned|Grupos asignados/);
+  await expect(toastSaying(page, /Groups assigned|Grupos asignados/)).toBeVisible();
   const tags = shown(page).locator('[data-testid=customer-tags]');
   await tags.locator(`[data-testid=customer-tags-item-${tag}]`).click();
   await tags.locator('[data-testid=customer-tags-save]').click();
-  await expect(toast(page)).toContainText(/Tags assigned|Etiquetas asignadas/);
+  await expect(toastSaying(page, /Tags assigned|Etiquetas asignadas/)).toBeVisible();
   await expect.poll(async () => (await cardOf(context, card.id)).data.group_ids).toEqual([group]);
   await threeShots(page, 'CUSTOMER-F06', () => shown(page).locator('[data-testid=customer-groups]'));
 });
@@ -304,7 +303,7 @@ test('CUSTOMER-F11: a phone typed with 0034 and spaces is kept in E.164 and show
   await shown(page).locator('[data-testid=customer-detail-edit]').click();
   await inputOf(shown(page), 'customer-form-phone').fill(`0034 ${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`);
   await shown(page).locator('[data-testid=customer-edit-save]').click();
-  await expect(toast(page)).toContainText(/Customer updated|Cliente actualizado/);
+  await expect(toastSaying(page, /Customer updated|Cliente actualizado/)).toBeVisible();
   expect((await cardOf(context, card.id)).data.phone).toBe(`+34${phone}`);
   const shownPhone = shown(page).locator('[data-fact=phone] dd');
   await expect(shownPhone).toHaveText(`+34 ${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`);
@@ -346,7 +345,7 @@ test('CUSTOMER-F13: «Merge with…» says what will happen; merged, the duplica
   await expect(panel.locator('[data-testid=customer-merge-confirm]')).toContainText(duplicate.name);
   await threeShots(page, 'CUSTOMER-F13', () => shown(page).locator('[data-testid=customer-merge-submit]'));
   await panel.locator('[data-testid=customer-merge-submit]').click();
-  await expect(toast(page)).toContainText(duplicate.name);
+  await expect(toastSaying(page, duplicate.name)).toBeVisible();
   expect((await cardOf(context, duplicate.id)).status).toBe(404);
 });
 
@@ -360,9 +359,9 @@ test('CUSTOMER-F14 and F15: consent is recorded with the words read out, and wit
   await expect(ask).toContainText(/I want to receive offers|Quiero recibir ofertas/);
   await threeShots(page, 'CUSTOMER-F14', () => shown(page).locator('[data-testid=customer-consent-whatsapp-confirm]'));
   await shown(page).locator('[data-testid=customer-consent-whatsapp-confirm]').click();
-  await expect(toast(page)).toContainText(/Consent recorded|Consentimiento registrado/);
+  await expect(toastSaying(page, /Consent recorded|Consentimiento registrado/)).toBeVisible();
   await shown(page).locator('[data-testid=customer-consent-whatsapp-withdraw]').click();
-  await expect(toast(page)).toContainText(/Consent withdrawn|Consentimiento retirado/);
+  await expect(toastSaying(page, /Consent withdrawn|Consentimiento retirado/)).toBeVisible();
   await expect(shown(page).locator('[data-testid=customer-consent-whatsapp] .customer-consent__state')).toHaveText(/Withdrawn|Retirado/);
   await threeShots(page, 'CUSTOMER-F15', () => shown(page).locator('[data-testid=customer-consent-whatsapp]'));
 });
@@ -488,11 +487,11 @@ test('CUSTOMER-F32: allergies are kept only after the permission; withdrawing it
   await health.locator('[data-testid=customer-health-ask]').click();
   await expect(health.locator('[data-testid=customer-health-asking]')).toContainText(/I give my permission|Doy mi permiso/);
   await health.locator('[data-testid=customer-health-confirm]').click();
-  await expect(toast(page)).toContainText(/Permission recorded|Permiso registrado/);
+  await expect(toastSaying(page, /Permission recorded|Permiso registrado/)).toBeVisible();
   await health.locator('[data-testid=customer-health-edit]').click();
   await health.locator('[data-testid=customer-health-allergies-input] textarea').fill('PPD (hair dye)');
   await health.locator('[data-testid=customer-health-save]').click();
-  await expect(toast(page)).toContainText(/Health data saved|Datos de salud guardados/);
+  await expect(toastSaying(page, /Health data saved|Datos de salud guardados/)).toBeVisible();
   const allergies = health.locator('[data-testid=customer-health-allergies]');
   await expect(allergies).toHaveClass(/customer-health__alert/);
   await expect(allergies).toContainText('PPD (hair dye)');
@@ -507,7 +506,7 @@ test('CUSTOMER-F32: allergies are kept only after the permission; withdrawing it
   await expect(dialog).toContainText(/erased|se borran/);
   await page.screenshot({ path: shot('APP-CUSTOMER-CUSTOMER-F32-withdraw-1440') });
   await dialog.locator('[data-testid=customer-health-withdraw-dialog-submit]').click();
-  await expect(toast(page)).toContainText(/Permission withdrawn|Permiso retirado/);
+  await expect(toastSaying(page, /Permission withdrawn|Permiso retirado/)).toBeVisible();
   await expect(health.locator('[data-testid=customer-health-intro]')).toBeVisible();
   const after = await api<{ consent: string; allergies: string }>(context, A, 'GET', `/customer/health?customer_id=${card.id}`);
   expect(after.data).toMatchObject({ consent: 'withdrawn', allergies: '' });

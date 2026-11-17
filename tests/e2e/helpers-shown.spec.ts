@@ -8,7 +8,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, listReady, login, openApps, rowOf, shown, uniqueName } from './helpers';
 
-const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy';
+const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-picker-legacy';
 
 /** Where `shown(page)` lands: its parent, the overlay around it (if any) and whether it holds the list's rows. */
 const landing = (page: Page) =>

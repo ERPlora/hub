@@ -1,5 +1,5 @@
 // flow: SALE-F20, SALE-F01
-// hub#755: with Kitchen on, a round that cannot be sent keeps the cart open and says why for 4.5 s. Left at the bottom
+// hub#755: with Kitchen on, a round that cannot be sent keeps the cart open and says why for 5 s. Left at the bottom
 // on a low phone the notice lay over «Charge», and a tap there to try again fell on the notice: no new send. Here, with
 // the notice on screen, the middle of «Charge» and of «Send order» answer with the button itself, the notice covers
 // neither, and a real tap on «Charge» sends the round again. The kitchen's answer is a 500 of this spec's own route,
@@ -13,13 +13,14 @@ import { capture, settled, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
 import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { toastSaying, toasts } from './toast-helpers';
 
 const KEY = 'FIX-HUB-755-ERROR-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
 const PARKED = 'e2e_sale_kitchen_error_issuer';
 const RUN = stamp();
-/** How long this notice lasts. */
-const NOTICE_MS = 4500;
+/** How long this notice lasts: the default of an error toast. */
+const NOTICE_MS = 5000;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', notSent: 'The order could not be sent to the kitchen. Try again.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', notSent: 'No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.' },
@@ -76,7 +77,6 @@ async function reach(button: Locator): Promise<{ answer: string; box: Box }> {
 
 /** With the notice on screen: both ways of sending again answer with themselves, and it sits whole, clear of both. */
 async function bothButtonsFree(notice: Locator, charge: Locator, send: Locator, height: number, where: string): Promise<void> {
-  await expect(notice, `one notice at a time ${where}`).toHaveCount(1);
   await expect(notice, `the notice is on screen ${where}`).toBeVisible();
   await untilStill(notice.page());
   const box = await noticeBox(notice);
@@ -98,23 +98,26 @@ for (const { name, lang, locale, notSent } of LANGUAGES) {
       const till = shown(page);
       const charge = till.locator('[data-testid=pos-charge]');
       const send = till.locator('[data-testid=pos-kitchen-send]');
-      const notice = page.locator('ion-toast').filter({ hasText: notSent });
+      const notice = toastSaying(page, notSent);
+      const notices = toasts(page).filter({ hasText: notSent });
 
       await till.locator('[data-testid=pos-cart-tab-round]').click();
       await expect(send).toBeVisible();
       await send.click();
       await expect.poll(sends, 'the send that fails').toBe(1);
+      await expect(notices, 'one notice after «Send order»').toHaveCount(1);
       await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Send order»`);
       await capture(page, `${KEY}-${lang}-${size.label}`);
 
       // Trying again with the notice on screen: the finger lands on «Charge», which sends the round first.
-      const first = await notice.getAttribute('id');
+      const first = String(await notice.getAttribute('data-toast-id'));
       const at = (await charge.boundingBox())!;
       await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
       await expect.poll(sends, 'a tap on «Charge» sends the round again').toBe(2);
       await expect.soft(page.locator('[data-testid=sale-checkout-modal]'), 'nothing is charged with the round not sent').toBeHidden();
-      // The second notice closes the first before it opens: what is measured next is the new one.
-      await expect(page.locator(`ion-toast[id="${first}"]`), 'the new notice takes the place of the first').toHaveCount(0);
+      // The second notice comes in front of the first, which stays behind it: what is measured next is the new one.
+      await expect(notices, 'the new notice joins the first').toHaveCount(2);
+      await expect(notice, 'the new notice in front').not.toHaveAttribute('data-toast-id', first);
       await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Charge»`);
       if (await tillIsPhone(page)) await expect.soft(till.locator('[data-testid=pos-cart-drawer]'), 'the check stays open').toBeVisible();
     });

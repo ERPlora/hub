@@ -10,6 +10,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { formatSize } from '../../base/frontend/lib/files';
 import { A, api, B, capture, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { toastSaying, toasts } from './toast-helpers';
 
 /** The real files of the preview's unit tests (hub#578): a JSON, an .xlsx of two sheets and a .docx written by an
  *  office suite, whose text carries `<script>` and `onerror` as words. */
@@ -92,15 +93,14 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
 const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
 const item = (page: Page, path: string) => shown(page).locator(`[data-item="${path}"]`);
 const dialog = (page: Page, id: string) => page.locator(`ion-modal[data-testid="${id}"]`);
-const toast = (page: Page, text: string | RegExp) => page.locator('ion-toast').filter({ hasText: text }).last();
 
-/** The messages of the notices painted on screen now: an open toast whose box inside its shadow root has a height. */
+/** The messages of the notices painted on screen now: a toast not faded out whose content is not hidden behind the front. */
 function paintedNotices(page: Page): Promise<string[]> {
-  return page.locator('ion-toast').evaluateAll((toasts) =>
-    toasts
-      .filter((t) => !t.classList.contains('overlay-hidden'))
-      .filter((t) => (t.shadowRoot?.querySelector('.toast-wrapper')?.getBoundingClientRect().height ?? 0) > 0)
-      .map((t) => t.shadowRoot?.querySelector('.toast-message')?.textContent?.trim() ?? ''),
+  return toasts(page).evaluateAll((all) =>
+    all
+      .filter((t) => getComputedStyle(t).opacity !== '0')
+      .filter((t) => getComputedStyle(t.firstElementChild ?? t).opacity !== '0')
+      .map((t) => (t as HTMLElement).innerText.trim()),
   );
 }
 
@@ -167,7 +167,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(folderDialog).toBeVisible();
       await folderDialog.locator('[data-testid="files-new-folder-name"] input').fill('Invoices');
       await folderDialog.locator('[data-testid="files-new-folder-dialog-submit"]').click();
-      await expect(toast(page, 'Folder created.')).toBeVisible();
+      await expect(toastSaying(page, 'Folder created.')).toBeVisible();
       await expect(item(page, 'Invoices')).toHaveAttribute('data-kind', 'folder');
 
       // Two files uploaded at the top; a third with a taken name keeps «name (1).ext».
@@ -175,17 +175,17 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         { name: 'logo.png', mimeType: 'image/png', buffer: PNG },
         { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from(NOTE) },
       ]);
-      await expect(toast(page, 'Files uploaded.')).toBeVisible();
+      await expect(toastSaying(page, 'Files uploaded.')).toBeVisible();
       await expect(item(page, 'logo.png')).toBeVisible();
       await expect(item(page, 'notes.txt')).toBeVisible();
       await upload(page, [{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('again') }]);
-      await expect(toast(page, 'Uploaded as “notes (1).txt”: there was already one with that name.')).toBeVisible();
+      await expect(toastSaying(page, 'Uploaded as “notes (1).txt”: there was already one with that name.')).toBeVisible();
       await expect(item(page, 'notes (1).txt')).toBeVisible();
 
       // A program is refused, and the notice says why, never a code.
       await upload(page, [{ name: 'setup.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }]);
       await expect(
-        toast(page, 'Could not upload “setup.exe”: Programs (.exe) can\'t be kept in Files: they could harm whoever opens them.'),
+        toastSaying(page, 'Could not upload “setup.exe”: Programs (.exe) can\'t be kept in Files: they could harm whoever opens them.'),
       ).toBeVisible();
       await expect(item(page, 'setup.exe')).toHaveCount(0);
 
@@ -277,18 +277,18 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'files-search').locator('input').fill('nothing like it');
       await expect(testid(page, 'files-no-match')).toHaveText('No file in this folder matches “nothing like it”.');
 
-      // Two notices in a row never cover each other: the second closes the first, and it reads whole.
-      const refused = toast(page, 'Could not upload “setup.exe”');
+      // Two notices in a row never cover each other: the second comes in front of the first, and it reads whole.
+      const refused = toastSaying(page, 'Could not upload “setup.exe”');
       await upload(page, [{ name: 'setup.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }]);
       await expect(refused).toBeVisible();
       await upload(page, [{ name: 'later.txt', mimeType: 'text/plain', buffer: Buffer.from('later') }]);
-      const kept = toast(page, 'Files uploaded.');
+      const kept = toastSaying(page, 'Files uploaded.');
       await expect(kept).toBeVisible();
-      // What is painted, read inside each toast's shadow root (the host spans the screen either way): one notice, the
-      // last; the one before is closed, never left underneath.
+      // What is painted with the pointer off the stack (over it, the stack opens into a list): one notice, the last;
+      // the one before waits behind it with its words hidden, never showing through.
+      await page.mouse.move(0, 0);
       await expect.poll(() => paintedNotices(page)).toEqual(['Files uploaded.']);
       await expect(kept).toBeInViewport({ ratio: 1 });
-      await page.mouse.move(0, 0);
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-notices-${width}`) });
 
@@ -300,7 +300,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       ]);
       const both = "Files uploaded. Could not upload “virus.exe”: Programs (.exe) can't be kept in Files: they could harm whoever opens them.";
       await expect.poll(() => paintedNotices(page)).toEqual([both]);
-      await expect(toast(page, both)).toBeInViewport({ ratio: 1 });
+      await expect(toastSaying(page, both)).toBeInViewport({ ratio: 1 });
       await page.mouse.move(0, 0);
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-batch-notice-${width}`) });
@@ -459,7 +459,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(renameDialog.locator('[data-testid="files-rename-name"] input')).toHaveValue('march.txt');
       await renameDialog.locator('[data-testid="files-rename-name"] input').fill('april.txt');
       await renameDialog.locator('[data-testid="files-rename-dialog-submit"]').click();
-      await expect(toast(page, 'Renamed.')).toBeVisible();
+      await expect(toastSaying(page, 'Renamed.')).toBeVisible();
       await expect(item(page, 'april.txt')).toBeVisible();
       await expect(item(page, 'march.txt')).toHaveCount(0);
 
@@ -482,7 +482,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G85-move-${width}`) });
       await moveDialog.locator('[data-testid="files-move-dialog-submit"]').click();
-      await expect(toast(page, 'Moved to “Invoices”.')).toBeVisible();
+      await expect(toastSaying(page, 'Moved to “Invoices”.')).toBeVisible();
       await expect(item(page, 'april.txt')).toHaveCount(0);
 
       // A folder, with what it holds, into another: the open folder follows it.
@@ -494,7 +494,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // Never inside itself: the folder is no destination of its own.
       await expect(moveDialog.locator('[data-testid="files-move-option"][data-to="Invoices"]')).toHaveCount(0);
       await moveDialog.locator('[data-testid="files-move-dialog-submit"]').click();
-      await expect(toast(page, 'Moved to “Contracts”.')).toBeVisible();
+      await expect(toastSaying(page, 'Moved to “Contracts”.')).toBeVisible();
       await expect(page).toHaveURL(`${A}/files?folder=Contracts/Invoices`);
       await expect(item(page, 'Contracts/Invoices/april.txt')).toBeVisible();
       await snap(page, 'BASE-G85', width);
@@ -507,7 +507,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G86-${width}`) });
       await ask.getByRole('button', { name: 'Delete' }).click();
-      await expect(toast(page, 'File deleted.')).toBeVisible();
+      await expect(toastSaying(page, 'File deleted.')).toBeVisible();
       await expect(testid(page, 'files-empty')).toBeVisible();
 
       // Deleting a folder and everything in it; the screen goes back to where it was.
@@ -515,7 +515,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.locator('ion-popover [data-testid="files-action-delete"]').click();
       await expect(ask).toContainText('You are about to delete “Invoices” and everything in it. This cannot be undone.');
       await ask.getByRole('button', { name: 'Delete' }).click();
-      await expect(toast(page, 'Folder deleted.')).toBeVisible();
+      await expect(toastSaying(page, 'Folder deleted.')).toBeVisible();
       await expect(page).toHaveURL(`${A}/files?folder=Contracts`);
       await expect(testid(page, 'files-empty')).toBeVisible();
       await snap(page, 'BASE-G86-done', width);
@@ -550,7 +550,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // Past the plan's space, refused with its sentence; nothing is kept.
       await upload(page, [{ name: 'second.dat', mimeType: 'application/octet-stream', buffer: Buffer.alloc(600 * 1024, 7) }]);
       await expect(
-        toast(page, 'Could not upload “second.dat”: There is no space left for that file: your plan includes 1 MB.'),
+        toastSaying(page, 'Could not upload “second.dat”: There is no space left for that file: your plan includes 1 MB.'),
       ).toBeVisible();
       await expect(item(page, 'second.dat')).toHaveCount(0);
       await snap(page, 'BASE-G83-no-space', width);

@@ -15,6 +15,7 @@ import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP';
@@ -188,7 +189,7 @@ for (const viewport of VIEWPORTS) {
     for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
 
     const approvedBy = new RegExp(`(Approved by|Aprobado por) ${escaped(name)}`);
-    await expect(page.locator('ion-toast').filter({ hasText: approvedBy }).first()).toBeVisible();
+    await expect(toastSaying(page, approvedBy)).toBeVisible();
     await expect(dialog).toBeHidden();
     await expect(page.locator('ion-modal[data-testid=sale-void]')).toBeHidden();
     await expect

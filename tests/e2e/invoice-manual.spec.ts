@@ -15,6 +15,7 @@ import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, openDialog, deliver, ensureIssuer, flowShots, invoiceOf, type InvoiceOut, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const ISSUER = {
@@ -88,7 +89,7 @@ test('INVOICE-F21: without the issuer Invoices says so once; «Set up» opens it
     await expect(taxId).not.toHaveClass(/ion-invalid/);
     await expect(taxId.locator('.error-text')).toBeHidden();
     await form.locator('[data-testid=invoice-issuer-save]').click();
-    await expect(page.locator('ion-toast').filter({ hasText: 'Issuer saved.' })).toBeVisible();
+    await expect(toastSaying(page, 'Issuer saved.')).toBeVisible();
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toHaveCount(0);
     const saved = await issuerNow(context);
     expect([saved.configured, saved.legal_name, saved.tax_id, saved.address, saved.country]).toEqual([true, ISSUER['legal-name'], ISSUER['tax-id'], ISSUER.address, 'ES']);

@@ -9,7 +9,7 @@
 // It follows `verifactu.record.get` live: an answer of the AEAT shows by itself.
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, openExternalLink, toast, toastSuccess, useSession } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, toastSuccess, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
@@ -102,10 +102,10 @@ async function sendNow(): Promise<void> {
   }
   // A reason means it did not reach the AEAT (or the AEAT refused the sending): a warning, never a success.
   if (answer.reason) {
-    void toast(answer.message, 'warning', 4500);
+    toastWarning(answer.message);
     return;
   }
-  void toastSuccess(
+  toastSuccess(
     t('verifactu.detail.transmitted', { accepted: answer.accepted + answer.accepted_with_errors, rejected: answer.rejected, waiting: answer.waiting }),
   );
 }
@@ -123,10 +123,10 @@ async function askTheAeat(): Promise<void> {
   }
   // Not held is no failure, but nothing changed: it stays in the queue (a warning, never a success).
   if (!answer.held) {
-    void toast(t('verifactu.detail.askNotHeld', { number: r.invoice_number }), 'warning', 4500);
+    toastWarning(t('verifactu.detail.askNotHeld', { number: r.invoice_number }));
     return;
   }
-  void toastSuccess(t('verifactu.detail.askHeld', { number: r.invoice_number }));
+  toastSuccess(t('verifactu.detail.askHeld', { number: r.invoice_number }));
 }
 
 async function correctIt(): Promise<void> {
@@ -147,7 +147,7 @@ async function correctIt(): Promise<void> {
     refused.value = refusal(correct.error.value, t('verifactu.detail.actionFailed'))?.message ?? t('verifactu.detail.actionFailed');
     return;
   }
-  void toastSuccess(t('verifactu.detail.correctDone', { number: r.invoice_number }));
+  toastSuccess(t('verifactu.detail.correctDone', { number: r.invoice_number }));
 }
 </script>
 

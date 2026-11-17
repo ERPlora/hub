@@ -100,7 +100,7 @@ async function save(): Promise<void> {
     return; // `error` holds it: the form paints it.
   }
   editing.value = false;
-  void toastSuccess(t('customer.detail.updated'));
+  toastSuccess(t('customer.detail.updated'));
 }
 </script>
 

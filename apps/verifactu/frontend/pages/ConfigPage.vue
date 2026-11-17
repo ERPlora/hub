@@ -90,7 +90,7 @@ async function uploadCertificate(): Promise<void> {
   }
   picked.value = null;
   password.value = '';
-  void toastSuccess(t('verifactu.config.uploadedToast', { holder: out.own_certificate.holder, taxId: out.own_certificate.holder_tax_id }));
+  toastSuccess(t('verifactu.config.uploadedToast', { holder: out.own_certificate.holder, taxId: out.own_certificate.holder_tax_id }));
 }
 
 async function removeCertificate(): Promise<void> {
@@ -109,7 +109,7 @@ async function removeCertificate(): Promise<void> {
     problem.value = refusal(remove.error.value, t('verifactu.config.removeFailed'))?.message ?? t('verifactu.config.removeFailed');
     return;
   }
-  void toastSuccess(t('verifactu.config.removedToast'));
+  toastSuccess(t('verifactu.config.removedToast'));
 }
 </script>
 

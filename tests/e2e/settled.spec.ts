@@ -1,16 +1,17 @@
 // flow: hub-e2e-capture — the harness's `settled()` and Ionic's animations
 // The harness's `settled()` (helpers.ts; service-helpers.ts and schedule-helpers.ts hand out the same one), the wait the
 // captures and measurements of the specs take: once it returns, nothing on the screen moves any more. Ionic animates
-// its overlays (`ion-toast`, `ion-modal`, `ion-popover`) with Web Animations on elements of their shadow roots, which
-// `document.getAnimations()` leaves out: a toast still entering counts 0 animations in the document and 1 in its own
-// shadow root. The checks here read the page on their own, never through `settled()`'s code. erplora.com's e2e waits
-// the same way.
+// its overlays (`ion-modal`, `ion-popover`) with Web Animations on elements of their shadow roots, which
+// `document.getAnimations()` leaves out, and a toast enters with CSS transitions on its own element in the document:
+// `settled()` waits for both. The checks here read the page on their own, never through `settled()`'s code.
+// erplora.com's e2e waits the same way.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, login, repeatedTop, settled as baseSettled, shown, uniqueName } from './helpers';
 import { signedIn, snap } from './cart-checkout-helpers';
 import { settled as scheduleSettled } from './schedule-helpers';
 import { settled } from './service-helpers';
+import { newestToast } from './toast-helpers';
 
 const TASK = 'FIX-HUB-E2E-SETTLED-IONIC-ANIMATIONS';
 
@@ -37,24 +38,21 @@ const stillMoving = (page: Page) =>
     return moving;
   });
 
-/** The finite animations running in the document alone (what the old `settled()` read) and in the toast's shadow root. */
+/** The finite animations running on the toast on screen and inside it: its entrance, read on the toast alone. */
 const toastAnimations = (page: Page) =>
-  page.evaluate(() => {
-    const running = (list: Animation[]) =>
-      list.filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity).length;
-    const toast = [...document.querySelectorAll('ion-toast')].at(-1);
-    return { document: running(document.getAnimations()), toast: running(toast?.shadowRoot?.getAnimations() ?? []) };
+  newestToast(page).evaluate((toast) => {
+    const running = (animation: Animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity;
+    return toast.getAnimations({ subtree: true }).filter(running).length;
   });
 
-/** The box of the toast on screen (its `.toast-wrapper`, in its shadow root) and the window's size. */
+/** The box of the toast on screen, where its stack moves it, and the window's size. */
 const toastBox = (page: Page) =>
-  page.locator('ion-toast').last().evaluate((toast) => {
-    const box = toast.shadowRoot?.querySelector('.toast-wrapper')?.getBoundingClientRect();
-    if (!box) throw new Error('ion-toast without its .toast-wrapper');
+  newestToast(page).evaluate((toast) => {
+    const box = toast.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, width: innerWidth, height: innerHeight };
   });
 
-test('hub-e2e-capture: after settled() a toast of Ionic has stopped, whole on screen, in the three sizes', async ({ page, context }) => {
+test('hub-e2e-capture: after settled() a toast has stopped, whole on screen, in the three sizes', async ({ page, context }) => {
   await login(page, A, '/demo/items');
   const item = await createItem(context, A, uniqueName('Settled toast'));
   try {
@@ -68,9 +66,9 @@ test('hub-e2e-capture: after settled() a toast of Ionic has stopped, whole on sc
       await expect(detail.getByTestId('demo-note-save')).toBeEnabled();
       await settled(page);
       await detail.getByTestId('demo-note-save').click();
-      await expect(page.locator('ion-toast').last()).toBeVisible();
+      await expect(newestToast(page)).toBeVisible();
       await settled(page);
-      expect(await toastAnimations(page), `the toast still entering after settled() at ${size.label}`).toEqual({ document: 0, toast: 0 });
+      expect(await toastAnimations(page), `the toast still entering after settled() at ${size.label}`).toBe(0);
       expect(await stillMoving(page), `still moving after settled() at ${size.label}`).toEqual([]);
       const box = await toastBox(page);
       expect(box.top, `toast top at ${size.label}`).toBeGreaterThanOrEqual(0);
@@ -86,7 +84,7 @@ test('hub-e2e-capture: after settled() a toast of Ionic has stopped, whole on sc
   }
 });
 
-test('hub-e2e-capture: the snap() of cart_checkout captures a toast of Ionic once it has stopped, at 390, 834 and 1440', async ({ browser }) => {
+test('hub-e2e-capture: the snap() of cart_checkout captures a toast once it has stopped, at 390, 834 and 1440', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/demo/items');
   const item = await createItem(context, A, uniqueName('Snap toast'));
   // Animations at a fifth of their speed (Chrome's own control): the toast enters for longer than a capture takes, so
@@ -105,7 +103,7 @@ test('hub-e2e-capture: the snap() of cart_checkout captures a toast of Ionic onc
       await settled(page);
       await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.2 });
       await detail.getByTestId('demo-note-save').click();
-      await expect(page.locator('ion-toast').last()).toBeVisible();
+      await expect(newestToast(page)).toBeVisible();
       await snap(page, `${TASK}-SNAP`, size.label);
       expect(await stillMoving(page), `still moving once snap() captured at ${size.label}`).toEqual([]);
     }

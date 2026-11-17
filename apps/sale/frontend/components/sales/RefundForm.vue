@@ -117,7 +117,7 @@ function cardError(tender: TenderOption): string | undefined {
 async function confirm(): Promise<void> {
   if (command.pending.value || !data.value || nothingLeft.value) return;
   if (blockText.value) {
-    void toastError(blockText.value);
+    toastError(blockText.value);
     return;
   }
   const lines = refundLines(data.value.lines, picked.value);
@@ -136,7 +136,7 @@ async function confirm(): Promise<void> {
     failure.value = refusal(err, t('sale.refund.unknown'))?.message ?? t('sale.refund.unknown');
     return;
   }
-  void toastSuccess(t('sale.refund.done'));
+  toastSuccess(t('sale.refund.done'));
   emit('refunded');
 }
 
