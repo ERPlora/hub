@@ -6,6 +6,7 @@
 // session open is said, and so is a forgotten session past its cut-off. Nothing here refetches: it all re-runs by
 // itself.
 import { DataTable } from '@erplora/ui/components';
+import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
@@ -62,16 +63,18 @@ async function setup(options: MountOptions = {}) {
   const rows = () => m.wrapper.findAll('[data-testid="cash-register-sessions-row"]');
   const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => words(c.element));
   const action = async (id: string, actionId: string) => {
-    await m.find(`cash-register-sessions-row-${id}-${actionId}`).trigger('click');
+    await pressRowAction(m.wrapper, id, actionId);
     await flush();
   };
+  /** What a row offers, on its buttons or in its «⋮». */
+  const offers = (id: string) => offeredRowActions(m.wrapper, id);
   /** The table's subscriptions to the list (the figures above it read the closed ones apart: no offset). */
   const tableParams = () => m.params(LIST).filter((params) => 'offset' in params);
   const ready = async (current: unknown = { ...NONE, session: OPEN }, page: unknown = PAGE) => {
     await m.result(CURRENT, current);
     await m.result(LIST, page, { offset: 0 });
   };
-  return { ...m, table, rows, cells, action, ready, tableParams };
+  return { ...m, table, rows, cells, action, offers, ready, tableParams };
 }
 
 describe('SessionsPage: the screen', () => {
@@ -271,17 +274,17 @@ describe('SessionsPage: the actions', () => {
   it('«Detail» on every row; «Movement», «Count» and «Close» only on the open one', async () => {
     const s = await setup();
     await s.ready();
-    for (const id of ['detail', 'movement', 'count', 'close']) expect(s.find(`cash-register-sessions-row-s2-${id}`).exists(), id).toBe(true);
-    expect(s.find('cash-register-sessions-row-s1-detail').exists()).toBe(true);
-    for (const id of ['movement', 'count', 'close']) expect(s.find(`cash-register-sessions-row-s1-${id}`).exists(), id).toBe(false);
+    expect(s.offers('s2')).toEqual(expect.arrayContaining(['detail', 'movement', 'count', 'close']));
+    expect(s.offers('s1')).toContain('detail');
+    for (const id of ['movement', 'count', 'close']) expect(s.offers('s1'), id).not.toContain(id);
   });
 
   it('a session past its cut-off takes nothing more: only «Detail»', async () => {
     const s = await setup();
     const due = { ...OPEN, auto_close_due: true };
     await s.ready({ ...NONE, session: due, auto_close_at: '2026-10-14T02:00:00Z' }, { ...PAGE, rows: [due, CLOSED] });
-    expect(s.find('cash-register-sessions-row-s2-detail').exists()).toBe(true);
-    for (const id of ['movement', 'count', 'close']) expect(s.find(`cash-register-sessions-row-s2-${id}`).exists(), id).toBe(false);
+    expect(s.offers('s2')).toContain('detail');
+    for (const id of ['movement', 'count', 'close']) expect(s.offers('s2'), id).not.toContain(id);
   });
 
   it('opens the movement, the count and the close of the open session', async () => {

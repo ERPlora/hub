@@ -2,7 +2,7 @@
 //   - the employee (`hub_employee`) sees products, movements and categories, but nothing that writes:
 //     no «+», no CSV, «Yes»/«No» instead of the switch, only «Details»; no Settings tab, and its
 //     address says «This page does not exist»; the API refuses every write with 403;
-//   - on a phone (390×844) the products list is cards with «Load more», a product's sheet opens, and
+//   - on a phone (390×844) the products list is cards that load more at their end, a product's sheet opens, and
 //     the form fits as a sheet.
 import { expect, test } from '@playwright/test';
 

@@ -82,9 +82,9 @@ describe('WaitlistPage', () => {
     expect([s.cells(0)[3], s.cells(1)[3]]).toEqual(['+34 600 333 444', '+44 791 112 3456']);
     await ionValue(s.wrapper.find('[data-testid="reservation-waitlist-view"]').element, 'cards');
     const phones = s.wrapper
-      .findAll('.data-table__field')
-      .filter((field) => field.find('.data-table__field-label').text() === 'Phone')
-      .map((field) => field.find('.data-table__field-value').text().trim());
+      .findAll('.data-table__card-meta')
+      .filter((field) => field.find('.data-table__card-meta-label').text() === 'Phone')
+      .map((field) => field.find('.data-table__card-meta-value').text().trim());
     expect(phones).toEqual(['+34 600 333 444', '+44 791 112 3456']);
   });
 

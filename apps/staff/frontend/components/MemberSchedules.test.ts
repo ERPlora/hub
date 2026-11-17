@@ -4,6 +4,7 @@
 // («New»), a row or «Edit» («Edit · {name}»), «Activate / deactivate» at once, and «Delete» after
 // «Delete the schedule "{name}"? …». A refused action is said above the table.
 import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
+import { pressRowAction } from '@erplora/ui/testing/data-table';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
@@ -42,7 +43,7 @@ async function setup(options: MountOptions = {}) {
   const rows = () => m.wrapper.findAll('[data-testid="staff-schedules-row"]');
   const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
   async function action(id: string, actionId: string) {
-    await m.find(`staff-schedules-row-${id}-${actionId}`).trigger('click');
+    await pressRowAction(m.wrapper, id, actionId);
     await settle();
   }
   return { ...m, table, prop, rows, cells, action, show: (data: unknown) => m.result(OP, data) };

@@ -5,7 +5,8 @@
 // Total —, search «Search number or customer…», the filters behind the table's funnel, table or cards, 50 a page. A row opens its
 // document; «Document» and «Reprint» for everyone, «Void» and «Refund» too, only where they apply (whoever
 // may not, with a manager's approval: the windows ask it). The list re-runs by itself on charges, voids and refunds: nothing here refetches.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+import { DataTable, EmptyState, formatDateTime } from '@erplora/ui/components';
+import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
@@ -17,7 +18,6 @@ import ReprintJob from '../components/document/ReprintJob.vue';
 import RefundModal from '../components/sales/RefundModal.vue';
 import SalesKpis from '../components/sales/SalesKpis.vue';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
-import { formatDateTime } from '@erplora/ui/components';
 import { plain } from '../lib/format';
 import type { SaleRow } from '../operations';
 import SalesWeek from '../components/sales/SalesWeek.vue';
@@ -126,7 +126,7 @@ async function setup(options: MountOptions = {}) {
     await m.reopen();
   }
   async function action(id: string, actionId: string) {
-    await m.find(`sales-table-row-${id}-${actionId}`).trigger('click');
+    await pressRowAction(m.wrapper, id, actionId);
     await flush();
   }
   const businessDayCalls = () => m.sent().filter((c) => c.path === '/api/sale/business_day');
@@ -412,7 +412,7 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
       ['void', 'Void', 'ban-outline', 'danger'],
       ['refund', 'Refund', 'lucide:rotate-ccw', 'warning'],
     ]);
-    const has = (id: string, action: string) => s.find(`sales-table-row-${id}-${action}`).exists();
+    const has = (id: string, action: string) => offeredRowActions(s.wrapper, id).includes(action);
     // A completed ticket without refunds: everything.
     expect(['document', 'reprint', 'void', 'refund'].map((a) => has('s1', a))).toEqual([true, true, true, true]);
     // Voided, or refunded in full: only the paper.
@@ -435,7 +435,7 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
       ],
       total: 3,
     });
-    const has = (id: string, action: string) => s.find(`sales-table-row-${id}-${action}`).exists();
+    const has = (id: string, action: string) => offeredRowActions(s.wrapper, id).includes(action);
     expect(['void', 'refund'].map((a) => has('s6', a))).toEqual([true, true]);
     expect(has('s7', 'refund')).toBe(false);
     expect(['void', 'refund'].map((a) => has('s8', a))).toEqual([false, true]);
@@ -449,7 +449,7 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
       rows: [row('s9', { refunded_total: 0, refundable_total: 1250, sessions_to_return: 1, has_refunds: true })],
       total: 1,
     });
-    const has = (action: string) => s.find(`sales-table-row-s9-${action}`).exists();
+    const has = (action: string) => offeredRowActions(s.wrapper, 's9').includes(action);
     expect([has('void'), has('refund')]).toEqual([false, true]);
   });
 
@@ -493,7 +493,7 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
     await s.show({ ...PAGE, rows: [row('s1'), row('s6', { invoice_status: 'pending', documents_pending: true })], total: 2 });
     expect(s.wrapper.findAll('[data-testid="sales-documents-pending"]').map((pill) => pill.text())).toEqual(['Documento pendiente']);
     expect(s.cells(1).join(' | ')).toContain('Documento pendiente');
-    expect([s.find('sales-table-row-s1-issue').exists(), s.find('sales-table-row-s6-issue').exists()]).toEqual([false, true]);
+    expect([offeredRowActions(s.wrapper, 's1').includes('issue'), offeredRowActions(s.wrapper, 's6').includes('issue')]).toEqual([false, true]);
   });
 
   it('«Issue now» asks the server for the sale’s waiting documents and says how it went', async () => {
