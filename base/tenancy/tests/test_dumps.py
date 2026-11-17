@@ -39,7 +39,7 @@ from base.tenancy.tests.s3 import (  # noqa: F401
 )
 from control.models import Hub, HubDump
 
-pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES), pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 
 AT = dt.datetime(2026, 10, 31, 10, 15, 0, tzinfo=dt.UTC)
 

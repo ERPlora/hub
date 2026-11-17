@@ -32,7 +32,6 @@ from base.tenancy.tests import hubs
 from base.tests.test_worker_activations import (  # noqa: F401 (the fixtures)
     business,
     fresh,
-    no_test_fallback,
     nothing_checked_yet,
     platform_template,
     row,
@@ -42,8 +41,6 @@ from base.tests.test_worker_activations import (  # noqa: F401 (the fixtures)
     turn_on,
 )
 from control.models import HubDue
-
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 SALON = "hair_salon.en"
 #: In the seed: 8 services in 4 categories, and 5 products in 1.

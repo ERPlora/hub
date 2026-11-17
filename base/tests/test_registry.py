@@ -87,13 +87,11 @@ def test_a_hub_is_preparing_until_it_is_ready(status, preparing):
         ("hub_x", "dropping", True, False),
     ],
 )
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_database_is_made_once_it_was_ready_and_until_it_is_dropped(db_name, status, was_ready, made):
     hub = Hub(slug="acme", db_name=db_name, status=status, ready_at=timezone.now() if was_ready else None)
     assert registry.database_is_made(hub) is made
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 def test_a_ready_business_without_its_own_database_is_not_served_until_its_cut():
     """No business shares a database any more: one still on control's answers 503 until ``cut_shared_hubs`` gives it
     its own (``base.tenancy.cut``), the maintenance one, as one moving to another cluster."""

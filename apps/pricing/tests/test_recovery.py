@@ -322,7 +322,6 @@ def added(hub) -> int:
         return OutboxEvent.objects.filter(name="pricing.price_item.added").count()
 
 
-@pytest.mark.usefixtures("no_test_fallback")
 class TestPricesComeBack:
     def a_business(self, recoveries, every_app_on):
         """A business with a product priced in two lists, by their screens' operations: its id."""

@@ -35,19 +35,10 @@ from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import opened_at  # noqa: F401 (a fixture)
 from control.models import Hub, HubDue
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 #: An app without ``requires``, with migrations of its own.
 APP = "printing"
 #: This module's template: the platform's apps and no other.
 VERTICAL = "w6activation"
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture(autouse=True)
@@ -198,11 +189,9 @@ def tables_failing(monkeypatch) -> Callable[[], None]:
 # (A ``django_db`` test: pytest-django sets the test databases up for the session before any of this module's.)
 
 
-@pytest.mark.django_db
-def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_came():
-    from base.tenancy.tests.legacy import use_legacy
-
-    with use_legacy():
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_came(hub_a):
+    with use_hub(hub_a):
         _what_is_due()
 
 

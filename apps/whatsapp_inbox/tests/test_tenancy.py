@@ -14,7 +14,6 @@ from base.tenancy.context import use_hub
 
 pytestmark = [
     HUB_DB,
-    pytest.mark.usefixtures("no_test_fallback"),
 ]
 
 

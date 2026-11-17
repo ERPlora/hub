@@ -48,8 +48,6 @@ from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  #
 from control import services as control_services
 from control.models import Cluster, Hub, HubDue, HubDump, MovedCopy
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 AT = dt.datetime(2026, 11, 11, 12, 0, tzinfo=dt.UTC)
 #: The moment the copy is of.
 THEN = AT - dt.timedelta(days=2)

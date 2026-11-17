@@ -75,7 +75,7 @@ def _run_with_reuse_db(database: str, case: str) -> None:
 
 def _factory_rows(database: str) -> int:
     with hubs._maintenance(_worker_database(database)) as conn:
-        return conn.execute("SELECT count(*) FROM tax_taxcategory").fetchone()[0]
+        return conn.execute(sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(testing.FACTORY_TABLE))).fetchone()[0]
 
 
 def test_a_reused_database_a_transactional_test_emptied_is_created_again(database):

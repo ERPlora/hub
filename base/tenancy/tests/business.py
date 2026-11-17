@@ -52,7 +52,7 @@ def require_the_businesses_databases(request) -> None:
 
 
 @pytest.fixture(autouse=True)
-def in_business_a(request, no_test_fallback, hub_databases):
+def in_business_a(request, hub_databases):
     """Business A (``hub_a``), entered for the whole test if the test uses the database.
 
     ``hub_databases`` is asked for here, not only through ``hub_a``: built inside a test, its aliases would be forgotten

@@ -39,8 +39,6 @@ from base.tenancy.tests.s3 import (  # noqa: F401
 )
 from control.models import Cluster, Hub, HubDue, HubDump
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 
 def databases() -> set[str]:
     control = tenancy_connections.control_name()

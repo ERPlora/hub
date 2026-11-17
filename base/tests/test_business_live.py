@@ -15,7 +15,7 @@ from base.tests.test_internal import HUB_ID, signed
 
 __all__ = ["listening"]
 
-pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("no_test_fallback")]
+pytestmark = [HUB_DB_COMMITTED]
 
 REGISTRY_PATH = f"/internal/hubs/{HUB_ID}"
 REGISTRY = {

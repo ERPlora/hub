@@ -383,7 +383,7 @@ def off_apps(scope: Scope) -> frozenset[str]:
 def creating_apps(scope: Scope) -> frozenset[str]:
     """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
     tells them «activating». None in the platform, nor in a hub without a database of its own, where nothing is made
-    later (only the test suite's fallback keeps one)."""
+    later."""
     if is_platform(scope):
         return frozenset()
     return _kept(scope)[1]

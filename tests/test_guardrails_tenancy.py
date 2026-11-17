@@ -4,10 +4,9 @@ scanning they share (``source_files``, ``_offenders``), are ``tests/test_guardra
 (e) The tenancy: no ``CREATE``/``DROP DATABASE`` built by string formatting (``base.tenancy.names``:
     ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is swapped in); ``apps/`` never
     imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside ``live.broker``; the old shared
-    database (``use_shared_database``) is gone and nobody brings it back; the tests' fallback never set outside the
-    tests; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
+    database (``use_shared_database``) is gone and nobody brings it back; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
     (``live.operations.on_commit``); no migration of ``base/`` or ``apps/`` asks the router whether a model migrates
-    (a ``RunPython``'s hints choose its database); a test that runs as production does never counts queries on
+    (a ``RunPython``'s hints choose its database); no test counts queries on
     control's database without naming it (a business's reads go to its own).
 (g) Operations that need the hub's own database: a business that still shares control's (``db_name=""``, not cut
     yet) is not served at all. Each of them asked at its host, even by its administrator, answers 503 maintenance
@@ -21,7 +20,6 @@ from pathlib import Path
 
 import pytest
 from test_guardrails import HUB_DIR, _dotted, _offenders, _receiver_name, is_migration, source_files, suite_files
-from test_guardrails_legacy_fallback import current_entries
 
 # ── (e) The tenancy ────────────────────────────────────────────────────────────────────────────
 
@@ -150,26 +148,6 @@ def shared_database_touches(source: str) -> list[tuple[int, str]]:
     return sorted(found)
 
 
-def fallback_touches(source: str) -> list[tuple[int, str]]:
-    """``(line, "_test_fallback")`` for every assignment of the tests' fallback (an attribute or ``setattr``)."""
-    found: set[tuple[int, str]] = set()
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, (ast.Assign, ast.AugAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            if any(isinstance(target, ast.Attribute) and target.attr == "_test_fallback" for target in targets):
-                found.add((node.lineno, "_test_fallback"))
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "setattr"
-            and len(node.args) >= 2
-            and isinstance(node.args[1], ast.Constant)
-            and node.args[1].value == "_test_fallback"
-        ):
-            found.add((node.lineno, "_test_fallback"))
-    return sorted(found)
-
-
 def router_question_touches(source: str) -> list[tuple[int, str]]:
     """``(line, what)`` for every ``router.allow_migrate…(`` call. A ``RunPython`` already runs only where the router
     lets its hints through: asking it again inside is a branch that, on a business's database, always goes one way."""
@@ -230,8 +208,6 @@ connections.settings[alias] = cfg
 connections.settings.update({alias: cfg})
 del connections.settings[alias]
 cursor.execute("LISTEN hub_x")
-context._test_fallback = SHARED
-setattr(context, "_test_fallback", SHARED)
 transaction.on_commit(partial(notify, scope), robust=True)
 from django.db.transaction import on_commit
 elsewhere = not router.allow_migrate_model(schema_editor.connection.alias, Hub)
@@ -245,7 +221,6 @@ TENANCY_LOOKALIKES = """\
 query = sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name))
 connections.settings = {**connections.settings, alias: cfg}
 settings = dict(connections.settings)
-fallback = context._test_fallback
 operations.on_commit(partial(notify, scope))
 transaction.atomic(using=alias)
 migrations.RunPython(add_prefix, remove_prefix, hints={"model_name": "membership"})
@@ -276,17 +251,16 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
     ]
     assert listen_touches(TENANCY_OFFENDER) == [(11, "LISTEN")]
     assert shared_database_touches(TENANCY_OFFENDER) == [(4, "use_shared_database")]
-    assert fallback_touches(TENANCY_OFFENDER) == [(12, "_test_fallback"), (13, "_test_fallback")]
     assert bare_on_commit_touches(TENANCY_OFFENDER) == [
-        (14, "transaction.on_commit("),
-        (15, "from django.db.transaction import on_commit"),
+        (12, "transaction.on_commit("),
+        (13, "from django.db.transaction import on_commit"),
     ]
-    assert router_question_touches(TENANCY_OFFENDER) == [(16, "router.allow_migrate_model(")]
+    assert router_question_touches(TENANCY_OFFENDER) == [(14, "router.allow_migrate_model(")]
     assert control_count_touches(TENANCY_OFFENDER) == [
-        (17, "CaptureQueriesContext(connection)"),
-        (18, "CaptureQueriesContext(connection)"),
-        (19, "django_assert_num_queries( on control"),
-        (20, "django_assert_max_num_queries( on control"),
+        (15, "CaptureQueriesContext(connection)"),
+        (16, "CaptureQueriesContext(connection)"),
+        (17, "django_assert_num_queries( on control"),
+        (18, "django_assert_max_num_queries( on control"),
     ]
     for check in (
         database_ddl_touches,
@@ -294,7 +268,6 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         tenancy_import_touches,
         listen_touches,
         shared_database_touches,
-        fallback_touches,
         bare_on_commit_touches,
         router_question_touches,
         control_count_touches,
@@ -350,12 +323,6 @@ def test_nothing_runs_on_a_shared_database_any_more():
     )
 
 
-def test_the_tests_fallback_is_never_set_outside_the_tests():
-    offenders = _everywhere(fallback_touches)
-
-    assert offenders == [], f"Only the suite's conftest.py sets base.tenancy.context._test_fallback: {offenders}"
-
-
 def test_no_migration_of_a_business_s_app_asks_the_router():
     files = [path for path in source_files(HUB_DIR) if is_migration(path) and path.parts[0] in ("base", "apps")]
 
@@ -367,13 +334,8 @@ def test_no_migration_of_a_business_s_app_asks_the_router():
     )
 
 
-def test_no_test_that_runs_as_production_counts_queries_on_control_without_naming_it():
-    # The files with a test still on the suite's fallback keep the businesses' tables in control's database, so a
-    # count there still sees their reads; every other file is checked.
-    on_the_fallback = {entry.split("::", 1)[0] for entry in current_entries()}
-    files = [path for path in suite_files(HUB_DIR) if str(path) not in on_the_fallback]
-
-    offenders = _offenders(lambda path: control_count_touches((HUB_DIR / path).read_text()), files)
+def test_no_test_counts_queries_on_control_without_naming_it():
+    offenders = _offenders(lambda path: control_count_touches((HUB_DIR / path).read_text()), suite_files(HUB_DIR))
 
     assert offenders == [], (
         "A business's reads go to its own database, so this count sees none of them and passes with any number of "

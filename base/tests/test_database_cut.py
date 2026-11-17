@@ -1,6 +1,6 @@
 """A business's Hub while the database is cut for a moment (BASE-F111).
 
-The whole chain of the Hub, against the real Postgres, as production runs it (``no_test_fallback``): ``pg_terminate_backend``
+The whole chain of the Hub, against the real Postgres, as production runs it: ``pg_terminate_backend``
 is the server cutting a connection right before a statement of the request, ``default_transaction_read_only`` the old
 writer refusing writes during a switchover. The piece itself, and what it never repeats, is tested in ``live``
 (``tests/test_database_cut.py``); here, that the Hub is wired to it, on control and on a business's own database: control's
@@ -42,7 +42,6 @@ from base.tenancy.tests import hubs
 from base.tests.test_internal import signed
 
 pytestmark = [
-    pytest.mark.usefixtures("no_test_fallback"),
     pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True),
 ]
 

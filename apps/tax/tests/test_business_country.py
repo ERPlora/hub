@@ -38,7 +38,7 @@ PORTUGUESE_RULE = {"country_code": "PT", "tax_category_key": GENERIC, "rate_pct"
 
 
 @pytest.fixture(autouse=True)
-def as_production(no_test_fallback):
+def as_production():
     """Without ``use_hub`` a hub's model fails: nothing falls back on a database the two businesses share."""
 
 

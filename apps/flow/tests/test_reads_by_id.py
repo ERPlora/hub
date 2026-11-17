@@ -8,12 +8,10 @@ import datetime as dt
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from live.errors import NotFound, PermissionDenied
 
 from apps.flow.models import Draft, Flow, FlowRun, Question
 from base.models import Membership
-from base.tenancy import context
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, ctx_for, make_draft, make_flow, make_run, run
@@ -147,15 +145,6 @@ ROUTES = [
 ]
 
 
-@pytest.fixture
-def as_in_production(monkeypatch):
-    """Every request opens its own database context, as in production (``base/tenancy/tests/conftest.py``)."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-    cache.clear()
-    yield
-    cache.clear()
-
-
 def signed_in(client, hub):
     user, _ = get_user_model().objects.get_or_create(username="saas:1", defaults={"first_name": "Olga"})
     Membership.objects.get_or_create(user=user, host=hub.slug, defaults={"role": "hub_admin"})
@@ -170,7 +159,7 @@ def read(client, hub, path: str, record_id) -> tuple[int, dict]:
 
 @HUB_DB
 @pytest.mark.parametrize(("path", "made", "named"), ROUTES)
-def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client, hub_a, as_in_production, path, made, named):
+def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client, hub_a, path, made, named):
     signed_in(client, hub_a)
     with use_hub(hub_a):
         record = made()
@@ -181,7 +170,7 @@ def test_the_api_reads_one_of_this_business_by_its_id_with_what_names_it(client,
 
 @HUB_DB
 @pytest.mark.parametrize(("path", "made", "named"), ROUTES)
-def test_another_businesss_record_is_not_there(client, hub_a, hub_b, as_in_production, path, made, named):
+def test_another_businesss_record_is_not_there(client, hub_a, hub_b, path, made, named):
     with use_hub(hub_b):
         theirs = made()
     signed_in(client, hub_a)

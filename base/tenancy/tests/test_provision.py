@@ -52,8 +52,6 @@ from base.tenancy.tests.s3 import (  # noqa: F401
 )
 from control.models import Cluster, Hub, HubDue
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 HUB_DIR = Path(__file__).resolve().parents[3]
 
 

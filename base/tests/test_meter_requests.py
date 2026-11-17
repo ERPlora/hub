@@ -31,8 +31,6 @@ HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transacti
 ITEMS = "/api/demo/items"
 
 
-pytestmark = pytest.mark.usefixtures("no_test_fallback")
-
 
 @pytest.fixture(autouse=True)
 def counting(monkeypatch):
