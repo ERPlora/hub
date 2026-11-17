@@ -13,9 +13,14 @@ from django.contrib import admin
 
 from base.admin import ADMIN_HUB_SESSION_KEY, HubAdmin, MembershipAdmin, TaskScheduleAdmin
 from base.models import Hub, Membership, TaskSchedule
+from base.tenancy.context import use_control, use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, A, B
+from base.tenancy.tests.concurrency import hub_staff
+from control.tests.conftest import events
 
-pytestmark = pytest.mark.django_db
-HOST = "a.localhost:8000"
+__all__ = ["hub_staff"]
+
+pytestmark = HUB_DB
 PLATFORM = "hubs.localhost:8000"
 BANNER = 'id="admin-hub"'
 
@@ -99,17 +104,18 @@ class TestExpireNow:
         demo.refresh_from_db()
         assert demo.status == "expired" and demo.expires_at <= timezone.now()
         assert "1 demo ended" in html
-        [event] = OutboxEvent.objects.filter(name="base.demo.expired")
+        assert len(events("base.demo.expired")) == 1
+        with use_control():
+            [event] = OutboxEvent.objects.filter(name="base.demo.expired")
         assert event.actor == str(superuser)
 
-    def test_a_business_is_left_as_it_is_and_named(self, client, superuser, demo):
+    def test_a_business_is_left_as_it_is_and_named(self, client, superuser, demo, hub_a):
         client.force_login(superuser)
-        business = Hub.objects.get(slug="a")
-        html = self.expire_now(client, demo, business).content.decode()
-        business.refresh_from_db()
-        assert business.status == "ready"
-        # The admin capitalises its messages («A is no demo…»).
-        assert "a is no demo" in html.lower() and "1 demo ended" in html
+        html = self.expire_now(client, demo, hub_a).content.decode()
+        hub_a.refresh_from_db()
+        assert hub_a.status == "ready"
+        # The admin capitalises its messages («Tenant-a is no demo…»).
+        assert f"{A.key} is no demo" in html.lower() and "1 demo ended" in html
 
     def test_read_only_staff_neither_see_it_nor_run_it(self, client, make_user, demo):
         from base.services import sessions
@@ -132,11 +138,12 @@ def test_the_scheduled_tasks_are_registered():
     assert isinstance(admin.site._registry[TaskSchedule], TaskScheduleAdmin)
 
 
-def test_the_scheduled_tasks_are_listed_with_their_clock(client, superuser):
-    scheduled_task()
-    client.force_login(superuser)
+def test_the_scheduled_tasks_are_listed_with_their_clock(hub_staff, hub_a):
+    # A business's rows are read in its own database: the staff chose business A first.
+    with use_hub(hub_a):
+        scheduled_task()
 
-    html = client.get("/admin/base/taskschedule/", HTTP_HOST=PLATFORM).content.decode()
+    html = hub_staff.get("/admin/base/taskschedule/", HTTP_HOST=PLATFORM).content.decode()
 
     assert "verifactu.contingency.process" in html and "* * * * *" in html
 
@@ -148,11 +155,11 @@ def test_a_scheduled_task_is_not_added_by_hand(client, superuser):
     assert client.get("/admin/base/taskschedule/add/", HTTP_HOST=PLATFORM).status_code == 403
 
 
-def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(client, superuser):
-    task = scheduled_task()
-    client.force_login(superuser)
+def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(hub_staff, hub_a):
+    with use_hub(hub_a):
+        task = scheduled_task()
 
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/base/taskschedule/{task.pk}/change/",
         # The admin speaks the server's time (Europe/Madrid): 11:00 there is 09:00 UTC.
         {"next_run_0": "2026-10-15", "next_run_1": "11:00:00", "cron": "0 0 * * *", "operation": "x.y.z"},
@@ -160,13 +167,14 @@ def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(client, s
     )
 
     assert response.status_code == 302
-    task.refresh_from_db()
+    with use_hub(hub_a):
+        task.refresh_from_db()
     assert task.next_run == dt.datetime(2026, 10, 15, 9, 0, tzinfo=dt.UTC)
     assert (task.cron, task.operation) == ("* * * * *", "verifactu.contingency.process")
 
 
 def test_changelist_lists_memberships(client, superuser, make_user):
-    make_user("ana", host="a", role="hub_employee")
+    make_user("ana", host=A.key, role="hub_employee")
     client.force_login(superuser)
     response = client.get("/admin/base/membership/", HTTP_HOST=PLATFORM)
     assert response.status_code == 200
@@ -175,10 +183,10 @@ def test_changelist_lists_memberships(client, superuser, make_user):
 
 def test_changelist_filters_and_search(client, superuser, make_user):
     # Usernames that appear nowhere else on the page ("ana" is inside "Manager").
-    make_user("xavier", host="a", role="hub_employee")
-    make_user("quentin", host="b", role="hub_admin")
+    make_user("xavier", host=A.key, role="hub_employee")
+    make_user("quentin", host=B.key, role="hub_admin")
     client.force_login(superuser)
-    html = client.get("/admin/base/membership/?host=b", HTTP_HOST=PLATFORM).content.decode()
+    html = client.get(f"/admin/base/membership/?host={B.key}", HTTP_HOST=PLATFORM).content.decode()
     assert "quentin" in html and "xavier" not in html
     html = client.get("/admin/base/membership/?q=xavier", HTTP_HOST=PLATFORM).content.decode()
     assert "xavier" in html and "quentin" not in html
@@ -188,7 +196,7 @@ def test_add_form_creates_a_membership(client, superuser, make_user):
     user = make_user("ana")
     client.force_login(superuser)
     response = client.post(
-        "/admin/base/membership/add/", {"user": user.pk, "host": "a", "role": "hub_manager"}, HTTP_HOST=PLATFORM
+        "/admin/base/membership/add/", {"user": user.pk, "host": A.key, "role": "hub_manager"}, HTTP_HOST=PLATFORM
     )
     assert response.status_code == 302
     assert Membership.objects.get(user=user).role == "hub_manager"
@@ -206,13 +214,13 @@ def test_admin_scripts_carry_the_csp_nonce(client, superuser):
 class TestDeepLink:
     """``/admin/hub/<slug>/``: where «Open in the Hub admin» of the SaaS admin lands."""
 
-    def test_chooses_the_hub_and_opens_the_admin_index_with_its_banner(self, client, superuser):
+    def test_chooses_the_hub_and_opens_the_admin_index_with_its_banner(self, client, superuser, hub_a):
         client.force_login(superuser)
-        response = client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
+        response = client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
         assert (response.status_code, response["Location"]) == (302, "/admin/")
-        assert client.session[ADMIN_HUB_SESSION_KEY] == "a"
+        assert client.session[ADMIN_HUB_SESSION_KEY] == A.key
         html = client.get("/admin/", HTTP_HOST=PLATFORM).content.decode()
-        assert BANNER in html and "Hub: a" in html
+        assert BANNER in html and f"Hub: {A.key}" in html
         # The admin's own branding stays.
         assert 'id="site-name"' in html
 
@@ -221,11 +229,11 @@ class TestDeepLink:
         client.get("/admin/hub/acme/", HTTP_HOST=PLATFORM)
         assert "Hub: acme" in client.get("/admin/base/membership/", HTTP_HOST=PLATFORM).content.decode()
 
-    def test_another_deep_link_replaces_the_choice(self, client, superuser):
+    def test_another_deep_link_replaces_the_choice(self, client, superuser, hub_a, hub_b):
         client.force_login(superuser)
-        client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
-        client.get("/admin/hub/b/", HTTP_HOST=PLATFORM)
-        assert client.session[ADMIN_HUB_SESSION_KEY] == "b"
+        client.get(f"/admin/hub/{A.key}/", HTTP_HOST=PLATFORM)
+        client.get(f"/admin/hub/{B.key}/", HTTP_HOST=PLATFORM)
+        assert client.session[ADMIN_HUB_SESSION_KEY] == B.key
 
     def test_chooses_a_demo_too(self, client, superuser):
         # A demo (demo-<8 hex>) is a hub of the registry the staff may look into.
@@ -244,12 +252,12 @@ class TestDeepLink:
         assert client.get(f"/admin/hub/{slug}/", HTTP_HOST=PLATFORM).status_code == 404
         assert ADMIN_HUB_SESSION_KEY not in client.session
 
-    def test_on_a_hub_host_it_is_not_found_and_chooses_nothing(self, client, superuser, make_user):
+    def test_on_a_hub_host_it_is_not_found_and_chooses_nothing(self, client, superuser, make_user, hub_a):
         # The admin lives only on the platform host, even for the staff.
-        assert client.get("/admin/hub/a/", HTTP_HOST=HOST).status_code == 404
-        for user in (make_user("ana", host="a", role="hub_owner"), superuser):
+        assert client.get(f"/admin/hub/{A.key}/", HTTP_HOST=HOST).status_code == 404
+        for user in (make_user("ana", host=A.key, role="hub_owner"), superuser):
             client.force_login(user)
-            assert client.get("/admin/hub/a/", HTTP_HOST=HOST).status_code == 404
+            assert client.get(f"/admin/hub/{A.key}/", HTTP_HOST=HOST).status_code == 404
             assert ADMIN_HUB_SESSION_KEY not in client.session
 
     def test_the_banner_label_is_translated(self):

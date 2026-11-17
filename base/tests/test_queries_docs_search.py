@@ -12,18 +12,20 @@ route asks before the turn's transaction opens (``assistant.prepare``). erplora.
 import pytest
 from django.db import connections
 from live.assistant import is_tool
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import OperationError
 from live.operations import AI, get
 from pydantic import ValidationError
 
 from base import assistant
 from base.schemas import AssistantCallIn
-from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
+from base.tests.fake_gateway import gateway, signed
 
-pytestmark = pytest.mark.django_db
+__all__ = ["gateway", "in_business_a"]
 
-A = Scope("host", "a")
+pytestmark = HUB_DB
+
 DOCS = "/internal/assistant/docs/search"
 EXCERPT = {
     "source": "app_doc",
@@ -67,7 +69,7 @@ class TestTheOperation:
 
         assert found == {"results": [CITED]}
         [seen] = gateway.sent(DOCS)
-        assert seen.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
+        assert seen.body == {"hub": A.key, "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
         assert signed(seen)
 
     @pytest.mark.parametrize(("language", "asked"), [("en", "en"), ("es", "es"), ("es-ES", "es"), ("fr", "en")])
@@ -197,7 +199,7 @@ class TestPreparedBeforeTheTurn:
         assert gateway.requests == []
 
 
-@pytest.mark.django_db(transaction=True)
+@HUB_DB_COMMITTED
 def test_waiting_for_the_documentation_holds_no_transaction(gateway, monkeypatch):
     """Up to 15 s of waiting inside a transaction would hold the hub's connection, as for every door of
     the gateway (``test_services_assistant.test_waiting_for_erplora_com_holds_no_transaction``)."""

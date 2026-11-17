@@ -8,18 +8,20 @@ import datetime as dt
 import pytest
 from django.utils import timezone
 from live.assistant import description
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from base.models import EventDelivery, Hub
+from base.models import EventDelivery
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.routes import assert_bound
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+pytestmark = HUB_DB
+
 ADMIN = "base.administer_hub"
 
 
@@ -30,6 +32,8 @@ def run(name, *permissions, scope=A, language="en", **data):
 
 
 def event(scope=A, name="sale.sale.completed", at=None, taken=True):
+    """An event in the outbox of the business at work; one with another business's scope stands for a row no query of
+    this business may show."""
     at = at or timezone.now()
     return OutboxEvent.objects.create(
         scope_kind=scope.kind,
@@ -71,17 +75,17 @@ def test_the_status_says_the_release_and_where_the_data_lives(settings):
     assert run("base.system.status", ADMIN) == {
         "version": "4da2a10",
         "released_at": "2026-10-23T18:50:00Z",
-        # The suite's business on the one shared database (``db_name`` empty).
-        "shared_database": True,
+        # Business A on its own database.
+        "shared_database": False,
     }
 
 
-def test_a_hub_with_its_own_database_says_so(settings):
+def test_a_hub_with_its_own_database_says_so(settings, hub_b):
     settings.APP_VERSION, settings.APP_RELEASED_AT = "", ""
-    Hub.objects.filter(slug="b").update(db_name="hub_0190f3a4b5c67d8e9fa0b1c2d3e4f5a6")
 
-    assert run("base.system.status", ADMIN, scope=B)["shared_database"] is False
-    assert run("base.system.status", ADMIN)["shared_database"] is True
+    with use_hub(hub_b):
+        assert run("base.system.status", ADMIN, scope=B)["shared_database"] is False
+    assert run("base.system.status", ADMIN)["shared_database"] is False
 
 
 def test_without_a_release_it_runs_the_development_build_and_never_makes_up_a_date(settings):
@@ -202,7 +206,7 @@ def test_the_failed_events_of_this_hub_newest_first_with_what_failed():
 
 def test_one_failed_event_is_read_by_its_id_as_the_list_shows_it_and_only_this_hubs():
     """``base.failed_event.detail``, what names a failed event on the assistant's card: this hub's and still failed;
-    another hub's (the suite's businesses share the table) or one resent meanwhile is not there."""
+    another hub's or one resent meanwhile is not there."""
     mine = delivery(event())
     assert run("base.failed_event.detail", ADMIN, id=str(mine.id)) == run("base.failed_event.list", ADMIN)["items"][0]
     for other in (delivery(event(B)), delivery(event(), status=EventDelivery.Status.PENDING)):
@@ -260,9 +264,9 @@ def test_the_routes_are_bound_to_their_queries(path, operation):
 @pytest.mark.parametrize("path", ["/api/system/status", "/api/system/events", "/api/system/failed-events"])
 def test_a_cashier_is_refused_and_an_owner_is_answered(client, make_user, path):
     """A cashier never reads System: the errors of the events may carry customers' data."""
-    client.force_login(make_user("eva", host="a", role="hub_employee"))
-    refused = client.get(path, HTTP_HOST="a.localhost:8000")
+    client.force_login(make_user("eva", host=A.key, role="hub_employee"))
+    refused = client.get(path, HTTP_HOST=HOST)
     assert (refused.status_code, refused.json()["error"]["code"]) == (403, "permission_denied")
 
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
-    assert client.get(path, HTTP_HOST="a.localhost:8000").status_code == 200
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
+    assert client.get(path, HTTP_HOST=HOST).status_code == 200
