@@ -440,7 +440,7 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
             raise RuntimeError("database gone")
         return real(host, at)
 
-    monkeypatch.setattr(queries, "activations_stuck", broken)
+    monkeypatch.setattr(queries.apps, "activations_stuck", broken)
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert stuck_count(counted(now, never())) == 1.0
 
@@ -457,7 +457,7 @@ def test_a_business_never_read_that_cannot_be_read_counts_nothing(hub_a, hub_b, 
     def broken(host, at):
         raise RuntimeError("database gone")
 
-    monkeypatch.setattr(queries, "activations_stuck", broken)
+    monkeypatch.setattr(queries.apps, "activations_stuck", broken)
 
     assert stuck_count(StuckActivations()(timezone.now(), never())) == 0.0
 
