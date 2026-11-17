@@ -3774,7 +3774,8 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
 - **La puerta pública `/p/<slug>/<página>`** (`base/public_door.py`): las páginas sin sesión que una app da a los
   clientes del negocio, en el host de su hub. La app la pide en su `LiveAppConfig` con `public_pages = {"<página>":
-  "<permiso>"}`, un permiso suyo (uno de otra app, o que no declara, no abre nada: la puerta se lo da a cualquiera);
+  "<permiso>"}`, un permiso suyo (uno de otra app, o que no declara, no abre nada: la puerta se lo da a cualquiera; ni
+  una página que también da otra app; `base.E020` lo dice al arrancar);
   hoy, Reservas online (`{"book": "online_booking.public"}`). `GET /p/<slug>/<página>` es el HTML del shell
   (`base.spa.shell`), con el dinero del negocio en el bloque `public-door`, y la ruta de la app de ese camino pinta la
   página; `POST /p/<slug>/api/<operación>` corre en el proceso una operación de esa app que pide justo ese permiso,

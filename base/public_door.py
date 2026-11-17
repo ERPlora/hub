@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 import pydantic
 from django.conf import settings
+from django.core import checks
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST, require_safe
@@ -55,13 +56,48 @@ class Page:
 
 
 def pages() -> dict[str, Page]:
-    """Every page the installed apps give, by its path; one naming a permission not of its app's own is left out."""
-    given = {}
-    for config in all_live_app_configs():
-        for path, permission in getattr(config, PUBLIC_PAGES, {}).items():
-            if permission.startswith(f"{config.label}.") and permission in config.permissions:
-                given[path] = Page(config.label, permission)
-    return given
+    """Every page the installed apps give, by its path; what ``base.E020`` refuses is left out."""
+    return {
+        path: Page(config.label, permission)
+        for config in all_live_app_configs()
+        if not _problems(config)
+        for path, permission in getattr(config, PUBLIC_PAGES, {}).items()
+    }
+
+
+@checks.register("base")
+def check_public_pages(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E020``: an app declares in ``public_pages`` a dict of its pages, each with a permission of its own that
+    it declares, and no page another app gives."""
+    return [
+        checks.Error(
+            f"{config.label}'s {PUBLIC_PAGES} {problem}.",
+            hint=f'An app gives pages of its own: {PUBLIC_PAGES} = {{"<page>": "<label>.<permission>"}}.',
+            obj=config,
+            id="base.E020",
+        )
+        for config in all_live_app_configs()
+        for problem in _problems(config)
+    ]
+
+
+def _problems(config) -> list[str]:
+    """What is wrong with the pages ``config`` declares (none declared: nothing)."""
+    declared = getattr(config, PUBLIC_PAGES, {})
+    if not isinstance(declared, dict) or not all(isinstance(item, str) for pair in declared.items() for item in pair):
+        return ['is not a dict of "<page>": "<permission>"']
+    others = {
+        path: other.label
+        for other in all_live_app_configs()
+        if other is not config and isinstance(getattr(other, PUBLIC_PAGES, {}), dict)
+        for path in getattr(other, PUBLIC_PAGES, {})
+    }
+    problems = [
+        f"opens {path!r} with {permission!r}, not a permission of {config.label}'s own"
+        for path, permission in declared.items()
+        if not permission.startswith(f"{config.label}.") or permission not in config.permissions
+    ]
+    return problems + [f"gives {path!r}, and {others[path]} gives it too" for path in declared if path in others]
 
 
 @require_safe

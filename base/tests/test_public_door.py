@@ -13,6 +13,7 @@ import json
 
 import pytest
 from django.apps import apps
+from django.core import checks
 from django.test import Client
 
 from apps.appointment.models import Appointment
@@ -198,3 +199,38 @@ def test_a_call_is_posted_with_the_page_s_csrf_token(hub_a):
         f"/p/{A.key}/api/online_booking.public.page", "{}", content_type="application/json", HTTP_HOST=HOST
     )
     assert forged.status_code == 403
+
+
+# What an app declares, said at start (base.E020)
+
+
+def page_errors() -> list:
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E020"]
+
+
+def test_the_pages_of_every_app_are_sound():
+    assert page_errors() == []
+
+
+@pytest.mark.parametrize(
+    ("declared", "why"),
+    [
+        ({"steal": "online_booking.public"}, "not a permission of demo's own"),
+        ({"items": "demo.nothing"}, "not a permission of demo's own"),
+        ({"book": "demo.view"}, "online_booking gives it too"),
+        (["items"], "is not a dict"),
+        ({"items": None}, "is not a dict"),
+    ],
+)
+def test_a_page_that_opens_nothing_is_said_at_start(monkeypatch, declared, why):
+    # Such a page is left out, or hides another's: nobody would see why its address is not found.
+    monkeypatch.setattr(apps.get_app_config("demo"), "public_pages", declared, raising=False)
+    errors = [error for error in page_errors() if error.obj.label == "demo"]
+    assert len(errors) == 1
+    assert why in errors[0].msg
+
+
+def test_a_page_two_apps_give_is_nobody_s(client, monkeypatch):
+    # Which app's it is would hang on the order they are installed in: neither opens it.
+    monkeypatch.setattr(apps.get_app_config("demo"), "public_pages", {"book": "demo.view"}, raising=False)
+    assert client.get(PAGE, HTTP_HOST=HOST).status_code == 404
