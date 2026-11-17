@@ -433,7 +433,7 @@ def test_a_business_that_cannot_be_read_keeps_its_last_count_and_is_logged(hub_a
     waiting(hub_a, "website", activation.FAILED, now)
     counted = StuckActivations()
     assert stuck_count(counted(now, never())) == 1.0
-    real = queries.activations_stuck
+    real = queries.apps.activations_stuck
 
     def broken(host, at):
         if host == hub_a.slug:

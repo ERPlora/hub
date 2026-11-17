@@ -1063,10 +1063,10 @@ def test_an_api_key_cannot_be_given_an_app_off(django_capture_on_commit_callback
     from base import queries
 
     set_rows(task="on*", staff="on", customer="on*")
-    assert "task" in {app["id"] for app in queries.api_apps(ctx())}
+    assert "task" in {app["id"] for app in queries.api_keys.api_apps(ctx())}
     with django_capture_on_commit_callbacks(execute=True, using=current_alias()):  # its COMMIT forgets the cache
         disable("task")
-    assert "task" not in {app["id"] for app in queries.api_apps(ctx())}
+    assert "task" not in {app["id"] for app in queries.api_keys.api_apps(ctx())}
 
 
 # ── The Apps screen ─────────────────────────────────────────────────────────────────────────────────────────

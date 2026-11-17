@@ -24,7 +24,7 @@ from live.outbox import channel_for
 
 from base import events, files
 from base.models import Hub
-from base.queries import refuse_past_the_plans_space
+from base.queries.files import refuse_past_the_plans_space
 from base.storage import hub_prefix
 from base.tests.routes import assert_bound, spa_route_map
 from base.tests.test_queries_home import listen, received

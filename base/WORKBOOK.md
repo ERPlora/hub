@@ -3312,7 +3312,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `activation.disabling` nunca apaga en cascada (ni lo que necesitan: siguen queriéndolo) y a las que
   `activation.refusals` da el motivo de `base` (`MANDATORY_OFF`, con el nombre de la app y el del país en el idioma
   de quien pregunta) cuando la app no da uno propio (VeriFactu da el suyo, VERIFACTU-F32). `base.app.disable` y
-  `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.app_off_refusal` pone el motivo
+  `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.apps.app_off_refusal` pone el motivo
   propio de la app por delante del de las que la necesitan, porque desactivarlas no la apagaría. `base.app.list` trae
   `mandatory` por app y `country_name` (CLDR, `business.country_name`), y Apps pinta «Obligatoria en {país}» con un
   `StatusPill` de `@erplora/ui` junto al estado; `lib/apps.ts` `goesOffWith` deja fuera la obligatoria encendida,
@@ -3325,7 +3325,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (cuyos bloques son de las apps encendidas), `services.turn_on_born_apps` escribe todas las filas del negocio: esas
   `on` y sin elegir (no gastan `max_apps`), las demás `off`, y olvida lo que la caché guardaba de sus apps. Si la semilla
   ya escribió filas (los hubs locales `a` y `b`, todo encendido) o la preparación se repite, no toca nada. Una demo
-  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries._platform_steps`) no cuenta
+  nace igual (sin país: España). Los hubs que ya existían no cambian. «Tus apps» (`queries.home._platform_steps`) no cuenta
   las de `born_apps`: con ellas solas el TPV no vende nada. Tests: `test_activation.py`, `test_queries_home.py` (con
   apps de paja), `base/tenancy/tests/test_provision.py` (dos BD reales: España, Portugal, sin país, una demo, dos
   negocios a la vez y una app de paja obligatoria solo en Portugal), `apps/tax/tests/test_apps.py` y la e2e
@@ -3464,7 +3464,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   viva con la foto): `plan.max_users`/`max_devices` de la foto (0 = sin tope) frente a las `Membership` activas del
   host; los dispositivos, sin cuenta. Tests: `base/tests/test_queries_apps.py`.
 - `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
-  `app`, como la dice la persona (`queries.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
+  `app`, como la dice la persona (`queries.apps.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
   del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
   palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide) y `state` como lo
   dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
@@ -3477,7 +3477,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   `test_app_activation_tables.py` y `test_api.py`.
 - «Uso y plan» (BASE-F40, hub#603). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
-  estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries._plan_motives`, sin
+  estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries.usage._plan_motives`, sin
   preguntar a erplora.com, con los mismos umbrales. Una app dice qué incluye su plan declarando `plan_meter` en su
   `LiveAppConfig` (`home.plan_meters`, comprobado por `base.E013`): `base` no lee tablas de otra app. `base/meter.py`
   cuenta en la memoria de cada proceso que atiende peticiones y lo vuelca cada 60 s y al salir
@@ -3650,13 +3650,13 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   misma ranura. Sin eso el clúster rechazaba la lectura (`CROSSSLOT`), el freno se apartaba y el pinpad aceptó
   nueve PIN erróneos seguidos en producción (hub#440).
 - `way_in` (sin sesión, pidiendo HTML): al Acceso (`/login`) si el dispositivo ofrece el pinpad
-  (`queries.pin_door_open`), con `notice=ended` si llegó la cookie de una sesión que ya no existe, o si otra entrada
+  (`queries.access.pin_door_open`), con `notice=ended` si llegó la cookie de una sesión que ya no existe, o si otra entrada
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
   mientras su sesión vive (BASE-F13, `tests/e2e/helpers-login-hub-session.spec.ts`). `/auth/logout` en una caja con
   pinpad vuelve a `/login`.
 - Operaciones (`base/queries/`, `base/services/`; rutas en `base/api.py` y `frontend/generated/operations.json`):
   `base.access.door` (sin sesión: la cookie decide; nunca da caras a quien el PIN no dejaría entrar, ni correos:
-  `queries.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
+  `queries.people.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
   `base.device.mode_set`, `base.device.list|rename|remove|prune` y `base.access.settings|settings_update`
   (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (la foto, en
@@ -3709,7 +3709,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   (gh:hub#2538, #2539); la cuenta abierta de Ventas la recuerda su app (`useCurrentCheck`). Guardar el nombre en Mi
   perfil llama a `sessionChanged()` (`lib/access.ts`) y `frontend/main.ts` vuelve a leer `base.session.me`, que es la
   sesión que pinta el shell (el menú lateral); si esa lectura falla, se queda la que había.
-- «Uso y plan» (BASE-F40, `queries.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F57
+- «Uso y plan» (BASE-F40, `queries.usage.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F57
   (`services._end_other_devices`): los `device_id` distintos de las sesiones vivas del host (`SessionOwner`).
 - `TrustedDevice`, `Credential`, `AccessSettings` y `Profile` viven en la BD de cada negocio, y no hay ninguno en una
   compartida: la lista de dispositivos, el dial y «Quitar» son de ese negocio. Las caras y los PIN se
@@ -3740,7 +3740,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   es el de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
-  `base.queries.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
+  `base.queries.files.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
   409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app.
   Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
@@ -4017,7 +4017,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
   arrancar: orden de la propia app que su `approvals` nombra, campos que existen en su entrada, `percent` de un
   número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`) y
   Ventas (los descuentos y el cobro por encima del máximo de SALE-F14, y el precio libre de SALE-F09).
-  `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.pin_owner`,
+  `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.access.pin_owner`,
   `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
   pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`
   añade ese permiso a esa llamada y el pase se gasta en la transacción de la propia orden: `LIVE["operation_database"]`

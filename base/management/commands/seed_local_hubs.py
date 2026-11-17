@@ -20,7 +20,7 @@ from django.core.management.base import BaseCommand, CommandError
 from live.context import system_context
 
 from base.services import hub_registry, provisioning
-from base.queries import hubs_by_slugs
+from base.queries.hubs import hubs_by_slugs
 from base.registry import REGISTRY_SCOPE
 from base.schemas import HubsBySlugIn, HubSeedLocalIn
 from base.services.hub_registry import hub_seed_local

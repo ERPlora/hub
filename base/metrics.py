@@ -205,7 +205,7 @@ class FiscalBacklog(HubReadings):
 
 class StuckActivations(HubReadings):
     """``ERPlora/Hubs`` ``AppsActivationStuck``: how many apps of every ready business are stuck turning on
-    (``base.queries.activations_stuck``: waiting for their tables for more than 10 minutes, or failed), each
+    (``base.queries.apps.activations_stuck``: waiting for their tables for more than 10 minutes, or failed), each
     business read in its own database; 0 when none is. Only the ready ones: a business that left
     keeps its database for its fiscal records, and nobody waits there for an app. A business that cannot be read counts
     nothing until it is read: the fiscal backlog already pages for it."""
@@ -216,7 +216,7 @@ class StuckActivations(HubReadings):
         return [hub for hub in super().hubs(now) if hub.status == Hub.Status.READY]
 
     def read(self, hub, now: dt.datetime) -> int:
-        return queries.activations_stuck(hub.slug, now)
+        return queries.apps.activations_stuck(hub.slug, now)
 
     def metrics(self, readings: list, now: dt.datetime) -> list[Metric]:
         return [Metric(HUBS_NAMESPACE, "AppsActivationStuck", float(sum(readings)), "Count")]
