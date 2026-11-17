@@ -12,6 +12,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
+import DiagnosticRouteRow from '../components/DiagnosticRouteRow.vue';
 import SettingsSendingRoute from '../components/SettingsSendingRoute.vue';
 import { useLocale, useT } from '../composables/useT';
 import { environmentTone } from '../lib/record';
@@ -40,6 +41,7 @@ const result = computed(() => fresh.value ?? last.value?.result ?? null);
 const busy = computed(() => update.pending.value || goLive.pending.value || back.pending.value || diagnose.pending.value || testInvoice.pending.value);
 const outsideSpain = computed(() => !!config.value?.live_blockers.some((reason) => reason.code === 'outside_spain'));
 const routeAvailable = computed(() => config.value?.erplora_route_available ?? true);
+const diagnosticRoute = computed(() => ({ route: result.value?.route, available: routeAvailable.value }));
 const ownCertificateValid = computed(() => {
   const cert = config.value?.own_certificate;
   return !!cert?.loaded && (cert.expires_in_days === null || cert.expires_in_days >= 0);
@@ -345,8 +347,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           <dl class="verifactu-settings__fields">
             <dt>{{ $t('verifactu.settings.ranAt') }}</dt>
             <dd>{{ formatDateTime(result.ran_at, locale) }}</dd>
-            <dt>{{ $t('verifactu.settings.route') }}</dt>
-            <dd>{{ !config.erplora_route_available || result.route === 'own' ? $t('verifactu.config.own') : $t('verifactu.config.erplora') }}</dd>
+            <DiagnosticRouteRow :diagnostic="diagnosticRoute" />
             <dt>{{ $t('verifactu.filters.environment') }}</dt>
             <dd>{{ $t(`verifactu.env.${result.environment}`) }}</dd>
             <dt>{{ $t('verifactu.settings.gateway') }}</dt>
