@@ -38,14 +38,15 @@ from ninja import Schema
 from apps.printing.models import PrintJob
 from base import ws_print
 from base.models import Hub, Membership
+from base.tenancy.tests.business import A, B, HUB_DB_COMMITTED, in_business_a
+from base.tests.businesses import in_each, inside, scopes_of, without_a_business
 from config.asgi import application
 
-pytestmark = pytest.mark.django_db(transaction=True)
+__all__ = ["in_business_a"]
+pytestmark = HUB_DB_COMMITTED
 
-HUB_HOST = "a.localhost:8000"
-OTHER_HOST = "b.localhost:8000"
-A = Scope("host", "a")
-B = Scope("host", "b")
+HUB_HOST = f"{A.key}.localhost:8000"
+OTHER_HOST = f"{B.key}.localhost:8000"
 #: How long a test waits for a frame that should come; one that must not come is waited for this long too.
 WAIT = 5.0
 QUIET = 1.0
@@ -97,7 +98,7 @@ class Socket:
 
     async def connect(self) -> dict:
         """Open the socket; the application's first answer (``websocket.accept`` or ``websocket.close``)."""
-        self.task = asyncio.create_task(application(self.scope, self.inbox.get, self.outbox.put))
+        self.task = without_a_business(application(self.scope, self.inbox.get, self.outbox.put))
         await self.inbox.put({"type": "websocket.connect"})
         return await self._next()
 
@@ -208,7 +209,7 @@ async def handled_until(results: asyncio.Queue, check: Callable[[set[str]], bool
 def session(django_user_model):
     """The Hub's session cookie of a new user with ``role`` on ``host`` (``None``: no membership)."""
 
-    def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.OWNER) -> str:
+    def make(username: str = "ana", *, host: str | None = A.key, role: str = Membership.Role.OWNER) -> str:
         user = django_user_model.objects.create_user(username=username, password="pw")
         if host is not None:
             Membership.objects.create(user=user, host=host, role=role)
@@ -286,6 +287,20 @@ async def ready_socket(sockets, cookie: str, printers: list[str], host: str = HU
     return socket
 
 
+async def refused_at_hello(sockets, cookie: str) -> dict:
+    """The frame that refuses the hello of the till's device with ``cookie`` while a job waits: the socket is closed
+    4403 and the job still waits."""
+    till = await db(printer)
+    job = await db(enqueue, till)
+    socket = sockets(cookie=cookie)
+    await socket.connect()
+    frame = await socket.hello("till-1", [till])
+    assert frame["type"] == "error", frame
+    assert await socket.closed() == 4403
+    assert await db(status_of, job.id) == "pending"
+    return frame
+
+
 # ── The handshake ─────────────────────────────────────────────────────────────────────────────────
 
 
@@ -308,7 +323,7 @@ async def test_the_handshake_is_accepted_and_hello_answers_ready(sockets, sessio
 
 async def test_a_foreign_origin_is_refused_before_the_handshake(sockets, session):
     cookie = await db(session)
-    for origin in ("http://evil.example", "http://b.localhost:8000", None):
+    for origin in ("http://evil.example", f"http://{OTHER_HOST}", None):
         socket = sockets(cookie=cookie, origin=origin)
         first = await socket.connect()
         assert first["type"] == "websocket.close", f"{origin!r} was let in"
@@ -339,14 +354,13 @@ async def test_a_host_that_is_no_hub_closes_the_socket_with_its_code(sockets, ho
 
 async def test_a_suspended_business_closes_the_socket_with_its_402(sockets):
     # The SaaS's photo says suspended for an unpaid invoice (base.middleware): the print host hears why and is closed.
-    await db(Hub.objects.create, slug="late", status=Hub.Status.READY, state={"status": "suspended"})
-    socket = sockets("late.localhost:8000")
+    await db(Hub.objects.filter(slug=A.key).update, state={"status": "suspended"})
+    socket = sockets(HUB_HOST)
 
     assert (await socket.connect())["type"] == "websocket.accept"
     frame = await socket.receive()
     assert frame["type"] == "error" and frame["code"] == "base.hub_suspended"
     assert await socket.closed() == 4402
-
 
 
 @pytest.mark.parametrize(
@@ -364,7 +378,7 @@ async def test_a_business_that_stops_serving_while_the_socket_is_open_closes_it_
     cookie = await db(session)
     till = await db(printer)
     socket = await ready_socket(sockets, cookie, [till])
-    await db(Hub.objects.filter(slug="a").update, **change)
+    await db(Hub.objects.filter(slug=A.key).update, **change)
 
     await socket.send({"type": "beat"})
 
@@ -379,7 +393,7 @@ async def test_the_wake_of_a_business_suspended_while_the_socket_is_open_closes_
     cookie = await db(session)
     till = await db(printer)
     socket = await ready_socket(sockets, cookie, [till])
-    await db(Hub.objects.filter(slug="a").update, state={"status": "suspended"})
+    await db(Hub.objects.filter(slug=A.key).update, state={"status": "suspended"})
 
     await db(enqueue, till)
 
@@ -406,16 +420,16 @@ async def test_hello_without_a_session_is_refused_and_the_socket_closed(sockets)
     assert await bogus.closed() == 4401
 
 
-async def test_a_session_opened_on_another_hub_is_no_session_here_even_for_a_member_of_both(sockets, django_user_model):
+async def test_a_session_opened_on_another_hub_is_no_session_here_even_for_a_member_of_both(sockets, django_user_model, hub_b):
     """The session notes the host it was opened on (``base.middleware.SessionHostMiddleware``); the print
     socket reads the session itself, so it applies the same rule: B's session on A's socket is 4401."""
 
     def opened_on_b() -> str:
         user = django_user_model.objects.create_user(username="bea", password="pw")
-        for host in ("a", "b"):
+        for host in (A.key, B.key):
             Membership.objects.create(user=user, host=host, role=Membership.Role.OWNER)
         request = RequestFactory().get("/auth/callback")
-        request.session, request.hub = SessionStore(), Hub.objects.get(slug="b")
+        request.session, request.hub = SessionStore(), hub_b
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         request.session.save()
         return request.session.session_key
@@ -432,17 +446,9 @@ async def test_a_session_opened_on_another_hub_is_no_session_here_even_for_a_mem
 
 
 async def test_a_session_of_another_hub_drains_nothing_here(sockets, session):
-    cookie = await db(session, "bea", host="b")
-    till = await db(printer)
-    job = await db(enqueue, till)
-    socket = sockets(cookie=cookie)
-    await socket.connect()
+    frame = await refused_at_hello(sockets, await db(session, "bea", host=B.key))
 
-    frame = await socket.hello("till-1", [till])
-
-    assert frame["type"] == "error" and frame["code"] == "permission_denied"
-    assert await socket.closed() == 4403
-    assert await db(status_of, job.id) == "pending"
+    assert frame["code"] == "permission_denied"
 
 
 async def test_a_session_that_ends_closes_the_socket_at_its_next_frame(sockets, session):
@@ -559,17 +565,9 @@ async def test_hello_of_a_device_nobody_set_up_is_refused_at_once(sockets, sessi
     """A device nobody set up in printing is no print host here, whatever printers it names: it is told at its
     hello (the old hub's ``print.host_not_registered``, a refusal it does not retry), not with a ``ready`` and then
     a ``printing.device_not_registered`` at every claim."""
-    cookie = await db(session, "eva", role=Membership.Role.EMPLOYEE)
-    till = await db(printer)
-    job = await db(enqueue, till)
-    socket = sockets(cookie=cookie)
-    await socket.connect()
+    frame = await refused_at_hello(sockets, await db(session, "eva", role=Membership.Role.EMPLOYEE))
 
-    frame = await socket.hello("till-1", [till])
-
-    assert frame["type"] == "error" and frame["code"] == "print.host_not_registered", frame
-    assert await socket.closed() == 4403
-    assert await db(status_of, job.id) == "pending"
+    assert frame["code"] == "print.host_not_registered", frame
     assert await db(registered_printers, "till-1") is None, "a refused hello set the device up"
 
     owners = await db(session, "ana")
@@ -1043,11 +1041,10 @@ def test_one_app_at_most_declares_the_presence(monkeypatch, presence):
 # ── The nudge ─────────────────────────────────────────────────────────────────────────────────────
 
 
-async def test_a_job_queued_after_the_commit_wakes_the_device_of_its_hub_and_no_other(sockets, session):
-    cookie_a = await db(session, "ana", host="a")
-    cookie_b = await db(session, "bea", host="b")
+async def test_a_job_queued_after_the_commit_wakes_the_device_of_its_hub_and_no_other(sockets, session, hub_b):
+    cookie_a, cookie_b = await db(session, "ana"), await db(session, "bea", host=B.key)
     till_a = await db(printer, "Till A", scope=A)
-    till_b = await db(printer, "Till B", scope=B)
+    till_b = await db(inside, hub_b, printer, "Till B", scope=B)
     in_a = await ready_socket(sockets, cookie_a, [till_a], HUB_HOST)
     in_b = await ready_socket(sockets, cookie_b, [till_b], OTHER_HOST, device_id="till-b")
 
@@ -1056,9 +1053,10 @@ async def test_a_job_queued_after_the_commit_wakes_the_device_of_its_hub_and_no_
     assert await in_a.receive() == {"type": "wake", "role": "receipt"}
     assert await in_b.silent(), "a job of hub A woke a device of hub B"
 
-    await db(enqueue, till_b, scope=B)
+    await db(inside, hub_b, enqueue, till_b, scope=B)
     assert await in_b.receive() == {"type": "wake", "role": "receipt"}
     assert await in_a.silent(), "a job of hub B woke a device of hub A"
+    assert await db(in_each, lambda _: scopes_of("printing.job.queued"), hub_b) == ([(A.kind, A.key)], [(B.kind, B.key)])
 
 
 async def test_a_claim_that_empties_the_queue_wakes_nobody(sockets, session):
