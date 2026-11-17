@@ -10,7 +10,8 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { formatSize } from '../../base/frontend/lib/files';
 import { A, api, B, capture, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
-import { toastSaying, toasts } from './toast-helpers';
+import { readableToasts, toastSaying } from './toast-helpers';
+import { discardChanges } from './unsaved-back-helpers';
 
 /** The real files of the preview's unit tests (hub#578): a JSON, an .xlsx of two sheets and a .docx written by an
  *  office suite, whose text carries `<script>` and `onerror` as words. */
@@ -94,16 +95,6 @@ const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${
 const item = (page: Page, path: string) => shown(page).locator(`[data-item="${path}"]`);
 const dialog = (page: Page, id: string) => page.locator(`ion-modal[data-testid="${id}"]`);
 
-/** The messages of the notices painted on screen now: a toast not faded out whose content is not hidden behind the front. */
-function paintedNotices(page: Page): Promise<string[]> {
-  return toasts(page).evaluateAll((all) =>
-    all
-      .filter((t) => getComputedStyle(t).opacity !== '0')
-      .filter((t) => getComputedStyle(t.firstElementChild ?? t).opacity !== '0')
-      .map((t) => (t as HTMLElement).innerText.trim()),
-  );
-}
-
 /** Opens the actions of `path` and picks `action` (`open`, `download`, `rename`, `move`, `delete`). */
 async function act(page: Page, path: string, action: string): Promise<void> {
   await item(page, path).locator('[data-testid="files-item-actions"]').click();
@@ -166,7 +157,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const folderDialog = dialog(page, 'files-new-folder-dialog');
       await expect(folderDialog).toBeVisible();
       await folderDialog.locator('[data-testid="files-new-folder-name"] input').fill('Invoices');
-      await folderDialog.locator('[data-testid="files-new-folder-dialog-submit"]').click();
+      await folderDialog.locator('[data-testid="files-new-folder-name"] input').press('Enter');
       await expect(toastSaying(page, 'Folder created.')).toBeVisible();
       await expect(item(page, 'Invoices')).toHaveAttribute('data-kind', 'folder');
 
@@ -287,7 +278,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // What is painted with the pointer off the stack (over it, the stack opens into a list): one notice, the last;
       // the one before waits behind it with its words hidden, never showing through.
       await page.mouse.move(0, 0);
-      await expect.poll(() => paintedNotices(page)).toEqual(['Files uploaded.']);
+      await expect.poll(() => readableToasts(page)).toEqual(['Files uploaded.']);
       await expect(kept).toBeInViewport({ ratio: 1 });
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-notices-${width}`) });
@@ -299,7 +290,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         { name: 'virus.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') },
       ]);
       const both = "Files uploaded. Could not upload “virus.exe”: Programs (.exe) can't be kept in Files: they could harm whoever opens them.";
-      await expect.poll(() => paintedNotices(page)).toEqual([both]);
+      await expect.poll(() => readableToasts(page)).toEqual([both]);
       await expect(toastSaying(page, both)).toBeInViewport({ ratio: 1 });
       await page.mouse.move(0, 0);
       await untilStill(page);
@@ -470,7 +461,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(renameDialog.locator('[data-testid="files-rename-dialog-error"]')).toContainText(
         'There is already a file or folder with that name here.',
       );
+      // «Cancel» with what was typed asks first, and the person discards it.
       await renameDialog.locator('[data-testid="files-rename-dialog-cancel"]').click();
+      await discardChanges(page);
 
       // Moved into a folder; the notice names it.
       await act(page, 'april.txt', 'move');

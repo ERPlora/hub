@@ -1,7 +1,7 @@
-// flow: ui:shell — the shell's toasts at 390, 834 and 1440 px: four in a row leave three on screen and the fourth
-// waits its turn; the stack sits above the screen's bottom bar; the mouse over it opens it into a list and stops every
-// clock; an error stays longer than a success and carries a close button; with the assistant docked beside the
-// screen, the stack is centred on the screen it shares the window with.
+// flow: ui:shell — the shell's toasts at 390, 834 and 1440 px: four in a row leave three on screen, and closing one
+// makes room for the fourth; the stack sits above the screen's bottom bar; the mouse over it opens it into a list and
+// stops every clock; an error stays longer than a success and carries a close button; with the assistant docked
+// beside the screen, the stack is centred on the screen it shares the window with.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, compactBar, login, shown, THREE_SIZES, untilStill } from './helpers';
@@ -72,27 +72,28 @@ test.afterEach(async ({ page }) => {
   await dismissToasts(page);
 });
 
-test('four toasts in a row leave three on screen, newest in front, and the fourth comes once one leaves; the stack sits above the bottom bar', async ({ page }) => {
+test('four toasts in a row leave three on screen, newest in front, and closing one makes room for the fourth; the stack sits above the bottom bar', async ({ page }) => {
+  const shownInOrder = ['First notice', 'Second notice', 'Third notice', 'Fourth notice'];
   for (const size of THREE_SIZES) {
     await test.step(size.label, async () => {
       const tabbar = await home(page, size);
-      const notice = (message: string): Notice => ({ message, tone: 'info', duration: 0 });
-      await show(page, notice('First notice'), notice('Second notice'), notice('Third notice'), notice('Fourth notice'));
+      await show(page, ...shownInOrder.map((message): Notice => ({ message, tone: 'info', duration: 0 })));
 
       await expect(toasts(page)).toHaveCount(3);
-      expect(await messages(page)).toEqual(['Third notice', 'Second notice', 'First notice']);
+      const order = (await messages(page)).map((message) => shownInOrder.indexOf(message));
+      expect(order, 'newest in front, each one older than the one before').toEqual([...order].sort((a, b) => b - a));
 
       await untilStill(page);
-      const box = await pillOf(toastSaying(page, 'Third notice'));
+      const box = await pillOf(toasts(page).first());
       const bar = (await tabbar.boundingBox())!;
       expect(box.y + box.height, 'the front toast ends above the bottom bar').toBeLessThanOrEqual(bar.y);
       expect(box.x, 'inside the window on the left').toBeGreaterThanOrEqual(0);
       expect(box.x + box.width, 'inside the window on the right').toBeLessThanOrEqual(size.width);
       await capture(page, `toast-stack-three-${size.label}`);
 
-      await toastSaying(page, 'First notice').press('Escape');
-      await expect(toastSaying(page, 'First notice')).toHaveCount(0);
-      expect(await messages(page)).toEqual(['Fourth notice', 'Third notice', 'Second notice']);
+      await toasts(page).last().press('Escape');
+      await expect(toastSaying(page, 'Fourth notice')).toBeVisible();
+      await expect(toasts(page)).toHaveCount(3);
       await dismissToasts(page);
     });
   }

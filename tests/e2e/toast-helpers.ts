@@ -19,6 +19,16 @@ export const toastWithId = (scope: Scope, id: string): Locator => scope.locator(
 export const newestToast = (scope: Scope): Locator =>
   scope.locator(`[data-testid="toast-stack"][data-position="bottom"] ${TOAST}`).first();
 
+/** What a person can read on screen now: each toast not faded out whose words are not hidden behind the front one. */
+export function readableToasts(page: Page): Promise<string[]> {
+  return toasts(page).evaluateAll((all) =>
+    all
+      .filter((t) => getComputedStyle(t).opacity !== '0')
+      .filter((t) => getComputedStyle(t.firstElementChild ?? t).opacity !== '0')
+      .map((t) => (t as HTMLElement).innerText.trim()),
+  );
+}
+
 /** The id of the first toast on screen; `null` with none. */
 const firstId = async (all: Locator): Promise<string | null> => ((await all.count()) > 0 ? all.first().getAttribute('data-toast-id') : null);
 

@@ -18,7 +18,7 @@ import {
   searchList,
   spanishMobile,
 } from './customer-helpers';
-import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown, usernamesOf } from './helpers';
 import { toastSaying } from './toast-helpers';
 
 const OWNER_PIN = '2468';
@@ -28,8 +28,8 @@ test.describe.configure({ mode: 'serial' });
 let owner: { context: BrowserContext; page: Page };
 let employee: { context: BrowserContext; page: Page };
 
-/** Every account of `email` in this hub's database: the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => `SELECT username FROM auth_user WHERE email = '${email}'`;
+/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
+const accountsOf = (email: string): string => usernamesOf(email);
 
 /** No PIN of the owner's left behind, in any of their accounts, and no approval of a Customers action. */
 function forgetThePinAndTheApprovals(): void {
