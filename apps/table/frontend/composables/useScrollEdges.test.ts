@@ -1,17 +1,19 @@
-// `useScrollEdges(el)`: which edges of a sideways scroller have something behind them, so each one fades out
-// (a hard cut reads «nothing more»). Measured when the scroller appears, on its scroll, and when
-// it or what it holds is resized; `mark()` measures again on demand (new content of the same size).
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
 import { useScrollEdges } from './useScrollEdges';
 
-/** Gives `el` the box of a scroller `client` px wide holding `scroll` px, scrolled to `left`. */
 function box(el: Element, client: number, scroll: number, left = 0): void {
   Object.defineProperty(el, 'clientWidth', { configurable: true, value: client });
   Object.defineProperty(el, 'scrollWidth', { configurable: true, value: scroll });
   Object.defineProperty(el, 'scrollLeft', { configurable: true, writable: true, value: left });
+}
+
+function height(el: Element, client: number, scroll: number, top = 0): void {
+  Object.defineProperty(el, 'clientHeight', { configurable: true, value: client });
+  Object.defineProperty(el, 'scrollHeight', { configurable: true, value: scroll });
+  Object.defineProperty(el, 'scrollTop', { configurable: true, writable: true, value: top });
 }
 
 async function setup(shown = true) {
@@ -28,8 +30,9 @@ async function setup(shown = true) {
   const wrapper = mount(Host);
   await nextTick();
   const strip = () => wrapper.find('[data-testid="strip"]').element;
-  const scroll = async (left: number) => {
+  const scroll = async (left: number, top = 0) => {
     Object.defineProperty(strip(), 'scrollLeft', { configurable: true, writable: true, value: left });
+    Object.defineProperty(strip(), 'scrollTop', { configurable: true, writable: true, value: top });
     strip().dispatchEvent(new Event('scroll'));
     await nextTick();
   };
@@ -37,35 +40,47 @@ async function setup(shown = true) {
 }
 
 describe('useScrollEdges', () => {
-  it('fades the edges with something behind them as the scroller moves', async () => {
+  it('marks the horizontal edges with something behind them as the scroller moves', async () => {
     const s = await setup();
     box(s.strip(), 300, 700);
     s.mark();
-    expect(s.edges()).toEqual({ left: false, right: true });
+    expect(s.edges()).toEqual({ left: false, right: true, top: false, bottom: false });
     await s.scroll(200);
-    expect(s.edges()).toEqual({ left: true, right: true });
+    expect(s.edges()).toEqual({ left: true, right: true, top: false, bottom: false });
     await s.scroll(400);
-    expect(s.edges()).toEqual({ left: true, right: false });
+    expect(s.edges()).toEqual({ left: true, right: false, top: false, bottom: false });
+  });
+
+  it('marks the vertical edges with something behind them', async () => {
+    const s = await setup();
+    height(s.strip(), 300, 700);
+    s.mark();
+    expect(s.edges()).toEqual({ left: false, right: false, top: false, bottom: true });
+    await s.scroll(0, 200);
+    expect(s.edges()).toEqual({ left: false, right: false, top: true, bottom: true });
+    await s.scroll(0, 400);
+    expect(s.edges()).toEqual({ left: false, right: false, top: true, bottom: false });
   });
 
   it('fades nothing when everything fits', async () => {
     const s = await setup();
     box(s.strip(), 300, 300);
+    height(s.strip(), 300, 300);
     s.mark();
-    expect(s.edges()).toEqual({ left: false, right: false });
+    expect(s.edges()).toEqual({ left: false, right: false, top: false, bottom: false });
   });
 
-  it('follows a scroller that appears later (the zones arrive after the page)', async () => {
+  it('follows a scroller that appears later', async () => {
     const s = await setup(false);
-    expect(s.edges()).toEqual({ left: false, right: false });
+    expect(s.edges()).toEqual({ left: false, right: false, top: false, bottom: false });
     s.visible.value = true;
     await nextTick();
     box(s.strip(), 300, 700);
     await s.scroll(400);
-    expect(s.edges()).toEqual({ left: true, right: false });
+    expect(s.edges()).toEqual({ left: true, right: false, top: false, bottom: false });
   });
 
-  it('measures again when the scroller or what it holds is resized, and lets both go with the screen', async () => {
+  it('measures again when the scroller or its content is resized, and disconnects', async () => {
     const seen: string[] = [];
     let resized = () => {};
     class FakeObserver {
@@ -86,7 +101,7 @@ describe('useScrollEdges', () => {
       expect(seen).toEqual(['observe strip', 'observe inner']);
       box(s.strip(), 300, 700);
       resized();
-      expect(s.edges()).toEqual({ left: false, right: true });
+      expect(s.edges()).toEqual({ left: false, right: true, top: false, bottom: false });
       s.wrapper.unmount();
       expect(seen.at(-1)).toBe('disconnect');
     } finally {
@@ -103,6 +118,6 @@ describe('useScrollEdges', () => {
     Object.defineProperty(strip, 'scrollLeft', { configurable: true, writable: true, value: 400 });
     strip.dispatchEvent(new Event('scroll'));
     await nextTick();
-    expect(s.edges()).toEqual({ left: false, right: true });
+    expect(s.edges()).toEqual({ left: false, right: true, top: false, bottom: false });
   });
 });
