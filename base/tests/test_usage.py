@@ -22,7 +22,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.test import Client
 from django.utils import timezone
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.context import OperationContext, Scope
 from live.operations import get
@@ -327,7 +327,7 @@ def test_a_page_reads_the_day_s_activity_in_one_query(measured_night):
     op = get("base.usage.list")
     ctx = OperationContext(scope=Scope("platform", "platform"), actor="system", permissions=frozenset({"*"}))
 
-    with CaptureQueriesContext(connection) as queries:
+    with CaptureQueriesContext(connections["default"]) as queries:
         op(ctx, op.input(day=DAY))
 
     assert sum('"control_hubactivitydaily"' in query["sql"] for query in queries) == 1
