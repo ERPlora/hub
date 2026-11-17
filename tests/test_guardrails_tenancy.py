@@ -6,8 +6,8 @@ scanning they share (``source_files``, ``_offenders``), are ``tests/test_guardra
     imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside ``live.broker``; the old shared
     database (``use_shared_database``) is gone and nobody brings it back; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
     (``live.operations.on_commit``); no migration of ``base/`` or ``apps/`` asks the router whether a model migrates
-    (a ``RunPython``'s hints choose its database); no test counts queries on
-    control's database without naming it (a business's reads go to its own).
+    (a ``RunPython``'s hints choose its database); no test counts queries on control's database without naming it
+    (a business's reads go to its own).
 (g) Operations that need the hub's own database: a business that still shares control's (``db_name=""``, not cut
     yet) is not served at all. Each of them asked at its host, even by its administrator, answers 503 maintenance
     having read nothing of any business, only its row in control's registry; an API key there is refused alike

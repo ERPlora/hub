@@ -371,8 +371,6 @@ class HubDatabaseMiddleware:
             if hub is None:
                 return _CONTROL
         if hub is not None:
-            if not hub.db_name:
-                raise tenancy_context.HubWithoutDatabase(f"{hub.slug} has no database of its own yet.")
             tenancy_connections.open_hub_alias(hub)
         return hub
 
