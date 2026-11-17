@@ -8,6 +8,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
 import { discardChanges, expectWaysOutAskOnDirtyForm, type UnsavedFormCase } from './unsaved-back-helpers';
@@ -24,9 +25,7 @@ const printers = new Set<string>();
 
 /** The three sizes of every flow's screenshots (390×844, 834×1112, 1440×900). */
 const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
+  { label: '390', width: 390, height: 844 }, { label: '834', width: 834, height: 1112 }, { label: '1440', width: 1440, height: 900 },
 ];
 
 /** `APP-CASH_REGISTER-<flow>-<size>` in the three sizes, each once `ready` says it painted. */
@@ -249,7 +248,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await flowShots(page, 'CASH_REGISTER-F13', sessionsReady);
 
   // F05: the movement window.
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-movement]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session.id, 'movement');
   const movement = dialog(page, 'cash-register-movement');
   await expect(movement).toBeVisible();
   // hub#1160: «12,555» is 12.555 €, as in a price: rewritten in the page format on leaving the field.
@@ -264,7 +263,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await expect(movement).toBeHidden();
 
   // F06: the count by notes and coins (no face value cut on the phone).
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-count]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session.id, 'count');
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
   await fill(count, 'cash-register-count-denom-50', '1');
@@ -279,7 +278,7 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: the windows of a shift, in three si
   await expect(count).toBeHidden();
 
   // F09: the close, with the expected and the difference while typing.
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${session.id}-close]`).first().click();
+  await rowAction(page, 'cash-register-sessions', session.id, 'close');
   const close = dialog(page, 'cash-register-close');
   await expect(close).toBeVisible();
   await fill(close, 'cash-register-close-counted', '62');
@@ -388,7 +387,7 @@ test('CASH_REGISTER-F08: the close warns of an open check, a kitchen ticket and 
 
   await page.reload();
   await sessionsReady(page);
-  await shown(page).locator(`[data-testid=cash-register-sessions-row-${id}-close]`).first().click();
+  await rowAction(page, 'cash-register-sessions', id, 'close');
   const close = dialog(page, 'cash-register-close');
   await expect(close).toBeVisible();
   const review = close.locator('[data-testid=cash-register-review]');

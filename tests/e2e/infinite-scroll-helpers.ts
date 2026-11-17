@@ -14,8 +14,16 @@ export async function loadsMore(page: Page): Promise<boolean> {
     .evaluate((el) => (el as HTMLElement & { disabled?: boolean }).disabled !== true);
 }
 
-/** Scrolls the table's rows to their end, as a person would: Ionic asks for the next ones. */
+/** Scrolls the table's rows to the bottom of their scroll (the page's `ion-content`, or the cards themselves), as a
+ *  person would: Ionic asks for the next ones. */
 export async function scrollToEnd(page: Page): Promise<void> {
-  await infinite(page).first().scrollIntoViewIfNeeded();
-  await page.mouse.wheel(0, 2000);
+  await infinite(page)
+    .first()
+    .evaluate(async (el) => {
+      // `ion-content` scrolls an element of its own; the cards of a table that fills its page are their own scroller.
+      // Ionic's `scrollToBottom` is not awaited: it can wait on an animation that never ends while the rows grow.
+      const host = el.closest<HTMLElement & { getScrollElement?: () => Promise<HTMLElement> }>('ion-content, .ion-content-scroll-host');
+      const scroller = host?.getScrollElement ? await host.getScrollElement() : host;
+      if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    });
 }

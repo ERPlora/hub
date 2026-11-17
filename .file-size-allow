@@ -181,7 +181,7 @@
 1167 tests/e2e/base-assistant.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
 635 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
-590 tests/e2e/cash-register-flows.spec.ts ERPlora/erplora-next#74
+589 tests/e2e/cash-register-flows.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/combo-menus.spec.ts ERPlora/erplora-next#74
 513 tests/e2e/customer-flows.spec.ts ERPlora/erplora-next#74
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74

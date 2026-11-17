@@ -1,7 +1,7 @@
 // Turning an app on and off, and the plan's limit of apps (BASE-F18, F23, F24), in the
 // three viewports, as the owner of hub `a`: Apps counts the apps the business chose against the plan's `max_apps`
-// (Gratis, 20); «Turn off» Tasks asks with its name and, confirmed, takes it out of «My apps» and of the topbar's «My
-// apps» (the menu), and its screens say why they do not open; «Turn on» brings it back. With 20 chosen apps on, the
+// (Gratis, 20); Tasks' switch turned off asks with its name and, confirmed, takes it out of «My apps» and of the
+// topbar's «My apps» (the menu), and its screens say why they do not open; on again, it is back. With 20 chosen apps on, the
 // 21st is refused with the plan's notice and «Upgrade plan» (erplora.com's plans). Each flow leaves a capture at each
 // width. The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`,
 // signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are put back before and after
@@ -20,6 +20,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
+import { expectSwitch, flipApp } from './apps-switch-helpers';
 import {
   A,
   api,
@@ -196,8 +197,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await openInside(page, '/apps');
       await expect(testid(page, 'apps-counter')).toBeVisible();
 
-      // BASE-F23 — «Turn off» asks with its name; confirmed, Tasks leaves «My apps» and the menu.
-      await testid(page, 'apps-row-task-toggle').click();
+      // BASE-F23 — its switch turned off asks with its name; confirmed, Tasks leaves «My apps» and the menu.
+      await flipApp(page, 'task');
       const confirm = page.locator('.ep-confirm-dialog').last();
       await expect(confirm).toContainText('Turn off Tasks?');
       await expect(confirm).toContainText('Nothing is deleted');
@@ -232,11 +233,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await snap(page, 'blocked-screen', width);
       expect(errors, 'no error of the page on the screen of an app turned off').toEqual([]);
 
-      // BASE-F24 — «Add apps»: Tasks is there, «Off», with its name; «Turn on» brings it back to the menu.
+      // BASE-F24 — «Add apps»: Tasks is there, «Off», with its name; its switch turned on brings it back to the menu.
       await page.goto(`${A}/apps#all`);
       await search(page, 'Tasks');
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Off');
-      await testid(page, 'apps-row-task-toggle').click();
+      await flipApp(page, 'task');
       await expect(appRow(page, 'task').locator('[data-testid="apps-state"]')).toHaveText('Installed');
       await expect(testid(page, 'apps-counter')).toHaveText('27 apps turned on · 17 of 20 in your plan');
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Tasks');
@@ -271,7 +272,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'apps-counter')).toHaveText('26 apps turned on · 20 of 20 in your plan');
       await search(page, 'Website');
       await expect(appRow(page, 'website').locator('[data-testid="apps-state"]')).toHaveText('Off');
-      await testid(page, 'apps-row-website-toggle').click();
+      await flipApp(page, 'website');
 
       const notice = testid(page, 'apps-limit');
       await expect(notice).toContainText('You have reached the 20-app limit of your plan. Upgrade your plan or turn one off.');
@@ -306,7 +307,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
 
       // It needs no other app: «Activar» turns it on at once, without a question.
-      await testid(page, 'apps-row-flow-toggle').click();
+      await flipApp(page, 'flow');
       await expect(toastSaying(page, 'Automatizaciones está activada.')).toBeVisible();
       await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
       await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
@@ -334,7 +335,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await search(page, 'Reservas');
 
       // BASE-F23 — the question names the app and what goes off with it: Tables, which only Reservations needed.
-      await testid(page, 'apps-row-reservation-toggle').click();
+      await flipApp(page, 'reservation');
       const askOff = page.locator('.ep-confirm-dialog').last();
       await expect(askOff).toContainText('¿Desactivar Reservas?');
       await expect(askOff).toContainText('Mesas se desactiva con ella: solo la necesitaba Reservas.');
@@ -358,7 +359,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.goto(`${A}/apps#all`);
       await search(page, 'Reservas');
       await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
-      await testid(page, 'apps-row-reservation-toggle').click();
+      await flipApp(page, 'reservation');
       const askOn = page.locator('.ep-confirm-dialog').last();
       await expect(askOn).toContainText('¿Activar Reservas?');
       await expect(askOn).toContainText('Reservas necesita Mesas: se activa con ella.');
@@ -388,7 +389,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await search(page, 'Mesas');
       const before = stored('table'); // on, brought along by Reservas (`baseline`)
       expect(before).toBe('on:false');
-      await testid(page, 'apps-row-table-toggle').click();
+      await flipApp(page, 'table');
 
       // No question: it cannot go off. The notice says why and what to do, and stays past a toast's time.
       const refused = testid(page, 'apps-refused');
@@ -448,8 +449,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(before).toEqual(['on:true', 'on:false']);
       // VeriFactu's own reason, in Spanish, on its row, and nothing to press; nothing changed.
       const neverOff = 'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.';
-      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-refusal"]')).toHaveText(neverOff);
-      await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
+      await expectSwitch(page, 'verifactu', { checked: true, disabled: true, note: neverOff });
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
       // The server says the same if asked anyway.
       const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'verifactu' });
@@ -487,8 +487,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await search(page, 'Impuestos');
       await expect(appRow(page, 'tax').locator('[data-testid="apps-mandatory"]')).toHaveText('Obligatoria en España');
       await expect(appRow(page, 'tax').locator('[data-testid="apps-state"]')).toHaveText('Activa');
-      await expect(appRow(page, 'tax').locator('[data-testid="apps-refusal"]')).toHaveText(mandatory);
-      await expect(testid(page, 'apps-row-tax-toggle')).toHaveCount(0);
+      await expectSwitch(page, 'tax', { checked: true, disabled: true, note: mandatory });
       await snap(page, 'mandatory', width);
       await capture(page, `FIX-HUB-997-MANDATORY-MINE-${width}`);
       // The server says the same if asked anyway, and nothing is written.
@@ -500,7 +499,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // BASE-F23 — «Desactivar» Sales names Customers, which came along only with it, never Taxes, which stays on.
       await search(page, 'Ventas');
       await expect(appRow(page, 'sale').locator('[data-testid="apps-mandatory"]')).toHaveCount(0);
-      await testid(page, 'apps-row-sale-toggle').click();
+      await flipApp(page, 'sale');
       const askOff = page.locator('.ep-confirm-dialog').last();
       await expect(askOff).toContainText('Clientes se desactiva con ella: solo la necesitaba Ventas / TPV.');
       await expect(askOff).not.toContainText('Impuestos');
@@ -515,7 +514,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await search(page, 'VeriFactu');
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-mandatory"]')).toHaveText('Obligatoria en España');
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
-      await expect(testid(page, 'apps-row-verifactu-toggle')).toContainText('Activar');
+      await expectSwitch(page, 'verifactu', { checked: false, disabled: false });
       await snap(page, 'mandatory-off', width);
       await capture(page, `FIX-HUB-997-MANDATORY-ALL-${width}`);
     } finally {
@@ -583,7 +582,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
       // «Turn on»: 202 «creating», and the toast says it is being set up.
       const answered = page.waitForResponse((response) => response.url().endsWith('/api/apps/enable'));
-      await testid(page, `apps-row-${PRINTING}-toggle`).click();
+      await flipApp(page, PRINTING);
       const response = await answered;
       expect([response.status(), (await response.json()).state]).toEqual([202, 'creating']);
       await expect(toastSaying(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
@@ -596,7 +595,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect.poll(() => menuApps(page), { timeout: SET_UP_MS }).toContain('Printing');
       await snap(page, 'S3-on', width);
 
-      // «Turning on…», as a row the worker set off leaves it: no «Open», and «Turn off» if the business changes its mind.
+      // «Turning on…», as the worker leaves it: no «Open», its switch waiting on, and «Turn off» in «⋮» to change its mind.
       psql(
         `update base_appactivation set state = 'creating', next_attempt_at = now() + interval '10 minutes' ` +
           `where host = 'a' and app = '${PRINTING}'`,
@@ -604,7 +603,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.reload();
       await search(page, 'Printing');
       await expect(state).toHaveText('Turning on…');
-      await expect(testid(page, `apps-row-${PRINTING}-toggle`)).toContainText('Turn off');
+      await expectSwitch(page, PRINTING, { checked: true, disabled: true });
+      await expect(testid(page, `apps-row-${PRINTING}-menu`)).toBeVisible();
       await expect(testid(page, `apps-row-${PRINTING}-open`)).toHaveCount(0);
       await snap(page, 'S3-creating', width);
 
