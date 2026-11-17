@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
+import { CONFIG as STARTING_CONFIG } from '../__tests__/config-fixture';
 import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { ConfigOut, DiagnosticOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
@@ -25,28 +26,7 @@ beforeEach(() => {
   vi.mocked(toastSuccess).mockClear();
 });
 
-const CONFIG: ConfigOut = {
-  environment: 'testing',
-  route: 'erplora',
-  production_since: null,
-  production_open: true,
-  can_go_back: true,
-  gateway_configured: false,
-  issuer_nif: 'B12345674',
-  issuer_name: 'Peluquería Ana SL',
-  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: 'S' },
-  declaration_version: 'v1',
-  declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
-  account_url: 'https://erplora.com',
-  own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null },
-  representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
-  synced_at: null,
-  route_ready: true,
-  route_ready_for_production: false,
-  reasons: [],
-  issue_blocker: null,
-  live_blockers: [],
-};
+const CONFIG: ConfigOut = { ...STARTING_CONFIG, production_open: true };
 const NOT_APPROVED = { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file for you' };
 const NOT_ACTIVE = { code: 'hub_not_active', message: 'your ERPlora account has a pending payment or is suspended' };
 const GATEWAY = { code: 'gateway_unavailable', message: "ERPlora's sending gateway is not configured on this server" };

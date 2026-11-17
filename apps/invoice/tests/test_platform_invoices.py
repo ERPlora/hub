@@ -16,7 +16,7 @@ from live.errors import OperationError
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import A, HUB_DB, HUB_DB_COMMITTED, run
-from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, line
+from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, free_month, line
 from apps.verifactu.models import Config, Record
 from base.tenancy.tests.concurrency import at_once
 
@@ -117,6 +117,52 @@ def test_a_second_delivery_answers_what_the_first_issued(platform_hub):
     assert (second.status, second.qr, second.error) == (first.status, first.qr, None)
     assert Invoice.objects.count() == 1
     assert Record.objects.count() == 1
+
+
+FREE_ID = "019a0000-0000-7000-8000-000000000003"
+
+
+def test_a_free_month_is_issued_with_the_plans_price_its_discount_and_a_record_of_zero(platform_hub):
+    answer = issue(free_month())
+
+    invoice = Invoice.objects.get(platform_ref=BODY["id"])
+    [only] = invoice.lines.all()
+    record = Record.objects.get(invoice=invoice)
+    assert (answer.status, answer.qr) == ("issued", record.qr_url)
+    assert (only.unit_price, only.discount_amount, only.base_amount, only.total_amount) == (2999, 2999, 0, 0)
+    assert (invoice.invoice_type, invoice.total_amount, record.total_amount) == ("F1", 0, 0)
+    assert "&importe=0.00" in record.qr_url
+    assert "<sum1:CuotaTotal>0.00</sum1:CuotaTotal>" in record.xml
+    assert "<sum1:ImporteTotal>0.00</sum1:ImporteTotal>" in record.xml
+    assert "<sum1:BaseImponibleOimporteNoSujeto>0.00</sum1:BaseImponibleOimporteNoSujeto>" in record.xml
+
+
+def test_the_document_of_a_free_month_shows_the_plans_price_its_discount_and_zero(platform_hub):
+    issue(free_month())
+
+    document = run("invoice.invoice.platform_document", {"id": BODY["id"]}, system())
+
+    assert "<th class=\"num\">Descuento</th>" in document.html
+    assert document.html.count("29,99\xa0€") == 2
+    assert "0,00\xa0€" in document.html
+
+
+def test_a_free_month_is_kept_and_read_through_every_door_as_a_paid_invoice(platform_hub):
+    free = free_month(id=FREE_ID, number="ERP-2026-00124")
+    paid = copy.deepcopy(BODY)
+    first = {body["id"]: issue(body) for body in (paid, free)}
+
+    for body in (paid, free):
+        again = issue(copy.deepcopy(body))
+        assert (again.already, again.status, again.qr) == (True, "issued", first[body["id"]].qr)
+        assert status(body["id"]).qr == first[body["id"]].qr
+        document = run("invoice.invoice.platform_document", {"id": body["id"]}, system())
+        assert document.number == body["number"]
+        got = run("invoice.invoice.get", {"number": body["number"]}, system())
+        assert got.total_amount == body["total_cents"]
+    listed = run("invoice.invoice.list", {}, system())
+    assert sorted(row.number for row in listed.rows) == ["ERP-2026-00123", "ERP-2026-00124"]
+    assert Record.objects.count() == 2
 
 
 def test_a_number_another_invoice_holds_is_refused(platform_hub):

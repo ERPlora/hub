@@ -13,18 +13,8 @@ export type Route = 'erplora' | 'own';
 export type CertificateKind = 'seal' | 'representative' | 'personal' | 'unknown';
 export type InvoiceType = 'F1' | 'F2' | 'F3' | 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
 export type EventKind =
-  | 'record_created'
-  | 'deferred'
-  | 'accepted'
-  | 'accepted_with_errors'
-  | 'failed'
-  | 'queue_processed'
-  | 'queue_retried'
-  | 'chain_valid'
-  | 'chain_broken'
-  | 'aeat_queried'
-  | 'chain_recovered'
-  | 'connection_test'
+  | 'record_created' | 'deferred' | 'accepted' | 'accepted_with_errors' | 'failed' | 'queue_processed'
+  | 'queue_retried' | 'chain_valid' | 'chain_broken' | 'aeat_queried' | 'chain_recovered' | 'connection_test'
   | 'config_changed';
 export type Severity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 export type Representation = 'none' | 'submitted' | 'approved' | 'returned' | 'revoked';
@@ -262,6 +252,8 @@ export interface DiagnosticOut {
 export interface ConfigOut {
   environment: Environment;
   route: Route;
+  /** ERPlora's route can be chosen here; when not, only the own certificate goes live. */
+  erplora_route_available: boolean;
   production_since: string | null;
   production_open: boolean;
   can_go_back: boolean;
