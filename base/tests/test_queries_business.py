@@ -141,6 +141,8 @@ def test_erplora_s_own_hub_follows_its_issuer_s_country_and_not_a_registry_row(s
         first = business(B, language="en")
         Hub.objects.filter(pk=platform.pk).update(name="Another name", country="JP")
         assert business(B, language="en") == first
+        Hub.objects.filter(pk=platform.pk).update(slug="moved")  # nor does it need a row at its address
+        assert business(B, language="en") == first
     assert (first["name"], first["country"], first["country_name"]) == ("ERPlora Ltd", "GB", "United Kingdom")
     assert (first["currency"], first["currency_label"], first["currency_decimals"]) == ("GBP", "GBP · British Pound", 2)
 
