@@ -74,8 +74,6 @@ from apps.invoice.schemas import (
     IssuerSyncOut,
     MarkPaidIn,
     PaperOut,
-    PlatformInvoiceIn,
-    PlatformInvoiceOut,
     RectifyIn,
     SeriesCreateIn,
     SeriesOut,
@@ -83,6 +81,7 @@ from apps.invoice.schemas import (
     SubstituteIn,
     check_tax_id,
 )
+from apps.invoice.schemas.platform import PlatformInvoiceIn, PlatformInvoiceOut
 from apps.sale import pricing
 from apps.sale.models import OrderLine, Refund, Sale, Settings
 from apps.sale.queries import TICKET_LIMIT, business_country, find_sale, money_text, tax_category_name

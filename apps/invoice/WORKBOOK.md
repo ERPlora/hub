@@ -725,13 +725,15 @@ Pasos:
    `ERPR`) y la manda, firmada, al hub de plataforma de ERPlora.
 3. Facturación la emite tal cual llega, con el número y la fecha de la cuenta (ninguna serie del hub
    cuenta para ella), con ERPlora como emisor y el pagador de ese día como destinatario, y VeriFactu sella
-   su registro en la misma operación. Contesta «emitida» con su QR.
+   su registro en la misma operación. Contesta «emitida» con su QR. Una línea con descuento (un código
+   promocional) lleva el precio del plan y el descuento aparte; un mes gratis es una factura de 0 €, que se
+   emite, se registra y se imprime como cualquier otra.
 4. La cuenta pregunta después cómo va: «emitida» mientras el registro va a la AEAT, y «aceptada»,
    «aceptada con errores» o «rechazada» cuando contesta (con su código y su mensaje).
 5. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
    tributario:», «VERI*FACTU») solo cuando la AEAT ya lo aceptó, como en la cuenta antigua.
-Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas y,
-en un abono, la factura que corrige.
+Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas
+(cada una con su descuento) y, en un abono, la factura que corrige.
 Sale: la factura, con la referencia de la cuenta (avisa `invoice.invoice.issued`; un abono, además,
 `invoice.invoice.rectified`), y su registro de VeriFactu.
 Si falla: la misma factura otra vez (o dos entregas a la vez) contesta lo que ya hay, sin escribir nada;
@@ -944,8 +946,9 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el
   cuerpo de `platform_payload()` del SaaS (`id`, `kind`, `series`, `number`, `issued_on`, `rectification`,
-  `currency`, `language`, céntimos, `tax_treatment`, `tax_country`, `tax_rate`, `recipient`, `lines`,
-  `rectifies`) → `201 {"status": "issued", "qr", "error": null}` (la misma otra vez, `200` con lo que ya
+  `currency`, `language`, céntimos, `tax_treatment`, `tax_country`, `tax_rate`, `recipient`, `lines`
+  (cada una con su `discount_cents`), `rectifies`; esquemas en `schemas/platform.py`) →
+  `201 {"status": "issued", "qr", "error": null}` (la misma otra vez, `200` con lo que ya
   hay); `GET …/{id}` → `issued`, `accepted`, `accepted_with_errors` o `rejected` (con su código y mensaje);
   `GET …/{id}/pdf`; un abono de una original que no llegó, 404 `invoice.platform_original_unknown`; más de
   400 € sin NIF, 409 `invoice.platform_recipient_required`; fuera de contrato, 422 con su código. La factura
@@ -961,6 +964,15 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     lleva el aviso «VAT included — customer VAT number could not be verified» del PDF antiguo (queda fuera).
   - **Notas**: el aviso que imprimía la factura antigua (inversión del sujeto pasivo, OSS, no sujeta), en
     el idioma del pagador.
+  - **Descuento** (los meses gratis de un código promocional): cada línea trae `discount_cents`, el descuento
+    sin IVA, de 0 a 10^12 (uno negativo es 422; sin el campo, 0); `net_cents` ya viene descontado. El precio
+    unitario es (|base| + descuento) / cantidad y `InvoiceLine.discount_amount` lleva el descuento con el signo
+    de la línea (negativo en un abono), así que cantidad × precio − descuento es la base y el A4 lo enseña en
+    su columna «Descuento». Sin IVA español la base es el importe entero de la línea, y en OSS ese importe
+    lleva el IVA del otro Estado: el descuento lo lleva también (29,99 € al 19 % → 35,69 €). Un mes gratis
+    es una factura de 0 € (base y cuota 0 en su clave, S1 al 21 % en una venta nacional; F1 con NIF, F2
+    sin él) que se emite, se registra en VeriFactu (`ImporteTotal` 0.00) y se lee por todas las puertas
+    como una de pago.
   - **Número**: el del SaaS tal cual; `sequence` = sus últimas cifras; la serie `ERP`/`ERPR` del año nace
     con el formato del SaaS (`{prefix}-{year}-{seq:05d}`) y su contador no se usa. Dos entregas a la vez
     se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
@@ -990,8 +1002,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
-  `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,
-  formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma), `fiscal.py`
+  (aritmética pura: cierre por clave fiscal, prorrateo, formato del número), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el

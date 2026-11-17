@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7cbe30dab4c6551c2ff8653c6eb99a7c079161461fa9a0baff5d645071351b05 -->
+<!-- generated from WORKBOOK.md sha256:56f09d229c6ad7ee8b75aaa7ebf4e9b9092e4e11b2c53d289419183ab0c4c2e4 -->
 
 ## What it is for and who it is for
 
@@ -220,10 +220,10 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing |
 | VERIFACTU-F02 | Upload the business's own certificate | done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Remove the own certificate | done — in the Hub |
-| VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done |
-| VERIFACTU-F05 | Sign and upload the representation authorisation so ERPlora files | done — uploaded in the Hub, reviewed by staff in the SaaS (`fiscal/`) and the status comes back in the snapshot |
+| VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done — the ERPlora route can only be chosen while the server keeps it open (`VERIFACTU_ERPLORA_ROUTE_ENABLED`) |
+| VERIFACTU-F05 | Sign and upload the representation authorisation so ERPlora files | done — uploaded in the Hub, reviewed by staff in the SaaS (`fiscal/`) and the status comes back in the snapshot; with the ERPlora route closed on the server it is not offered |
 | VERIFACTU-F06 | Send the authorisation again | done — in the Hub, like VERIFACTU-F05 |
-| VERIFACTU-F08 | Go live | done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid certificate \| ERPlora route with an approved authorisation) ∧ active account, in every plan (Free included); the server keeps it closed until ERPlora opens it (under Ioan's supervision) |
+| VERIFACTU-F08 | Go live | done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid certificate \| ERPlora route open on the server with an approved authorisation) ∧ active account, in every plan (Free included); the server keeps it closed until ERPlora opens it (under Ioan's supervision) |
 | VERIFACTU-F09 | Go back to testing | done |
 | VERIFACTU-F10 | Test the connection with the AEAT | done — with the SaaS gateway's probe (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Create a test invoice | done |
@@ -338,12 +338,17 @@ Steps:
    shows.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and the switch is
    disabled.
+5. ERPlora can close its route on the server (`VERIFACTU_ERPLORA_ROUTE_ENABLED` set to false; open by default):
+   then nobody can move to it and only the own certificate is left. Whoever is already on it carries on: in testing
+   it files with ERPlora's seal and, if already live, keeps sending and cancelling through it. ERPlora's own business
+   is not affected.
 In: the chosen route; the uploaded certificate (VERIFACTU-F02) and the authorisation's status, from the account.
 Out: the route kept; the next records go out through it (it announces `verifactu.config.changed`).
 If it fails: with no valid certificate, "There is no valid certificate loaded: upload it in VeriFactu →
 Configuration → My certificate."; in production and through the ERPlora route with no approved authorisation, "For
-ERPlora to file in production, ERPlora still has to approve your signed authorisation.". The switch goes back to
-the real route.
+ERPlora to file in production, ERPlora still has to approve your signed authorisation."; with the ERPlora route
+closed on the server, moving to it gives "ERPlora does not file on behalf of businesses for now: file with your own
+certificate." (409 `verifactu.erplora_route_unavailable`). The switch goes back to the real route.
 Involved: VERIFACTU-F02, VERIFACTU-F05
 
 ### VERIFACTU-F05 Sign and upload the representation authorisation so ERPlora files
@@ -382,6 +387,9 @@ to be 5 MB at most."); the SaaS's refusal, with its `fiscal.*` code and its fiel
 business the SaaS does not know, 409 `verifactu.hub_unregistered` ("ERPlora has not linked this business yet.");
 without the SaaS, 503 `verifactu.saas_unreachable` ("ERPlora could not handle this right now. Try again in a few
 minutes.").
+With the ERPlora route closed on the server, neither "Download the form" nor "Send for review" reaches the SaaS: 409
+`verifactu.erplora_route_unavailable`, "ERPlora does not file on behalf of businesses for now: file with your own
+certificate.". ERPlora's own business is not affected.
 When downloading the form, an issuer detail the form cannot write (a letter outside its own or a text that is too
 long) comes blank to write it by hand, with the rest already in: it never leaves you without a form. Inside the app,
 if it cannot save it, it says so with its reason (BASE-F112) and "Model downloaded" does not appear.
@@ -402,7 +410,7 @@ Involved: VERIFACTU-F05
 
 ### VERIFACTU-F08 Go live
 Status: done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (own route with a valid
-certificate | ERPlora route with an approved authorisation) ∧ active account (`status` of the snapshot), in every
+certificate | ERPlora route open on the server with an approved authorisation) ∧ active account (`status` of the snapshot), in every
 plan (Free included, with no paid option); the server keeps it closed until ERPlora opens it (under Ioan's supervision). In `pre` it never opens: everything goes to testing. A
 demo hub never goes live (`verifactu.go_live_forbidden`).
 Actor: administrator
@@ -410,8 +418,8 @@ Screen: Settings
 Steps:
 1. In **VeriFactu → Settings**, "AEAT environment" shows "Testing (AEAT test)" and "Your invoices go to the AEAT's
    test environment. When everything is ready, go live.". If something is missing, below shows "It cannot go live
-   yet:" with the list (demo business, authorisation not approved, own certificate missing or expired, account with
-   a pending payment or suspended) and "Go live" stays disabled. No plan is missing from it: VeriFactu live is for
+   yet:" with the list (demo business, authorisation not approved, ERPlora route closed on the server, own certificate
+   missing or expired, account with a pending payment or suspended) and "Go live" stays disabled. No plan is missing from it: VeriFactu live is for
    every plan.
 2. Tap "Go live" and confirm in "Send your invoices to the AEAT for real?" ("From now on every record goes to the
    real AEAT. As soon as the first one is sealed you can no longer go back to testing.").
@@ -431,7 +439,11 @@ again in VeriFactu → Configuration → My certificate." (`verifactu.own_certif
 business cannot go live: it always files in the AEAT's test environment." (`verifactu.go_live_forbidden`;
 who is a demo is said by the platform, `base.operations.is_demo_hub`); with no issuer, "Set up the issuer first in
 Invoicing → Issuer."; through the ERPlora route with no approved authorisation, "For ERPlora to file in production,
-ERPlora still has to approve your signed authorisation." (`verifactu.representation_not_approved`); with the account
+ERPlora still has to approve your signed authorisation." (`verifactu.representation_not_approved`); through the
+ERPlora route while the server keeps it closed, approved authorisation or not, "To go live, upload your own
+certificate and choose it as the sending route: ERPlora does not file on behalf of businesses for now."
+(`verifactu.own_certificate_required`; in the list of what is missing: "ERPlora does not file on behalf of businesses
+for now: use your own certificate", `own_certificate_required`); with the account
 with a pending payment or suspended, "Your ERPlora account has a pending payment or is suspended: settle it in your
 ERPlora account to go live." (`verifactu.hub_not_active`); with an own certificate missing or expired, "There is no
 valid certificate loaded: upload it in VeriFactu → Configuration → My certificate."
@@ -448,8 +460,12 @@ reach it now:", the reason and "Fix it in VeriFactu → Settings and try again."
 and invoices are refused until this is fixed:" (`issue_blocker`). What was already sealed with no approved
 authorisation or no valid certificate waits, because the gateway could not file it. Switching to the ERPlora route
 in production without the approved authorisation is refused the same way.
+Closing the ERPlora route on the server does not take anyone already live through it out of production: it keeps
+sealing, sending and cancelling with ERPlora's seal, because the AEAT only takes a cancellation filed with the same
+seal. With the route closed, the Home's "Set up VeriFactu" step is only done with the own certificate.
 It is checked in this order and the first cause gives the 409 with its code: the closed server → a demo
-business → the issuer → the route (the own certificate needs no authorisation) → the account.
+business → the issuer → the route (ERPlora's, open on the server; the own certificate needs no authorisation) → the
+account.
 Involved: VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Go back to testing
@@ -938,7 +954,7 @@ invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The configuration: environment, route, own certificate (holder, tax ID, kind, expiry; never its material), status of the authorisation, producer's data, declaration | view | F02, F04, F08, F09, F12 | `verifactu.config.get` |
+| The configuration: environment, route (and whether ERPlora's can be chosen), own certificate (holder, tax ID, kind, expiry; never its material), status of the authorisation, producer's data, declaration | view | F02, F04, F08, F09, F12 | `verifactu.config.get` |
 | The records, with search, filters, sorting and pages (up to 100) | view | F16 | `verifactu.record.list` |
 | A record, by its id or by its invoice's number, with its QR, its XML and why it waits | view | F17, F18 | `verifactu.record.get` |
 | The current record of an invoice (QR, CSV, status) | view | F19 | `verifactu.record.by_invoice` |

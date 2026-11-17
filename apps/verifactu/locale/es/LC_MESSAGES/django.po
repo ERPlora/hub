@@ -582,6 +582,10 @@ msgid "ERPlora still has to approve your signed authorisation to file for you"
 msgstr "falta que ERPlora apruebe tu autorización firmada para remitir en tu nombre"
 
 #: models.py
+msgid "ERPlora does not file on behalf of businesses for now: use your own certificate"
+msgstr "de momento ERPlora no presenta por cuenta de los negocios: usa tu propio certificado"
+
+#: models.py
 msgid "ERPlora does not recognise this business: contact ERPlora's support"
 msgstr "ERPlora no reconoce este negocio: contacta con el soporte de ERPlora"
 
@@ -1285,3 +1289,15 @@ msgstr "Contraseña del certificado"
 #: apps/verifactu/schemas.py
 msgid "Invoice number"
 msgstr "Número de factura"
+
+#: erplora_route.py
+msgid "ERPlora does not file on behalf of businesses for now: file with your own certificate."
+msgstr "De momento ERPlora no presenta por cuenta de los negocios: presenta con tu propio certificado."
+
+#: erplora_route.py
+msgid ""
+"To go live, upload your own certificate and choose it as the sending route: ERPlora does not file on behalf of "
+"businesses for now."
+msgstr ""
+"Para pasar a producción, sube tu propio certificado y elígelo como vía de envío: de momento ERPlora no presenta "
+"por cuenta de los negocios."

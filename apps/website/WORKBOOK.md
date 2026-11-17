@@ -652,7 +652,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   Django propias. **Clásica**, de «Business Casual» de Start Bootstrap; **Moderna**, de «Agency» de Start Bootstrap y
   de los ejemplos «Heroes» y «Features» de Bootstrap; **Minimalista**, de «Clean Blog» de Start Bootstrap;
   **Llamativa**, de «Grayscale» y «One Page Wonder» de Start Bootstrap. Licencia MIT en todos (Start Bootstrap LLC;
-  The Bootstrap Authors); registro en `docs/licences.md` de la raíz de erplora-next.
+  The Bootstrap Authors); registro en `knowledge/wiki/topics/licences.md` de la raíz de erplora-next.
 - **Migración 0002** (`0002_theme_palettes`, reversible, solo JSON): el tema de antes `{primary, accent, mode}` del
   borrador y de lo publicado pasa a `{palette: "custom", custom: {primary, accent}, mode}`, así que ninguna página
   cambia de colores; a la inversa, una paleta vuelve a sus dos colores (congelados en la migración) y automático a

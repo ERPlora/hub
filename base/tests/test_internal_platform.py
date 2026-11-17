@@ -17,9 +17,10 @@ import pytest
 from django.conf import settings as deployed
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.test_platform import BODY
+from apps.invoice.tests.test_platform import BODY, free_month
 from apps.invoice.tests.test_platform_invoices import PLATFORM, PLATFORM_ISSUER, system
 from apps.invoice.tests.conftest import run
+from apps.verifactu.models import Record
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.legacy import use_legacy
@@ -143,6 +144,34 @@ def test_an_invoice_is_issued_with_its_qr(client, platform_hub):
     assert body["qr"].startswith("https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?")
     [invoice] = invoices()
     assert invoice.platform_ref is not None
+
+
+def test_a_free_month_is_issued_with_its_record_sealed_at_zero_and_its_pdf(client, platform_hub):
+    answer = post(client, free_month())
+
+    assert answer.status_code == 201
+    assert (answer.json()["status"], answer.json()["error"]) == ("issued", None)
+    assert "&importe=0.00" in answer.json()["qr"]
+    with use_hub(Hub.objects.get(slug=deployed.PLATFORM_HUB_SLUG)):
+        [record] = Record.objects.filter(invoice__platform_ref=BODY["id"])
+        assert record.fingerprint and record.qr_url == answer.json()["qr"]
+        assert "<sum1:ImporteTotal>0.00</sum1:ImporteTotal>" in record.xml
+        [line] = record.invoice.lines.all()
+        assert (line.unit_price, line.discount_amount, line.base_amount) == (2999, 2999, 0)
+    pdf = get(client, f"{ROOT}/{BODY['id']}/pdf")
+    assert (pdf.status_code, pdf["Content-Type"]) == (200, "application/pdf")
+    assert pdf.content.startswith(b"%PDF-")
+
+
+def test_a_negative_discount_is_422_with_its_field(client, platform_hub):
+    body = free_month()
+    body["lines"][0]["discount_cents"] = -1
+
+    answer = post(client, body)
+
+    assert (answer.status_code, code(answer)) == (422, "internal.payload_invalid")
+    assert any("discount_cents" in field for field in answer.json()["error"]["fields"])
+    assert invoices() == []
 
 
 def test_posting_it_again_answers_the_same_with_200(client, platform_hub):

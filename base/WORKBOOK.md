@@ -3775,7 +3775,7 @@ hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 - **Asistente** (BASE-F92…F106): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. Las mecánicas que no dependen de la pasarela son de `live.assistant` (las mismas del panel
-  del SaaS; `docs/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant/` (sin ORM) les añade
+  del SaaS; `knowledge/raw/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant/` (sin ORM) les añade
   lo suyo, un módulo por pieza (`_Words`, pantallas, `ALWAYS`, `NOT_FROM_CHAT`, checks y pasarela): el catálogo de herramientas (`catalog`:
   toda `@operation` de las apps activas cuyo `ai=` es una herramienta (`Operation.ai_spec()` es un `AI`) y cuyo permiso
   tiene la persona, o que su app deja aprobar a un responsable (`approvals.label_of`). Toda operación declara `ai=`

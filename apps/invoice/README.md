@@ -33,7 +33,9 @@ Sirve igual al restaurante y a la peluquería.
 - **Hub de plataforma** (F23, parte de Facturación): `invoice.invoice.issue_platform` y sus consultas emiten las
   facturas de ERPlora que manda el SaaS por `/internal/platform/invoices`, en la BD propia de ese hub
   (`manage.py create_platform_hub --execute`); en producción solo se declara listo con el envío real a la AEAT
-  abierto.
+  abierto. Cada línea trae su descuento (`discount_cents`, sin IVA; `net_cents` ya descontado): la factura
+  guarda el precio del plan y el descuento aparte, y un mes gratis de un código promocional es una factura de
+  0 € que se emite y se registra como cualquier otra.
 
 ## Ficha
 

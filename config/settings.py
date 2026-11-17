@@ -338,9 +338,7 @@ CACHES = {
 
 # The SaaS is erplora.com, locally http://localhost:8001 (hubs.localhost is the Hub admin's host):
 # SAAS_URL is where the browser goes (/hub-login/, the admin's Hubs page, the logout).
-SAAS_URL = (
-    config("SAAS_URL", default="http://localhost:8001") if DEBUG else config("SAAS_URL")
-)
+SAAS_URL = config("SAAS_URL", default="http://localhost:8001") if DEBUG else config("SAAS_URL")
 # Where the Hub calls the SaaS's /internal/*: the ALB answers 404 to it, so production uses the private
 # name (http://saas.erplora.internal:8000); without it, the public URL (local development).
 SAAS_INTERNAL_URL = config("SAAS_INTERNAL_URL", default=SAAS_URL)
@@ -386,6 +384,8 @@ GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it by hand,
 # and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
+# Whether a business may take ERPlora's route, ERPlora filing for it with its seal (apps/verifactu/erplora_route.py).
+VERIFACTU_ERPLORA_ROUTE_ENABLED = config("VERIFACTU_ERPLORA_ROUTE_ENABLED", default=True, cast=bool)
 # ERPlora's own hub: it issues ERPlora's invoices to its customers, which the SaaS posts to
 # /internal/platform/invoices (base.internal). A reserved slug, so no business can ever take it; it files in the
 # AEAT's environment of the deployment (prod: production; pre: testing), never by its own switch.
