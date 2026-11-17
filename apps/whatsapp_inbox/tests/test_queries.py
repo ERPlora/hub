@@ -307,12 +307,16 @@ def test_the_notes_ask_who_the_caller_is_once_however_many_there_are(three, make
         return run("whatsapp_inbox.note.list", {"conversation": "Ana"}, as_luis).rows
 
     run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": "One"}, as_luis)
-    with CaptureQueriesContext(connections[current_alias()]) as one:
+    business, control = connections[current_alias()], connections["default"]
+    with CaptureQueriesContext(business) as one, CaptureQueriesContext(control) as one_on_control:
         assert len(listed()) == 1
     for text in ("Two", "Three", "Four"):
         run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": text}, as_luis)
 
-    with django_assert_num_queries(len(one.captured_queries), connection=connections[current_alias()]):
+    with (
+        django_assert_num_queries(len(one), connection=business),
+        django_assert_num_queries(len(one_on_control), connection=control),
+    ):
         assert [note.can_delete for note in listed()] == [True] * 4
 
 
