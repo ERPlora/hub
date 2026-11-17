@@ -11,6 +11,8 @@ says why; a ``media/`` entry that is no WebP of 2 MB at most makes the file unre
 The ceilings: a photo is kept as a 512 × 512 WebP of 20–60 KB (``base.images``), already compressed, so a zip carries
 about what its photos weigh: 300 photos of 60 KB are 18 MB, under :data:`blueprint.MAX_FILE_BYTES` (20 MB), in 1 000
 entries at most; once inflated, 100 MB (the rows' JSON compresses ten to one, the photos not at all).
+
+Every test works in business A's own database, and business B in its own, as production does.
 """
 
 import base64
@@ -31,12 +33,14 @@ from base import blueprint
 from base.models import Hub, Membership
 from base.permissions import permissions_for
 from base.storage import hub_prefix
+from base.tenancy.context import current_alias, use_hub
+from base.tenancy.tests.business import HUB_DB, A, B, in_business_a
 from base.tests.test_image_catalog import IMAGES, webp, write_library
-from base.tests.test_images import hub_files  # noqa: F401 - the store fixture
+from base.tests.test_images import hub_files
 
-pytestmark = pytest.mark.django_db
+__all__ = ["hub_files", "in_business_a"]
+pytestmark = HUB_DB
 
-A, B = Scope("host", "a"), Scope("host", "b")
 FOLDER = "inventory/products/"
 LATTE = "catalog:hospitality/cafe_con_leche"
 
@@ -178,7 +182,7 @@ def test_an_export_carries_its_own_photos_inside_and_the_librarys_by_reference(c
 
 def test_a_photo_that_is_gone_from_the_store_is_exported_without_it(ctx, library, hub_files):  # noqa: F811
     reference, _ = photo_of(ctx)
-    hub_files.delete(f"{hub_prefix(Hub.objects.get(slug='a').id)}/{reference.removeprefix('file:')}")
+    hub_files.delete(f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}")
 
     data = blueprint.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
 
@@ -189,33 +193,33 @@ def test_a_photo_that_is_gone_from_the_store_is_exported_without_it(ctx, library
 # ── Import: each photo copied under a new name ────────────────────────────────────────────────────────────────
 
 
-def test_loading_the_file_in_another_business_copies_each_photo_under_a_new_name(ctx, library, hub_files):  # noqa: F811
+def test_loading_the_file_in_another_business_copies_each_photo_under_a_new_name(ctx, library, hub_files, hub_b):  # noqa: F811
     reference, kept = photo_of(ctx)
     data = blueprint.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
     media = blueprint.export_media(ctx, data)
-    # Both hubs share the suite's one test database: another SKU, so B's load creates its own product.
-    data["inventory.product"][0]["sku"] = "B-CAF-03"
     content = blueprint.write_zip(bundle(data["inventory.product"], media))
-    other = person(B)
 
-    result = blueprint.apply(other, blueprint.read_zip(content), apps=None)
+    with use_hub(hub_b):
+        other = person(B)
+        result = blueprint.apply(other, blueprint.read_zip(content), apps=None)
+        copy = products(other)["CAF-03"].image
 
     assert problems(result) == []
-    copy = products(other)["B-CAF-03"].image
     assert re.fullmatch(rf"file:{FOLDER}[0-9a-f]{{32}}\.webp", copy) and copy != reference
     assert uuid.UUID(copy.removeprefix(f"file:{FOLDER}").removesuffix(".webp")).version == 7
     assert stored(B, copy) == kept
 
 
-def test_loading_it_twice_copies_no_photo_twice(ctx, library, hub_files):  # noqa: F811
+def test_loading_it_twice_copies_no_photo_twice(ctx, library, hub_files, hub_b):  # noqa: F811
     reference, kept = photo_of(ctx)
     loaded = bundle([product_row("Cortado", "CAF-09", image=reference)], {reference.removeprefix("file:"): kept})
-    other = person(B)
-    blueprint.apply(other, loaded, apps=None)
-    hub = Hub.objects.get(slug="b").id
-    before = hub_files.listdir(f"{hub_prefix(hub)}/{FOLDER}")[1]
+    hub = hub_b.id
+    with use_hub(hub_b):
+        other = person(B)
+        blueprint.apply(other, loaded, apps=None)
+        before = hub_files.listdir(f"{hub_prefix(hub)}/{FOLDER}")[1]
 
-    blueprint.apply(other, loaded, apps=None)
+        blueprint.apply(other, loaded, apps=None)
 
     assert hub_files.listdir(f"{hub_prefix(hub)}/{FOLDER}")[1] == before and len(before) == 1
 
@@ -229,7 +233,7 @@ def test_a_photo_missing_from_the_file_loads_the_product_without_it_and_says_why
 
 def test_a_photo_past_the_plans_space_loads_the_product_without_it_and_says_why(ctx, library, hub_files):  # noqa: F811
     name = f"{FOLDER}{uuid.uuid7().hex}.webp"
-    Hub.objects.filter(slug="a").update(state={"plan": {"max_storage_bytes": 10}})
+    Hub.objects.filter(slug=A.key).update(state={"plan": {"max_storage_bytes": 10}})
 
     result = blueprint.apply(ctx, bundle([product_row(image=f"file:{name}")], {name: webp()}), apps=None)
 
@@ -243,28 +247,27 @@ def test_undoing_the_load_deletes_the_photos_it_copied(ctx, library, hub_files, 
     result = blueprint.apply(ctx, bundle([product_row(image=f"file:{name}")], {name: webp()}), apps=None)
     copy = products(ctx)["CAF-02"].image
 
-    with django_capture_on_commit_callbacks(execute=True):
+    with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
         blueprint.undo(ctx, result.created)
 
     assert copy.startswith("file:")
-    assert not hub_files.exists(f"{hub_prefix(Hub.objects.get(slug='a').id)}/{copy.removeprefix('file:')}")
+    assert not hub_files.exists(f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{copy.removeprefix('file:')}")
 
 
-def test_a_service_travels_with_its_image(ctx, library):
+def test_a_service_travels_with_its_image(ctx, library, hub_b):
     made = call(ctx, "service.service.create", name="Corte de señora", tax_category_key="service.generic", price=2500)
     call(ctx, "service.service.set_image", id=made.id, image="catalog:beauty_hair/corte_senora")
 
     data = blueprint.export_data(ctx, {"service": ["service.service"]}, purpose="template")
     assert data["service.service"][0]["image"] == "catalog:beauty_hair/corte_senora"
-    # Both hubs share the suite's one test database: another name, so B's load creates its own service.
-    data["service.service"][0]["name"] = "Corte de señora (B)"
-    other = person(B)
 
-    result = blueprint.apply(other, blueprint.Bundle(manifest=bundle([]).manifest, data=data), apps={"service"})
+    with use_hub(hub_b):
+        other = person(B)
+        result = blueprint.apply(other, blueprint.Bundle(manifest=bundle([]).manifest, data=data), apps={"service"})
+        images = {row.name: row.image for row in call(other, "service.service.list", limit=10).rows}
 
     assert problems(result) == [] and result.created["service.service"]
-    images = {row.name: row.image for row in call(other, "service.service.list", limit=10).rows}
-    assert images["Corte de señora (B)"] == "catalog:beauty_hair/corte_senora"
+    assert images["Corte de señora"] == "catalog:beauty_hair/corte_senora"
 
 
 # ── The file: what a media/ entry may be, and the ceilings ─────────────────────────────────────────────────────
