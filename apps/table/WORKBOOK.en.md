@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a0df419ef31761e1d2afc33f1cb73e859583781d73d4963cd45ecf63dd4f38b9 -->
+<!-- generated from WORKBOOK.md sha256:036af1a05e1b12925daaff7c53dea5f20723b16143a5ad1e0cccbf75f5a98ef7 -->
 
 ## What it is for and who it is for
 
@@ -392,7 +392,7 @@ Steps:
 2. On tablet and desktop the plan fits every table to the space; on the phone, "Service" shows them in
    two-column cards. Each table says its status in writing, with an icon, shape, seats and colour:
    Available, Occupied, Reserved or Blocked.
-3. An occupied table shows the time ("35:00") and guests ("3/4 pax"); the time moves forward by itself and
+3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    its warnings change only the clock and arc. A table with a booking today says its name and time. The
    server is found in the table's sheet.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no

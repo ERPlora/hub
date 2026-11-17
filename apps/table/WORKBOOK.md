@@ -396,7 +396,7 @@ Pasos:
 2. En tableta y ordenador el plano ajusta todas las mesas al espacio; en el teléfono, «Servicio» las
    muestra en tarjetas a dos columnas. Cada mesa dice su estado escrito, con icono, forma, sillas y color:
    Disponible, Ocupada, Reservada o Bloqueada.
-3. Una mesa ocupada enseña el tiempo («35:00») y los comensales («3/4 pax»); el tiempo avanza solo y sus
+3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y sus
    avisos cambian solo el reloj y el arco. Una mesa con reserva hoy dice el nombre y la hora. Quien atiende
    se consulta en la hoja de la mesa.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
