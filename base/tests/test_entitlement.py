@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.apps import apps as django_apps
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
@@ -130,7 +130,7 @@ def test_a_right_with_an_unreadable_end_is_no_right(caplog):
 def test_without_a_paid_module_nothing_is_read(modules):
     """Today no module is premium: blocking costs no query on any operation."""
     modules(TAX, SALE)
-    with CaptureQueriesContext(connection) as queries:
+    with CaptureQueriesContext(connections["default"]) as queries:
         assert entitlement.blocked_apps(A) == frozenset()
     assert len(queries) == 0
 

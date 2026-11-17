@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid7
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
@@ -14,6 +14,7 @@ from live.errors import NotFound, PermissionDenied
 from apps.sale.models import PaymentMethod, Sale
 from apps.sale.schemas import BreakdownOut, PreviewLineOut, PreviewOut
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from base.tenancy.context import current_alias
 from base.tests.typed_operations import ts_fields
 
 pytestmark = HUB_DB
@@ -551,7 +552,7 @@ def test_by_professional_reads_a_fixed_number_of_queries_whatever_the_refunds(ca
         )
         give_back(sale, 100)
         give_back(sale, 50)
-    with CaptureQueriesContext(connection) as captured:
+    with CaptureQueriesContext(connections[current_alias()]) as captured:
         [row] = run("sale.sale.by_staff", {}).rows
     assert row.refunded_total == 900
     assert len(captured) <= 12, [query["sql"][:80] for query in captured]

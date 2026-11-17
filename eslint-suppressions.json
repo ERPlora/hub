@@ -500,11 +500,6 @@
       "count": 1
     }
   },
-  "apps/verifactu/frontend/pages/SettingsPage.vue": {
-    "vue/max-lines-per-block": {
-      "count": 1
-    }
-  },
   "apps/website/frontend/components/HoursEditor.vue": {
     "max-params": {
       "count": 1

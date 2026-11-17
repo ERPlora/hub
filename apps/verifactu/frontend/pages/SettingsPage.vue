@@ -3,14 +3,17 @@
 // while something is missing, listed above it: the server's opening and its gateway, the approved signed
 // authorisation, the own certificate (one this server can open), an active account. «Back to testing» is offered only
 // until the first production record. «Test the connection» presents nothing to the AEAT. Outside Spain VeriFactu is not
-// for the business: the switch, «Go live» and the live test are disabled.
+// for the business: the switch, «Go live» and the live test are disabled. When ERPlora's route is unavailable,
+// only the certificate status is shown and its production blocker is explained beside «Go live».
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, openExternalLink, toastSuccess, useSession } from '@erplora/ui/shell';
-import { IonButton, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
+import DiagnosticRouteRow from '../components/DiagnosticRouteRow.vue';
+import SettingsSendingRoute from '../components/SettingsSendingRoute.vue';
 import { useLocale, useT } from '../composables/useT';
 import { environmentTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
@@ -37,6 +40,22 @@ const fresh = shallowRef<DiagnosticOut | null>(null);
 const result = computed(() => fresh.value ?? last.value?.result ?? null);
 const busy = computed(() => update.pending.value || goLive.pending.value || back.pending.value || diagnose.pending.value || testInvoice.pending.value);
 const outsideSpain = computed(() => !!config.value?.live_blockers.some((reason) => reason.code === 'outside_spain'));
+const routeAvailable = computed(() => config.value?.erplora_route_available ?? true);
+const diagnosticRoute = computed(() => ({ route: result.value?.route, available: routeAvailable.value }));
+const ownCertificateValid = computed(() => {
+  const cert = config.value?.own_certificate;
+  return !!cert?.loaded && (cert.expires_in_days === null || cert.expires_in_days >= 0);
+});
+const certificateRequired = computed(() => !routeAvailable.value && !ownCertificateValid.value && !!config.value?.live_blockers.some((reason) => reason.code === 'own_certificate_required'));
+const routeReasonHidden = (code: string) => !routeAvailable.value && ['representation_not_approved', 'erplora_route_unavailable'].includes(code);
+const visibleLiveBlockers = computed(() => config.value?.live_blockers.filter((reason) => (routeAvailable.value || reason.code !== 'own_certificate_required') && !routeReasonHidden(reason.code)) ?? []);
+const goLiveBlocked = computed(() => routeAvailable.value ? !!config.value?.live_blockers.length : certificateRequired.value || visibleLiveBlockers.value.length > 0);
+const visibleReasons = computed(() => config.value?.reasons.filter((reason) => !routeReasonHidden(reason.code)) ?? []);
+const visibleDiagnosticReasons = computed(() => result.value?.reasons.filter((reason) => !routeReasonHidden(reason.code)) ?? []);
+const visibleIssueBlocker = computed(() => {
+  const blocker = config.value?.issue_blocker;
+  return blocker && !routeReasonHidden(blocker.code) ? blocker : null;
+});
 
 const identity = computed(() => {
   const p = config.value?.producer;
@@ -85,6 +104,14 @@ async function goingLive(): Promise<void> {
     tone: 'danger',
   });
   if (!yes) return;
+  if (config.value && !routeAvailable.value && config.value.route !== 'own') {
+    try {
+      await update.run({ route: 'own' });
+    } catch {
+      failed(update);
+      return;
+    }
+  }
   try {
     await goLive.run({});
   } catch {
@@ -149,12 +176,10 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
       :status="status"
       :error="error"
     />
-    <div
+    <ion-spinner
       v-if="!config && status === 'loading'"
-      class="ion-text-center ion-padding"
-    >
-      <ion-spinner />
-    </div>
+      class="ion-padding verifactu-settings__loading"
+    />
     <InlineFeedback
       v-if="outsideSpain"
       tone="warning"
@@ -178,25 +203,13 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         data-testid="verifactu-settings-sending-card"
       >
         <h3>{{ $t('verifactu.settings.sending') }}</h3>
-        <ion-toggle
-          v-if="canConfigure"
-          data-testid="verifactu-settings-own"
-          :checked="config.route === 'own'"
-          :disabled="busy || outsideSpain"
-          @ion-change="setRoute"
-        >
-          {{ $t('verifactu.settings.ownCertificate') }}
-        </ion-toggle>
-        <p
-          class="verifactu-settings__hint"
-          data-testid="verifactu-settings-route-hint"
-        >
-          {{ config.route === 'own' ? $t('verifactu.settings.ownOn') : $t('verifactu.settings.ownOff') }}
-          <router-link to="/verifactu/config">
-            {{ $t('verifactu.settings.openConfig') }}
-          </router-link>
-        </p>
-
+        <SettingsSendingRoute
+          :config="config"
+          :can-configure="canConfigure"
+          :busy="busy"
+          :outside-spain="outsideSpain"
+          @route-change="setRoute"
+        />
         <div
           class="verifactu-settings__environment"
           data-testid="verifactu-settings-environment"
@@ -212,14 +225,27 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             {{ $t('verifactu.settings.goLiveHint') }}
           </p>
           <InlineFeedback
-            v-if="config.live_blockers.length && !outsideSpain"
+            v-if="certificateRequired && !config.erplora_route_available && !outsideSpain"
+            tone="info"
+            data-testid="verifactu-settings-certificate-required"
+          >
+            {{ $t('verifactu.settings.certificateRequired') }}
+            <router-link
+              class="verifactu-settings__certificate-link"
+              to="/verifactu/config"
+            >
+              {{ $t('verifactu.settings.uploadCertificate') }}
+            </router-link>
+          </InlineFeedback>
+          <InlineFeedback
+            v-if="visibleLiveBlockers.length && !outsideSpain"
             tone="warning"
             data-testid="verifactu-settings-live-blockers"
           >
             {{ $t('verifactu.settings.cannotGoLive') }}
             <ul class="verifactu-settings__reasons">
               <li
-                v-for="reason in config.live_blockers"
+                v-for="reason in visibleLiveBlockers"
                 :key="reason.code"
               >
                 {{ reason.message }}
@@ -230,7 +256,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             v-if="canConfigure"
             color="danger"
             data-testid="verifactu-settings-go-live"
-            :disabled="busy || !config.production_open || config.live_blockers.length > 0"
+            :disabled="busy || !config.production_open || goLiveBlocked"
             @click="goingLive"
           >
             {{ $t('verifactu.settings.goLive') }}
@@ -238,24 +264,24 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         </template>
         <template v-else>
           <InlineFeedback
-            v-if="config.issue_blocker"
+            v-if="visibleIssueBlocker"
             tone="danger"
             data-testid="verifactu-settings-issue-blocked"
           >
             {{ $t('verifactu.settings.issueBlocked') }}
             <ul class="verifactu-settings__reasons">
-              <li>{{ config.issue_blocker.message }}</li>
+              <li>{{ visibleIssueBlocker.message }}</li>
             </ul>
           </InlineFeedback>
           <InlineFeedback
-            v-if="config.reasons.length && !outsideSpain"
+            v-if="visibleReasons.length && !outsideSpain"
             tone="warning"
             data-testid="verifactu-settings-waiting"
           >
             {{ $t('verifactu.settings.waiting') }}
             <ul class="verifactu-settings__reasons">
               <li
-                v-for="reason in config.reasons"
+                v-for="reason in visibleReasons"
                 :key="reason.code"
               >
                 {{ reason.message }}
@@ -285,7 +311,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           </p>
         </template>
       </section>
-
       <section
         class="verifactu-settings__card verifactu-settings__test"
         data-testid="verifactu-settings-test-card"
@@ -297,6 +322,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
         <div class="verifactu-settings__buttons">
           <ion-button
             v-if="canSend"
+            :fill="!config.erplora_route_available && config.environment === 'testing' ? 'outline' : undefined"
             data-testid="verifactu-settings-test"
             :disabled="busy || outsideSpain"
             @click="testConnection"
@@ -321,8 +347,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           <dl class="verifactu-settings__fields">
             <dt>{{ $t('verifactu.settings.ranAt') }}</dt>
             <dd>{{ formatDateTime(result.ran_at, locale) }}</dd>
-            <dt>{{ $t('verifactu.settings.route') }}</dt>
-            <dd>{{ result.route === 'own' ? $t('verifactu.config.own') : $t('verifactu.config.erplora') }}</dd>
+            <DiagnosticRouteRow :diagnostic="diagnosticRoute" />
             <dt>{{ $t('verifactu.filters.environment') }}</dt>
             <dd>{{ $t(`verifactu.env.${result.environment}`) }}</dd>
             <dt>{{ $t('verifactu.settings.gateway') }}</dt>
@@ -340,7 +365,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
               {{ $t('verifactu.settings.cannotSend') }}
               <ul class="verifactu-settings__reasons">
                 <li
-                  v-for="reason in result.reasons"
+                  v-for="reason in visibleDiagnosticReasons"
                   :key="reason.code"
                 >
                   {{ reason.message }}
@@ -356,7 +381,6 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           {{ $t('verifactu.settings.noTest') }}
         </p>
       </section>
-
       <section
         class="verifactu-settings__card verifactu-settings__declaration"
         data-testid="verifactu-settings-declaration-card"
@@ -392,6 +416,10 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 </template>
 
 <style scoped>
+.verifactu-settings__loading {
+  display: block;
+  margin-inline: auto;
+}
 .verifactu-settings__card {
   margin-bottom: 1.25rem;
   padding: 1rem;
@@ -405,6 +433,12 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
 .verifactu-settings__hint {
   color: var(--ion-color-medium, #8a8577);
   font-size: 0.875rem;
+}
+.verifactu-settings__certificate-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  margin-inline-start: 0.5rem;
 }
 .verifactu-settings__environment {
   display: flex;

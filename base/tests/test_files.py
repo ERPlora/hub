@@ -31,7 +31,11 @@ from base import files, registry
 from base.models import Hub
 from base.schemas import HubStateIn
 from base.storage import hub_prefix
+from base.tenancy.tests import business
+from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.test_files_api import b64, http, owner, raw
+
+__all__ = ["in_business_a"]
 
 A = uuid.UUID("0199c4b0-0000-7000-8000-00000000000a")
 B = uuid.UUID("0199c4b0-0000-7000-8000-00000000000b")
@@ -323,11 +327,11 @@ def with_space(slug, space):
     assert answer.applied
 
 
-def post_files(client, action, host="a.localhost:8000", **body):
+def post_files(client, action, host=f"{business.HOST}:8000", **body):
     return http(client, "post", f"/api/files/{action}", host=host, data=body, content_type="application/json")
 
 
-def upload_over_http(client, name, size, host="a.localhost:8000"):
+def upload_over_http(client, name, size, host=f"{business.HOST}:8000"):
     return post_files(client, "upload", host=host, folder="", name=name, content_base64=b64(b"x" * size))
 
 
@@ -346,16 +350,16 @@ def bought_down(client, make_user, store):
     """``KEPT`` under a plan of 1 MB, then bought down to 100 bytes: 180 used, 100 allowed. Over HTTP and with the
     SaaS's photo, because the plan only reaches the files through the operations. Gives what was listed before."""
     for path, content in KEPT.items():
-        put(store, Hub.objects.get(slug="a").id, path, content)
+        put(store, Hub.objects.get(slug=business.A.key).id, path, content)
     owner(client, make_user)
-    with_space("a", 1024**2)
+    with_space(business.A.key, 1024**2)
     before = listed(client)
-    with_space("a", 100)
+    with_space(business.A.key, 100)
     return before
 
 
-@pytest.mark.django_db
-def test_a_lower_plan_loses_no_file_and_only_refuses_one_more(client, make_user, bought_down):
+@HUB_DB
+def test_a_lower_plan_loses_no_file_and_only_refuses_one_more(client, make_user, bought_down, hub_b):
     # What exceeds the new plan stays and is used; nothing more goes in until it is under the limit.
     frozen = [{**seen, "space": BOUGHT_DOWN_SPACE} for seen in bought_down]
     assert listed(client) == frozen
@@ -374,11 +378,11 @@ def test_a_lower_plan_loses_no_file_and_only_refuses_one_more(client, make_user,
     assert upload_over_http(client, "fits.pdf", 40).status_code == 200
 
     # Another business's plan is its own: this business's lower plan refuses it nothing.
-    owner(client, make_user, "b")
-    assert upload_over_http(client, "theirs.pdf", 1024, host="b.localhost:8000").status_code == 200
+    owner(client, make_user, business.B.key)
+    assert upload_over_http(client, "theirs.pdf", 1024, host=f"{business.B.key}.localhost:8000").status_code == 200
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_lower_plan_leaves_what_is_there_in_use(client, bought_down):
     # What exceeds the plan is still used: none of these adds a byte, and BASE-F73 and BASE-F75 give no refusal for
     # the space.

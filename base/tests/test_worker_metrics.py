@@ -19,19 +19,38 @@ from base import catalog, metrics, worker
 from base.catalog import CatalogError
 from base.metrics import Metric
 from base.tests.test_metrics import FakeCloudWatch
-from base.tests.test_worker import (  # noqa: F401 (the fakes of every pass of the tick, autouse)
+from base.tests.test_worker import (
     THREADED,
     WRITTEN,
+    activations_pass,
     data_pass,
     due,
     freeze_switch,
     hubs_pass,
     inline_passes,
+    moves_pass,
+    nobody_without_a_database,
     outbox,
     reaper,
     tasks,
     usage_pass,
 )
+
+# The fakes of every pass of the tick, autouse.
+__all__ = [
+    "activations_pass",
+    "data_pass",
+    "due",
+    "freeze_switch",
+    "hubs_pass",
+    "inline_passes",
+    "moves_pass",
+    "nobody_without_a_database",
+    "outbox",
+    "reaper",
+    "tasks",
+    "usage_pass",
+]
 
 START = dt.datetime(2026, 11, 1, 10, 0, tzinfo=dt.UTC)
 
@@ -81,7 +100,7 @@ def test_a_pass_runs_at_once_then_once_a_minute_of_the_workers_clock(registered,
     ]
 
 
-def test_a_slow_metrics_pass_never_holds_the_tick(registered, cloudwatch, monkeypatch, tasks):
+def test_a_slow_metrics_pass_never_holds_the_tick(registered, cloudwatch, monkeypatch, hubs_pass):
     monkeypatch.setattr(worker, "Background", THREADED)
     entered, release = threading.Event(), threading.Event()
     measured_in: list[str] = []
@@ -106,9 +125,10 @@ def test_a_slow_metrics_pass_never_holds_the_tick(registered, cloudwatch, monkey
 
     assert worker.run(stop, wait=wait, clock=every(30)) == 0
 
-    # Five ticks, each with its tasks run, all while the one metrics pass was still measuring in its own thread.
+    # Five ticks, each with its pass over the businesses (their tasks run in it), all while the one metrics pass was
+    # still measuring in its own thread.
     assert held == [True] * 5
-    assert len(tasks.ticks) == 5
+    assert len(hubs_pass) == 5
     assert measured_in == ["worker-metrics"]
 
 

@@ -9,7 +9,7 @@ Cases from the current module's ``list_filters``, ``record_detail_fields``, ``ev
 import datetime as dt
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.context import system_context
@@ -34,6 +34,7 @@ from apps.verifactu.tests.conftest import (
     manual,
     run,
 )
+from base.tenancy.context import current_alias
 
 pytestmark = HUB_DB
 
@@ -240,12 +241,15 @@ def test_filters_the_rejections_pending_or_already_corrected(three):
 
 
 def test_the_corrections_cost_no_query_per_row(issuer):
-    # One subquery in the page's SELECT, never one query per rejected row.
-    def queries_listing() -> int:
-        with CaptureQueriesContext(connection) as captured:
+    # One subquery in the page's SELECT, never one query per rejected row, in the business's database or in control's.
+    def queries_listing() -> tuple[int, int]:
+        with (
+            CaptureQueriesContext(connections[current_alias()]) as on_the_business,
+            CaptureQueriesContext(connections["default"]) as on_control,
+        ):
             page = run("verifactu.record.list")
         assert page.total == Record.objects.count()
-        return len(captured)
+        return len(on_the_business), len(on_control)
 
     one = ticket(1000)
     Record.objects.filter(pk=one.id).update(status="rejected")

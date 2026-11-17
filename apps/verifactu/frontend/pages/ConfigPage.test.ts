@@ -6,9 +6,10 @@
 // uploaded here with its password («Upload the certificate») or removed («Remove», asking first). Only who
 // configures VeriFactu uploads or removes it.
 import { toastSuccess } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CONFIG } from '../__tests__/config-fixture';
+import { CONFIG, CONFIG_WITHOUT_ERPLORA_ROUTE, LOADED_CERTIFICATE } from '../__tests__/config-fixture';
 import { click, EMPLOYEE, ionValue, mountVerifactu, settle } from '../__tests__/mount-verifactu';
 import type { ConfigOut } from '../operations';
 import ConfigPage from './ConfigPage.vue';
@@ -27,15 +28,7 @@ beforeEach(() => {
   vi.mocked(toastSuccess).mockClear();
 });
 
-const LOADED: ConfigOut['own_certificate'] = {
-  loaded: true,
-  holder: 'ACME SL',
-  holder_tax_id: 'B12345674',
-  kind: 'representative',
-  uploaded_at: '2026-10-01T10:00:00Z',
-  expires_at: '2027-10-01T10:00:00Z',
-  expires_in_days: 351,
-};
+const LOADED = LOADED_CERTIFICATE;
 
 async function setup(config: Partial<ConfigOut> = {}, options: { session?: typeof EMPLOYEE } = {}) {
   const m = await mountVerifactu(ConfigPage, { path: '/verifactu/config', session: options.session });
@@ -213,5 +206,59 @@ describe('ConfigPage', () => {
     await click(m.find('verifactu-config-tab-own').element);
     expect(m.find('verifactu-config-cert-upload').text()).toBe('Subir el certificado');
     expect(m.find('verifactu-config-cert-choose').text()).toBe('Elegir el fichero .p12 / .pfx');
+  });
+
+  it('without the ERPlora route it shows the own certificate directly and nothing of the authorisation', async () => {
+    const s = await setup(CONFIG_WITHOUT_ERPLORA_ROUTE);
+    expect(s.find('verifactu-config-tab-erplora').exists()).toBe(false);
+    expect(s.find('verifactu-config-tab-own').exists()).toBe(false);
+    expect(s.find('verifactu-config-erplora').exists()).toBe(false);
+    expect(s.find('verifactu-config-grant').exists()).toBe(false);
+    expect(s.find('verifactu-grant-form').exists()).toBe(false);
+    expect(s.find('verifactu-config-own').exists()).toBe(true);
+    expect(s.find('verifactu-config-cert-status').text()).toBe('No certificate uploaded');
+    expect(s.wrapper.text()).not.toContain('ERPlora');
+    expect(s.wrapper.text()).not.toMatch(/authorisation|representation/i);
+  });
+
+  it('in testing without a certificate it reassures instead of warning', async () => {
+    const s = await setup(CONFIG_WITHOUT_ERPLORA_ROUTE);
+    expect(s.find('verifactu-config-testing-note').text()).toBe('You can test VeriFactu without a certificate. You only need one to go live.');
+    expect(s.find('verifactu-config-expiry').exists()).toBe(false);
+  });
+
+  it.each([
+    { days: 351, label: 'Valid' },
+    { days: 17, label: 'Expires soon' },
+    { days: -1, label: 'Expired' },
+  ])('gives a certificate with $days days left the explicit status $label', async ({ days, label }) => {
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, own_certificate: { ...LOADED, expires_in_days: days } });
+    expect(s.find('verifactu-config-cert-status').text()).toBe(label);
+    expect(s.find('verifactu-config-cert').text()).toContain('ACME SL');
+  });
+
+  it('keeps one primary action in the certificate card', async () => {
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, own_certificate: LOADED });
+    const primary = s.wrapper.findAllComponents(IonButton).filter((button) => button.props('fill') !== 'outline');
+    expect(primary).toHaveLength(1);
+    expect(primary[0].attributes('data-testid')).toBe('verifactu-config-cert-upload');
+  });
+
+  it('does not name the ERPlora route when removing the only way to send', async () => {
+    const s = await setup({ ...CONFIG_WITHOUT_ERPLORA_ROUTE, own_certificate: LOADED });
+    mocks.confirm.mockResolvedValue(false);
+    await click(s.find('verifactu-config-cert-remove').element);
+    expect(mocks.confirm.mock.calls[0][0].message).toBe('Records will wait until you upload another certificate.');
+  });
+
+  it('speaks Spanish without the ERPlora route', async () => {
+    const m = await mountVerifactu(ConfigPage, { path: '/verifactu/config', locale: 'es' });
+    await m.live();
+    await m.result('verifactu.config.get', CONFIG_WITHOUT_ERPLORA_ROUTE);
+    await settle();
+    expect(m.find('verifactu-config-cert-status').text()).toBe('Sin certificado');
+    expect(m.find('verifactu-config-testing-note').text()).toBe('Puedes probar VeriFactu sin certificado. Solo lo necesitas para pasar a producción.');
+    expect(m.wrapper.text()).not.toContain('ERPlora');
+    expect(m.wrapper.text()).not.toMatch(/autorización|otorgamiento|representación/i);
   });
 });

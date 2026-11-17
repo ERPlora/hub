@@ -161,7 +161,7 @@
 1521 base/tests/test_assistant.py ERPlora/erplora-next#74
 1145 base/tests/test_queries_home.py ERPlora/erplora-next#74
 1058 base/tests/test_worker.py ERPlora/erplora-next#74
-1196 base/tests/test_ws_print.py ERPlora/erplora-next#74
+1194 base/tests/test_ws_print.py ERPlora/erplora-next#74
 641 base/worker.py ERPlora/erplora-next#74
 849 base/ws_print.py ERPlora/erplora-next#74
 650 config/settings.py ERPlora/erplora-next#74

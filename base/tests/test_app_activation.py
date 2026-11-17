@@ -29,7 +29,7 @@ from base.schemas import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
-from base.tenancy.tests.concurrency import at_once, in_a_thread, plan_with_room
+from base.tenancy.tests.concurrency import at_once, in_a_thread, meanwhile, plan_with_room
 from base.tests.routes import assert_bound
 
 #: Business A entered for every test with the database, room for two of its sessions at once, and control's LISTEN.
@@ -1444,9 +1444,9 @@ def test_a_change_waits_while_another_holds_the_business_rows(plan_with_room):
 
 @HUB_DB_COMMITTED
 def test_two_first_changes_at_once_write_the_business_down_once(plan_with_room):
-    outcomes = at_once(lambda: disable("website"), lambda: disable("flow"))
-
-    assert [outcome["state"] for outcome in outcomes] == ["off", "off"]
+    born_off()
+    with meanwhile(lambda sql: sql.lstrip().startswith('INSERT INTO "base_appactivation"'), lambda: enable("flow")) as flow:
+        assert enable("website")["state"] == "on"
+    assert isinstance(flow[0], dict) and flow[0]["state"] == "on", flow
     now = rows()
-    assert len(now) == len(activation.module_graph())
-    assert now["website"] == Activation(OFF, False) and now["flow"] == Activation(OFF, False)
+    assert len(now) == len(activation.module_graph()) and now["website"] == now["flow"] == Activation(ON, True)

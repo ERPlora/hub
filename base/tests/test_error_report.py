@@ -12,11 +12,12 @@ from django.test import Client
 from django.urls import resolve
 
 from base import error_report
+from base.tenancy.tests.business import HOST, HUB_DB, A, B
+from base.tests.test_spa import B_HOST
 
-pytestmark = pytest.mark.django_db
+pytestmark = [HUB_DB, pytest.mark.usefixtures("hub_a")]
 
 URL = "/api/error-report"
-HOST = "a.localhost:8000"
 REPORT = {
     "kind": "error",
     "message": "TypeError: Cannot read properties of undefined (reading 'total')",
@@ -28,7 +29,7 @@ REPORT = {
 
 @pytest.fixture
 def owner(client, make_user):
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
     return client
 
 
@@ -58,7 +59,7 @@ def test_the_route_is_the_reports_own_and_not_the_apis():
 
 
 def test_a_report_is_one_error_line_with_where_and_who(client, make_user, caplog):
-    user = make_user("ana", host="a", role="hub_owner")
+    user = make_user("ana", host=A.key, role="hub_owner")
     client.force_login(user)
 
     with caplog.at_level(logging.INFO, logger="base.error_report"):
@@ -69,7 +70,7 @@ def test_a_report_is_one_error_line_with_where_and_who(client, make_user, caplog
     assert record.levelno == logging.ERROR
     assert record.getMessage().startswith("frontend.error ")
     [logged] = reports(caplog)
-    assert logged == {**REPORT, "hub": "a", "user": str(user.pk), "user_agent": "Mozilla/5.0 (Linux; Android 14)"}
+    assert logged == {**REPORT, "hub": A.key, "user": str(user.pk), "user_agent": "Mozilla/5.0 (Linux; Android 14)"}
 
 
 def test_long_fields_are_cut_and_unknown_ones_dropped(owner, caplog):
@@ -121,7 +122,7 @@ def test_only_post(owner):
 def test_a_beacon_carries_no_csrf_token_and_is_taken(make_user, caplog):
     """``navigator.sendBeacon`` cannot send the CSRF header: the route only writes a log line, never data."""
     client = Client(enforce_csrf_checks=True)
-    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    client.force_login(make_user("ana", host=A.key, role="hub_owner"))
 
     with caplog.at_level(logging.INFO, logger="base.error_report"):
         assert post(client, REPORT).status_code == 204
@@ -137,10 +138,10 @@ def test_a_caller_cannot_flood_the_log(owner, caplog):
     assert len(reports(caplog)) == error_report.LIMIT
 
 
-def test_each_hub_is_named_in_its_own_lines(client, make_user, caplog):
-    client.force_login(make_user("bea", host="b", role="hub_owner"))
+def test_each_hub_is_named_in_its_own_lines(client, make_user, caplog, hub_b):
+    client.force_login(make_user("bea", host=B.key, role="hub_owner"))
 
     with caplog.at_level(logging.INFO, logger="base.error_report"):
-        assert post(client, REPORT, host="b.localhost:8000").status_code == 204
+        assert post(client, REPORT, host=B_HOST).status_code == 204
 
-    assert [logged["hub"] for logged in reports(caplog)] == ["b"]
+    assert [logged["hub"] for logged in reports(caplog)] == [B.key]

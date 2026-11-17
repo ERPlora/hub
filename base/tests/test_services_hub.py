@@ -16,7 +16,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.models import OutboxEvent
 
 from apps.verifactu.models import Config
 from base import registry, signing
@@ -26,11 +25,15 @@ from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, Hub
 from base.services.hub_registry import hub_cancel, hub_register, hub_restore, hub_state_apply
 from base.services.provisioning import report_ready
 from base.tenancy import names
+from base.tenancy.tests import hubs
 from base.tenancy.connections import control_name
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB, A
 from base.tests.conftest import SECRET
 from control.models import HubDue
+from control.tests.conftest import events
 
-pytestmark = pytest.mark.django_db
+pytestmark = HUB_DB
 
 HUB_ID = uuid.UUID("0199c4b0-0000-7000-8000-000000000001")
 OTHER_ID = uuid.UUID("0199c4b0-0000-7000-8000-000000000002")
@@ -53,10 +56,6 @@ def register(**changes):
 def a_user_context():
     user = get_user_model().objects.create_user(username="ana", password="pw")
     return OperationContext(scope=registry.REGISTRY_SCOPE, actor=user, permissions=frozenset({"*"}))
-
-
-def events(name):
-    return list(OutboxEvent.objects.filter(name=name).values_list("payload", flat=True))
 
 
 class TestRegister:
@@ -198,19 +197,23 @@ class TestReportReady:
         assert "base.hub.ready_reported" in caplog.text
 
 
+def configs(hub: Hub) -> list[Config]:
+    """The VeriFactu configurations in the own database of ``hub``."""
+    with use_hub(hub):
+        return list(Config.objects.all())
+
+
 class TestStateApply:
     @pytest.fixture
-    def hub(self, every_app_on):
-        """``acme`` with VeriFactu on (a new business is born with every app off)."""
-        hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
-        every_app_on("acme")
-        return hub
+    def hub(self, hub_a):
+        """Business A, with VeriFactu on (every app on), in its own database."""
+        return hub_a
 
-    def apply(self, version, **photo):
-        body = {"hub_id": str(HUB_ID), "slug": "acme", "version": version, **photo}
+    def apply(self, version, hub_id=hubs.HUB_A_ID, **photo):
+        body = {"hub_id": str(hub_id), "slug": A.key, "version": version, **photo}
         return hub_state_apply(
             SYSTEM,
-            HubStateIn(id=HUB_ID, version=version, status=photo.get("status"), verifactu=photo.get("verifactu"), photo=body),
+            HubStateIn(id=hub_id, version=version, status=photo.get("status"), verifactu=photo.get("verifactu"), photo=body),
         )
 
     def test_a_newer_photo_is_kept_as_it_came(self, hub):
@@ -218,8 +221,8 @@ class TestStateApply:
         assert (answer.applied, answer.version) == (True, 3)
         hub.refresh_from_db()
         assert hub.state_version == 3
-        assert hub.state == {"hub_id": str(HUB_ID), "slug": "acme", "version": 3, "plan": {"slug": "starter"}, "members": []}
-        assert events("base.hub.state_applied") == [{"id": str(HUB_ID), "version": 3}]
+        assert hub.state == {"hub_id": str(hub.id), "slug": A.key, "version": 3, "plan": {"slug": "starter"}, "members": []}
+        assert events("base.hub.state_applied") == [{"id": str(hub.id), "version": 3}]
 
     @pytest.mark.parametrize("version", [3, 2])
     def test_an_equal_or_older_photo_changes_nothing(self, hub, version):
@@ -229,19 +232,21 @@ class TestStateApply:
         hub.refresh_from_db()
         assert hub.state["plan"] == {"slug": "starter"}
 
-    def test_the_verifactu_block_and_the_status_reach_verifactu_on_the_hub_s_slug(self, hub):
+    def test_the_verifactu_block_and_the_status_reach_verifactu_on_the_hub_s_slug(self, hub, hub_b):
         self.apply(4, status="active", verifactu={"representation": {"status": "approved"}})
-        config = Config.objects.get()
+        [config] = configs(hub)
         assert (config.representation_status, config.hub_status, config.synced_version, str(config.hub_id)) == (
             "approved",
             "active",
             4,
-            str(HUB_ID),
+            str(hub.id),
         )
+        # In that business's own database, never in another one's.
+        assert configs(hub_b) == []
 
     def test_a_photo_without_block_or_status_leaves_verifactu_alone(self, hub):
         self.apply(1, plan=None)
-        assert not Config.objects.exists()
+        assert configs(hub) == []
 
     def test_a_verifactu_block_out_of_contract_keeps_nothing(self, hub):
         with pytest.raises(InvalidPayload) as refused:
@@ -250,7 +255,7 @@ class TestStateApply:
 
     def test_an_unknown_hub_is_not_found(self):
         with pytest.raises(NotFound):
-            self.apply(1)
+            self.apply(1, hub_id=HUB_ID)
 
     def test_only_the_platform_applies_a_photo(self, hub):
         with pytest.raises(PermissionDenied) as refused:

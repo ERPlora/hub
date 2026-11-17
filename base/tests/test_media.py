@@ -5,6 +5,7 @@ never changes (cached for a year, immutable). No session and no permission (a vi
 but only the host's own hub: a URL naming another hub's id is not found, whatever its files (one hub never serves
 another's, the tenancy rule). A name that climbs out of the hub's prefix is not found either, nor one outside the
 folders the apps declare (the website's ``website/img/``, for anyone): a private file of the store is never served.
+Businesses A and B each have their own database, as production does.
 """
 
 import pytest
@@ -14,9 +15,14 @@ from storages.utils import clean_name, safe_join
 
 from base.models import Hub
 from base.storage import hub_prefix, media_url
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
+pytestmark = HUB_DB
 
+ON_A = f"{HOST}:8000"
+ON_B = f"{B.key}.localhost:8000"
 PNG = b"\x89PNG\r\n\x1a\n" + b"pixels" * 100
 YEAR = "public, max-age=31536000, immutable"
 
@@ -38,13 +44,12 @@ def hub_files(settings):
 
 
 @pytest.fixture
-def a(hub_files) -> Hub:
-    hub = Hub.objects.get(slug="a")
-    hub_files.save(f"{hub_prefix(hub.id)}/website/img/3f2a9c.png", ContentFile(PNG))
-    return hub
+def a(hub_files, hub_a) -> Hub:
+    hub_files.save(f"{hub_prefix(hub_a.id)}/website/img/3f2a9c.png", ContentFile(PNG))
+    return hub_a
 
 
-def get(client, url, host="a.localhost:8000", method="get"):
+def get(client, url, host=ON_A, method="get"):
     return getattr(client, method)(url, HTTP_HOST=host)
 
 
@@ -85,15 +90,15 @@ def test_a_missing_file_is_not_found(client, a):
     assert get(client, media_url(a.id, "website/img/000000.png")).status_code == 404
 
 
-def test_another_hub_s_files_are_never_served_from_this_host(client, a, hub_files):
-    b = Hub.objects.get(slug="b")
+def test_another_hub_s_files_are_never_served_from_this_host(client, a, hub_files, hub_b):
+    b = hub_b
     hub_files.save(f"{hub_prefix(b.id)}/website/img/b0b0b0.png", ContentFile(PNG))
     # b's URL on a's host: not found, though the file exists.
     assert get(client, media_url(b.id, "website/img/b0b0b0.png")).status_code == 404
     # a's id with a name only b has: a's prefix holds no such file.
     assert get(client, media_url(a.id, "website/img/b0b0b0.png")).status_code == 404
     # On its own host, b's file is served (the store holds it).
-    assert get(client, media_url(b.id, "website/img/b0b0b0.png"), host="b.localhost:8000").status_code == 200
+    assert get(client, media_url(b.id, "website/img/b0b0b0.png"), host=ON_B).status_code == 200
 
 
 @pytest.mark.parametrize(
@@ -104,20 +109,20 @@ def test_another_hub_s_files_are_never_served_from_this_host(client, a, hub_file
         "..\\{b}\\website\\img\\b0b0b0.png",
     ],
 )
-def test_a_name_never_climbs_into_another_hub_s_files(client, a, hub_files, climb):
+def test_a_name_never_climbs_into_another_hub_s_files(client, a, hub_files, hub_b, climb):
     # The S3 store folds ``..`` and turns backslashes into slashes: a's prefix + ``../hub-b/…`` would be b's file.
-    b = Hub.objects.get(slug="b")
+    b = hub_b
     hub_files.save(f"{hub_prefix(b.id)}/website/img/b0b0b0.png", ContentFile(PNG))
     assert get(client, f"/p/media/{a.id.hex}/{climb.format(b=hub_prefix(b.id))}").status_code == 404
 
 
-def test_a_null_byte_in_the_name_is_not_found_on_disk_either(client, settings, tmp_path):
+def test_a_null_byte_in_the_name_is_not_found_on_disk_either(client, settings, tmp_path, hub_a):
     # Locally the store is the disk (MEDIA_ROOT), where a name with a null byte cannot even be opened.
     settings.STORAGES = {
         **settings.STORAGES,
         "hub_files": {"BACKEND": "django.core.files.storage.FileSystemStorage", "OPTIONS": {"location": tmp_path}},
     }
-    hub = Hub.objects.get(slug="a")
+    hub = hub_a
     assert get(client, f"/p/media/{hub.id.hex}/website/img/3f2a9c.png%00.txt").status_code == 404
 
 
@@ -165,13 +170,13 @@ def test_a_file_outside_the_public_folders_is_never_served(client, a, hub_files,
 
 
 @pytest.fixture
-def on_disk(settings, tmp_path):
+def on_disk(settings, tmp_path, hub_a):
     """The store on disk (``MEDIA_ROOT`` locally), with a's image and a folder under its images."""
     settings.STORAGES = {
         **settings.STORAGES,
         "hub_files": {"BACKEND": "django.core.files.storage.FileSystemStorage", "OPTIONS": {"location": tmp_path}},
     }
-    hub = Hub.objects.get(slug="a")
+    hub = hub_a
     storages["hub_files"].save(f"{hub_prefix(hub.id)}/website/img/3f2a9c.png", ContentFile(PNG))
     (tmp_path / hub_prefix(hub.id) / "website" / "img" / "album").mkdir()
     return hub
@@ -218,9 +223,9 @@ def member(client, make_user, a):
     """A session of hub a, opened on its host."""
     from base.middleware import SESSION_HOST_KEY
 
-    client.force_login(make_user("saas:7", host="a"))
+    client.force_login(make_user("saas:7", host=A.key))
     session = client.session
-    session[SESSION_HOST_KEY] = "a"
+    session[SESSION_HOST_KEY] = A.key
     session.save()
     return client
 
@@ -240,22 +245,22 @@ def test_a_visitor_without_a_session_never_sees_a_members_folder_nor_learns_it_e
     assert get(client, plan).status_code == 404
 
 
-def test_a_session_of_another_hub_never_sees_a_members_folder(client, make_user, a, table, plan, monkeypatch, hub_files):
+def test_a_session_of_another_hub_never_sees_a_members_folder(client, make_user, a, table, plan, monkeypatch, hub_files, hub_b):
     from base.middleware import SESSION_HOST_KEY
 
     monkeypatch.setattr(table, "members_media", ["table/plans/"])
-    b = Hub.objects.get(slug="b")
+    b = hub_b
     hub_files.save(f"{hub_prefix(b.id)}/{TABLE_PLAN}", ContentFile(PNG))
-    client.force_login(make_user("saas:8", host="b"))
+    client.force_login(make_user("saas:8", host=B.key))
     session = client.session
-    session[SESSION_HOST_KEY] = "b"
+    session[SESSION_HOST_KEY] = B.key
     session.save()
     # b's session on b's host, asking for a's file: another hub's id.
-    assert get(client, plan, host="b.localhost:8000").status_code == 404
+    assert get(client, plan, host=ON_B).status_code == 404
     # b's session carried to a's host: no session there.
     assert get(client, plan).status_code == 404
     # On its own host, b's member sees b's file.
-    assert get(client, media_url(b.id, TABLE_PLAN), host="b.localhost:8000").status_code == 200
+    assert get(client, media_url(b.id, TABLE_PLAN), host=ON_B).status_code == 200
 
 
 def test_a_folder_an_app_declares_public_is_served_to_anyone(client, table, plan, monkeypatch):
@@ -271,7 +276,7 @@ def test_a_folder_no_app_declares_is_never_served(member, table, plan):
 def test_a_members_folder_inside_a_public_one_stays_for_members(client, member, table, plan, monkeypatch):
     monkeypatch.setattr(table, "public_media", ["table/"])
     monkeypatch.setattr(table, "members_media", ["table/plans/"])
-    assert type(client)().get(plan, HTTP_HOST="a.localhost:8000").status_code == 404
+    assert type(client)().get(plan, HTTP_HOST=ON_A).status_code == 404
     assert get(member, plan).status_code == 200
 
 
@@ -303,7 +308,7 @@ def test_the_website_s_images_are_served_because_the_website_declares_them(clien
 def test_the_people_s_photos_stay_base_s_for_the_hub_s_sessions(client, member, a, hub_files):
     hub_files.save(f"{hub_prefix(a.id)}/avatars/0123456789abcdef.png", ContentFile(PNG))
     url = media_url(a.id, "avatars/0123456789abcdef.png")
-    assert (get(member, url).status_code, type(client)().get(url, HTTP_HOST="a.localhost:8000").status_code) == (200, 404)
+    assert (get(member, url).status_code, type(client)().get(url, HTTP_HOST=ON_A).status_code) == (200, 404)
 
 
 def turn_off(slug: str, label: str) -> None:
@@ -317,16 +322,21 @@ def turn_off(slug: str, label: str) -> None:
 def test_an_app_turned_off_in_the_business_serves_none_of_its_folders(client, member, table, plan, monkeypatch):
     monkeypatch.setattr(table, "public_media", ["table/plans/"])
     monkeypatch.setattr(table, "members_media", ["table/members/"])
-    a = Hub.objects.get(slug="a")
+    a = Hub.objects.get(slug=A.key)
     storages["hub_files"].save(f"{hub_prefix(a.id)}/table/members/3f2a9c.png", ContentFile(PNG))
-    turn_off("a", "table")
+    turn_off(A.key, "table")
     assert get(client, plan).status_code == 404
     assert get(member, media_url(a.id, "table/members/3f2a9c.png")).status_code == 404
 
 
-def test_an_app_turned_off_in_another_business_still_serves_here(client, table, plan, monkeypatch):
+def test_an_app_turned_off_in_another_business_still_serves_here(client, table, plan, monkeypatch, hub_b):
+    from base.models import AppActivation
+
     monkeypatch.setattr(table, "public_media", ["table/plans/"])
-    turn_off("b", "table")
+    with use_hub(hub_b):
+        turn_off(B.key, "table")
+    # Every row carries its business: one of B's kept in A's database is not A's either.
+    AppActivation.objects.create(host=B.key, app="table", state="off", chosen=False)
     assert get(client, plan).status_code == 200
 
 
