@@ -134,6 +134,7 @@ function onStation(event: CustomEvent<{ value?: string | number }>): void {
 
 <style scoped>
 .kds-bar {
+  container-type: inline-size;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -144,14 +145,16 @@ function onStation(event: CustomEvent<{ value?: string | number }>): void {
 }
 .kds-bar__main {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
 }
+/* The views never shrink below their words: on a narrow bar «Full screen» wraps instead of a tab being clipped. */
 .kds-bar__views {
   flex: 1 1 auto;
   width: auto;
-  min-width: 0;
+  min-width: fit-content;
   max-width: 32rem;
 }
 .kds-bar__stations {
@@ -190,6 +193,20 @@ function onStation(event: CustomEvent<{ value?: string | number }>): void {
   --padding-start: 0;
   --padding-end: 0;
   --border-radius: 12px;
+}
+@container (max-width: 26rem) {
+  .kds-bar ion-segment-button {
+    --padding-start: 0.3rem;
+    --padding-end: 0.3rem;
+  }
+  .kds-bar ion-label {
+    gap: 0.25rem;
+    font-size: 0.8rem;
+  }
+  .kds-bar__count {
+    min-width: 1.4rem;
+    padding: 0.1rem 0.3rem;
+  }
 }
 .kds-bar__dot {
   flex: none;

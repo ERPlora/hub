@@ -118,7 +118,6 @@
       "aria": "Comanda {n}",
       "waiter": "Camarero: {name}",
       "round": "Ronda {n}",
-      "ready": "Lista",
       "bump": "Listo",
       "bumpAll": "Marcar listos todos los platos en pantalla",
       "markRush": "Marcar urgente",

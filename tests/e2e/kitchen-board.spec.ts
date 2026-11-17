@@ -204,6 +204,12 @@ test('KITCHEN-F10, F11, F12, F13, F16: a new round rings once and comes in; a di
       await page.setViewportSize(size);
       await card(page, ticketId).scrollIntoViewIfNeeded();
       const edge = await card(page, ticketId).boundingBox();
+      // The three views fit their bar whole: none is clipped or scrolled out of it.
+      const views = await view.locator('[data-testid=kitchen-display-views]').boundingBox();
+      for (const tab of ['tickets', 'ready', 'allday']) {
+        const box = await view.locator(`[data-testid=kitchen-display-view-${tab}]`).boundingBox();
+        expect(box!.x >= views!.x - 1 && box!.x + box!.width <= views!.x + views!.width + 1, `${tab} whole at ${size.width}`).toBe(true);
+      }
       // The head row (type, label, clock) leads the card and its pills follow it, in iOS mode too.
       const head = await view.locator(`[data-testid=kitchen-card-${ticketId}-head]`).boundingBox();
       const pill = await view.locator(`[data-testid=kitchen-card-${ticketId}-status]`).boundingBox();

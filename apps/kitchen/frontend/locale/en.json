@@ -118,7 +118,6 @@
       "aria": "Ticket {n}",
       "waiter": "Waiter: {name}",
       "round": "Round {n}",
-      "ready": "Ready",
       "bump": "Ready",
       "bumpAll": "Mark every dish on screen ready",
       "markRush": "Mark rush",
