@@ -12,7 +12,8 @@ is read back with ``pg_restore``.
 """
 
 import datetime as dt
-import os
+import itertools
+import signal
 import subprocess
 import sys
 import time
@@ -306,35 +307,37 @@ SMALLEST_PART = 5 * 1024 * 1024
 LARGE = b"PGDMP" + bytes(range(256)) * (48 * 1024)
 
 
-def a_pg_dump(tmp_path, monkeypatch, script: str) -> str:
-    """``pg_dump`` replaced by ``script`` (Python, its own program): what a real one does at its edges, on demand. The
-    path of the file it writes its pid to."""
+def a_pg_dump(tmp_path, monkeypatch, script: str) -> list[subprocess.Popen]:
+    """``pg_dump`` replaced by ``script`` (Python, its own program): what a real one does at its edges, on demand. Each
+    one the copy starts reaches it only once it runs, however loaded the machine is, counts the copy's ``waits`` for it
+    to end, and is kept in the list returned to see how it ended."""
     program = tmp_path / "pg_dump"
-    pid = tmp_path / "pg_dump.pid"
-    started_line = f"open({str(pid)!r}, 'w').write(str(os.getpid()))"
-    program.write_text(f"#!{sys.executable}\nimport os, sys, time\n{started_line}\n{script}\n")
+    running = tmp_path / "pg_dump.running"
+    program.write_text(f"#!{sys.executable}\nimport os, sys, time\nopen({str(running)!r}, 'w').close()\n{script}\n")
     program.chmod(0o755)
+    started: list[subprocess.Popen] = []
+
+    class PgDump(subprocess.Popen):
+        waits = 0
+
+        def __init__(self, command, **kwargs):
+            super().__init__(command, **kwargs)
+            while self.poll() is None and not running.exists():
+                time.sleep(0.01)
+            started.append(self)
+
+        def wait(self, timeout=None):
+            self.waits += 1
+            return super().wait(timeout)
+
     monkeypatch.setattr(dumps, "pg_dump", lambda: str(program))
-    return str(pid)
+    monkeypatch.setattr(dumps.subprocess, "Popen", PgDump)
+    return started
 
 
-def started(pid_file: str) -> None:
-    """Wait until the replaced ``pg_dump`` is running (it wrote its pid)."""
-    deadline = time.monotonic() + 10
-    while not os.path.exists(pid_file) or not open(pid_file).read():
-        assert time.monotonic() < deadline, "the replaced pg_dump never started"
-        time.sleep(0.01)
-
-
-def gone(pid_file: str) -> bool:
-    """Whether the process that wrote ``pid_file`` is over (killed and waited for: no zombie left)."""
-    with open(pid_file) as written:
-        pid = int(written.read())
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return True
-    return False
+def killed(process: subprocess.Popen) -> bool:
+    """Whether the copy killed ``process`` and waited for it (no zombie left), rather than letting it end on its own."""
+    return process.returncode == -signal.SIGKILL
 
 
 def test_a_database_is_streamed_to_its_key_never_through_a_file(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
@@ -401,58 +404,61 @@ def test_a_stream_that_fails_says_why_never_the_password(hub_a, dumps_bucket, mo
 
 
 def test_a_stream_that_runs_too_long_is_stopped_and_keeps_nothing(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
-    pid = a_pg_dump(tmp_path, monkeypatch, "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); time.sleep(60)")
-    started = time.monotonic()
+    started = a_pg_dump(tmp_path, monkeypatch, "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); time.sleep(60)")
 
     with pytest.raises(dumps.DumpFailed) as failed:
         dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=0.5)
 
-    assert "took longer than 0.5 s" in str(failed.value)
-    assert time.monotonic() - started < 10 and gone(pid)
+    [process] = started
+    assert "took longer than 0.5 s" in str(failed.value) and killed(process)
     assert nothing_kept(moto_s3, dumps_bucket)
 
 
 @pytest.mark.parametrize(
-    "script",
+    ("script", "stopping"),
     [
-        "time.sleep(60)",
-        # Its output closed but still running: the end of the copy waits for it the same way.
-        "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); os.close(1); time.sleep(60)",
+        # Nothing written yet: the worker stops once the copy has looked once and waits on pg_dump's output.
+        ("time.sleep(60)", lambda looks, process: looks > 0),
+        # Its output closed but still running: the worker stops once the copy waits for it to end.
+        (
+            "sys.stdout.buffer.write(b'PGDMP'); sys.stdout.flush(); os.close(1); time.sleep(60)",
+            lambda looks, process: process.waits > 0,
+        ),
     ],
     ids=["before-any-output", "its-output-closed"],
 )
 def test_a_stream_is_stopped_when_the_worker_stops_and_keeps_nothing(
-    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, script
+    hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path, script, stopping
 ):
-    pid = a_pg_dump(tmp_path, monkeypatch, script)
-    asked = time.monotonic()
+    started = a_pg_dump(tmp_path, monkeypatch, script)
+    looks = itertools.count()
 
     with pytest.raises(dumps.DumpStopped):
-        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, cancelled=lambda: time.monotonic() - asked > 0.5)
+        dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, cancelled=lambda: stopping(next(looks), started[0]))
 
-    assert time.monotonic() - asked < 10 and gone(pid)
-    assert nothing_kept(moto_s3, dumps_bucket)
+    [process] = started
+    assert killed(process) and nothing_kept(moto_s3, dumps_bucket)
 
 
 def test_while_it_streams_its_heartbeat_beats_and_one_that_fails_stops_it(
     hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path
 ):
     monkeypatch.setattr(dumps, "POLL_SECONDS", 0.0)
-    pid = a_pg_dump(tmp_path, monkeypatch, "time.sleep(60)")
+    started = a_pg_dump(tmp_path, monkeypatch, "time.sleep(60)")
     beats = []
 
     class LeaseLost(Exception):
         pass
 
     def lost():
-        started(pid)
         beats.append(1)
         raise LeaseLost("another worker holds it now")
 
     with pytest.raises(LeaseLost):
         dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60, heartbeat=lost)
 
-    assert beats == [1] and gone(pid)
+    [process] = started
+    assert beats == [1] and killed(process)
     assert nothing_kept(moto_s3, dumps_bucket)
 
 
@@ -468,12 +474,12 @@ def test_its_heartbeat_waits_its_time_between_beats(hub_a, dumps_bucket, moto_s3
 
 
 def test_without_a_bucket_nothing_is_streamed_and_pg_dump_never_starts(hub_a, no_dumps_bucket, monkeypatch, tmp_path):
-    pid = a_pg_dump(tmp_path, monkeypatch, "")
+    started = a_pg_dump(tmp_path, monkeypatch, "")
 
     with pytest.raises(dumps.DumpsUnavailable):
         dumps.stream_to_bucket(hub_a, MOVE_KEY, timeout=60)
 
-    assert not os.path.exists(pid)
+    assert started == []
 
 
 def test_a_bucket_that_refuses_the_stream_is_a_readable_failure(hub_a, dumps_bucket, moto_s3, monkeypatch, tmp_path):
