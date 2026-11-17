@@ -269,13 +269,32 @@ describe('SettingsPage', () => {
     ]);
   });
 
-  it('does not bring the old route or authorisation back in a diagnostic', async () => {
+  it('omits the diagnostic route when the closed ERPlora route still carries testing records', async () => {
     const s = await setup(CONFIG_WITHOUT_ERPLORA_ROUTE);
     await s.result('verifactu.diagnostic.last', { result: { ...DIAGNOSTIC, reasons: [NOT_APPROVED] } });
     const result = s.find('verifactu-settings-result').text();
-    expect(result).toContain('My certificate');
+    expect(result).not.toContain('Filed through');
+    expect(result).not.toContain('My certificate');
     expect(result).not.toContain('ERPlora files for you');
     expect(result).not.toMatch(/authorisation|representation/i);
+  });
+
+  it('shows the own certificate in the diagnostic when it really carries the records', async () => {
+    const s = await setup(CONFIG_WITHOUT_ERPLORA_ROUTE);
+    await s.result('verifactu.diagnostic.last', { result: { ...DIAGNOSTIC, route: 'own' } });
+    const result = s.find('verifactu-settings-result').text();
+    expect(result).toContain('Filed through');
+    expect(result).toContain('My certificate');
+  });
+
+  it('keeps both diagnostic route labels when ERPlora is available', async () => {
+    for (const [route, label] of [['erplora', 'ERPlora files for you'], ['own', 'My certificate']] as const) {
+      const s = await setup();
+      await s.result('verifactu.diagnostic.last', { result: { ...DIAGNOSTIC, route } });
+      const result = s.find('verifactu-settings-result').text();
+      expect(result).toContain('Filed through');
+      expect(result).toContain(label);
+    }
   });
 
   it('speaks Spanish when only the own certificate can go live', async () => {
