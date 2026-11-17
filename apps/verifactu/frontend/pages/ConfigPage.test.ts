@@ -8,6 +8,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CONFIG } from '../__tests__/config-fixture';
 import { click, EMPLOYEE, ionValue, mountVerifactu, settle } from '../__tests__/mount-verifactu';
 import type { ConfigOut } from '../operations';
 import ConfigPage from './ConfigPage.vue';
@@ -25,29 +26,6 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
 });
-
-const CONFIG: ConfigOut = {
-  environment: 'testing',
-  route: 'erplora',
-  production_since: null,
-  production_open: false,
-  can_go_back: true,
-  gateway_configured: false,
-  issuer_nif: 'B12345674',
-  issuer_name: 'Peluquería Ana SL',
-  producer: { name: 'ERPLORA CLOUD SL', nif: 'B27593136', system_name: 'ERPlora Hub', system_id: 'EC', version: 'dev', installation: 'a', only_verifactu: 'S', multi_ot: 'S', multiple_ot: 'S' },
-  declaration_version: 'v1',
-  declaration_url: 'https://erplora.com/legal/declaracion-responsable/v1/',
-  account_url: 'https://erplora.com',
-  own_certificate: { loaded: false, holder: '', holder_tax_id: '', kind: '', uploaded_at: null, expires_at: null, expires_in_days: null },
-  representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
-  synced_at: null,
-  route_ready: true,
-  route_ready_for_production: false,
-  reasons: [],
-  issue_blocker: null,
-  live_blockers: [],
-};
 
 const LOADED: ConfigOut['own_certificate'] = {
   loaded: true,

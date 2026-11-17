@@ -120,10 +120,10 @@
 1032 apps/tax/tests/test_services.py ERPlora/erplora-next#74
 635 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
-411 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
-749 apps/verifactu/models.py ERPlora/erplora-next#74
+403 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
+748 apps/verifactu/models.py ERPlora/erplora-next#74
 1314 apps/verifactu/queries.py ERPlora/erplora-next#74
-845 apps/verifactu/schemas.py ERPlora/erplora-next#74
+844 apps/verifactu/schemas.py ERPlora/erplora-next#74
 2466 apps/verifactu/services.py ERPlora/erplora-next#74
 2019 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 577 apps/website/queries.py ERPlora/erplora-next#74
