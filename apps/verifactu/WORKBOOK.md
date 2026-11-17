@@ -166,7 +166,8 @@ factura» y «Fecha» y «Continuar desde esta huella». Las dos recuperaciones 
 recuperación» / «Cancelar»). Al terminar: «Operación completada.».
 
 ### Configuración
-Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu». Dos pestañas, las dos vías:
+Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu». Con la vía de ERPlora disponible, dos
+pestañas, las dos vías:
 - **«Lo remite ERPlora»** (abre por defecto): «Otorgamiento de
   representación» con su estado («Sin firmar», «En revisión desde el {fecha}», «Aprobado el {fecha}», «Devuelto el
   {fecha}» con «Nota de la revisión», «Revocado el {fecha}»); «Lo que has enviado» («Envío n.º {n}, enviado el
@@ -191,17 +192,23 @@ Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu».
   VeriFactu ve «Elegir el fichero .p12 / .pfx», «Contraseña del certificado», «Subir el certificado» y, con uno
   cargado, «Quitar» (pregunta antes, en una tarjeta). Nota: «El certificado y su contraseña se guardan cifrados
   en este Hub y solo viajan a la pasarela de ERPlora al enviar a la AEAT; no se vuelven a mostrar.».
+Cuando la vía de ERPlora no está disponible, no hay pestañas ni se muestra nada del otorgamiento. El certificado
+es la única tarjeta: su estado dice «Sin certificado», «Válido», «Caduca pronto» o «Caducado», además de sus datos
+y los avisos de caducidad. En pruebas y sin certificado, «Puedes probar VeriFactu sin certificado. Solo lo necesitas
+para pasar a producción.»; en producción, «Sube un certificado válido para enviar tus registros a la AEAT.». «Subir
+el certificado» es la única acción principal; elegir el fichero y quitarlo son secundarias. Al quitarlo, el aviso solo
+dice que los registros esperarán hasta subir otro. La nota de cifrado no menciona la vía de ERPlora.
 En un negocio de fuera de España, arriba sale «VeriFactu solo es para negocios de España.» como único motivo: «Lo
-remite ERPlora» no enseña el otorgamiento ni el trámite, y «Mi certificado» solo enseña el estado del certificado, sin
-subirlo ni quitarlo.
+remite ERPlora», si está disponible, no enseña el otorgamiento ni el trámite, y el certificado solo enseña su estado,
+sin subirlo ni quitarlo.
 
 ### Ajustes
 Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
-- **«Envío»**: «Usar mi propio certificado» (interruptor, con su explicación según la vía) y «Entorno AEAT» con
-  la pastilla «Pruebas (AEAT de pruebas)» o «Producción» y, según el caso, «Pasar a producción» (con «Todavía no puede
-  pasar a producción:» y lo que falta, si falta algo) o «Volver a pruebas» con su explicación y su confirmación; en
-  producción, «Las ventas y facturas nuevas se rechazan hasta que se resuelva:» y el motivo, si no hay ruta a la
-  AEAT, y «Los registros están esperando:» y por qué, si esperan.
+- **«Envío»**: con la vía de ERPlora disponible, «Usar mi propio certificado» (interruptor, con su explicación según
+  la vía) y «Entorno AEAT» con la pastilla «Pruebas (AEAT de pruebas)» o «Producción» y, según el caso, «Pasar a
+  producción» (con «Todavía no puede pasar a producción:» y lo que falta, si falta algo) o «Volver a pruebas» con su
+  explicación y su confirmación; en producción, «Las ventas y facturas nuevas se rechazan hasta que se resuelva:» y
+  el motivo, si no hay ruta a la AEAT, y «Los registros están esperando:» y por qué, si esperan.
 - **«Prueba en vivo»**: «Probar la conexión» y «Crear factura de prueba»; debajo, el resultado de la última
   prueba («Probado el», «Se remite», «Entorno», «Pasarela de ERPlora», «Emisor», «Vía lista» y «Este negocio puede
   enviar.» o «Todavía no puede enviar:» con los motivos), o «Aún no has ejecutado ninguna prueba.».
@@ -209,8 +216,16 @@ Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
   identificativos de este sistema» (Productor, NIF del productor, Nombre del sistema, Código del sistema,
   Versión instalada, Número de instalación, Solo VERI\*FACTU, Puede dar servicio a varios obligados, Da
   servicio a varios obligados: siempre «S»).
-En un negocio de fuera de España, arriba sale «VeriFactu solo es para negocios de España.» como único motivo, y «Usar mi propio certificado»,
-«Pasar a producción», «Probar la conexión» y «Crear factura de prueba» van deshabilitados.
+Cuando la vía de ERPlora no está disponible, «Envío» muestra el estado del certificado y «Sube tu certificado» o
+«Gestionar el certificado», sin el interruptor ni ninguna referencia a la autorización. Si falta para producción, un
+aviso informativo junto a «Pasar a producción» dice «Puedes seguir probando. Para pasar a producción, sube el
+certificado de tu negocio.» y enlaza con «Sube tu certificado»; los demás bloqueos siguen en su lista y el botón queda
+deshabilitado mientras haya alguno. Al confirmar «Pasar a producción» con un certificado válido, esa misma acción elige
+primero la vía propia. Los avisos y diagnósticos no recuperan la autorización ni el nombre de la vía antigua, y
+«Probar la conexión» es secundario en pruebas.
+En un negocio de fuera de España, arriba sale «VeriFactu solo es para negocios de España.» como único motivo, y el
+interruptor, si está disponible, «Pasar a producción», «Probar la conexión» y «Crear factura de prueba» van
+deshabilitados.
 Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde si fue bien, roja si no).
 
 ## Estados de cada pantalla
