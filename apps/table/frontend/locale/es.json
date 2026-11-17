@@ -64,6 +64,7 @@
         "edit": "Editar plano"
       },
       "zones": "Zonas",
+      "paxOf": "{guests}/{capacity} pax",
       "add": "Añadir zona o mesa",
       "editZone": "Editar zona",
       "hint": "Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.",

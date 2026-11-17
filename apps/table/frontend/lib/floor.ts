@@ -72,14 +72,6 @@ export const STATUS_TONE: Readonly<Record<TableStatus, StatusPillTone>> = Object
   blocked: 'neutral',
 });
 
-/** The theme colour of each status, painted on a tile's border and its written status. */
-export const STATUS_COLOR: Readonly<Record<TableStatus, string>> = Object.freeze({
-  available: 'var(--ion-color-success, #2f9e44)',
-  occupied: 'var(--ion-color-danger, #d9480f)',
-  reserved: 'var(--ion-color-warning, #f08c00)',
-  blocked: 'var(--ion-color-medium, #868e96)',
-});
-
 /** Whose reservation a table paints: its name, or «Deleted customer» once her data was erased (F31). */
 export function holdName(hold: HoldShownOut | null | undefined, erased: string): string {
   if (!hold) return '';

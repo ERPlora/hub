@@ -64,6 +64,7 @@
         "edit": "Edit plan"
       },
       "zones": "Zones",
+      "paxOf": "{guests}/{capacity} pax",
       "add": "Add zone or table",
       "editZone": "Edit zone",
       "hint": "Drag to position · click a table to edit or delete it. Changes are saved instantly.",
