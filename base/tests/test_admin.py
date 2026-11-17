@@ -15,7 +15,10 @@ from base.admin import ADMIN_HUB_SESSION_KEY, HubAdmin, MembershipAdmin, TaskSch
 from base.models import Hub, Membership, TaskSchedule
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B
+from base.tenancy.tests.concurrency import hub_staff
 from control.tests.conftest import events
+
+__all__ = ["hub_staff"]
 
 pytestmark = HUB_DB
 PLATFORM = "hubs.localhost:8000"
@@ -135,18 +138,12 @@ def test_the_scheduled_tasks_are_registered():
     assert isinstance(admin.site._registry[TaskSchedule], TaskScheduleAdmin)
 
 
-def in_the_admin_of_a(client, user, hub_a) -> None:
-    """``user`` in the Hub admin with business A chosen: a business's rows are read in its own database."""
-    client.force_login(user)
-    client.get(f"/admin/hub/{hub_a.slug}/", HTTP_HOST=PLATFORM)
-
-
-def test_the_scheduled_tasks_are_listed_with_their_clock(client, superuser, hub_a):
+def test_the_scheduled_tasks_are_listed_with_their_clock(hub_staff, hub_a):
+    # A business's rows are read in its own database: the staff chose business A first.
     with use_hub(hub_a):
         scheduled_task()
-    in_the_admin_of_a(client, superuser, hub_a)
 
-    html = client.get("/admin/base/taskschedule/", HTTP_HOST=PLATFORM).content.decode()
+    html = hub_staff.get("/admin/base/taskschedule/", HTTP_HOST=PLATFORM).content.decode()
 
     assert "verifactu.contingency.process" in html and "* * * * *" in html
 
@@ -158,12 +155,11 @@ def test_a_scheduled_task_is_not_added_by_hand(client, superuser):
     assert client.get("/admin/base/taskschedule/add/", HTTP_HOST=PLATFORM).status_code == 403
 
 
-def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(client, superuser, hub_a):
+def test_the_next_run_can_be_brought_forward_and_the_declaration_stays(hub_staff, hub_a):
     with use_hub(hub_a):
         task = scheduled_task()
-    in_the_admin_of_a(client, superuser, hub_a)
 
-    response = client.post(
+    response = hub_staff.post(
         f"/admin/base/taskschedule/{task.pk}/change/",
         # The admin speaks the server's time (Europe/Madrid): 11:00 there is 09:00 UTC.
         {"next_run_0": "2026-10-15", "next_run_1": "11:00:00", "cron": "0 0 * * *", "operation": "x.y.z"},

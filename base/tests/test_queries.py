@@ -196,6 +196,14 @@ def test_on_a_business_that_is_no_demo_there_is_no_demo(request, business):
         assert get("base.session.me")(ctx, SessionMeIn()).demo is None
 
 
+def test_a_business_whose_row_is_gone_has_no_demo(hub_a):
+    from base.models import Hub
+
+    Hub.objects.filter(pk=hub_a.pk).update(slug="gone")
+
+    assert session_me().get("demo", "missing") is None
+
+
 def test_an_app_the_business_has_no_right_to_is_off_and_out_of_the_menu(make_user, monkeypatch):
     """A paid module without its right in the SaaS's photo (``base.entitlement``) is no app of the menu nor
     of «My apps»; ``off`` tells the shell's gate why its screens do not open."""
