@@ -37,6 +37,7 @@ from apps.verifactu import (
     certificates,
     chain,
     envelope,
+    erplora_route,
     events,
     gateway,
     producer,
@@ -1996,6 +1997,7 @@ def _route_refusal(
 )
 def update_config(ctx: OperationContext, data: ConfigUpdateIn) -> ConfigOut:
     config = _config()
+    erplora_route.refuse_choosing(config, data.route, ctx.scope)
     refusal = _route_refusal(config, data.route, config.environment, ctx.scope)
     if refusal is not None:
         raise refusal
@@ -2053,6 +2055,7 @@ def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
         raise Conflict(str(GO_LIVE_FORBIDDEN), code="verifactu.go_live_forbidden")
     if not issuer_configured():
         raise Conflict(str(ISSUER_MISSING), code="verifactu.issuer_missing")
+    erplora_route.refuse_going_live(config, ctx.scope)
     refusal = _route_refusal(config, config.route, Environment.PRODUCTION, ctx.scope)
     if refusal is not None:
         raise refusal
@@ -2291,13 +2294,9 @@ def follow_deployment(ctx: OperationContext, data: NoInput) -> ConfigOut:
 
 SIGNER_REQUIRED = _("Fill in the name and ID number of the person signing.")
 SIGNED_MODEL_REQUIRED = _("Attach the signed form.")
-SIGNED_MODEL_NOT_PDF = _(
-    "The signed form has to be a PDF: scan it or sign it with AutoFirma."
-)
+SIGNED_MODEL_NOT_PDF = _("The signed form has to be a PDF: scan it or sign it with AutoFirma.")
 ID_COPY_REQUIRED = _("Attach a copy of the identity document.")
-SIGNATURE_SAMPLE_REQUIRED = _(
-    "With a NIE we also need a sample of the handwritten signature."
-)
+SIGNATURE_SAMPLE_REQUIRED = _("With a NIE we also need a sample of the handwritten signature.")
 REPRESENTATION_PROOF_REQUIRED = _(
     "Attach the document that proves you may sign for the company."
 )
@@ -2420,6 +2419,7 @@ def submit_representation(
     ctx: OperationContext, data: RepresentationSubmitIn
 ) -> ConfigOut:
     refuse_outside_spain(ctx)
+    erplora_route.refuse_unavailable(ctx.scope)
     hub_id = config_row().hub_id
     if hub_id is None:
         raise Conflict(str(HUB_UNREGISTERED), code="verifactu.hub_unregistered")

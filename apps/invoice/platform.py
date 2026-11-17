@@ -24,6 +24,7 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 
 from apps.invoice import fiscal
+from apps.tax.queries import round_half_up
 
 KINDS = ("invoice", "credit_note")
 #: A rectifying invoice by differences (``Invoice.RectificationKind.DIFFERENCES``): the credit note's negative amounts.
@@ -47,6 +48,7 @@ TAX_ID_MAX_LENGTH = 20
 DESCRIPTION_MAX_LENGTH = 500
 _SEQUENCE = re.compile(r"(\d+)$")
 _TWO_PLACES = Decimal("0.01")
+_HUNDRED = Decimal(100)
 
 REVERSE_CHARGE_NOTICE = _(
     "This is a B2B transaction. VAT is payable by the customer under the reverse charge mechanism."
@@ -158,19 +160,23 @@ def _line(item: dict, treatment: str) -> tuple[fiscal.FiscalKey, dict]:
         int(item["tax_cents"]),
         int(item["total_cents"]),
     )
+    discount = int(item.get("discount_cents") or 0)
     if key.cls == fiscal.SUBJECT:
         base, quota = net, tax
     else:
-        # No Spanish VAT is charged here: the whole amount of the line is its base, without quota.
+        # No Spanish VAT is charged here: the whole amount of the line is its base, without quota. Another state's
+        # VAT (OSS) is part of it, so the SaaS's discount, without VAT, takes it too.
         base, quota = total, 0
+        discount = round_half_up(discount * (_HUNDRED + rate) / _HUNDRED)
     quantity = Decimal(int(item.get("quantity") or 1))
-    # Invoicing keeps the sign of a line in its quantity, never in its price.
-    signed = -quantity if base < 0 else quantity
-    unit_price = (Decimal(abs(base)) / quantity).quantize(_TWO_PLACES)
+    # Invoicing keeps the sign of a line in its quantity, never in its price; its discount follows that sign.
+    sign = -1 if base < 0 else 1
+    unit_price = ((Decimal(abs(base)) + discount) / quantity).quantize(_TWO_PLACES)
     return key, {
         "description": (item.get("description") or "").strip()[:255],
-        "quantity": signed,
+        "quantity": sign * quantity,
         "unit_price": unit_price,
+        "discount_amount": sign * discount,
         "tax_rate": key.rate,
         "tax_category_key": (item.get("tax_category") or "")[:80],
         "base_amount": base,

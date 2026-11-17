@@ -30,6 +30,7 @@ from apps.verifactu import (
     certificates,
     chain,
     envelope,
+    erplora_route,
     gateway,
     producer,
     representation,
@@ -295,8 +296,8 @@ def live_problems(config: Config, scope: Scope) -> list[str]:
             found.append("own_certificate_missing")
         elif not own_certificate_readable(config):
             found.append("own_certificate_unreadable")
-    elif config.representation_status != Config.Representation.APPROVED:
-        found.append("representation_not_approved")
+    elif problem := erplora_route.live_problem(config, scope):
+        found.append(problem)
     if config.hub_status != Config.HubStatus.ACTIVE:
         found.append("hub_not_active")
     return found
@@ -503,6 +504,7 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
     return ConfigOut(
         environment=config.environment,
         route=config.route,
+        erplora_route_available=erplora_route.available(ctx.scope),
         production_since=config.production_since,
         production_open=production_open(),
         can_go_back=not Record.objects.filter(
@@ -537,9 +539,8 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         representation=representation_out(config, nif),
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment, ctx.scope),
-        route_ready_for_production=not _route_sending_problem(
-            config, Environment.PRODUCTION, ctx.scope
-        ),
+        route_ready_for_production=not erplora_route.closed(config, ctx.scope)
+        and not _route_sending_problem(config, Environment.PRODUCTION, ctx.scope),
         reasons=[wait(code) for code in blockers(config, config.environment, ctx.scope)],
         issue_blocker=wait(refused) if refused else None,
         live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
@@ -1251,9 +1252,7 @@ def representation_out(config: Config, issuer_nif: str) -> dict:
 
 
 def saas_unreachable() -> OperationError:
-    return OperationError(
-        str(SAAS_UNREACHABLE), code="verifactu.saas_unreachable", status=503
-    )
+    return OperationError(str(SAAS_UNREACHABLE), code="verifactu.saas_unreachable", status=503)
 
 
 @operation(
@@ -1280,6 +1279,7 @@ def saas_unreachable() -> OperationError:
     },
 )
 def representation_model(ctx: OperationContext, data: NoInput) -> RepresentationModelOut:
+    erplora_route.refuse_unavailable(ctx.scope)
     try:
         content = representation.model_pdf(issuer_model_details())
     except representation.SaasUnreachable:

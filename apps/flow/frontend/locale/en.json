@@ -2562,6 +2562,7 @@
       "accepted": "Accepted",
       "rejected": "Rejected",
       "route_ready_for_production": "Route ready for production",
+      "erplora_route_available": "ERPlora's route available",
       "categories": "Categories",
       "data_base64": "File",
       "size": "Size",

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:69f09ba396417bad22aa31111a829e0ea8869bdd2879eb7d3a705d6451551b44 -->
+<!-- generated from WORKBOOK.md sha256:01bbe865cc6da71c2d9c7b4f8e14ece45ade5f8f3cfc5b5573bc005f49242e46 -->
 
 ## What it is for and who it is for
 
@@ -719,13 +719,15 @@ Steps:
    notes in `ERPR`) and sends it, signed, to ERPlora's platform hub.
 3. Invoicing issues it as it arrives, with the account's number and date (no series of the hub counts for
    it), with ERPlora as issuer and that day's payer as recipient, and VeriFactu seals its record in the
-   same operation. It answers "issued" with its QR.
+   same operation. It answers "issued" with its QR. A discounted line (a promotion code) carries the plan's
+   price and the discount apart; a free month is an invoice of 0 €, which is issued, filed and printed like
+   any other.
 4. The account then asks how it is going: "issued" while the record goes to the AEAT, and "accepted",
    "accepted with errors" or "rejected" when it answers (with its code and its message).
 5. The PDF is the same A4 as in INVOICE-F18 in the payer's language, with the VeriFactu QR ("QR
    tributario:", "VERI*FACTU") only once the AEAT has accepted it, as in the old account.
-In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines and,
-in a credit note, the invoice it corrects.
+In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines
+(each with its discount) and, in a credit note, the invoice it corrects.
 Out: the invoice, with the account's reference (announces `invoice.invoice.issued`; a credit note, also
 `invoice.invoice.rectified`), and its VeriFactu record.
 If it fails: the same invoice again (or two deliveries at once) answers what there already is, without

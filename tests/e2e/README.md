@@ -271,7 +271,7 @@ mismo con su pasada.
 
 ## La demo (`demo.spec.ts`)
 
-Recorre la demo de punta a punta (plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
+Recorre la demo de punta a punta (plan `knowledge/raw/plans/2026-10-17-demo-hubs-fase-1.md` §3, README del Hub «Demo»):
 `/demo/` del SaaS → «Try the demo» → `demo-<hex>.localhost:<puerto>` con la shell y la sesión «Demo» → crea un ítem
 → `manage.py demo_expire <slug>` (por `execFileSync`, desde este checkout y con el `DB_NAME` de la ejecución) → 410
 «This demo has ended» → su enlace → `/demo/?state=expired` del SaaS → otra demo. Pide dos cosas que el resto de
@@ -363,7 +363,7 @@ variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.
 
 ## La QA del asistente con el modelo real (`qa/assistant-battery.spec.ts`)
 
-La batería de QA del asistente del Hub (`docs/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
+La batería de QA del asistente del Hub (`knowledge/raw/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
 C35 a C37) con el **modelo de verdad** y el **índice de documentación de verdad**: una prueba por punto. Se salta sin
 `QA_REAL_PROVIDER=1`, así que la suite y la CI nunca la corren (gasta tokens de verdad, unos 20 turnos). Pide una pila
 propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
@@ -398,7 +398,7 @@ QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep 
 
 ## Las sondas del asistente: capa 2 con el modelo real (`qa/assistant-probes.spec.ts`)
 
-La capa 2 de la QA del asistente (`docs/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
+La capa 2 de la QA del asistente (`knowledge/raw/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
 **sonda** es una frase natural **nueva** para una herramienta, escrita como la teclearía una persona de un rol en un
 idioma, y lo que el turno tiene que hacer. Nunca es una de las `asks` de la herramienta (eso ya lo mide la capa 1 en cada
 PR): mide que el asistente generaliza. Las sondas viven en `qa/probes/*.json` (esquema `qa/probes.schema.json`; el corpus

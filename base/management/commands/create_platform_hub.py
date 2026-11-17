@@ -14,8 +14,8 @@ SaaS's. Then, inside that database, it gives the hub its issuer, ERPlora's tax i
 prod: production, pre: testing), always through their operations, as the system on that slug. Invoicing and
 VeriFactu are always active on it.
 
-In AWS it runs once per environment as a one-off ECS task of the ``worker`` family, which has the migrator's
-credentials to make the database (WORKBOOK of invoice; runbook ``docs/runbooks/cut-shared-hubs.md``). The command
+In AWS it runs once per environment as a one-off ECS task of the ``worker`` family, which has the migrator's credentials
+to make the database (WORKBOOK of invoice; runbook ``knowledge/wiki/runbooks/cut-shared-hubs-prod.md``). The command
 makes the database itself; a row an older run left due may be the worker's to finish then, and it waits for it.
 """
 
