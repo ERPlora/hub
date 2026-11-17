@@ -19,6 +19,13 @@ export const toastWithId = (scope: Scope, id: string): Locator => scope.locator(
 export const newestToast = (scope: Scope): Locator =>
   scope.locator(`[data-testid="toast-stack"][data-position="bottom"] ${TOAST}`).first();
 
+/** How many finite animations still run on the newest toast and inside it (its entrance), read on that toast alone. */
+export const toastAnimationsRunning = (page: Page): Promise<number> =>
+  newestToast(page).evaluate((toast) => {
+    const running = (animation: Animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity;
+    return toast.getAnimations({ subtree: true }).filter(running).length;
+  });
+
 /** What a person can read on screen now: each toast not faded out whose words are not hidden behind the front one. */
 export function readableToasts(page: Page): Promise<string[]> {
   return toasts(page).evaluateAll((all) =>

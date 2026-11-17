@@ -35,11 +35,11 @@ const filesRead = () => vi.mocked(readFileSync).mock.calls.length + vi.mocked(re
 const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The files that ask for animations on purpose, and how many times: the detector itself (`movingInPage`), and the two
- * specs that measure it from outside — every root, and a toast's own entrance once `settled()` returned (`settled.spec.ts`), and
- * a toast still entering once `capture()` returned (`helpers-capture.spec.ts`). They read; they never wait.
+ * The files that ask for animations on purpose, and how many times: the detector itself (`movingInPage`), the spec that
+ * measures it from outside, every root once `settled()` returned (`settled.spec.ts`), and the toasts' helper that reads a
+ * toast's own entrance for that spec and `helpers-capture.spec.ts` (`toast-helpers.ts`). They read; they never wait.
  */
-const ALLOWED: Record<string, number> = { 'helpers-capture.spec.ts': 1, 'helpers.ts': 1, 'settled.spec.ts': 2 };
+const ALLOWED: Record<string, number> = { 'helpers.ts': 1, 'settled.spec.ts': 1, 'toast-helpers.ts': 1 };
 
 /** What is left of the specs' own waits, by file: it only goes down. */
 const RATCHET = JSON.parse(readFileSync(join(E2E_DIR, 'own-animation-waits.json'), 'utf8')) as Record<string, number>;
@@ -52,7 +52,7 @@ const WAIT_WITH_THE_DETECTOR =
 
 const LOWER_THE_RATCHET =
   'a file that lost getAnimations() reads lowers its count in own-animation-waits.json, or drops its line at 0 ' +
-  '(helpers.ts, settled.spec.ts and helpers-capture.spec.ts: their number in ALLOWED of own-animation-waits.test.ts)';
+  '(helpers.ts, settled.spec.ts and toast-helpers.ts: their number in ALLOWED of own-animation-waits.test.ts)';
 
 /**
  * How many times `source` reaches for `getAnimations` in its code, comments left out: a call
@@ -195,8 +195,8 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-    expect(staleInTheRatchet({ ...ALLOWED, ...RATCHET, 'settled.spec.ts': 1 })).toEqual([
-      'settled.spec.ts: 1 getAnimations reads, the ratchet says 2',
+    expect(staleInTheRatchet({ ...ALLOWED, ...RATCHET, 'settled.spec.ts': 0 })).toEqual([
+      'settled.spec.ts: 0 getAnimations reads, the ratchet says 1',
     ]);
   });
 

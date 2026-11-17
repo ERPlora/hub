@@ -16,7 +16,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, listReady, login, repeatedTop, shot, shown, uniqueName } from './helpers';
 import { settled } from './service-helpers';
-import { newestToast } from './toast-helpers';
+import { newestToast, toastAnimationsRunning } from './toast-helpers';
 
 const TASK = 'FIX-HUB-E2E-SHOT-BEFORE-RESIZE-UNCHECKED';
 const WAIT_TASK = 'FIX-HUB-E2E-CAPTURE-WITHOUT-WAIT-UNCHECKED';
@@ -92,13 +92,6 @@ async function picture(
   }, options);
   return Buffer.from(base64, 'base64');
 }
-
-/** The finite animations running on the toast on screen and inside it (its entrance), read on its own. */
-const toastMoving = (page: Page) =>
-  newestToast(page).evaluate((toast) => {
-    const running = (animation: Animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity;
-    return toast.getAnimations({ subtree: true }).filter(running).length;
-  });
 
 /** The box of the toast on screen, where its stack moves it, in whole pixels inside the window. */
 const toastBox = (page: Page) =>
@@ -277,7 +270,7 @@ test.describe('capture: never a screenshot while something finite moves on the p
         // No wait of the spec's own: capture() is the one that waits.
         const name = `${WAIT_TASK}-${size.label}`;
         const png = await capture(page, name);
-        expect.soft(await toastMoving(page), `the toast still entering once capture() returned at ${size.label}`).toBe(0);
+        expect.soft(await toastAnimationsRunning(page), `the toast still entering once capture() returned at ${size.label}`).toBe(0);
         await settled(page);
         const atRest = await capture(page, `${name}-at-rest`);
         const box = await toastBox(page);

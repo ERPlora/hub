@@ -11,7 +11,7 @@ import { A, api, capture, createItem, login, repeatedTop, settled as baseSettled
 import { signedIn, snap } from './cart-checkout-helpers';
 import { settled as scheduleSettled } from './schedule-helpers';
 import { settled } from './service-helpers';
-import { newestToast } from './toast-helpers';
+import { newestToast, toastAnimationsRunning } from './toast-helpers';
 
 const TASK = 'FIX-HUB-E2E-SETTLED-IONIC-ANIMATIONS';
 
@@ -38,13 +38,6 @@ const stillMoving = (page: Page) =>
     return moving;
   });
 
-/** The finite animations running on the toast on screen and inside it: its entrance, read on the toast alone. */
-const toastAnimations = (page: Page) =>
-  newestToast(page).evaluate((toast) => {
-    const running = (animation: Animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity;
-    return toast.getAnimations({ subtree: true }).filter(running).length;
-  });
-
 /** The box of the toast on screen, where its stack moves it, and the window's size. */
 const toastBox = (page: Page) =>
   newestToast(page).evaluate((toast) => {
@@ -68,7 +61,7 @@ test('hub-e2e-capture: after settled() a toast has stopped, whole on screen, in 
       await detail.getByTestId('demo-note-save').click();
       await expect(newestToast(page)).toBeVisible();
       await settled(page);
-      expect(await toastAnimations(page), `the toast still entering after settled() at ${size.label}`).toBe(0);
+      expect(await toastAnimationsRunning(page), `the toast still entering after settled() at ${size.label}`).toBe(0);
       expect(await stillMoving(page), `still moving after settled() at ${size.label}`).toEqual([]);
       const box = await toastBox(page);
       expect(box.top, `toast top at ${size.label}`).toBeGreaterThanOrEqual(0);
