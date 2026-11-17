@@ -7,7 +7,7 @@ from django.apps import apps
 from django.utils import translation
 
 from apps.verifactu import admin as verifactu_admin
-from apps.verifactu import models, queries, schemas, services
+from apps.verifactu import erplora_route, models, queries, schemas, services
 from apps.verifactu.models import (
     EVENT_MESSAGES,
     WAIT_REASONS,
@@ -50,7 +50,7 @@ def visible_texts() -> set[str]:
             for value in panel.options.values()
             if type(value).__name__ == "__proxy__"
         ),
-        *module_texts(queries, schemas, services, models, verifactu_admin),
+        *module_texts(queries, schemas, services, models, verifactu_admin, erplora_route),
         *EVENT_MESSAGES.values(),
         *WAIT_REASONS.values(),
         *Environment.labels,

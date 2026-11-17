@@ -231,10 +231,10 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada |
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
-| VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
-| VERIFACTU-F05 | Firmar y subir el otorgamiento de representación para que remita ERPlora | hecho — se sube en el Hub, lo revisa el staff en el SaaS (`fiscal/`) y el estado vuelve en la foto |
+| VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho — la vía de ERPlora solo se elige con ella abierta en el servidor (`VERIFACTU_ERPLORA_ROUTE_ENABLED`) |
+| VERIFACTU-F05 | Firmar y subir el otorgamiento de representación para que remita ERPlora | hecho — se sube en el Hub, lo revisa el staff en el SaaS (`fiscal/`) y el estado vuelve en la foto; con la vía de ERPlora cerrada en el servidor no se ofrece |
 | VERIFACTU-F06 | Volver a enviar el otorgamiento | hecho — en el Hub, como VERIFACTU-F05 |
-| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado válido \| vía ERPlora con otorgamiento aprobado) ∧ cuenta activa, en todos los planes (también en Gratis); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
+| VERIFACTU-F08 | Pasar a producción | hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado válido \| vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa, en todos los planes (también en Gratis); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan) |
 | VERIFACTU-F09 | Volver a pruebas | hecho |
 | VERIFACTU-F10 | Probar la conexión con la AEAT | hecho — con la sonda de la pasarela del SaaS (`/internal/verifactu/probe`) |
 | VERIFACTU-F11 | Crear una factura de prueba | hecho |
@@ -344,11 +344,17 @@ Pasos:
 3. Sale «Listo: a partir de ahora envías con tu propio certificado.» o «Listo: a partir de ahora remite
    ERPlora en tu nombre.».
 4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y el interruptor va deshabilitado.
+5. ERPlora puede cerrar su vía en el servidor (`VERIFACTU_ERPLORA_ROUTE_ENABLED` a falso; abierta por defecto):
+   entonces no se puede pasar a ella y solo queda el certificado propio. Quien ya está en ella sigue igual:
+   en pruebas remite con el sello de ERPlora y, si ya está en producción, sigue enviando y anulando por ella. El
+   negocio de la propia ERPlora no se ve afectado.
 Entra: la vía elegida; el certificado subido (VERIFACTU-F02) y el estado de la autorización, de la cuenta.
 Sale: la vía guardada; los registros siguientes salen por ella (avisa `verifactu.config.changed`).
 Si falla: sin certificado vigente, «No hay ningún certificado válido cargado: súbelo en VeriFactu →
 Configuración → Mi certificado.»; en producción y por la vía de ERPlora sin autorización aprobada, «Para que ERPlora remita en
-producción falta que apruebe tu autorización firmada.». El interruptor vuelve a la vía real.
+producción falta que apruebe tu autorización firmada.»; con la vía de ERPlora cerrada en el servidor, pasar a ella da
+«De momento ERPlora no presenta por cuenta de los negocios: presenta con tu propio certificado.» (409
+`verifactu.erplora_route_unavailable`). El interruptor vuelve a la vía real.
 Implicados: VERIFACTU-F02, VERIFACTU-F05
 
 ### VERIFACTU-F05 Firmar y subir el otorgamiento de representación para que remita ERPlora
@@ -385,6 +391,9 @@ fichero puede ocupar 5 MB como máximo.»); el rechazo del SaaS, con su código 
 emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no sabe su id en ERPlora) o un negocio
 que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
 SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
+Con la vía de ERPlora cerrada en el servidor, ni «Descargar el modelo» ni «Enviar a revisión» llegan al SaaS: 409
+`verifactu.erplora_route_unavailable`, «De momento ERPlora no presenta por cuenta de los negocios: presenta con tu
+propio certificado.». El negocio de la propia ERPlora no se ve afectado.
 Al descargar el modelo, un dato del emisor que el modelo no puede escribir (una letra fuera de las suyas o un texto
 demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo. Dentro de la app,
 si no lo puede guardar, lo dice con su motivo (BASE-F112) y no sale «Modelo descargado».
@@ -405,7 +414,7 @@ Implicados: VERIFACTU-F05
 
 ### VERIFACTU-F08 Pasar a producción
 Estado: hecho — producción = despliegue `prod` ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (vía propia con certificado
-válido | vía ERPlora con otorgamiento aprobado) ∧ cuenta activa (`status` de la foto), en todos los planes
+válido | vía ERPlora abierta en el servidor con otorgamiento aprobado) ∧ cuenta activa (`status` de la foto), en todos los planes
 (también en Gratis, sin opción de pago); el servidor lo tiene cerrado hasta que ERPlora lo abra (bajo supervisión de Ioan). En `pre` nunca se abre: todo va a pruebas. Un
 hub demo nunca pasa a producción (`verifactu.go_live_forbidden`).
 Actor: administrador
@@ -413,9 +422,9 @@ Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, «Entorno AEAT» enseña «Pruebas (AEAT de pruebas)» y «Tus facturas van al entorno de
    pruebas de la AEAT. Cuando esté todo listo, pasa a producción.». Si falta algo, debajo sale «Todavía no puede
-   pasar a producción:» con la lista (negocio de demostración, otorgamiento sin aprobar, certificado propio que falta
-   o ha caducado, cuenta con un pago pendiente o suspendida) y «Pasar a producción» queda desactivado. Ningún plan
-   falta en ella: VeriFactu en vivo es de todos los planes.
+   pasar a producción:» con la lista (negocio de demostración, otorgamiento sin aprobar, vía de ERPlora cerrada en el
+   servidor, certificado propio que falta o ha caducado, cuenta con un pago pendiente o suspendida) y «Pasar a
+   producción» queda desactivado. Ningún plan falta en ella: VeriFactu en vivo es de todos los planes.
 2. Pulsa «Pasar a producción» y confirma en «¿Enviar tus facturas a la AEAT de verdad?» («A partir de ahora
    cada registro se remite a la AEAT real. En cuanto se selle el primero ya no podrás volver a pruebas.»).
 3. Sale «Tu negocio está en producción: los registros ya se remiten a la AEAT real.» y la pastilla pasa a
@@ -434,7 +443,11 @@ subirlo en VeriFactu → Configuración → Mi certificado.» (`verifactu.own_ce
 puede pasar a producción: siempre presenta en el entorno de pruebas de la AEAT.» (`verifactu.go_live_forbidden`;
 quién es demo lo dice la plataforma, `base.operations.is_demo_hub`); sin emisor, «Configura antes el emisor en
 Facturación → Emisor.»; por la vía de ERPlora sin autorización aprobada, «Para que ERPlora remita en producción
-falta que apruebe tu autorización firmada.» (`verifactu.representation_not_approved`); con la cuenta con un pago
+falta que apruebe tu autorización firmada.» (`verifactu.representation_not_approved`); por la vía de ERPlora con ella
+cerrada en el servidor, apruebe o no la autorización, «Para pasar a producción, sube tu propio certificado y elígelo
+como vía de envío: de momento ERPlora no presenta por cuenta de los negocios.» (`verifactu.own_certificate_required`;
+en la lista de lo que falta: «de momento ERPlora no presenta por cuenta de los negocios: usa tu propio certificado»,
+`own_certificate_required`); con la cuenta con un pago
 pendiente o suspendida, «Tu cuenta de ERPlora tiene un pago pendiente o está suspendida: regulariza el pago en tu
 cuenta de ERPlora para pasar a producción.» (`verifactu.hub_not_active`); con certificado propio que falta o ha
 caducado, «No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado.»
@@ -451,8 +464,12 @@ Ajustes lo dice bajo «Las ventas y facturas nuevas se rechazan hasta que se
 resuelva:» (`issue_blocker`). Lo ya sellado sin otorgamiento aprobado o sin certificado válido espera, porque la
 pasarela no podría presentarlo. Cambiar a la vía de ERPlora en producción sin el otorgamiento aprobado se rechaza
 igual.
+Cerrar la vía de ERPlora en el servidor no saca de producción a quien ya está en ella: sigue sellando, enviando y
+anulando con el sello de ERPlora, porque la AEAT solo acepta una anulación presentada con el mismo sello. El paso
+«Configura VeriFactu» del Inicio, con la vía cerrada, solo se da por hecho con el certificado propio.
 Se comprueba en este orden y la primera causa da el 409 con su código: el servidor cerrado → un negocio de
-demostración → el emisor → la vía (el certificado propio no pide otorgamiento) → la cuenta.
+demostración → el emisor → la vía (la de ERPlora, abierta en el servidor; el certificado propio no pide otorgamiento)
+→ la cuenta.
 Implicados: VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Volver a pruebas
@@ -938,7 +955,7 @@ factura** (`TICKET-2026-000012`) o por su secuencia; un emisor, por su NIF.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| La configuración: entorno, vía, certificado propio (titular, NIF, tipo, caducidad; nunca su material), estado de la autorización, datos del productor, declaración | ver | F02, F04, F08, F09, F12 | `verifactu.config.get` |
+| La configuración: entorno, vía (y si la de ERPlora se puede elegir), certificado propio (titular, NIF, tipo, caducidad; nunca su material), estado de la autorización, datos del productor, declaración | ver | F02, F04, F08, F09, F12 | `verifactu.config.get` |
 | Los registros, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `verifactu.record.list` |
 | Un registro, por su id o por el número de su factura, con su QR, su XML y por qué espera | ver | F17, F18 | `verifactu.record.get` |
 | El registro vigente de una factura (QR, CSV, estado) | ver | F19 | `verifactu.record.by_invoice` |
@@ -1067,7 +1084,8 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home.py`: el nivel
 es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
 production, scope)`: vía propia con certificado vigente que este servidor abre, o vía ERPlora con el otorgamiento
-aprobado; la exención del hub de ERPlora incluida; lo que le falte al servidor no cuenta, no es tarea del negocio),
+aprobado, si la vía no está cerrada en el servidor (`erplora_route.closed`); la exención del hub de ERPlora incluida;
+lo que le falte al servidor no cuenta, no es tarea del negocio),
 permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`, `countries`
 `(SPAIN,)` (`apps.py`; hub#682: un negocio de otro país no lo ve, ni su muro en producción; uno sin país cuenta como
 España por `base.business.country_or_market`, que también lee `queries.outside_spain`: una sola regla). **Paneles** (permiso
@@ -1455,6 +1473,13 @@ necesitan para el soporte». Por eso:
     la anuncia ni la carga la activa. En erplora.com, `verticals` es también lo que la tienda pública usa para
     «Pensada para» y para las apps de cada sector (`public/industries.py` del SaaS), así que VeriFactu no sale en las
     páginas de restaurante ni de peluquería, como Pagos, que tampoco viene en ninguna plantilla.
+18. **La vía de ERPlora se cierra con un interruptor del servidor, sin borrar nada**: de momento ERPlora no quiere
+    asumir la presentación por cuenta de los negocios. `VERIFACTU_ERPLORA_ROUTE_ENABLED` (verdadero por
+    defecto) y `erplora_route.py` frenan solo las entradas: elegir la vía, pedir o subir el otorgamiento, pasar a
+    producción por ella y el paso del Inicio. El envío no lo mira (`route_problem` no cambia): las pruebas, demos
+    incluidas, siguen con el sello, y quien ya está en producción por ella sigue sellando, enviando y anulando, porque
+    la AEAT solo acepta una anulación con el mismo sello. El hub de ERPlora queda fuera. `verifactu.config.get` lo
+    expone en `erplora_route_available` para que la pantalla oculte la vía.
 
 ### Qué queda fuera
 
