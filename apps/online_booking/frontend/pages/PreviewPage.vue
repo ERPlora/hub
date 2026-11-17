@@ -1,19 +1,20 @@
 <script setup lang="ts">
-// The preview of the public booking page, on the dev server only (routes.ts; WORKBOOK «Vista previa de la
-// reserva»): the customer's flow with the same public operations the page of base (`/p/<slug>/book`, Django
-// templates) will call in-process — services, a professional or «No preference», a day and a free time, name
-// and mobile, book; then the booking seen and cancelled with the personal link. One-shot calls of the API
-// client (what is public is not followed live). A price is in the business's money (BASE-F50: «20,00 zł» in Poland,
-// a dash until it answers), as the diary paints it. Never part of a production build.
+// The customer's booking flow: services, a professional or «No preference», a day and a free time, name and mobile,
+// book; then the booking seen and cancelled with the personal link. One-shot calls (what is public is not followed
+// live), and a price in the business's money (BASE-F50: «20,00 zł» in Poland, a dash until it is known), as the diary
+// paints it. It is the public booking page itself when that page gives it base's public door (`PUBLIC_DOOR`: the
+// calls, the money and the customer's words); without it, the team's preview on the dev server (routes.ts; WORKBOOK
+// «Vista previa de la reserva»), through the session.
 import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 
 import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
 import { formatMoney, useBusinessMoney } from '../../../appointment/frontend/lib/format';
 import { useLocale, useT } from '../composables/useT';
+import { PUBLIC_DOOR } from '../lib/door';
 import type {
   BookedOut,
   PageOut,
@@ -26,10 +27,15 @@ import type {
 /** The services the preview lists (the server's cap on a page). */
 const SERVICE_WINDOW = 100;
 
-const client = useLiveClient();
+const door = inject(PUBLIC_DOOR, null);
+const api = door?.api ?? useLiveClient().api;
 const t = useT();
 const locale = useLocale();
-const money = useBusinessMoney();
+const money = door?.money ?? useBusinessMoney();
+// The customer's words on the public page; the team's on its preview.
+const heading = computed(() => (door ? t('online_booking.door.title') : t('online_booking.preview.title')));
+const intro = computed(() => (door ? t('online_booking.door.intro') : t('online_booking.preview.intro')));
+const noServices = computed(() => (door ? t('online_booking.door.noServices') : t('online_booking.preview.noServices')));
 
 const asError = (failure: unknown): ApiError =>
   failure instanceof ApiError ? failure : new ApiError(0, 'client_error', failure instanceof Error ? failure.message : String(failure));
@@ -43,8 +49,8 @@ const loadError = ref<ApiError | null>(null);
 
 onMounted(async () => {
   try {
-    info.value = await client.api.call('online_booking.public.page', {});
-    services.value = (await client.api.call('online_booking.public.services', { limit: SERVICE_WINDOW })).rows;
+    info.value = await api.call('online_booking.public.page', {});
+    services.value = (await api.call('online_booking.public.services', { limit: SERVICE_WINDOW })).rows;
     servicesLoaded.value = true;
   } catch (failure) {
     loadError.value = asError(failure);
@@ -96,7 +102,7 @@ watch([chosen, staff, day], async () => {
   if (!chosen.value.length || !day.value) return;
   slotsLoading.value = true;
   try {
-    const answer = await client.api.call('online_booking.public.slots', {
+    const answer = await api.call('online_booking.public.slots', {
       service_ids: chosen.value,
       date: day.value,
       ...(staff.value ? { staff_id: staff.value } : {}),
@@ -125,7 +131,7 @@ async function book(): Promise<void> {
   booking.value = true;
   bookError.value = null;
   try {
-    booked.value = await client.api.call('online_booking.public.book', {
+    booked.value = await api.call('online_booking.public.book', {
       service_ids: chosen.value,
       ...(staff.value ? { staff_id: staff.value } : {}),
       start: start.value,
@@ -151,7 +157,7 @@ async function byLink(op: 'online_booking.public.booking' | 'online_booking.publ
   linkPending.value = true;
   linkError.value = null;
   try {
-    seen.value = await client.api.call(op, { token: booked.value.token });
+    seen.value = await api.call(op, { token: booked.value.token });
   } catch (failure) {
     linkError.value = asError(failure);
   } finally {
@@ -177,16 +183,16 @@ const text = (value: unknown): string => (value === null || value === undefined 
 
 <template>
   <AppPage
-    :title="$t('online_booking.preview.title')"
+    :title="heading"
     content-layout="detail"
   >
     <div
       class="ob-preview"
       data-testid="ob-preview"
     >
-      <h2>{{ $t('online_booking.preview.title') }}</h2>
+      <h2>{{ heading }}</h2>
       <p class="ob-preview__help">
-        {{ $t('online_booking.preview.intro') }}
+        {{ intro }}
       </p>
       <InlineFeedback
         v-if="loadError"
@@ -234,7 +240,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             data-testid="ob-preview-no-services"
             class="ob-preview__help"
           >
-            {{ $t('online_booking.preview.noServices') }}
+            {{ noServices }}
           </p>
 
           <ion-select

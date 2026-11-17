@@ -41,6 +41,9 @@ class OnlineBookingConfig(LiveAppConfig):
         "online_booking.manage_settings",
         "online_booking.public",
     ]
+    # The page base's public door serves without a session at /p/<slug>/book: whoever opens it holds
+    # ``online_booking.public`` and nothing else.
+    public_pages = {"book": "online_booking.public"}
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["online_booking.*"],
