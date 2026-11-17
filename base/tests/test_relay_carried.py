@@ -18,8 +18,9 @@ from live.models import OutboxEvent
 
 from base import recovery, relay
 from base.services import relay_runs
+from base.tenancy.tests.business import A, HUB_DB, in_business_a
 
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
 
 #: Who hears what, and what each one records in answer: a first app answers the event that starts it all, a second
 #: one answers the first's, and a third records two events of its own; a fourth answers what the business itself does,
@@ -103,8 +104,9 @@ MARKS = [
 ]
 
 
+@HUB_DB
 @pytest.mark.parametrize("mark", MARKS)
-def test_what_reactions_record_as_the_system_for_a_carried_actor_takes_it_first_and_second_hand(db, mark):
+def test_what_reactions_record_as_the_system_for_a_carried_actor_takes_it_first_and_second_hand(mark):
     record(A, "one.card.made", mark)
 
     relayed(timezone.now())
@@ -118,8 +120,9 @@ def test_what_reactions_record_as_the_system_for_a_carried_actor_takes_it_first_
     }
 
 
+@HUB_DB
 @pytest.mark.parametrize("mark", MARKS)
-def test_what_a_reaction_records_as_someone_of_its_own_keeps_it(db, mark):
+def test_what_a_reaction_records_as_someone_of_its_own_keeps_it(mark):
     """An automation the reaction runs does its steps as its own run: the chain grows from that run, never from the one
     before it."""
     record(A, "three.card.made", mark)
@@ -137,7 +140,8 @@ def test_what_a_reaction_records_as_someone_of_its_own_keeps_it(db, mark):
         pytest.param("another_run:01a1cff9-afb1-777e-af7c-92ec1c30390e", id="something nobody declares"),
     ],
 )
-def test_what_reactions_record_for_anyone_else_is_the_system_s(db, actor):
+@HUB_DB
+def test_what_reactions_record_for_anyone_else_is_the_system_s(actor):
     record(A, "one.card.made", actor)
 
     relayed(timezone.now())
@@ -152,8 +156,9 @@ def test_what_reactions_record_for_anyone_else_is_the_system_s(db, actor):
     }
 
 
+@HUB_DB
 @pytest.mark.parametrize("mark", MARKS)
-def test_what_the_business_does_in_the_same_pass_never_takes_a_carried_actor(db, mark):
+def test_what_the_business_does_in_the_same_pass_never_takes_a_carried_actor(mark):
     """The business at work in the same pass as a carried actor's event: only what answers that event takes it, not what
     answered the business's a moment before, nor what the platform records as the system while the relay delivers."""
     record(A, "two.card.made", PERSON)
