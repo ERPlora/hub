@@ -25,3 +25,19 @@ export const CONFIG: ConfigOut = {
   issue_blocker: null,
   live_blockers: [],
 };
+
+export const CONFIG_WITHOUT_ERPLORA_ROUTE: ConfigOut = {
+  ...CONFIG,
+  route: 'own',
+  erplora_route_available: false,
+};
+
+export const LOADED_CERTIFICATE: ConfigOut['own_certificate'] = {
+  loaded: true,
+  holder: 'ACME SL',
+  holder_tax_id: 'B12345674',
+  kind: 'representative',
+  uploaded_at: '2026-10-01T10:00:00Z',
+  expires_at: '2027-10-01T10:00:00Z',
+  expires_in_days: 351,
+};
