@@ -5,7 +5,7 @@ then the person's language, and whether the business has nothing a template brin
 what a template or a file brings, writing nothing; ``base.blueprint.export`` the ``.blueprint.zip`` of the apps and
 datasets chosen, a template never with personal data; ``base.import.list`` the loads, the last one that did not go in
 whole first; ``base.dataset.list`` every app on with what of it can travel and how many rows it has. Only who runs the
-hub reads them.
+hub reads them. Every test works in business A's own database, as production does.
 """
 
 import base64
@@ -15,23 +15,23 @@ import zipfile
 
 import pytest
 from django.contrib.auth import get_user_model
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
 from base import blueprint
 from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
-from base.tests.test_services_data import born  # noqa: F401 (a fixture: the tests below take it by name)
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from base.tests.test_services_data import born
 
-pytestmark = pytest.mark.django_db
-
-A = Scope("host", "a")
+__all__ = ["born", "in_business_a"]
+pytestmark = HUB_DB
 
 
 def person(role, username="olga", language="es"):
     user = get_user_model().objects.create_user(username=username, password="pw")
-    Membership.objects.create(user=user, host="a", role=role)
+    Membership.objects.create(user=user, host=A.key, role=role)
     return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
 
 
@@ -85,7 +85,7 @@ def test_the_hubs_country_goes_before_the_language(owner, monkeypatch):
     seeds = blueprint.catalog()
     french = blueprint.Template(**{**seeds[0].__dict__, "key": "restaurant.fr", "language": "fr", "country": "FR"})
     monkeypatch.setattr(blueprint, "catalog", lambda: [*seeds, french])
-    Hub.objects.filter(slug="a").update(country="FR")
+    Hub.objects.filter(slug=A.key).update(country="FR")
 
     listed = call(owner, "base.blueprint.list")
 
@@ -93,7 +93,7 @@ def test_the_hubs_country_goes_before_the_language(owner, monkeypatch):
 
 
 def test_within_its_language_the_hubs_own_vertical_comes_first(owner):
-    Hub.objects.filter(slug="a").update(vertical="restaurant")
+    Hub.objects.filter(slug=A.key).update(vertical="restaurant")
 
     keys = [template.key for template in call(owner, "base.blueprint.list").templates]
 
@@ -163,7 +163,7 @@ def test_inspecting_a_file_says_what_it_brings_and_what_never_travels(owner):
 def test_the_review_does_not_promise_an_app_that_will_not_go_on_here(born, country, verifactu):
     """hub#694: outside Spain the load will leave VeriFactu off, so what it says beforehand is that, not «turns on».
     A file that lists it (no template of the catalogue does, hub#998)."""
-    Hub.objects.filter(slug="c").update(country=country)
+    Hub.objects.filter(slug=A.key).update(country=country)
     file = a_file(purpose="template", apps=("table", "verifactu"))
 
     statuses = {app.id: app.status for app in call(born, "base.blueprint.inspect", file_base64=file).apps}
@@ -177,7 +177,7 @@ def test_an_app_off_the_blueprint_lists_is_said_to_turn_on_and_one_it_does_not_l
     summary = call(born, "base.blueprint.inspect", file_base64=a_file(apps=("table",)))
 
     assert {app.id: app.status for app in summary.apps} == {"table": "turns_on", "customer": "inactive"}
-    assert not AppActivation.objects.filter(host="c").exists()
+    assert not AppActivation.objects.filter(host=A.key).exists()
 
 
 def test_an_app_off_the_plan_gives_no_right_to_is_said_to_stay_off(born, monkeypatch):
@@ -214,7 +214,7 @@ def opened(exported):
 
 
 def test_exporting_a_template_writes_the_apps_chosen_without_personal_data(owner):
-    Hub.objects.filter(slug="a").update(country="ES", vertical="restaurant")
+    Hub.objects.filter(slug=A.key).update(country="ES", vertical="restaurant")
     call(owner, "base.blueprint.import", template="restaurant.es")
     call(owner, "customer.customer.create", name="Lucía Pérez", email="lucia@example.com")
 
