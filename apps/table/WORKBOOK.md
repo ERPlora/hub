@@ -94,20 +94,33 @@ El menú **Mesas** tiene cinco pestañas: **Plano de sala**, **Zonas**, **Mesas*
 que el perfil no puede usar no salen.
 
 ### Plano de sala
-Menú **Mesas → Plano de sala**. Arriba, una sola fila: la tira de zonas (se desliza de lado en el
-móvil y se difumina por el borde cuando hay más zonas), el conmutador **Servicio / Editar plano** (solo
-a quien puede dibujar el plano) y, en «Editar plano», un «+» («Añadir zona o mesa») y un lápiz
-(«Editar zona»). Debajo, el plano de la zona elegida, con las mesas a su tamaño real: si no cabe de
-ancho (móvil, tableta) se desliza de lado y el borde con mesas detrás se difumina; si no cabe de alto,
-crece y se baja la página.
+Menú **Mesas → Plano de sala**. Arriba, la tira de zonas (se desliza de lado en el móvil y se difumina
+por el borde cuando hay más zonas), el conmutador **Servicio / Editar plano** (solo a quien puede dibujar
+el plano) y, en «Editar plano», un «+» («Añadir zona o mesa») y un lápiz («Editar zona»). Cada pestaña
+lleva un punto del color de su zona y el número de mesas ocupadas sobre las que están en servicio
+(«7/12»). Debajo, una tarjeta resume la zona elegida: libres, ocupadas, reservadas y comensales.
 
-Cada mesa es una baldosa con su número, su estado escrito con su icono y color (Disponible, Ocupada,
-Reservada, Bloqueada), el aforo («4 pax») o, si está ocupada, los comensales y los minutos que llevan
-(«3 pax · 35 min», que avanzan solos) y quién la atiende; si tiene una reserva hoy, el nombre y la
-hora de la reserva («Cliente borrado» si se borraron los datos de esa clienta) en una línea: un nombre
-que no cabe se recorta con «…» y la hora se ve siempre entera («Maximiliana F… · 20:00»); el nombre
-completo va en el título de la mesa. Las mesas redondas se pintan redondas y la rectangular, más
-ancha que alta. El plano **es vivo**: cambia solo cuando alguien sienta, cobra, mueve o edita una mesa.
+En tableta y ordenador, el plano ajusta automáticamente las posiciones y el tamaño de las mesas para
+mostrar toda la zona con un tamaño mínimo legible. Si aun así no cabe, se desplaza dentro de su área en
+los dos ejes, con un fundido en cada borde que tenga contenido detrás; el fondo se arrastra con el ratón
+y el área enfocada se desplaza con las flechas. No hay controles de zoom. La cuadrícula solo aparece en
+«Editar plano». En el teléfono (hasta 640 px), «Servicio» muestra tarjetas compactas a dos columnas, con
+la miniatura de la mesa y sus sillas, número, estado y hora; «Editar plano» mantiene el plano interactivo.
+
+Cada mesa tiene su forma (redonda, cuadrada o rectangular) y sillas según su aforo; las sillas llenas
+indican los comensales sentados. Se dibujan como máximo doce y, con un aforo mayor, las llenas se reparten
+proporcionalmente; la cifra exacta siempre está escrita. La mesa Disponible tiene fondo verde suave y
+contorno verde; Ocupada, relleno azul; Reservada, contorno amarillo discontinuo; Bloqueada, trama gris. El
+estado también va escrito y con su icono. Dentro van el número grande y un dato: el tiempo transcurrido en
+una ocupada («1:08»), la hora en una reservada o el estado en las demás. Debajo, una etiqueta indica los
+comensales («3/4 pax») o el aforo, y el nombre y la hora de la reserva («Ana · 21:00»; «Cliente borrado»
+si se borraron los datos de esa clienta). Quien atiende una mesa se lee en su nombre accesible y en su hoja.
+
+El tiempo de una ocupada lleva además un arco que avanza. Al superar los minutos de aviso de los Ajustes,
+solo el tiempo y el arco pasan a ámbar y después a rojo: la mesa sigue azul. Los cambios de estado y de
+zona tienen transiciones suaves, que se desactivan si el dispositivo pide movimiento reducido. Mientras
+carga se muestra un esqueleto del plano; los avisos de vacío y error conservan sus acciones. El plano **es
+vivo**: cambia solo cuando alguien sienta, cobra, mueve o edita una mesa.
 
 - **Servicio** (de entrada): no se arrastra. Tocar una mesa abre su ventana **Mesa N**:
   - libre o reservada: la pregunta de comensales («Comensales en la mesa N · 4 pax», «−» y «+», atajos
@@ -171,7 +184,7 @@ líneas y «Guardar» se ve completo al final (hub#866).
 
 | Pantalla | Cargando | Vacío | Error |
 |---|---|---|---|
-| Plano de sala | «Cargando…» | Sin zonas: «Crea una zona para empezar a colocar mesas.»; zona sin mesas: «Sin mesas en esta zona. Pulsa «Añadir mesa».» | Al cargar: aviso con «Reintentar»; al guardar, dentro de la ventana abierta (o encima del plano si no hay ninguna) |
+| Plano de sala | Esqueleto del plano | Sin zonas: «Crea una zona para empezar a colocar mesas.»; zona sin mesas: «Sin mesas en esta zona. Pulsa «Añadir mesa».» | Al cargar: aviso con «Reintentar»; al guardar, dentro de la ventana abierta (o encima del plano si no hay ninguna) |
 | Zonas | La tabla en carga | «No hay zonas. Pulsa «+» para crear la primera (Salón, Terraza, Barra…).» | El de la tabla con «Reintentar»; el de guardar, dentro del panel |
 | Mesas | La tabla en carga | «Sin mesas.» | El de la tabla con «Reintentar»; el de guardar, dentro del panel |
 | Sesiones | La tabla en carga | «No hay sesiones. Sienta a un grupo desde el plano y aparecerá aquí.» | El de la tabla con «Reintentar»; el de cerrar, en su confirmación |
@@ -377,15 +390,19 @@ Estado: hecho
 Actor: responsable, empleado
 Pantalla: Plano de sala
 Pasos:
-1. Abre **Mesas → Plano de sala** y elige la zona: su plano sale al momento, sin esperar a cargar. Se
-   ven todas sus mesas en uso, a su tamaño real.
-2. Cada mesa dice su estado escrito, con icono y color: Disponible, Ocupada, Reservada o Bloqueada.
-3. Una mesa ocupada dice los comensales y los minutos que llevan («3 pax · 35 min») y quién la
-   atiende; los minutos avanzan solos. Una mesa con reserva hoy dice el nombre y la hora.
-4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que
-   salir y volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en
-   el paso en que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su reserva y vuelve a
-   Disponible cuando la reserva acaba, sin que nadie toque nada.
+1. Abre **Mesas → Plano de sala** y elige la zona: su contenido sale al momento, sin esperar a cargar.
+   La pestaña indica cuántas mesas están ocupadas y la tarjeta resume libres, ocupadas, reservadas y
+   comensales.
+2. En tableta y ordenador el plano ajusta todas las mesas al espacio; en el teléfono, «Servicio» las
+   muestra en tarjetas a dos columnas. Cada mesa dice su estado escrito, con icono, forma, sillas y color:
+   Disponible, Ocupada, Reservada o Bloqueada.
+3. Una mesa ocupada enseña el tiempo («35:00») y los comensales («3/4 pax»); el tiempo avanza solo y sus
+   avisos cambian solo el reloj y el arco. Una mesa con reserva hoy dice el nombre y la hora. Quien atiende
+   se consulta en la hoja de la mesa.
+4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
+   volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
+   que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su
+   reserva y vuelve a Disponible cuando la reserva acaba, sin que nadie toque nada.
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
