@@ -30,8 +30,10 @@ from live.operations import get
 from base import services, usage, worker
 from base.models import Membership
 from base.storage import hub_prefix
+from base.tenancy.context import use_hub
 from base.tenancy.ops import connect_ops
 from base.tenancy.tests import hubs
+from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.hubs import make_cluster, make_hub  # noqa: F401 (fixtures)
 from base.tests.test_internal import signed
 from base.tests.test_session_revoke import ANA, OLGA, login
@@ -241,19 +243,17 @@ def test_a_test_marked_for_them_gets_the_slow_passes(monkeypatch):
 # ── Who came in ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
-def test_every_login_on_a_hub_notes_its_person_once_a_day_and_the_platforms_none():
-    acme = Hub.objects.create(slug="acme", status="ready")
-
-    login(ANA, acme)
-    login(ANA, acme)
-    login(OLGA, acme)
+@HUB_DB
+def test_every_login_on_a_hub_notes_its_person_once_a_day_and_the_platforms_none(hub_a):
+    login(ANA, hub_a)
+    login(ANA, hub_a)
+    login(OLGA, hub_a)
     login(ANA)  # the platform's admin
 
     today = timezone.now().date()
     assert set(HubVisit.objects.values_list("host", "saas_user_id", "day")) == {
-        ("acme", ANA, today),
-        ("acme", OLGA, today),
+        (hub_a.slug, ANA, today),
+        (hub_a.slug, OLGA, today),
     }
 
 
@@ -387,44 +387,36 @@ def admin_of(slug: str) -> OperationContext:
     return OperationContext(scope=Scope("host", slug), actor=user, permissions=permissions_for(user, Scope("host", slug)), language="en")
 
 
-def plan_usage(ctx):
+def plan_usage(hub: Hub):
+    """``base.plan.usage`` as the owner of ``hub`` reads it, inside the hub."""
+    ctx = admin_of(hub.slug)
     op = get("base.plan.usage")
-    return op(ctx, op.input())
+    with use_hub(hub):
+        return op(ctx, op.input())
 
 
-def with_its_own_database(slug: str = "a") -> Hub:
-    """The registry's row of ``slug`` as a hub with its own database (the operation reads only the row here)."""
-    from base.tenancy import connections, names
+@HUB_DB
+def test_the_hub_says_the_size_of_its_database_last_measured(hub_a):
+    HubUsageDaily.objects.create(hub=hub_a, day=DAY - dt.timedelta(days=1), db_bytes=10, measured_at=NIGHT)
+    HubUsageDaily.objects.create(hub=hub_a, day=DAY, db_bytes=2048, measured_at=NIGHT)
 
-    hub = Hub.objects.get(slug=slug)
-    Hub.objects.filter(pk=hub.pk).update(db_name=names.hub_db_name(connections.control_name(), hub.id))
-    return hub
-
-
-@pytest.mark.django_db
-def test_the_hub_says_the_size_of_its_database_last_measured():
-    hub = with_its_own_database()
-    HubUsageDaily.objects.create(hub=hub, day=DAY - dt.timedelta(days=1), db_bytes=10, measured_at=NIGHT)
-    HubUsageDaily.objects.create(hub=hub, day=DAY, db_bytes=2048, measured_at=NIGHT)
-
-    database = plan_usage(admin_of("a")).database
+    database = plan_usage(hub_a).database
 
     assert (database.available, database.bytes, database.day) == (True, 2048, DAY)
 
 
-@pytest.mark.django_db
-def test_a_hub_with_its_own_database_not_measured_yet_says_so():
-    with_its_own_database()
-
-    database = plan_usage(admin_of("a")).database
+@HUB_DB
+def test_a_hub_with_its_own_database_not_measured_yet_says_so(hub_a):
+    database = plan_usage(hub_a).database
 
     assert (database.available, database.bytes, database.day) == (True, None, None)
 
 
-@pytest.mark.django_db
-def test_a_hub_that_shares_its_database_has_no_size_of_its_own():
-    HubUsageDaily.objects.create(hub=Hub.objects.get(slug="a"), day=DAY, db_bytes=99, measured_at=NIGHT)
+@HUB_DB
+def test_a_hub_never_shows_the_size_measured_for_another(hub_a, hub_b):
+    HubUsageDaily.objects.create(hub=hub_a, day=DAY - dt.timedelta(days=1), db_bytes=10, measured_at=NIGHT)
+    HubUsageDaily.objects.create(hub=hub_b, day=DAY, db_bytes=99, measured_at=NIGHT)
 
-    database = plan_usage(admin_of("a")).database
+    database = plan_usage(hub_a).database
 
-    assert (database.available, database.bytes, database.day) == (False, None, None)
+    assert (database.available, database.bytes, database.day) == (True, 10, DAY - dt.timedelta(days=1))

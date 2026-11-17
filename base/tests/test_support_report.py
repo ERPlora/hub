@@ -16,21 +16,25 @@ import pytest
 from base import access, registry, signing
 from base.models import Membership, SessionOwner, TrustedDevice
 from base.services import CREDENTIAL_SESSION_KEY
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 from base.tests.conftest import ANA, SECRET
 from base.tests.test_access_account import enter
 from base.tests.test_access_badge import badge, with_badge
 from base.tests.test_access_spa import a_device, enter_with_pin, with_pin
+from base.tests.test_spa import B_HOST
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
 
-HOST = "a.localhost:8000"
+pytestmark = HUB_DB
 
 
 def bea_enters_with_her_pin(client, make_user):
     """Bea enters this browser, a shared till of the business, with her PIN."""
-    bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
+    bea = make_user("saas:2", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Bea")
     a_device(client)
-    enter_with_pin(client, with_pin(bea, "9071"), "9071", host=HOST)
+    enter_with_pin(client, with_pin(bea, "9071"), "9071")
+
+
 URL = "/api/support/report"
 SAAS_PATH = "/internal/support/report"
 BROWSER = "Mozilla/5.0 (iPad; CPU OS 18_0) ERPlora/1.4"
@@ -47,7 +51,7 @@ ACCOUNT_ID = "019a2b3c-0000-7000-8000-000000000042"
 
 @pytest.fixture
 def ana(make_user, saas, spa_manifest):
-    return make_user(f"saas:{ACCOUNT_ID}", host="a", role=Membership.Role.MANAGER, first_name="Ana")
+    return make_user(f"saas:{ACCOUNT_ID}", host=A.key, role=Membership.Role.MANAGER, first_name="Ana")
 
 
 @pytest.fixture
@@ -56,7 +60,7 @@ def account(client, ana, fake_saas):
     makes it a shared device of the hub): ``_log_in`` keeps the session's credential in it. A test's own
     ``fake_saas`` then answers the report."""
     fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
-    assert enter(client, host=HOST).status_code == 302
+    assert enter(client).status_code == 302
     return ana
 
 
@@ -72,9 +76,9 @@ def forget_the_credential(client) -> None:
     session.save()
 
 
-def report(client, **body):
+def report(client, host=HOST, **body):
     payload = {"subject": "The printer stops", "description": "It prints half a ticket.", "page": "/sales/pos", **body}
-    return client.post(URL, json.dumps(payload), content_type="application/json", HTTP_HOST=HOST, HTTP_USER_AGENT=BROWSER)
+    return client.post(URL, json.dumps(payload), content_type="application/json", HTTP_HOST=host, HTTP_USER_AGENT=BROWSER)
 
 
 class TestSent:
@@ -91,8 +95,8 @@ class TestSent:
         assert call["url"] == f"http://localhost:8001{SAAS_PATH}"
         assert json.loads(call["body"]) == {
             "account": "019a2b3c-0000-7000-8000-000000000042",
-            "hub": "a",
-            "hub_id": str(registry.hub_id("a")),
+            "hub": A.key,
+            "hub_id": str(registry.hub_id(A.key)),
             "page": "/sales/pos",
             "browser": BROWSER,
             "subject": "The printer stops",
@@ -110,6 +114,17 @@ class TestSent:
         assert headers["Content-Type"] == "application/json"
         assert headers[signing.SIGNATURE_HEADER] == signing.sign(body, timestamp, SECRET)
         assert headers[signing.SIGNATURE_V2_HEADER] == signing.sign_v2("POST", SAAS_PATH, body, timestamp, SECRET)
+
+    def test_a_report_from_another_business_names_that_one(self, client, make_user, saas, spa_manifest, fake_saas, hub_b):
+        make_user(f"saas:{ACCOUNT_ID}", host=B.key, role=Membership.Role.MANAGER, first_name="Ana")
+        fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
+        assert enter(client, host=B_HOST).status_code == 302
+        answering = fake_saas(body=SENT)
+
+        assert report(client, host=B_HOST).status_code == 200
+
+        sent = json.loads(answering.calls[0]["body"])
+        assert (sent["hub"], sent["hub_id"]) == (B.key, str(hub_b.id))
 
     def test_without_a_screen_it_says_none(self, client, account, fake_saas):
         saas = fake_saas(body=SENT)
@@ -186,7 +201,7 @@ class TestOnlyWithTheAccount:
     def test_a_person_who_is_no_erplora_com_account_cannot(self, client, make_user, saas, spa_manifest, fake_saas):
         # A demo's visitor (``demo:<slug>``) or any local copy without an account behind it.
         fake = fake_saas(body=SENT)
-        client.force_login(make_user("demo:a", host="a", role=Membership.Role.OWNER))
+        client.force_login(make_user(f"demo:{A.key}", host=A.key, role=Membership.Role.OWNER))
         # Its shell says it entered with no PIN (a demo has no SessionOwner): only the missing account stops it.
         load_the_shell(client)
         assert client.session[CREDENTIAL_SESSION_KEY] == SessionOwner.Credential.ACCOUNT
@@ -201,10 +216,10 @@ class TestOnlyWithTheAccount:
         # A card on a shared till is the device's way in, like a PIN: the browser's erplora.com account is whoever
         # made it a device of the hub, never the person who swiped.
         saas = fake_saas(body=SENT)
-        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
+        bea = make_user("saas:2", host=A.key, role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
         with_badge(bea, "04a1b2c3")
-        assert badge(client, "04a1b2c3", host=HOST).status_code == 200
+        assert badge(client, "04a1b2c3").status_code == 200
         assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.BADGE
 
         response = report(client)
