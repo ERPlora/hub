@@ -130,7 +130,13 @@
       "tapToBump": "Toca para marcar listo",
       "tapToRecall": "Toca para recuperar",
       "menuDishes": "{n} plato | {n} platos",
-      "bumpMenu": "Marcar listos los platos de este menú"
+      "bumpMenu": "Marcar listos los platos de este menú",
+      "moreActions": "Más acciones",
+      "wait": {
+        "ok": "En tiempo",
+        "warning": "Aviso",
+        "critical": "Retraso"
+      }
     },
     "tickets": {
       "search": "Buscar comanda o destino…",

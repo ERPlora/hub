@@ -130,7 +130,13 @@
       "tapToBump": "Tap to mark ready",
       "tapToRecall": "Tap to recall",
       "menuDishes": "{n} dish | {n} dishes",
-      "bumpMenu": "Mark this menu's dishes ready"
+      "bumpMenu": "Mark this menu's dishes ready",
+      "moreActions": "More actions",
+      "wait": {
+        "ok": "On time",
+        "warning": "Warning",
+        "critical": "Late"
+      }
     },
     "tickets": {
       "search": "Search ticket or destination…",

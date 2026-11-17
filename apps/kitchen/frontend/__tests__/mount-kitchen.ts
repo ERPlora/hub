@@ -1,8 +1,9 @@
 // Test helper of the kitchen app's pages and components: `mountInShell` with its catalogues, the display and its people.
-// Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
-// (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
+// Dialogs: a test that opens a popover passes `stubs: { IonPopover: PopoverStub }`; one that opens a modal mocks
+// `@ionic/vue`'s IonModal with FormModal's `IonModalStub` (imported from its own file in the mock factory: this helper
+// loads @ionic/vue, the factory must not).
 import type { SessionMe } from '@erplora/ui/shell';
-import type { Component } from 'vue';
+import { type Component, defineComponent } from 'vue';
 
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import en from '../locale/en.json';
@@ -48,6 +49,17 @@ export const VIEWER: SessionMe = {
   user: { id: '3', label: 'Eva' },
   permissions: ['kitchen.view_ticket'],
 };
+
+/** Ionic's popover as a plain box that shows its content while open (Ionic's overlay does not present in happy-dom). */
+export const PopoverStub = defineComponent({
+  name: 'IonPopover',
+  props: { isOpen: Boolean, event: { type: null, default: undefined } },
+  emits: ['didDismiss'],
+  template: '<div v-if="isOpen" data-stub="ion-popover"><slot /></div>',
+});
+
+/** The words inside an element as a person reads them (Ionic's label patches its own textContent in happy-dom). */
+export const said = (el: Element): string => el.innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 export async function mountKitchen(component: Component, options: MountOptions = {}) {
   return mountInShell(component, options, { path: '/kitchen/display', session: OWNER, messages: { en, es } });

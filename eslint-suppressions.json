@@ -208,11 +208,6 @@
       "count": 1
     }
   },
-  "apps/kitchen/frontend/components/KdsTicket.vue": {
-    "vue/max-lines-per-block": {
-      "count": 1
-    }
-  },
   "apps/kitchen/frontend/composables/useServerTable.ts": {
     "max-lines-per-function": {
       "count": 1
