@@ -462,8 +462,9 @@ class RepresentationOut(Schema):
 
 class ConfigOut(Schema):
     environment: EnvironmentCode = Field(description="testing or production.")
-    route: RouteCode = Field(
-        description="erplora (ERPlora files for you) or own (your certificate)."
+    route: RouteCode = Field(description="erplora (ERPlora files for you) or own (your certificate).")
+    erplora_route_available: bool = Field(
+        description="ERPlora's route can be chosen here; if not, only the own certificate goes live."
     )
     production_since: dt.datetime | None = Field(description="When it went live.")
     production_open: bool = Field(description="This server lets a business go live.")
@@ -474,9 +475,7 @@ class ConfigOut(Schema):
     issuer_nif: str = Field(description="Invoicing's issuer tax ID.")
     issuer_name: str = Field(description="Invoicing's issuer legal name.")
     producer: ProducerOut = Field(description="SistemaInformatico.")
-    declaration_version: str = Field(
-        description="Version of the responsible declaration."
-    )
+    declaration_version: str = Field(description="Version of the responsible declaration.")
     declaration_url: str = Field(description="Where to read it.")
     account_url: str = Field(
         description="The ERPlora account, where the signed authorisation is managed."
