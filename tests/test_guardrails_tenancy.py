@@ -377,8 +377,10 @@ def test_no_test_that_runs_as_production_counts_queries_on_control_without_namin
 
     assert offenders == [], (
         "A business's reads go to its own database, so this count sees none of them and passes with any number of "
-        "queries per row: count on connections[current_alias()] (django_assert_num_queries(..., connection=...)), "
-        f"or name connections['default'] when it is control's work being counted: {offenders}"
+        "queries per row: count on that database (connections[current_alias()] inside the business; for a request to "
+        "its host, which the test does not enter, connections[base.tenancy.connections.hub_alias(hub)]), giving "
+        "django_assert_num_queries its connection=, or name connections['default'] when control's work is counted: "
+        f"{offenders}"
     )
 
 
