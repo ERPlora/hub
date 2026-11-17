@@ -200,7 +200,7 @@ def test_a_session_open_for_days_counts_on_each_of_them(counting, at, acme):
 
 
 def test_a_pass_with_nothing_to_write_touches_nothing(counting, at, db, django_assert_num_queries):
-    with django_assert_num_queries(0):
+    with django_assert_num_queries(0, connection=connections["default"]):
         meter.flush()
 
 

@@ -7,7 +7,8 @@ scanning they share (``source_files``, ``_offenders``), are ``tests/test_guardra
     database (``use_shared_database``) is gone and nobody brings it back; the tests' fallback never set outside the
     tests; no ``hub_id`` column in a hub's model but the listed ones; no bare ``transaction.on_commit`` in ``apps/``
     (``live.operations.on_commit``); no migration of ``base/`` or ``apps/`` asks the router whether a model migrates
-    (a ``RunPython``'s hints choose its database).
+    (a ``RunPython``'s hints choose its database); a test that runs as production does never counts queries on
+    control's database without naming it (a business's reads go to its own).
 (g) Operations that need the hub's own database: a business that still shares control's (``db_name=""``, not cut
     yet) is not served at all. Each of them asked at its host, even by its administrator, answers 503 maintenance
     having read nothing of any business, only its row in control's registry; an API key there is refused alike
@@ -19,7 +20,8 @@ import re
 from pathlib import Path
 
 import pytest
-from test_guardrails import HUB_DIR, _offenders, _receiver_name, is_migration, source_files
+from test_guardrails import HUB_DIR, _dotted, _offenders, _receiver_name, is_migration, source_files, suite_files
+from test_guardrails_legacy_fallback import current_entries
 
 # ── (e) The tenancy ────────────────────────────────────────────────────────────────────────────
 
@@ -183,6 +185,37 @@ def router_question_touches(source: str) -> list[tuple[int, str]]:
     )
 
 
+#: pytest-django's fixtures that count queries: on ``default``, control's database, unless given ``connection=``.
+QUERY_COUNT_FIXTURES = frozenset({"django_assert_num_queries", "django_assert_max_num_queries"})
+
+
+def _counted_on(node: ast.Call, position: int) -> ast.AST | None:
+    """The connection a count of queries is given: its argument at ``position``, or ``connection=``."""
+    if len(node.args) > position:
+        return node.args[position]
+    return next((keyword.value for keyword in node.keywords if keyword.arg == "connection"), None)
+
+
+def _is_django_connection(node: ast.AST | None) -> bool:
+    """Django's ``connection``: the one on ``default``, control's database."""
+    return node is not None and _dotted(node) in {"connection", "db.connection", "django.db.connection"}
+
+
+def control_count_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every count of queries on control's database that does not name it: a
+    ``CaptureQueriesContext`` over Django's ``connection``, or a counting fixture without another ``connection=``."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        called = _receiver_name(node.func)
+        if called == "CaptureQueriesContext" and _is_django_connection(_counted_on(node, 0)):
+            found.add((node.lineno, "CaptureQueriesContext(connection)"))
+        elif called in QUERY_COUNT_FIXTURES and (_counted_on(node, 1) is None or _is_django_connection(_counted_on(node, 1))):
+            found.add((node.lineno, f"{called}( on control"))
+    return sorted(found)
+
+
 # ── (e) The tenancy: positive controls ─────────────────────────────────────────────────────────
 
 TENANCY_OFFENDER = """\
@@ -202,6 +235,10 @@ setattr(context, "_test_fallback", SHARED)
 transaction.on_commit(partial(notify, scope), robust=True)
 from django.db.transaction import on_commit
 elsewhere = not router.allow_migrate_model(schema_editor.connection.alias, Hub)
+captured = CaptureQueriesContext(connection)
+captured = utils.CaptureQueriesContext(connection=db.connection)
+counting = django_assert_num_queries(1)
+counting = django_assert_max_num_queries(3, connection=connection)
 """
 TENANCY_LOOKALIKES = """\
 \"\"\"LISTEN on control, never CREATE DATABASE by hand.\"\"\"
@@ -213,6 +250,11 @@ operations.on_commit(partial(notify, scope))
 transaction.atomic(using=alias)
 migrations.RunPython(add_prefix, remove_prefix, hints={"model_name": "membership"})
 TenantRouter().allow_migrate(alias, "base")
+captured = CaptureQueriesContext(connections[current_alias()])
+on_control = CaptureQueriesContext(connections["default"])
+statements = CaptureQueriesContext(ddl)
+counting = django_assert_num_queries(1, connection=connections[current_alias()])
+counting = django_assert_max_num_queries(3, connections["default"])
 """
 
 
@@ -240,6 +282,12 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         (15, "from django.db.transaction import on_commit"),
     ]
     assert router_question_touches(TENANCY_OFFENDER) == [(16, "router.allow_migrate_model(")]
+    assert control_count_touches(TENANCY_OFFENDER) == [
+        (17, "CaptureQueriesContext(connection)"),
+        (18, "CaptureQueriesContext(connection)"),
+        (19, "django_assert_num_queries( on control"),
+        (20, "django_assert_max_num_queries( on control"),
+    ]
     for check in (
         database_ddl_touches,
         settings_mutation_touches,
@@ -249,6 +297,7 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         fallback_touches,
         bare_on_commit_touches,
         router_question_touches,
+        control_count_touches,
     ):
         assert check(TENANCY_LOOKALIKES) == [], check.__name__
 
@@ -315,6 +364,21 @@ def test_no_migration_of_a_business_s_app_asks_the_router():
     assert offenders == [], (
         "A migration of a business's app runs where its hints send it, so the router always answers the same there: "
         f"drop the branch, or split the step in two RunPython with their own hints: {offenders}"
+    )
+
+
+def test_no_test_that_runs_as_production_counts_queries_on_control_without_naming_it():
+    # The files with a test still on the suite's fallback keep the businesses' tables in control's database, so a
+    # count there still sees their reads; every other file is checked.
+    on_the_fallback = {entry.split("::", 1)[0] for entry in current_entries()}
+    files = [path for path in suite_files(HUB_DIR) if str(path) not in on_the_fallback]
+
+    offenders = _offenders(lambda path: control_count_touches((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], (
+        "A business's reads go to its own database, so this count sees none of them and passes with any number of "
+        "queries per row: count on connections[current_alias()] (django_assert_num_queries(..., connection=...)), "
+        f"or name connections['default'] when it is control's work being counted: {offenders}"
     )
 
 

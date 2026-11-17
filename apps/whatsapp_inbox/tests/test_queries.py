@@ -4,11 +4,12 @@ exact-number lookup for other apps, the summary, the templates, the channel and 
 import datetime as dt
 
 import pytest
-from django.db import connection
+from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.whatsapp_inbox.models import Conversation
+from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from apps.whatsapp_inbox.tests.conftest import (
@@ -306,12 +307,12 @@ def test_the_notes_ask_who_the_caller_is_once_however_many_there_are(three, make
         return run("whatsapp_inbox.note.list", {"conversation": "Ana"}, as_luis).rows
 
     run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": "One"}, as_luis)
-    with CaptureQueriesContext(connection) as one:
+    with CaptureQueriesContext(connections[current_alias()]) as one:
         assert len(listed()) == 1
     for text in ("Two", "Three", "Four"):
         run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": text}, as_luis)
 
-    with django_assert_num_queries(len(one.captured_queries)):
+    with django_assert_num_queries(len(one.captured_queries), connection=connections[current_alias()]):
         assert [note.can_delete for note in listed()] == [True] * 4
 
 
