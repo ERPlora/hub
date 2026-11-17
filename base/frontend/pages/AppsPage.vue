@@ -205,6 +205,7 @@ const actions = computed<DataTableAction<AppRow>[]>(() => [
     icon: 'ion:open-outline',
     color: 'primary',
     pinned: true,
+    showLabel: true,
     hidden: (row) => !canOpen(row),
   },
   {
@@ -212,6 +213,7 @@ const actions = computed<DataTableAction<AppRow>[]>(() => [
     // A text button, as «Turn on»: what it does is its label.
     label: t('base.appsPage.toggle.retry'),
     color: 'primary',
+    pinned: true,
     hidden: (row) => !mayManage.value || !canRetry(row),
     loading: (row) => pending.value === row.id,
     disabled: (row) => pending.value !== null && pending.value !== row.id,
@@ -221,6 +223,7 @@ const actions = computed<DataTableAction<AppRow>[]>(() => [
     // A text button: what it does is its label («Turn on», «Turn off»).
     label: (row) => t(canTurnOn(row) ? 'base.appsPage.toggle.on' : 'base.appsPage.toggle.off'),
     color: 'primary',
+    pinned: true,
     hidden: (row) => !mayManage.value || !(canTurnOn(row) || canTurnOff(row)),
     loading: (row) => pending.value === row.id,
     disabled: (row) => pending.value !== null && pending.value !== row.id,
@@ -400,6 +403,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
         :search-placeholder="searchPlaceholder"
         :views="['table', 'cards']"
         :card-title="(row: AppRow) => row.name"
+        card-title-column="name"
         :rows="rows"
         :columns="columns"
         :actions="actions"
@@ -411,13 +415,19 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
         <template #app="{ row }">
           <span class="apps-name">
             <HubIcon
-              class="apps-icon"
+              class="apps-icon ep-icon-tile"
               :name="(row as AppRow).icon"
             />
-            <span
-              class="apps-name-text"
-              :title="(row as AppRow).name"
-            >{{ (row as AppRow).name }}</span>
+            <span class="apps-identity">
+              <span
+                class="apps-name-text"
+                :title="(row as AppRow).name"
+              >{{ (row as AppRow).name }}</span>
+              <span
+                class="apps-plan"
+                data-testid="apps-plan"
+              >{{ priceLabel(row as AppRow) }}</span>
+            </span>
           </span>
         </template>
         <template #price="{ row }">
@@ -472,16 +482,22 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
 
 <style scoped>
 .apps-name {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
   min-width: 0;
   font-weight: 600;
 }
 
-/* A long name in a narrow column («Ventas / TPV», «Facturación» at 834) ends in «…», never cut mid-letter; the whole
-   name on hover. */
+.apps-identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
 .apps-name-text {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -490,9 +506,18 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
 
 .apps-icon {
   flex: none;
-  width: 20px;
-  height: 20px;
-  color: var(--ion-color-primary);
+  width: 44px;
+  height: 44px;
+  color: var(--ep-primary-text);
+  font-size: 22px;
+}
+
+.apps-plan {
+  color: var(--ep-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .apps-state {
@@ -500,6 +525,11 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
+  max-width: 100%;
+}
+
+.apps-page :deep(.data-table__field[data-column='state']) {
+  order: -1;
 }
 
 .apps-counter {

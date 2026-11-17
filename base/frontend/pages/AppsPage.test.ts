@@ -130,6 +130,16 @@ describe('AppsPage', () => {
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="stock"]').text()).toContain('Needs a subscription');
   });
 
+  it('shows the plan under the app name and keeps the primary action readable', async () => {
+    const m = await open('/apps#all');
+    await m.result(m.call, 'base.app.list', LIST);
+    const invoice = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"]');
+    expect(invoice.find('.apps-name-text').text()).toContain('Invoicing');
+    expect(invoice.find('[data-testid="apps-plan"]').text()).toBe('Free');
+    expect(invoice.find('.apps-icon').classes()).toContain('ep-icon-tile');
+    expect(m.wrapper.find('[data-testid="apps-row-tax-open"]').text()).toContain('Open');
+  });
+
   it('«Paid» (#paid) lists only what is bought apart; never a free app', async () => {
     const m = await open('/apps#paid');
     await m.result(m.call, 'base.app.list', LIST);
@@ -243,7 +253,7 @@ describe('AppsPage', () => {
       expect(headers(m)).toContain('Comes with');
       expect(m.wrapper.find('[data-testid="apps-price"]').exists()).toBe(false);
       const invoice = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"]');
-      expect(invoice.text()).not.toContain('Free');
+      expect(invoice.find('[data-testid="apps-plan"]').text()).toBe('Free');
       expect(invoice.text()).toContain('Taxes');
     });
 
@@ -290,6 +300,25 @@ describe('AppsPage', () => {
         expect(fields(m, 'invoice')).not.toContain('Price');
         expect(fields(m, 'invoice')).toContain('Comes with');
         expect(m.wrapper.find('[data-testid="apps-price"]').exists()).toBe(false);
+      });
+
+      it('put the slotted app identity and its plan in the card head', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', FREE_LIST);
+        const head = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"] .data-table__card-head');
+        expect(head.find('[data-testid="apps-plan"]').text()).toBe('Free');
+        expect(head.find('.apps-icon').classes()).toContain('ep-icon-tile');
+        expect(fields(m, 'invoice')).not.toContain('App');
+      });
+
+      it('keep category and state filters in the mobile sheet', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', LIST);
+        await m.wrapper.find('[data-testid="apps-filters-toggle"]').trigger('click');
+        await flush();
+        expect(m.wrapper.find('[data-testid="apps-filters-panel"]').attributes('aria-modal')).toBe('true');
+        expect(m.wrapper.find('[data-testid="apps-filter-category"]').exists()).toBe(true);
+        expect(m.wrapper.find('[data-testid="apps-filter-state"]').exists()).toBe(true);
       });
 
       it('say the price again once an app is sold apart', async () => {
