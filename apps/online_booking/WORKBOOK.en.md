@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e041a30afbb6768130cd241db4f20535fcb99b9f64f2430c76feb67efca48378 -->
+<!-- generated from WORKBOOK.md sha256:4d59f62c8d70f1e59e182212240e812a95aabf3b3a61ce72d2b29dbc1e4b4580 -->
 
 ## What it is for and who it is for
 
@@ -41,7 +41,8 @@ from there respects the business's notice.
 3. In **Staff** and **Schedules**, the same the diary asks for: bookable professionals, their hours and the
    business's. The page offers only the times the diary would give the customer.
 4. Open **Online booking → Settings**, switch on **Public page on** and press **Save**. While it is off,
-   the page says that the business does not take online bookings.
+   the page says that the business does not take online bookings. The address given to customers is
+   `https://<business>.erplora.com/p/<business>/book`.
 5. Every time is on the **business's clock**, in its time zone.
 
 ## Screens
@@ -80,18 +81,27 @@ Title "Booking page settings". Three blocks and a **Save** button:
 
 On saving: "Settings saved."; a refusal shows under its field ("Could not save").
 
+### Booking page (the customer, no session)
+Page `/p/<business>/book` at the business's address: anyone opens it, without signing in or seeing anything of the
+team's (no menu of theirs). At the top, "Book online" and "Choose your services, a day and a free time, then leave
+your name and mobile."; below, the title and the welcome message of the Settings, in its colour, and the flow:
+services with their price and length, professional or "No preference", day, free times, name, mobile, email, note
+and **Book**. Once booked, the appointment number, the confirmation message, **See my booking**, **Cancel the
+booking** and **Book another**. With another business's address, or this one's at another's, there is no page. Still
+without the logo of the Settings or the form's privacy notice (hub#1660).
+
 ### Booking preview (development only)
-Page `/online_booking/preview`, only on the development server: it walks the public page's flow
-(service → professional → day and time → details → book → see and cancel with the link) with the same
-operations that the public page of `base` will call. It is not part of the production version.
+Page `/online_booking/preview`, only on the development server: the same flow as the booking page
+(service → professional → day and time → details → book → see and cancel with the link), with the same
+operations, through the team's session. It is not part of the production version.
 
 ## States of each screen
 
 | State | What the person sees |
 |---|---|
-| Loading | "Loading…" in the table; "Loading settings…" in Settings. |
-| Empty | "No online bookings yet."; with filters, "No booking matches the search."; in Settings without services, "No services yet. Add them in Services.". |
-| Error | The table's notice with "Retry"; the refusal of a row action, in its confirmation or above the table; a refusal in Settings, under its field, without losing what was typed. |
+| Loading | "Loading…" in the table; "Loading settings…" in Settings; "Loading the page…" on the booking page. |
+| Empty | "No online bookings yet."; with filters, "No booking matches the search."; in Settings without services, "No services yet. Add them in Services."; on the booking page with nothing to book online, "This business has nothing to book online right now.". |
+| Error | The table's notice with "Retry"; the refusal of a row action, in its confirmation or above the table; a refusal in Settings, under its field, without losing what was typed; on the booking page, "The page could not be loaded" with the reason ("This business does not take online bookings right now."), and a booking's refusal above **Book** and under its field. |
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they get there another way, "You do not have permission". |
@@ -102,7 +112,7 @@ Dates and times show on the business's clock and in the format of the language o
 
 | ID | Flow | Status |
 |---|---|---|
-| ONLINE_BOOKING-F01 | The customer books from the booking page | done (operations and preview; the public page is `base`'s) |
+| ONLINE_BOOKING-F01 | The customer books from the booking page | partial — she books, without the logo or the privacy notice (hub#1660) |
 | ONLINE_BOOKING-F02 | Confirm a booking | done |
 | ONLINE_BOOKING-F03 | Complete a booking | done |
 | ONLINE_BOOKING-F04 | Mark that she did not show up | done |
@@ -111,14 +121,14 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F07 | Set up the booking page | done |
 | ONLINE_BOOKING-F08 | See and search the bookings | done |
 | ONLINE_BOOKING-F09 | Follow the customer when two cards are merged | done (Appointments does it; the inbox reflects it) |
-| ONLINE_BOOKING-F10 | The customer sees her booking with her link | done (operation; the page is `base`'s) |
-| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | done (operation; the page is `base`'s) |
+| ONLINE_BOOKING-F10 | The customer sees her booking with her link | partial — right after booking; her link does not open a page yet |
+| ONLINE_BOOKING-F11 | The customer cancels her booking with her link | partial — right after booking; her link does not open a page yet |
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
-Status: done (operations and preview; the public page is `base`'s)
+Status: partial — she books, without the logo or the privacy notice (hub#1660)
 Actor: customer (no session); owner or administrator, with the preview or with the assistant
-Screen: public booking page (`base`); in development, the preview
+Screen: booking page (`/p/<business>/book`); in development, the preview too
 Steps:
 1. She opens the business's page: title, welcome message, logo and colour from the Settings.
 2. She picks one or several services (up to 5) among those **booked online**, with their price (in the
@@ -274,9 +284,10 @@ If it fails: Appointments is never left halfway and the relay retries on its own
 Involved: APPOINTMENT-F23, CUSTOMER-F13
 
 ### ONLINE_BOOKING-F10 The customer sees her booking with her link
-Status: done (operation; the page is `base`'s)
+Status: partial — she sees it with **See my booking** right after booking; her link does not open a page yet
 Actor: customer (no session)
-Screen: her booking's page (`base`); in development, the preview
+Screen: the booking page, once booked; her booking's page (`/p/<business>/book/<link>`), not yet; in
+development, the preview
 Steps:
 1. She opens the link of her confirmation.
 2. She sees the number, the status, the day and the time, the services, the professional, the cancellation policy and whether
@@ -289,9 +300,10 @@ longer valid.".
 Involved: APPOINTMENT-F06
 
 ### ONLINE_BOOKING-F11 The customer cancels her booking with her link
-Status: done (operation; the page is `base`'s)
+Status: partial — she cancels it with **Cancel the booking** right after booking; her link does not open a page yet
 Actor: customer (no session)
-Screen: her booking's page (`base`); in development, the preview
+Screen: the booking page, once booked; her booking's page (`/p/<business>/book/<link>`), not yet; in
+development, the preview
 Steps:
 1. From her link she presses **Cancel the booking** (optional reason).
 2. The policy of Appointments applies: "Let the customer cancel her booking" and "Minimum notice to
@@ -374,3 +386,6 @@ The rest of the facts (confirmed, cancelled, completed, no-show, deleted) are th
 | Delete bookings | yes | yes | no | no | `online_booking.delete_booking` |
 | Set up the page | yes | yes | no | no | `online_booking.manage_settings` |
 | Try the public page (preview) | yes | yes | no | no | `online_booking.public` |
+
+The booking page asks for no session: whoever opens it holds `online_booking.public` and nothing else, also someone of
+the team with their session open.

@@ -109,6 +109,7 @@ def test_a_visitor_reads_the_page_its_services_and_free_times_and_books(client, 
     salon = open_salon()
     page = door(client, "online_booking.public.page")
     assert (page.status_code, page.json()["title"]) == (200, "Book an appointment")
+    assert "no-store" in page["Cache-Control"]
     services = door(client, "online_booking.public.services", {"limit": 100})
     assert [row["name"] for row in services.json()["rows"]] == ["Colour", "Haircut"]
     slots = door(

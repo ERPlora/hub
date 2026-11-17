@@ -11,7 +11,7 @@ import appointmentEs from '../../../appointment/frontend/locale/es.json';
 import { click, ionChecked, ionValue, mountInShell, page, settle } from '../__tests__/mount-online-booking';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
-import type { BookedOut, PageOut, PublicServiceOut, PublicSlotsOut } from '../operations';
+import type { BookedOut, PageOut, PublicBookingOut, PublicServiceOut, PublicSlotsOut } from '../operations';
 import PublicBookingPage from './PublicBookingPage.vue';
 
 const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
@@ -51,11 +51,25 @@ const BOOKED: BookedOut = {
   message: 'We have received your booking.',
   token: 't'.repeat(43),
 };
+const SEEN: PublicBookingOut = {
+  number: BOOKED.number,
+  status: 'pending',
+  start: BOOKED.start,
+  end: BOOKED.end,
+  timezone: 'Europe/Madrid',
+  service_names: 'Haircut',
+  staff_name: 'Ana López',
+  can_cancel: true,
+  cancel_until: '2030-03-04T10:00:00+01:00',
+  cancellation_policy: '',
+};
 const ANSWERS: Record<string, [number, unknown]> = {
   'online_booking.public.page': [200, PAGE],
   'online_booking.public.services': [200, page(SERVICES, 1, 100)],
   'online_booking.public.slots': [200, SLOTS],
   'online_booking.public.book': [200, BOOKED],
+  'online_booking.public.booking': [200, SEEN],
+  'online_booking.public.cancel': [200, { ...SEEN, status: 'cancelled', can_cancel: false, cancel_until: null }],
 };
 const DOOR = '/p/salon-lucia/api/';
 
@@ -169,9 +183,7 @@ describe('PublicBookingPage', () => {
     expect(s.el('error')?.textContent).toContain(message);
   });
 
-  it('books through the door and shows the booking’s number and the business’s message', async () => {
-    door();
-    const s = await open();
+  async function booked(s: Awaited<ReturnType<typeof open>>): Promise<void> {
     await ionChecked(s.el('service-v1'), true);
     await ionValue(s.el('day'), '2030-03-05', 'ionChange');
     await settle();
@@ -180,8 +192,31 @@ describe('PublicBookingPage', () => {
     await ionValue(s.el('phone'), '612 345 678', 'ionInput');
     await click(s.el('book'));
     await settle();
+  }
+
+  it('books through the door and shows the booking’s number and the business’s message', async () => {
+    door();
+    const s = await open();
+    await booked(s);
     expect(s.el('booked')?.textContent).toContain('We have received your booking.');
     const book = posted.find(({ op }) => op === 'online_booking.public.book');
     expect(book?.body).toMatchObject({ service_ids: ['v1'], start: '2030-03-05T10:00', name: 'Marta Gil', phone: '612 345 678' });
+  });
+
+  it('right after booking she sees it and cancels it through the door, its link in the body', async () => {
+    door();
+    const s = await open();
+    await booked(s);
+    await click(s.el('view'));
+    await settle();
+    expect(s.el('status')?.textContent).toContain('Pending');
+    await click(s.el('cancel'));
+    await settle();
+    expect(s.el('status')?.textContent).toContain('Cancelled');
+    const byLink = posted.filter(({ op }) => op === 'online_booking.public.booking' || op === 'online_booking.public.cancel');
+    expect(byLink.map(({ op, body }) => [op, body])).toEqual([
+      ['online_booking.public.booking', { token: BOOKED.token }],
+      ['online_booking.public.cancel', { token: BOOKED.token }],
+    ]);
   });
 });

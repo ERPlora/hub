@@ -9,11 +9,11 @@ business is never read from the address, so another's slug is not found.
 
 - ``GET /p/<slug>/<page>``: the SPA's HTML (``base.spa.shell``), whose route of the same path paints the page, with the
   business's money (``public-door``) for its prices: a visitor has no session to ask for it.
-- ``POST /p/<slug>/api/<operation>``: an operation of that app asking exactly the page's permission, run in this process
-  as nobody signed in, with that permission and nothing else, whoever is signed in. Its input is the JSON body, never the
-  query string, which servers log (a customer's personal link travels in it); its answer, the operation's output or the
-  API's single error envelope in the visitor's language. Django's CSRF check guards it: the page's HTML set the cookie
-  its script sends back.
+- ``POST /p/<slug>/api/<operation>``: an operation asking exactly the page's permission (one of that app's), run in
+  this process as nobody signed in, with that permission and nothing else, whoever is signed in. Its input is the JSON
+  body, never the query string, which servers log (a customer's personal link travels in it); its answer, the
+  operation's output or the API's single error envelope in the visitor's language. Django's CSRF check guards it: the
+  page's HTML set the cookie its script sends back.
 """
 
 from dataclasses import dataclass
@@ -40,7 +40,8 @@ PUBLIC_PAGES = "public_pages"
 #: The block of the page's HTML with the business's money.
 DOOR_BLOCK_ID = "public-door"
 
-# The hub API's own answer to a failure, for the door's calls: the single envelope, a 422 per field, the visitor's language.
+# The hub API's own answer to a failure, for the door's calls: the single envelope, a 422 per field, in the visitor's
+# language.
 _failures = NinjaAPI(urls_namespace="public-door", docs_url=None, openapi_url=None)
 install_error_handlers(_failures)
 
@@ -54,7 +55,7 @@ class Page:
 
 
 def pages() -> dict[str, Page]:
-    """Every page the installed apps give, by its path; one naming a permission that is not its app's own is left out."""
+    """Every page the installed apps give, by its path; one naming a permission not of its app's own is left out."""
     given = {}
     for config in all_live_app_configs():
         for path, permission in getattr(config, PUBLIC_PAGES, {}).items():
@@ -97,13 +98,10 @@ def _opened(request: HttpRequest, slug: str, page: Page | None) -> Page:
 
 
 def _page_of(op: Operation | None) -> Page | None:
-    """The page of ``op``'s app whose permission ``op`` asks exactly: the only operations the door runs."""
+    """The page whose permission ``op`` asks exactly: the only operations the door runs."""
     if op is None:
         return None
-    return next(
-        (page for page in pages().values() if op.permission == page.permission and op.name.startswith(f"{page.app}.")),
-        None,
-    )
+    return next((page for page in pages().values() if op.permission == page.permission), None)
 
 
 def _visitor(request: HttpRequest, page: Page) -> OperationContext:
