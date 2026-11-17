@@ -17,7 +17,7 @@ describe('FloorTile', () => {
     const t = await tile(tableRow({ position_x: 100, position_y: 40, width: 120 }), { fit });
     expect(t.part('number').text()).toBe('4');
     expect(t.part('line').text()).toBe('Available');
-    expect(t.part('status').text()).toBe('Available · 4 pax');
+    expect(t.part('status').text()).toBe('4 pax');
     expect(t.el.getAttribute('data-status')).toBe('available');
     expect(t.el.getAttribute('data-testid')).toBe('table-floor-tile-t1');
     expect([t.el.dataset.x, t.el.dataset.y]).toEqual(['100', '40']);
@@ -50,6 +50,8 @@ describe('FloorTile', () => {
     expect(t.button().attributes('title')).toContain('Reservada para Maximiliana Fernández');
     const erased = await tile(tableRow({ hold: { ...hold, label: '', erased: true } }), {}, 'es');
     expect(erased.part('hold-name').text()).toBe('Cliente borrado');
+    const dotted = await tile(tableRow({ status: 'reserved', hold: { ...hold, label: 'Ana · Bea' } }), {}, 'es');
+    expect(dotted.part('hold-name').text()).toBe('Ana · Bea');
   });
 
   it('keeps a later reservation visible on an available table', async () => {
@@ -64,7 +66,8 @@ describe('FloorTile', () => {
     expect((await tile(tableRow({ shape: 'round' }))).el.classList.contains('table-tile--round')).toBe(true);
     expect((await tile(tableRow({ shape: 'rectangle' }))).el.classList.contains('table-tile--rectangle')).toBe(true);
     const blocked = await tile(tableRow({ status: 'blocked', blocked: true }));
-    expect(blocked.part('status').text()).toBe('Blocked · 4 pax');
+    expect(blocked.part('line').text()).toBe('Blocked');
+    expect(blocked.part('status').text()).toBe('4 pax');
     const idle = await tile(tableRow({ is_active: false, in_service: false }), { editing: true });
     expect(idle.el.classList.contains('table-tile--inactive')).toBe(true);
     expect(idle.part('inactive').text()).toBe('Inactive');

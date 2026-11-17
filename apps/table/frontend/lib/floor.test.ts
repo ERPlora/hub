@@ -67,7 +67,7 @@ describe('statuses', () => {
       reserved: 'ion:time-outline',
       blocked: 'ion:ban-outline',
     });
-    expect(STATUS_TONE).toEqual({ available: 'success', occupied: 'danger', reserved: 'warning', blocked: 'neutral' });
+    expect(STATUS_TONE).toEqual({ available: 'success', occupied: 'info', reserved: 'warning', blocked: 'neutral' });
   });
 });
 

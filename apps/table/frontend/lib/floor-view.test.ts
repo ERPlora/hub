@@ -39,9 +39,9 @@ describe('elapsed', () => {
 });
 
 describe('floorView', () => {
-  it('gives a free table its status and capacity without inventing a timer', () => {
+  it('gives a free table its status inside and its capacity on the label, without inventing a timer', () => {
     const model = view();
-    expect(model).toMatchObject({ minutes: null, tone: 'normal', progress: 0, short: 'Available', labels: ['Available · 4 pax'] });
+    expect(model).toMatchObject({ minutes: null, tone: 'normal', progress: 0, short: 'Available', labels: ['4 pax'] });
     expect(model.accessible).toBe('Table 4 · Dining room · 4 pax · Available');
   });
 
@@ -60,17 +60,20 @@ describe('floorView', () => {
     expect(view(tableRow({ status: 'reserved' })).tone).toBe('normal');
   });
 
-  it('uses the table status when an occupied row has no start time', () => {
-    expect(view(occupied({ since: null })).short).toBe('Occupied');
+  it('writes the status once: on the label only when the table does not show it inside', () => {
+    const untimed = view(occupied({ since: null }));
+    expect([untimed.short, untimed.labels[0]]).toEqual(['Occupied', '3/4 pax']);
+    const blocked = view(tableRow({ status: 'blocked', blocked: true }));
+    expect([blocked.short, blocked.labels]).toEqual(['Blocked', ['4 pax']]);
   });
 
   it('keeps reservation details on a second label line for reserved and free tables', () => {
     const hold = { label: 'Ana', erased: false, held_from: '2026-10-14T18:00:00Z', held_until: '2026-10-14T20:00:00Z', party_size: 4, reserving: true };
     const reserved = view(tableRow({ status: 'reserved', hold }));
-    expect(reserved.short).toBe('8:00 PM');
+    expect([reserved.short, reserved.holder]).toEqual(['8:00 PM', 'Ana']);
     expect(reserved.labels).toEqual(['Reserved · 4 pax', 'Ana · 8:00 PM']);
     expect(reserved.accessible).toContain('Reserved for Ana · 8:00 PM');
-    expect(view(tableRow({ hold: { ...hold, reserving: false } })).labels).toEqual(['Available · 4 pax', 'Ana · 8:00 PM']);
+    expect(view(tableRow({ hold: { ...hold, reserving: false } })).labels).toEqual(['4 pax', 'Ana · 8:00 PM']);
   });
 
   it('keeps exact guest counts above capacity and names erased customers', () => {

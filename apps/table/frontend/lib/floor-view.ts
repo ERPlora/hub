@@ -16,6 +16,7 @@ export interface FloorView {
   tone: 'normal' | 'warning' | 'critical';
   progress: number;
   short: string;
+  holder: string;
   holdTime: string;
   labels: string[];
   accessible: string;
@@ -53,13 +54,15 @@ export function floorView(table: TableOut, options: FloorViewOptions): FloorView
   const holdTime = clock(table.hold?.held_from, options.locale, options.timeZone);
   const holder = holdName(table.hold, t('table.erasedCustomer'));
   const pax = table.status === 'occupied' ? t('table.floor.paxOf', { guests: table.guests ?? 0, capacity: table.capacity }) : t('table.pax', { count: table.capacity });
+  const short = minutes !== null ? elapsed(minutes) : table.status === 'reserved' && holdTime ? holdTime : status;
   const model = {
     minutes,
     tone: rawTone === 'ok' ? ('normal' as const) : rawTone,
     progress: minutes === null ? 0 : Math.min(100, (minutes / options.settings.timer_critical_minutes) * 100),
-    short: minutes !== null ? elapsed(minutes) : table.status === 'reserved' && holdTime ? holdTime : status,
+    short,
+    holder,
     holdTime,
-    labels: [`${status} · ${pax}`, ...(holder ? [`${holder}${holdTime ? ` · ${holdTime}` : ''}`] : [])],
+    labels: [short === status ? pax : `${status} · ${pax}`, ...(holder ? [`${holder}${holdTime ? ` · ${holdTime}` : ''}`] : [])],
   };
   return { ...model, accessible: accessible(table, model, options) };
 }

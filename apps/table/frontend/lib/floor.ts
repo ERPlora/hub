@@ -67,7 +67,7 @@ export const STATUS_ICON: Readonly<Record<TableStatus, string>> = Object.freeze(
 
 export const STATUS_TONE: Readonly<Record<TableStatus, StatusPillTone>> = Object.freeze({
   available: 'success',
-  occupied: 'danger',
+  occupied: 'info',
   reserved: 'warning',
   blocked: 'neutral',
 });

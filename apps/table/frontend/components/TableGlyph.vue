@@ -47,12 +47,46 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
       preserveAspectRatio="none"
     >
       <template v-if="table.shape === 'round'">
-        <circle class="table-glyph__arc-track" cx="50" cy="50" r="48" pathLength="100" vector-effect="non-scaling-stroke" />
-        <circle class="table-glyph__arc-value" cx="50" cy="50" r="48" pathLength="100" vector-effect="non-scaling-stroke" :stroke-dasharray="dash" />
+        <circle
+          class="table-glyph__arc-track"
+          cx="50"
+          cy="50"
+          r="48"
+          pathLength="100"
+          vector-effect="non-scaling-stroke"
+        />
+        <circle
+          class="table-glyph__arc-value"
+          cx="50"
+          cy="50"
+          r="48"
+          pathLength="100"
+          vector-effect="non-scaling-stroke"
+          :stroke-dasharray="dash"
+        />
       </template>
       <template v-else>
-        <rect class="table-glyph__arc-track" x="1" y="1" width="98" height="98" rx="14" pathLength="100" vector-effect="non-scaling-stroke" />
-        <rect class="table-glyph__arc-value" x="1" y="1" width="98" height="98" rx="14" pathLength="100" vector-effect="non-scaling-stroke" :stroke-dasharray="dash" />
+        <rect
+          class="table-glyph__arc-track"
+          x="1"
+          y="1"
+          width="98"
+          height="98"
+          rx="14"
+          pathLength="100"
+          vector-effect="non-scaling-stroke"
+        />
+        <rect
+          class="table-glyph__arc-value"
+          x="1"
+          y="1"
+          width="98"
+          height="98"
+          rx="14"
+          pathLength="100"
+          vector-effect="non-scaling-stroke"
+          :stroke-dasharray="dash"
+        />
       </template>
     </svg>
   </div>

@@ -55,7 +55,11 @@ const style = computed(() => {
     :data-y="y ?? table.position_y"
     :data-testid="`table-floor-tile-${table.id}`"
   >
-    <TableGlyph :table="table" :tone="model.tone" :progress="model.progress" />
+    <TableGlyph
+      :table="table"
+      :tone="model.tone"
+      :progress="model.progress"
+    />
     <button
       class="table-tile__button"
       type="button"
@@ -65,19 +69,43 @@ const style = computed(() => {
       :disabled="pickable === false"
       :title="model.accessible"
     >
-      <span class="table-tile__number" data-part="number">{{ table.number }}</span>
-      <span class="table-tile__line" :data-tone="model.tone" data-part="line">{{ model.short }}</span>
+      <span
+        class="table-tile__number"
+        data-part="number"
+      >{{ table.number }}</span>
+      <span
+        class="table-tile__line"
+        :data-tone="model.tone"
+        data-part="line"
+      >{{ model.short }}</span>
     </button>
     <div class="table-tile__caption">
-      <span class="table-tile__status" data-part="status">
+      <span
+        class="table-tile__status"
+        data-part="status"
+      >
         <HubIcon :name="STATUS_ICON[table.status]" />
         {{ model.labels[0] }}
       </span>
-      <span v-if="table.hold" class="table-tile__hold">
-        <span class="table-tile__hold-name" data-part="hold-name">{{ model.labels[1]?.split(' · ')[0] }}</span>
-        <span v-if="model.holdTime" class="table-tile__hold-time" data-part="hold-time">· {{ model.holdTime }}</span>
+      <span
+        v-if="model.holder"
+        class="table-tile__hold"
+      >
+        <span
+          class="table-tile__hold-name"
+          data-part="hold-name"
+        >{{ model.holder }}</span>
+        <span
+          v-if="model.holdTime"
+          class="table-tile__hold-time"
+          data-part="hold-time"
+        >· {{ model.holdTime }}</span>
       </span>
-      <span v-if="inactive" class="table-tile__inactive" data-part="inactive">{{ $t('table.inactive') }}</span>
+      <span
+        v-if="inactive"
+        class="table-tile__inactive"
+        data-part="inactive"
+      >{{ $t('table.inactive') }}</span>
     </div>
   </div>
 </template>
