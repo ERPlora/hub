@@ -111,7 +111,9 @@ function bumpAll(): void {
 </template>
 
 <style scoped>
+/* Ionic's card header stacks its children bottom-up in iOS mode: the head row comes first in both modes. */
 .kds-head {
+  flex-direction: column;
   padding: 0.5rem 0.5rem 0.75rem;
   border-bottom: 1px solid var(--ion-border-color);
   background: color-mix(in srgb, var(--ion-color-step-50) 60%, var(--ion-card-background));

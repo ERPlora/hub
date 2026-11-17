@@ -115,6 +115,7 @@ function choose(step: Secondary): void {
       />
     </ion-button>
     <ion-popover
+      class="kds-actions__popover"
       :is-open="open"
       :event="anchor"
       alignment="end"
@@ -175,8 +176,11 @@ function choose(step: Secondary): void {
   --padding-start: 0;
   --padding-end: 0;
 }
+/* Wide enough for «Marcar urgente» in iOS mode, whose popover is narrower than the list would be. */
+.kds-actions__popover {
+  --width: 16rem;
+}
 .kds-actions__menu {
-  min-width: 15rem;
   padding: 0.35rem;
 }
 .kds-actions__menu ion-item {
