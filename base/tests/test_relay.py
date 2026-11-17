@@ -11,41 +11,41 @@ it is turned on).
 """
 
 import datetime as dt
-import json
 import logging
-import threading
 from decimal import Decimal
 from importlib import import_module
 from types import SimpleNamespace
 
-import psycopg
 import pytest
 from django.apps import apps as global_apps
-from django.db import connection, connections, transaction
+from django.db import connection
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, NotFound
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
-from live.operations import get
-from live.outbox import channel_for
-from psycopg.conninfo import make_conninfo
+from live.operations import atomic, get
 
 from apps.customer.models import Customer
+from apps.flow.tests.test_relay import heard, listen, worker_loop
 from apps.inventory.models import Product, StockMovement
 from apps.invoice.models import Invoice
 from apps.kitchen.models import Ticket
 from apps.printing.models import PrintJob
+from apps.sale.tests.conftest import db_dsn
 from apps.verifactu.models import Record
-from base import catalog, relay, worker
-from base.services import relay_runs
-from base.catalog import RegisterResult
+from base import relay
 from base.models import EventDelivery
+from base.services import relay_runs
+from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.business import A, B, HUB_DB, HUB_DB_COMMITTED, factory_data, factory_data_b, in_business_a
+from base.tenancy.tests.concurrency import in_a_thread, plan_with_room
+from base.tests.businesses import SchemaEditor
 
-A = Scope("host", "a")
-B = Scope("host", "b")
+__all__ = ["db_dsn", "factory_data", "factory_data_b", "in_business_a", "listen", "plan_with_room", "worker_loop"]
+
 ISSUER = {
     "legal_name": "Peluquería Ana SL",
     "tax_id": "B12345674",
@@ -54,7 +54,6 @@ ISSUER = {
     "city": "Madrid",
     "province": "Madrid",
 }
-REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 
 
 def ctx_for(scope: Scope = A, actor: str = "tester") -> OperationContext:
@@ -74,34 +73,9 @@ def english():
         yield
 
 
-@pytest.fixture
-def worker_loop(monkeypatch):
-    """The worker's real loop, without the SaaS (``register_apps``) and, inside a test's transaction, without
-    releasing the connections (that would close the test's own); ``tick(n)`` runs ``n`` ticks at ``now``."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    now = timezone.now()
-
-    def tick(times: int = 1, *, at: dt.datetime | None = None) -> None:
-        stop, waits = threading.Event(), []
-
-        def wait(seconds: float) -> bool:
-            waits.append(seconds)
-            if len(waits) == times:
-                stop.set()
-            return stop.is_set()
-
-        moment = at or now
-        assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: moment) == 0
-
-    tick.now = now
-    return tick
-
-
-@pytest.fixture
-def till(db):
-    """An issuer, a shampoo with 10 units on the shelf and Ana's card, all made by their own apps."""
-    run("invoice.issuer.update", ISSUER)
+def stocked(scope: Scope = A) -> None:
+    """An issuer and a shampoo with 10 units on the shelf in ``scope``'s business, made by their own apps."""
+    run("invoice.issuer.update", ISSUER, ctx_for(scope))
     run(
         "inventory.product.create",
         {
@@ -111,8 +85,14 @@ def till(db):
             "tax_category_key": "product.generic",
             "initial_stock": "10",
         },
-        system_context(A),
+        system_context(scope),
     )
+
+
+@pytest.fixture
+def till(factory_data):
+    """Business A's shelf (``stocked``) and Ana's card, on committed data the worker's real pass sees."""
+    stocked()
     return run("customer.customer.create", {"name": "Ana López"}, system_context(A))
 
 
@@ -154,6 +134,7 @@ def deliveries(name: str) -> dict[str, tuple[str, int]]:
 # ── The tick: money, fiscal and stock, exactly once ───────────────────────────────────────────
 
 
+@HUB_DB_COMMITTED
 def test_a_paid_sale_lowers_the_stock_once_and_keeps_one_invoice_and_one_record(worker_loop, till):
     sale = charge("relay-0001", customer=till)
     # The till issued the ticket and its record in the charge; the stock and the card wait for the relay.
@@ -186,6 +167,7 @@ def test_a_paid_sale_lowers_the_stock_once_and_keeps_one_invoice_and_one_record(
     assert deliveries("sale.sale.completed")["inventory"] == ("delivered", 1)
 
 
+@HUB_DB_COMMITTED
 def test_a_voided_sale_gives_the_stock_back_once_with_one_rectification(worker_loop, till):
     sale = charge("relay-0002", customer=till)
     worker_loop()
@@ -205,6 +187,7 @@ def test_a_voided_sale_gives_the_stock_back_once_with_one_rectification(worker_l
     assert (stock(), card(till), documents()) == (Decimal("10"), (0, 0), (2, 2))
 
 
+@HUB_DB_COMMITTED
 def test_a_refund_puts_its_units_back_once_with_one_rectification(worker_loop, till):
     sale = charge("relay-0003", customer=till)
     worker_loop()
@@ -229,7 +212,8 @@ def test_a_refund_puts_its_units_back_once_with_one_rectification(worker_loop, t
     assert (stock(), card(till), documents()) == (Decimal("9"), (1, 1210), (2, 2))
 
 
-def test_a_round_fired_at_the_till_reaches_the_kitchen_once(worker_loop, db):
+@HUB_DB_COMMITTED
+def test_a_round_fired_at_the_till_reaches_the_kitchen_once(worker_loop, factory_data):
     burger = run(
         "inventory.product.create",
         {"name": "Burger", "sku": "BURGER", "price": 1200, "tax_category_key": "restaurant.food"},
@@ -259,22 +243,17 @@ def test_a_round_fired_at_the_till_reaches_the_kitchen_once(worker_loop, db):
 # ── The backlog: what was recorded before the relay existed is never applied ──────────────────
 
 
-class _SchemaEditor:
-    """What a ``RunPython`` function reads from the schema editor: the connection."""
-
-    connection = connection
-
-
 def _relay_migration():
     return import_module("base.migrations.0006_event_delivery")
 
 
+@HUB_DB_COMMITTED
 def test_the_events_recorded_before_the_relay_are_never_applied(worker_loop, till):
     charge("relay-0004", customer=till)
     old = OutboxEvent.objects.get(name="sale.sale.completed")
 
     # The migration that brings the relay marks the backlog as handed over, without delivering it.
-    _relay_migration().hold_back_the_backlog(global_apps, _SchemaEditor())
+    _relay_migration().hold_back_the_backlog(global_apps, SchemaEditor())
     worker_loop()
 
     assert (stock(), card(till)) == (Decimal("10"), (0, 0))
@@ -285,15 +264,16 @@ def test_the_events_recorded_before_the_relay_are_never_applied(worker_loop, til
     assert (stock(), card(till)) == (Decimal("7"), (1, 3630))
 
 
+@HUB_DB_COMMITTED
 def test_reverting_the_migration_gives_back_only_the_events_it_held_back(worker_loop, till):
     charge("relay-0006")
-    _relay_migration().hold_back_the_backlog(global_apps, _SchemaEditor())
+    _relay_migration().hold_back_the_backlog(global_apps, SchemaEditor())
     held = OutboxEvent.objects.get(name="sale.sale.completed")
     charge("relay-0007")
     worker_loop()
     relayed = OutboxEvent.objects.filter(name="sale.sale.completed").exclude(pk=held.pk).get()
 
-    _relay_migration().release_the_backlog(global_apps, _SchemaEditor())
+    _relay_migration().release_the_backlog(global_apps, SchemaEditor())
 
     held.refresh_from_db()
     relayed.refresh_from_db()
@@ -304,10 +284,10 @@ def test_reverting_the_migration_gives_back_only_the_events_it_held_back(worker_
 # ── Only the apps that are on ─────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db  # which apps are on is the business's: its rows (base.activation)
+@HUB_DB  # which apps are on is the business's: its rows (base.activation)
 def test_listeners_of_an_event():
     def event(name: str) -> OutboxEvent:
-        return OutboxEvent(scope_kind="host", scope_key="a", name=name)
+        return OutboxEvent(scope_kind=A.kind, scope_key=A.key, name=name)
 
     # The apps whose REACTIONS name it, and Flows («*»), which hears every event but its own app's.
     assert relay.listeners(event("sale.sale.completed")) == ["customer", "flow", "inventory", "invoice"]
@@ -316,7 +296,7 @@ def test_listeners_of_an_event():
     assert relay.listeners(event("demo.item.created")) == ["flow"]
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_event_of_the_platform_is_heard_by_no_app_of_a_hub():
     """hub#471, seen in pre: ``base.demo.created`` (control's outbox, the registry's scope) reached Flows
     («*»), whose reaction ran on control and failed 8 times with ``HubContextMissing``. An event of no hub has no hub
@@ -325,9 +305,9 @@ def test_an_event_of_the_platform_is_heard_by_no_app_of_a_hub():
         assert relay.listeners(OutboxEvent(scope_kind="platform", scope_key="registry", name=name)) == []
 
 
-def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_loop, db):
+@HUB_DB_COMMITTED
+def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_loop):
     from base.registry import REGISTRY_SCOPE
-    from base.tenancy.context import use_control
 
     with use_control():
         event = OutboxEvent.objects.create(
@@ -340,13 +320,13 @@ def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_
 
     worker_loop()
 
-    event.refresh_from_db()
-    assert event.delivered_at is not None
-    assert not EventDelivery.objects.filter(event=event).exists()
+    with use_control():
+        event.refresh_from_db()
+        assert event.delivered_at is not None
+        assert not EventDelivery.objects.filter(event=event).exists()
 
 
-@pytest.mark.django_db
-@pytest.mark.usefixtures("no_test_fallback")
+@HUB_DB
 def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_a_business_s_old_events_alone(
     monkeypatch,
 ):
@@ -354,7 +334,6 @@ def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_a_business_
     of that business would need its database, so on control the relay never takes one, nor runs its deliveries
     (the cut copies a business's own into its database: ``base.tenancy.cut``)."""
     from base.registry import REGISTRY_SCOPE
-    from base.tenancy.context import use_control
 
     # Inside the test's transaction the relay's release of its connections would close the test's own.
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
@@ -394,10 +373,8 @@ class TestTheMigrationThatClosesControlDeliveries:
             event=event, app_label="flow", status=status, next_attempt_at=timezone.now(), last_error=last_error
         )
 
-    @pytest.mark.django_db
+    @HUB_DB
     def test_a_pending_delivery_of_an_event_of_no_hub_is_closed_dead_with_why(self):
-        from base.tenancy.context import use_control
-
         with use_control():
             control = self.delivery("platform", "registry")
             business = self.delivery("host", "a")
@@ -419,12 +396,13 @@ class TestTheMigrationThatClosesControlDeliveries:
         assert close.reverse_code is close.noop
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_business_that_never_turned_an_app_off_has_every_installed_app_on():
     # base.session.me lists every module as «on»: no right is missing and nothing was turned off (base.activation).
     assert relay.active_apps(A) == frozenset(config.label for config in all_live_app_configs())
 
 
+@HUB_DB_COMMITTED
 def test_an_app_that_is_off_receives_nothing_nor_the_history_once_it_is_on(worker_loop, till, monkeypatch):
     every = relay.active_apps(A)
     monkeypatch.setattr(relay, "active_apps", lambda scope: every - {"inventory"})
@@ -448,6 +426,7 @@ def test_an_app_that_is_off_receives_nothing_nor_the_history_once_it_is_on(worke
 # ── Depth: a reaction that records events does not loop ───────────────────────────────────────
 
 
+@HUB_DB_COMMITTED
 def test_what_a_reaction_records_is_handed_over_in_its_own_transaction_one_level_deeper(worker_loop, till):
     charge("relay-0010")
 
@@ -465,6 +444,7 @@ class _Undone(Exception):
     pass
 
 
+@HUB_DB_COMMITTED
 def test_an_event_a_reaction_records_and_then_undoes_is_not_handed_over(worker_loop, till, monkeypatch):
     # A reaction may try something in a savepoint and give it up (Kitchen's paper when Printing refuses it): the
     # event recorded there is gone, and a delivery pointing at it would fail the whole COMMIT on every tick.
@@ -474,7 +454,7 @@ def test_an_event_a_reaction_records_and_then_undoes_is_not_handed_over(worker_l
         outcome = real(app_label, event)
         if app_label == "inventory":
             try:
-                with transaction.atomic():
+                with atomic():
                     run("customer.customer.create", {"name": "Never kept"}, system_context(A))
                     raise _Undone
             except _Undone:
@@ -493,6 +473,7 @@ def test_an_event_a_reaction_records_and_then_undoes_is_not_handed_over(worker_l
     assert deliveries("sale.sale.completed")["inventory"] == ("delivered", 1)
 
 
+@HUB_DB_COMMITTED
 def test_past_the_deepest_level_an_event_is_not_delivered_and_says_why(worker_loop, till, monkeypatch, caplog):
     monkeypatch.setattr(relay, "MAX_EVENT_DEPTH", 0)
 
@@ -510,15 +491,16 @@ def test_past_the_deepest_level_an_event_is_not_delivered_and_says_why(worker_lo
 # ── A failing reaction: retried a few times, never in a loop, never blocking the others ────────
 
 
+@HUB_DB_COMMITTED
 def test_a_reaction_that_fails_is_retried_with_a_growing_wait_then_given_up_and_the_rest_flows(
     worker_loop, till, caplog
 ):
-    OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed", payload={"bogus": 1})
+    OutboxEvent.objects.create(scope_kind=A.kind, scope_key=A.key, name="sale.sale.completed", payload={"bogus": 1})
     charge("relay-0012")
-    now = worker_loop.now
+    now = timezone.now()
 
     with caplog.at_level(logging.ERROR, logger="base.services.relay_runs"):
-        worker_loop()
+        worker_loop(now)
 
     # The good sale went through; the broken one waits 2 s for its second attempt.
     assert stock() == Decimal("8")
@@ -529,20 +511,20 @@ def test_a_reaction_that_fails_is_retried_with_a_growing_wait_then_given_up_and_
     assert any(str(broken.event_id) in record.getMessage() for record in caplog.records)
 
     # Not before its time; then 4 s, 8 s… until the eighth attempt, which gives up.
-    worker_loop(at=now + dt.timedelta(seconds=1))
+    worker_loop(now + dt.timedelta(seconds=1))
     broken.refresh_from_db()
     assert broken.attempts == 1
     moment = now
     for attempt in range(2, relay.MAX_ATTEMPTS + 1):
         moment = broken.next_attempt_at
-        worker_loop(at=moment)
+        worker_loop(moment)
         broken.refresh_from_db()
         assert broken.attempts == attempt
         if attempt < relay.MAX_ATTEMPTS:
             # The wait grows with the attempts of this delivery: 4 s after the second, 8 s after the third…
             assert broken.next_attempt_at == moment + relay.backoff(attempt)
     assert broken.status == "dead"
-    worker_loop(at=moment + dt.timedelta(days=1))
+    worker_loop(moment + dt.timedelta(days=1))
     broken.refresh_from_db()
     assert (broken.status, broken.attempts) == ("dead", relay.MAX_ATTEMPTS)
 
@@ -556,9 +538,9 @@ def test_the_wait_doubles_and_stops_growing_at_an_hour():
 
 @pytest.fixture
 def one_delivery(db):
-    """A ``sale.sale.completed`` taken for Invoicing, due now: ``(event, now)``."""
+    """A ``sale.sale.completed`` of business A taken for Invoicing, due now: ``(event, now)``."""
     now = timezone.now()
-    event = OutboxEvent.objects.create(scope_kind="host", scope_key="a", name="sale.sale.completed", payload={})
+    event = OutboxEvent.objects.create(scope_kind=A.kind, scope_key=A.key, name="sale.sale.completed", payload={})
     relay_runs.relay_take_events(now, listeners=lambda _: ["invoice"], limit=10, max_depth=relay.MAX_EVENT_DEPTH)
     return event, now
 
@@ -593,6 +575,7 @@ def relay_logs(caplog) -> list[logging.LogRecord]:
         (NotFound("No such sale."), "not_found"),
     ],
 )
+@HUB_DB
 def test_a_reaction_the_business_refuses_is_a_warning_with_its_code_and_no_traceback(
     one_delivery, caplog, refusal, code
 ):
@@ -617,6 +600,7 @@ def test_a_reaction_the_business_refuses_is_a_warning_with_its_code_and_no_trace
     )
 
 
+@HUB_DB
 def test_a_reaction_that_fails_unexpectedly_is_an_error_with_its_traceback(one_delivery, caplog):
     event, now = one_delivery
 
@@ -636,6 +620,7 @@ def test_a_reaction_that_fails_unexpectedly_is_an_error_with_its_traceback(one_d
     )
 
 
+@HUB_DB
 def test_a_refusal_given_up_at_the_last_attempt_is_an_error_with_its_code(one_delivery, caplog):
     event, now = one_delivery
     EventDelivery.objects.filter(event=event).update(attempts=relay.MAX_ATTEMPTS - 1)
@@ -661,99 +646,49 @@ def test_a_refusal_given_up_at_the_last_attempt_is_an_error_with_its_code(one_de
 # ── Two hubs and two workers, on committed data ───────────────────────────────────────────────
 
 
-@pytest.fixture
-def committed_till(transactional_db):
-    """``till`` on a flushed database: tax's factory catalogue and the payment methods are planted again, as
-    their migrations do."""
-    with connections["default"].schema_editor() as editor:
-        for module in (
-            "apps.tax.migrations.0002_factory_catalogue",
-            "apps.tax.migrations.0005_retail_alcohol",
-            "apps.sale.migrations.0002_factory_payment_methods",
-        ):
-            import_module(module).plant(global_apps, editor)
-    run("invoice.issuer.update", ISSUER)
-    run(
-        "inventory.product.create",
-        {
-            "name": "Shampoo",
-            "sku": "SHA",
-            "price": 1210,
-            "tax_category_key": "product.generic",
-            "initial_stock": "10",
-        },
-        system_context(A),
-    )
-
-
-@pytest.fixture
-def listen():
-    params = connections["default"].settings_dict
-    dsn = make_conninfo(
-        dbname=params["NAME"],
-        user=params["USER"],
-        password=params["PASSWORD"],
-        host=params["HOST"],
-        port=params["PORT"],
-    )
-    sessions = []
-
-    def open_session(scope: Scope):
-        session = psycopg.connect(dsn, autocommit=True)
-        sessions.append(session)
-        session.execute(f"LISTEN {channel_for(scope)}")
-        return session
-
-    yield open_session
-    for session in sessions:
-        session.close()
-
-
-def heard(session, timeout: float = 0.5) -> set[str]:
-    return {name for note in session.notifies(timeout=timeout) for name in json.loads(note.payload)["events"]}
-
-
-def test_an_event_of_hub_b_runs_in_b_and_is_heard_in_b_only(committed_till, listen, monkeypatch):
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+@HUB_DB_COMMITTED
+def test_an_event_of_hub_b_runs_in_b_and_is_heard_in_b_only(till, factory_data_b, hub_b, listen, worker_loop):
     on_a, on_b = listen(A), listen(B)
-    charge("relay-b-0001", scope=B)
+    with use_hub(hub_b):
+        stocked(B)
+        charge("relay-b-0001", scope=B)
     heard(on_b)  # the charge's own notice
 
-    stop = threading.Event()
-    assert worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set()) == 0
+    worker_loop()
 
-    assert stock() == Decimal("8")
+    with use_hub(hub_b):
+        assert stock() == Decimal("8")
+        changed = newest("inventory.stock.changed")
+        assert (changed.scope_kind, changed.scope_key) == (B.kind, B.key)
+    assert stock() == Decimal("10")
+    assert not OutboxEvent.objects.filter(scope_key=B.key).exists()
     assert "inventory.stock.changed" in heard(on_b)
     assert heard(on_a) == set()
     # The positive control: a charge of A is heard in A.
     charge("relay-a-0001", scope=A)
     heard(on_a)
-    stop.clear()
-    worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set())
+    worker_loop()
     assert "inventory.stock.changed" in heard(on_a)
 
 
-def test_two_workers_never_deliver_the_same_event_to_the_same_app(committed_till, monkeypatch):
+@HUB_DB_COMMITTED
+@pytest.mark.usefixtures("plan_with_room")
+def test_two_workers_never_deliver_the_same_event_to_the_same_app(till, monkeypatch):
     # The deploy starts the new worker before stopping the old one: both relay the same outbox.
     seen: list[tuple[str, str]] = []
     waited: list[bool] = []
+    other_pass: list = [None]
     real = relay.deliver
 
     def deliver(app_label, event):
         seen.append((app_label, str(event.id)))
         if app_label == "inventory" and not waited:
             # While this worker holds inventory's delivery, the other one relays: it skips it, never waits.
-            other = threading.Thread(target=other_worker)
+            other = in_a_thread(lambda: relay.run(timezone.now()), other_pass)
             other.start()
             other.join(timeout=10)
             waited.append(other.is_alive())
         return real(app_label, event)
-
-    def other_worker():
-        try:
-            relay.run(timezone.now())
-        finally:
-            connection.close()
 
     monkeypatch.setattr(relay, "deliver", deliver)
     charge("relay-two-0001")
@@ -761,12 +696,13 @@ def test_two_workers_never_deliver_the_same_event_to_the_same_app(committed_till
     relay.run(timezone.now())
 
     assert waited == [False]
+    assert isinstance(other_pass[0], relay.RelayPass), other_pass
     assert len(seen) == len(set(seen))
     assert stock() == Decimal("8")
     assert StockMovement.objects.filter(movement_type="sale").count() == 1
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_hubs_outbox_has_one_pending_index_and_it_is_base_outbox_pending(hub_databases):
     """``base/0006`` owns the index that takes a tick straight to the events not taken yet.
     Without it a tick reads the whole outbox; a second one on the same condition costs every write and serves no query.
