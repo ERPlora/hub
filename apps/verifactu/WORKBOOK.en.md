@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:56f09d229c6ad7ee8b75aaa7ebf4e9b9092e4e11b2c53d289419183ab0c4c2e4 -->
+<!-- generated from WORKBOOK.md sha256:0ed55fac6e6c1b0ab779d4cced98bc9628b8c815b9c5f5837ffc6a6ae70f9e02 -->
 
 ## What it is for and who it is for
 
@@ -157,7 +157,8 @@ and "Recover chain from AEAT". Table "Latest records at the AEAT": "Invoice", "D
 for confirmation ("Confirm recovery" / "Cancel"). When done: "Operation completed.".
 
 ### Configuration
-Menu **VeriFactu → Configuration**. Title "VeriFactu configuration". Two tabs, the two routes:
+Menu **VeriFactu → Configuration**. Title "VeriFactu configuration". With ERPlora's route available, two tabs,
+the two routes:
 - **"ERPlora files for you"** (opens by default): "Representation
   authorisation" with its status ("Not signed", "Under review since {date}", "Approved on {date}", "Returned on
   {date}" with "Note of the review", "Revoked on {date}"); "What you sent" ("Submission no. {n}, sent on {date}" and
@@ -181,25 +182,38 @@ Menu **VeriFactu → Configuration**. Title "VeriFactu configuration". Two tabs,
   VeriFactu sees "Choose the .p12 / .pfx file", "Certificate password", "Upload the certificate" and, with one
   loaded, "Remove" (it asks first, in a card). Note: "The certificate and its password are kept encrypted in this
   Hub and only travel to ERPlora's gateway when sending to the AEAT; they are never shown again.".
+When ERPlora's route is unavailable, there are no tabs and nothing of the authorisation is shown. The certificate
+is the only card: its status says "No certificate uploaded", "Valid", "Expires soon" or "Expired", along with its
+details and expiry notices. In testing without a certificate, "You can test VeriFactu without a certificate. You only
+need one to go live."; in production, "Upload a valid certificate to send your records to the AEAT.". "Upload the
+certificate" is the only primary action; choosing the file and removing it are secondary. When removing it, the
+notice only says that records will wait until another one is uploaded. The encryption note does not mention ERPlora's
+route.
 In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason: "ERPlora
-files for you" shows neither the authorisation nor the procedure, and "My certificate" only shows the certificate's
+files for you", if available, shows neither the authorisation nor the procedure, and the certificate only shows its
 status, without uploading or removing it.
 
 ### Settings
 Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
-- **"Sending"**: "Use my own certificate" (switch, with its explanation by route) and "AEAT environment" with the
-  pill "Testing (AEAT test)" or "Production" and, as the case may be, "Go live" (with "It cannot go live yet:" and
-  what is missing, if something is missing) or "Back to testing" with its explanation and its confirmation; in
-  production, "New sales and invoices are refused until this is fixed:" and the reason, if there is no route to the
-  AEAT, and "Records are waiting:" and why, if they wait.
+- **"Sending"**: with ERPlora's route available, "Use my own certificate" (switch, with its explanation by route)
+  and "AEAT environment" with the pill "Testing (AEAT test)" or "Production" and, as the case may be, "Go live" (with
+  "It cannot go live yet:" and what is missing, if something is missing) or "Back to testing" with its explanation
+  and its confirmation; in production, "New sales and invoices are refused until this is fixed:" and the reason, if
+  there is no route to the AEAT, and "Records are waiting:" and why, if they wait.
 - **"Live test"**: "Test the connection" and "Create test invoice"; below, the result of the last test ("Tested
   on", "Filed through", "Environment", "ERPlora's gateway", "Issuer", "Route ready" and "This business can send." or
   "It cannot send yet:" with the reasons), or "No test run yet.".
 - **"Responsible declaration"**: "Read the signed declaration", "Declaration version" and the "Identifying data of
   this system" (Producer, Producer tax ID, System name, System code, Installed version, Installation number,
   VERI\*FACTU only, Can serve several taxpayers, Serves several taxpayers: always "S").
-In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason, and "Use
-my own certificate", "Go live", "Test the connection" and "Create test invoice" are disabled.
+When ERPlora's route is unavailable, "Sending" shows the certificate status and "Upload your certificate" or
+"Manage certificate", without the switch or any reference to the authorisation. If it is needed for production, an
+information notice beside "Go live" says "You can keep testing. To go live, upload your business certificate." and
+links to "Upload your certificate"; the other blockers stay in their list and the button is disabled while any remain.
+Confirming "Go live" with a valid certificate first chooses the own route in the same action. Notices and diagnostics
+do not bring back the authorisation or the old route's name, and "Test the connection" is secondary in testing.
+In a business outside Spain, on top shows "VeriFactu is only for businesses in Spain." as the only reason, and the
+switch, if available, "Go live", "Test the connection" and "Create test invoice" are disabled.
 Screen notices: the result of each action in a strip on top (green if it went well, red if not).
 
 ## States of each screen
