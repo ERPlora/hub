@@ -10,8 +10,9 @@
 // (`online-booking-public-<state>-<width>`).
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import { A, B, capture, psql } from './helpers';
-import { aMonday, cast, cleanUp, putBack, readSettings, type Settings } from './online-booking-helpers';
+import { cast, keepTheBusiness } from './online-booking-helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, post } from './service-helpers';
 
 const TAG = 'E2E PB';
@@ -21,17 +22,7 @@ const named = (label: string): string => `${TAG} ${label} ${RUN}`;
 const mobile = (n: number): string => `6${String(Date.now() + n * 7919).slice(-8)}`;
 const PAGE = `${A}/p/a/book`;
 
-let saved: Settings | null = null;
-
-test.beforeAll(async ({ browser }) => {
-  cleanUp(TAG);
-  saved = await readSettings(browser);
-});
-
-test.afterAll(async ({ browser }) => {
-  cleanUp(TAG);
-  await putBack(browser, saved);
-});
+keepTheBusiness(TAG);
 
 /** A visitor without a session, in Spanish, at `viewport`; every CSP violation the page reports is kept. */
 async function visitor(browser: Browser, viewport: { width: number; height: number }, address: string) {
@@ -53,7 +44,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     const shoot = (state: string) => capture(page, `online-booking-public-${state}-${vp.label}`);
     const day = aMonday(index);
     try {
-      const who = await cast(owner, named, vp.label, day);
+      const who = await cast(owner, named(vp.label), day);
       await post(owner, '/online_booking/settings', { page_title: named(`Salon ${vp.label}`), welcome_message: '' }, 200);
 
       // Loading: the page holds its business's answer (then every call goes through).

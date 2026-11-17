@@ -4,10 +4,10 @@ import type { BrowserContext } from '@playwright/test';
 
 import { post } from './service-helpers';
 
-/** A Monday five weeks ahead (inside the 90 days of advance and past any notice), as `YYYY-MM-DD`. */
-export function aMonday(): string {
+/** A Monday five weeks ahead, and `weeks` more (inside the 90 days of advance and past any notice), as `YYYY-MM-DD`. */
+export function aMonday(weeks = 0): string {
   const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + ((8 - day.getUTCDay()) % 7));
+  day.setUTCDate(day.getUTCDate() + 35 + 7 * weeks + ((8 - day.getUTCDay()) % 7));
   return day.toISOString().slice(0, 10);
 }
 

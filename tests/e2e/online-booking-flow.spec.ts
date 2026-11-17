@@ -12,8 +12,9 @@
 // of Appointments and of this app are read first and put back by API at the end.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import { A, api, psql, shot, shown } from './helpers';
-import { aMonday, type Cast, cast, cleanUp, putBack, readSettings, type Settings } from './online-booking-helpers';
+import { type Cast, cast, keepTheBusiness } from './online-booking-helpers';
 import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, ownerPage, rowAction, settled } from './service-helpers';
 
 const TAG = 'E2E OB';
@@ -25,18 +26,7 @@ const mobile = (n: number): string => `6${String(STAMP + n * 7919).slice(-8)}`;
 /** The visitor (its forwarded address) each size books as: one of its own per run. */
 const VISITOR = `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
 
-/** What the business had, put back at the end: the rules of Appointments and the page's settings. */
-let saved: Settings | null = null;
-
-test.beforeAll(async ({ browser }) => {
-  cleanUp(TAG);
-  saved = await readSettings(browser);
-});
-
-test.afterAll(async ({ browser }) => {
-  cleanUp(TAG);
-  await putBack(browser, saved);
-});
+keepTheBusiness(TAG);
 
 interface Booked {
   number: string;
@@ -126,7 +116,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     await context.setExtraHTTPHeaders({ 'X-Forwarded-For': visitor });
     const day = aMonday(index);
     try {
-      const who = await cast(context, named, vp.label, day);
+      const who = await cast(context, named(vp.label), day);
 
       // ONLINE_BOOKING-F07: the page's title saved and said so; the service's «Online booking» off and on again.
       await page.goto('/online_booking/settings');

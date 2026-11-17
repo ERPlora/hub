@@ -7,6 +7,7 @@
 // Citas's settings are put back as they were.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { aMonday } from './appointment-helpers';
 import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
 import { spanishOwnerOnMyApps as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
@@ -15,13 +16,6 @@ const KEY = 'FIX-APPOINTMENT-SETUP-HOOKS';
 const TAG = 'E2E Bell';
 const RUN = Date.now().toString(36);
 const named = (label: string): string => `${TAG} ${label} ${RUN}`;
-
-/** A Monday `weeks` + five weeks ahead (inside the 90 days of advance), as `YYYY-MM-DD`. */
-function aMonday(weeks: number): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + 7 * weeks + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
 
 function cleanUp(): void {
   const customers = `select id from customer_customer where name like '${TAG}%'`;
