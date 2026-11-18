@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:445f7a278f1b7b84574ff69079e27be9588e00f522c8e7679d5607430a56581d -->
+<!-- generated from WORKBOOK.md sha256:59bec8c57255bfe33c191c312e623a9475d9827bf555b6785b1a0d987fa5ed7d -->
 
 ## What it is for and who it is for
 
@@ -238,6 +238,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F08 | Group products into categories for the till | done |
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
+| INVENTORY-F35 | Declare a product's allergens | not done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -1108,6 +1109,40 @@ its modifier groups, if Modifiers is recovered too (MODIFIER-F10), and its choic
 too (COMBO-F15).
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07, INVENTORY-F16, INVENTORY-F29, INVENTORY-F30,
 PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
+
+### INVENTORY-F35 Declare a product's allergens
+Status: not done — the product does not keep allergens yet: its closed list, the block of the form, the line of the
+card and the CSV column are missing
+Actor: administrator, manager
+Screen: Products, Product card, Import products
+Steps:
+1. In **Products**, open the form with **+** or with "Edit". Under "Description" comes the "Allergens" block, with
+   the note "Mark the ones it has, also inside a sauce, a batter or a side." and the fourteen allergens that must be
+   declared, each by its name and always in this order: Gluten, Crustaceans, Egg, Fish, Peanut, Soy, Milk, Tree
+   nuts, Celery, Mustard, Sesame, Sulphites, Lupin and Molluscs. When creating, none comes marked.
+2. Tap the ones the product has: each tap marks or unmarks one. There are no others: it is the list of the European
+   regulation and it is not extended.
+3. Tap "Save" or "Save changes", as when creating and editing (INVENTORY-F01, INVENTORY-F02). An allergen marked and
+   not saved asks before the panel closes, like any other field.
+4. The **product card** says "Allergens: Gluten, Milk", in the order of the list, or "No allergens declared" if it
+   has none marked.
+5. To have the whole menu in writing, export the catalogue (INVENTORY-F11): the file carries the "Allergens" column,
+   with their names separated by commas ("Gluten, Milk") and empty if it has none. The import (INVENTORY-F09)
+   recognises that column in the products it creates, with the names in Spanish or in English, with or without
+   accents and in upper or lower case; a SKU that already exists is skipped as always and its allergens do not
+   change.
+In: the product; the list of the fourteen allergens.
+Out: the product with its allergens, in the same step as the rest of the form: either everything is saved or
+nothing. Inventory tells of the change as of any other, and the catalogue the till and Kitchen read
+(INVENTORY-F27) carries each product's allergens. The same is done through the assistant or the API, with the same
+permissions ("mark gluten and milk on the burger" asks for the confirmation card first). A change counts for what
+is ordered from that moment on: a line already ordered keeps the allergens it had when it was ordered (SALE-F40).
+If it fails: an allergen that is not on the list is refused, also through the assistant or the API, and nothing is
+saved ("That allergen is not one of the fourteen that must be declared."). In the import, a cell with a name that
+is not recognised leaves the row as failed with the reason "Allergen not recognised: <text>". Whoever can only see
+products reads the line of the card, but has no form. Every refusal shows inside the panel, like those of the rest
+of the form.
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, SALE-F40, SALE-F41, KITCHEN-F32
 
 ## What the verticals share
 
