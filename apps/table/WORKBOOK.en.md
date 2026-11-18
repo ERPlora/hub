@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:045de2decc42bd6d131c9e111be07084090c0b427b57dfbf09f0b04523238e33 -->
+<!-- generated from WORKBOOK.md sha256:3a9921d2601a55dd22b1c4832e5c9793220776dc978c3a3bf67da638bcefa528 -->
 
 ## What it is for and who it is for
 
@@ -130,8 +130,8 @@ or edits a table.
     "Merge N with…" / "Pick an occupied table") and "Cancel"; only the tables that are valid can be
     tapped.
 - **Edit plan**: each table is dragged to its spot (also with the keyboard: arrows, 8 px; with Shift,
-  32 px) and it is saved when it is dropped. Tapping a table opens **Edit table** (Number, Capacity,
-  Name (optional), Shape, Status (Available or Blocked), Zone, Active; footer with "Delete" and "Save");
+  32 px) and it is saved when it is dropped. Tapping a table opens **Edit table** (Number, Capacity, Width,
+  Height, Name (optional), Shape, Status (Available or Blocked), Zone, Active; footer with "Delete" and "Save");
   the "+" opens **Add** (Zone field and "Add zone"; "Table number" field, which if left empty is
   "Auto-numbered", and "Add table"); the pencil opens **Edit zone** (Name, Description (optional);
   "Delete zone" and "Save"). Below, the help "Drag to position · click a table to edit or delete it.
@@ -150,9 +150,9 @@ in "Delete zone?" and leaves "Delete zone" off if the zone has tables.
 ### Tables
 Menu **Tables → Tables**. Table in natural order (2 before 10): Number, Name, Zone, Capacity, Status;
 search box "Search table…" (number and name), column filters behind the funnel (zone, status, shape,
-capacity), table or cards view. The "+" opens the panel with Number, Capacity, Zone and "Add table".
-Per row, "Edit" (Number, Name, Capacity, Shape, Zone, Status and Active) and "Delete" (the
-administrator only, with confirmation).
+capacity), table or cards view. The "+" opens the panel with Number, Capacity, Width, Height, Zone and
+"Add table". Per row, "Edit" (Number, Name, Capacity, Width, Height, Shape, Zone, Status and Active) and
+"Delete" (the administrator only, with confirmation).
 
 ### Sessions
 Menu **Tables → Sessions**: the checks of the room. Tabs "Open", "Closed" and "All". Table: Table ("No
@@ -260,9 +260,10 @@ Steps:
    the first free number of that zone.
 4. Tap "Add table" (off while there is no zone).
 5. The table appears in the zone, in the first free spot, square, for 4 and Available.
-6. Another door: in **Tables → Tables**, "+" with Number, Capacity and Zone and "Add table"; it is also
-   born in the first free spot of its zone.
-In: number (or none), and in the list also capacity and zone.
+6. Another door: in **Tables → Tables**, "+" with Number, Capacity, Width and Height (empty, "Standard":
+   the usual table, 72 × 72) and Zone and "Add table"; it is also born in the first free spot of its
+   zone, at the size it has.
+In: number (or none), and in the list also capacity, width, height and zone.
 Out: the table (announces: `table.table.created`). With a table in use, "Choose table" of the till stops
 saying "There are no tables yet. Set them up in Tables → Floor plan." (`table.floor.status`), and "Your
 tables" is "Done" on the Home without a reload. An occupied or blocked table still counts; if they are
@@ -295,19 +296,22 @@ Actor: manager, administrator
 Screen: Floor plan (Edit plan), Tables
 Steps:
 1. In **Edit plan**, tap the table (or in **Tables**, "Edit" in its row): "Edit table" opens.
-2. Change Number, Capacity, Name (optional), Shape (Square, Round, Rectangular), Status (Available or
-   Blocked), Zone or Active.
+2. Change Number, Capacity, Width and Height (the size of its box on the plan, from 24 to 10000; the
+   usual table is 72 × 72: a long one for eight, 160 × 72), Name (optional), Shape (Square, Round,
+   Rectangular), Status (Available or Blocked), Zone or Active.
 3. Tap "Save": the window closes and the plan changes by itself (if it changed zone, it appears in the
-   other tab in the same spot).
+   other tab in the same spot; with another size, it is painted in its spot with its new box).
 4. To remove it, tap "Delete" (the administrator only) and confirm it: it disappears from the plan and
    from the list; its history of checks is kept.
 In: the chosen table.
 Out: the changed table (announces: `table.table.updated`) or the deleted one (announces:
 `table.table.deleted`).
 If it fails: inside the window: "The table number is required", "There is already a table with that
-number in this zone.", "That table does not exist in this business.", each reason under its field until
-that field is corrected, even if another one says the same (hub#888); deleting a table with an open
-check: "That table has an open check. Close it or move it before deleting the table.".
+number in this zone.", "That table does not exist in this business.", a width or a height outside 24
+to 10000 ("Ensure this value is greater than or equal to 24.", "Ensure this value is less than or equal
+to 10000.") or with decimals ("Enter a whole number."), and then nothing is saved; each reason under its
+field until that field is corrected, even if another one says the same (hub#888); deleting a table with
+an open check: "That table has an open check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Take a table out of service (block it) and bring it back
