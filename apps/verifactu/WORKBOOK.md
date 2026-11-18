@@ -1099,12 +1099,12 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 
 `apps.py`, `models.py` (`Config`, `OwnCertificate`, `Chain`, `SendControl`, `Record`, `Event`, `AeatRecord`),
 `migrations/`,
-`schemas.py`, `services.py`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
+`schemas.py`, `services/`, `queries/`, `api.py`, `live.py`, `events.py`, `admin.py`, `locale/`,
 `frontend/` y, puros y sin ORM: `chain.py` (formatos, huella, QR), `envelope.py` (el XML: `RegistroAlta`,
 `RegistroAnulacion`, el sobre y la consulta), `xsd.py` (validación con los esquemas de `xsd/`), `aeat.py`
 (lectura de las respuestas de la AEAT y de la consulta), `gateway.py` (cliente de la pasarela del SaaS),
 `certificates.py` (abre e inspecciona el certificado propio y lo cifra y descifra; la fila la leen y escriben
-`queries/` y `services.py`) y
+`queries/` y `services/`) y
 `producer.py` (los datos del productor que declara la declaración responsable). Un `tests/test_<fichero>.py`
 por fichero, más `test_xsd.py` contra los esquemas reales, `test_integration_invoice.py` (Facturación real,
 sin dobles), `test_concurrency.py` (sesiones reales en hilos; también una emisión cuyo cerrojo de cadena no
