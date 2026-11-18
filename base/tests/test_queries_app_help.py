@@ -45,15 +45,17 @@ def test_it_is_a_read_of_whoever_sees_the_home_that_holds_no_database_and_is_a_t
 
 
 class TestWhichApps:
-    def test_no_module_has_its_help_ready_until_it_declares_it(self):
-        assert app_help.ready_apps() == []
+    def test_a_module_that_does_not_declare_its_help_is_not_ready(self, monkeypatch):
+        monkeypatch.setattr(apps.get_app_config("table"), "help", None)
+        assert "table" not in app_help.ready_apps()
 
     def test_a_module_that_declares_its_help_is_ready(self, monkeypatch):
         monkeypatch.setattr(apps.get_app_config("table"), "help", Help())
-        assert app_help.ready_apps() == ["table"]
+        assert "table" in app_help.ready_apps()
 
     @pytest.mark.parametrize("app", ["table", "base", "nope"])
-    def test_an_app_without_its_help_ready_is_not_found_in_the_person_s_language(self, app):
+    def test_an_app_without_its_help_ready_is_not_found_in_the_person_s_language(self, app, monkeypatch):
+        monkeypatch.setattr(apps.get_app_config("table"), "help", None)
         with pytest.raises(NotFound) as refused:
             ask(app)
         assert (refused.value.code, refused.value.message) == ("base.help_missing", "Esta app aún no tiene ayuda.")

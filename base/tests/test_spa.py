@@ -154,8 +154,8 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
             "linux": f"{saas}/app/download/linux/",
             "android": f"{saas}/app/download/android/",
         },
-        # The modules whose help window is ready: none declares it yet (the test below).
-        "help_apps": [],
+        # The modules whose help window is ready: those that declare it (the test below).
+        "help_apps": ["table"],
     }
 
 
