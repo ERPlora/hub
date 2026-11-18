@@ -49,14 +49,14 @@
 // that category and performed by that professional again; in its Agenda, the appointment's «History» ends in
 // «Restored» (APPOINTMENT-F10).
 // The stack's worker serves databases only (no moves' thread), so the spec plays its passes, as the specs play the
-// relay. What the business has and loses goes through its apps' API with the owner's session, as in the other specs:
-// a start of Django per operation does not fit the test's time on a loaded machine.
-import { spawnSync } from 'node:child_process';
-
+// relay, in one `manage.py shell` opened before the tests (`manage-shell.ts`). What the business has and loses goes
+// through its apps' API with the owner's session, as in the other specs.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { capture, HUB_DIR, OWNER, psql } from './helpers';
+import { WORKER_START_TIMEOUT_MS } from './global-setup';
+import { capture, OWNER, psql } from './helpers';
 import { GENERIC } from './inventory-helpers';
+import { openShell, type Shell } from './manage-shell';
 import { ownerPage, post, rowAction } from './service-helpers';
 import { STACK } from './stack';
 
@@ -73,19 +73,6 @@ const HUBS = `${PLATFORM}/admin/control/hub/`;
 const TEMPORARY = 'e2e-recover-temporary';
 const RUN = Date.now().toString(36);
 
-/** `code` run by `manage.py shell` of this checkout on the stack's database, in `hub`'s own when given (its cards),
- *  else on control (the registry: the separate copy, the staff's session, the worker's pass); its last line. */
-function shell(code: string, hub?: string): string {
-  const where = hub ? ['--hub', hub] : [];
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', ...where, '-c', code], {
-    cwd: HUB_DIR,
-    env: process.env,
-    encoding: 'utf8',
-  });
-  if (out.status !== 0) throw new Error(`The shell of manage.py exited with ${out.status}:\n${out.stdout}\n${out.stderr}`);
-  return out.stdout.trim().split('\n').at(-1) ?? '';
-}
-
 /** POST `path` of `a`'s API with the owner's session in `business`; the id of what it made, if it made one. */
 async function inA(business: BrowserContext, path: string, body: Record<string, unknown>, status = 200): Promise<string> {
   return (await post<{ id?: string }>(business, path, body, status)).id ?? '';
@@ -95,20 +82,21 @@ async function inA(business: BrowserContext, path: string, body: Record<string, 
 const made = (business: BrowserContext, path: string, body: Record<string, unknown>): Promise<string> =>
   inA(business, path, body, 201);
 
-/** What the worker's relay runs in `a` (the stack's worker relays nothing), each operation with its input, in one
- *  `manage.py shell`. */
-function relay(calls: [string, Record<string, unknown>][]): void {
-  shell(
+/** What the worker's relay runs in `a` (the stack's worker relays nothing), each operation with its input. */
+async function relay(calls: [string, Record<string, unknown>][]): Promise<void> {
+  await shell.run(
     [
       'import json',
+      'from base.registry import hub_by_slug',
+      'from base.tenancy.context import use_hub',
       'from live.context import OperationContext, Scope',
       'from live.operations import get',
       'ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}), language="en")',
-      `for name, data in json.loads(${JSON.stringify(JSON.stringify(calls))}):`,
-      '    op = get(name)',
-      '    op(ctx, op.input(**data))',
+      'with use_hub(hub_by_slug("a")):',
+      `    for name, data in json.loads(${JSON.stringify(JSON.stringify(calls))}):`,
+      '        op = get(name)',
+      '        op(ctx, op.input(**data))',
     ].join('\n'),
-    'a',
   );
 }
 
@@ -152,11 +140,11 @@ async function anAppointment(business: BrowserContext, label: string): Promise<s
 
 /** Control's side, by `step`: `setup` makes the staff member and the temporary cluster once and opens the staff
  *  member's session (its key), `make` runs the worker's pass of the separate copies (the latest copy of `a`, made;
- *  its copy goes through a dumps bucket of its own, on the tests' S3 server),
- *  `recover` runs its pass of the recoveries, and `clean` drops the copies of `a` with their rows and the temporary
- *  cluster. */
-function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
-  return shell(
+ *  its copy goes through a dumps bucket of its own, on a tests' S3 server emptied first: its state lives in the
+ *  shell), `recover` runs its pass of the recoveries, and `clean` drops the copies of `a` with their rows and the
+ *  temporary cluster. Its last line. */
+async function control(step: 'setup' | 'make' | 'recover' | 'clean'): Promise<string> {
+  const out = await shell.run(
     [
       'from django.contrib.auth import get_user_model',
       'from django.db import connections',
@@ -175,17 +163,20 @@ function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
       '    client.force_login(root)',
       '    print(client.cookies["sessionid"].value)',
       'elif step == "make":',
-      '    import os',
+      '    import os, urllib.request',
+      '    from unittest import mock',
       '    from moto.server import ThreadedMotoServer',
       '    from base.tenancy.tests.s3 import FAKE_CREDENTIALS, REGION, client',
       '    s3 = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)',
       '    s3.start()',
       '    try:',
       '        endpoint = "http://%s:%d" % s3.get_host_and_port()',
-      '        os.environ.pop("AWS_PROFILE", None)',
-      '        os.environ.update(FAKE_CREDENTIALS, AWS_REGION=REGION, HUB_DUMPS_BUCKET="e2e-copies", HUB_DUMPS_ENDPOINT_URL=endpoint)',
-      '        client(endpoint).create_bucket(Bucket="e2e-copies", CreateBucketConfiguration={"LocationConstraint": REGION})',
-      '        restore.run_aside_due(source=lambda copied: copied.db_name)',
+      '        urllib.request.urlopen(urllib.request.Request(endpoint + "/moto-api/reset", method="POST"))',
+      '        dumps = dict(FAKE_CREDENTIALS, AWS_REGION=REGION, HUB_DUMPS_BUCKET="e2e-copies", HUB_DUMPS_ENDPOINT_URL=endpoint)',
+      '        with mock.patch.dict(os.environ, dumps):',
+      '            os.environ.pop("AWS_PROFILE", None)',
+      '            client(endpoint).create_bucket(Bucket="e2e-copies", CreateBucketConfiguration={"LocationConstraint": REGION})',
+      '            restore.run_aside_due(source=lambda copied: copied.db_name)',
       '    finally:',
       '        s3.stop()',
       '    made = RestoredCopy.objects.filter(hub=hub).order_by("-asked_at").first()',
@@ -203,14 +194,7 @@ function control(step: 'setup' | 'make' | 'recover' | 'clean'): string {
       .join('\n')
       .replace('TEMPORARY', JSON.stringify(TEMPORARY)),
   );
-}
-
-/** The staff member's session, opened once for every size. */
-let staffSession: string | undefined;
-
-async function asStaff(page: Page): Promise<void> {
-  staffSession ??= control('setup');
-  await page.context().addCookies([{ name: 'sessionid', value: staffSession, domain: 'hubs.localhost', path: '/' }]);
+  return out.split('\n').at(-1) ?? '';
 }
 
 /** The moment of a copy as the page asks it: now, to the second, in UTC («2026-11-09T14:30:00Z»). */
@@ -228,8 +212,23 @@ async function runOn(page: Page, url: string, value: string, action: string): Pr
 
 test.describe.configure({ mode: 'serial' });
 
-test.afterAll(() => {
-  control('clean');
+/** The spec's `manage.py shell` on control, open from before the first test to after the last, and the staff member's
+ *  session, opened once for every size. */
+let shell: Shell;
+let staffSession: string;
+
+test.beforeAll(async () => {
+  // Django's start, before the tests' time and bounded as the run's worker's is.
+  test.setTimeout(WORKER_START_TIMEOUT_MS);
+  shell = await openShell();
+  staffSession = await control('setup');
+});
+
+test.afterAll(async () => {
+  // A shell that never opened made nothing to clean.
+  if (!shell) return;
+  await control('clean');
+  await shell.close();
 });
 
 for (const { label, viewport } of SIZES) {
@@ -290,7 +289,7 @@ for (const { label, viewport } of SIZES) {
 
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
-    await asStaff(page);
+    await context.addCookies([{ name: 'sessionid', value: staffSession, domain: 'hubs.localhost', path: '/' }]);
 
     // Hubs › tick `a` › «Restore to a separate copy…»: the temporary cluster and the moment, then «Make the copies».
     await runOn(page, HUBS, hubId, 'restore_aside');
@@ -302,12 +301,12 @@ for (const { label, viewport } of SIZES) {
     await capture(page, `${KEY}-${label}-0-copy-asked`, { fullPage: true });
     await page.locator('input[type="submit"][value="Make the copies"]').click();
     await expect(page.locator('.messagelist .success')).toContainText('1 hub will get a separate copy');
-    const copy = control('make');
+    const copy = await control('make');
     // Lost since: the card, the product, the product's category and the service's category deleted in the business.
     await inA(business, '/customer/customers/delete', { id: card });
     await inA(business, '/inventory/products/delete', { id: product });
     await inA(business, '/inventory/categories/delete', { id: shelf });
-    relay([
+    await relay([
       ['pricing.catalog.forget_product', { id: product }],
       ['modifier.link.drop_product', { id: product }],
       ['combo.option.drop_product', { id: product }],
@@ -378,7 +377,7 @@ for (const { label, viewport } of SIZES) {
     await capture(page, `${KEY}-${label}-3-asked`);
 
     // The worker's pass, then Recoveries says what came back.
-    expect(control('recover')).toBe('1');
+    expect(await control('recover')).toBe('1');
     await page.goto(RECOVERIES);
     const recovered = page.locator('#result_list tbody tr').first();
     await expect(recovered).toContainText('Done');
