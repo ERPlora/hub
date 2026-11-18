@@ -10,7 +10,11 @@
 // the cash register goes back as it was.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { dialog, PHOTO_PNG, photoLoaded, VIEWPORTS } from './inventory-helpers';
 import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { cleanUp, named, post, rowAction } from './service-helpers';

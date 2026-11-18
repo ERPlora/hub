@@ -13,7 +13,9 @@
 // flow: FLOW-F36 FLOW-F38 FLOW-F29
 import { expect, test } from '@playwright/test';
 
-import { capture, psql, shown } from './helpers';
+import { capture } from './capture';
+import { psql } from './psql';
+import { shown } from './screen';
 import { approve, signedIn } from './flow-helpers';
 import { relay, workerAsks } from './provider-helpers';
 import { madridDay, reservationStatus } from './reservation-helpers';

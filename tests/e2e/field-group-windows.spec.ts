@@ -4,7 +4,14 @@
 // its window says, and nothing scrolls sideways.
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, login, psql, shown, THREE_SIZES, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import { turnOffTurnedOn, turnOnMissing } from './apps-on';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { horizontalOverflow, shown, THREE_SIZES } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { dialog, presentedDialog } from './inventory-helpers';
 import { pickMember, staffCleanUp } from './staff-helpers';
 

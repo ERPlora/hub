@@ -9,7 +9,11 @@
 // ui's Vitest (`DataTable.filters.test.ts` and `DataTable.visual.test.ts`); this spec measures the panel and the sheet.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, record, shot, shown, untilStill } from './helpers';
+import { record, shot } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 
 const KEY = 'FIX-UI-DATATABLE-RANGE-FILTER-LABELS';
 

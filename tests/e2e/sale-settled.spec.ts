@@ -1,14 +1,19 @@
 // flow: sale-e2e-wait — the Sales specs' wait
 // Before a capture or a measurement, the Sales specs (sale-*.spec.ts) wait for the screen to stop moving with the
-// harness's one wait, `untilStill` (helpers.ts). A wait that asks only for what Ionic animates in its shadow roots
+// harness's one wait, `untilStill` (settled.ts). A wait that asks only for what Ionic animates in its shadow roots
 // (`ion-modal`, the till's sheets) leaves out the toasts, which enter with a CSS transition in the document: a
 // capture could come out with a notice still sliding in and pass for good. Here the till's «… is sold out.» toast
 // (SALE-F07: a tap on a sold-out article says why) enters at a fifth of its speed (Chrome's own control), and once
 // the Sales specs' wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`,
-// helpers.ts), at 390, 834 and 1440. What this file creates is deleted after it.
+// settled.ts), at 390, 834 and 1440. What this file creates is deleted after it.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, exposeMovingInPage, hostPage, repeatedTop, shown, untilStill } from './helpers';
+import { capture, repeatedTop } from './capture';
+import { api } from './hub-api';
+import { hostPage } from './login';
+import { shown } from './screen';
+import { exposeMovingInPage, untilStill } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
@@ -42,7 +47,7 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-/** What moves on the page now, by the detector of helpers.ts put in the page (`exposeMovingInPage`). */
+/** What moves on the page now, by the detector of settled.ts put in the page (`exposeMovingInPage`). */
 async function moving(page: Page): Promise<string[]> {
   await exposeMovingInPage(page);
   return page.evaluate(() => (window as unknown as { __movingInPage: () => string[] }).__movingInPage());

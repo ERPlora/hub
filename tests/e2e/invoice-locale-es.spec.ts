@@ -11,9 +11,10 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { sentCard, type SentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
-import { A, capture, login, REPO_DIR } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
 import { issuerNow } from './invoice-helpers';
-import { STACK } from './stack';
+import { A, REPO_DIR, STACK } from './stack';
 import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP';

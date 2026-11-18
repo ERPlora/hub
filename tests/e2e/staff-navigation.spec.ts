@@ -5,9 +5,13 @@
 // old module's screens; the page never scrolls sideways.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, shot, shown, topbarApps } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 import { staffCleanUp } from './staff-helpers';
-import { openApps } from './topbar';
+import { openApps, topbarApps } from './topbar';
 
 const TAG = 'E2E';
 const VIEWPORTS = {

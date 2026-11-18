@@ -13,7 +13,11 @@
 // cash register goes back as it was.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import {
   cleanInventory,
   createProduct,

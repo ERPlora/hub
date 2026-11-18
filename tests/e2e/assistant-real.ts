@@ -8,8 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { expect, type Locator, type Page, type Response } from '@playwright/test';
 
 import { cleanupCommand, type Meta, observe, redact, seedCommand } from './assistant-battery';
-import { A, HUB_DIR, REPO_DIR } from './helpers';
-import { STACK } from './stack';
+import { A, HUB_DIR, REPO_DIR, STACK } from './stack';
 import { openAssistant } from './topbar';
 
 /** The checkout of the stack's SaaS (`E2E_SAAS_DIR`). */

@@ -6,7 +6,12 @@
 import { expect, test } from '@playwright/test';
 
 import { cleanUp, customersReady, e2eName, idFromUrl, inputOf, rowNamed, searchList } from './customer-helpers';
-import { A, api, EMPLOYEE, hostPage, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { hostPage } from './login';
+import { EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 
 test.afterAll(() => cleanUp());
 

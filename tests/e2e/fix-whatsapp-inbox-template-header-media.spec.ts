@@ -16,7 +16,10 @@
 // here (`erploraForgetsTemplates`) before and after: its copy would come back to the next run as a row without file.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shown } from './helpers';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import {  } from './service-helpers';
 import { photo } from './website-helpers';
 import { BUSINESS_ID, CODE, type GraphThread, HEADER_HANDLE, MEDIA_ID, META_APP, NUMBER_ID, TEMPLATE_ID, UPLOAD_SESSION, WABA_ID } from './whatsapp-graph';

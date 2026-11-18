@@ -11,7 +11,12 @@
 // never reach the SaaS.
 import { type Browser, type BrowserContext, expect, type Route, test } from '@playwright/test';
 
-import { A, hostPage, listReady, login, OWNER, SAAS, SAAS_CODE as CODE, SAAS_SIGN_IN as SIGN_IN, shot, topbarApps } from './helpers';
+import { shot } from './capture';
+import { listReady } from './demo-items';
+import { hostPage, login } from './login';
+import { OWNER, SAAS, SAAS_CODE as CODE, SAAS_SIGN_IN as SIGN_IN } from './saas';
+import { A } from './stack';
+import { topbarApps } from './topbar';
 
 /** What `login` is given here: the trip through the SaaS, even with a session of the hub kept. */
 const JUMP = { fresh: true };

@@ -8,7 +8,11 @@
 // The automation is deleted after it.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { signedIn } from './task-helpers';
 
 const KEY = 'FIX-HUB-FLOW-LONG-AUTOMATION-NAME-CUT-MID-WORD-ON-TABLET';

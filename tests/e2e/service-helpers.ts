@@ -5,7 +5,12 @@
 // named «E2E Svc …» and deleted from the hub's database, the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 
 /** Every name a service spec gives starts like this. */
 export const TAG = 'E2E Svc';
@@ -27,8 +32,8 @@ export const FLOW_VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
-/** Waits until nothing moves and the page is painted: helpers.ts's, the one every spec takes. */
-export { settled } from './helpers';
+/** Waits until nothing moves and the page is painted: settled.ts's, the one every spec takes. */
+export { settled } from './settled';
 
 /** The page does not scroll sideways: everything fits its width. */
 export async function noHorizontalScroll(page: Page, label: string): Promise<void> {

@@ -8,7 +8,12 @@
 // viewports. What this file creates is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanDocumentsOf, shots } from './sale-helpers';

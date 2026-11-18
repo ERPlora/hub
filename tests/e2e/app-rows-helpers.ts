@@ -3,7 +3,9 @@
 // of a business in its cache for a minute (`base.activation`), it makes the Hub read them now.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, psql } from './helpers';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { A } from './stack';
 
 /** Tasks turned `first` and then `then` in `a` through Apps (`/api/apps/<enable|disable>`): a change the Hub forgets
  * its cache of the apps off for, at its COMMIT, leaving the rest as it was (Tasks needs only Staff). */

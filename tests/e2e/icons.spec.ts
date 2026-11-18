@@ -4,7 +4,12 @@
 // any Iconify host, no icon fetched as a URL from our server and no failed request at all.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, createItem, type Item, listReady, login, psql, record, shot, shown, uniqueName } from './helpers';
+import { record, shot } from './capture';
+import { createItem, type Item, listReady, uniqueName } from './demo-items';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { openApps } from './topbar';
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com|iconify/i;

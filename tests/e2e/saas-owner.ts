@@ -4,7 +4,8 @@
 // its own takes them from here (saas-owner.test.ts keeps it so); the Hub's API stays `api`'s (hub-api.test.ts).
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { type Credentials, MAIL_CLOCK_SLACK, MAIL_DIR, psql, SAAS } from './helpers';
+import { psql } from './psql';
+import { type Credentials, MAIL_CLOCK_SLACK, MAIL_DIR, SAAS } from './saas';
 import { readMailCode } from './mail';
 
 /** The password of every account a spec signs up on the SaaS. */

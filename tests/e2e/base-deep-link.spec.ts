@@ -4,7 +4,11 @@
 // in a fresh browser (no session on the hub nor on erplora.com): the SaaS's form, then the hub, on the address asked.
 import { expect, test } from '@playwright/test';
 
-import { A, login, shot, shown, untilStill } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 
 const SIZES = [
   { name: '390', width: 390, height: 844 },

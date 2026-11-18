@@ -1,7 +1,7 @@
 // What the Kitchen specs share: the three sizes their screens are captured at, and the capture at each of them.
 import type { Page } from '@playwright/test';
 
-import { capture as captureScreen } from './helpers';
+import { capture as captureScreen } from './capture';
 
 export const SIZES = [
   { label: '390', width: 390, height: 844 },

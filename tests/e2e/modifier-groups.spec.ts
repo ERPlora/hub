@@ -9,7 +9,14 @@
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, login, painted, psql, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { hostPage, login } from './login';
+import { psql } from './psql';
+import { EMPLOYEE } from './saas';
+import { horizontalOverflow, shown } from './screen';
+import { painted, untilStill } from './settled';
+import { A } from './stack';
 import { offersRowAction, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 

@@ -3,7 +3,8 @@
 // notice comes as, and the panel with the gravest notice on top and the others in rows.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, shown } from './helpers';
+import { shown } from './screen';
+import { A } from './stack';
 import { api } from './hub-api';
 
 /** The bell of the screen on view: plain with nothing pending, a pill with the number and the gravity otherwise. */

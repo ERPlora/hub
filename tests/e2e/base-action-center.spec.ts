@@ -31,13 +31,19 @@ import {
 } from './action-center';
 import { openForACut, salonCleanUp } from './appointment-helpers';
 import { cardDeletes } from './customer-helpers';
-import { A, api, capture, clearItems, compactBar, horizontalOverflow, login, psql, shown, uniqueName } from './helpers';
+import { capture } from './capture';
+import { clearItems, uniqueName } from './demo-items';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 import { spanishContext, spanishHome } from './home-helpers';
 import { cleanInventory, type Product, VIEWPORTS } from './inventory-helpers';
 import { type IssuerOut, issuerNow, parkIssuer, unparkIssuer } from './invoice-helpers';
 import { checkWithDish, cleanSales, dishForTheTill } from './sale-helpers';
 import { post } from './service-helpers';
-import { expectTitleCentred, openApps, openAssistant, topbar, topbarMore, topbarMoreMenu } from './topbar';
+import { compactBar, expectTitleCentred, openApps, openAssistant, topbar, topbarMore, topbarMoreMenu } from './topbar';
 
 const KEY = 'BASE-ACTION-CENTER';
 /** Hub `a`'s issuer, parked while the run needs a business that cannot issue invoices yet. */

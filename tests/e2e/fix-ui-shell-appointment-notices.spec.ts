@@ -16,7 +16,9 @@ import {
   startDeviceNotices,
   tapNotification,
 } from './device-notice-helpers';
-import { psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { psql } from './psql';
+import { shown } from './screen';
 import { FLOW_VIEWPORTS, ownerPage, post, settled } from './service-helpers';
 
 const TAG = 'E2E Apn';

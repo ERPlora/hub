@@ -2,7 +2,11 @@
 // and a step's row in it, and the panels of its widget board.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, capturedFitting, type Credentials, login, OWNER, shown } from './helpers';
+import { capturedFitting } from './capture';
+import { login } from './login';
+import { type Credentials, OWNER } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 
 /** The setup card of the Home on view. */
 export const setupCard = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');

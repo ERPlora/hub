@@ -4,8 +4,13 @@
 // «My apps» sheet in the topbar, and no Back on the list, the root of the app.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, api, createItem, horizontalOverflow, listReady, login, MY_APPS_DOOR, record, shot, shown, uniqueName } from './helpers';
-import { openApps } from './topbar';
+import { record, shot } from './capture';
+import { createItem, listReady, uniqueName } from './demo-items';
+import { api } from './hub-api';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
+import { MY_APPS_DOOR, openApps } from './topbar';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },

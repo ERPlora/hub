@@ -8,7 +8,12 @@
 // is deleted after it (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 

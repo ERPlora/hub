@@ -9,7 +9,11 @@
 // flow: COMBO-F02, ui:Combo
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, shown } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 
 const TAG = 'E2E VAT finger';
 const VIEWPORTS = [

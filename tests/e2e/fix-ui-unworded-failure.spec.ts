@@ -5,7 +5,11 @@
 // and 1440, keeping what was typed. The request is stopped in the browser (`page.route`), so nothing is created.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { stamp } from './sale-helpers';
 
 const NAME = `E2E K2281 ${stamp()}`;

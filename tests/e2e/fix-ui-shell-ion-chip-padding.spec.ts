@@ -11,7 +11,11 @@
 // flow: UI shell ion-chip padding
 import { type Browser, expect, type Locator, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { dialog, pickCombo, productsReady } from './inventory-helpers';
 import { pick, post } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';

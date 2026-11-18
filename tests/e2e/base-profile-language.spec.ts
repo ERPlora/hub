@@ -2,7 +2,9 @@
 // take their server-rendered names again in that language, in both directions, without reloading the document.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, hostPage, shown } from './helpers';
+import { hostPage } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 
 async function openProfile(page: Page): Promise<void> {
   await page.locator('ion-menu [data-testid="user-menu-trigger"]').click();

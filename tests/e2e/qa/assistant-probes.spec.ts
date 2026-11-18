@@ -45,8 +45,11 @@ import {
   seedRealProviders,
   TURN_MS,
 } from '../assistant-real';
-import { A, api, ARTIFACTS, capture, type Credentials, EMPLOYEE, HUB_DIR, hostPage, OWNER } from '../helpers';
-import { STACK } from '../stack';
+import { ARTIFACTS, capture } from '../capture';
+import { api } from '../hub-api';
+import { hostPage } from '../login';
+import { type Credentials, EMPLOYEE, OWNER } from '../saas';
+import { A, HUB_DIR, STACK } from '../stack';
 
 const REAL = process.env.QA_REAL_PROVIDER === '1';
 test.skip(!REAL, 'QA with the real model: QA_REAL_PROVIDER=1 (tests/e2e/README.md)');

@@ -7,20 +7,14 @@
 // purpose.
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
-import {
-  A,
-  api,
-  B,
-  type Credentials,
-  dropPlanFromPhoto,
-  EMPLOYEE,
-  listReady,
-  login,
-  OWNER,
-  restorePhotoFrom,
-  shot,
-  untilStill,
-} from './helpers';
+import { shot } from './capture';
+import { listReady } from './demo-items';
+import { api } from './hub-api';
+import { login } from './login';
+import { dropPlanFromPhoto, restorePhotoFrom } from './registration';
+import { type Credentials, EMPLOYEE, OWNER } from './saas';
+import { untilStill } from './settled';
+import { A, B } from './stack';
 
 /** Where `a`'s photo waits while the spec runs (the table of `base_hub` rows, put back after it). */
 const PHOTO_BACKUP = 'e2e_backup_session_photo';

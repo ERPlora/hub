@@ -5,7 +5,11 @@
 // its sales (`E2E-INV-…` products), its names (`e2e …`), its series (`E2E…` codes) or the ids it recorded.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, login, psql } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { A } from './stack';
 
 /** The three sizes of a flow's evidence (the migration's: 390×844, 834×1112, 1440×900). */
 export const FLOW_VIEWPORTS = [

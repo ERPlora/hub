@@ -1,14 +1,20 @@
 // flow: combo-e2e-wait — the Menus specs' wait
 // Before a capture or a measurement, the Menus specs (combo-*.spec.ts) wait for the screen to stop moving with the
-// harness's one wait, `untilStill` (helpers.ts). Their own wait asked the document alone for its animations, which
+// harness's one wait, `untilStill` (settled.ts). Their own wait asked the document alone for its animations, which
 // leaves shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-popover`) in theirs: a capture could come
 // out with a sheet still sliding in and pass for good. Here the till's menu sheet (COMBO-F07: tapping a menu opens
 // it) enters at a fifth of its speed (Chrome's own control), and once the Menus specs' wait returns nothing may move,
-// asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834 and 1440. What this file
+// asked with the harness's own detector (`exposeMovingInPage`, settled.ts), at 390, 834 and 1440. What this file
 // creates — the products `E2E-CST-<run>-…` and the menu «e2e Combo Settled <run>» — is deleted after it, and nothing else.
 import { type BrowserContext, type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, exposeMovingInPage, hostPage, psql, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { hostPage } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { exposeMovingInPage, untilStill } from './settled';
+import { A } from './stack';
 import { createProduct } from './inventory-helpers';
 import { drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -77,7 +83,7 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-/** What moves on the page now, by the detector of helpers.ts put in the page (`exposeMovingInPage`). */
+/** What moves on the page now, by the detector of settled.ts put in the page (`exposeMovingInPage`). */
 async function moving(page: Page): Promise<string[]> {
   await exposeMovingInPage(page);
   return page.evaluate(() => (window as unknown as { __movingInPage: () => string[] }).__movingInPage());

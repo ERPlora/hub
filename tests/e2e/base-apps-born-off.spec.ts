@@ -17,19 +17,15 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy, bounceTasks } from './app-rows-helpers';
-import {
-  A,
-  api,
-  emptyOfTemplateData,
-  horizontalOverflow,
-  hostPage,
-  psql,
-  registerBusinessIn,
-  registrationOf,
-  shot,
-  shown,
-  untilStill,
-} from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { hostPage } from './login';
+import { psql } from './psql';
+import { registerBusinessIn, registrationOf } from './registration';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
+import { emptyOfTemplateData } from './template-data';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

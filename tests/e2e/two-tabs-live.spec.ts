@@ -6,21 +6,13 @@
 import { expect, test } from '@playwright/test';
 
 import { type Figures, figuresAt, shownFigures, watchFigures } from './demo-figures';
-import {
-  A,
-  api,
-  appearedAt,
-  createViaPage,
-  listReady,
-  login,
-  record,
-  row,
-  runningTimeout,
-  shot,
-  shown,
-  uniqueName,
-  watchForRow,
-} from './helpers';
+import { record, shot } from './capture';
+import { appearedAt, createViaPage, listReady, row, uniqueName, watchForRow } from './demo-items';
+import { api } from './hub-api';
+import { login } from './login';
+import { runningTimeout } from './login-trip';
+import { shown } from './screen';
+import { A } from './stack';
 import { recordResponses, responseEnd } from './resource-timing';
 
 const ROUNDS = 3;

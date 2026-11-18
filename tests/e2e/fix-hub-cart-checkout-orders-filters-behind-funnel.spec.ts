@@ -6,7 +6,10 @@
 // «Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», or the two readings of «1.250») and filters nothing.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, record, shot, shown, untilStill } from './helpers';
+import { record, shot } from './capture';
+import { shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { cleanUp, code, listShown, type Order, orderFrom, post, rowOf, signedIn, VIEWPORTS } from './cart-checkout-helpers';
 import { pick } from './inventory-helpers';
 

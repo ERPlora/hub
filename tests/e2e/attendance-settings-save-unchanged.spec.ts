@@ -6,7 +6,10 @@
 // flow: ATTENDANCE-F04
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, shown } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { noHorizontalScroll, VIEWPORTS } from './schedule-helpers';
 
 const KEY = 'FIX-HUB-894-ATTENDANCE-SETTINGS-SAVE-UNCHANGED-CLEARS-REFUSAL';

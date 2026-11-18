@@ -6,8 +6,10 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 
 import { DONE, type Provider, startProvider } from './assistant-provider';
 import { answers, box, card, emptyMonth, panel, saasSql, send } from './assistant-real';
-import { A, api, login, turnOffTurnedOn, turnOnMissing } from './helpers';
-import { STACK } from './stack';
+import { turnOffTurnedOn, turnOnMissing } from './apps-on';
+import { api } from './hub-api';
+import { login } from './login';
+import { A, STACK } from './stack';
 
 /** An id as a schema's `format: uuid` takes it: never on a card. */
 export const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;

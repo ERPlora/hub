@@ -6,7 +6,8 @@
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { createSseParser, type SseParser } from '../../packages/ui/src/sdk/sse-parser';
-import { decodeSubs, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { saveSessionForTheSweep, signedInSpanish } from './login';
+import { shown } from './screen';
 
 /** A `/api/live` the page opened: when, the operations it carries and the subscriptions the Hub has answered so far. */
 export interface LiveStream {
@@ -120,4 +121,16 @@ export async function liveStreamsSettled(
   { timeout = SETTLE_TIMEOUT_MS } = {},
 ): Promise<void> {
   await expect.poll(() => liveStreamsPending(streams, left), { timeout }).toEqual([]);
+}
+
+/** Decodes the `s=` of a `/api/live` URL (base64url JSON) into its subscriptions. */
+export function decodeSubs(url: string): unknown[] {
+  const s = new URL(url).searchParams.get('s') ?? '';
+  const json = Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  try {
+    const value: unknown = JSON.parse(json);
+    return Array.isArray(value) ? value : [value];
+  } catch {
+    return [json];
+  }
 }

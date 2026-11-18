@@ -4,7 +4,12 @@
 // board list does not fail on a translated text among a panel's options. Each size and language leaves a capture.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 
 const KEY = 'FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT';
 const PANEL = 'verifactu.contingency';

@@ -9,7 +9,10 @@ import { join } from 'node:path';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, shown } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { toastWithId } from './toast-helpers';
 
 /** Where the fleet keeps the evidence of this change (`## UI vista` of its PR), outside the repo. */

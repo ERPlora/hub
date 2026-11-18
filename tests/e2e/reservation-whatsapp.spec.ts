@@ -11,7 +11,8 @@
 // flow: RESERVATION-F17 RESERVATION-F18 (and WHATSAPP_INBOX-F24 WHATSAPP_INBOX-F25)
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture, psql } from './helpers';
+import { capture } from './capture';
+import { psql } from './psql';
 import { approve, signedIn } from './flow-helpers';
 import { askedOnce, chats, workerAsks } from './provider-helpers';
 import { guestRowInTheBook, madridDay } from './reservation-helpers';

@@ -5,7 +5,9 @@
 // nothing is created.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { capture, psql, shown } from './helpers';
+import { capture } from './capture';
+import { psql } from './psql';
+import { shown } from './screen';
 import { VIEWPORTS } from './sale-helpers';
 import { expectMarked, refuseWithTheSameWords, type SameWordsWindow, testTheMarksGoOneByOne } from './same-words-helpers';
 import { cleanUp, named, ownerPage, pick, post, TAG } from './service-helpers';

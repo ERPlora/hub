@@ -1,6 +1,6 @@
 // flow: modifier-e2e-wait — the Modifiers specs' wait
 // Before a capture or a measurement, the Modifiers specs (modifier-*.spec.ts) wait with the harness's one wait,
-// `untilStill(page)` (helpers.ts), which asks every open shadow root too. A wait of their own that asks the document
+// `untilStill(page)` (settled.ts), which asks every open shadow root too. A wait of their own that asks the document
 // alone for its animations is blind to Ionic's overlays (`modifier-settled.spec.ts` shows the till's options sheet
 // passing for still), and swapping one back would leave every spec green: this keeps them out of the Modifiers files,
 // and no fixed sleep (`waitForTimeout(`) takes their place. own-animation-waits.test.ts holds the same rule for every
@@ -28,7 +28,7 @@ function sleeps(source: string): string[] {
   return source.split('\n').filter((line) => /\.waitForTimeout\(/.test(line));
 }
 
-describe('the Modifiers specs wait with untilStill() of helpers.ts', () => {
+describe('the Modifiers specs wait with untilStill() of settled.ts', () => {
   it('there are Modifiers specs to look at', () => {
     expect(modifierFiles()).toEqual(expect.arrayContaining(['modifier-groups.spec.ts', 'modifier-settled.spec.ts', 'modifier-till.spec.ts']));
   });

@@ -3,7 +3,16 @@
 // «My apps» and the assistant are rows of «⋮», and each one opens once the menu has gone.
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { compactBar, MY_APPS_DOOR, shown } from './helpers';
+import { shown } from './screen';
+
+/** What opens «My apps» on the hub's topbar: its ⠿ button from a tablet, the shell's «⋮» on a phone. */
+export const MY_APPS_DOOR = '[data-testid=topbar-apps], [data-testid=topbar-more]';
+
+/** The way to «My apps»: there once the authenticated shell is painted (every page of the stack has its own). */
+export const topbarApps = (page: Page): Locator => page.locator(MY_APPS_DOOR).first();
+
+/** Whether the page is a phone's (under 768 px): the shell folds «My apps» and the assistant into «⋮». */
+export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;
 
 /** The topbar of the screen on view. */
 export const topbar = (page: Page): Locator => shown(page).locator('ion-header.app-topbar');

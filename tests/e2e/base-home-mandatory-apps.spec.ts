@@ -11,20 +11,13 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { bounceTasks } from './app-rows-helpers';
-import {
-  A,
-  api,
-  capture,
-  horizontalOverflow,
-  hostPage,
-  psql,
-  registerBusinessIn,
-  registrationOf,
-  saveSessionForTheSweep,
-  shown,
-  signedInSpanish,
-  type Registration,
-} from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { hostPage, saveSessionForTheSweep, signedInSpanish } from './login';
+import { psql } from './psql';
+import { registerBusinessIn, type Registration, registrationOf } from './registration';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

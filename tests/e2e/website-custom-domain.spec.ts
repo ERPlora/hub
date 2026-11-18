@@ -8,8 +8,11 @@
 // fails: the other specs expect `/` of `a` to jump to the login.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, internalPut, psql } from './helpers';
-import { STACK } from './stack';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { internalPut } from './registration';
+import { A, STACK } from './stack';
 import { atRest, ownerOfTheSite, photo, type Site } from './website-helpers';
 
 const KEY = 'HUBS-F17-CUSTOM-DOMAIN';

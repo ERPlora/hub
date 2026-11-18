@@ -6,7 +6,11 @@
 // shoots the three sizes. What this file creates is deleted after it.
 import { expect, test } from '@playwright/test';
 
-import { A, capture, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { capture } from './capture';
+import { login, saveSessionForTheSweep, signedInSpanish } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product, productRow, productsReady, searchProducts } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, checkWithDish, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';

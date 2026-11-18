@@ -1,5 +1,5 @@
 // What a spec file turned on in a business, so that its `afterAll` turns off that and nothing else (hub#480). Plain
-// bookkeeping, without Playwright: helpers.ts drives it with Apps' own commands (`turnOnMissing`, `turnOffTurnedOn`).
+// bookkeeping, without Playwright: apps-on.ts drives it with Apps' own commands (`turnOnMissing`, `turnOffTurnedOn`).
 
 /** Turns on, one by one and in their order, the apps of `needed` that `on` does not list, and appends each to
  *  `turnedOn` once `turnOn` came back: an app whose turning on failed is not recorded, and neither is one that was

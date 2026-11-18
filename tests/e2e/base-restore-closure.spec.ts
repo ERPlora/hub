@@ -4,7 +4,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { ADMIN_PAGE_SIZES, adminPage, CLOSURE_SAID, inControl, staffSession } from './admin-list-helpers';
-import { capture, horizontalOverflow } from './helpers';
+import { capture } from './capture';
+import { horizontalOverflow } from './screen';
 import { STACK } from './stack';
 
 const KEY = 'RESTORE-CLOSURE';

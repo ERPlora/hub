@@ -157,8 +157,9 @@ describe('api and a hub busy for a moment (503 base.hub_busy)', () => {
 });
 
 describe('the shared helpers ask the hub’s API only through api', () => {
-  it('helpers.ts (turnOn, turnOnMissing, turnOffTurnedOn…) sends no request of its own', () => {
-    const source = read(join(E2E_DIR, 'helpers.ts'));
+  it('apps-on.ts, demo-items.ts, template-data.ts and psql.ts (turnOn, createItem, usernameOf…) send no request of their own', () => {
+    const files = ['apps-on.ts', 'demo-items.ts', 'template-data.ts', 'psql.ts'];
+    const source = files.map((file) => read(join(E2E_DIR, file))).join('\n');
     const own = source.split('\n').filter((line) => /\.request\.(get|post|put|patch|delete|fetch)\(/.test(line));
 
     expect(own).toEqual([]);

@@ -1,6 +1,6 @@
 // @vitest-environment node
 // flow: ninguno — e2e harness (hub#1317, hub#1342, hub#1370)
-// `login()` (helpers.ts) against a fake page that runs on a clock of its own, so what it does over minutes takes no
+// `login()` (login.ts) against a fake page that runs on a clock of its own, so what it does over minutes takes no
 // real time.
 //
 // The SaaS's jump interrupting its `page.goto` to the hub (hub#1317). A spec that signs an owner up leaves the page on
@@ -25,7 +25,7 @@ import { join } from 'node:path';
 import { type Page, type TestInfo, test } from '@playwright/test';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-// The folder the fake SaaS mails its codes to, which helpers.ts reads as it loads (`MAIL_DIR`). Hoisted above the
+// The folder the fake SaaS mails its codes to, which saas.ts reads as it loads (`MAIL_DIR`). Hoisted above the
 // imports, so no import is at hand here: the folder itself is made in `beforeAll`.
 const MAIL = vi.hoisted(() => {
   const dir = `${(process.env.TMPDIR ?? '/tmp').replace(/\/?$/, '/')}helpers-login-mail-${process.pid}-${Date.now()}`;
@@ -33,7 +33,8 @@ const MAIL = vi.hoisted(() => {
   return dir;
 });
 
-import { login, OWNER, SAAS, SAAS_CODE, SAAS_SIGN_IN } from './helpers';
+import { login } from './login';
+import { OWNER, SAAS, SAAS_CODE, SAAS_SIGN_IN } from './saas';
 
 const HUB = 'http://bar.localhost:8000';
 /** The config's time for a test (playwright.config.ts). */

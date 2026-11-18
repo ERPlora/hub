@@ -10,7 +10,14 @@
 // flow: BASE-F86 BASE-F87 BASE-F88 BASE-F89
 import { type APIRequestContext, type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, collectProblems, horizontalOverflow, hostPage, psql, saveSessionForTheSweep, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { hostPage, saveSessionForTheSweep } from './login';
+import { collectProblems } from './page-problems';
+import { psql } from './psql';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { rowAction } from './service-helpers';
 import { toastSaying } from './toast-helpers';
 

@@ -15,7 +15,11 @@
 // WhatsApp Manager one that it cannot be sent or edited here, never offering it to send. Each flow in three sizes.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { FLOW_VIEWPORTS, noHorizontalScroll, offersRowAction, rowAction, settled } from './service-helpers';
 import {
   cleanUp,

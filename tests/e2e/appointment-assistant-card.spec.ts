@@ -13,7 +13,10 @@ import { type BrowserContext, expect, test } from '@playwright/test';
 import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
 import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
-import { A, api, capture, psql } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { A } from './stack';
 import { post } from './service-helpers';
 
 const TAG = 'E2E Tarjeta cita';

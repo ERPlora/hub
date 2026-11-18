@@ -10,7 +10,7 @@
 // it when it answers the Hub), and puts it back the same way.
 import { expect, test } from '@playwright/test';
 
-import { psql } from './helpers';
+import { psql } from './psql';
 import { cleanUp, keepPhoto, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 /** `a`'s photo as the Hub keeps it: its version and its state. */

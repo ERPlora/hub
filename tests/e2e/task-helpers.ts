@@ -4,7 +4,14 @@
 // A row action is service-helpers.ts's `rowAction`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, type Credentials, horizontalOverflow, hubUserIdOf, login, psql, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { hubUserIdOf, psql } from './psql';
+import { type Credentials } from './saas';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 
 /** Every name a task spec gives starts like this. */
 export const TAG = 'E2E Task';

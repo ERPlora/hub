@@ -13,8 +13,13 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
-import { A, api, capture, exposeMovingInPage, login, psql, REPO_DIR, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
-import { STACK } from './stack';
+import { turnOffTurnedOn, turnOnMissing } from './apps-on';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { exposeMovingInPage, untilStill } from './settled';
+import { A, REPO_DIR, STACK } from './stack';
 
 const KEY = 'FIX-HUB-ATTENDANCE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 const TAG = 'E2EAac';

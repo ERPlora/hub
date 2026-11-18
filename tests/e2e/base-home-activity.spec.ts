@@ -6,7 +6,11 @@
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, exposeMovingInPage, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { exposeMovingInPage, untilStill } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 
@@ -139,7 +143,7 @@ async function toolbarAt(page: Page, size: Size): Promise<Toolbar> {
       if (!pane || typeof pane.when !== 'string') return true;
       return pane.classList.contains('split-pane-visible') === matchMedia(breakpoints[pane.when] ?? pane.when).matches;
     };
-    // helpers.ts's `movingInPage`, put in the page by `exposeMovingInPage`: the one detector of the e2e.
+    // settled.ts's `movingInPage`, put in the page by `exposeMovingInPage`: the one detector of the e2e.
     const animating = () => (window as unknown as { __movingInPage: () => string[] }).__movingInPage().length > 0;
     (window as unknown as { __toolbar: Promise<unknown> }).__toolbar = new Promise((resolve) => {
       let last: string | undefined;

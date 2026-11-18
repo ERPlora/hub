@@ -6,7 +6,13 @@
 // app's pytest and Vitest suites. Everything created here is named «E2E Pay …» and removed before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { capture, shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { EMPLOYEE } from './saas';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 

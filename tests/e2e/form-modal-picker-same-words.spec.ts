@@ -7,7 +7,12 @@
 // fleet's visual sweep reads (`E2E_SAVE_STORAGE_STATE`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { capture } from './capture';
+import { login, saveSessionForTheSweep, signedInSpanish } from './login';
+import { psql } from './psql';
+import { type Credentials, EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 import { expectMarked, expectUnmarked, refuseWithTheSameWords } from './same-words-helpers';
 import { stamp, VIEWPORTS } from './sale-helpers';
 

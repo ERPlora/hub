@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, login, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 

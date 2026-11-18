@@ -7,7 +7,12 @@
 // flow: INVOICE-F03 — the manual invoice in the Canary Islands, Ceuta or Melilla
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInvoices, ensureIssuer, invoiceOf, issuedIds, openDialog, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 import { createRule, FLOW_VIEWPORTS, horizontalOverflow } from './tax-helpers';

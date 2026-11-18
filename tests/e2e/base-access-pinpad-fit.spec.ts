@@ -9,7 +9,14 @@
 // the PIN pad: base-access.spec.ts), and goes with it (`afterAll`).
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, OWNER, psql, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { OWNER } from './saas';
+import { shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 
 const KEY = 'FIX-HUB-441-PINPAD-LANDSCAPE';
 /** The key the cut hid: the PIN has a 0. */
@@ -82,7 +89,7 @@ async function expectWholePad(page: Page, size: { label: string; width: number; 
 test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A, locale: 'es-ES' });
   till = { context, page: await context.newPage() };
-  // Its own session: signing out of it must not end the one other specs reuse (helpers.ts, `login`).
+  // Its own session: signing out of it must not end the one other specs reuse (login.ts, `login`).
   await login(till.page, A, '/', OWNER, { fresh: true });
   const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
   expect(me.status, 'GET /api/me').toBe(200);

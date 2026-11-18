@@ -8,7 +8,12 @@
 // device and the settings go away.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 
 type Rows<T> = { rows: T[]; total: number };

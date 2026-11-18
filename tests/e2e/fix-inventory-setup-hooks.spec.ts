@@ -9,7 +9,12 @@
 // which `cleanInventory()` removes.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, psql, shot, shown, untilStill } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { boardWidget, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
 import { cleanInventory, createProduct, stamp, VIEWPORTS } from './inventory-helpers';
 

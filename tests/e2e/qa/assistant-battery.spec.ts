@@ -28,7 +28,10 @@ import {
   seedRealProviders,
   TURN_MS,
 } from '../assistant-real';
-import { A, api, ARTIFACTS, capture, login } from '../helpers';
+import { ARTIFACTS, capture } from '../capture';
+import { api } from '../hub-api';
+import { login } from '../login';
+import { A } from '../stack';
 
 test.skip(process.env.QA_REAL_PROVIDER !== '1', 'QA with the real model: QA_REAL_PROVIDER=1 (tests/e2e/README.md)');
 

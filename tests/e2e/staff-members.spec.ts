@@ -7,7 +7,13 @@
 // removed after it (and before, if a run died half-way).
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { capture, shot } from './capture';
+import { api } from './hub-api';
+import { hostPage, login } from './login';
+import { hubUserIdOf, psql } from './psql';
+import { EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 import { staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 

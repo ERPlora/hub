@@ -5,7 +5,8 @@
 // makes is deleted after it, and the business goes back to the whole country.
 import { expect, test } from '@playwright/test';
 
-import { shot, shown } from './helpers';
+import { shot } from './capture';
+import { shown } from './screen';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import {  } from './invoice-helpers';
 import { cleanSales, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';

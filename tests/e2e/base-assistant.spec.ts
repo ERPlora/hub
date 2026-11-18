@@ -12,10 +12,16 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { ownerIn, sentCard, thisDeviceNamed } from './assistant-card-helpers';
 import { CLAIM_ANSWER, DICTATION, DONE, GREETING, NOT_DONE, type Provider, STEPS_SAID } from './assistant-provider';
 import { saasSql } from './assistant-real';
-import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, shot, shown, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
+import { turnOffTurnedOn, turnOnMissing } from './apps-on';
+import { capture, shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { EMPLOYEE, upgradeLandsInside } from './saas';
+import { shown, THREE_SIZES as VIEWPORTS } from './screen';
+import { exposeMovingInPage, untilStill } from './settled';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { seededProvider } from './provider-helpers';
-import {  } from './stack';
+import { A } from './stack';
 import { assistantDoor, openAssistant, pressAssistant, topbarMore, topbarMoreMenu } from './topbar';
 
 let provider: Provider;
@@ -160,7 +166,7 @@ async function confirmationReady(page: Page): Promise<void> {
 /** The dangerous card's «Confirmation» as its capture must show it: focused, its label floated and, in the same frame,
  *  nothing moving on the page, the label's move included (rv-ui-35: the first size caught the first frame of the label's
  *  move, with a gap in the outline). Stillness is asked of the e2e's one detector, put in the page by
- *  `exposeMovingInPage` (helpers.ts), never of the label's own animations; and, as the detector leaves endless moves out
+ *  `exposeMovingInPage` (settled.ts), never of the label's own animations; and, as the detector leaves endless moves out
  *  (a spinner's), the label must also look the same two frames apart. */
 async function confirmationSettled(page: Page): Promise<boolean> {
   await exposeMovingInPage(page);

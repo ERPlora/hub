@@ -1,11 +1,16 @@
 // flow: e2e-overflow — the e2e harness's horizontal scroll check (seen in hub#386)
 // Reading the document alone (how wide it is, against the window) misses horizontal scroll: Ionic pins the `body` to
 // the window and every screen scrolls inside its `ion-content`, so a screen that runs past the right edge is cut there
-// and the document never grows. `horizontalOverflow(page)` (helpers.ts) measures the document and every `ion-content`
+// and the document never grows. `horizontalOverflow(page)` (screen.ts) measures the document and every `ion-content`
 // on screen. The checks here put a block wider than any window in each box the helper has to read and expect to see it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, listReady, login, settled, shown } from './helpers';
+import { capture } from './capture';
+import { listReady } from './demo-items';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { settled } from './settled';
+import { A } from './stack';
 
 const TASK = 'FIX-HUB-E2E-HORIZONTAL-SCROLL-CHECK-BLIND-TO-ION-CONTENT';
 

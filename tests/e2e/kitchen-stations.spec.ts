@@ -7,7 +7,10 @@
 // stations «E2E KST <run> …», products `E2E-KST-<run>-…` and the category «E2E KST <run>» — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shown } from './helpers';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { capture, SIZES } from './kitchen-helpers';
 import { stamp } from './sale-helpers';

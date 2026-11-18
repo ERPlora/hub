@@ -8,7 +8,11 @@
 // flow: SALE-F01
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, login, shot, untilStill } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { EMPLOYEE } from './saas';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = [

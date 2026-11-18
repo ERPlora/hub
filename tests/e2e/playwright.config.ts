@@ -19,7 +19,7 @@
 // `PW_RUN_ID` is fixed by the first evaluation of this file, in the runner: Playwright evaluates it
 // again in every worker process, which inherits the runner's environment and so the same id.
 // `E2E_OUTPUT_DIR` overrides the folder. The specs' own evidence keeps its fixed paths
-// (`.artifacts/*.png` and `.artifacts/metrics/*.json`, from `shot()` and `record()` in helpers.ts);
+// (`.artifacts/*.png` and `.artifacts/metrics/*.json`, from `shot()` and `record()` in capture.ts);
 // an old `.artifacts/results.json` is no longer rewritten.
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

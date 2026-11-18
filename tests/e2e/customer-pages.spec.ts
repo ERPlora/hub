@@ -7,7 +7,10 @@
 import { expect, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, horizontalOverflow, login, record, shot, shown } from './helpers';
+import { record, shot } from './capture';
+import { login } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 
 test.afterAll(() => cleanUp());
 

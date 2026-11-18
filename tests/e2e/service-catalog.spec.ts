@@ -6,7 +6,10 @@
 // Everything this spec creates is named «E2E Svc …» and removed before and after it.
 import { expect, test } from '@playwright/test';
 
-import { A, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanUp, clearFilters, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
 
 test.beforeAll(cleanUp);

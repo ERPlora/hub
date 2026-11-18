@@ -6,7 +6,13 @@
 // spec creates is named «E2E …» and removed after it.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, hubUserIdOf, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { hubUserIdOf, psql } from './psql';
+import { type Credentials, EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 import { staffCleanUp } from './staff-helpers';
 import { offersRowAction, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';

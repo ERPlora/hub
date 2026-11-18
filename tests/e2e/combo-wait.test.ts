@@ -1,6 +1,6 @@
 // flow: combo-e2e-wait — the Menus specs' wait
 // Before a capture or a measurement, the Menus specs (combo-*.spec.ts) wait with the harness's one wait,
-// `untilStill(page)` (helpers.ts), which asks every open shadow root too, and `painted(page)` for a frame. Their own
+// `untilStill(page)` (settled.ts), which asks every open shadow root too, and `painted(page)` for a frame. Their own
 // wait asked the document alone for its animations, blind to Ionic's overlays (`combo-settled.spec.ts` shows it let
 // the till's menu sheet pass for still), or only waited two frames. Swapping one back would leave every spec green:
 // this keeps them from coming back in the Menus files, and no fixed sleep (`waitForTimeout(`) takes their place. The
@@ -33,7 +33,7 @@ function sleeps(source: string): string[] {
   return source.split('\n').filter((line) => /\.waitForTimeout\(/.test(line));
 }
 
-describe('the Menus specs wait with untilStill() of helpers.ts', () => {
+describe('the Menus specs wait with untilStill() of settled.ts', () => {
   it('there are Menus specs to look at', () => {
     expect(comboFiles()).toEqual(
       expect.arrayContaining(['combo-business-currency.spec.ts', 'combo-menus.spec.ts', 'combo-settled.spec.ts', 'combo-till.spec.ts']),

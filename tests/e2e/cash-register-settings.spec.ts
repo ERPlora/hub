@@ -4,7 +4,12 @@
 // are put back and the drawer deleted after it.
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, psql, shown } from './helpers';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 import { rowAction } from './service-helpers';
 import { dialog, fill } from './inventory-helpers';
 import { shots, stamp } from './sale-helpers';

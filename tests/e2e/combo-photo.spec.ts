@@ -9,7 +9,12 @@
 // folder); the cash register goes back as it was.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct, dialog, PHOTO_PNG, photoLoaded, stamp, VIEWPORTS } from './inventory-helpers';
 import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { rowAction } from './service-helpers';

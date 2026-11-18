@@ -6,7 +6,10 @@
 // bar) is not where the point lands. Each size captured.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, shown } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { noHorizontalScroll, settled } from './service-helpers';
 import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 

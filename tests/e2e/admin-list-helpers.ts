@@ -4,7 +4,7 @@
 import { type Browser, expect, type Locator, type Page } from '@playwright/test';
 
 import { managePy } from './global-setup';
-import { horizontalOverflow } from './helpers';
+import { horizontalOverflow } from './screen';
 import { STACK } from './stack';
 
 export const ADMIN_LIST_SIZES = [

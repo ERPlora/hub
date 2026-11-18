@@ -7,7 +7,9 @@
 // hub#1236). The dialog and that row are captured at the fleet's three sizes, without sideways scroll.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { A, api, capture } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { A } from './stack';
 import { chargeByApi, cleanSales } from './sale-helpers';
 import { cleanUp, named, noHorizontalScroll, ownerPage, pick, post, rowAction, settled, VIEWPORTS } from './service-helpers';
 

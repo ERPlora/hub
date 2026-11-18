@@ -6,7 +6,12 @@
 // override (F05) and deletes both after confirming (F06). What the hub had is put back after the file.
 import { expect, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import {
   cleanupExceptions,
   DEFAULT_WEEK,

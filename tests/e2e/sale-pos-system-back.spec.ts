@@ -7,7 +7,10 @@
 // does. Hub, SaaS and the till are the real ones; nothing is written.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { shown, THREE_SIZES as VIEWPORTS } from './screen';
+import { A } from './stack';
 import { openTillCart } from './sale-helpers';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
 import { openApps } from './topbar';

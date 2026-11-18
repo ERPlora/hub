@@ -5,7 +5,13 @@
 // What this file creates is deleted after it (`afterAll`), and the settings it touched are restored.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { hostPage, login } from './login';
+import { psql } from './psql';
+import { EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 import { rowAction } from './service-helpers';
 import { shots } from './sale-helpers';
 

@@ -9,7 +9,10 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, login, shot, shown } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 
 test.afterAll(() => cleanUp());
 

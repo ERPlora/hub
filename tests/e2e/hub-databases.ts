@@ -1,4 +1,4 @@
-// Where a spec's SQL goes (helpers.ts `psql`) now that every hub has its own database (`seed_local_hubs` gives `a`
+// Where a spec's SQL goes (`psql` of psql.ts) now that every hub has its own database (`seed_local_hubs` gives `a`
 // and `b` theirs once every app can live in one). Control's tables — the registry
 // (`base_hub`, `base_democode`, `control_*`), Django's users and sessions (`auth_*`, `django_*`) and the memberships
 // and session owners (`base_membership`, `base_sessionowner`) — live in the stack's control database

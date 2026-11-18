@@ -11,7 +11,7 @@
 // database migrated, the template skipped) leaves rows of its own, however fast or slow the machine is.
 //
 // It reads compose's Postgres as its superuser (`psqlOn` of global-setup.ts): the registry in the stack's control
-// database (`base_hub`), then the demo's own database and its template's, which `psql()` of helpers.ts never reaches
+// database (`base_hub`), then the demo's own database and its template's, which `psql()` of psql.ts never reaches
 // (`django_migrations` is control's table for it).
 import { type CommandResult, psqlOn } from './global-setup';
 

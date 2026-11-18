@@ -24,9 +24,33 @@ tiene las cuentas de demo con las que entran las specs (abajo, «Varias ejecucio
 worker: `--workers=N` pisa el `workers: 1` de `playwright.config.ts`, y dos specs a la vez sobre la misma pila se
 borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecuciones a la vez»).
 
+## Las ayudas compartidas
+
+Una spec importa cada ayuda del módulo que la lleva, sin un fichero que lo reúna todo:
+
+| Módulo | Qué lleva |
+|---|---|
+| `stack.ts` | dónde está la pila (puertos, BD, el SaaS), sus dos hubs locales `A` y `B`, y las carpetas `HUB_DIR` y `REPO_DIR` |
+| `login.ts` | `login`, con las sesiones que guarda por worker, y las páginas que abre con él: `hostPage`, `signedInSpanish` |
+| `login-trip.ts` | los pasos del viaje del login por el SaaS y lo que dice que uno no va a llegar; `runningTimeout` |
+| `saas.ts` | el SaaS como lo ven las specs: `SAAS`, las cuentas `OWNER` y `EMPLOYEE`, la carpeta de su correo y `upgradeLandsInside` |
+| `hub-api.ts` | `api`, el único camino de las specs a la API del Hub |
+| `screen.ts` | los tres tamaños, la página a la vista (`shown`, `testid`, `appRow`), `scrolledTo`, `iconStates` y `horizontalOverflow` |
+| `topbar.ts` | la barra de arriba: «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), el asistente y `compactBar` |
+| `settled.ts` | la única espera de «nada se mueve»: `settled`, `untilStill`, `painted` y `exposeMovingInPage` |
+| `capture.ts` | las pruebas que deja una spec en `.artifacts/`: `capture`, `shot`, `record`, `settledCapture` y `capturedFitting` |
+| `demo-items.ts` | los elementos de la app de demo: crearlos, leerlos, la lista y `uniqueName` |
+| `apps-on.ts` | encender y apagar las apps que necesita una spec: `turnOn`, `turnOnMissing`, `turnOffTurnedOn` |
+| `template-data.ts` | `emptyOfTemplateData`: quita lo que trae una plantilla |
+| `psql.ts` | `psql`, donde viven las tablas de cada sentencia, y las personas de un hub (`usernameOf`, `hubUserIdOf`) |
+| `registration.ts` | lo que erplora.com mandó de un hub: el plan de su foto y su registro por `/internal` |
+| `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
+| `page-problems.ts` | `collectProblems`: CSP, errores de consola y de la página |
+| `live-streams.ts` | los `/api/live` que abre una página, con `decodeSubs` |
+
 ## El login
 
-`login()` de `helpers.ts` hace el login de verdad: el hub manda al SaaS, el SaaS pide la cuenta y el código que
+`login()` de `login.ts` hace el login de verdad: el hub manda al SaaS, el SaaS pide la cuenta y el código que
 envía por correo (leído de `E2E_MAIL_DIR`) y devuelve al hub con su código de un solo uso. Cada cuenta inicia
 sesión en el SaaS **una vez por worker**: los logins siguientes, en contextos nuevos, empiezan con esa sesión del
 SaaS, como quien ya entró en erplora.com, y solo hacen la vuelta al hub. Antes cada login dejaba otra sesión
@@ -105,7 +129,7 @@ la columna `db_name` de `base_hub`), que hace `seed_local_hubs` para `a` y `b` y
 control propia aísla todos los datos de la ejecución: dos pilas sobre `hub` se pisan (el 16-10-2026, el cobro en
 efectivo de una cayó en el turno de caja abierto de la otra y `cash-register-shift.spec.ts` falló).
 
-`psql()` (`helpers.ts`) corre cada sentencia donde viven sus tablas (`hub-databases.ts`): las de control (`base_hub`,
+`psql()` (`psql.ts`) corre cada sentencia donde viven sus tablas (`hub-databases.ts`): las de control (`base_hub`,
 `base_democode`, `control_*`, `auth_*`, `django_*`, `base_membership`, `base_sessionowner`) en `DB_NAME` y el resto en
 la BD del hub (`a` si la spec no pasa otro), las seguidas de una misma BD en una sola llamada. Las tablas de copia de
 una spec (`e2e…`) van a la BD donde se crearon, y lo que no nombra ninguna tabla (`pg_notify`) va a la de control, donde
@@ -351,7 +375,7 @@ ella (lo normal, ronda 2026-11-04a) corre el caso de la voz del dispositivo y sa
 `ASSISTANT_SERVER_VOICE=True`, al revés. Para cubrirlo todo, se corre una vez con cada valor.
 
 Las specs del asistente de cada app (`<app>-assistant.spec.ts`) encienden en su `beforeAll` las apps que necesitan y que
-están apagadas en `a` con `turnOnMissing(context, A, NEEDED, turnedOn)` (`helpers.ts`), que apunta cada una en
+están apagadas en `a` con `turnOnMissing(context, A, NEEDED, turnedOn)` (`apps-on.ts`), que apunta cada una en
 `turnedOn` cuando ya está encendida, y su `afterAll` apaga solo eso, de la última a la primera, con
 `turnOffTurnedOn(context, A, turnedOn)`. Una spec que cae antes de encender nada (el SaaS sin su proveedor: «not seeded
 with this provider») deja el negocio como estaba: nunca apaga Control horario, Personal ni nada que ya estuviera
@@ -536,7 +560,7 @@ memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.arti
 
 ## La página a la vista y los diálogos
 
-`shown(page)` (`helpers.ts`) es la página que enseña `IonRouterOutlet`, nunca un diálogo abierto encima: Ionic Vue
+`shown(page)` (`screen.ts`) es la página que enseña `IonRouterOutlet`, nunca un diálogo abierto encima: Ionic Vue
 envuelve el contenido de un `ion-modal` en un `.ion-page` propio y lleva el diálogo presentado a `ion-app`, detrás
 de las páginas, así que «el último `.ion-page` visible» era el diálogo. Ahí la lista no tiene filas, y una spec que
 contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (el 17-10-2026, en
@@ -554,7 +578,7 @@ contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (
 Una captura justo después de `setViewportSize` puede salir antes de que el navegador pinte la página a su nuevo tamaño:
 la zona que destapa el cambio de tamaño aún tiene lo de arriba de la página, y la captura repite la barra superior en su
 parte de abajo (87 filas; en `main`, 5 de 24 capturas de la lista de la demo sin espera y 2 de 24 tras `settled`). Esa
-captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`helpers.ts`):
+captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`capture.ts`):
 espera a que nada finito se mueva (`untilStill`, abajo: un aviso o un `ion-modal` entrando, no un spinner) y a un
 fotograma pintado, repite la captura mientras repite la franja de arriba (`repeatedTop`, la del SaaS) y, si no deja de
 hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<name>.png` y la devuelve. Si algo sigue
@@ -567,7 +591,7 @@ es la barra superior, con filas distintas entre sí. Sin esa regla, el panel del
 blanco arriba y abajo con su borde izquierdo) y la tarjeta de confirmación encima no se podían capturar
 (FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE).
 
-`settled(page)` (`helpers.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
+`settled(page)` (`settled.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
 nada se mueva (`untilStill`) y a un fotograma pintado. «Nada se mueve» se lee en el documento **y en cada shadow root
 abierto, a cualquier profundidad** (`movingInPage`): `document.getAnimations()` no ve los shadow roots, y Ionic anima ahí
 sus diálogos y popovers; los avisos de `@erplora/ui` entran con transiciones CSS en el propio documento. Las infinitas
@@ -584,14 +608,14 @@ profundidad, pide las animaciones por su cuenta (`getAnimations`) más veces de 
 (las esperas propias que quedaban al llegar el guardarraíl), y un fichero nuevo no lo hace ninguna: «nada se mueve» se
 espera con `settled(page)` o `untilStill(page)`, que miran también los shadow roots. Cuenta toda referencia en el código,
 sin los comentarios: la llamada, guardada con otro nombre (`const a = document.getAnimations`), entre corchetes
-(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `helpers.ts` (el detector) y las dos
+(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `settled.ts` (el detector) y las dos
 specs que lo miden desde fuera (`settled.spec.ts` y `helpers-capture.spec.ts`) tienen su número fijo en el propio test.
 Al retirar una copia, baja su número en el JSON (o quita su línea). Los `<app>-wait.test.ts` (Ventas, Cocina, Menús,
 Modificadores, Tareas) siguen: prohíben además, en los ficheros de su app, las esperas fijas y los recuentos propios.
 
 ## Sin scroll horizontal
 
-Toda comprobación de «nada se sale por la derecha» pasa por `horizontalOverflow(page)` (`helpers.ts`): los píxeles que
+Toda comprobación de «nada se sale por la derecha» pasa por `horizontalOverflow(page)` (`screen.ts`): los píxeles que
 quedan más allá del borde derecho de su caja, 0 si todo cabe. Mide el documento **y la caja de scroll de cada
 `ion-content`** (la de la página que se ve, la del menú lateral fijo y la de una hoja abierta), en su shadow root
 (`part="scroll"`). Ionic fija el `body` a la ventana y cada pantalla se desplaza dentro de su `ion-content`, así que una
@@ -599,7 +623,7 @@ pantalla que se sale por la derecha queda cortada ahí y el documento nunca crec
 (`documentElement.scrollWidth` contra la ventana) daba 0 con un bloque de 1600 px en una página a 390, y la spec pasaba
 con la barra cortada en su propia captura (lo vio el revisor de hub#386). `helpers-overflow.spec.ts` comprueba que lo ve
 en la página, en el menú, en una hoja y en una página sin Ionic (la web pública). `horizontal-overflow.test.ts` (Vitest),
-sin trinquete: ningún fichero de `tests/e2e` salvo `helpers.ts` vuelve a medir el documento a mano, ni un solo
+sin trinquete: ningún fichero de `tests/e2e` salvo `screen.ts` vuelve a medir el documento a mano, ni un solo
 `ion-content` (`getScrollElement()`, `.inner-scroll`, `part="scroll"`). Caza también el raíz por un nombre que se le dé
 (`const root = document.documentElement`), leído con `??` o `as` en línea o por un `then()`, su `scrollWidth`
 desestructurado, el raíz hallado por su selector (`querySelector('html')`) o por un localizador de Playwright

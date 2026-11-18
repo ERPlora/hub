@@ -7,7 +7,11 @@
 // the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, shot, shown } from './helpers';
+import { capture, shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import {
   type Box,

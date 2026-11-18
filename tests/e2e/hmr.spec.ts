@@ -6,8 +6,12 @@ import { join } from 'node:path';
 
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { A, createItem, HUB_DIR, healthy, listReady, login, record, row, shot, shown, uniqueName, waitFor } from './helpers';
-import { STACK } from './stack';
+import { record, shot } from './capture';
+import { createItem, listReady, row, uniqueName } from './demo-items';
+import { healthy, waitFor } from './dev-server';
+import { login } from './login';
+import { shown } from './screen';
+import { A, HUB_DIR, STACK } from './stack';
 
 const VUE = join(HUB_DIR, 'apps/demo/frontend/pages/ItemListPage.vue');
 const PY = join(HUB_DIR, 'apps/demo/queries.py');

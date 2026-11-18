@@ -1,5 +1,5 @@
 // flow: hub-e2e-capture — the e2e harness's screenshots
-// Every capture of the e2e goes through `capture` (helpers.ts), which refuses a screenshot taken before the page was
+// Every capture of the e2e goes through `capture` (capture.ts), which refuses a screenshot taken before the page was
 // painted at its size (`repeatedTop`). A raw `.screenshot(` takes it as it comes, and right after `setViewportSize` it
 // can repeat the topbar at its bottom. This keeps them from coming back as a ratchet:
 // `raw-screenshots.json` holds, for each file that still had raw calls when `capture` arrived, how many; a file can
@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** The raw calls `capture` itself makes, and the one of the spec that measures `settled` alone, on purpose. */
-const ALLOWED: Record<string, number> = { 'helpers.ts': 1, 'helpers-capture.spec.ts': 1 };
+const ALLOWED: Record<string, number> = { 'capture.ts': 1, 'helpers-capture.spec.ts': 1 };
 
 /** What is left of the raw calls of before `capture`, by file: it only goes down. */
 const RATCHET = JSON.parse(readFileSync(join(E2E_DIR, 'raw-screenshots.json'), 'utf8')) as Record<string, number>;
@@ -40,7 +40,7 @@ function rawCallsByFile(): Record<string, number> {
   return found;
 }
 
-describe('the e2e captures go through capture() of helpers.ts', () => {
+describe('the e2e captures go through capture() of capture.ts', () => {
   it('no file takes more raw screenshots than the ratchet lists: a new capture is capture(page, name)', () => {
     const over = Object.entries(rawCallsByFile())
       .filter(([name, calls]) => calls > (ALLOWED[name] ?? RATCHET[name] ?? 0))

@@ -2,7 +2,7 @@
 // set. `demo.item.stats` is re-run by the same notices as `demo.item.list`, in the same pass of the stream.
 import type { Page } from '@playwright/test';
 
-import { shown } from './helpers';
+import { shown } from './screen';
 
 export type Figures = { open: number; done: number; lines: number };
 

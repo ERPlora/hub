@@ -2,7 +2,7 @@
 // person flips it.
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { appRow } from './helpers';
+import { appRow } from './screen';
 
 /** The `ion-toggle` of `id`'s row, in the list or on its card. */
 export const appSwitch = (page: Page, id: string): Locator => appRow(page, id).locator('ion-toggle');

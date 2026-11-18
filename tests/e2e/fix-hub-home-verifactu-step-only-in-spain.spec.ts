@@ -12,18 +12,12 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeIn, openActionCenter } from './action-center';
-import {
-  A,
-  api,
-  capture,
-  horizontalOverflow,
-  registerBusinessIn,
-  type Registration,
-  registrationOf,
-  saveSessionForTheSweep,
-  signedInSpanish,
-  testid,
-} from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { saveSessionForTheSweep, signedInSpanish } from './login';
+import { registerBusinessIn, type Registration, registrationOf } from './registration';
+import { horizontalOverflow, testid } from './screen';
+import { A } from './stack';
 import { keepVerifactu, putVerifactuBack, revokedIn } from './verifactu-helpers';
 
 const KEY = 'FIX-HUB-HOME-VERIFACTU-STEP-ONLY-IN-SPAIN';

@@ -4,7 +4,11 @@
 // says anything. Tasks is turned on again and the automation removed however the test ends.
 import { expect, test } from '@playwright/test';
 
-import { A, api, capture, psql, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { signedIn } from './flow-helpers';
 import { noHorizontalScroll, VIEWPORTS } from './schedule-helpers';
 

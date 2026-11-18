@@ -11,7 +11,11 @@
 // What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanUp as cleanCustomers } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, deliver, ensureIssuer, flowShots, invoiceOf, snapshotSeries } from './invoice-helpers';

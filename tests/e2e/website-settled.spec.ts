@@ -4,10 +4,13 @@
 // `ion-popover`) and an `ion-segment`'s indicator inside theirs: in the editor, right after it, the «Publish your
 // website?» dialog could still be sliding in. Here that dialog enters at a fifth of its speed (Chrome's own
 // control), and once `atRest` returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`,
-// helpers.ts), at 390, 834 and 1440. The dialog is cancelled each time: the site is not published.
+// settled.ts), at 390, 834 and 1440. The dialog is cancelled each time: the site is not published.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, exposeMovingInPage, hostPage, repeatedTop } from './helpers';
+import { capture, repeatedTop } from './capture';
+import { hostPage } from './login';
+import { exposeMovingInPage } from './settled';
+import { A } from './stack';
 import { atRest } from './website-helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-E2E-WAIT-BLIND-TO-SHADOW-ROOTS';
@@ -18,7 +21,7 @@ const SIZES = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
-/** What moves on the page now, by the detector of helpers.ts put in the page (`exposeMovingInPage`). */
+/** What moves on the page now, by the detector of settled.ts put in the page (`exposeMovingInPage`). */
 async function moving(page: Page): Promise<string[]> {
   await exposeMovingInPage(page);
   return page.evaluate(() => (window as unknown as { __movingInPage: () => string[] }).__movingInPage());

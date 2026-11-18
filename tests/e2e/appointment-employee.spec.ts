@@ -5,7 +5,13 @@
 // control: he sees both. Everything is named «E2E Apt …» and removed before and after.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { type Credentials, EMPLOYEE } from './saas';
+import { shown } from './screen';
+import { A } from './stack';
 import { pick, post } from './service-helpers';
 
 const TAG = 'E2E Apt';

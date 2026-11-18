@@ -9,7 +9,11 @@
 // is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, painted, shown } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { painted } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp, tillIn } from './sale-helpers';
 

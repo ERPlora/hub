@@ -3,7 +3,14 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
-import { A, api, clearItems, horizontalOverflow, hostPage, login, psql, shot, shown, uniqueName, untilStill } from './helpers';
+import { shot } from './capture';
+import { clearItems, uniqueName } from './demo-items';
+import { api } from './hub-api';
+import { hostPage, login } from './login';
+import { psql } from './psql';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { panelAdded, spanishContext, spanishHome } from './home-helpers';
 
 const VIEWPORTS = {

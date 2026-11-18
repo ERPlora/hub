@@ -6,7 +6,7 @@
 // stayed empty and the `afterAll` turned off every app it needed, though the business had them on — Time clock, Staff,
 // Pricing, Cart checkout… — and the specs that came after failed one after another (404 on their routes, 409
 // `base.app_required` on the way). Now the `beforeAll` records each app once it is on (`turnOnMissing`) and the
-// `afterAll` turns off that record and nothing else, last first (`turnOffTurnedOn`, helpers.ts): a file that fell before
+// `afterAll` turns off that record and nothing else, last first (`turnOffTurnedOn`, apps-on.ts): a file that fell before
 // turning anything on leaves the business as it found it. The guardrail keeps it so: no hook, and no function a hook
 // can call, posts `/apps/disable` itself; only a test does (turning an app off is what some tests prove) and the one
 // helper, which every file hands the record its own `turnOnMissing` filled (never `NEEDED` or a copy).
@@ -28,7 +28,7 @@ const SKIPPED_DIRS = new Set(['.artifacts', 'node_modules']);
 const DISABLE = '/apps/disable';
 
 /** The one place outside a test that turns an app off: `turnOffTurnedOn`, which turns off only what was recorded. */
-const ALLOWED = new Set(['helpers.ts']);
+const ALLOWED = new Set(['apps-on.ts']);
 
 /** Every source of the e2e under `root` (specs and their helpers, at any depth; not Vitest's own tests). */
 function e2eSources(root = HERE): string[] {
@@ -182,7 +182,7 @@ describe('every source of the e2e', () => {
     // Not a guard that finds nothing to guard: tests turn apps off, and the helper does.
     expect(sources.filter(({ source }) => source.includes(DISABLE)).length).toBeGreaterThan(1);
     const offenders = sources.filter(({ file }) => !ALLOWED.has(file)).flatMap(({ file, source }) => disablesOutsideATest(file, source));
-    expect(offenders, 'turn off in an afterAll with turnOffTurnedOn(context, origin, turnedOn) of helpers.ts').toEqual([]);
+    expect(offenders, 'turn off in an afterAll with turnOffTurnedOn(context, origin, turnedOn) of apps-on.ts').toEqual([]);
   });
 
   it('hands turnOffTurnedOn only the record its own turnOnMissing filled', () => {
@@ -192,10 +192,10 @@ describe('every source of the e2e', () => {
     expect(offenders, 'hand turnOffTurnedOn the same list the file handed turnOnMissing').toEqual([]);
   });
 
-  it('and helpers.ts posts it once, for each app of the record (turnOffTurnedOn → turnOffRecorded)', () => {
-    const source = readFileSync(join(HERE, 'helpers.ts'), 'utf8');
-    expect(disablesOutsideATest('helpers.ts', source)).toHaveLength(1);
-    expect(disablesOffTheRecord('helpers.ts', source)).toEqual([]);
+  it('and apps-on.ts posts it once, for each app of the record (turnOffTurnedOn → turnOffRecorded)', () => {
+    const source = readFileSync(join(HERE, 'apps-on.ts'), 'utf8');
+    expect(disablesOutsideATest('apps-on.ts', source)).toHaveLength(1);
+    expect(disablesOffTheRecord('apps-on.ts', source)).toEqual([]);
   });
 });
 
@@ -204,21 +204,21 @@ describe('disablesOffTheRecord', () => {
 
   it('passes the helper that turns off each app of the record', () => {
     const helper = `export async function turnOffTurnedOn(context, origin, turnedOn) {\n  await turnOffRecorded(turnedOn, async (app) => {\n    ${post}\n  });\n}`;
-    expect(disablesOffTheRecord('helpers.ts', helper)).toEqual([]);
+    expect(disablesOffTheRecord('apps-on.ts', helper)).toEqual([]);
   });
 
   it('names one that turns off a list of its own, or hands the record a callback that is not the one posting', () => {
     const own = `export async function turnOffTurnedOn(context, origin, turnedOn) {\n  for (const app of NEEDED) {\n    ${post}\n  }\n}`;
-    expect(disablesOffTheRecord('helpers.ts', own)).toEqual(['helpers.ts:3']);
+    expect(disablesOffTheRecord('apps-on.ts', own)).toEqual(['apps-on.ts:3']);
     const aside = `export async function turnOffTurnedOn(context, origin, turnedOn) {\n  turnOffRecorded; await each(['x'], async (app) => {\n    ${post}\n  });\n}`;
-    expect(disablesOffTheRecord('helpers.ts', aside)).toEqual(['helpers.ts:3']);
+    expect(disablesOffTheRecord('apps-on.ts', aside)).toEqual(['apps-on.ts:3']);
     const otherList = `export async function turnOffTurnedOn(context, origin, turnedOn) {\n  await turnOffRecorded(NEEDED, async (app) => {\n    ${post}\n  });\n}`;
-    expect(disablesOffTheRecord('helpers.ts', otherList)).toEqual(['helpers.ts:3']);
+    expect(disablesOffTheRecord('apps-on.ts', otherList)).toEqual(['apps-on.ts:3']);
   });
 
-  it('names one posted from another function of helpers.ts', () => {
+  it('names one posted from another function of apps-on.ts', () => {
     const other = `export async function turnOffAll(context, origin, turnedOn) {\n  await turnOffRecorded(turnedOn, async (app) => {\n    ${post}\n  });\n}`;
-    expect(disablesOffTheRecord('helpers.ts', other)).toEqual(['helpers.ts:3']);
+    expect(disablesOffTheRecord('apps-on.ts', other)).toEqual(['apps-on.ts:3']);
   });
 });
 

@@ -8,7 +8,10 @@
 // `E2E-KNOTICE-<run>`, its checks and their kitchen tickets, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture, psql, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { psql } from './psql';
+import { shown } from './screen';
+import { untilStill } from './settled';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';

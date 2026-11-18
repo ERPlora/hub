@@ -8,7 +8,14 @@
 // when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { registerBusinessIn, type Registration, registrationOf } from './registration';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 
 const KEY = 'FIX-HUB-PAYMENT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const TAG = 'E2E PayCur';

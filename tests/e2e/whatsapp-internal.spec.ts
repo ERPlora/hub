@@ -13,9 +13,11 @@ import { createHmac } from 'node:crypto';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { shown } from './screen';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { STACK } from './stack';
+import { A, STACK } from './stack';
 import { cleanUp, e2ePhone, keepPhoto, PREFIX, restorePhoto, waId } from './whatsapp-helpers';
 
 /** The name of the final screen's shots. */

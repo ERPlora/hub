@@ -8,7 +8,10 @@ import { type BrowserContext, expect, test } from '@playwright/test';
 import { cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
 import { cleanUp as customersCleanUp } from './customer-helpers';
-import { A, api, capture, psql } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { A } from './stack';
 import { post } from './service-helpers';
 
 const NEEDED = ['customer', 'tax', 'sale', 'table', 'schedule', 'reservation'];

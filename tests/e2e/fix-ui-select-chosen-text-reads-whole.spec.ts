@@ -10,7 +10,11 @@
 // flow: PRINTING-F06, INVOICE-F21, ui:theme
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, hostPage, settled, shown, signedInSpanish } from './helpers';
+import { capture } from './capture';
+import { hostPage, signedInSpanish } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { settled } from './settled';
+import { A } from './stack';
 
 const SIZES = [
   { label: '320x568', width: 320, height: 568 },

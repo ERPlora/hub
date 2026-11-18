@@ -9,20 +9,13 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy } from './app-rows-helpers';
 import { appNote, expectSwitch, flipApp } from './apps-switch-helpers';
-import {
-  A,
-  api,
-  appRow,
-  hostPage,
-  psql,
-  type Registration,
-  registerBusinessIn,
-  registrationOf,
-  settledCapture,
-  shown,
-  signedInSpanish,
-  testid,
-} from './helpers';
+import { settledCapture } from './capture';
+import { api } from './hub-api';
+import { hostPage, signedInSpanish } from './login';
+import { psql } from './psql';
+import { registerBusinessIn, type Registration, registrationOf } from './registration';
+import { appRow, shown, testid } from './screen';
+import { A } from './stack';
 
 const KEY = 'FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN';
 const VIEWPORTS = {

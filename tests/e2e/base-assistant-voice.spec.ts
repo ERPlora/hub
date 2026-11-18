@@ -16,7 +16,10 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { GREETING, type Provider } from './assistant-provider';
 import { emptyMonth, openPanel, panel } from './assistant-real';
-import { A, capture, login, THREE_SIZES as VIEWPORTS } from './helpers';
+import { capture } from './capture';
+import { login } from './login';
+import { THREE_SIZES as VIEWPORTS } from './screen';
+import { A } from './stack';
 import { seededProvider } from './provider-helpers';
 
 const KEY = 'APP-BASE-9-SERVER-VOICE';

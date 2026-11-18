@@ -1,6 +1,6 @@
 // @vitest-environment node
 // flow: e2e-capture — the e2e harness's one wait for «nothing moves»
-// Every wait for «nothing moves» in the e2e goes through the one detector of helpers.ts (`settled`, `untilStill`,
+// Every wait for «nothing moves» in the e2e goes through the one detector of settled.ts (`settled`, `untilStill`,
 // `movingInPage`), which asks every open shadow root too. `document.getAnimations()` leaves shadow roots out, and Ionic
 // animates its dialogs and popovers there: a spec that asks for animations itself lets a dialog still
 // entering pass for still. The per-app guardrails (`<app>-wait.test.ts`)
@@ -39,7 +39,7 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
  * measures it from outside, every root once `settled()` returned (`settled.spec.ts`), and the toasts' helper that reads a
  * toast's own entrance for that spec and `helpers-capture.spec.ts` (`toast-helpers.ts`). They read; they never wait.
  */
-const ALLOWED: Record<string, number> = { 'helpers.ts': 1, 'settled.spec.ts': 1, 'toast-helpers.ts': 1 };
+const ALLOWED: Record<string, number> = { 'settled.ts': 1, 'settled.spec.ts': 1, 'toast-helpers.ts': 1 };
 
 /** What is left of the specs' own waits, by file: it only goes down. */
 const RATCHET = JSON.parse(readFileSync(join(E2E_DIR, 'own-animation-waits.json'), 'utf8')) as Record<string, number>;
@@ -47,12 +47,12 @@ const RATCHET = JSON.parse(readFileSync(join(E2E_DIR, 'own-animation-waits.json'
 const NAME = 'getAnimations';
 
 const WAIT_WITH_THE_DETECTOR =
-  'wait with settled(page) or untilStill(page) of helpers.ts, which also sees the shadow roots, instead of asking for ' +
+  'wait with settled(page) or untilStill(page) of settled.ts, which also sees the shadow roots, instead of asking for ' +
   'getAnimations() yourself (and never raise a count in own-animation-waits.json)';
 
 const LOWER_THE_RATCHET =
   'a file that lost getAnimations() reads lowers its count in own-animation-waits.json, or drops its line at 0 ' +
-  '(helpers.ts, settled.spec.ts and toast-helpers.ts: their number in ALLOWED of own-animation-waits.test.ts)';
+  '(settled.ts, settled.spec.ts and toast-helpers.ts: their number in ALLOWED of own-animation-waits.test.ts)';
 
 /**
  * How many times `source` reaches for `getAnimations` in its code, comments left out: a call
@@ -131,7 +131,7 @@ function staleInTheRatchet(found: Record<string, number>): string[] {
     .map((name) => `${name}: ${found[name] ?? 0} getAnimations reads, the ratchet says ${allowed(name)}`);
 }
 
-describe('the e2e waits for «nothing moves» with the one detector of helpers.ts', () => {
+describe('the e2e waits for «nothing moves» with the one detector of settled.ts', () => {
   // The e2e's folder, scanned once here without a clock (hub#1292): a read of a file of the repo ends, as late as the
   // machine makes it, which no clock in seconds tells from one that never does; what could still not end, a wait
   // nobody settles, only the end of the run's job cuts. Each test keeps Vitest's own budget for its own work.
@@ -184,12 +184,12 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
       mkdirSync(join(dir, '.artifacts'));
       writeFileSync(join(dir, 'zz-new.spec.ts'), 'await page.waitForFunction(() => document.getAnimations().length === 0);\n');
       writeFileSync(join(dir, 'lib', 'wait.ts'), "export const moving = (page) => page.evaluate('document.getAnimations().length');\n");
-      writeFileSync(join(dir, 'helpers.ts'), 'const moving = document.getAnimations();\nconst more = root.getAnimations();\n');
+      writeFileSync(join(dir, 'settled.ts'), 'const moving = document.getAnimations();\nconst more = root.getAnimations();\n');
       writeFileSync(join(dir, '.artifacts', 'report.js'), 'document.getAnimations();\n');
       writeFileSync(join(dir, 'zz-wait.test.ts'), 'document.getAnimations();\n');
       expect(overTheRatchet(await readsByFile(dir)).sort()).toEqual([
-        'helpers.ts: 2 getAnimations reads, 1 allowed',
         'lib/wait.ts: 1 getAnimations reads, 0 allowed',
+        'settled.ts: 2 getAnimations reads, 1 allowed',
         'zz-new.spec.ts: 1 getAnimations reads, 0 allowed',
       ]);
     } finally {

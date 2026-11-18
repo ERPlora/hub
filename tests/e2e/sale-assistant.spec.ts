@@ -11,10 +11,14 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { sentCard, type SentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, login, psql, REPO_DIR, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { untilStill } from './settled';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, stamp } from './sale-helpers';
-import { STACK } from './stack';
+import { A, REPO_DIR, STACK } from './stack';
 import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-HUB-SALE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';

@@ -7,7 +7,10 @@
 // What is made here is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql } from './helpers';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { A } from './stack';
 import { stamp } from './sale-helpers';
 
 const RUN = stamp();

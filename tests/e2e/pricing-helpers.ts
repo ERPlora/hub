@@ -3,7 +3,11 @@
 // `cleanPricing()` removes exactly that, in every app it touched, before and after the spec.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
+import { capture, shot } from './capture';
+import { api } from './hub-api';
+import { psql } from './psql';
+import { shown, THREE_SIZES as VIEWPORTS } from './screen';
+import { A } from './stack';
 
 export const TAG = 'E2E Pricing';
 export const CODE = 'E2EPF';

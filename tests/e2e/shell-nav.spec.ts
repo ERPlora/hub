@@ -7,10 +7,14 @@ import { join } from 'node:path';
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, createItem, HUB_DIR, listReady, login, MY_APPS_DOOR, record, shot, shown, THREE_SIZES as VIEWPORTS, topbarApps, uniqueName } from './helpers';
+import { record, shot } from './capture';
+import { createItem, listReady, uniqueName } from './demo-items';
+import { login } from './login';
+import { shown, THREE_SIZES as VIEWPORTS } from './screen';
+import { A, HUB_DIR } from './stack';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
 import { toastWithId } from './toast-helpers';
-import { openApps } from './topbar';
+import { MY_APPS_DOOR, openApps, topbarApps } from './topbar';
 
 type Box = { x: number; y: number; width: number; height: number };
 

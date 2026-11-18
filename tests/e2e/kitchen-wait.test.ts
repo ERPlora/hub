@@ -1,6 +1,6 @@
 // flow: kitchen-e2e-wait — the Kitchen specs' wait
 // Before a capture or a measurement, the Kitchen specs (kitchen-*.spec.ts) and their helpers wait with the harness's
-// one wait, `untilStill(page)` (helpers.ts), which asks every open shadow root too. A wait of their own that asks the
+// one wait, `untilStill(page)` (settled.ts), which asks every open shadow root too. A wait of their own that asks the
 // document alone for its animations is blind to Ionic's overlays (`kitchen-settled.spec.ts` shows the till's «Order
 // tickets» sheet passing for still while it slides in), and swapping one back would leave every spec green: this
 // keeps them out of the Kitchen files. own-animation-waits.test.ts holds the same rule for every spec of the e2e;
@@ -32,7 +32,7 @@ function sleeps(source: string): string[] {
 const offending = (find: (source: string) => string[]): string[] =>
   kitchenFiles().flatMap((name) => find(read(name)).map((line) => `${name}: ${line.trim()}`));
 
-describe('the Kitchen specs wait with untilStill() of helpers.ts', () => {
+describe('the Kitchen specs wait with untilStill() of settled.ts', () => {
   it('there are Kitchen specs to look at, and not the Printing app’s', () => {
     expect(kitchenFiles()).toEqual(expect.arrayContaining(['kitchen-menu-options.spec.ts', 'kitchen-pos.spec.ts', 'kitchen-display.spec.ts']));
     expect(kitchenFiles()).not.toContain('printing-kitchen.spec.ts');

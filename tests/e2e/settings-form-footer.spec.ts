@@ -12,7 +12,11 @@
 // flow: APPOINTMENT-F19, ATTENDANCE-F04, INVENTORY-F19, KITCHEN-F26, ONLINE_BOOKING-F07, RESERVATION-F03, SERVICE-F11, STAFF-F22, TABLE-F08
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, login, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { turnOffTurnedOn, turnOnMissing } from './apps-on';
+import { capture } from './capture';
+import { login, signedInSpanish } from './login';
+import { horizontalOverflow, shown } from './screen';
+import { A } from './stack';
 import { ownerPage } from './service-helpers';
 
 /** Each settings page and the prefix of its hooks (`<hook>-save`). */

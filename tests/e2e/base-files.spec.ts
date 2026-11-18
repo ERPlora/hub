@@ -9,7 +9,14 @@ import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { formatSize } from '../../base/frontend/lib/files';
-import { A, api, B, capture, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { capture, shot } from './capture';
+import { api } from './hub-api';
+import { hostPage } from './login';
+import { psql } from './psql';
+import { EMPLOYEE } from './saas';
+import { horizontalOverflow, shown } from './screen';
+import { untilStill } from './settled';
+import { A, B } from './stack';
 import { readableToasts, toastSaying } from './toast-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 

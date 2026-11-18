@@ -6,7 +6,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { nativeApp, type NativeAppOptions } from './device-notice-helpers';
-import { A, api } from './helpers';
+import { api } from './hub-api';
+import { A } from './stack';
 import { ownerPage } from './service-helpers';
 import { toasts } from './toast-helpers';
 

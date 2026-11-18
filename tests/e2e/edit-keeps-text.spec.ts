@@ -3,7 +3,10 @@
 // keeps its text and focus and warns «Updated elsewhere».
 import { expect, test } from '@playwright/test';
 
-import { A, createItem, itemDetail, login, record, shot, uniqueName } from './helpers';
+import { record, shot } from './capture';
+import { createItem, itemDetail, uniqueName } from './demo-items';
+import { login } from './login';
+import { A } from './stack';
 
 test('typing in the note survives a line and a note saved elsewhere; «Updated elsewhere» shows', async ({ context }) => {
   const tab1 = await context.newPage();

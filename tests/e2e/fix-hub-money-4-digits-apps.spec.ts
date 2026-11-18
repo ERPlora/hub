@@ -6,7 +6,12 @@
 // What this file creates is deleted after it, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post } from './service-helpers';

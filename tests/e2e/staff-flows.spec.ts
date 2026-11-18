@@ -7,7 +7,13 @@
 // Everything created here is named «E2E…» and removed after the run (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { hubUserIdOf, psql } from './psql';
+import { type Credentials, EMPLOYEE } from './saas';
+import { horizontalOverflow, shown, THREE_SIZES as VIEWPORTS } from './screen';
+import { A } from './stack';
 import { pickMember, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 

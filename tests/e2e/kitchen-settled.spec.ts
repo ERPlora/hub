@@ -1,14 +1,19 @@
 // flow: kitchen-e2e-wait — the Kitchen specs' wait
 // Before a capture or a measurement, the Kitchen specs (kitchen-*.spec.ts) wait for the screen to stop moving with the
-// harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves shadow
+// harness's one wait, `untilStill` (settled.ts). A wait that asks the document alone for its animations leaves shadow
 // roots out, and Ionic animates its overlays (`ion-modal`, `ion-popover`) in theirs: a capture could come out with a
 // sheet still sliding in and pass for good. Here the till's «Order tickets» sheet (KITCHEN-F19: «Tickets · 1»
 // beside what was sent opens it) enters at a fifth of its speed (Chrome's own control), and once the Kitchen specs'
-// wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834
+// wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, settled.ts), at 390, 834
 // and 1440. What a run creates — the product `E2E-KST-<run>`, its check and its kitchen ticket — is deleted after it.
 import { type CDPSession, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, exposeMovingInPage, hostPage, psql, repeatedTop, shown, untilStill } from './helpers';
+import { capture, repeatedTop } from './capture';
+import { hostPage } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { exposeMovingInPage, untilStill } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
@@ -64,7 +69,7 @@ test.afterAll(() => {
 
 const sheet = (page: Page): Locator => page.locator('ion-modal[data-testid=pos-kitchen-tickets]');
 
-/** What moves on the page now, by the detector of helpers.ts put in the page (`exposeMovingInPage`). */
+/** What moves on the page now, by the detector of settled.ts put in the page (`exposeMovingInPage`). */
 async function moving(page: Page): Promise<string[]> {
   await exposeMovingInPage(page);
   return page.evaluate(() => (window as unknown as { __movingInPage: () => string[] }).__movingInPage());

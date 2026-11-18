@@ -6,7 +6,11 @@
 // named «e2e PrK <stamp>» (printer), `E2E-PRK…` (product) and «e2e prk <stamp>» (check); `afterAll` removes it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shown } from './helpers';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { flowShots } from './printing-helpers';
 import { cleanSales, stamp } from './sale-helpers';

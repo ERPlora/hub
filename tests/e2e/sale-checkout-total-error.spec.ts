@@ -6,7 +6,10 @@
 // flow: none — Sales' charge sheet
 import { expect, test } from '@playwright/test';
 
-import { A, login, shot, shown } from './helpers';
+import { shot } from './capture';
+import { login } from './login';
+import { shown } from './screen';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, stamp } from './sale-helpers';
 import { cleanUp as cleanTaxes, FLOW_VIEWPORTS, freshCategory } from './tax-helpers';

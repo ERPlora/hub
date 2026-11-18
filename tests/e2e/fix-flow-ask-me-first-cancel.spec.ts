@@ -7,7 +7,9 @@
 // flow: FLOW-F28 FLOW-F12 FLOW-F37 FLOW-F38
 import { expect, test } from '@playwright/test';
 
-import { capture, psql, shown } from './helpers';
+import { capture } from './capture';
+import { psql } from './psql';
+import { shown } from './screen';
 import { approve, ownerOnAutomations, saveGrantAndSwitchOn } from './flow-helpers';
 import { providerSpec, runAndAsk, runFinishes } from './provider-helpers';
 import { bookingOn, cleanUpTagged, madridDay, reservationStatus } from './reservation-helpers';

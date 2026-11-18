@@ -6,7 +6,12 @@
 // Everything this spec creates is named «E2E Price …» (codes E2EPR…) and removed before and after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { shot } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { A } from './stack';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 

@@ -8,7 +8,9 @@
 // Spanish. What a run creates, its product `E2E-SHORTSIDE-<run>` and its check, is deleted after it.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture, settled, shown } from './helpers';
+import { capture } from './capture';
+import { shown } from './screen';
+import { settled } from './settled';
 import { type Product } from './inventory-helpers';
 import { cleanTill, dishForTheTill, openTillCart, stamp, TILL_LANGUAGES, tillIsPhone, tillOpenAt1440 } from './sale-helpers';
 

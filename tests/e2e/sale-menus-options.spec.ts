@@ -6,7 +6,13 @@
 // kitchen tickets and fiscal documents — is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown, untilStill } from './helpers';
+import { capture } from './capture';
+import { api } from './hub-api';
+import { login } from './login';
+import { psql } from './psql';
+import { shown } from './screen';
+import { untilStill } from './settled';
+import { A } from './stack';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, expectFirstTile, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
