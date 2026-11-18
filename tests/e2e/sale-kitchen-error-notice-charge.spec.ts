@@ -3,21 +3,16 @@
 // on a low phone the notice lay over «Charge», and a tap there to try again fell on the notice: no new send. Here, with
 // the notice on screen, the middle of «Charge» and of «Send order» answer with the button itself, the notice covers
 // neither, and a real tap on «Charge» sends the round again. The kitchen's answer is a 500 of this spec's own route,
-// and the notice is told to stay until it has been read: where it sits is the point, not how long it lasts. The worst
-// case of a real business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s
-// issuer is parked for the run and put back after it). What a run creates, its product `E2E-KERROR-<run>` and its
-// checks, is deleted after it.
+// and the notice is told to stay until it has been read: where it sits is the point, not how long it lasts. What a run
+// creates, its product `E2E-KERROR-<run>` and its checks, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, settled, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
-import { parkIssuer, unparkIssuer } from './invoice-helpers';
-import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { type Box, checkWithDish, cleanSales, cleanTill, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, stamp, tillIsPhone } from './sale-helpers';
 import { toastSaying, toasts } from './toast-helpers';
 
 const KEY = 'FIX-HUB-755-ERROR-NOTICE';
-/** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
-const PARKED = 'e2e_sale_kitchen_error_issuer';
 const RUN = stamp();
 /** How long this notice lasts: the default of an error toast. */
 const NOTICE_MS = 5000;
@@ -31,22 +26,10 @@ let dish: Product;
 test.beforeAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
-  parkIssuer(PARKED);
   dish = await dishForTheTill(browser, 'KERROR', RUN);
 });
 
-test.afterAll(() => {
-  try {
-    cleanSales();
-    cleanInventory();
-  } finally {
-    try {
-      restoreDrawer();
-    } finally {
-      unparkIssuer(PARKED);
-    }
-  }
-});
+test.afterAll(cleanTill);
 
 /** A check of its own with a dish not sent, its till in the language under test and the kitchen refusing: returns how
  *  many sends the kitchen has been asked for so far. */
@@ -58,7 +41,6 @@ async function checkWithKitchenDown(page: Page, context: BrowserContext, lang: s
     await route.fulfill({ status: 500, json: { error: { code: 'internal_error', message: 'The kitchen did not answer.' } } });
   });
   await checkWithDish(page, context, lang, dish);
-  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible({ timeout: 30_000 });
   await settled(page);
   return () => sends;
 }

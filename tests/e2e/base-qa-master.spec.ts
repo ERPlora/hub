@@ -12,6 +12,7 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { closeActionCenter, openActionCenter } from './action-center';
 import { GREETING, type Provider, startProvider } from './assistant-provider';
 import {
   api,
@@ -20,7 +21,6 @@ import {
   HUB_DIR,
   login,
   openApps,
-  openBell,
   psql,
   REPO_DIR,
   SAAS,
@@ -183,7 +183,7 @@ async function tab(page: Page, id: string): Promise<void> {
   await expect(button).toHaveClass(/segment-button-checked/);
 }
 
-/** The topbar's way to the assistant: the sparkles, or on a phone «More options» (the sparkles folded with the bell). */
+/** The topbar's way to the assistant: the sparkles, or on a phone «More options», which carries them. */
 async function openAssistant(page: Page): Promise<Locator> {
   const panel = page.locator('[data-testid="assistant-panel"]');
   if (compactBar(page)) {
@@ -265,7 +265,7 @@ for (const language of LANGUAGES) {
       const seen = watch(page);
       const check = (name: string) => screen(page, name, language, size);
 
-      // Home: Summary, then Activity; «My apps» and the bell over it.
+      // Home: Summary, then Activity; «My apps» and the action center over it.
       await page.goto(`${origin}/`);
       await expect(shown(page).locator('[data-testid="home-date"]')).toBeVisible();
       await expect(shown(page).locator('[data-testid="setup-card"]')).toHaveAttribute('aria-busy', 'false');
@@ -277,10 +277,9 @@ for (const language of LANGUAGES) {
       await check('apps-launcher');
       await launcher.locator('[data-testid="apps-launcher-close"]').click();
       await expect(launcher).toBeHidden();
-      await openBell(page);
+      await openActionCenter(page);
       await check('bell');
-      await page.keyboard.press('Escape');
-      await expect(page.locator('ion-popover [data-testid^="hub-bell-"]')).toHaveCount(0);
+      await closeActionCenter(page);
 
       // BASE-F05: «Add apps», the last tile of «My apps», leads to Apps.
       await shown(page).locator('[data-testid="home-my-apps-add"]').click();

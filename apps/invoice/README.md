@@ -29,7 +29,7 @@ Sirve igual al restaurante y a la peluquería.
   «Justificante VeriFactu», A4 por la impresora del sistema o el diálogo del navegador (nunca sin su QR), «Marcar
   pagada» y la factura vigente de una venta para otras apps.
 - **El emisor** (F21): la identidad fiscal del negocio, obligatoria para emitir; el paso «Los datos de tu negocio»
-  del Inicio y la franja «Todavía no puedes facturar» hasta que está.
+  del Inicio y el aviso «Todavía no puedes facturar» de la campana hasta que está.
 - **Hub de plataforma** (F23, parte de Facturación): `invoice.invoice.issue_platform` y sus consultas emiten las
   facturas de ERPlora que manda el SaaS por `/internal/platform/invoices`, en la BD propia de ese hub
   (`manage.py create_platform_hub --execute`); en producción solo se declara listo con el envío real a la AEAT

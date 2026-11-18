@@ -1073,18 +1073,8 @@ export async function openApps(page: Page): Promise<Locator> {
   return sheet;
 }
 
-/** Whether the page is a phone's (under 768 px): base folds the assistant's sparkles and the bell into «More options». */
+/** Whether the page is a phone's (under 768 px): base folds the assistant's sparkles into «More options». */
 export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;
-
-/** The bell's count on the screen on view: on the bell, or on a phone's «More options», which carries it. */
-export const bellBadge = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
-
-/** The bell's count says `total`, or shows nothing when it is 0. */
-export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
-  else await expect(bellBadge(page)).toHaveCount(0, options);
-}
 
 /** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
 export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
@@ -1092,31 +1082,6 @@ export async function capturedFitting(page: Page, name: string, label: string): 
   const overflow = await horizontalOverflow(page);
   expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
   await capture(page, name);
-}
-
-/**
- * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
- * options» (TopbarChrome.vue). Ionic animates a popover in a shadow root, so it waits for its `ionPopoverDidPresent`.
- */
-export async function openBell(page: Page): Promise<void> {
-  const presented = page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        const done = (event: Event) => {
-          if (!(event.target as Element).querySelector('[data-testid^="hub-bell-"]')) return;
-          document.removeEventListener('ionPopoverDidPresent', done);
-          resolve();
-        };
-        document.addEventListener('ionPopoverDidPresent', done);
-      }),
-  );
-  if (compactBar(page)) {
-    await shown(page).locator('[data-testid=topbar-chrome-more]').click();
-    await page.locator('ion-popover [data-testid=topbar-chrome-more-bell]').click();
-  } else {
-    await shown(page).locator('[data-testid=hub-bell]').click();
-  }
-  await presented;
 }
 
 /** Waits until the list painted its first result (empty state or rows). */

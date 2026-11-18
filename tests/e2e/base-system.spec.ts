@@ -2,9 +2,10 @@
 // the run removes them after; the relay giving up and its live notice are base/tests/test_services_system.py's. One
 // of hub `b` is planted too, in `b`'s own database: `a` never sees it.
 // flow: BASE-F40
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, horizontalOverflow, hostPage, openBell, psql, shot, shown, untilStill } from './helpers';
+import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
+import { A, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -92,6 +93,17 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
 }
 
 const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
+
+/** The action center's notice of the plan's limits, in the singular or the plural. */
+const PLAN_LIMITS = /plan limits? to review/;
+
+/** The Home's action center, open once its notices came. */
+async function homeActionCenter(page: Page): Promise<Locator> {
+  await page.goto(`${A}/`);
+  const panel = await openActionCenter(page);
+  await expect(panel.locator('[data-testid=action-panel-loading]')).toHaveCount(0);
+  return panel;
+}
 const rows = (page: Page) => shown(page).locator('[data-testid="failed-event-row"]');
 
 async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string, employee = false) {
@@ -200,10 +212,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(shown(page).getByText(/\bCPU\b|PostgreSQL|Active yesterday/)).toHaveCount(0);
         await snap(page, 'BASE-F40-green', width);
 
-        // Nothing amber or red: no row in the bell.
-        await page.goto(`${A}/`);
-        await openBell(page);
-        await expect(page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Plan limits' })).toHaveCount(0);
+        // Nothing amber or red: no notice of the plan's limits in the action center.
+        await expect(noticeIn(await homeActionCenter(page), PLAN_LIMITS)).toHaveCount(0);
 
         // A plan with no limit on its files: the figure, with no bar or pill.
         onPlan({ max_storage_bytes: 0 });
@@ -229,12 +239,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(shown(page).locator('[data-testid^="system-usage-row-"]').first()).toHaveAttribute('data-testid', 'system-usage-row-files');
         await snap(page, 'BASE-F40-amber', width);
 
-        // The bell says it too, and its row opens the tab.
+        // The action center says it too, and its button opens the tab.
         await page.goto(`${A}/`);
-        await openBell(page);
-        const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Plan limits (1)' });
-        await expect(row).toBeVisible();
-        await row.click();
+        await bellSays(page, await bellTotal(context));
+        const featured = await featureNotice(page, '1 plan limit to review');
+        await noticeButton(featured, 'See the plan’s usage').click();
         await expect(page).toHaveURL(`${A}/system#usage`);
         await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'warning');
       } finally {
@@ -257,11 +266,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(shown(page).locator('[data-testid^="system-usage-row-"]').first()).toHaveAttribute('data-testid', 'system-usage-row-capacity');
         await snap(page, 'BASE-F40-red', width);
 
-        // Files full add their own motive to the bell.
+        // Files full add their own motive to the action center.
         measuredFiles(hubId, 2 * 1024 * 1024);
-        await page.goto(`${A}/`);
-        await openBell(page);
-        await expect(page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Plan limits (2)' })).toBeVisible();
+        await expect(noticeIn(await homeActionCenter(page), '2 plan limits to review')).toBeVisible();
         await page.goto(`${A}/system`);
         await expect(testid(page, 'system-usage-verdict')).toContainText('You have to upgrade: no more files fit');
         await expect(testid(page, 'system-usage-row-files').locator('.usage-meter')).toHaveAttribute('data-tone', 'danger');
@@ -280,10 +287,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(testid(page, 'system-usage-row-capacity').locator('.usage-meter')).toHaveAttribute('data-tone', 'success');
         await snap(page, 'BASE-F40-neutral-capacity', width);
 
-        // Its bell has no row for it: nothing to upgrade to.
-        await page.goto(`${A}/`);
-        await openBell(page);
-        await expect(page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Plan limits' })).toHaveCount(0);
+        // Its action center has no notice for it: nothing to upgrade to.
+        await expect(noticeIn(await homeActionCenter(page), PLAN_LIMITS)).toHaveCount(0);
 
         // A real motive wins that line: more space can be bought.
         measuredFiles(hubId, 900 * 1024);
@@ -352,11 +357,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     plantFailed('b', 'E2E of b: never seen in a.');
     const { context, page } = await signedIn(browser, viewport, '/');
     try {
-      // The bell says how many and leads to them (BASE-F10).
-      await openBell(page);
-      const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Failed events (2)' });
-      await expect(row).toBeVisible();
-      await row.click();
+      // The action center says how many and leads to them (BASE-F10).
+      await bellSays(page, await bellTotal(context));
+      const featured = await featureNotice(page, '2 failed events');
+      await noticeButton(featured, 'Review the events').click();
       await expect(page).toHaveURL(`${A}/system#events`);
       await expect(rows(page)).toHaveCount(2);
       await expect(shown(page).getByText('E2E of b')).toHaveCount(0);
