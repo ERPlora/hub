@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:045de2decc42bd6d131c9e111be07084090c0b427b57dfbf09f0b04523238e33 -->
+<!-- generated from WORKBOOK.md sha256:66069eb46c3f08a041840c1cde62676b94a081a201e447d48530d6220c7c5fc5 -->
 
 ## What it is for and who it is for
 
@@ -94,27 +94,35 @@ the plan) and, in "Edit plan", a "+" ("Add zone or table") and a pencil ("Edit z
 in its zone's colour and the number of occupied tables over those in service ("7/12"). Below, a card
 summarises the chosen zone: available, occupied, reserved tables and guests.
 
-On tablet and desktop, the plan automatically adjusts the positions and size of the tables to show the
-whole zone at a minimum legible size. If it still does not fit, it scrolls within its area on both axes,
-with a fade at every edge that has content behind it; the background can be dragged with the mouse and the
-focused area can be scrolled with the arrow keys. There are no zoom controls. The grid only appears in
-"Edit plan". On a phone (up to 640 px), "Service" shows compact two-column cards with a thumbnail of the
-table and its seats, number, status and time; "Edit plan" keeps the interactive plan.
+On tablet and desktop, the plan adjusts the place and size of the tables by itself to show the whole zone
+while they can still be read. If it still does not fit, it scrolls within its frame, sideways and up and
+down, with a fade at every edge that has tables behind it; the background can be dragged with the mouse
+and, with the plan selected, the keyboard's arrows scroll it. There are no zoom buttons. The grid only
+shows in "Edit plan". On a phone, "Service" shows the tables as two-column cards, each with the drawing of
+the table and its seats, the number, the status and the time; "Edit plan" is still the plan.
 
-Each table has its shape (round, square or rectangular) and seats according to its capacity; filled seats
-show the seated guests. At most twelve are drawn and, above that capacity, the filled ones are distributed
-proportionally; the exact figure is always written. An Available table has a soft green background and
-green outline; Occupied, a solid blue fill; Reserved, a dashed amber outline; Blocked, a grey hatch. The
-status is also written and has its icon. Inside are the large number and one fact: elapsed time on an
-occupied table ("1:08"), the time on a reserved one or the status on the others. Below, a label shows the
-guests ("3/4 pax") or capacity, and the booking's name and time ("Ana · 9:00 PM"; "Deleted customer" if
-that customer's data were erased). The server is read in the accessible name and the table's sheet.
+Each table has its shape (round, square or rectangular) and seats according to its capacity; the filled
+seats are the seated guests. At most twelve seats are drawn: with a bigger capacity, the filled ones are
+shared out in proportion, and the exact figure is always written. Inside the table are its number in large
+type and one fact: the time it has been occupied ("1:08"), the time on a reserved one or the status on the
+others. Below, the status written with its icon, the guests ("3/4 pax") or the capacity, and the booking's
+name and time ("Ana · 9:00 PM"; "Deleted customer" if that customer's data were erased). Who serves an
+occupied table is seen in its window.
 
-An occupied table also has an advancing time arc. Past the warning minutes in Settings, only the time and
-arc turn amber and then red: the table stays blue. Status and zone changes have smooth transitions, turned
-off when the device requests reduced motion. While loading, a floor-plan skeleton appears; empty and error
-notices keep their actions. The plan **is live**: it changes by itself when somebody seats, charges, moves
-or edits a table.
+The colour of each table says its status:
+
+- **Green**, Available: soft green background and green border. It is free and can be seated.
+- **Filled with colour**, Occupied: the whole table in the main colour of the "Theme palette" (blue with
+  the ERPlora palette). A party is seated with its check open.
+- **Yellow**, Reserved: soft yellow background and dashed yellow border. Its booking starts within an hour
+  or has already started.
+- **Grey stripes**, Blocked: it is out of service and cannot be seated until it is unblocked.
+
+On an occupied table, the time also has an arc that moves forward. Past the minutes of "Amber warning
+(minutes)" in Settings, the time and the arc turn amber, and past those of "Red warning (minutes)", red;
+the table does not change colour. Status and zone changes are animated gently, unless the device asks for less motion. While
+it loads, the outline of the plan shows. The plan **is live**: it changes by itself when somebody seats,
+charges, moves or edits a table. It has two modes:
 
 - **Service** (at first): nothing is dragged. Tapping a table opens its **Table N** window:
   - free or reserved: the guests question ("Guests at table N · 4 pax", "−" and "+", shortcuts from 1
@@ -129,8 +137,8 @@ or edits a table.
   - Transfer and Merge put the plan in destination mode: "Transfer N to…" / "Pick a free table" (or
     "Merge N with…" / "Pick an occupied table") and "Cancel"; only the tables that are valid can be
     tapped.
-- **Edit plan**: each table is dragged to its spot (also with the keyboard: arrows, 8 px; with Shift,
-  32 px) and it is saved when it is dropped. Tapping a table opens **Edit table** (Number, Capacity,
+- **Edit plan**: each table is dragged to its spot (also with the keyboard: each arrow moves it a little
+  and, with Shift, four times as much) and it is saved when it is dropped. Tapping a table opens **Edit table** (Number, Capacity,
   Name (optional), Shape, Status (Available or Blocked), Zone, Active; footer with "Delete" and "Save");
   the "+" opens **Add** (Zone field and "Add zone"; "Table number" field, which if left empty is
   "Auto-numbered", and "Add table"); the pencil opens **Edit zone** (Name, Description (optional);
@@ -168,8 +176,7 @@ with its decimals), never in euros if the business charges in another.
 ### Settings
 Menu **Tables → Settings**: "Ask for the guests when seating a table", "Amber warning (minutes)" and
 "Red warning (minutes)", and "Save". Only whoever can change them sees it (by default, the owner and the
-administrator). On a phone it fits whole, in Spanish and in English: the switch's long sentence breaks onto two
-lines and "Save" shows complete at the end (hub#866).
+administrator).
 
 ## States of each screen
 
@@ -221,7 +228,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F25 | Hold the table of a confirmed booking | done |
 | TABLE-F26 | Move or release the hold when the booking changes | done |
 | TABLE-F27 | Release the table when the booking is cancelled or a no-show | done |
-| TABLE-F28 | Spend the hold when the booking is seated | done |
+| TABLE-F28 | Seat the party of a booking | done |
 | TABLE-F29 | Expire the holds that are due | done |
 | TABLE-F30 | Hold or release a table by hand | done |
 | TABLE-F31 | Forget the name of a customer whose data are erased (GDPR) | done |
@@ -242,8 +249,8 @@ In: the name, the description, the colour and the order.
 Out: the zone (announces: `table.zone.created`).
 If it fails: without a name, the button does not turn on. A name another zone already has: "There is
 already a zone with that name.". The reason of a field shows under it and goes away as soon as that field
-is corrected, even if another one says the same (hub#888). An employee does not see the "+"; if they ask
-for it through the API, it is refused for lack of permission.
+is corrected. An employee does not see the "+"; if they ask for it through the API, it is refused for lack
+of permission.
 Involved: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Add tables
@@ -260,7 +267,7 @@ Steps:
    the first free number of that zone.
 4. Tap "Add table" (off while there is no zone).
 5. The table appears in the zone, in the first free spot, square, for 4 and Available.
-6. Another door: in **Tables → Tables**, "+" with Number, Capacity and Zone and "Add table"; it is also
+6. Another way: in **Tables → Tables**, "+" with Number, Capacity and Zone and "Add table"; it is also
    born in the first free spot of its zone.
 In: number (or none), and in the list also capacity and zone.
 Out: the table (announces: `table.table.created`). With a table in use, "Choose table" of the till stops
@@ -268,10 +275,10 @@ saying "There are no tables yet. Set them up in Tables → Floor plan." (`table.
 tables" is "Done" on the Home without a reload. An occupied or blocked table still counts; if they are
 all switched off or deleted (TABLE-F04), the step goes back to pending by itself. A zone without tables
 does not tick it.
-If it fails: a number repeated in the zone (regardless of case and spaces), through any door: "There is
-already a table with that number in this zone.". A zone deleted in the meantime: "That zone does not
-exist in this business.". In the **Tables** window, the reason of a field shows under it and goes away as
-soon as that field is corrected, even if another one says the same (hub#888).
+If it fails: a number repeated in the zone (regardless of case and spaces), wherever it is added from:
+"There is already a table with that number in this zone.". A zone deleted in the meantime: "That zone
+does not exist in this business.". In the **Tables** window, the reason of a field shows under it and
+goes away as soon as that field is corrected.
 Involved: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Place the tables on the plan
@@ -281,7 +288,8 @@ Screen: Floor plan (Edit plan)
 Steps:
 1. In **Floor plan → Edit plan**, choose the zone.
 2. Drag each table to its spot (only the table catches the gesture; sliding over the empty plan scrolls
-   it). With the keyboard: tab to the table and move it with the arrows (8 px; with Shift, 32 px).
+   it). With the keyboard: tab to the table and move it with the arrows, in short steps; with Shift, in
+   steps four times as long.
 3. When it is dropped it is saved at once. The table does not leave the edge of the plan.
 4. On reloading, each table is still where it was left.
 In: the new position.
@@ -306,8 +314,7 @@ Out: the changed table (announces: `table.table.updated`) or the deleted one (an
 `table.table.deleted`).
 If it fails: inside the window: "The table number is required", "There is already a table with that
 number in this zone.", "That table does not exist in this business.", each reason under its field until
-that field is corrected, even if another one says the same (hub#888); deleting a table with an open
-check: "That table has an open check. Close it or move it before deleting the table.".
+that field is corrected; deleting a table with an open check: "That table has an open check. Close it or move it before deleting the table.".
 Involved: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Take a table out of service (block it) and bring it back
@@ -320,11 +327,11 @@ Steps:
    seated until it is unblocked.".
 3. To bring it back, set "Available" and save.
 4. Blocking an occupied table does not touch its check: it stays Occupied until it is charged and then
-   it stays Blocked. A booking does not paint a Blocked table Reserved.
+   it stays Blocked. A Blocked table does not show Reserved even if it has a booking.
 In: the chosen table.
 Out: the table's status (announces: `table.table.updated`).
-If it fails: as in TABLE-F04. Seating at a blocked table (assistant, API) is refused for the same
-reason.
+If it fails: the same notices as when editing a table. Seating at a blocked table, also from the
+assistant or the API, is refused with the same out-of-service notice.
 Involved: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Rename or delete a zone
@@ -342,8 +349,7 @@ In: the chosen zone.
 Out: the changed zone (announces: `table.zone.updated`) or the deleted one (announces:
 `table.zone.deleted`).
 If it fails: "That zone still has tables. Move them to another zone or delete them first." or "That zone
-does not exist in this business.". The reason of a field shows under it until that field is corrected,
-even if another one says the same (hub#888).
+does not exist in this business.". The reason of a field shows under it until that field is corrected.
 Involved: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Create many tables at once
@@ -370,15 +376,16 @@ Steps:
 2. Set "Amber warning (minutes)" and "Red warning (minutes)" (from 1 to 600; the red one cannot be lower
    than the amber one).
 3. Tap "Save".
-   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
+   What is changed while it is saving is not lost: it stays on screen, still to save.
 4. Unticked, tapping a free table seats it with its capacity (with the booking's guests if it is
-   Reserved). In **Sessions**, the time of an open check turns amber and red from those minutes. Without
-   ever saving: it asks, 60 and 90 minutes.
+   Reserved). In **Sessions**, the time of an open check turns amber and red from those minutes. Until
+   they are saved, the factory ones apply: the guests are asked and the warnings come at 60 and at 90
+   minutes.
 In: the three values.
 Out: the room settings (announces: `table.settings.updated`).
-If it fails: a value out of range shows in its field. As in the form windows, the notice goes as soon as
-something is changed and a field's reason as soon as that field is corrected; both come back if the next try
-is refused too. A refusal that names no field stays until the next try (hub#854).
+If it fails: a value out of range shows in its field. The notice goes as soon as something is changed
+and a field's reason as soon as that field is corrected; both come back if saving again is refused. A
+notice that belongs to no field stays until it is saved again.
 Involved: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 See how the room is
@@ -393,8 +400,8 @@ Steps:
    two-column cards. Each table says its status in writing, with an icon, shape, seats and colour:
    Available, Occupied, Reserved or Blocked.
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
-   its warnings change only the clock and arc. A table with a booking today says its name and time. The
-   server is found in the table's sheet.
+   past the warnings in Settings only the time and its arc change colour. A table with a booking today says
+   its name and time. Who serves it is seen in its window.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
    the step you were at, with whatever you typed. And with the clock: a table turns Reserved an hour before
@@ -414,7 +421,7 @@ Steps:
 2. Tap a shortcut from 1 to 8 (it seats in one tap) or adjust with "−" and "+" and tap "Seat N". More
    than the capacity warns "Above the table capacity (4)" and lets you seat. With the guests setting
    off, "Seat" seats with the capacity.
-3. If you want, before seating "Assign customer" puts the card on the check (TABLE-F32).
+3. If you want, before seating "Assign customer" puts the card on the check.
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
    checks** of the till sees it). Whoever seats is the server of the check.
 5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
@@ -436,8 +443,8 @@ Screen: Floor plan (Service)
 Steps:
 1. In **Floor plan → Service**, tap an Occupied table: its window opens with guests ("1 guest", "3
    guests"), since when, server and customer.
-2. **Charge** takes you to **Sales → Sell** with that check on screen (`/sale/pos?order=<id>`); there
-   rounds are added and it is charged.
+2. **Charge** takes you to **Sales → Sell** with that check on screen; there rounds are added and it
+   is charged.
 3. With two checks at the table (split), the check is chosen first ("Check 1", "Check 2").
 In: the tapped table and its open check.
 Out: nothing in Tables.
@@ -478,7 +485,7 @@ Steps:
 1. In the window of the occupied table tap "Remove table".
 2. The table stays Available for others; the table check turns "Parked", without a table, keeping
    guests, server and time; the check stays open in Sales (**Open checks**).
-3. To carry on with it at a table, **Sessions → Seat again** (TABLE-F24).
+3. To carry on with it at a table, **Sessions → Seat again**.
 In: the table check.
 Out: the parked check (announces: `table.session.parked`) and the table free if it has no other check
 left. If Sales then charges it whole or voids it, the table check stays "Closed" (without a table).
@@ -497,9 +504,9 @@ Steps:
 4. With the assistant: "one more joined table 4, make it five"; on a split table, say which of its checks.
 In: the open check of the table.
 Out: the check's guests (announces: `table.session.updated`).
-If it fails: a check already closed, transferred, merged or parked is not corrected (the message of
-TABLE-F13). Always at least 1.
-Involved: TABLE-F10, TABLE-F17
+If it fails: a check already closed, transferred, merged or parked is not corrected: the same notice
+shows as when removing the table ("That check is not open…"). There is always at least 1 guest.
+Involved: TABLE-F10, TABLE-F13, TABLE-F17
 
 ### TABLE-F15 Move the check to another table (transfer)
 Status: done
@@ -512,7 +519,7 @@ Steps:
 3. Tap the destination table.
 4. The check is the same one, now at the destination table, with its guests, its server, its notes, its
    arrival time and its new title in Sales ("Table M"); the origin one stays free if it has no other
-   check left, and the destination one, Occupied (if it was Reserved, it spends the booking).
+   check left, and the destination one, Occupied (if it was Reserved, its booking counts as seated).
 5. With the assistant: "move table 4 to 6".
 In: the origin check and the destination table.
 Out: the origin check "Transferred" and a new table check at the destination with the same Sales check
@@ -535,7 +542,7 @@ Steps:
    voided, **in the same operation**: either everything is joined, or nothing is. What the origin check
    had already charged stays in its "Charged". The till that had the origin check on screen (on this
    device or another) moves to the check of the table that stays and says "That check was joined with
-   another one: the screen shows the joined check." (SALE-F24).
+   another one: the screen shows the joined check.".
 In: the two checks.
 Out: a single open check at the table that stays (announces: `table.session.merged` and
 `sale.order.merged`).
@@ -617,8 +624,8 @@ Steps:
    it from the till." (with just one, "1 guest").
 3. If its Sales check is empty (nobody ordered anything), Tables voids it and closes the table: a party
    that gets up without ordering does not need a manager.
-4. If its check has something ordered, nothing is closed: it is charged (TABLE-F18), moved to another
-   table (TABLE-F15) or deleted in Sales (TABLE-F20).
+4. If its check has something ordered, nothing is closed: it is charged, moved to another table or
+   deleted in Sales.
 In: the open table check and the status of its check in Sales.
 Out: the table check "Closed" with its time (announces: `table.session.closed`).
 If it fails: "This table's bill is still open in Sales: charge it, move it to another table or delete it
@@ -638,7 +645,8 @@ Steps:
 4. "Details" shows zone, server, status, guests, opening, closing, time, charged and notes.
 In: the table checks and what was charged in Sales.
 Out: nothing.
-If it fails: the table's error with retry. Refunds do not subtract from "Charged".
+If it fails: if the list does not load, a notice shows with "Retry". Refunds do not subtract from
+"Charged".
 Involved: TABLE-F18, TABLE-F19, TABLE-F23
 
 ### TABLE-F23 Delete a closed check from the history
@@ -663,14 +671,14 @@ Screen: Sessions; also in Sales → Sell, by tapping a table in "Choose table" w
 Steps:
 1. In **Sessions → All**, "Seat again" on a parked check and pick a free table.
 2. The table check goes back to "Open" at that table, with its guests, its server and its opening time,
-   and its Sales check takes the table's title; the table turns Occupied and, if it was Reserved, it
-   spends the booking.
+   and its Sales check takes the table's title; the table turns Occupied and, if it was Reserved, its
+   booking counts as seated.
 In: the parked check and the table.
 Out: the seated table check (announces: `table.session.restored`).
 If it fails: "That check is not parked: it does not exist in this business, or it is already seated at
-a table."; the table has to be free as when seating (TABLE-F10). Seating it again is done with the
-party in front: an automation cannot do it.
-Involved: TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
+a table."; the table has to be free, as when seating a party, and the same notices show. Seating it
+again is done with the party in front: an automation cannot do it.
+Involved: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
 
 ### TABLE-F25 Hold the table of a confirmed booking
 Status: done
@@ -721,26 +729,27 @@ Out: the released hold (announces: `table.table.hold_released`).
 If it fails: if it is asked twice, nothing changes.
 Involved: RESERVATION-F09, RESERVATION-F10, RESERVATION-F20, TABLE-F25
 
-### TABLE-F28 Spend the hold when the booking is seated
+### TABLE-F28 Seat the party of a booking
 Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
 1. The booking's party arrives: the table is Reserved. Tap it; the guests question comes with the
-   booking's. Tap "Seat N" (TABLE-F10).
-2. The table turns Occupied and its hold is spent. Transferring or splitting a check to that table, or
-   seating a parked one there again, also spends it.
+   booking's. Tap "Seat N", as when seating any party.
+2. The table turns Occupied and the booking counts as seated: the table no longer shows Reserved for
+   it. Transferring or splitting a check to that table, or seating a parked one there again, also
+   counts it as seated.
 3. Seating another party at that table hours before the booking (the table still Available) does
-   **not** spend the evening's booking.
-4. When seating from Reservations ("Seat" on the booking, RESERVATION-F11) only that booking's hold is
-   spent: with Ana at 19:00 and Bea at 21:00 at table 5, seating Ana at 20:10 leaves Bea's alive, and
-   when Ana leaves the table shows Reserved for Bea again. If Reservations seats a party more than an
-   hour before its booking (its hold does not paint the table yet), it releases that hold when seating
-   it: the table does not show Reserved again for whoever already sat down. From the plan it is not
-   known which booking the party belongs to, and all those that already painted it Reserved are spent.
-In: the Reserved table (and, from Reservations, the booking that is seated).
-Out: the holds that painted it Reserved (from Reservations, only its own), spent and without a name.
-If it fails: those of TABLE-F10.
+   **not** count the evening's booking as seated.
+4. When seating from Reservations ("Seat" on the booking), only that booking counts: with Ana at 19:00
+   and Bea at 21:00 at table 5, seating Ana at 20:10 leaves Bea's alive, and when Ana leaves the table
+   shows Reserved for Bea again. If Reservations seats a party more than an hour before its booking, the
+   table does not show Reserved again for whoever already sat down. From the plan it is not known which
+   booking the party belongs to, and all those that already had the table Reserved count as seated.
+In: the Reserved table (and, from Reservations, the booking that is seated, RESERVATION-F11).
+Out: the holds that painted it Reserved (from Reservations, only its own), spent and without a name; a
+hold that did not paint the table yet, released when seating from Reservations.
+If it fails: the same notices as when seating a party at a free or reserved table.
 Involved: RESERVATION-F11, TABLE-F10, TABLE-F25
 
 ### TABLE-F29 Expire the holds that are due
@@ -777,7 +786,7 @@ Involved: TABLE-F09, TABLE-F28
 ### TABLE-F31 Forget the name of a customer whose data are erased (GDPR)
 Status: done
 Actor: system
-Screen: Floor plan
+Screen: none (it is seen on the Floor plan)
 Steps:
 1. In **Customers** the personal data of a card are erased (also of the ones merged into it).
 2. At once, all the table holds of that customer, live or finished, are left without her name, and the
@@ -800,7 +809,7 @@ Steps:
    it go.
 3. The assistant can also seat with a customer: "seat Ana García at table 4, there are 3 of us".
 4. If the card is deleted in Customers, the check stops saying her name; if ERPlora's staff recover it from the
-   separate copy (CUSTOMER-F33), it says it again at once, also on the floor plan and the room that are open.
+   separate copy, it says it again at once, also on the floor plan and the room that are open.
 In: the card, from Customers.
 Out: the check ↔ customer link, which Customers keeps (announces: `customer.order.linked`).
 If it fails: the reason of Customers; the table is seated anyway.
