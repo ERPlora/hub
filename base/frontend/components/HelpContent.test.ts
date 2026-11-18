@@ -62,6 +62,28 @@ describe('HelpContent', () => {
     expect(m.wrapper.get('[data-testid="help-other-screen-content-settings"]').text()).toContain('Configura el comedor.');
   });
 
+  it('shows whole purpose and screen summaries, including lists, without an expander', async () => {
+    const detailed = {
+      ...help,
+      purpose: 'First purpose sentence.\n\nThe whole purpose remains visible.',
+      screens: [
+        { ...help.screens[0], text: 'A paragraph about the floor.\n\nThe colours mean:\n\n- **Verde**, Disponible: libre.' },
+        { ...help.screens[1], text: 'Configura el comedor.\n\nEvery setting summary line remains.' },
+      ],
+    };
+    const m = await setup(detailed);
+    expect(m.wrapper.get('[data-help-section="purpose"]').text()).toContain('The whole purpose remains visible.');
+    const current = m.wrapper.get('[data-testid="help-current-screen"]');
+    expect(current.text()).toContain('The colours mean:');
+    expect(current.text()).toContain('Verde');
+    expect(current.text()).toContain('Disponible: libre.');
+    expect(m.wrapper.find('[data-testid="help-summary-purpose-toggle"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="help-summary-current-toggle"]').exists()).toBe(false);
+
+    await m.wrapper.get('[data-testid="help-other-screen-settings"]').trigger('click');
+    expect(m.wrapper.get('[data-testid="help-other-screen-content-settings"]').text()).toContain('Every setting summary line remains.');
+  });
+
   it('omits the how-to section when the module has no flows', async () => {
     const m = await setup({ ...help, flows: [] });
     expect(m.wrapper.find('[data-help-section="flows"]').exists()).toBe(false);

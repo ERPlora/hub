@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:56c884b92e9f93978d2e451bba1a4927f174057e92c43b6d18e2b6707e7f62f2 -->
+<!-- generated from WORKBOOK.md sha256:31240a81ce8caa066ed65b49a0530b4ea8c6bd1be07125305367f575bce20e4e -->
 
 ## What it is for and who it is for
 
@@ -246,7 +246,7 @@ Over the screen where the action was tried: what is approved, "Who approves it?"
 With the back button: how the API is called, "Download the OpenAPI file" and a section per app with its calls.
 
 ### Assistant
-The panel the "Assistant" sparkles of the top bar open (on a phone, inside "More options"), on the right. On a tablet
+The panel the "Assistant" sparkles of the top bar open (on a phone, inside "⋮", beside "My apps"), on the right. On a tablet
 or a computer it stays beside the screen and pushes it, so they keep working with it open; on a phone it covers it,
 over a dark veil. At the top, "Assistant", "New conversation" once there is one and the "Close" ×. In the middle, the
 conversation: empty, the sparkles, the welcome sentence and the setup's shortcuts; then, the messages, each answer
@@ -430,7 +430,7 @@ On the Employees screens and the API documentation:
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
-| BASE-F115 | See the help of a module's screen | done |
+| BASE-F115 | See the help of a module's screen | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2333,8 +2333,8 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles go in "More options", so the title stays centred; the bell and help stay
-     visible in the bar. In the menu, "Assistant" opens the panel as soon as the menu has finished closing, so what
+     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title stays centred, and
+     the bell stays in sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what
      they type straight away goes to the chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
@@ -3210,7 +3210,8 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of a module's screen
-Status: done
+Status: partial — the Hub already gives the help of each module whose help is ready, in the person's language; the
+window and its "?" button are missing
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
 Steps:
@@ -3220,12 +3221,9 @@ Steps:
      opens by itself.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
      is asked of YouTube until it is tapped, and it plays inside the window.
-  4. Below, "What it is for" and "On this screen", with what the tab the person is on shows, marked "You are here".
-     When opened, each shows its first paragraph, at most about four lines; if there is more, "Show more" expands it
-     and "Show less" folds it again. Then "How to", with each finished task done in that module, folded, with its
-     steps and what happens if it fails; and "Other screens of this module", folded. With more than eight tasks,
-     "Search tasks…" filters their titles and steps without regard to accents; if none match, it says so and "Clear
-     search" shows them again. Only one task is open at a time.
+  4. Below, "What it is for"; "On this screen", with a short summary of what the tab the person is on shows, open and
+     marked "You are here"; "How to", with each finished task done in that module, folded, with its steps and what
+     happens if it fails; and "Other screens of this module", folded, each with its short summary.
   5. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: about
      the last task opened or, if none was opened, about the module and the screen. "Close" closes the help.
 In: the module and the tab the person is on.

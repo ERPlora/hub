@@ -1260,13 +1260,10 @@
       "retry": "Retry",
       "ask": "Ask the assistant",
       "close": "Close",
-      "more": "Show more",
-      "less": "Show less",
       "flowQuestion": "How do I do this: {title}?",
       "screenQuestion": "How do I use {app} on {screen}?"
     },
     "assistant": {
-      "more": "More options",
       "empty": "Ask me about your sales, your stock or anything about your business.",
       "setupIntro": "Review your business's setup. Choose an option or write your question.",
       "shortcuts": {

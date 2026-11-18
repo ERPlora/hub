@@ -7,7 +7,6 @@ import type { AppHelp, HelpScreen } from '../operations-help';
 import { useBaseI18n } from '../lib/i18n';
 import HelpFlowList from './HelpFlowList.vue';
 import HelpMarkdown from './HelpMarkdown.vue';
-import HelpSummary from './HelpSummary.vue';
 
 const props = defineProps<{ help: AppHelp; current?: HelpScreen; icon: string }>();
 const emit = defineEmits<{ expand: [title: string]; go: [path: string] }>();
@@ -40,8 +39,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
       <h3 class="help-section__title">
         {{ t('base.help.purpose') }}
       </h3>
-      <HelpSummary
-        name="purpose"
+      <HelpMarkdown
         :text="help.purpose"
         @go="emit('go', $event)"
       />
@@ -64,8 +62,7 @@ const otherScreens = computed(() => props.help.screens.filter((screen) => screen
             {{ t('base.help.here') }}
           </span>
         </div>
-        <HelpSummary
-          name="current"
+        <HelpMarkdown
           :text="current.text"
           @go="emit('go', $event)"
         />

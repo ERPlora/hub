@@ -1,15 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 
-import { accessibleName, flush, memoryStorage, mountBase, OWNER } from '../__tests__/mount-base';
+import { flush, memoryStorage, mountBase } from '../__tests__/mount-base';
 import BackgroundChrome from './BackgroundChrome.vue';
 import TopbarChrome from './TopbarChrome.vue';
-
-vi.mock('@ionic/vue', async (importOriginal) => {
-  const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonPopover: IonModalStub };
-});
 
 beforeEach(() => {
   installAssistant(createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined }));
@@ -36,7 +31,6 @@ describe('the chrome of base', () => {
   it('the topbar: the assistant and no bell of its own, nor a live query of the bell', async () => {
     const m = await mountBase(TopbarChrome);
     expect(m.wrapper.find('[data-testid="assistant-button"]').exists()).toBe(true);
-    expect(m.wrapper.find('[data-testid="topbar-chrome-more"]').exists()).toBe(false);
     expect(m.client.stream.subscriptions('base.bell.counters')).toEqual([]);
   });
 
@@ -70,54 +64,5 @@ describe('the chrome of base', () => {
     const m = await mountBase(BackgroundChrome);
     await m.live();
     expect(m.client.stream.subscriptions('base.app.list').map((sub) => sub.params)).toEqual([{}]);
-  });
-});
-
-describe('the topbar on a phone (under 768 px): «More options» holds the assistant', () => {
-  const inDoc = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-
-  beforeEach(() => {
-    vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query === '(max-width: 767px)', addEventListener() {}, removeEventListener() {},
-    }));
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('folds the sparkles into one button with no count: the bell stays in the bar, the shell’s', async () => {
-    const m = await mountBase(TopbarChrome, { locale: 'es' });
-    expect(m.wrapper.find('[data-testid="assistant-button"]').exists()).toBe(false);
-    const more = m.wrapper.get('[data-testid="topbar-chrome-more"]');
-    expect(accessibleName(more.element)).toBe('Más opciones');
-    expect(more.find('ion-badge').exists()).toBe(false);
-    expect(m.client.stream.subscriptions('base.bell.counters')).toEqual([]);
-  });
-
-  it('«Assistant» opens the panel and closes the menu', async () => {
-    const m = await mountBase(TopbarChrome);
-    await m.wrapper.get('[data-testid="topbar-chrome-more"]').trigger('click');
-    await flush();
-    expect(inDoc('topbar-chrome-more-assistant')?.textContent?.trim()).toBe('Assistant');
-    inDoc('topbar-chrome-more-assistant')!.click();
-    await flush();
-    expect(useAssistant().state.open).toBe(true);
-    expect(inDoc('topbar-chrome-more-assistant')).toBeNull();
-  });
-
-  it('«More options» has only the assistant, and no «erplora.com» (it is at the side menu’s foot)', async () => {
-    embedHome(MANAGE);
-    const m = await mountBase(TopbarChrome, { locale: 'es' });
-    await m.wrapper.get('[data-testid="topbar-chrome-more"]').trigger('click');
-    await flush();
-    const rows = [...document.querySelectorAll('[data-testid^="topbar-chrome-more-"]')].filter((row) => row.tagName === 'ION-ITEM');
-    expect(rows.map((row) => row.getAttribute('data-testid'))).toEqual(['topbar-chrome-more-assistant']);
-    expect(document.querySelector(`[href="${MANAGE}"]`)).toBeNull();
-  });
-
-  it('without the assistant there is nothing to fold: no «More options»', async () => {
-    const m = await mountBase(TopbarChrome, { session: { ...OWNER, permissions: [] } });
-    expect(m.wrapper.find('[data-testid="topbar-chrome-more"]').exists()).toBe(false);
   });
 });

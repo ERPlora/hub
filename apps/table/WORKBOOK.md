@@ -94,6 +94,19 @@ El menú **Mesas** tiene cinco pestañas: **Plano de sala**, **Zonas**, **Mesas*
 que el perfil no puede usar no salen.
 
 ### Plano de sala
+Aquí ves de un vistazo cómo está la sala: cada mesa en su sitio, con su color y, si está ocupada, el
+tiempo que lleva el grupo sentado. En **Servicio** tocas una mesa para sentar a un grupo, cobrar, pasar
+la cuenta a otra mesa o juntarla con otra; en **Editar plano** colocas las mesas arrastrándolas y añades
+zonas y mesas.
+
+El color de cada mesa dice cómo está:
+
+- **Verde**, Disponible: está libre y se puede sentar.
+- **Rellena del color principal** (azul de serie), Ocupada: hay un grupo sentado con su cuenta abierta.
+- **Amarilla**, Reservada: su reserva empieza dentro de una hora o ya ha empezado.
+- **Gris a rayas**, Bloqueada: está fuera de servicio y no se puede sentar.
+
+#### Detalle
 Menú **Mesas → Plano de sala**. Arriba, la tira de zonas (se desliza de lado en el móvil y se difumina
 por el borde cuando hay más zonas), el conmutador **Servicio / Editar plano** (solo a quien puede dibujar
 el plano) y, en «Editar plano», un «+» («Añadir zona o mesa») y un lápiz («Editar zona»). Cada pestaña
@@ -145,9 +158,9 @@ sienta, cobra, mueve o edita una mesa. Tiene dos modos:
     valen.
 - **Editar plano**: se arrastra cada mesa a su sitio (también con el teclado: cada flecha la mueve un
   poco y, con Mayúsculas, cuatro veces más) y se guarda al soltar. Tocar una mesa abre **Editar mesa**
-  (Número, Aforo, Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa; pie con «Borrar» y
-  «Guardar»); el «+» abre **Añadir** (campo Zona y «Añadir zona»; campo «Número de mesa», que si se
-  deja vacío «Se numera sola», y «Añadir mesa»); el lápiz abre **Editar zona** (Nombre, Descripción
+  (Número, Aforo, Ancho, Alto, Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa;
+  pie con «Borrar» y «Guardar»); el «+» abre **Añadir** (campo Zona y «Añadir zona»; campo «Número de
+  mesa», que si se deja vacío «Se numera sola», y «Añadir mesa»); el lápiz abre **Editar zona** (Nombre, Descripción
   (opcional); «Borrar zona» y «Guardar»). Debajo, la ayuda «Arrastra para colocar · clic en una mesa
   para editarla o borrarla. Los cambios se guardan al momento.». En «Editar plano» se ven también las
   mesas y zonas desactivadas, en gris.
@@ -155,6 +168,12 @@ sienta, cobra, mueve o edita una mesa. Tiene dos modos:
 Las ventanas tapan toda la pantalla en el móvil y van centradas en tableta y ordenador.
 
 ### Zonas
+Aquí creas y ordenas las zonas del local, como la sala, la terraza o la barra, cada una con su color.
+Las zonas son las pestañas que salen arriba en el **Plano de sala**, y aquí ves cuántas mesas tiene cada
+una y cuántas están libres ahora. Con el «+» añades una zona y, desde su fila, cambias su nombre, su
+color o su orden.
+
+#### Detalle
 Menú **Mesas → Zonas**. Tabla: Nombre (con su color), Mesas, Libres («libres / total»), Orden,
 Estado (Activa, Inactiva); buscador «Buscar zona…», filtros por columna tras el embudo, vista tabla o
 tarjetas. El «+» (solo a quien puede crear zonas) abre el panel con Nombre, Descripción, Color (Azul,
@@ -163,13 +182,24 @@ el interruptor «Activa» y «Guardar cambios») y «Borrar» (solo el administr
 en «¿Borrar la zona?» y deja «Borrar zona» apagado si la zona tiene mesas.
 
 ### Mesas
+Aquí tienes todas las mesas del local en una lista, con su número, su zona, su aforo y su estado. Sirve
+para buscar una mesa, añadir mesas nuevas con el «+» o cambiar sus datos con **Editar** sin pasar por el
+plano. Una mesa nueva aparece en el primer hueco libre de su zona; para llevarla a su sitio, usa
+**Editar plano** en el **Plano de sala**.
+
+#### Detalle
 Menú **Mesas → Mesas**. Tabla en orden natural (la 2 antes que la 10): Número, Nombre, Zona, Aforo,
 Estado; buscador «Buscar mesa…» (número y nombre), filtros por columna tras el embudo (zona, estado,
-forma, aforo), vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Zona y «Añadir mesa».
-Por fila, «Editar» (Número, Nombre, Aforo, Forma, Zona, Estado y Activa) y «Borrar» (solo el
-administrador, con confirmación).
+forma, aforo), vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Ancho, Alto, Zona y
+«Añadir mesa». Por fila, «Editar» (Número, Nombre, Aforo, Ancho, Alto, Forma, Zona, Estado y Activa) y
+«Borrar» (solo el administrador, con confirmación).
 
 ### Sesiones
+Aquí ves las cuentas de la sala, las abiertas y las ya cerradas, con su mesa, quién atiende, los
+comensales y el tiempo que llevan. Desde cada fila miras el **Detalle** de una cuenta, cierras una que se
+quedó abierta o, con **Volver a sentar**, llevas a una mesa libre una cuenta que se quedó sin mesa.
+
+#### Detalle
 Menú **Mesas → Sesiones**: las cuentas de la sala. Pestañas «Abiertas», «Cerradas» y «Todas». Tabla:
 Mesa («Sin mesa (aparcada)» si no tiene), Cobrado y Cierre (no salen en Abiertas), Zona, Camarero,
 Comensales, Apertura, Tiempo, Estado (Abierta, Cerrada, Trasladada, Fusionada, Aparcada); el tiempo de
@@ -181,6 +211,12 @@ horas van en la hora del negocio. Lo cobrado va en la moneda en que se cobró: l
 país, con sus decimales), nunca en euros si el negocio cobra en otra.
 
 ### Ajustes
+Aquí decides cómo trabaja la sala: si al sentar una mesa se preguntan los comensales y a los cuántos
+minutos el tiempo de una mesa ocupada se pone ámbar y, después, rojo. Si no se preguntan, la mesa se
+sienta con su aforo. Cambia lo que necesites y pulsa **Guardar**: vale para todo el negocio, en todos
+los aparatos.
+
+#### Detalle
 Menú **Mesas → Ajustes**: «Preguntar los comensales al sentar una mesa», «Aviso ámbar (minutos)» y
 «Aviso rojo (minutos)», y «Guardar». Solo la ve quien puede cambiarlos (de fábrica, el propietario y el
 administrador).
@@ -273,9 +309,10 @@ Pasos:
    con el primer número libre de esa zona.
 4. Pulsa «Añadir mesa» (apagado mientras no haya ninguna zona).
 5. La mesa aparece en la zona, en el primer hueco libre, cuadrada, para 4 y Disponible.
-6. Otra forma: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
-   primer hueco libre de su zona.
-Entra: número (o ninguno), y en la lista también aforo y zona.
+6. Otra forma: en **Mesas → Mesas**, «+» con Número, Aforo, Ancho y Alto (vacíos, «Estándar»: la mesa
+   de siempre, 72 × 72) y Zona y «Añadir mesa»; también nace en el primer hueco libre de su zona, del
+   tamaño que tenga.
+Entra: número (o ninguno), y en la lista también aforo, ancho, alto y zona.
 Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa» del TPV deja de decir
 «Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`), y «Tus mesas» queda
 «Hecho» en el Inicio sin recargar. Una mesa ocupada o bloqueada sigue contando; si se apagan o se borran
@@ -308,18 +345,21 @@ Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
 Pasos:
 1. En **Editar plano**, toca la mesa (o en **Mesas**, «Editar» en su fila): se abre «Editar mesa».
-2. Cambia Número, Aforo, Nombre (opcional), Forma (Cuadrada, Redonda, Rectangular), Estado
-   (Disponible o Bloqueada), Zona o Activa.
+2. Cambia Número, Aforo, Ancho y Alto (el tamaño de su caja en el plano, de 24 a 10000; la mesa de
+   siempre mide 72 × 72: una larga para ocho, 160 × 72), Nombre (opcional), Forma (Cuadrada, Redonda,
+   Rectangular), Estado (Disponible o Bloqueada), Zona o Activa.
 3. Pulsa «Guardar»: la ventana se cierra y el plano cambia solo (si cambió de zona, aparece en la otra
-   pestaña en el mismo sitio).
+   pestaña en el mismo sitio; con otro tamaño, se pinta en su sitio con su caja nueva).
 4. Para quitarla, pulsa «Borrar» (solo el administrador) y confírmalo: desaparece del plano y de la
    lista; su historia de cuentas se conserva.
 Entra: la mesa elegida.
 Sale: la mesa cambiada (avisa: `table.table.updated`) o borrada (avisa: `table.table.deleted`).
 Si falla: dentro de la ventana: «El número de mesa es obligatorio», «Ya hay una mesa con ese número
-en esta zona.», «Esa mesa no existe en este negocio.», cada motivo bajo su campo hasta que se corrige
-ese campo; borrar una mesa con cuenta abierta: «Esa mesa tiene una cuenta abierta. Ciérrala o
-trasládala antes de borrar la mesa.».
+en esta zona.», «Esa mesa no existe en este negocio.», un ancho o un alto fuera de 24 a 10000 («Debe
+ser mayor o igual que 24.», «Debe ser menor o igual que 10000.») o con decimales («Introduce un número
+entero.»), y entonces no se guarda nada; cada motivo bajo su campo hasta que se corrige ese campo;
+borrar una mesa con cuenta abierta: «Esa mesa tiene una cuenta abierta. Ciérrala o trasládala antes de
+borrar la mesa.».
 Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Sacar una mesa del servicio (bloquearla) y devolverla

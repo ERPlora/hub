@@ -2,7 +2,7 @@
 // the rest of base's (`operations.d.ts`); keep it in step with base/schemas/app_help.py and
 // `frontend/generated/operations.json`. Every text is markdown for the assistant's markdown tree.
 
-/** `base.HelpScreenOut`: one tab of the module (its menu entry) and its section of the WORKBOOK. */
+/** `base.HelpScreenOut`: one tab of the module (its menu entry); `text`, the summary of its WORKBOOK section. */
 export interface HelpScreen {
   id: string;
   title: string;

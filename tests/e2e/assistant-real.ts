@@ -8,8 +8,9 @@ import { execFileSync } from 'node:child_process';
 import { expect, type Locator, type Page, type Response } from '@playwright/test';
 
 import { cleanupCommand, type Meta, observe, redact, seedCommand } from './assistant-battery';
-import { A, compactBar, HUB_DIR, REPO_DIR, shown } from './helpers';
+import { A, HUB_DIR, REPO_DIR } from './helpers';
 import { STACK } from './stack';
+import { openAssistant } from './topbar';
 
 /** The checkout of the stack's SaaS (`E2E_SAAS_DIR`). */
 export const SAAS_DIR = process.env.E2E_SAAS_DIR ?? '';
@@ -88,19 +89,11 @@ export const answers = (page: Page): Locator => panel(page).locator('[data-testi
 export const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
 export const send = (page: Page): Locator => panel(page).locator('[data-testid="assistant-send"]');
 export const foot = (page: Page): Locator => panel(page).locator('[data-testid="assistant-usage"]');
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
 
 /** The Hub's home with the assistant's panel open and its box ready. */
 export async function openPanel(page: Page): Promise<void> {
   await page.goto(`${A}/`);
-  await expect(opener(page)).toBeVisible();
-  // The panel stays open across a reload (its state is the tab's): the sparkles would close it.
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
+  await openAssistant(page);
   await expect(box(page)).toBeVisible();
 }
 

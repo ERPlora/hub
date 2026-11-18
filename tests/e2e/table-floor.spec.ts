@@ -1,6 +1,6 @@
 // Tables in Chrome (apps/table/WORKBOOK.md), with the real Sales, Inventory and Customers apps: the owner
 // draws a zone and its tables on the floor plan (Edit plan: «+», a drag that stays after a reload, «Edit
-// table»), serves it (Service: seats a party, transfers it, merges two tables, charges in Sales — the plan
+// table», a long table by its width and height), serves it (Service: seats a party, transfers it, merges two tables, charges in Sales — the plan
 // frees the table by itself, live — and closes an empty table), and reads the checks in Sessions, the
 // zones in Zones and the tables in Tables. Every screen in three viewports. What a run creates lives in a
 // zone named «E2E Tbl <stamp>…» and its checks; `afterAll` removes all of it, sales included.
@@ -15,6 +15,7 @@ const STAMP = Date.now().toString(36).toUpperCase();
 const ZONE = `E2E Tbl ${STAMP} Terrace`;
 const HALL = `E2E Tbl ${STAMP} Hall`;
 const PATIO = `E2E Tbl ${STAMP} Patio`;
+const LONG = `E2E Tbl ${STAMP} Long`;
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1194 },
@@ -143,6 +144,48 @@ test('Draw the room: a zone and its tables on the plan, a drag that stays, «Edi
     await shots(page, 'table-floor-edit', async () => {
       await expect(tile(page, two.id)).toBeVisible();
     });
+  } finally {
+    await context.close();
+  }
+});
+
+test('A long table: «Edit table» takes its width and height, and the plan paints its box as long as it is', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/table/floor-plan');
+  try {
+    const zone = await post<{ id: string }>(context, '/table/zones', { name: LONG });
+    const table = await post<{ id: string }>(context, '/table/tables', { zone_id: zone.id, number: '8', capacity: 8 });
+    const detail = async () => (await api<TableRow & { width: number; height: number }>(context, A, 'GET', `/table/tables/detail?id=${table.id}`)).data;
+    const ratio = async () => {
+      const box = await tile(page, table.id).boundingBox();
+      if (!box) throw new Error('table 8 has no box');
+      return box.width / box.height;
+    };
+    const view = shown(page);
+    await view.locator('[data-testid=table-floor-mode-edit]').click();
+    await view.locator(`[data-testid=table-floor-zone-tab-${zone.id}]`).click();
+    expect(await ratio()).toBeCloseTo(1, 1);
+
+    await tile(page, table.id).click();
+    const form = page.locator('ion-modal[data-testid=table-form]');
+    await expect(form.locator('[data-testid=table-form-width] input')).toHaveValue('72');
+    await form.locator('[data-testid=table-form-shape]').click();
+    await page.locator('ion-popover').getByText('Rectangular', { exact: true }).click();
+    // A side the server does not take is said under it, and nothing is saved.
+    await form.locator('[data-testid=table-form-width] input').fill('10');
+    await form.locator('[data-testid=table-form-submit]').click();
+    await expect(form.locator('[data-testid=table-form-width] .error-text')).toHaveText('Ensure this value is greater than or equal to 24.');
+    expect(await detail()).toMatchObject({ width: 72, height: 72, shape: 'square' });
+
+    await form.locator('[data-testid=table-form-width] input').fill('160');
+    await shots(page, 'table-form-size', async () => {
+      await expect(form.locator('[data-testid=table-form-height] input')).toHaveValue('72');
+    });
+    await form.locator('[data-testid=table-form-submit]').click();
+    await expect(form).toBeHidden();
+    expect(await detail()).toMatchObject({ width: 160, height: 72, shape: 'rectangle' });
+    await expect(tile(page, table.id)).toHaveClass(/table-tile--rectangle/);
+    await expect.poll(ratio).toBeGreaterThan(2.1);
+    expect(await ratio()).toBeCloseTo(160 / 72, 1);
   } finally {
     await context.close();
   }

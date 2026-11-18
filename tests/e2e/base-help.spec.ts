@@ -2,7 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, settled, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, capture, horizontalOverflow, settled, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
 
 const SIZES = [
   { label: '390', width: 390, height: 844 },
@@ -22,7 +22,6 @@ const assistantTurns: string[] = [];
 const modal = () => page.locator('ion-modal[data-testid="help-window"]').last();
 const content = () => page.locator('[data-testid="help-content"]');
 const search = () => page.getByTestId('help-flow-search');
-const flowHeading = () => page.locator('[data-help-section="flows"] > h3');
 
 async function snap(name: string): Promise<void> {
   const png = await capture(page, name);
@@ -45,6 +44,28 @@ async function openHelp(): Promise<void> {
 async function closeHelp(): Promise<void> {
   await page.getByTestId('help-close').click();
   await expect(modal()).toBeHidden();
+}
+
+async function checkSummaryLayout(): Promise<void> {
+  const current = page.getByTestId('help-current-screen');
+  const list = current.locator('ul').first();
+  await expect(list).toBeVisible();
+  const layout = await list.evaluate((element) => {
+    const previous = element.previousElementSibling;
+    const style = getComputedStyle(element);
+    const body = element.closest('ion-modal')?.querySelector('.ep-form-modal__body');
+    return {
+      indent: Number.parseFloat(style.paddingInlineStart),
+      marker: style.listStyleType,
+      gap: previous ? element.getBoundingClientRect().top - previous.getBoundingClientRect().bottom : 0,
+      overflow: body ? body.scrollWidth - body.clientWidth : 0,
+    };
+  });
+  expect(layout.indent).toBeGreaterThanOrEqual(20);
+  expect(layout.marker).toBe('disc');
+  expect(layout.gap).toBeGreaterThanOrEqual(4);
+  expect(layout.overflow).toBeLessThanOrEqual(0);
+  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
 }
 
 async function atTables(): Promise<void> {
@@ -87,12 +108,13 @@ test.afterAll(async () => {
   }
 });
 
-test('Spanish progressive disclosure and every capture at three sizes in light and dark', async () => {
+test('Spanish whole summaries and every capture at three sizes in light and dark', async () => {
   await openHelp();
   await expect(page.getByTestId('help-current-screen')).toContainText('En esta pantalla · Plano de sala');
   await expect(page.getByTestId('help-current-screen')).toContainText('Estás aquí');
-  await expect(page.getByTestId('help-summary-purpose-toggle')).toHaveText('Ver más');
-  await expect(page.getByTestId('help-summary-current-toggle')).toHaveText('Ver más');
+  await expect(page.getByTestId('help-current-screen')).toContainText('El color de cada mesa dice cómo está:');
+  await expect(page.getByTestId('help-current-screen')).toContainText('Disponible');
+  await expect(page.getByText('Ver más', { exact: true })).toHaveCount(0);
   await expect(page.locator('[data-help-section="video"]')).toHaveCount(0);
   await expect(content()).toHaveAttribute('lang', 'es');
 
@@ -103,14 +125,8 @@ test('Spanish progressive disclosure and every capture at three sizes in light a
       await page.setViewportSize({ width: size.width, height: size.height });
       await theme(dark);
       await openHelp();
+      await checkSummaryLayout();
       await snap(`help-window-${size.label}-${mode}-open`);
-
-      if (size.width >= 834) {
-        await expect(page.locator('[data-help-section="purpose"]')).toBeInViewport();
-        await expect(page.getByTestId('help-current-screen')).toBeInViewport();
-        await expect(flowHeading()).toBeInViewport();
-        await expect(search()).toBeInViewport();
-      }
 
       await search().scrollIntoViewIfNeeded();
       const first = page.locator('.help-flow-header').first();
@@ -135,8 +151,8 @@ test('Spanish progressive disclosure and every capture at three sizes in light a
     await theme(dark);
     await expect(page.getByTestId('help-button')).toBeVisible();
     await expect(page.getByTestId('action-bell')).toBeVisible();
-    await expect(page.getByTestId('topbar-chrome-more')).toBeVisible();
-    await expect(page.getByTestId('assistant-button')).toHaveCount(0);
+    await expect(page.getByTestId('topbar-more')).toBeVisible();
+    await expect(page.getByTestId('assistant-button')).toBeHidden();
     await expect(page.locator('ion-header.app-topbar ion-title').last()).toBeVisible();
     await snap(`help-phone-header-390-${mode}`);
   }
