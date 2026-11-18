@@ -205,16 +205,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
     )
     _save(product)
     _link(product, categories)
-    record_event(
-        ctx,
-        events.PRODUCT_CREATED,
-        {
-            "id": str(product.id),
-            "sku": product.sku,
-            "name": product.name,
-            "category_ids": sorted(str(category.id) for category in categories),
-        },
-    )
+    record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, categories))
     for category in sorted(categories, key=lambda category: category.id):
         _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category.id)
     if data.initial_stock:
@@ -295,9 +286,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
         stock = outcome.pop("stock")
         product = Product(**outcome, created_by=_actor(ctx), updated_by=_actor(ctx))
         _save(product)
-        record_event(
-            ctx, events.PRODUCT_CREATED, {"id": str(product.id), "sku": product.sku, "name": product.name, "category_ids": []}
-        )
+        record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, []))
         if stock:
             _move(ctx, product, StockMovement.Type.INITIAL, stock)
         report.append(_row(row.line, sku, "created", id=product.id))
@@ -1325,6 +1314,15 @@ def _link(product: Product, categories: list[Category]) -> None:
 
 def _record_link(ctx: OperationContext, name: str, product_id: UUID, category_id: UUID) -> None:
     record_event(ctx, name, {"product_id": str(product_id), "category_id": str(category_id)})
+
+
+def _created_payload(product: Product, categories: list[Category]) -> dict:
+    return {
+        "id": str(product.id),
+        "sku": product.sku,
+        "name": product.name,
+        "category_ids": sorted(str(category.id) for category in categories),
+    }
 
 
 def _product_payload(product: Product) -> dict:

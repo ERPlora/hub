@@ -126,6 +126,7 @@ Quantity = Annotated[Decimal, Field(max_digits=15, decimal_places=3)]
 Said = _text(200, 1)
 #: A raw CSV cell, as typed in the file.
 Cell = _text(500)
+ProductSearch = Annotated[str | None, Field(max_length=200, description="Part of the name or the SKU.")]
 
 # The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
@@ -249,9 +250,7 @@ class _ProductLineRef(Schema):
 class ProductFiltersIn(Schema):
     """The product list's search, filters and order; the export takes the same."""
 
-    search: str | None = Field(
-        None, max_length=200, description="Part of the name or the SKU."
-    )
+    search: ProductSearch = None
     name: str | None = Field(None, max_length=200, description="Part of the name.")
     sku: str | None = Field(None, max_length=64, description="Part of the SKU.")
     price_min: Cents | None = Field(None, description="Lowest price, in cents.")
@@ -297,9 +296,7 @@ class ProductListIn(PageIn, ProductFiltersIn):
 
 
 class LowStockListIn(PageIn):
-    search: str | None = Field(
-        None, max_length=200, description="Part of the name or the SKU."
-    )
+    search: ProductSearch = None
     sku: str | None = Field(None, max_length=64, description="This exact SKU.")
     stock_min: Quantity | None = Field(None, description="Lowest stock.")
     stock_max: Quantity | None = Field(None, description="Highest stock.")
@@ -310,9 +307,7 @@ class LowStockListIn(PageIn):
 
 
 class ForSaleListIn(PageIn):
-    search: str | None = Field(
-        None, max_length=200, description="Part of the name or the SKU."
-    )
+    search: ProductSearch = None
 
 
 class ProductCategoryListIn(PageIn):
