@@ -82,10 +82,10 @@ class VerifactuConfig(LiveAppConfig):
     # (VERIFACTU-F08), whatever the plan. Its level is base's: functional in testing, which files without it while the
     # till sells; ⛔ legal where the hub files in production, which refuses every sale without it
     # (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). Only a business in Spain is asked: outside it
-    # VeriFactu seals and sends nothing (``queries.outside_spain``), and a hub without a country (a demo, ERPlora's own)
-    # is in Spain, base's reading (``base.business.country_or_market``). Each panel is refreshed by the events live.py
-    # re-runs it on; the latest events are a component of the app, which names each event's type in the reader's
-    # language. Registered icons only: `stats-chart-outline` waits in UI-REQUESTS.md.
+    # VeriFactu seals and sends nothing (``queries.country.outside_spain``), and a hub without a country (a demo,
+    # ERPlora's own) is in Spain, base's reading (``base.business.country_or_market``). Each panel is refreshed by
+    # the events live.py re-runs it on; the latest events are a component of the app, which names each event's
+    # type in the reader's language. Registered icons only: `stats-chart-outline` waits in UI-REQUESTS.md.
     setup = [
         SetupStep(
             key="sending_route",
@@ -165,37 +165,37 @@ class VerifactuConfig(LiveAppConfig):
 
     def can_enable(self, ctx) -> str | None:
         """VERIFACTU-F01: the platform's ``base.app.enable`` asks before turning the app on: only in Spain, with the
-        reason (``queries.enable_refusal``)."""
+        reason (``queries.app_hooks.enable_refusal``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
-        return queries.enable_refusal(ctx)
+        return queries.app_hooks.enable_refusal(ctx)
 
     def can_disable(self, ctx) -> str | None:
         """VERIFACTU-F32: the platform's ``base.app.disable`` asks before turning the app off: in Spain it never goes
-        off once on, with the legal reason (``queries.disable_refusal``); outside Spain it goes off."""
+        off once on, with the legal reason (``queries.app_hooks.disable_refusal``); outside Spain it goes off."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
-        return queries.disable_refusal(ctx)
+        return queries.app_hooks.disable_refusal(ctx)
 
     def fiscal_pending_since(self):
         """The platform's metrics (``base.metrics``) ask, in each database they read, since when the oldest
-        production record not in the AEAT yet waits (``queries.oldest_unsent_at``), or ``None``: its age pages the
-        team after 5 minutes (``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``)."""
+        production record not in the AEAT yet waits (``queries.app_hooks.oldest_unsent_at``), or ``None``: its age
+        pages the team after 5 minutes (``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
-        return queries.oldest_unsent_at()
+        return queries.app_hooks.oldest_unsent_at()
 
     def fiscal_documents_kept(self) -> bool:
         """The platform asks (``base.tenancy.offboarding``) before it drops the database of a business that left:
         its records for the tax authority here are documents nothing archives yet, so the database stays."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
-        return queries.keeps_fiscal_documents()
+        return queries.app_hooks.keeps_fiscal_documents()
 
     def fiscal_record_states(self, conn) -> dict:
         """The platform asks (``base.tenancy.restore``) before it puts a business's database back as it was
         at a moment, in its database and in the copy, through ``conn``, a direct connection to one of them: what each
-        production record says of its life at the AEAT, by id (``queries.record_states``)."""
+        production record says of its life at the AEAT, by id (``queries.app_hooks.record_states``)."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
-        return queries.record_states(conn)
+        return queries.app_hooks.record_states(conn)

@@ -192,7 +192,7 @@ depth = 0
 ignore_imports = [
     "**.tests.** -> **",
     "apps.flow.recipes -> apps.flow.queries",
-    "apps.verifactu.queries -> apps.verifactu.apps",
+    "apps.verifactu.queries.country -> apps.verifactu.apps",
     "base.activation -> base.queries",
     "base.activation -> base.services",
     "base.activation -> base.services.provisioning",

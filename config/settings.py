@@ -382,7 +382,7 @@ FLOW_SECRETS_KEY = config("FLOW_SECRETS_KEY", default="")
 # and the task definition in AWS. Empty: the reviews section asks nothing and shows only what was read before.
 GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it by hand,
-# and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
+# and only the prod deployment honours it (apps.verifactu.queries.route.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
 # Whether a business may take ERPlora's route, ERPlora filing for it with its seal (apps/verifactu/erplora_route.py).
 VERIFACTU_ERPLORA_ROUTE_ENABLED = config("VERIFACTU_ERPLORA_ROUTE_ENABLED", default=True, cast=bool)
