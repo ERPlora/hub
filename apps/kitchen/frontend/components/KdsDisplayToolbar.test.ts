@@ -4,7 +4,7 @@
 // It says what was chosen; the page decides.
 import { describe, expect, it } from 'vitest';
 
-import { click, flush, mountKitchen } from '../__tests__/mount-kitchen';
+import { click, ionValue, mountKitchen, said } from '../__tests__/mount-kitchen';
 import type { StationChipOut } from '../operations';
 import KdsDisplayToolbar from './KdsDisplayToolbar.vue';
 
@@ -16,12 +16,8 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     props: { view: 'tickets', station: '', stations: [], counts: { tickets: 2, ready: 1 }, fullscreenOffered: true, fullscreen: false, ...props },
     locale,
   });
-  const change = async (testid: string, value: string) => {
-    m.find(testid).element.dispatchEvent(new CustomEvent('ionChange', { detail: { value }, bubbles: true }));
-    await flush();
-  };
-  /** The words inside an element (Ionic's segment hosts answer no textContent in happy-dom). */
-  const words = (testid: string) => m.find(testid).element.innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const change = (testid: string, value: string) => ionValue(m.find(testid).element, value);
+  const words = (testid: string) => said(m.find(testid).element);
   return { ...m, change, words, emitted: () => m.wrapper.emitted() };
 }
 

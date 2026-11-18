@@ -11,19 +11,15 @@
 // checks «e2e kbd <run> …» and their tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, collectProblems, psql, shot, shown, untilStill } from './helpers';
+import { A, api, collectProblems, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { capture } from './kitchen-helpers';
 import { cleanSales, stamp } from './sale-helpers';
-import { ownerPage, settled } from './service-helpers';
+import { ownerPage } from './service-helpers';
 
 const RUN = stamp();
 const STATION = `E2E KBD ${RUN} Grill`;
 const CHECK = `e2e kbd ${RUN}`;
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 /** A dish to do: pending, or preparing once its ticket started. */
 const TO_DO = /^(pending|preparing)$/;
 
@@ -114,16 +110,6 @@ function labelCut(target: Locator): Promise<boolean> {
     const own = el.getBoundingClientRect();
     return text.width === 0 || text.left < own.left - 1 || text.right > own.right + 1;
   });
-}
-
-async function capture(page: Page, flow: string, ready: () => Promise<void>): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await ready();
-    await settled(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-${flow}-${size.label}`) });
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
 }
 
 test.beforeAll(async ({ browser }) => {
