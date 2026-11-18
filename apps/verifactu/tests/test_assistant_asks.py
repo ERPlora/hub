@@ -126,7 +126,6 @@ OWN_WORDS = [
     ),
     ("verifactu.diagnostic.run", "¿llegamos bien a la Agencia Tributaria? pruébalo sin remitir nada"),
     ("verifactu.test_invoice.create", "Begoña quiere ver si funciona todo con la prueba de un euro"),
-    ("verifactu.config.update", "a partir de ahora que lo remita ERPlora, la asesora está de acuerdo"),
     ("verifactu.config.go_live", "la asesora dice que ya podemos remitir de verdad a Hacienda"),
     ("verifactu.config.back_to_testing", "vuelve VeriFactu a pruebas hasta que la asesoría dé el visto bueno"),
     ("verifactu.certificate.remove", "la asesora dice que ya no usamos la firma digital que subimos: elimínala"),
@@ -177,12 +176,12 @@ def test_verifactu_is_listed_so_layer_1_sweeps_every_ask_of_it():
     assert "verifactu" in settings.LIVE_ASSISTANT_ASKS_REQUIRED
 
 
-def test_verifactu_offers_its_thirty_one_tools():
-    """VeriFactu's tools are its thirty-one operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails. What
+def test_verifactu_offers_its_thirty_tools():
+    """VeriFactu's tools are its thirty operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails. What
     takes a secret or is the system's is none."""
     tools = verifactu_tools()
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
-    assert len(tools) == 31
+    assert len(tools) == 30
     assert {name for name, _ in REPORTED} <= set(tools)
     assert NOT_TOOLS <= set(registry)  # positive control: they are operations, only not tools
     assert NOT_TOOLS.isdisjoint(tools)
@@ -262,7 +261,6 @@ OWN_WORDS_EN = [
     ("verifactu.config.back_to_testing", "put us in the test environment again until the accountant signs off"),
     ("verifactu.config.get", "which route do we file through, and are we still in testing?"),
     ("verifactu.config.go_live", "we're done testing, start filing for real with the AEAT"),
-    ("verifactu.config.update", "let them do the filing on our behalf"),
     ("verifactu.contingency.list", "anything queued up for the AEAT this morning?"),
     ("verifactu.contingency.process", "send whatever is due in the queue now"),
     ("verifactu.contingency.retry", "that stuck one, push it out sooner on the next round"),

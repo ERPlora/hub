@@ -93,11 +93,17 @@ async function uploadCertificate(): Promise<void> {
   toastSuccess(t('verifactu.config.uploadedToast', { holder: out.own_certificate.holder, taxId: out.own_certificate.holder_tax_id }));
 }
 
+/** What removing the certificate does to the records: in testing they keep going out; live, the fixed route says. */
+const removeMessage = computed(() => {
+  if (config.value?.environment !== 'production') return 'verifactu.config.removeMessage';
+  return config.value.route === 'own' ? 'verifactu.config.removeMessageOwn' : 'verifactu.config.removeMessageSeal';
+});
+
 async function removeCertificate(): Promise<void> {
   problem.value = null;
   const yes = await confirm({
     title: t('verifactu.config.removeTitle'),
-    message: t(config.value?.erplora_route_available ? 'verifactu.config.removeMessage' : 'verifactu.config.removeMessageOwn'),
+    message: t(removeMessage.value),
     confirmLabel: t('verifactu.config.remove'),
     cancelLabel: t('verifactu.cancel'),
     tone: 'danger',
