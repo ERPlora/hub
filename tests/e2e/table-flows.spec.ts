@@ -11,11 +11,8 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A, HUB_DIR } from './stack';
+import { A, api, psql, shot, shown } from './helpers';
+import { HUB_DIR } from './stack';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, openTillCart, stamp } from './sale-helpers';
 import { ownerPage, post, rowAction, settled } from './service-helpers';

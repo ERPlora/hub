@@ -9,11 +9,8 @@
 // What it creates is deleted after the file (`afterAll`).
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown, THREE_SIZES_TALL_TABLET as VIEWPORTS } from './screen';
-import { A } from './stack';
+import { A, api, login, shot, shown } from './helpers';
+import { THREE_SIZES_TALL_TABLET as VIEWPORTS } from './screen';
 import { noHorizontalScroll, rowAction } from './service-helpers';
 import { cleanUp, freshCategory, pickSelect as pick, type Rule, rulesOf } from './tax-helpers';
 import { discardChanges } from './unsaved-back-helpers';

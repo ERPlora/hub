@@ -10,13 +10,10 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { topbarApps } from './topbar';
+import { A, login, psql, shot, shown } from './helpers';
+import { topbarApps } from './saas-login';
 import { FLOW_VIEWPORTS } from './invoice-helpers';
-import { A, STACK } from './stack';
+import { STACK } from './stack';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
 const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';

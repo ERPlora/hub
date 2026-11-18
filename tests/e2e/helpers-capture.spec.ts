@@ -1,7 +1,7 @@
 // flow: hub-e2e-capture — the e2e harness's screenshots
 // A screenshot taken right after `setViewportSize` can come before the browser painted the page at its new size: the
 // area the resize uncovered still holds the top of the page, so the capture repeats the topbar at its bottom. Such a
-// capture is evidence of a screen nobody saw. `repeatedTop` (capture.ts) spots it; `capture` (capture.ts) waits for
+// capture is evidence of a screen nobody saw. `repeatedTop` (detectors.ts) spots it; `capture` (helpers.ts) waits for
 // a painted frame, takes the screenshot again while it repeats the top, and fails saying so if it never stops;
 // `settled` (service-helpers.ts) waits for a painted frame too.
 // A spec that forgets to wait before `capture` could catch an overlay still entering (a toast sliding in), so
@@ -14,12 +14,9 @@ import { readFileSync, rmSync } from 'node:fs';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture, repeatedTop, shot } from './capture';
-import { createItem, listReady, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
+import { repeatedTop } from './detectors';
 import { settled } from './service-helpers';
 import { newestToast, toastAnimationsRunning } from './toast-helpers';
 

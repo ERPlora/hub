@@ -7,11 +7,7 @@
 // the hub had before the file are put back after it (`afterAll`).
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { horizontalOverflow, shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, horizontalOverflow, psql, shown } from './helpers';
 import { setupStep, spanishOwnerOnTheSetupCard as spanishOwner, streamsQuiet as settled } from './home-helpers';
 import { DEFAULT_WEEK, restoreWeek, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 

@@ -1,20 +1,15 @@
 // flow: modifier-e2e-wait — the Modifiers specs' wait
 // Before a capture or a measurement, the Modifiers specs (modifier-*.spec.ts) wait for the screen to stop moving with
-// the harness's one wait, `untilStill` (settled.ts). A wait that asks the document alone for its animations leaves
+// the harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves
 // shadow roots out, and Ionic animates its overlays (`ion-modal`, `ion-popover`) in theirs: a capture could come
 // out with a sheet still sliding in and pass for good. Here the till's options sheet (MODIFIER-F06: tapping a dish
 // with groups opens it) enters at a fifth of its speed (Chrome's own control), and once the Modifiers specs' wait
-// returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, settled.ts), at 390, 834 and
+// returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834 and
 // 1440. What this file creates — the product `E2E-MST-<run>` and the group «E2E Mod Settled … <run>» — is deleted after it.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { capture, repeatedTop } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { exposeMovingInPage, untilStill } from './settled';
-import { A } from './stack';
+import { A, api, capture, exposeMovingInPage, hostPage, psql, shown, untilStill } from './helpers';
+import { repeatedTop } from './detectors';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -73,7 +68,7 @@ test.afterAll(() => {
   restoreDrawer();
 });
 
-/** What moves on the page now, by the detector of settled.ts put in the page (`exposeMovingInPage`). */
+/** What moves on the page now, by the detector of helpers.ts put in the page (`exposeMovingInPage`). */
 async function moving(page: Page): Promise<string[]> {
   await exposeMovingInPage(page);
   return page.evaluate(() => (window as unknown as { __movingInPage: () => string[] }).__movingInPage());

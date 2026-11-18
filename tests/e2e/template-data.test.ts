@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Guardrail: every e2e spec that loads a template into a business (it first empties it of what a template brings,
-// `emptyOfTemplateData` of template-data.ts) leaves it empty again after its tests: `emptyOfTemplateData` in a
+// `emptyOfTemplateData` of business.ts) leaves it empty again after its tests: `emptyOfTemplateData` in a
 // `test.afterAll` or `test.afterEach` of its own, or each load undone in a `finally` (`/settings/data/imports/undo`,
 // as base-apps-born-off.spec.ts does). The business is the one every later spec of the run uses: until hub#529
 // base-data.spec.ts left the template's services, products and categories in `a`, and the specs after it found them

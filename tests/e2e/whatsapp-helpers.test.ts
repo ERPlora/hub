@@ -159,7 +159,7 @@ const byBusinessColumn = (source: string): string[] =>
 describe("the e2e reads the inbox's tables as the Hub keeps them, without the business column", () => {
   it('no spec or helper picks the rows of an inbox table by its business column, which the code leaves empty', () => {
     const picking = helpersAndSpecs().flatMap((name) => byBusinessColumn(readFileSync(join(E2E_DIR, name), 'utf8')).map((line) => `${name}: ${line.trim()}`));
-    expect(picking, "each business has its own database: psql() of psql.ts already runs the statement in `a`'s").toEqual([]);
+    expect(picking, "each business has its own database: psql() of helpers.ts already runs the statement in `a`'s").toEqual([]);
   });
 
   it('the check reads the shapes that picked by it, and the same statements without it as none', () => {

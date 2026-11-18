@@ -5,8 +5,7 @@
 // flow: CART_CHECKOUT-F12
 import { expect, test } from '@playwright/test';
 
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
+import { EMPLOYEE, shown } from './helpers';
 import { cleanUp, code, FLOW_VIEWPORTS, listShown, orderFrom, rowOf, signedIn, snap } from './cart-checkout-helpers';
 
 test.beforeAll(cleanUp);

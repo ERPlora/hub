@@ -6,8 +6,7 @@
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { createSseParser, type SseParser } from '../../packages/ui/src/sdk/sse-parser';
-import { saveSessionForTheSweep, signedInSpanish } from './login';
-import { shown } from './screen';
+import { saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 
 /** A `/api/live` the page opened: when, the operations it carries and the subscriptions the Hub has answered so far. */
 export interface LiveStream {

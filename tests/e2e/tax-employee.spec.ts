@@ -4,12 +4,7 @@
 // The owner's Rules is the positive control: the same hooks are there for who may manage.
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, EMPLOYEE, hostPage, shot, shown } from './helpers';
 
 type Envelope = { error?: { code: string } };
 

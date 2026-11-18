@@ -6,12 +6,7 @@
 //     the form fits as a sheet.
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, EMPLOYEE, hostPage, shot, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, productRow, productsReady, searchProducts, stamp } from './inventory-helpers';
 import { offersRowAction } from './service-helpers';
 

@@ -12,12 +12,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
-import { capture } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { EMPLOYEE, OWNER } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, login, OWNER, shown } from './helpers';
 import { keepVerifactu, putVerifactuBack, revokedIn } from './verifactu-helpers';
 
 const KEY = 'FIX-HUB-HOME-VERIFACTU-LEGAL-LEVEL-IN-PRODUCTION';

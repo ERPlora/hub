@@ -68,7 +68,7 @@ it('checks every .ts of tests/e2e', async () => {
 // The projects walked ahead and the program read ahead, without holding the worker (hub#1315): some 1,500 files, each
 // first open of which waits on its own on a loaded machine. What is left here is TypeScript's own work, the check.
 it('reports a type error planted in a helper and in a spec', async () => {
-  const planted = ['login.ts', 'csp.spec.ts'].map((name) => join(e2eDir, name));
+  const planted = ['helpers.ts', 'csp.spec.ts'].map((name) => join(e2eDir, name));
   const projects = await walkAhead(typecheckProjects);
   const project = projects.find((candidate) => planted.every((file) => checked(candidate).has(file)));
   if (!project) throw new Error('no project of the typecheck script holds tests/e2e/');
@@ -88,7 +88,7 @@ it('reports a type error planted in a helper and in a spec', async () => {
   });
   // TS2322: Type 'string' is not assignable to type 'number'.
   expect(errors).toEqual([
-    ['tests/e2e/login.ts', 2322],
+    ['tests/e2e/helpers.ts', 2322],
     ['tests/e2e/csp.spec.ts', 2322],
   ]);
 }, NO_CLOCK);

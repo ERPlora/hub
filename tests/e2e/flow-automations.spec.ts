@@ -6,11 +6,7 @@
 // What it creates is removed after it by its ids (the task by its unique title).
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { signedIn, VIEWPORTS } from './task-helpers';
 

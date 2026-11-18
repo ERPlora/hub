@@ -7,10 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { manualFlow } from './flow-helpers';
-import { capture } from './capture';
-import { saveSessionForTheSweep, signedInSpanish } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { noHorizontalScroll } from './schedule-helpers';
 
 const KEY = 'ui-122-selection-count';

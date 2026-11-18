@@ -3,8 +3,7 @@
 // creates (named «E2E …»), and the waits of the two screens. A row action is service-helpers.ts's `rowAction`.
 import { expect, type Page } from '@playwright/test';
 
-import { psql } from './psql';
-import { horizontalOverflow, shown } from './screen';
+import { horizontalOverflow, psql, shown } from './helpers';
 
 /** The three sizes of a flow's screenshots: a phone, a tablet and a desk. */
 export const VIEWPORTS = [
@@ -74,5 +73,5 @@ export async function noHorizontalScroll(page: Page, label: string): Promise<voi
     .toBeLessThanOrEqual(0);
 }
 
-/** Waits until nothing moves and the page is painted: settled.ts's, the one every spec takes. */
-export { settled } from './settled';
+/** Waits until nothing moves and the page is painted: helpers.ts's, the one every spec takes. */
+export { settled } from './helpers';

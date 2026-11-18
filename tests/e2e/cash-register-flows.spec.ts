@@ -7,13 +7,7 @@
 // the settings it changes go back as they were.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login, saveSessionForTheSweep } from './login';
-import { psql } from './psql';
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, offersRowAction, rowAction } from './service-helpers';
 import { createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';

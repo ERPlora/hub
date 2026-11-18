@@ -3,12 +3,8 @@
 // same detail open says «This item no longer exists.» by itself, without the item nor its actions.
 import { expect, test } from '@playwright/test';
 
-import { record, shot } from './capture';
-import { createItem, listReady, rowOf, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady, rowOf } from './demo-items';
 import { recordResponses, responseEnd } from './resource-timing';
 
 test('delete asks first; cancel keeps it; confirm removes it here and the other tab says it no longer exists', async ({ context }) => {

@@ -5,12 +5,7 @@
 // three viewports. Each list filters behind its own funnel, named after the list, with its count. Everything it creates is named «E2E …» on dates of 2099 and removed after the file.
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanupExceptions, listsReady, noHorizontalScroll, TAG, VIEWPORTS } from './schedule-helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';

@@ -10,13 +10,7 @@
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { hostPage, login } from './login';
-import { psql } from './psql';
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers';
 import { offersRowAction } from './service-helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';

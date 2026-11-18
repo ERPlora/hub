@@ -16,11 +16,7 @@
 //   - PRICING-F12: «Deactivate» asks first; the rule waits under «Inactive» until «Activate».
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, psql, shot, shown } from './helpers';
 import {
   choose,
   cleanPricing,

@@ -14,11 +14,7 @@
 // list paints a date range in the open row; the row's 8.75rem is guarded by ui's DataTable.visual.test.ts).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { record, shot } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, login, record, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-UI-DATATABLE-DATERANGE-ICON-CLIPS-PLACEHOLDER';
 const TABLE = 'payment-payments';

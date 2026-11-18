@@ -5,10 +5,7 @@
 // declare their tests with `testTheMarksGoOneByOne`, or walk a window of their own with `testEachSameWordsCase`.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { saveSessionForTheSweep, signedInSpanish } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { VIEWPORTS } from './sale-helpers';
 import { ownerPage } from './service-helpers';
 

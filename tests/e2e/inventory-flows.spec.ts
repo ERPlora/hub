@@ -18,11 +18,8 @@ import { execFileSync } from 'node:child_process';
 
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A, HUB_DIR } from './stack';
+import { A, api, login, psql, shown } from './helpers';
+import { HUB_DIR } from './stack';
 import {
   cleanInventory,
   createProduct,

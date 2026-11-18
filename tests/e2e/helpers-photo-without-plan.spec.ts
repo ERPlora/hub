@@ -1,12 +1,12 @@
 // flow: none — the e2e harness (hub#808)
-// `dropPlanFromPhoto` and `restorePhotoFrom` (registration.ts): a spec that signs in from more than one browser runs with no
+// `dropPlanFromPhoto` and `restorePhotoFrom` (business.ts): a spec that signs in from more than one browser runs with no
 // plan in `a`'s photo, whatever the seed left there (erplora.com's Free covers one device, and each entry from another
 // browser would end the others' sessions with a 401), and puts the
 // photo back as it found it at the end. No browser: only the registry's row of `a`.
 import { expect, test } from '@playwright/test';
 
-import { psql } from './psql';
-import { dropPlanFromPhoto, restorePhotoFrom } from './registration';
+import { psql } from './helpers';
+import { dropPlanFromPhoto, restorePhotoFrom } from './business';
 
 /** Where `a`'s photo as the run finds it waits while this spec gives it a plan of its own. */
 const FOUND = 'e2e_backup_photo_without_plan_found';

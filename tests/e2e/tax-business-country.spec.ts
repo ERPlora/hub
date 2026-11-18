@@ -7,11 +7,8 @@
 // `HUB-996-refusal-<width>.png`). What the run makes is deleted after it, and `a` goes back to its own country.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { registerBusinessIn, type Registration, registrationOf } from './registration';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, capture, login, shown } from './helpers';
+import { registerBusinessIn, type Registration, registrationOf } from './business';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeRefused, cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';

@@ -14,11 +14,8 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { DICTATION, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
-import { shot } from './capture';
-import { login } from './login';
-import { THREE_SIZES as VIEWPORTS } from './screen';
-import { untilStill } from './settled';
-import { A, STACK } from './stack';
+import { A, login, shot, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
+import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-BASE-MIC-DENIED-SAYS-BROWSER-INSIDE-THE-APP';
 const DOUBLE_TAP_KEY = 'FIX-HUB-BASE-ASSISTANT-DICTATION-NOT-EXPORTED';

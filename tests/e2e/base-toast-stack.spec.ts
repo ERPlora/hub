@@ -4,11 +4,7 @@
 // beside the screen, the stack is centred on the screen it shares the window with.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { shown, THREE_SIZES } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, capture, login, shown, THREE_SIZES, untilStill } from './helpers';
 import { compactBar } from './topbar';
 import { dismissToasts, toastSaying, toasts } from './toast-helpers';
 

@@ -7,11 +7,10 @@
 // flow: none — the Hub's COOP, which WHATSAPP_INBOX-F01/F02 need
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { topbarApps } from './topbar';
+import { A, login, shot } from './helpers';
+import { topbarApps } from './saas-login';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { A, STACK } from './stack';
+import { STACK } from './stack';
 
 interface Posted {
   origin: string;

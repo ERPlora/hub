@@ -10,9 +10,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { choose, confirmDialog, signedIn } from './flow-helpers';
-import { capture } from './capture';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { photo } from './website-helpers';
 import { cleanUp as cleanUpInbox, e2ePhone, metaGraph, pushChannel, receive, restorePhoto, seedErplora, template } from './whatsapp-helpers';

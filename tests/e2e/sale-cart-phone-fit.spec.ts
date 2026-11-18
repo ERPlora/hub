@@ -15,11 +15,7 @@
 // after it.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { settled, untilStill } from './settled';
-import { A } from './stack';
+import { A, capture, login, settled, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanTill, drawerOff, fingerOn, openTillCart, stamp, tillIn, tillIsPhone } from './sale-helpers';
 

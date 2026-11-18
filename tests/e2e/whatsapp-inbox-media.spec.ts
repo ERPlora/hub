@@ -14,11 +14,8 @@
 // Each screen in three sizes. What it creates is named `e2e.…` and deleted after the file.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { SAAS } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shot, shown } from './helpers';
+import { SAAS } from './saas-login';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, receive, restorePhoto, seedErplora } from './whatsapp-helpers';
 

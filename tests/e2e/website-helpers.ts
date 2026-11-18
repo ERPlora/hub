@@ -1,11 +1,8 @@
 // What the specs of the website editor (website*.spec.ts and the fixes seen in it) share and the rest of the e2e does not.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { registerBusinessIn, type Registration, registrationOf } from './registration';
-import { settled } from './settled';
-import { A } from './stack';
+import { A, api, hostPage, settled } from './helpers';
+import { registerBusinessIn, type Registration, registrationOf } from './business';
 
 /** The site as `GET /website/site` answers it: what a spec puts back after. */
 export interface Site {
@@ -28,7 +25,7 @@ export async function ownerOfTheSite(
 
 /**
  * The page at rest for its capture: no focus ring (the website's own step), then the harness's one wait, `settled`
- * (settled.ts): nothing moving, in the document or in any shadow root (Bootstrap's buttons fade 150 ms, the dev server
+ * (helpers.ts): nothing moving, in the document or in any shadow root (Bootstrap's buttons fade 150 ms, the dev server
  * injects the stylesheets after the first paint, and in the editor Ionic animates its dialogs in theirs and a toast in the document),
  * and the page painted as it is now.
  */

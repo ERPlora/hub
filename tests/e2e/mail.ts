@@ -2,7 +2,7 @@
 // In local the SaaS uses Django's file e-mail backend: one `<timestamp>-<id>.log` per connection in
 // `saas/.mail/`, each message in RFC 822 (headers, a blank line, a quoted-printable body) followed
 // by a line of 79 dashes. The code is the body's line of six digits, alone. No Playwright here: the
-// browser steps live in login-trip.ts.
+// browser steps live in saas-login.ts.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 

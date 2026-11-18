@@ -6,12 +6,10 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { record, shot } from './capture';
-import { createItem, listReady, uniqueName } from './demo-items';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
-import { expectTitleCentred, MY_APPS_DOOR, openApps } from './topbar';
+import { A, login, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
+import { MY_APPS_DOOR } from './saas-login';
+import { expectTitleCentred, openApps } from './topbar';
 
 const VIEWPORTS = {
   phone: { label: '390', width: 390, height: 844 },

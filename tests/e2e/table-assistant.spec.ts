@@ -13,10 +13,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { NOT_DONE } from './assistant-provider';
 import { ask, cardSpec, ownerIn } from './assistant-card-helpers';
 import { card, openPanel, panel } from './assistant-real';
-import { capture } from './capture';
-import { api } from './hub-api';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, capture, untilStill } from './helpers';
 import { cleanRoom } from './sale-helpers';
 
 const KEY = 'FIX-HUB-TABLE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';

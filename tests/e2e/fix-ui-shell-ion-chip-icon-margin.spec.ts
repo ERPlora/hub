@@ -12,13 +12,7 @@
 // flow: ui-shell-ion-chip-icon-margin
 import { expect, type Locator, test } from '@playwright/test';
 
-import { capture, record } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, capture, login, psql, record, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, dialog, productsReady, stamp, VIEWPORTS } from './inventory-helpers';
 
 const KEY = 'FIX-UI-SHELL-ION-CHIP-ICON-MARGIN-WIPED-BY-PREFLIGHT';

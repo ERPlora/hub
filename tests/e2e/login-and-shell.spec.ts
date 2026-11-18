@@ -3,13 +3,10 @@
 // topbar (⠿ apps; Back on a detail only), the empty state.
 import { expect, test } from '@playwright/test';
 
-import { record, shot } from './capture';
-import { clearItems, createItem, listReady, rowNames, rowOf, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { collectProblems } from './page-problems';
-import { iconStates, shown } from './screen';
-import { A } from './stack';
+import { A, api, clearItems, login, record, shot, shown, uniqueName } from './helpers';
+import { createItem, listReady, rowNames, rowOf } from './demo-items';
+import { collectProblems } from './saas-login';
+import { iconStates } from './screen';
 import { openApps } from './topbar';
 
 const ICONIFY_HOSTS = /iconify\.design|simplesvg\.com|unisvg\.com/;

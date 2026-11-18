@@ -7,12 +7,7 @@
 // What this file creates is deleted after it (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture, shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, capture, login, shot, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';

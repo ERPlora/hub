@@ -4,13 +4,9 @@
 // it in this Hub with the same id.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { turnOn } from './apps-on';
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { SAAS } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
+import { api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { turnOn } from './business';
+import { SAAS } from './saas-login';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
 

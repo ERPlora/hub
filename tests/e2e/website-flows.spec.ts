@@ -18,16 +18,10 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { psql } from './psql';
-import { dropPlanFromPhoto, restorePhotoFrom } from './registration';
-import { MAIL_DIR, OWNER, SAAS } from './saas';
-import { horizontalOverflow } from './screen';
-import { settled } from './settled';
-import { A, HUB_DIR } from './stack';
-import { topbarApps } from './topbar';
+import { A, api, capture, horizontalOverflow, hostPage, OWNER, psql, settled } from './helpers';
+import { dropPlanFromPhoto, restorePhotoFrom } from './business';
+import { MAIL_DIR, SAAS, topbarApps } from './saas-login';
+import { HUB_DIR } from './stack';
 import { readMailCode } from './mail';
 import { atRest, openSection, photo } from './website-helpers';
 

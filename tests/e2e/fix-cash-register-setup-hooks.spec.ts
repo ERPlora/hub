@@ -12,14 +12,7 @@
 // open per business), as cash-register-shift.spec.ts does.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { type Credentials, EMPLOYEE } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { boardShown, boardWidget, setupRow, spanishOnTheHome, unfoldedTo } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';

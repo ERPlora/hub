@@ -19,12 +19,7 @@
 // behind them is the Python suite's (`apps/verifactu/tests`). What the run makes is removed after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';

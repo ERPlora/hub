@@ -8,13 +8,7 @@
 // flow: PRINTING-F18
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { hostPage, login } from './login';
-import { psql } from './psql';
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers';
 import { dialog, fill } from './inventory-helpers';
 import { FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';

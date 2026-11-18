@@ -14,11 +14,8 @@
 // Each in three sizes. What it creates is deleted.
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { SAAS } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shot, shown } from './helpers';
+import { SAAS } from './saas-login';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 

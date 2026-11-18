@@ -1,6 +1,6 @@
 // flow: task-e2e-wait — the Tasks specs' wait
 // Before a capture, the Tasks specs (task-*.spec.ts) and their helpers wait with the harness's one wait,
-// `untilStill(page)` (settled.ts), which asks the document and every open shadow root for what moves. A wait that
+// `untilStill(page)` (helpers.ts), which asks the document and every open shadow root for what moves. A wait that
 // counts only Ionic's modals and popovers between their «will» and «did» events lets a toast entering pass for still
 // (`task-settled.spec.ts` shows it with «Task started»), and the capture catches it half in. This keeps such a wait —
 // counting what moves itself, or sleeping a fixed time — out of the Tasks files, and keeps `snap()` on untilStill.
@@ -54,7 +54,7 @@ function captureNames(source: string, sizes: string[]): string[] {
 const offending = (find: (source: string) => string[]): string[] =>
   taskFiles().flatMap((name) => find(read(name)).map((line) => `${name}: ${line.trim()}`));
 
-describe('the Tasks specs wait with untilStill() of settled.ts', () => {
+describe('the Tasks specs wait with untilStill() of helpers.ts', () => {
   it('there are Tasks specs and helpers to look at', () => {
     expect(taskFiles()).toEqual(
       expect.arrayContaining(['task-helpers.ts', 'task-flows.spec.ts', 'task-tasks.spec.ts', 'task-employee.spec.ts', 'task-settled.spec.ts']),

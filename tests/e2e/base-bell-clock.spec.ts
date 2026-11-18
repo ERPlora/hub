@@ -7,12 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { bellSays, bellTotal, closeActionCenter, noticeIn, openActionCenter } from './action-center';
-import { capture } from './capture';
-import { clearItems, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { signedInSpanish } from './login';
-import { horizontalOverflow, shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, clearItems, horizontalOverflow, shown, signedInSpanish, uniqueName } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

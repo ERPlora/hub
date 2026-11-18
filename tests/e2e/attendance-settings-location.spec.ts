@@ -8,11 +8,7 @@
 // flow: ATTENDANCE-F04
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, login, shot, shown, untilStill } from './helpers';
 import { noHorizontalScroll, VIEWPORTS } from './schedule-helpers';
 
 const KEY = 'FIX-HUB-ATTENDANCE-SETTINGS-LOCATION-DENIED-SAYS-BROWSER-INSIDE-THE-APP';

@@ -7,11 +7,7 @@
 // product — is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, capture, login, psql, shown } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { checkWithDish, cleanSales, dishForTheTill, openTillCart, restoreDrawer, stamp, zoneWithTable } from './sale-helpers';
 import { toastSaying } from './toast-helpers';

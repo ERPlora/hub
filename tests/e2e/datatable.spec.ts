@@ -4,13 +4,9 @@
 // list/cards ion-segment switches the view and back; on a phone the end of the cards brings the next rows.
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { record, shot } from './capture';
+import { A, api, login, record, shot, shown } from './helpers';
 import { createItem, listReady, rowNames } from './demo-items';
-import { api } from './hub-api';
 import { decodeSubs } from './live-streams';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
 import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 
 const COUNT = 12;

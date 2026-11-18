@@ -23,15 +23,12 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { demoBeingPrepared, migrationsAppliedAtSignUp } from './demo-born';
 import { doorOutcome, whyNoDemo } from './demo-door';
-import { turnOn } from './apps-on';
-import { shot } from './capture';
-import { createViaPage, listReady, rowNames, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { collectProblems } from './page-problems';
-import { SAAS } from './saas';
-import { shown } from './screen';
-import { MY_APPS_DOOR } from './topbar';
-import { HUB_DIR, STACK } from './stack';
+import { api, shot, shown, uniqueName } from './helpers';
+import { turnOn } from './business';
+import { createViaPage, listReady, rowNames } from './demo-items';
+import { collectProblems, MY_APPS_DOOR, SAAS } from './saas-login';
+import { HUB_DIR } from './stack';
+import { STACK } from './stack';
 
 const DEMO_HOST = new RegExp(`^http://(demo-[0-9a-f]{8})\\.localhost:${STACK.hubPort}/`);
 const DOOR = `${SAAS}/demo/`;

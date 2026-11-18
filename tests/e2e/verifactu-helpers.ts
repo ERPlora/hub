@@ -5,8 +5,8 @@
 // (`putVerifactuBack`); one spec at a time, as the e2e runs (`workers: 1`, playwright.config.ts).
 import { expect } from '@playwright/test';
 
-import { psql } from './psql';
-import { internalPut } from './registration';
+import { psql } from './helpers';
+import { internalPut } from './business';
 
 /** The configuration's columns a run moves: the photo's, the route and the environment. */
 const CONFIG_COLUMNS = [

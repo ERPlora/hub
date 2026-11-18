@@ -7,12 +7,7 @@
 // whole, inside the cell and never over the chip, at 390 (cards), 820, 834 and 1440.
 import { expect, test } from '@playwright/test';
 
-import { capture, record } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, psql, record, shown } from './helpers';
 import { chipBesideBadge, chipFit, cleanInventory, createProduct, type Product, productsReady, settled, stamp } from './inventory-helpers';
 
 test.afterAll(() => {

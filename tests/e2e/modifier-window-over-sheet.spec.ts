@@ -8,13 +8,7 @@
 // `afterAll` deletes exactly them.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
 const GROUP = `E2E Mod Over ${STAMP}`;

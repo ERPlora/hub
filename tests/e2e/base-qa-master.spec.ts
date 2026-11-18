@@ -14,13 +14,8 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { closeActionCenter, openActionCenter } from './action-center';
 import { GREETING, type Provider, startProvider } from './assistant-provider';
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { SAAS } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
+import { api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
+import { SAAS } from './saas-login';
 import { type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { HUB_DIR, REPO_DIR, STACK } from './stack';
 import { openApps, openAssistant } from './topbar';

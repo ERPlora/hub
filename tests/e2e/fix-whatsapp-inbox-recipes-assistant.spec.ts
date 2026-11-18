@@ -13,11 +13,7 @@
 // flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33 FLOW-F12
 import { expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, psql, shown } from './helpers';
 import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { chats, relay } from './provider-helpers';
 import { madridDay, openTheBook } from './reservation-helpers';

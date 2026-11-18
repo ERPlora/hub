@@ -7,10 +7,7 @@
 // (station), `E2E-KIT…` (products) and «e2e kitchen <stamp>» (checks); `afterAll` removes all of it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, psql, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, shots, stamp } from './sale-helpers';
 import { ownerPage } from './service-helpers';

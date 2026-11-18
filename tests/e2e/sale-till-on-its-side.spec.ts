@@ -7,11 +7,7 @@
 // its two rows. What a run creates, its product `E2E-TILLSIDE-<run>` and its check, is deleted after it.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { settled } from './settled';
-import { A } from './stack';
+import { A, capture, login, settled, shown } from './helpers';
 import { type Product } from './inventory-helpers';
 import { cleanTill, dishForTheTill, fingerOn, stamp, TILL_LANGUAGES, tillIsPhone, tillOpenAt1440 } from './sale-helpers';
 

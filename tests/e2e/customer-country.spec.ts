@@ -5,10 +5,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, idFromUrl, inputOf, rowNamed, searchList } from './customer-helpers';
-import { shot } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shot, shown } from './helpers';
 import { toastSaying } from './toast-helpers';
 
 test.afterAll(() => cleanUp());

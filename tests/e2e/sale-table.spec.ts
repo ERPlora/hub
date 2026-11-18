@@ -8,11 +8,7 @@
 // checks and their moves, its checks and lines, its product — is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { addToTill, cleanSales, shots, stamp, tillReady, zoneWithTable } from './sale-helpers';
 import { toastSaying, toasts } from './toast-helpers';

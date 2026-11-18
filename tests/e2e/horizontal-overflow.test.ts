@@ -1,8 +1,8 @@
 // flow: e2e-overflow — the e2e harness's horizontal scroll check
-// Every «no horizontal scroll» check of the e2e goes through `horizontalOverflow(page)` (screen.ts), which reads the
+// Every «no horizontal scroll» check of the e2e goes through `horizontalOverflow(page)` (helpers.ts), which reads the
 // document and every `ion-content` on screen. A spec that measures the document by hand (`documentElement.scrollWidth`
 // against the window) is blind to a screen cut inside `ion-content`: Ionic pins the `body`, so the document never
-// grows. No file but screen.ts measures it, in any spelling: through a name given to the root
+// grows. No file but helpers.ts measures it, in any spelling: through a name given to the root
 // (`const root = document.documentElement; root.scrollWidth`), one `ion-content` by hand (its `getScrollElement()`,
 // `.inner-scroll` or `part="scroll"` and their `scrollWidth`, which leaves out the menu and the sheets), its width
 // destructured (`const { scrollWidth } = document.documentElement`), the root found by its selector or a locator
@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
 /** The file of the one measure. */
-const MEASURE_FILE = 'screen.ts';
+const HELPERS = 'helpers.ts';
 
 /** The word every measure below reads. A file or a statement without it measures nothing, so the count does not test it.
  *  This check's work grows with the e2e: 287 files (3.2 MB, 58 000 lines), of which 35 say the word. Reading them inside
@@ -175,7 +175,7 @@ function documentMeasures(name: string, source: string): string[] {
 
 /** The files of the e2e (the specs and their helpers, not Vitest's own tests) and their text, read once. */
 const E2E_SOURCES: ReadonlyArray<[string, string]> = readdirSync(E2E_DIR)
-  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== MEASURE_FILE)
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== HELPERS)
   .sort()
   .map((name) => [name, readFileSync(join(E2E_DIR, name), 'utf8')]);
 
@@ -184,16 +184,16 @@ function handMeasures(): string[] {
   return E2E_SOURCES.flatMap(([name, source]) => documentMeasures(name, source));
 }
 
-describe('the e2e checks for a horizontal scroll go through horizontalOverflow() of screen.ts', () => {
-  it('no file of tests/e2e but screen.ts measures the document by hand: the check is horizontalOverflow(page)', () => {
+describe('the e2e checks for a horizontal scroll go through horizontalOverflow() of helpers.ts', () => {
+  it('no file of tests/e2e but helpers.ts measures the document by hand: the check is horizontalOverflow(page)', () => {
     expect(handMeasures()).toEqual([]);
   });
 
-  it('the files of the e2e are all read: the count is on every spec and helper but screen.ts and Vitest’s own tests', () => {
+  it('the files of the e2e are all read: the count is on every spec and helper but helpers.ts and Vitest’s own tests', () => {
     const names = E2E_SOURCES.map(([name]) => name);
     expect(names.length).toBeGreaterThan(200);
     expect(names).toContain('pricing-assistant.spec.ts');
-    expect(names.filter((name) => name === MEASURE_FILE || name.endsWith('.test.ts'))).toEqual([]);
+    expect(names.filter((name) => name === HELPERS || name.endsWith('.test.ts'))).toEqual([]);
   });
 
   it('every measure reads the word scrollWidth: a file or a statement without it is left unread, and none is missed', () => {
@@ -203,12 +203,12 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     expect(documentMeasures('w.ts', ['const root = document.documentElement;', 'return root.clientWidth;'].join('\n'))).toEqual([]);
   });
 
-  it('screen.ts has the one measure, and it reads the document and the scroll box of every ion-content', () => {
-    const source = readFileSync(join(E2E_DIR, MEASURE_FILE), 'utf8');
-    expect(source).toContain('export async function horizontalOverflow(page: Page): Promise<number>');
-    expect(source).toContain('const boxes: Element[] = [document.documentElement];');
-    expect(source).toContain("for (const content of document.querySelectorAll('ion-content'))");
-    expect(source).toContain(`content.shadowRoot?.querySelector('[part~="scroll"]')`);
+  it('helpers.ts has the one measure, and it reads the document and the scroll box of every ion-content', () => {
+    const helpers = readFileSync(join(E2E_DIR, HELPERS), 'utf8');
+    expect(helpers).toContain('export async function horizontalOverflow(page: Page): Promise<number>');
+    expect(helpers).toContain('const boxes: Element[] = [document.documentElement];');
+    expect(helpers).toContain("for (const content of document.querySelectorAll('ion-content'))");
+    expect(helpers).toContain(`content.shadowRoot?.querySelector('[part~="scroll"]')`);
   });
 
   it('the count reads every way of measuring the document by hand, and the helper or an element’s own width as none', () => {

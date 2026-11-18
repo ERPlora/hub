@@ -7,14 +7,13 @@ import { join } from 'node:path';
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { record, shot } from './capture';
-import { createItem, listReady, uniqueName } from './demo-items';
-import { login } from './login';
-import { shown, THREE_SIZES as VIEWPORTS } from './screen';
-import { A, HUB_DIR } from './stack';
+import { A, login, record, shot, shown, THREE_SIZES as VIEWPORTS, uniqueName } from './helpers';
+import { createItem, listReady } from './demo-items';
+import { MY_APPS_DOOR, topbarApps } from './saas-login';
+import { HUB_DIR } from './stack';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
 import { toastWithId } from './toast-helpers';
-import { MY_APPS_DOOR, openApps, topbarApps } from './topbar';
+import { openApps } from './topbar';
 
 type Box = { x: number; y: number; width: number; height: number };
 

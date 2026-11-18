@@ -6,12 +6,7 @@
 // does: at 834px it does not fit even folded, so it becomes cards instead of a list with «Location» under «⋮».
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { settled, VIEWPORTS } from './schedule-helpers';
 
 const TAG = 'E2EStk';

@@ -2,7 +2,7 @@
 // `ion-infinite-scroll`): there is no «Load more» button to press.
 import type { Page } from '@playwright/test';
 
-import { shown } from './screen';
+import { shown } from './helpers';
 
 const infinite = (page: Page) => shown(page).locator('ion-infinite-scroll');
 

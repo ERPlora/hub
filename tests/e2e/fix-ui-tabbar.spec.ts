@@ -10,11 +10,8 @@
 // than a fifth of a phone's strip, with its screenshots at 375, 390, 834 and 1440.
 import { type Browser, type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { record, shot } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
-import { topbarApps } from './topbar';
+import { A, login, record, shot, shown } from './helpers';
+import { topbarApps } from './saas-login';
 
 /** 360: the most common Android width, the one the 64px floor of the tabs is sized for. */
 const PHONES = [

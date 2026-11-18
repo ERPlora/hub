@@ -8,11 +8,7 @@
 // after.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, psql, shown } from './helpers';
 import { setupStep, spanishOwnerOnTheSetupCard as spanishOwner, streamsQuiet } from './home-helpers';
 import { cleanUp, createRule, FLOW_VIEWPORTS, freshCategory, horizontalOverflow, pickCombo } from './tax-helpers';
 

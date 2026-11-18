@@ -5,14 +5,7 @@
 // width. Everything this file creates is named «E2E-PRESENCE …» and removed after it.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { type Credentials, EMPLOYEE, OWNER } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 

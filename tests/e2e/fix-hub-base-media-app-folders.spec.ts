@@ -9,11 +9,8 @@ import { createHash } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
-import { turnOn } from './apps-on';
-import { capture } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { A } from './stack';
+import { A, api, capture, hostPage } from './helpers';
+import { turnOn } from './business';
 import { photo } from './website-helpers';
 
 const KEY = 'FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES';

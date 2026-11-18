@@ -5,13 +5,7 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton, noticeIn, openActionCenter } from './action-center';
-import { shot } from './capture';
-import { hostPage } from './login';
-import { psql } from './psql';
-import { EMPLOYEE } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

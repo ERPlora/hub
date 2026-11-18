@@ -4,11 +4,7 @@
 // go of the devices a spec printed from (PRINTING-F18: the owner's claim sets the device up).
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { painted, settled } from './settled';
-import { A } from './stack';
+import { A, api, capture, painted, psql, settled } from './helpers';
 
 /** Phone, tablet and desktop: 390×844, 834×1112 and 1440×900. */
 export const FLOW_VIEWPORTS = [

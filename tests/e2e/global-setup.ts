@@ -98,7 +98,7 @@ export function assertLocalHubsRegistered(manage: ManagePy, database: string): v
   );
 }
 
-/** The SaaS's `demo_seed` accounts the specs sign in with (`OWNER` and `EMPLOYEE` of saas.ts), each with access to
+/** The SaaS's `demo_seed` accounts the specs sign in with (`OWNER` and `EMPLOYEE` of helpers.ts), each with access to
  * the local hubs `a` and `b`. */
 export const DEMO_ACCOUNTS = ['owner@example.com', 'employee@example.com'] as const;
 const DEMO_HUBS = ['a', 'b'] as const;

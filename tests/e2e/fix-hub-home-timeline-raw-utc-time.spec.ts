@@ -6,12 +6,7 @@
 // file creates is deleted after it (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 

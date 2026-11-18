@@ -3,11 +3,7 @@
 // spec's `afterAll`) removes exactly them from the hub's database, with their movements and links.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { capture, shot } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, psql, shot, shown } from './helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },

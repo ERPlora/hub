@@ -7,9 +7,7 @@
 // creates, its product `E2E-KERROR-<run>` and its checks, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { shown } from './screen';
-import { settled, untilStill } from './settled';
+import { capture, settled, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { type Box, checkWithDish, cleanSales, cleanTill, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, stamp, tillIsPhone } from './sale-helpers';
 import { toastSaying, toasts } from './toast-helpers';

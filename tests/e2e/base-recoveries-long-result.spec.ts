@@ -6,7 +6,7 @@
 import { expect, test } from '@playwright/test';
 
 import { ADMIN_LIST_SIZES, adminPage, expectBrokenInItsCell, inControl, staffSession } from './admin-list-helpers';
-import { capture } from './capture';
+import { capture } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'BASE-F114-RECOVERIES-LONG-RESULT';

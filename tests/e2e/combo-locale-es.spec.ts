@@ -5,11 +5,7 @@
 // own key prefix and goes away.
 import { expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, capture, login, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, freshCategory, pickCombo } from './tax-helpers';
 
 const KEY = 'ISSUE-664-COMBO-VAT-CATEGORY-IN-SPANISH';

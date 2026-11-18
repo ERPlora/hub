@@ -6,11 +6,7 @@
 // from a tablet on, its icon and its text. No sideways scroll. Each width leaves its capture. Nothing is created.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE';
 const SIZES = [

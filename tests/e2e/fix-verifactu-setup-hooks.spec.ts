@@ -9,12 +9,7 @@
 // VeriFactu's configuration and in `a`'s photo is put back after it (or removed, if the run made it).
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { horizontalOverflow } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, horizontalOverflow, psql, shot, untilStill } from './helpers';
 import { boardWidget, setupCard, setupStep, spanishOwnerWithPanels as spanishOwner } from './home-helpers';
 import { keepVerifactu, pushPhoto, putVerifactuBack } from './verifactu-helpers';
 

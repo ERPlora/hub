@@ -8,11 +8,7 @@
 // flow: COMBO-F02, INVOICE-F21, ui:theme
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { settled } from './settled';
-import { A } from './stack';
+import { A, capture, login, settled, shown } from './helpers';
 
 const FORM_VIEWPORTS = [
   { label: '375x667', width: 375, height: 667, longOptionLines: 2 },

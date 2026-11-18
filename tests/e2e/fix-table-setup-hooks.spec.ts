@@ -7,10 +7,7 @@
 // off for the run and back on after it; the run's own zones are «E2E Tsh …», deleted with their tables before and after.
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, psql, shown } from './helpers';
 import { setupStep } from './home-helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { liveStreamsSettled, RELEASE_WINDOW_MS, spanishOwner } from './live-streams';

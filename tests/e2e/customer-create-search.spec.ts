@@ -5,10 +5,7 @@
 import { expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, customersReady, e2eName, idFromUrl, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { shot } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shot, shown } from './helpers';
 
 test.afterAll(() => cleanUp());
 

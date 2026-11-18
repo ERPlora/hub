@@ -54,8 +54,7 @@ import { spawnSync } from 'node:child_process';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { psql } from './psql';
+import { capture, psql } from './helpers';
 import { ownerPage, rowAction } from './service-helpers';
 import { HUB_DIR, STACK } from './stack';
 

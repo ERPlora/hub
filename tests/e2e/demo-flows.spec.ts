@@ -8,14 +8,8 @@
 // flow: DEMO-F01 DEMO-F02 DEMO-F03 DEMO-F04 DEMO-F05 DEMO-F06
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { createItem, listReady, row, rowNames, rowOf, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { EMPLOYEE } from './saas';
-import { horizontalOverflow, shown } from './screen';
-import { settled } from './settled';
-import { A } from './stack';
+import { A, api, capture, EMPLOYEE, horizontalOverflow, hostPage, settled, shown, uniqueName } from './helpers';
+import { createItem, listReady, row, rowNames, rowOf } from './demo-items';
 import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 import { dismissToasts, toastSaying } from './toast-helpers';
 

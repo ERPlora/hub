@@ -2,7 +2,7 @@
 // schedules, time off and roles it made.
 import { expect, type Page } from '@playwright/test';
 
-import { psql } from './psql';
+import { psql } from './helpers';
 
 /** Picks, in a staff `Combo`, the option that names `name`, searching the server by `text`. */
 export async function pickMember(page: Page, field: string, text: string, name: string): Promise<void> {

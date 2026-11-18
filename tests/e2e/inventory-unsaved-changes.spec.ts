@@ -8,10 +8,7 @@
 // products the edit needs are made through the API and removed.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, capture, login, shown } from './helpers';
 import {
   cleanInventory,
   createProduct,

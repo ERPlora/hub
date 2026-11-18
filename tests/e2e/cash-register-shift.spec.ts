@@ -8,12 +8,7 @@
 // What this file creates is deleted after it (its sessions, lines and counts, the sale and the product).
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { createProduct, dialog, fill, pick, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, newestSaleOf, shots, stamp } from './sale-helpers';

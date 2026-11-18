@@ -3,15 +3,12 @@
 // first. A wait that counts only Ionic's modals and popovers sliding in or out lets a toast entering pass for still,
 // and the capture catches it half in (TASK-F05: «Start» from a row says «Task started»). Here that
 // notice enters at a fifth of its speed (Chrome's own control) and, once `snap()` returns, nothing may move, asked
-// with the harness's own detector (`exposeMovingInPage`, settled.ts), at 390, 834 and 1440. The answer to «Start» is
+// with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834 and 1440. The answer to «Start» is
 // held until the click's own motion (the row's «⋮» menu leaving, where the row folds its actions) has ended at full
 // speed: the toast is the only thing entering slowly. What a run creates is named «E2E Task …» and deleted after it.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { shown } from './screen';
-import { exposeMovingInPage, untilStill } from './settled';
-import { A } from './stack';
+import { A, capture, exposeMovingInPage, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanUp, FLOW_VIEWPORTS, named, post, rowOf, signedIn, snap, VIEWPORTS } from './task-helpers';
 import { toastSaying } from './toast-helpers';
@@ -24,7 +21,7 @@ const SET_STATUS = '**/api/task/tasks/set_status';
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
-/** What moves on the page now, by the detector of settled.ts put in the page (`exposeMovingInPage`). */
+/** What moves on the page now, by the detector of helpers.ts put in the page (`exposeMovingInPage`). */
 async function moving(page: Page): Promise<string[]> {
   await exposeMovingInPage(page);
   return page.evaluate(() => (window as unknown as { __movingInPage: () => string[] }).__movingInPage());

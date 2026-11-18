@@ -7,12 +7,7 @@
 // The business's printers are switched off for the run and back on after it; what it makes is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, stamp } from './sale-helpers';

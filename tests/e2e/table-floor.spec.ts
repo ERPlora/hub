@@ -6,12 +6,7 @@
 // zone named «E2E Tbl <stamp>…» and its checks; `afterAll` removes all of it, sales included.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { capture, shot } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { settled } from './settled';
-import { A } from './stack';
+import { A, api, capture, psql, settled, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales } from './sale-helpers';
 import { ownerPage, post } from './service-helpers';

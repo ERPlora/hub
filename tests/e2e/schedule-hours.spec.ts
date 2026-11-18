@@ -6,13 +6,7 @@
 // viewports. The week and the settings the hub had before the file are put back after it (`afterAll`).
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { EMPLOYEE } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { DEFAULT_WEEK, noHorizontalScroll, restoreWeek, rowTexts, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 
 /** What the hub had before this file: its rows as INSERT statements, read in `beforeAll`. */

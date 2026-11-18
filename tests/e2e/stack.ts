@@ -110,13 +110,6 @@ export function stackFrom(env: Env): Stack {
 /** The stack of this run, from its environment. */
 export const STACK = stackFrom(process.env);
 
-// The local hubs `a` and `b` answer only once they are rows of the registry (`base.Hub`): without them every
-// host is a 404. `manage.py seed_local_hubs` (DEBUG only, idempotent) adds them;
-// `database.ts` runs it on an e2e database and `global-setup.ts` checks it (`seed_local_hubs --check`) before
-// the first spec. The shared `hub` database needs it once, by hand.
-export const A = STACK.hub('a');
-export const B = STACK.hub('b');
-
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const HUB_DIR = join(HERE, '..', '..');
 export const REPO_DIR = join(HUB_DIR, '..');

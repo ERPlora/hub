@@ -6,12 +6,8 @@
 // which Ionic also marks `.ion-page` and which holds the route's page and the presented dialogs.
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { createItem, listReady, rowOf, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, shown, uniqueName } from './helpers';
+import { createItem, listReady, rowOf } from './demo-items';
 import { openApps } from './topbar';
 
 const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-picker-legacy';

@@ -10,11 +10,7 @@
 // draft is put back as it was.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture, record } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { horizontalOverflow } from './screen';
-import { A } from './stack';
+import { A, api, capture, horizontalOverflow, hostPage, record } from './helpers';
 import { atRest, openSection, photo } from './website-helpers';
 
 const KEY = 'FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT';

@@ -5,11 +5,7 @@
 // What this file creates is deleted after it (`cleanSales()` takes the ticket and its record with the sale).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';

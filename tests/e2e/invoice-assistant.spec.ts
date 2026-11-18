@@ -22,16 +22,11 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { confirmedWithTheWord, type SentCard, sentCard } from './assistant-card-helpers';
-import { capture, shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { registerBusinessIn, registrationOf } from './registration';
-import { shown } from './screen';
-import { untilStill } from './settled';
+import { A, api, capture, login, psql, shot, shown, untilStill } from './helpers';
+import { registerBusinessIn, registrationOf } from './business';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
-import { A, REPO_DIR, STACK } from './stack';
+import { REPO_DIR, STACK } from './stack';
 import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-INVOICE-NO-VOICE-RECTIFY-WITH-ASSISTANT';

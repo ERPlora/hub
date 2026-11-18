@@ -12,13 +12,9 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { SAAS } from './saas';
-import { horizontalOverflow } from './screen';
-import { settled } from './settled';
-import { A, HUB_DIR } from './stack';
+import { A, api, capture, horizontalOverflow, hostPage, settled } from './helpers';
+import { SAAS } from './saas-login';
+import { HUB_DIR } from './stack';
 import { atRest, openSection } from './website-helpers';
 
 const WIDTHS = {

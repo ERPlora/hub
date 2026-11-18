@@ -94,7 +94,7 @@ describe('the e2e reads requests through resource-timing.ts', () => {
   it('scans the specs and the helpers', () => {
     const sources = e2eSources();
 
-    expect(sources).toEqual(expect.arrayContaining(['delete-item.spec.ts', 'demo-items.ts', 'hmr.spec.ts']));
+    expect(sources).toEqual(expect.arrayContaining(['delete-item.spec.ts', 'helpers.ts', 'hmr.spec.ts']));
     expect(sources).not.toContain('resource-timing.ts');
   });
 

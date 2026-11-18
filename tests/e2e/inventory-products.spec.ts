@@ -15,13 +15,23 @@
 //     amount it cannot read is said under its field and does not filter.
 import { expect, test } from '@playwright/test';
 
-import { capture, record, shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
-import { cleanInventory, createProduct, dialog, fill, GENERIC, pickCombo, productBySku, productRow, productsReady, searchProducts, settledChipFit, shoot, shootFlow, stamp } from './inventory-helpers';
+import { A, api, capture, login, psql, record, shot, shown } from './helpers';
+import {
+  cleanInventory,
+  createProduct,
+  dialog,
+  fill,
+  GENERIC,
+  pickCombo,
+  productBySku,
+  productRow,
+  productsReady,
+  searchProducts,
+  settledChipFit,
+  shoot,
+  shootFlow,
+  stamp,
+} from './inventory-helpers';
 import { rowAction } from './service-helpers';
 
 test.afterAll(() => {

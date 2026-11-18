@@ -12,10 +12,8 @@
 // DataTable action hands as its `icon`), draws a non-empty SVG and is visible. What the run creates is deleted.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { psql } from './psql';
-import { scrolledTo, shown } from './screen';
-import { A } from './stack';
+import { A, psql, shot, shown } from './helpers';
+import { scrolledTo } from './screen';
 import {
   cleanUp as cleanServices,
   FLOW_VIEWPORTS,

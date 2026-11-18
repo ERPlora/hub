@@ -18,11 +18,8 @@ import { join } from 'node:path';
 
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { ARTIFACTS } from './capture';
-import { createItem, listReady, rowOf, uniqueName } from './demo-items';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, ARTIFACTS, login, shown, uniqueName } from './helpers';
+import { createItem, listReady, rowOf } from './demo-items';
 import { openApps } from './topbar';
 
 const PROD = (process.env.PROD_ORIGIN ?? 'http://a.localhost:8002').replace(/\/$/, '');

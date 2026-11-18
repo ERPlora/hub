@@ -10,12 +10,8 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile, type Card } from './customer-helpers';
-import { shot } from './capture';
-import { hostPage, login } from './login';
-import { psql } from './psql';
-import { registerBusinessIn, type Registration, registrationOf } from './registration';
-import { horizontalOverflow, shown } from './screen';
-import { A } from './stack';
+import { A, horizontalOverflow, hostPage, login, psql, shot, shown } from './helpers';
+import { registerBusinessIn, type Registration, registrationOf } from './business';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-CUSTOMER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';

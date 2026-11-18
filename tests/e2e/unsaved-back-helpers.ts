@@ -6,10 +6,7 @@
 // close button as `<form>-close` and no «Cancel» (hub#1233).
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, capture, login, shown } from './helpers';
 import { presentedDialog } from './inventory-helpers';
 import { rowAction } from './service-helpers';
 import { insideTheApp, pressBack } from './system-back-helpers';

@@ -253,7 +253,7 @@ describe('assertLocalHubsRegistered', () => {
 });
 
 // flow: none — the Hub's e2e harness.
-// The specs sign in with the SaaS's demo accounts (`login` of login.ts), which the SaaS's `manage.py demo_seed`
+// The specs sign in with the SaaS's demo accounts (`login` of helpers.ts), which the SaaS's `manage.py demo_seed`
 // creates. A stack's own SaaS on its fresh database (`saas_e2e_<port>`, the SaaS's tests/e2e/database.ts) has none: on
 // 2026-10-28 the README's recipe never said it, and every login waited 30 s to fail with «The email address and/or
 // password you specified are not correct.». The run stops before the first spec with the command that seeds them,

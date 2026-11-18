@@ -12,11 +12,9 @@ import { execSync } from 'node:child_process';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { DICTATION, type Provider, startProvider } from './assistant-provider';
-import { shot } from './capture';
-import { login } from './login';
-import { EMPLOYEE } from './saas';
-import { untilStill } from './settled';
-import { A, REPO_DIR, STACK } from './stack';
+import { A, EMPLOYEE, login, shot, untilStill } from './helpers';
+import { REPO_DIR } from './stack';
+import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = [

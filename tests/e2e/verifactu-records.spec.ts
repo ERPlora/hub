@@ -13,12 +13,7 @@
 // What this file creates is deleted after it (VeriFactu's rows first: a record keeps its invoice).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture, record as recordMetrics, shot } from './capture';
-import { api } from './hub-api';
-import { login, saveSessionForTheSweep } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, psql, record as recordMetrics, saveSessionForTheSweep, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, shots, stamp } from './sale-helpers';

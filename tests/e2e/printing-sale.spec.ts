@@ -9,11 +9,7 @@
 // after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { flowShots } from './printing-helpers';

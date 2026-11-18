@@ -7,13 +7,8 @@
 // creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { hostPage, login } from './login';
-import { psql } from './psql';
-import { registerBusinessIn, type Registration, registrationOf } from './registration';
-import { horizontalOverflow, shown } from './screen';
-import { A } from './stack';
+import { A, api, horizontalOverflow, hostPage, login, psql, shot, shown } from './helpers';
+import { registerBusinessIn, type Registration, registrationOf } from './business';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-STAFF-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';

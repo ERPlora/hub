@@ -1,13 +1,33 @@
-// The steps of a login's trip through the SaaS and back to the hub, and what says one of them is not coming: `login`
-// (login.ts) waits for each as long as the test has, and fails at once on any of those signs, saying why.
-import { type Frame, type Page, type Request as PageRequest, type Response as PageResponse, test } from '@playwright/test';
+// The stack's SaaS, where every login goes: its address, where its sign-in posts, the folder of the mails with its
+// codes, and the steps of a login's trip through it and back to the hub's shell, which fail at once on what says a
+// step is not coming; and what the page says while a spec runs.
+import { type Frame, type Locator, type Page, type Request as PageRequest, type Response as PageResponse, test } from '@playwright/test';
 
-import { readMailCode } from './mail';
-import { type Credentials, MAIL_CLOCK_SLACK, MAIL_DIR, SAAS, SAAS_CODE, SAAS_REFUSED, SAAS_SIGN_IN } from './saas';
-import { topbarApps } from './topbar';
+import type { Credentials } from './helpers';
+import { mailDirFrom, readMailCode } from './mail';
+import { REPO_DIR, STACK } from './stack';
 
+/** The SaaS (`erplora.com` in production): the only login page a hub has. */
+export const SAAS = STACK.saas;
+
+/**
+ * Whether `page` is on the SaaS (its login): what its console says there is the SaaS's, judged by the SaaS's own
+ * suite. Its headless API answers 401 while nobody is signed in (allauth's protocol), and Chrome logs each one.
+ */
+export const onSaas = (page: Page): boolean => new URL(page.url()).origin === SAAS;
+
+/** Where the local SaaS writes its mails (Django's file backend): `saas/.mail` beside the Hub, or `E2E_MAIL_DIR`. */
+export const MAIL_DIR = mailDirFrom(process.env, REPO_DIR);
+/** Slack between our clock and the mail file's modification time, in ms. */
+export const MAIL_CLOCK_SLACK = 50;
 /** What each wait of `login` lasts outside a test, or in one with no time limit, in ms: the config's test time. */
 const LOGIN_DEFAULT = 180_000;
+/** Where the SaaS's sign-in form posts the account (allauth.headless). */
+export const SAAS_SIGN_IN = `${SAAS}/_allauth/browser/v1/auth/login`;
+/** Where the SaaS's code form posts the code it mailed (allauth.headless). */
+export const SAAS_CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
+/** The SaaS's page that says why it refused a sign-in or a jump to a hub (`?code=not_a_member`, `too_many`…): nothing goes on from there by itself. */
+const SAAS_REFUSED = '/login/error';
 
 /** The running test's (or hook's) time limit, in ms; 0 outside a test or hook, as with no limit. */
 export function runningTimeout(): number {
@@ -29,6 +49,35 @@ export function runningTimeout(): number {
  */
 export function loginTimeout(): number {
   return runningTimeout() || LOGIN_DEFAULT;
+}
+
+/** Whether two addresses are the same once written the same way (`http://a.localhost:8000` and `…:8000/`). */
+export const sameAddress = (one: string, other: string): boolean => new URL(one).href === new URL(other).href;
+
+/** Playwright's error when another navigation commits before the one `page.goto` started: where that one went. */
+const INTERRUPTED = /is interrupted by another navigation to "([^"]+)"/;
+
+/**
+ * Whether `error` is a `page.goto` to the hub at `origin` cut short by the SaaS's jump: another navigation committed
+ * first, on the jump's way out to the SaaS or on its way back into this hub. Not one to anywhere else, nor any other
+ * error.
+ */
+function interruptedByTheJump(error: unknown, origin: string): boolean {
+  const to = error instanceof Error ? INTERRUPTED.exec(error.message)?.[1] : undefined;
+  if (to === undefined || !URL.canParse(to)) return false;
+  const where = new URL(to).origin;
+  return where === new URL(SAAS).origin || where === new URL(origin).origin;
+}
+
+/** `page.goto(target)`; `true` when the SaaS's jump cut it short (`interruptedByTheJump`), any other error thrown. */
+export async function goneOrJumped(page: Page, target: string, origin: string): Promise<boolean> {
+  try {
+    await page.goto(target);
+    return false;
+  } catch (error) {
+    if (!interruptedByTheJump(error, origin)) throw error;
+    return true;
+  }
 }
 
 /** Chromium's failure of a request the page itself dropped, as it does with what is loading when it navigates away. */
@@ -338,4 +387,39 @@ export async function signInWithCode(
   if (answer.status() >= 400) {
     throw new Error(`login on ${origin}: code rejected, the SaaS answered ${answer.status()} ${which()}${await saidIn(answer)}`);
   }
+}
+
+/** What opens «My apps» on the hub's topbar: its ⠿ button from a tablet, the shell's «⋮» on a phone. */
+export const MY_APPS_DOOR = '[data-testid=topbar-apps], [data-testid=topbar-more]';
+
+/** The way to «My apps»: there once the authenticated shell is painted (every page of the stack has its own). */
+export const topbarApps = (page: Page): Locator => page.locator(MY_APPS_DOOR).first();
+
+
+/** Collects CSP violations (in-page listener), console errors and uncaught page errors. */
+export async function collectProblems(
+  page: Page,
+): Promise<() => Promise<{ csp: unknown[]; console: string[]; warnings: string[]; page: string[] }>> {
+  const consoleErrors: string[] = [];
+  const warnings: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('console', (msg) => {
+    if (onSaas(page)) return;
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+    if (msg.type() === 'warning') warnings.push(msg.text());
+  });
+  page.on('pageerror', (err) => pageErrors.push(String(err)));
+  await page.addInitScript(() => {
+    const w = window as unknown as { __csp: unknown[] };
+    w.__csp = [];
+    document.addEventListener('securitypolicyviolation', (e) => {
+      w.__csp.push({ directive: e.violatedDirective, blocked: e.blockedURI, sample: e.sample, source: e.sourceFile });
+    });
+  });
+  return async () => ({
+    csp: await page.evaluate(() => (window as unknown as { __csp?: unknown[] }).__csp ?? []),
+    console: consoleErrors,
+    warnings,
+    page: pageErrors,
+  });
 }

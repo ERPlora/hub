@@ -12,9 +12,7 @@ import { promisify } from 'node:util';
 import { expect, type Page, test } from '@playwright/test';
 
 import { DONE, type Provider, startProvider } from './assistant-provider';
-import { capture } from './capture';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, shown } from './helpers';
 import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { HUB_DIR, REPO_DIR, STACK } from './stack';

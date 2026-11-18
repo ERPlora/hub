@@ -9,12 +9,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { appNote, expectSwitch } from './apps-switch-helpers';
-import { settledCapture } from './capture';
-import { api } from './hub-api';
-import { hostPage, signedInSpanish } from './login';
-import { psql } from './psql';
-import { appRow, testid } from './screen';
-import { A } from './stack';
+import { A, api, appRow, hostPage, psql, signedInSpanish, testid } from './helpers';
+import { settledCapture } from './screen';
 import { menuApps } from './topbar';
 
 const VIEWPORTS = {

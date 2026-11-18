@@ -14,9 +14,7 @@ import { join, resolve } from 'node:path';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, shown } from './helpers';
 import { parkedEvent, signedIn } from './flow-helpers';
 import { chats, relay } from './provider-helpers';
 import { guestRowInTheBook, madridDay } from './reservation-helpers';

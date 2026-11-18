@@ -15,15 +15,10 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
-import { shot } from './capture';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
 import { createItem } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql, usernamesOf } from './psql';
-import { EMPLOYEE, OWNER } from './saas';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A, REPO_DIR, STACK } from './stack';
+import { REPO_DIR } from './stack';
+import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE';

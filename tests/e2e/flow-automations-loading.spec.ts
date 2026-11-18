@@ -8,10 +8,7 @@
 // flow: FLOW-F01 FLOW-F29
 import { expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { saveSessionForTheSweep } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, saveSessionForTheSweep, shown } from './helpers';
 import { askingFlow, onAutomations } from './flow-helpers';
 
 const KEY = 'hub-950-automations-loading';

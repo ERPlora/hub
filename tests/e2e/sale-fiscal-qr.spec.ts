@@ -5,11 +5,7 @@
 // product `E2E-SQR-<run>`, its sale, its ticket and VeriFactu's record of it — is deleted after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';

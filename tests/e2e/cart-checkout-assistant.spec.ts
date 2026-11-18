@@ -20,11 +20,10 @@ import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
 import { type Cart, cleanUp, code, get, type Line, type Order, post } from './cart-checkout-helpers';
-import { turnOffTurnedOn, turnOnMissing } from './apps-on';
-import { capture, shot } from './capture';
-import { login } from './login';
-import { exposeMovingInPage, untilStill } from './settled';
-import { A, REPO_DIR, STACK } from './stack';
+import { A, capture, exposeMovingInPage, login, shot, untilStill } from './helpers';
+import { turnOffTurnedOn, turnOnMissing } from './business';
+import { REPO_DIR } from './stack';
+import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-CART_CHECKOUT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 /** The captures of the verb of emptying a cart (base-assistant-card-verbs). */

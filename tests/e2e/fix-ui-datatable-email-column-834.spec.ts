@@ -7,9 +7,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, code, orderFrom, signedIn, VIEWPORTS } from './cart-checkout-helpers';
-import { record, shot } from './capture';
-import { horizontalOverflow, shown } from './screen';
-import { untilStill } from './settled';
+import { horizontalOverflow, record, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-UI-DATATABLE-EMAIL-COLUMN-834';
 const TABLE = 'cart-checkout-orders';

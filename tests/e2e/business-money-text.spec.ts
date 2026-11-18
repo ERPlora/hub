@@ -9,10 +9,8 @@
 // it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { psql } from './psql';
-import { registerBusinessIn } from './registration';
-import { A } from './stack';
+import { A, psql, shot } from './helpers';
+import { registerBusinessIn } from './business';
 import { atRest, publicPriceLabel, publishedSiteSpec } from './website-helpers';
 
 const KEY = 'FIX-HUB-PYTHON-MONEY-GLUES-CURRENCY-CODE-TO-AMOUNT';

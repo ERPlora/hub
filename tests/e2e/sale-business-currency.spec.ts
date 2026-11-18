@@ -11,11 +11,8 @@
 // in złoty.
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { registerBusinessIn, type Registration, registrationOf } from './registration';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shot, shown } from './helpers';
+import { registerBusinessIn, type Registration, registrationOf } from './business';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';

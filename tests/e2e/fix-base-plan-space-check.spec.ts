@@ -10,12 +10,7 @@ import { crc32, deflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { hostPage } from './login';
-import { psql } from './psql';
-import { horizontalOverflow, shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, horizontalOverflow, hostPage, psql, shown } from './helpers';
 import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = {

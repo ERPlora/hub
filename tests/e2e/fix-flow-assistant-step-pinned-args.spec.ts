@@ -9,9 +9,7 @@
 // flow: FLOW-F37 FLOW-F38 FLOW-F29 FLOW-F13
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { psql } from './psql';
-import { shown } from './screen';
+import { capture, psql, shown } from './helpers';
 import { approve, grantAllAndSwitchOn, idFromUrl, ownerOnAutomations } from './flow-helpers';
 import { providerSpec, runAndAsk, runFinishes } from './provider-helpers';
 import { bookingOn, cleanUpTagged, madridDay, reservationStatus } from './reservation-helpers';

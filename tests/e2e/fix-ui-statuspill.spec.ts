@@ -7,11 +7,7 @@
 // flow: ui:DataTable
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, psql, shot, shown } from './helpers';
 import { issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';

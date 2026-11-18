@@ -10,12 +10,8 @@
 import { type BrowserContext, type Locator, type Page, expect, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, searchList, spanishMobile } from './customer-helpers';
-import { shot } from './capture';
+import { A, api, login, shot, shown } from './helpers';
 import { createItem, listReady } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },

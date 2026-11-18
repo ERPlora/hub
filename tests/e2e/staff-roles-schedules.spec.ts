@@ -10,11 +10,7 @@
 // Everything this spec creates is named «E2E …» and removed after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { capture, shot } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, psql, shot, shown } from './helpers';
 import { signedIn } from './flow-helpers';
 import { shoot } from './inventory-helpers';
 import { pickMember, staffCleanUp } from './staff-helpers';

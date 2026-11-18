@@ -21,10 +21,8 @@
 // Captured in three sizes.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { login } from './login';
-import { SAAS } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shown } from './helpers';
+import { SAAS } from './saas-login';
 import { capturedAtSizes, FLOW_VIEWPORTS, settled } from './service-helpers';
 import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, type GraphThread, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
 import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';

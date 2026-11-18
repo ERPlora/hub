@@ -7,13 +7,11 @@
 // socket is routed and kept open from the page's side: only the live stream sees the outage.
 import { expect, test } from '@playwright/test';
 
-import { record, shot } from './capture';
-import { createViaPage, listReady, row, rowNames, uniqueName } from './demo-items';
+import { A, login, record, shot, shown, uniqueName } from './helpers';
+import { createViaPage, listReady, row, rowNames } from './demo-items';
 import { healthy, listeningPids, startRunserver, viteReady, waitFor } from './dev-server';
 import { decodeSubs } from './live-streams';
-import { login } from './login';
-import { shown } from './screen';
-import { A, STACK } from './stack';
+import { STACK } from './stack';
 
 const DOWN_MS = 10_000;
 

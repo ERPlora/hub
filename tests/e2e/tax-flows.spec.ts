@@ -6,10 +6,7 @@
 // tax-categories.spec.ts, tax-rules.spec.ts, tax-employee.spec.ts and the app's pytest and Vitest suites.
 import { expect, test } from '@playwright/test';
 
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, shown } from './helpers';
 import { loadsMore, scrollToEnd } from './infinite-scroll-helpers';
 import { rowAction } from './service-helpers';
 import {

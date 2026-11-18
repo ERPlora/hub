@@ -9,14 +9,10 @@
 // registers it in this Hub with the same id. The SaaS's changes are made on its panel, as the owner makes them.
 import { expect, type Page, test } from '@playwright/test';
 
-import { turnOn } from './apps-on';
-import { shot } from './capture';
+import { api, login, psql, shot, shown, THREE_SIZES as SIZES } from './helpers';
+import { turnOn } from './business';
 import { listReady } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { SAAS } from './saas';
-import { shown, THREE_SIZES as SIZES } from './screen';
+import { SAAS } from './saas-login';
 import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
 import { rowAction } from './service-helpers';
 import { STACK } from './stack';

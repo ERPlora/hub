@@ -40,6 +40,6 @@ describe('helpersAndSpecs, the e2e code the Vitest checks read', () => {
 
   it('walks the e2e folder by default', () => {
     expect(E2E_DIR.endsWith(join('tests', 'e2e'))).toBe(true);
-    expect(helpersAndSpecs()).toEqual(expect.arrayContaining(['login.ts', 'whatsapp-helpers.ts', 'qa/assistant-battery.spec.ts']));
+    expect(helpersAndSpecs()).toEqual(expect.arrayContaining(['helpers.ts', 'whatsapp-helpers.ts', 'qa/assistant-battery.spec.ts']));
   });
 });

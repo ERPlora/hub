@@ -10,10 +10,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { confirmDialog, signedIn } from './flow-helpers';
-import { shot } from './capture';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 
 const REF = 'appointment/customer_cancelled';

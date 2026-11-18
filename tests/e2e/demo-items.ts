@@ -1,8 +1,7 @@
-// The demo app's items as the specs make and read them: their names, through the API and on the list.
+// The demo app's items as the specs make and read them: through the API and on the list.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { api } from './hub-api';
-import { shown } from './screen';
+import { api, shown } from './helpers';
 
 export interface Item {
   id: string;
@@ -10,8 +9,6 @@ export interface Item {
   status: 'open' | 'done';
   note: string;
 }
-
-export const uniqueName = (prefix: string): string => `${prefix} ${Date.now().toString(36)}`;
 
 export async function createItem(context: BrowserContext, origin: string, name: string): Promise<Item> {
   const res = await api<Item>(context, origin, 'POST', '/demo/items', { name });
@@ -32,20 +29,6 @@ export async function itemDetail(
   );
   expect(res.status).toBe(200);
   return res.data;
-}
-
-/** Deletes every demo item, through the API. */
-export async function clearItems(context: BrowserContext, origin: string): Promise<number> {
-  let deleted = 0;
-  for (;;) {
-    const page = await api<{ rows: { id: string }[] }>(context, origin, 'GET', '/demo/items?limit=100');
-    if (page.data.rows.length === 0) return deleted;
-    for (const row of page.data.rows) {
-      const res = await api(context, origin, 'POST', '/demo/items/delete', { id: row.id });
-      expect(res.status).toBeLessThan(300);
-      deleted += 1;
-    }
-  }
 }
 
 /** Waits until the list painted its first result (empty state or rows). */

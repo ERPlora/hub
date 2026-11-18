@@ -9,14 +9,9 @@
 // flow: BASE-F31 BASE-F32 BASE-F33 BASE-F38
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { APP_SET_UP_MS } from './apps-on';
-import { settledCapture } from './capture';
-import { api } from './hub-api';
-import { hostPage, signedInSpanish } from './login';
-import { psql } from './psql';
-import { shown, testid } from './screen';
-import { A } from './stack';
-import { emptyOfTemplateData } from './template-data';
+import { A, api, hostPage, psql, shown, signedInSpanish, testid } from './helpers';
+import { APP_SET_UP_MS, emptyOfTemplateData } from './business';
+import { settledCapture } from './screen';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
 test.use({ actionTimeout: 30_000 });

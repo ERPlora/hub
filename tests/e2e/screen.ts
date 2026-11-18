@@ -1,18 +1,13 @@
-// What the specs find on the screen shown and measure on it: the sizes they look at it in, the page on view and
-// what it marks, its icons and how far it runs past the right edge.
-import type { Locator, Page } from '@playwright/test';
+// More of the screen on view: the taller tablet's size, the icons it painted, an element scrolled to through the
+// page's repaints, and the capture once it settled and nothing runs past its right edge.
+import { expect, type Locator, type Page } from '@playwright/test';
+
+import { capture, horizontalOverflow, shown, untilStill } from './helpers';
 
 /** The three sizes with the taller tablet, 834×1194. */
 export const THREE_SIZES_TALL_TABLET = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1194 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
-
-/** The three sizes the e2e looks at a screen in: a phone, a tablet and a desk. */
-export const THREE_SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
@@ -55,37 +50,17 @@ export async function scrolledTo(target: Locator): Promise<void> {
   throw new Error(`scrolledTo: ${String(target)} was painted again ${SCROLL_REPAINTS} times while scrolling to it`);
 }
 
-/**
- * How many pixels of the page lie past the right edge of their box, 0 when everything fits its width: the document's
- * and, in every `ion-content` (the shown page's, the pinned side menu's, an open sheet's), its scroll box, in its shadow
- * root (`part="scroll"`; a hidden one is 0 wide). Ionic pins the `body` to the window, so a screen that runs past the
- * right edge is cut inside its `ion-content` and the document never grows: the document alone read 0 with a 1600 px
- * block on a page at 390. The one «no horizontal scroll» measure of the e2e (`horizontal-overflow.test.ts` keeps it so).
- */
-export async function horizontalOverflow(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const boxes: Element[] = [document.documentElement];
-    for (const content of document.querySelectorAll('ion-content')) {
-      const scroll = content.shadowRoot?.querySelector('[part~="scroll"]');
-      if (scroll) boxes.push(scroll);
-    }
-    return Math.max(0, ...boxes.map((box) => box.scrollWidth - box.clientWidth));
-  });
+/** The capture once the screen settled and nothing scrolls sideways. */
+export async function settledCapture(page: Page, name: string): Promise<void> {
+  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
+  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
+  await capture(page, name);
 }
 
-/** What the page on screen marks with this `data-testid`. */
-export const testid = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="${id}"]`);
-
-/** `id`'s row in the Apps screen. */
-export const appRow = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
-
-/** Ionic's overlays. An inline `ion-modal` wraps its content in an `.ion-page` of its own. */
-const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-picker-legacy';
-
-/**
- * The page shown by `IonRouterOutlet` (hidden pages stay in the DOM), never a dialog presented over it:
- * Ionic moves a presented modal to `ion-app`, after the pages, so the last visible `.ion-page` would be the
- * dialog's. A dialog is found with `page.locator('ion-modal[data-testid=…]')`, not here.
- */
-export const shown = (page: Page): Locator =>
-  page.locator(`.ion-page:not(.ion-page-hidden):not(:is(${OVERLAYS}) *)`).last();
+/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
+export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
+  await untilStill(page);
+  const overflow = await horizontalOverflow(page);
+  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}

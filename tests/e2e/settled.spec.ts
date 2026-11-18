@@ -1,5 +1,5 @@
 // flow: hub-e2e-capture — the harness's `settled()` and Ionic's animations
-// The harness's `settled()` (settled.ts; service-helpers.ts and schedule-helpers.ts hand out the same one), the wait the
+// The harness's `settled()` (helpers.ts; service-helpers.ts and schedule-helpers.ts hand out the same one), the wait the
 // captures and measurements of the specs take: once it returns, nothing on the screen moves any more. Ionic animates
 // its overlays (`ion-modal`, `ion-popover`) with Web Animations on elements of their shadow roots, which
 // `document.getAnimations()` leaves out, and a toast enters with CSS transitions on its own element in the document:
@@ -7,13 +7,9 @@
 // erplora.com's e2e waits the same way.
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture, repeatedTop } from './capture';
-import { createItem, uniqueName } from './demo-items';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { settled as baseSettled } from './settled';
-import { A } from './stack';
+import { A, api, capture, login, settled as baseSettled, shown, uniqueName } from './helpers';
+import { createItem } from './demo-items';
+import { repeatedTop } from './detectors';
 import { signedIn, snap } from './cart-checkout-helpers';
 import { settled as scheduleSettled } from './schedule-helpers';
 import { settled } from './service-helpers';
@@ -154,7 +150,7 @@ test('hub-e2e-capture: settled() keeps waiting when the page reloads under it', 
   expect(await stillMoving(page)).toEqual([]);
 });
 
-test('hub-e2e-capture: the settled() of service-helpers.ts and of schedule-helpers.ts is the one of settled.ts', () => {
+test('hub-e2e-capture: the settled() of service-helpers.ts and of schedule-helpers.ts is the one of helpers.ts', () => {
   expect(settled).toBe(baseSettled);
   expect(scheduleSettled).toBe(baseSettled);
 });

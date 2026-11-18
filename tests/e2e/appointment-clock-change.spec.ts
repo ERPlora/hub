@@ -6,11 +6,7 @@
 // before and after; the settings of Citas are read first and put back by API at the end.
 import { expect, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, psql, shown } from './helpers';
 import { ownerPage, post, VIEWPORTS } from './service-helpers';
 
 const TAG = 'E2E Dst';

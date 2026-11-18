@@ -16,13 +16,9 @@
 // its own from 80 % (BASE-F104). Captured in three sizes.
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture, shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { SAAS, upgradeLandsInside } from './saas';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, psql, shot, shown } from './helpers';
+import { upgradeLandsInside } from './business';
+import { SAAS } from './saas-login';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { messageSends } from './whatsapp-graph';
 import {

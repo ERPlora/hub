@@ -7,11 +7,7 @@
 // it creates is deleted after it, and the series give their numbers back.
 import { expect, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, login, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';

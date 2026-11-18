@@ -10,11 +10,7 @@
 // erplora.com is not looked at here (fix-whatsapp-inbox-template-header-media.spec.ts follows it to Meta's review).
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, capture, login, psql, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 import { photo } from './website-helpers';

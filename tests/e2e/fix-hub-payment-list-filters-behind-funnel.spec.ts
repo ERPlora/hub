@@ -5,13 +5,7 @@
 // Status), and «Apply» still filters the list by status, by date and by amount in euros.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { untilStill } from './settled';
-import { A } from './stack';
+import { A, api, login, psql, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL';
 const TABLE = 'payment-payments';

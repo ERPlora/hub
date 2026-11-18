@@ -7,10 +7,7 @@
 // finds it. Settings saves the default duration. Each screen is captured in three viewports.
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { api } from './hub-api';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, shot, shown } from './helpers';
 import { cleanUp, filterBy, named, ownerPage, pick, post, rowAction, VIEWPORTS, voucherWithNoCustomer } from './service-helpers';
 
 test.beforeAll(cleanUp);

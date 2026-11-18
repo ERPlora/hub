@@ -9,8 +9,7 @@
 // flow: CART_CHECKOUT-F01 CART_CHECKOUT-F05 CART_CHECKOUT-F06 CART_CHECKOUT-F07 CART_CHECKOUT-F09 CART_CHECKOUT-F10 CART_CHECKOUT-F11 CART_CHECKOUT-F12
 import { expect, test } from '@playwright/test';
 
-import { psql } from './psql';
-import { shown } from './screen';
+import { psql, shown } from './helpers';
 import {
   type Cart,
   cleanUp,

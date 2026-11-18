@@ -10,8 +10,9 @@ import { expect, type Page, test } from '@playwright/test';
 import { type Provider, startProvider } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { parkedEvent, RELAY, runNowAsksTheAssistant } from './flow-helpers';
-import { psql } from './psql';
-import { HUB_DIR, STACK } from './stack';
+import { psql } from './helpers';
+import { HUB_DIR } from './stack';
+import { STACK } from './stack';
 
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 

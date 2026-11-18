@@ -13,8 +13,7 @@
 import { expect, test } from '@playwright/test';
 
 import { NOT_DONE } from './assistant-provider';
-import { capture } from './capture';
-import { psql } from './psql';
+import { capture, psql } from './helpers';
 import { approve, signedIn } from './flow-helpers';
 import { askedOnce, chats, inputsOf, workerAsks } from './provider-helpers';
 import { dayAsSaid, madridDay, reservationStatus } from './reservation-helpers';

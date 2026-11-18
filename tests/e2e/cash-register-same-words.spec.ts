@@ -5,12 +5,7 @@
 // Spanish, whose session the fleet's visual sweep reads. Nothing is created.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { capture } from './capture';
-import { api } from './hub-api';
-import { login } from './login';
-import { psql } from './psql';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { dialog } from './inventory-helpers';
 import { stamp } from './sale-helpers';

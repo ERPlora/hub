@@ -11,10 +11,7 @@ import { join } from 'node:path';
 
 import { expect, test } from '@playwright/test';
 
-import { shot } from './capture';
-import { login } from './login';
-import { shown } from './screen';
-import { A } from './stack';
+import { A, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
 import { rowAction } from './service-helpers';
 
