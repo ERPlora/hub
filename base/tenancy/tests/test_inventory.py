@@ -217,6 +217,18 @@ def test_controls_database_as_production_migrates_it_holds_exactly_controls_tabl
     }
 
 
+@pytest.mark.django_db
+def test_the_suites_control_database_holds_exactly_what_productions_does():
+    from django.db import connection
+
+    from base.tenancy.tests import hubs
+
+    found = hubs.table_names(connection.settings_dict["NAME"])
+
+    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
+    assert found == expected, {"not a model's": sorted(found - expected), "missing": sorted(expected - found)}
+
+
 @pytest.mark.django_db(databases=("default",))
 def test_a_hubs_database_holds_exactly_its_apps_tables(hub_databases):
     from base.tenancy.tests import hubs
