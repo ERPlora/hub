@@ -19,8 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanUpCards, inputOf } from './customer-helpers';
-import { A, login, psql, shot, shown } from './helpers';
-import { HUB_DIR } from './stack';
+import { A, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import {
   BUSINESS_PHONE,

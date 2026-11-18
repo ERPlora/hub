@@ -8,8 +8,7 @@
 // fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, psql } from './helpers';
-import { registerBusinessIn } from './business';
+import { A, capture, psql, registerBusinessIn } from './helpers';
 import { atRest, publicPriceLabel, publishedSiteSpec } from './website-helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-PRICES-IN-EUR-WHATEVER-THE-COUNTRY';

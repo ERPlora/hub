@@ -16,8 +16,7 @@ import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, hostPage, shown } from './helpers';
-import { HUB_DIR } from './stack';
+import { A, api, capture, HUB_DIR, hostPage, shown } from './helpers';
 import { productRow, productsReady, searchProducts, VIEWPORTS } from './inventory-helpers';
 
 test.use({ actionTimeout: 30_000 });

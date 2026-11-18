@@ -8,9 +8,9 @@ import { execFileSync } from 'node:child_process';
 
 import { expect, type Page, type Response, test } from '@playwright/test';
 
-import { A, shot } from './helpers';
+import { A, HUB_DIR, shot } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { HUB_DIR, STACK } from './stack';
+import { STACK } from './stack';
 
 /** The registry's rows of this file's hubs, one per gate (base.registry.refusal). */
 const HUBS = {

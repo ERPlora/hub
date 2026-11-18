@@ -2,7 +2,8 @@
 // again and the connection it keeps listening on the run's database.
 import { execSync, spawn } from 'node:child_process';
 
-import { HUB_DIR, REPO_DIR, STACK } from './stack';
+import { HUB_DIR, REPO_DIR } from './helpers';
+import { STACK } from './stack';
 
 const RUNSERVER_LOG = `/tmp/erplora-hub-runserver-${STACK.hubPort}.log`;
 

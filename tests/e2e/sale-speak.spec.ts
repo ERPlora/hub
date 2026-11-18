@@ -12,8 +12,7 @@ import { execSync } from 'node:child_process';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { DICTATION, type Provider, startProvider } from './assistant-provider';
-import { A, EMPLOYEE, login, shot, untilStill } from './helpers';
-import { REPO_DIR } from './stack';
+import { A, EMPLOYEE, login, REPO_DIR, shot, untilStill } from './helpers';
 import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 

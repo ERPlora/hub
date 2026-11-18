@@ -17,8 +17,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, login, psql, shown, untilStill } from './helpers';
-import { HUB_DIR } from './stack';
+import { A, api, capture, horizontalOverflow, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, expectFirstTile, restoreDrawer, stamp, tillGrid } from './sale-helpers';
 import { toastSaying } from './toast-helpers';

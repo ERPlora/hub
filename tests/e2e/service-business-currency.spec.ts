@@ -11,8 +11,7 @@
 // fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, hostPage, login, psql, shot, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, capture, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { openTillCart } from './sale-helpers';
 import { cleanUp as cleanServices, named, noHorizontalScroll, pick, post, settled } from './service-helpers';
 import { dropCountryRules } from './tax-helpers';

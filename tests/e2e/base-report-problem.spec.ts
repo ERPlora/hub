@@ -10,8 +10,7 @@ import { join } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, OWNER, psql, shot, shown, untilStill } from './helpers';
-import { MAIL_DIR } from './saas-login';
+import { A, login, MAIL_DIR, OWNER, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = [
   // A low phone too: the sheet scrolls its fields, and «Send report» stays on screen.

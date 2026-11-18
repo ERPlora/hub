@@ -54,9 +54,9 @@ import { spawnSync } from 'node:child_process';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { capture, psql } from './helpers';
+import { capture, HUB_DIR, psql } from './helpers';
 import { ownerPage, rowAction } from './service-helpers';
-import { HUB_DIR, STACK } from './stack';
+import { STACK } from './stack';
 
 const KEY = 'BASE-F114-RECOVER';
 const PLATFORM = `http://hubs.localhost:${STACK.hubPort}`;

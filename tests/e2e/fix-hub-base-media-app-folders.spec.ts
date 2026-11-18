@@ -9,8 +9,7 @@ import { createHash } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
-import { A, api, capture, hostPage } from './helpers';
-import { turnOn } from './business';
+import { A, api, capture, hostPage, turnOn } from './helpers';
 import { photo } from './website-helpers';
 
 const KEY = 'FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES';

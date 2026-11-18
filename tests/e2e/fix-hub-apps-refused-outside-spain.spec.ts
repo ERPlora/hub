@@ -9,8 +9,19 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy } from './app-rows-helpers';
 import { appNote, expectSwitch, flipApp } from './apps-switch-helpers';
-import { A, api, appRow, hostPage, psql, shown, signedInSpanish, testid } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import {
+  A,
+  api,
+  appRow,
+  hostPage,
+  psql,
+  registerBusinessIn,
+  type Registration,
+  registrationOf,
+  shown,
+  signedInSpanish,
+  testid,
+} from './helpers';
 import { settledCapture } from './screen';
 
 const KEY = 'FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN';

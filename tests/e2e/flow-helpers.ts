@@ -5,9 +5,8 @@ import { execFileSync } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, type Credentials, login, OWNER, psql, saveSessionForTheSweep, shown } from './helpers';
+import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, saveSessionForTheSweep, shown } from './helpers';
 import { settledCapture } from './screen';
-import { HUB_DIR } from './stack';
 import { toastSaying } from './toast-helpers';
 import { OUTBOUND_AT_ONCE } from './whatsapp-helpers';
 

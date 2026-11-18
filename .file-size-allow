@@ -177,7 +177,7 @@
 618 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
 514 tests/e2e/base-access.spec.ts ERPlora/erplora-next#74
-624 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
+638 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
 1167 tests/e2e/base-assistant.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
 635 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
@@ -187,6 +187,7 @@
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74
+1071 tests/e2e/helpers.ts ERPlora/erplora-next#74
 531 tests/e2e/inventory-products.spec.ts ERPlora/erplora-next#74
 516 tests/e2e/invoice-assistant.spec.ts ERPlora/erplora-next#74
 694 tests/e2e/reservation-book.spec.ts ERPlora/erplora-next#74
@@ -194,6 +195,6 @@
 539 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74
 794 tests/e2e/table-flows.spec.ts ERPlora/erplora-next#74
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
-767 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
+765 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74
 520 tests/e2e/whatsapp-graph.ts ERPlora/erplora-next#74
 1201 tests/test_no_internal_references.py ERPlora/erplora-next#74

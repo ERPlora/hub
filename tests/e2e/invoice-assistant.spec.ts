@@ -22,11 +22,10 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { CANNOT_RECTIFY, NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { confirmedWithTheWord, type SentCard, sentCard } from './assistant-card-helpers';
-import { A, api, capture, login, psql, shot, shown, untilStill } from './helpers';
-import { registerBusinessIn, registrationOf } from './business';
+import { A, api, capture, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
-import { REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-INVOICE-NO-VOICE-RECTIFY-WITH-ASSISTANT';

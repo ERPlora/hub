@@ -21,10 +21,24 @@ import { createHmac } from 'node:crypto';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { expectSwitch, flipApp } from './apps-switch-helpers';
-import { A, api, appRow, capture, horizontalOverflow, hostPage, psql, shot, shown, signedInSpanish, testid, untilStill } from './helpers';
+import {
+  A,
+  api,
+  appRow,
+  capture,
+  horizontalOverflow,
+  HUB_DIR,
+  hostPage,
+  psql,
+  shot,
+  shown,
+  signedInSpanish,
+  testid,
+  untilStill,
+} from './helpers';
 import { menuApps } from './topbar';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
-import { HUB_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = {

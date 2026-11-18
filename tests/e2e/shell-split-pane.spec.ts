@@ -6,9 +6,8 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, login, record, shot, shown, uniqueName } from './helpers';
+import { A, login, MY_APPS_DOOR, record, shot, shown, uniqueName } from './helpers';
 import { createItem, listReady } from './demo-items';
-import { MY_APPS_DOOR } from './saas-login';
 import { expectTitleCentred, openApps } from './topbar';
 
 const VIEWPORTS = {

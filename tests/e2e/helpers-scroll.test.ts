@@ -1,6 +1,6 @@
 // @vitest-environment node
 // flow: ninguno — e2e harness (hub#1303)
-// `scrolledTo()` (screen.ts) when the list paints itself again while the spec scrolls to what it found. After
+// `scrolledTo()` (helpers.ts) when the list paints itself again while the spec scrolls to what it found. After
 // `page.setViewportSize`, the DataTable switches between its cards and its rows across its phone breakpoint a frame or
 // more later (its `matchMedia` «change», #274): a spec checks the text in what the size before painted, and Playwright's
 // `locator.scrollIntoViewIfNeeded` takes that element once and keeps it, so it throws «Element is not attached to the
@@ -16,7 +16,7 @@ import type { Locator } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 
 import { E2E_DIR, helpersAndSpecs } from './e2e-sources';
-import { scrolledTo } from './screen';
+import { scrolledTo } from './helpers';
 
 /** One element the fake list paints: a card (a phone) or a row (a tablet or a desk). */
 interface Painted {
@@ -139,10 +139,10 @@ const OWN_RETRIES_LEFT: Record<string, number> = {
   'website-flows.spec.ts': 1,
 };
 
-describe('the e2e scrolls past a repaint one way, with scrolledTo of screen.ts (hub#1303)', () => {
+describe('the e2e scrolls past a repaint one way, with scrolledTo of helpers.ts (hub#1303)', () => {
   it('there are helpers and specs to look at, the shared helper and the lists that scrolled their own way among them', () => {
     expect(helpersAndSpecs()).toEqual(
-      expect.arrayContaining(['screen.ts', 'reservation-book.spec.ts', 'tax-helpers.ts', 'website-flows.spec.ts', 'qa/assistant-battery.spec.ts']),
+      expect.arrayContaining(['helpers.ts', 'reservation-book.spec.ts', 'tax-helpers.ts', 'website-flows.spec.ts', 'qa/assistant-battery.spec.ts']),
     );
     expect(helpersAndSpecs().filter((name) => name.endsWith('.test.ts'))).toEqual([]);
   });
@@ -153,7 +153,7 @@ describe('the e2e scrolls past a repaint one way, with scrolledTo of screen.ts (
         .map((name) => [name, scrollRetries(readFileSync(join(E2E_DIR, name), 'utf8')).length] as const)
         .filter(([, retries]) => retries > 0),
     );
-    expect(own, 'a new scroll past a repaint is scrolledTo(target) of screen.ts; a file that moved lowers its count').toEqual(
+    expect(own, 'a new scroll past a repaint is scrolledTo(target) of helpers.ts; a file that moved lowers its count').toEqual(
       OWN_RETRIES_LEFT,
     );
   });

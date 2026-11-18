@@ -8,8 +8,7 @@
 // flow: none — the Hub's CSP, which WHATSAPP_INBOX-F06 needs
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown } from './helpers';
-import { onSaas, SAAS } from './saas-login';
+import { A, login, onSaas, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { cleanUp, e2ePhone, keepPhoto, PREFIX, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
 

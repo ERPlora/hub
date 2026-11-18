@@ -16,10 +16,9 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { sentCard, type SentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
-import { A, api, capture, login, psql, untilStill } from './helpers';
-import { turnOffTurnedOn, turnOnMissing } from './business';
+import { A, api, capture, login, psql, REPO_DIR, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { forgetDevices } from './printing-helpers';
-import { REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 /** An id as a schema's `format: uuid` takes it: never on a card. */

@@ -10,8 +10,7 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, login, untilStill } from './helpers';
-import { HUB_DIR } from './stack';
+import { A, capture, HUB_DIR, horizontalOverflow, login, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-PALETTE-NAMES-WHOLE';
 /** Each width and how many palette cards go in a row there. */

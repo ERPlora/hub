@@ -12,10 +12,10 @@ import { promisify } from 'node:util';
 import { expect, type Page, test } from '@playwright/test';
 
 import { DONE, type Provider, startProvider } from './assistant-provider';
-import { capture, psql, shown } from './helpers';
+import { capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { HUB_DIR, REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { pick } from './task-helpers';
 import { toastSaying } from './toast-helpers';
 import { openAssistant } from './topbar';

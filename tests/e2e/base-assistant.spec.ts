@@ -12,8 +12,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { ownerIn, sentCard, thisDeviceNamed } from './assistant-card-helpers';
 import { CLAIM_ANSWER, DICTATION, DONE, GREETING, NOT_DONE, type Provider, STEPS_SAID } from './assistant-provider';
 import { saasSql } from './assistant-real';
-import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
-import { turnOffTurnedOn, turnOnMissing, upgradeLandsInside } from './business';
+import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, shot, shown, THREE_SIZES as VIEWPORTS, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { seededProvider } from './provider-helpers';
 import {  } from './stack';

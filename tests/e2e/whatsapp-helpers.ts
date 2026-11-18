@@ -50,10 +50,9 @@ import { dirname, join, resolve } from 'node:path';
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 
 import { WORKER_START_TIMEOUT_MS } from './global-setup';
-import { ARTIFACTS, capture, psql } from './helpers';
-import { SAAS } from './saas-login';
+import { ARTIFACTS, capture, HUB_DIR, psql, REPO_DIR, SAAS } from './helpers';
 import { capturedAtSizes, FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { HUB_DIR, REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import {
   BUSINESS_ID,
   configProblem,

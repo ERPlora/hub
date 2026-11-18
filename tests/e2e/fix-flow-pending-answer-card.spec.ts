@@ -14,10 +14,10 @@ import { promisify } from 'node:util';
 import { expect, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, psql, shown } from './helpers';
+import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { manualFlow, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { HUB_DIR, REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES';

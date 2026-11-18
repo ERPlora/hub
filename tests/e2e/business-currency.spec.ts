@@ -8,8 +8,7 @@
 // registration put back.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { createProduct, dialog, productsReady } from './inventory-helpers';
 import { ensureIssuer, issuedIds, issuerBackAndInvoicesGone, issuerNow, type IssuerOut, snapshotSeries } from './invoice-helpers';

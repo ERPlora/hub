@@ -5,8 +5,7 @@
 // old module's screens; the page never scrolls sideways.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, login, shot, shown } from './helpers';
-import { topbarApps } from './saas-login';
+import { A, api, horizontalOverflow, login, shot, shown, topbarApps } from './helpers';
 import { staffCleanUp } from './staff-helpers';
 import { openApps } from './topbar';
 

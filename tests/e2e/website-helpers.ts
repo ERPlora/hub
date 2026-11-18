@@ -1,8 +1,7 @@
 // What the specs of the website editor (website*.spec.ts and the fixes seen in it) share and the rest of the e2e does not.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, settled } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, hostPage, type Registration, registerBusinessIn, registrationOf, settled } from './helpers';
 
 /** The site as `GET /website/site` answers it: what a spec puts back after. */
 export interface Site {

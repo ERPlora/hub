@@ -28,10 +28,9 @@ import { inflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
-import { topbarApps } from './saas-login';
+import { A, capture, HUB_DIR, login, psql, saveSessionForTheSweep, shot, shown, topbarApps } from './helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, type IssuerOut, snapshotSeries } from './invoice-helpers';
-import { HUB_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 
 /** The secret `/internal` is signed with; the local default of both projects. */

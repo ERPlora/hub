@@ -11,8 +11,7 @@
 // checks «e2e kbd <run> …» and their tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shown, untilStill } from './helpers';
-import { collectProblems } from './saas-login';
+import { A, api, collectProblems, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { capture } from './kitchen-helpers';
 import { cleanSales, stamp } from './sale-helpers';

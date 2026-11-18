@@ -10,8 +10,7 @@
 // deleted before and after the run, and `a`'s registration is put back, also when a test fails.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, horizontalOverflow, psql, settled, shot, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, horizontalOverflow, psql, registerBusinessIn, registrationOf, type Registration, settled, shot, shown } from './helpers';
 import { type Cart, cleanUp, code, FLOW_VIEWPORTS, listShown, type Order, post, rowOf, signedIn } from './cart-checkout-helpers';
 
 const KEY = 'FIX-HUB-CART_CHECKOUT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';

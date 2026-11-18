@@ -11,9 +11,6 @@
 // database is named after that one, so `DB_NAME` is all a run needs to be on its own; without it, or with
 // `hub`, the run is refused.
 
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 type Env = Record<string, string | undefined>;
 
 export interface Stack {
@@ -109,7 +106,3 @@ export function stackFrom(env: Env): Stack {
 
 /** The stack of this run, from its environment. */
 export const STACK = stackFrom(process.env);
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-export const HUB_DIR = join(HERE, '..', '..');
-export const REPO_DIR = join(HUB_DIR, '..');

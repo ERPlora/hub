@@ -10,8 +10,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
-import { topbarApps } from './saas-login';
+import { A, login, psql, shot, shown, topbarApps } from './helpers';
 import { FLOW_VIEWPORTS } from './invoice-helpers';
 import { STACK } from './stack';
 

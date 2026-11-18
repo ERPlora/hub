@@ -25,7 +25,7 @@ import { join } from 'node:path';
 import { type Page, type TestInfo, test } from '@playwright/test';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-// The folder the fake SaaS mails its codes to, which saas-login.ts reads as it loads (`MAIL_DIR`). Hoisted above the
+// The folder the fake SaaS mails its codes to, which helpers.ts reads as it loads (`MAIL_DIR`). Hoisted above the
 // imports, so no import is at hand here: the folder itself is made in `beforeAll`.
 const MAIL = vi.hoisted(() => {
   const dir = `${(process.env.TMPDIR ?? '/tmp').replace(/\/?$/, '/')}helpers-login-mail-${process.pid}-${Date.now()}`;
@@ -33,8 +33,7 @@ const MAIL = vi.hoisted(() => {
   return dir;
 });
 
-import { login, OWNER } from './helpers';
-import { SAAS, SAAS_CODE, SAAS_SIGN_IN } from './saas-login';
+import { login, OWNER, SAAS, SAAS_CODE, SAAS_SIGN_IN } from './helpers';
 
 const HUB = 'http://bar.localhost:8000';
 /** The config's time for a test (playwright.config.ts). */

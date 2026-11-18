@@ -45,8 +45,7 @@ import {
   seedRealProviders,
   TURN_MS,
 } from '../assistant-real';
-import { A, api, ARTIFACTS, capture, type Credentials, EMPLOYEE, hostPage, OWNER } from '../helpers';
-import { HUB_DIR } from '../stack';
+import { A, api, ARTIFACTS, capture, type Credentials, EMPLOYEE, HUB_DIR, hostPage, OWNER } from '../helpers';
 import { STACK } from '../stack';
 
 const REAL = process.env.QA_REAL_PROVIDER === '1';

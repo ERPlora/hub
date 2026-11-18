@@ -6,8 +6,7 @@
 // `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { createProduct } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 import { post, settled } from './service-helpers';

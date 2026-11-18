@@ -10,8 +10,18 @@
 // under the price of a new product (the money field, `MoneyInput`), at 390, 834 and 1440.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, saveSessionForTheSweep, shown, untilStill } from './helpers';
-import { registerBusinessIn, registrationOf, turnOffTurnedOn, turnOnMissing } from './business';
+import {
+  A,
+  capture,
+  login,
+  registerBusinessIn,
+  registrationOf,
+  saveSessionForTheSweep,
+  shown,
+  turnOffTurnedOn,
+  turnOnMissing,
+  untilStill,
+} from './helpers';
 import { signedIn, VIEWPORTS } from './cart-checkout-helpers';
 import { dialog } from './inventory-helpers';
 

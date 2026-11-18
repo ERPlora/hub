@@ -17,8 +17,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy, bounceTasks } from './app-rows-helpers';
-import { A, api, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
-import { emptyOfTemplateData, registerBusinessIn, registrationOf } from './business';
+import { A, api, horizontalOverflow, hostPage, psql, registerBusinessIn, registrationOf, shot, shown, untilStill } from './helpers';
+import { emptyOfTemplateData } from './business';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

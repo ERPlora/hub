@@ -10,8 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 
 import { signedIn } from './flow-helpers';
-import { A, api, psql, shot, shown } from './helpers';
-import { HUB_DIR } from './stack';
+import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 
 const TAG = 'E2E FlowR';

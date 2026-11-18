@@ -15,8 +15,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, painted, psql, shown, untilStill } from './helpers';
-import { HUB_DIR } from './stack';
+import { A, api, capture, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
 import { capturedAtSizes, rowAction } from './service-helpers';
 
 const TAG = 'E2E Combo';

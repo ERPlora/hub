@@ -5,8 +5,7 @@ import { readFileSync } from 'node:fs';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
-import { collectProblems } from './saas-login';
+import { A, collectProblems, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },

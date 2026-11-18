@@ -7,8 +7,7 @@
 // `a`'s registration and whether its online page takes bookings are put back, also when a test fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, hostPage, login, settled, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, capture, hostPage, login, registerBusinessIn, registrationOf, type Registration, settled, shown } from './helpers';
 import { cleanUp, FLOW_VIEWPORTS, named, noHorizontalScroll, post } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 

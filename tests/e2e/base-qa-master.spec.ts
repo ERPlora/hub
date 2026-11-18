@@ -14,10 +14,20 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { closeActionCenter, openActionCenter } from './action-center';
 import { GREETING, type Provider, startProvider } from './assistant-provider';
-import { api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
-import { SAAS } from './saas-login';
+import {
+  api,
+  horizontalOverflow,
+  HUB_DIR,
+  login,
+  psql,
+  REPO_DIR,
+  SAAS,
+  shot,
+  shown,
+  untilStill,
+} from './helpers';
 import { type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
-import { HUB_DIR, REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { openApps, openAssistant } from './topbar';
 import { type Language, loadCatalog, normalText, rawKeys, wrongLanguage } from './translations';
 

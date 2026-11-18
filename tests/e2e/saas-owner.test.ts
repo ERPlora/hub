@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import type { BrowserContext } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 
-import { SAAS } from './saas-login';
+import { SAAS } from './helpers';
 import { saasPost } from './saas-owner';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

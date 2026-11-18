@@ -19,10 +19,9 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
-import { A, api, capture, login, psql, untilStill } from './helpers';
-import { turnOffTurnedOn, turnOnMissing } from './business';
+import { A, api, capture, login, psql, REPO_DIR, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { createProduct, post, stamp } from './pricing-helpers';
-import { REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-PRICING-PRICE-UPDATE-CARD-IN-THE-BUSINESS-CURRENCY';
 const REFERENCES_KEY = 'FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';

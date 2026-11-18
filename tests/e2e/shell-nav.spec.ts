@@ -7,10 +7,8 @@ import { join } from 'node:path';
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
-import { A, login, record, shot, shown, THREE_SIZES as VIEWPORTS, uniqueName } from './helpers';
+import { A, HUB_DIR, login, MY_APPS_DOOR, record, shot, shown, THREE_SIZES as VIEWPORTS, topbarApps, uniqueName } from './helpers';
 import { createItem, listReady } from './demo-items';
-import { MY_APPS_DOOR, topbarApps } from './saas-login';
-import { HUB_DIR } from './stack';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
 import { toastWithId } from './toast-helpers';
 import { openApps } from './topbar';

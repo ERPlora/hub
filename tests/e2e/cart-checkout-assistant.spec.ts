@@ -20,9 +20,7 @@ import { sentCard } from './assistant-card-helpers';
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
 import { type Cart, cleanUp, code, get, type Line, type Order, post } from './cart-checkout-helpers';
-import { A, capture, exposeMovingInPage, login, shot, untilStill } from './helpers';
-import { turnOffTurnedOn, turnOnMissing } from './business';
-import { REPO_DIR } from './stack';
+import { A, capture, exposeMovingInPage, login, REPO_DIR, shot, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-CART_CHECKOUT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';

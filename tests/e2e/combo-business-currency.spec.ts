@@ -9,8 +9,7 @@
 // put back, also when a test fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, hostPage, login, psql, shot, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, horizontalOverflow, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { rowAction, settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-COMBO-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';

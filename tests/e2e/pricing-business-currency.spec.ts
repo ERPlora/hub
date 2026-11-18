@@ -10,8 +10,7 @@
 // test fails.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { createProduct, dialog, post, ready, row, search, stamp } from './pricing-helpers';
 import { rowAction, settled } from './service-helpers';
 

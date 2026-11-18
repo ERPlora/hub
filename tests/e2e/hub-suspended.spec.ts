@@ -8,9 +8,8 @@
 // the gate's envelope) or at its live stream's next run (the Hub ends the stream, its reconnection hears the gate).
 import { expect, type Page, test } from '@playwright/test';
 
-import { api, B, hostPage, psql, shot, uniqueName } from './helpers';
+import { api, B, collectProblems, hostPage, psql, SAAS, shot, uniqueName } from './helpers';
 import { fillNewItem, listReady } from './demo-items';
-import { collectProblems, SAAS } from './saas-login';
 
 const SIZES = [
   { name: '390', width: 390, height: 844 },

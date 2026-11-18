@@ -3,8 +3,7 @@
 // «My apps» and the assistant are rows of «⋮», and each one opens once the menu has gone.
 import { expect, type Locator, type Page } from '@playwright/test';
 
-import { shown } from './helpers';
-import { MY_APPS_DOOR } from './saas-login';
+import { MY_APPS_DOOR, shown } from './helpers';
 
 /** Whether the page is a phone's (under 768 px): the shell folds «My apps» and the assistant into «⋮». */
 export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;

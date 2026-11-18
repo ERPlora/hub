@@ -6,9 +6,8 @@
 // reports the browser would POST to `/csp-report/`.
 import { expect, test } from '@playwright/test';
 
-import { A, login, record, shot, shown, uniqueName } from './helpers';
+import { A, login, onSaas, record, shot, shown, uniqueName } from './helpers';
 import { createItem, listReady, rowOf } from './demo-items';
-import { onSaas } from './saas-login';
 
 test('CSP header with nonce, strict-dynamic, Trusted Types and connect-src ipc:; zero violations on every demo screen', async ({ page, context }) => {
   const cspConsole: string[] = [];

@@ -26,10 +26,10 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { confirmedWithTheWord } from './assistant-card-helpers';
-import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, capture, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
-import { REPO_DIR, STACK } from './stack';
+import { STACK } from './stack';
 import { openAssistant as openPanel } from './topbar';
 
 const KEY = 'FIX-CASH_REGISTER-NO-VOICE-CLOSE-WITH-ASSISTANT';

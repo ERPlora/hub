@@ -11,8 +11,7 @@
 // without one Sales refuses the charge with `sale.no_tax_rule`; the run mounts it and deletes it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
-import { registerBusinessIn, type Registration, registrationOf } from './business';
+import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 import { noHorizontalScroll, post, rowAction, settled } from './service-helpers';
