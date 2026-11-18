@@ -21,6 +21,7 @@ HOOKS = ("pre-push", "commit-msg", "pre-commit", "applypatch-msg")
 ZERO = "0" * 40
 STAND_IN = """#!/usr/bin/env bash
 printf '%s|%s|%s\\n' "$*" "$PWD" "${UV_PROJECT_ENVIRONMENT:-}" >> "$CHECKS_LOG"
+git rev-parse HEAD >> "$CHECKS_LOG.heads"
 exit "$(cat verdict)"
 """
 RECORDER = """#!/usr/bin/env bash
@@ -98,6 +99,9 @@ class Sandbox:
             return []
         return [line.split("|") for line in self.checks_log.read_text(encoding="utf-8").splitlines()]
 
+    def checked_heads(self) -> list[str]:
+        return Path(f"{self.checks_log}.heads").read_text(encoding="utf-8").split()
+
     def use_global_hooks(self, path: Path, verdict: int = 0) -> None:
         self.global_log.with_suffix(".verdict").write_text(f"{verdict}\n", encoding="utf-8")
         self.git("config", "--global", "core.hooksPath", str(path))
@@ -169,6 +173,14 @@ def test_the_checks_run_on_the_pushed_commit_and_never_on_the_working_tree(sandb
     assert all(place.is_relative_to(sandbox.scratch) for place in places)
     assert list(sandbox.scratch.iterdir()) == []
     assert sandbox.git("worktree", "list", "--porcelain").count("worktree ") == 1
+
+
+def test_git_inside_the_checks_reads_the_pushed_commit_even_when_the_push_names_its_repository(sandbox):
+    pushed = sandbox.commit(verdict=0)
+    sandbox.commit(verdict=0)
+    sandbox.env["GIT_DIR"] = str(sandbox.work / ".git")
+    assert sandbox.push(f"{pushed}:refs/heads/a").returncode == 0
+    assert sandbox.checked_heads() == [pushed]
 
 
 @pytest.mark.parametrize("chosen, folder", [(None, ".venv"), ("elsewhere", "elsewhere")])
