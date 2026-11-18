@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d4aafce230b7313f0d8b4efd247e584150ca4c2c87e0ae63948f6968e2cddbad -->
+<!-- generated from WORKBOOK.md sha256:f8d40c816a39096416fa2f77cc0ac3c3570ad245963a3df3a12ceede275fb8db -->
 
 ## What it is for and who it is for
 
@@ -102,6 +102,13 @@ Sales & POS opens from the **Sales & POS** menu and has five entries: **Sell**, 
 word fits in a phone's tab bar with all five in sight.
 
 ### Sell
+This is the till: here you build the customer's check and take the payment. Tap the articles or the
+services in the catalogue to add them to the check, change the quantity or give them a note or a discount
+if needed, and press **Charge** to choose how they pay. If the customer is not leaving yet, park the
+check and pick it up later from **Open checks**; in a restaurant, this is also where you take the check
+to a table and send the order to the kitchen.
+
+#### Details
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
 "Exit full screen" (the browser's, when the device allows it) and it closes by tapping outside, with Esc
 or with the phone's back button. Two areas:
@@ -171,6 +178,11 @@ Esc or with the phone's back button.
 is not an invoice. The fiscal receipt is issued on payment.", and the print and close buttons.
 
 ### Sales
+Here are the sales already charged, with the figures for today or for the period you choose. Look a sale
+up by its number or by the customer to see its ticket, reprint it, void it or refund it. If you are not
+allowed to void or refund, a manager approves it for you with their PIN.
+
+#### Details
 Title "Sales", period ("Today", "7 days", "30 days", "All"), six figures ("Tickets", "Revenue", "Avg.
 ticket", "VAT", "Discounts", "Voided") and the table (Date, Number, Customer, Payment, Status, Total) with
 the search "Search number or customer…", filters, table or card view, 50 per page. Per row: "Document",
@@ -199,16 +211,30 @@ Window "Void sale <number>", opened by "Void": the explanation, the "Reason (req
 opens "An approval is needed" on top, where a manager approves it with their PIN.
 
 ### Quick notes
+Here you set up the notes that come up most often on the lines of a check, such as "no salt". Then, when
+you put a note on a line in **Sell**, they show as buttons and you just tap them instead of typing them.
+
+#### Details
 Explanation, table (Note, Position) with search, **+** to add and, per row, "Edit" and "Delete". Empty:
 "No quick notes yet…"; loading: "Loading quick notes…". Whoever lacks the settings permission sees it
 without **+** or actions.
 
 ### Sections
+Sections are the till's departments for charging something that is not in the catalogue, at an open
+price, such as fruit and vegetables. Here you create them, each with the VAT it charges and in the order
+they show. When you tap **Open price** in **Sell**, you pick the section and type the amount.
+
+#### Details
 Explanation, table (Name, VAT charged, Position), **+** and, per row, "Edit" and "Delete". Empty: "No
 sections yet…"; loading: "Loading sections…". Whoever lacks the settings permission sees it without
 **+** or actions.
 
 ### Settings
+Here you decide how the till charges: which payment methods it takes, whether every sale needs a
+customer, whether discounts are allowed and whether it gives a ticket or an invoice by default. You also
+write what goes at the top and the bottom of the receipt. Press **Save** for the changes to take effect.
+
+#### Details
 Header "Point of sale": a switch or field per setting and "Save". Loading: "Loading
 settings…"; error: "Could not load settings." with "Retry"; without permission: "You do not have
 permission to change these settings. Ask an administrator if you need to.".

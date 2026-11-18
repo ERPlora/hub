@@ -112,6 +112,13 @@ Ventas / TPV se abre desde el menú **Ventas / TPV** y tiene cinco entradas: **V
 palabra corta cabe en la barra de pestañas de un móvil con las cinco a la vista.
 
 ### Vender
+Es la caja: aquí se hace la cuenta del cliente y se cobra. Toca los artículos o los servicios del
+catálogo para añadirlos a la cuenta, cambia la cantidad o ponles una nota o un descuento si hace falta, y
+pulsa **Cobrar** para elegir cómo paga. Si el cliente aún no se va, aparca la cuenta y retómala después
+desde **Cuentas abiertas**; en un restaurante, desde aquí también se lleva la cuenta a una mesa y se
+envía la comanda a cocina.
+
+#### Detalle
 Se abre a pantalla completa de la aplicación; el menú ⋮ de la tira de categorías tiene «Pantalla
 completa» / «Salir de pantalla completa» (la del navegador, cuando el dispositivo la permite) y se
 cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
@@ -181,6 +188,11 @@ Ventana «Cuenta» que abre la impresora del pie («Imprimir cuenta»): el papel
 — no es una factura. El tique fiscal se entrega al cobrar.», y los botones de imprimir y cerrar.
 
 ### Ventas
+Aquí están las ventas ya cobradas, con las cifras del día o del periodo que elijas. Busca una venta por
+su número o por el cliente para ver su tique, reimprimirlo, anularla o devolverla. Si no tienes permiso
+para anular o devolver, un responsable te lo aprueba con su PIN.
+
+#### Detalle
 Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tiques», «Ingresos»,
 «Tique medio», «IVA», «Descuentos», «Anuladas») y la tabla (Fecha, Número, Cliente, Pago, Estado,
 Total) con el buscador «Buscar número o cliente…», filtros, vista tabla o tarjetas, 50 por página.
@@ -210,16 +222,30 @@ Ventana «Anular la venta <número>», que abre «Anular»: la explicación, el 
 anular, «Anular» abre encima «Hace falta una aprobación», donde un responsable lo aprueba con su PIN.
 
 ### Notas rápidas
+Aquí se preparan las notas que más se repiten en las líneas de una cuenta, como «sin sal». Luego, al
+poner una nota a una línea en **Vender**, salen como botones y basta con tocarlas en vez de escribirlas.
+
+#### Detalle
 Explicación, tabla (Nota, Posición) con buscador, **+** para añadir y, por fila, «Editar» y
 «Eliminar». Vacía: «Todavía no hay notas rápidas…»; cargando: «Cargando notas rápidas…». Quien no
 tiene el permiso de ajustes la ve sin **+** ni acciones.
 
 ### Secciones
+Las secciones son los departamentos de la caja para cobrar algo que no está en el catálogo, a precio
+libre, como las frutas y verduras. Aquí se crean, cada una con el IVA que cobra y en el orden en que
+salen. Al tocar **Precio libre** en **Vender**, eliges la sección y escribes el importe.
+
+#### Detalle
 Explicación, tabla (Nombre, IVA que cobra, Posición), **+** y, por fila, «Editar» y «Eliminar». Vacía:
 «Todavía no hay secciones…»; cargando: «Cargando secciones…». Quien no tiene el permiso de
 ajustes la ve sin **+** ni acciones.
 
 ### Ajustes
+Aquí se decide cómo cobra la caja: qué formas de pago acepta, si exige cliente en cada venta, si deja
+hacer descuentos y si da tique o factura por defecto. También se escribe lo que sale arriba y abajo del
+recibo. Pulsa **Guardar** para que los cambios valgan.
+
+#### Detalle
 Cabecera «TPV»: un interruptor o campo por ajuste y «Guardar». Cargando: «Cargando
 ajustes…»; error: «No se pudieron cargar los ajustes.» con «Reintentar»; sin permiso: «No tienes
 permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
@@ -1773,9 +1799,10 @@ es una línea.
 
 ### Lo que la ventana de ayuda no enseña
 
-La ayuda del Hub (`base.help.get`) publica el primer apartado, cada pantalla con sus ventanas `####` y, de cada
-flujo hecho con pantalla, su título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, tamaños ni
-ids de flujo (`tests/test_help_workbooks.py`). Lo que esas partes no dicen, y quien mantiene Ventas necesita:
+La ayuda del Hub (`base.help.get`) publica el primer apartado, el resumen de cada pantalla (lo que va antes de su
+primer `####`; lo que cuelga de un `####` es detalle y no se publica) y, de cada flujo hecho con pantalla, su
+título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, tamaños ni ids de flujo
+(`tests/test_help_workbooks.py`). Lo que esas partes no dicen, y quien mantiene Ventas necesita:
 
 - **Vender**: la rejilla pide los artículos de 100 en 100 por categoría, y el buscador de productos y el de mesas
   buscan en el servidor; el total de la cuenta y el importe del cobro son los que calcula el servidor. El cajón del
@@ -1784,7 +1811,7 @@ ids de flujo (`tests/test_help_workbooks.py`). Lo que esas partes no dicen, y qu
 - **Cobro**: la fila de «Entregado» tiene alto fijo y las teclas no se mueven bajo el dedo (hub#456). La fila que
   otra app añade al cobro (la propina) aún no existe: es SALE-F39, `no hecho`.
 - **SALE-F01**: con el móvil tumbado o una ventana de hasta 500 px de alto, el catálogo se desplaza con la página,
-  con el botón flotante a la vista, y la cuenta tapa la franja roja y la barra de pestañas (hub#800); en un móvil de
+  con el botón flotante a la vista, y la cuenta tapa la barra de pestañas (hub#800); en un móvil de
   320×568 el importe del cobro sube junto al título (hub#630). El cobro pide el tique a la cola de Impresión en su
   misma transacción, y la orden de abrir el cajón si entró efectivo (PRINTING-F07, PRINTING-F13). Sin moneda no se
   pinta ninguna cifra porque no se sabe cuántos decimales tiene (en yenes, «Cobrar · 15,00» para 1.500 ¥, y
@@ -1823,13 +1850,12 @@ ids de flujo (`tests/test_help_workbooks.py`). Lo que esas partes no dicen, y qu
 - **SALE-F20**: «Enviar comanda (N)» se queda fija también en «Cuenta», la pestaña con la que se abre una cuenta (al
   pulsar «Cobrar» en una mesa de Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
   (hub#1017). En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a
-  las pestañas y a una línea; en un móvil más bajo (320×568 con la franja roja) se desplazan con las líneas y
-  «Cobrar» sigue a la vista, y lo mismo en la columna lateral de una tableta de 1024×600 con la franja (hub#787). En
-  la columna lateral, si la cabecera, las pestañas y «Enviar comanda» no dejan sitio a una línea entera (1024×600,
-  1024×700 o 1280×560 sin la franja; 1024×700, 1024×768, 1280×720 o 1280×800 con ella), la columna se desplaza
-  entera, en las dos pestañas, con «Enviar comanda» fija abajo; donde la línea cabe, la cabecera y las pestañas se
-  quedan quietas y solo se desplazan las líneas (hub#820). Las dos pestañas se ven y se tocan enteras en cualquier
-  tamaño (hub#1435). Seguir las rondas y marcar una urgente es KITCHEN-F19 y KITCHEN-F20.
+  las pestañas y a una línea; en un móvil más bajo se desplazan con las líneas y «Cobrar» sigue a la vista, y lo
+  mismo en la columna lateral de una pantalla igual de baja (hub#787). En la columna lateral, si la cabecera, las
+  pestañas y «Enviar comanda» no dejan sitio a una línea entera (1024×600, 1024×700 o 1280×560), la columna se
+  desplaza entera, en las dos pestañas, con «Enviar comanda» fija abajo; donde la línea cabe, la cabecera y las
+  pestañas se quedan quietas y solo se desplazan las líneas (hub#820). Las dos pestañas se ven y se tocan enteras
+  en cualquier tamaño (hub#1435). Seguir las rondas y marcar una urgente es KITCHEN-F19 y KITCHEN-F20.
 - **SALE-F21 y SALE-F29**: el papel va a la cola de Impresión (PRINTING-F09 y PRINTING-F08). Sin moneda, la cuenta
   para la mesa nunca sale con una cifra supuesta (en yenes, 2.700 ¥ como «27,00»; hub#936). «Emitir ahora» pide a
   Facturación los documentos por nombre y con la sesión de quien lo pulsa; el reintento solo es INVOICE-F06. La
