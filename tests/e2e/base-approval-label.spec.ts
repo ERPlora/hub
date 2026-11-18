@@ -15,7 +15,8 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { type Provider, startProvider } from './assistant-provider';
 import { openPanel } from './assistant-real';
-import { A, api, createItem, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
+import { createItem } from './demo-items';
 import { STACK } from './stack';
 import { toastSaying } from './toast-helpers';
 

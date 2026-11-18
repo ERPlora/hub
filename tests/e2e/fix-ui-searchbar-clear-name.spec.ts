@@ -6,7 +6,9 @@
 // flow: ui-datatable-search
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
-import { A, decodeSubs, hostPage, listReady, shot, shown, untilStill } from './helpers';
+import { A, hostPage, shot, shown, untilStill } from './helpers';
+import { listReady } from './demo-items';
+import { decodeSubs } from './live-streams';
 
 const KEY = 'FIX-UI-SEARCHBAR-CLEAR-BUTTON-SAYS-RESET';
 const VIEWPORTS = [

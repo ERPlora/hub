@@ -8,18 +8,8 @@
 // flow: BASE-F39 PRINTING-F21
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import {
-  A,
-  api,
-  EMPLOYEE,
-  hostPage,
-  saveSessionForTheSweep,
-  settledCapture,
-  signedInSpanish,
-  testid,
-  turnOffTurnedOn,
-  turnOnMissing,
-} from './helpers';
+import { A, api, EMPLOYEE, hostPage, saveSessionForTheSweep, signedInSpanish, testid, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { settledCapture } from './screen';
 import { STACK } from './stack';
 
 const VIEWPORTS = {

@@ -8,7 +8,8 @@
 // 1440. What this file creates — the product `E2E-MST-<run>` and the group «E2E Mod Settled … <run>» — is deleted after it.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, exposeMovingInPage, hostPage, psql, repeatedTop, shown, untilStill } from './helpers';
+import { A, api, capture, exposeMovingInPage, hostPage, psql, shown, untilStill } from './helpers';
+import { repeatedTop } from './detectors';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { drawerOff, restoreDrawer, stamp } from './sale-helpers';
 

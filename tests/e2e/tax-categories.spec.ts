@@ -7,7 +7,8 @@
 // deleted after the file (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown, THREE_SIZES as FILTER_VIEWPORTS, THREE_SIZES_TALL_TABLET as VIEWPORTS } from './helpers';
+import { A, api, login, shot, shown, THREE_SIZES as FILTER_VIEWPORTS } from './helpers';
+import { THREE_SIZES_TALL_TABLET as VIEWPORTS } from './screen';
 import { noHorizontalScroll } from './service-helpers';
 import { cleanUp } from './tax-helpers';
 import { discardChanges } from './unsaved-back-helpers';

@@ -7,7 +7,8 @@
 // helpers.ts), at 390, 834 and 1440. The dialog is cancelled each time: the site is not published.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, exposeMovingInPage, hostPage, repeatedTop } from './helpers';
+import { A, capture, exposeMovingInPage, hostPage } from './helpers';
+import { repeatedTop } from './detectors';
 import { atRest } from './website-helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-E2E-WAIT-BLIND-TO-SHADOW-ROOTS';

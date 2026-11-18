@@ -8,7 +8,8 @@
 // helpers.ts), at 390, 834 and 1440. What this file creates is deleted after it.
 import { type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, exposeMovingInPage, hostPage, repeatedTop, shown, untilStill } from './helpers';
+import { A, api, capture, exposeMovingInPage, hostPage, shown, untilStill } from './helpers';
+import { repeatedTop } from './detectors';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
