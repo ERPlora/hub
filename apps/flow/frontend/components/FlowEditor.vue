@@ -273,8 +273,8 @@ async function run(): Promise<void> {
     const ran = await runNow.run({ id: props.flow.id });
     if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
     // A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38).
-    else if (ran.status === 'calling' && doc.value.steps[ran.step_index]?.kind === 'assistant') void toastSuccess(t('flow.editor.ranThinking'));
-    else void toastSuccess(t(RAN_NOTICE[ran.status] ?? 'flow.editor.ran'));
+    else if (ran.status === 'calling' && doc.value.steps[ran.step_index]?.kind === 'assistant') toastSuccess(t('flow.editor.ranThinking'));
+    else toastSuccess(t(RAN_NOTICE[ran.status] ?? 'flow.editor.ran'));
   } catch (failure) {
     problem.value = wording(failure, phrasing.value.t('flow.errors.action'));
   }

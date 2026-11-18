@@ -1344,14 +1344,14 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
 
 class TestTheMinorPoints:
     def test_the_switch_locks_the_lease_it_checks(self, moves):
-        from django.db import connection
+        from django.db import connections
         from django.test.utils import CaptureQueriesContext
 
         target = moves.cluster()
         hub = moves.hub(to=target)
         with use_control():
             move.services.provisioning.claim_hub(hub.id, AT, move.LEASE)
-            with CaptureQueriesContext(connection) as queries:
+            with CaptureQueriesContext(connections["default"]) as queries:
                 move.control_services.move_finished(
                     hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.provisioning.LEASE_OWNER
                 )

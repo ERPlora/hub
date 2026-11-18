@@ -7,7 +7,8 @@ Taxes) hold for an import too. Rows name each other by their natural key (a prod
 zone by name), never by an id of the business that made the file. People, PINs and fiscal data never travel: there is
 no dataset for them, and a file that brings one has it discarded.
 
-Every test here runs against the real apps (inventory, service, table, customer), never a stand-in.
+Every test here runs against the real apps (inventory, service, table, customer), never a stand-in, in business A's own
+database, as production does.
 """
 
 import base64
@@ -18,22 +19,23 @@ import zipfile
 
 import pytest
 from django.contrib.auth import get_user_model
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.operations import get
 
 from base import blueprint, catalog
 from base.models import Membership
 from base.permissions import permissions_for
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HUB_DB, A, B, in_business_a
 
-pytestmark = pytest.mark.django_db
-
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
+pytestmark = HUB_DB
 
 
 @pytest.fixture
 def owner():
     user = get_user_model().objects.create_user(username="olga", password="pw")
-    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
+    Membership.objects.create(user=user, host=A.key, role=Membership.Role.OWNER)
     return user
 
 
@@ -444,6 +446,20 @@ def test_what_an_export_reads_loads_into_another_business_as_it_was(ctx):
 
     for key, rows in seed.data.items():
         assert sorted(exported[key], key=json.dumps) == sorted(rows, key=json.dumps), key
+
+
+def test_an_export_of_business_b_carries_its_rows_and_none_of_business_a_s(ctx, hub_b):
+    blueprint.apply(ctx, restaurant_bundle(), apps=None)
+    patio = {"name": "Patio", "description": "", "color": "warning", "sort_order": 1}
+    with use_hub(hub_b):
+        user = get_user_model().objects.create_user(username="bea", password="pw")
+        Membership.objects.create(user=user, host=B.key, role=Membership.Role.OWNER)
+        theirs = OperationContext(scope=B, actor=user, permissions=permissions_for(user, B), language="es")
+        blueprint.apply(theirs, blueprint.Bundle(manifest=manifest(), data={"table.zone": [patio]}), apps=None)
+
+        exported = blueprint.export_data(theirs, blueprint.selection_of(restaurant_bundle().data), purpose="backup")
+
+    assert exported == {"table.zone": [patio]}
 
 
 def test_a_template_export_never_reads_personal_data(ctx):

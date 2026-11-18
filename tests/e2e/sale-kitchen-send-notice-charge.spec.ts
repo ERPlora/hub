@@ -1,6 +1,6 @@
 // flow: SALE-F20, SALE-F01
 // hub#748: on a low phone «Send order» says «Order N sent to the kitchen.», and what a waiter often does next is
-// «Charge». At the bottom that notice lay over the button for its 2.6 s (375x667: over its middle; 320x568: over all of
+// «Charge». At the bottom that notice lay over the button while it showed (375x667: over its middle; 320x568: over all of
 // it), so the tap fell on the notice and the sheet did not open. Here, with the notice on screen, the middle of «Charge»
 // answers with «Charge», the notice covers none of it and is whole on screen and painted on top, and a real tap on that
 // spot opens the charge sheet with the notice still up. The same with the longer words of a round whose sheet did not
@@ -14,14 +14,15 @@ import { capture, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
 import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-748-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
 const PARKED = 'e2e_sale_kitchen_send_notice_issuer';
 const RUN = stamp();
-/** How long `toast()` shows a plain notice and a warning that the sheet did not print. */
-const SENT_MS = 2600;
-const NOT_PRINTED_MS = 4500;
+/** How long a toast lasts by default: a success, the round sent, and a warning, the round whose sheet did not print. */
+const SENT_MS = 3000;
+const NOT_PRINTED_MS = 4000;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', sent: 'Order 1 sent to the kitchen.', notPrinted: 'Order 1 sent to the kitchen, but it did not print.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', sent: 'Comanda 1 enviada a cocina.', notPrinted: 'Comanda 1 enviada a cocina, pero no se imprimió.' },
@@ -61,7 +62,7 @@ async function sendRound(page: Page, context: BrowserContext, lang: string): Pro
 /** The notice's box and whether it answers on its middle, and the same for «Charge», with everything on screen still. */
 async function read(page: Page, notice: Locator): Promise<{ toast: Box; toastOnTop: boolean; charge: Box; answer: string }> {
   const toast = await noticeBox(notice);
-  const toastOnTop = await notice.evaluate((el, box) => document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2) === el, toast);
+  const toastOnTop = await notice.evaluate((el, box) => el.contains(document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2)), toast);
   const { charge, answer } = await shown(page)
     .locator('[data-testid=pos-charge]')
     .evaluate((button) => {
@@ -96,7 +97,7 @@ for (const { name, lang, locale, sent, notPrinted } of LANGUAGES) {
     eachNoticeSize(locale, async (page, context, size) => {
       await holdNotices(page, SENT_MS);
       await sendRound(page, context, lang);
-      const notice = page.locator('ion-toast').filter({ hasText: sent });
+      const notice = toastSaying(page, sent);
       await expect(notice).toBeVisible();
       await capture(page, `${KEY}-${lang}-${size.label}`);
       await chargeAnswersATap(page, notice, size);
@@ -112,7 +113,7 @@ for (const { name, lang, locale, sent, notPrinted } of LANGUAGES) {
         await route.fulfill({ response, json: { ...(await response.json()), print_error: 'no printer for usage kitchen' } });
       });
       await sendRound(page, context, lang);
-      const notice = page.locator('ion-toast').filter({ hasText: notPrinted });
+      const notice = toastSaying(page, notPrinted);
       await expect(notice).toBeVisible();
       await capture(page, `${KEY}-not-printed-${lang}-${size.label}`);
       await chargeAnswersATap(page, notice, size);

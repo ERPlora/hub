@@ -1098,7 +1098,7 @@ test('«Report a problem» sends the answer with its question and a reason', asy
   // flow: BASE-F105 (hub#870) — the «Hola» turn brought no pages of the web: the Hub closes it saying so
   // (`done.web`) and the chat sends it with the report, so erplora.com's support reads the answer even with its search on.
   expect(answered.request().postDataJSON()).toMatchObject({ reason: 'harmful', question: 'Hola', web: false });
-  await expect(page.locator('ion-toast')).toContainText('Thank you, we have received your report.');
+  await expect(page.getByTestId('toast').filter({ hasText: 'Thank you, we have received your report.' }).first()).toBeVisible();
   await expect(dialog).toBeHidden();
 });
 

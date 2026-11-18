@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from django.contrib.auth import get_user_model
 from django.core import signing
+from django.db import connections
 from django.test import Client
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -32,6 +33,7 @@ from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
 from base.services.demos import demo_code_create, demo_create
+from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_middleware import through_the_jump
@@ -304,13 +306,15 @@ class TestCallbackState:
         ],
     )
     def test_the_403_is_a_page_of_the_hub_that_signs_in_again(
-        self, client, fake_saas, django_assert_num_queries, language, heading, link
+        self, client, fake_saas, hub_a, django_assert_num_queries, language, heading, link
     ):
         fake_saas()
         start_login(client)
         data = {"code": "c1", "next": "/demo/items?q=1", "state": "forged"}
-        # One read, the host gate's row of the hub (base.registry); the page itself reads nothing.
-        with django_assert_num_queries(1):
+        # One read on control, the host gate's row of the hub (base.registry); the page itself reads nothing, there or
+        # in the business's own database.
+        own = connections[tenancy_connections.hub_alias(hub_a)]
+        with django_assert_num_queries(1, connection=connections["default"]), django_assert_num_queries(0, connection=own):
             response = client.post("/auth/callback", data, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language)
         assert response.status_code == 403
         assert response["Content-Type"].startswith("text/html")

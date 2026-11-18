@@ -255,7 +255,7 @@ export async function boot(
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
     logout: () => void signOut(doc),
-    toast: (message) => void toastSuccess(message),
+    toast: (message) => toastSuccess(message),
     paint: (mode, palette, scale) => applyUserThemePreferences(mode, palette as ThemePalette | null, undefined, scale),
     reset: resetUserThemePreferences,
     label: () => session.session.value?.user?.label,

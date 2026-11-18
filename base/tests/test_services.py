@@ -16,15 +16,19 @@ from base.services.sessions import (
     open_admin_session_from_saas,
     open_session_from_saas,
 )
+from base.tenancy.context import use_hub
+from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a
 
-pytestmark = pytest.mark.django_db
+__all__ = ["in_business_a"]
+
+pytestmark = HUB_DB
 
 ANA = RedeemedUser(user_id="42", email="ana@example.com", name="Ana", locale="es", role="hub_manager")
 
 
 @pytest.fixture
 def request_(rf):
-    request = rf.post("/auth/callback", HTTP_HOST="a.localhost:8000")
+    request = rf.post("/auth/callback", HTTP_HOST=HOST)
     SessionMiddleware(lambda r: None).process_request(request)
     request.session.save()
     request.user = AnonymousUser()
@@ -37,10 +41,10 @@ def memberships() -> set[tuple[str, str, str]]:
 
 def test_first_entry_creates_the_user_its_role_and_the_session(request_):
     before = request_.session.session_key
-    user = open_session_from_saas(request_, ANA, "a")
+    user = open_session_from_saas(request_, ANA, A.key)
     assert (user.username, user.email, user.first_name) == ("saas:42", "ana@example.com", "Ana")
     assert not user.has_usable_password()
-    assert memberships() == {("saas:42", "a", "hub_manager")}
+    assert memberships() == {("saas:42", A.key, "hub_manager")}
     assert request_.user == user
     assert request_.session[SESSION_KEY] == str(user.pk)
     assert request_.session[SAAS_USER_ID_SESSION_KEY] == "42"
@@ -48,39 +52,41 @@ def test_first_entry_creates_the_user_its_role_and_the_session(request_):
 
 
 def test_next_entry_reuses_the_user_and_follows_the_saas(request_):
-    first = open_session_from_saas(request_, ANA, "a")
+    first = open_session_from_saas(request_, ANA, A.key)
     again = RedeemedUser(user_id="42", email="ana@new.example.com", name="Ana María", locale="en", role="hub_admin")
-    second = open_session_from_saas(request_, again, "a")
+    second = open_session_from_saas(request_, again, A.key)
     assert second.pk == first.pk
     assert (second.email, second.first_name) == ("ana@new.example.com", "Ana María")
     assert get_user_model().objects.count() == 1
-    assert memberships() == {("saas:42", "a", "hub_admin")}
+    assert memberships() == {("saas:42", A.key, "hub_admin")}
 
 
-def test_each_hub_keeps_its_own_role(request_):
-    open_session_from_saas(request_, ANA, "a")
-    open_session_from_saas(request_, RedeemedUser("42", "ana@example.com", "Ana", "es", "hub_employee"), "b")
-    assert memberships() == {("saas:42", "a", "hub_manager"), ("saas:42", "b", "hub_employee")}
+def test_each_hub_keeps_its_own_role(request_, hub_b):
+    open_session_from_saas(request_, ANA, A.key)
+    with use_hub(hub_b):
+        open_session_from_saas(request_, RedeemedUser("42", "ana@example.com", "Ana", "es", "hub_employee"), B.key)
+    assert memberships() == {("saas:42", A.key, "hub_manager"), ("saas:42", B.key, "hub_employee")}
 
 
-def test_one_person_owns_a_and_works_in_b_and_each_entry_keeps_the_other_role(request_):
+def test_one_person_owns_a_and_works_in_b_and_each_entry_keeps_the_other_role(request_, hub_b):
     owner_in_a = RedeemedUser("42", "ana@example.com", "Ana", "es", "hub_owner")
     employee_in_b = RedeemedUser("42", "ana@example.com", "Ana", "es", "hub_employee")
-    open_session_from_saas(request_, owner_in_a, "a")
-    open_session_from_saas(request_, employee_in_b, "b")
-    open_session_from_saas(request_, owner_in_a, "a")
-    assert memberships() == {("saas:42", "a", "hub_owner"), ("saas:42", "b", "hub_employee")}
+    open_session_from_saas(request_, owner_in_a, A.key)
+    with use_hub(hub_b):
+        open_session_from_saas(request_, employee_in_b, B.key)
+    open_session_from_saas(request_, owner_in_a, A.key)
+    assert memberships() == {("saas:42", A.key, "hub_owner"), ("saas:42", B.key, "hub_employee")}
 
 
 def test_a_long_name_fits_the_user(request_):
-    user = open_session_from_saas(request_, RedeemedUser("42", "ana@example.com", "A" * 300, "es", "hub_employee"), "a")
+    user = open_session_from_saas(request_, RedeemedUser("42", "ana@example.com", "A" * 300, "es", "hub_employee"), A.key)
     assert user.first_name == "A" * 150
 
 
 def test_a_user_deactivated_on_the_hub_gets_no_session(request_):
     get_user_model().objects.create_user("saas:42", is_active=False)
     with pytest.raises(InactiveUser):
-        open_session_from_saas(request_, ANA, "a")
+        open_session_from_saas(request_, ANA, A.key)
     assert SESSION_KEY not in request_.session
     assert not request_.user.is_authenticated
     assert memberships() == set()
@@ -88,7 +94,7 @@ def test_a_user_deactivated_on_the_hub_gets_no_session(request_):
 
 def test_the_local_copy_of_a_customer_is_never_staff(request_):
     owner = RedeemedUser("42", "ana@example.com", "Ana", "es", "hub_owner")
-    user = open_session_from_saas(request_, owner, "a")
+    user = open_session_from_saas(request_, owner, A.key)
     user.refresh_from_db()
     assert (user.is_staff, user.is_superuser) == (False, False)
 
@@ -96,7 +102,7 @@ def test_the_local_copy_of_a_customer_is_never_staff(request_):
 def test_a_local_copy_raised_to_staff_is_lowered_on_its_next_entry(request_):
     # The Hub's /admin/ belongs to the platform's staff, never to a customer of the SaaS.
     get_user_model().objects.create_user("saas:42", is_staff=True, is_superuser=True)
-    user = open_session_from_saas(request_, ANA, "a")
+    user = open_session_from_saas(request_, ANA, A.key)
     user.refresh_from_db()
     assert (user.is_staff, user.is_superuser) == (False, False)
 
@@ -194,7 +200,7 @@ def local_users() -> dict[str, tuple[bool, bool, list[str]]]:
 def test_one_account_at_both_doors_has_a_separate_local_user_at_each(request_, staff, staff_copy, staff_first):
     expected = {CUSTOMER_COPY: (False, False, []), STAFF_COPY: staff_copy}
     doors = [
-        (CUSTOMER_COPY, lambda: open_session_from_saas(request_, OWNER_OF_A, "a")),
+        (CUSTOMER_COPY, lambda: open_session_from_saas(request_, OWNER_OF_A, A.key)),
         (STAFF_COPY, lambda: open_admin_session_from_saas(request_, staff)),
     ]
     if staff_first:
@@ -206,4 +212,4 @@ def test_one_account_at_both_doors_has_a_separate_local_user_at_each(request_, s
         assert (user.username, request_.user) == (username, user)
     assert local_users() == expected
     # The staff copy is no customer: the hub role stays on the customer copy only.
-    assert memberships() == {(CUSTOMER_COPY, "a", "hub_owner")}
+    assert memberships() == {(CUSTOMER_COPY, A.key, "hub_owner")}

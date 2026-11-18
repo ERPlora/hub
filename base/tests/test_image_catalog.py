@@ -5,7 +5,7 @@ ERPlora/blueprints publishes ``img/<folder>/<name>.webp`` and ``img/catalog.json
 each image in English and Spanish with its search words; the Hub reads it (kept 10 minutes, read again when the file
 changes on disk), finds an image by what a product is called in either language, and serves the image at
 ``/p/catalog/<folder>/<name>.webp`` to anyone, cached for a year: the library is nobody's data. A row points at an
-image with ``catalog:<folder>/<name>``, never with a URL.
+image with ``catalog:<folder>/<name>``, never with a URL. What a business reads, it reads in its own database (A's).
 """
 
 import io
@@ -18,16 +18,18 @@ from botocore.exceptions import ClientError
 from django.core.files.base import ContentFile
 from django.core.files.storage import InMemoryStorage, storages
 from live.assistant import description
-from live.context import OperationContext, Scope
+from live.context import OperationContext
 from live.errors import NotFound, OperationError, PermissionDenied
 from live.operations import get
 from PIL import Image as PILImage
 
 from base import image_catalog
 from base.schemas import CatalogImageRefIn, CatalogImageSearchIn
+from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
 from base.tests.routes import assert_bound
 
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
+ON_A = f"{HOST}:8000"
 HOME = "base.view_home"
 YEAR = "public, max-age=31536000, immutable"
 #: base/tests/test_api.py's map of the SPA's routes takes these too.
@@ -346,14 +348,14 @@ def test_search_is_a_read_for_everyone_of_the_hub_and_a_tool_of_the_assistant():
     assert "image" in description(op) and "library" in description(op)
 
 
-def speaks(language: str, slug: str = "a") -> None:
+def speaks(language: str, slug: str = A.key) -> None:
     """The business ``slug`` works in ``language`` (as erplora.com registered it)."""
     from base.models import Hub
 
     Hub.objects.filter(slug=slug).update(language=language)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_search_answers_the_best_images_first_titled_in_the_businesss_language(image_library):
     speaks("es")
 
@@ -370,7 +372,7 @@ def test_search_answers_the_best_images_first_titled_in_the_businesss_language(i
     assert (page.total, page.limit, page.offset) == (2, 60, 0)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_a_business_in_a_language_the_library_does_not_speak_reads_english_titles(image_library):
     speaks("fr")
 
@@ -379,7 +381,7 @@ def test_a_business_in_a_language_the_library_does_not_speak_reads_english_title
     assert page.rows[0].title == "White coffee"
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_search_pages_its_answer(image_library):
     page = get("base.catalog_image.search")(ctx_with(HOME), CatalogImageSearchIn(query="", limit=2, offset=2))
 
@@ -387,13 +389,13 @@ def test_search_pages_its_answer(image_library):
     assert ([row.name for row in page.rows], page.total) == (["patatas_bravas", "cafe_con_leche"], 5)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_search_needs_the_home(image_library):
     with pytest.raises(PermissionDenied):
         get("base.catalog_image.search")(ctx_with(), CatalogImageSearchIn(query="leche"))
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_search_says_when_the_library_cannot_be_read(settings, tmp_path):
     settings.CATALOG_DIR = str(tmp_path / "nowhere")
 
@@ -404,7 +406,7 @@ def test_search_says_when_the_library_cannot_be_read(settings, tmp_path):
     assert refused.value.message == "The image library could not be loaded."
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_it_is_said_in_the_persons_language(settings, tmp_path, image_library):
     with pytest.raises(NotFound) as missing:
         get("base.catalog_image.get")(ctx_with(HOME, language="es"), CatalogImageRefIn(reference="catalog:x/y"))
@@ -422,7 +424,7 @@ def test_search_refuses_a_folder_that_is_no_folder(folder):
         CatalogImageSearchIn(query="", folder=folder)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_get_names_an_image_by_its_reference_in_the_persons_language(image_library):
     speaks("en")
     image = get("base.catalog_image.get")(ctx_with(HOME, language="es"), CatalogImageRefIn(reference="catalog:hospitality/cafe_solo"))
@@ -430,6 +432,7 @@ def test_get_names_an_image_by_its_reference_in_the_persons_language(image_libra
     assert (image.title, image.url) == ("Café solo", "/p/catalog/hospitality/cafe_solo.webp")
 
 
+@HUB_DB
 @pytest.mark.parametrize("reference", ["catalog:hospitality/churros", "file:inventory/products/x.webp", "cafe_solo"])
 def test_get_does_not_find_what_the_library_does_not_have(image_library, reference):
     with pytest.raises(NotFound):
@@ -441,13 +444,13 @@ def test_both_are_bound_to_their_routes():
         assert_bound(method, path, name)
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_employee_searches_over_http_and_a_stranger_does_not(client, make_user, image_library):
     url = "/api/catalog/images?query=bravas"
-    assert client.get(url, HTTP_HOST="a.localhost:8000").status_code in (401, 403)
+    assert client.get(url, HTTP_HOST=ON_A).status_code in (401, 403)
 
-    client.force_login(make_user("ana", host="a", role="hub_employee"))
-    response = client.get(url, HTTP_HOST="a.localhost:8000")
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    response = client.get(url, HTTP_HOST=ON_A)
 
     assert response.status_code == 200, response.content
     assert [row["reference"] for row in response.json()["rows"]] == ["catalog:hospitality/patatas_bravas"]
@@ -456,9 +459,9 @@ def test_an_employee_searches_over_http_and_a_stranger_does_not(client, make_use
 # ── /p/catalog/<folder>/<name>.webp ─────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_image_is_served_to_anyone_cached_for_a_year(client, image_library):
-    response = client.get("/p/catalog/hospitality/cafe_solo.webp", HTTP_HOST="a.localhost:8000")
+    response = client.get("/p/catalog/hospitality/cafe_solo.webp", HTTP_HOST=ON_A)
 
     assert response.status_code == 200
     assert b"".join(response.streaming_content) == webp()
@@ -467,7 +470,7 @@ def test_an_image_is_served_to_anyone_cached_for_a_year(client, image_library):
     assert not response.cookies
 
 
-@pytest.mark.django_db
+@HUB_DB
 @pytest.mark.parametrize(
     "path",
     [
@@ -483,18 +486,18 @@ def test_what_the_manifest_does_not_name_is_not_found(client, image_library, pat
     (image_library / "stray").mkdir()
     (image_library / "stray" / "stray.webp").write_bytes(webp())
 
-    assert client.get(path, HTTP_HOST="a.localhost:8000").status_code == 404
+    assert client.get(path, HTTP_HOST=ON_A).status_code == 404
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_an_image_named_in_the_manifest_but_missing_is_not_found(client, image_library):
     (image_library / "hospitality" / "cafe_solo.webp").unlink()
 
-    assert client.get("/p/catalog/hospitality/cafe_solo.webp", HTTP_HOST="a.localhost:8000").status_code == 404
+    assert client.get("/p/catalog/hospitality/cafe_solo.webp", HTTP_HOST=ON_A).status_code == 404
 
 
-@pytest.mark.django_db
+@HUB_DB
 def test_without_a_library_an_image_is_not_found(client, settings, tmp_path):
     settings.CATALOG_DIR = str(tmp_path / "nowhere")
 
-    assert client.get("/p/catalog/hospitality/cafe_solo.webp", HTTP_HOST="a.localhost:8000").status_code == 404
+    assert client.get("/p/catalog/hospitality/cafe_solo.webp", HTTP_HOST=ON_A).status_code == 404

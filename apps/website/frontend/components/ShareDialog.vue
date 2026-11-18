@@ -37,7 +37,7 @@ async function downloadQr(format: keyof typeof QR_TYPES): Promise<void> {
     await saveFile(name || `website-qr.${format}`, blob, t);
   } catch (error) {
     console.error('website: the QR did not come', error);
-    void toastError(t('base.download.refusal.failed'));
+    toastError(t('base.download.refusal.failed'));
   }
 }
 
@@ -45,7 +45,7 @@ async function copy(url: string): Promise<void> {
   copyFailed.value = false;
   try {
     await navigator.clipboard.writeText(url);
-    void toastSuccess(t('website.share.copied'));
+    toastSuccess(t('website.share.copied'));
   } catch {
     copyFailed.value = true;
   }

@@ -11,6 +11,7 @@ import { A, api, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SECTION = `e2e Fruit ${RUN}`;
@@ -307,7 +308,7 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
     const name = page.locator('input[data-testid=pos-park-name]:visible');
     await name.fill(label);
     await page.locator('[data-testid=pos-park-confirm]:visible').click();
-    await expect(page.locator('ion-toast').filter({ hasText: `Parked as “${label}”` })).toBeVisible();
+    await expect(toastSaying(page, `Parked as “${label}”`)).toBeVisible();
     await expect(shown(page).locator('[data-testid=pos-cart-empty]')).toBeVisible();
   }
   const keptCheck = await checkOf(context, kept);

@@ -5,8 +5,11 @@
   minutes; ``available`` false for a business without its own database (it never gets a copy); 200 for a business
   that left (the 410 is its host's door, never ``/internal``); 404 for one unknown or purged.
 - ``base.hub.dumps`` (Settings › Data, who runs the business): the copies without links, and how the last reset went;
-  in a business without its own database, nothing and ``available`` false.
+  a business without its own database is never served, so none of its copies is read.
 - ``base.hub.dump_link``: the link of one copy, asked on every click; never another business's copy.
+
+The copies are control's rows; who runs the business reads them from inside business A's own database, as production
+does, and business B's copies sit next to A's in control.
 """
 
 import datetime as dt
@@ -25,6 +28,8 @@ from live.operations import get
 from base.models import Membership
 from base.permissions import permissions_for
 from base.tenancy import connections, names
+from base.tenancy.context import HubWithoutDatabase, use_hub
+from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket  # noqa: F401
 from base.tests.test_internal import signed
 from control.models import Hub, HubDump
@@ -188,8 +193,16 @@ def call(ctx, name, /, **data):
     return op(ctx, op.input(**data))
 
 
-def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went():
-    hub = business()
+@pytest.fixture
+def acme(hub_a):
+    """Business A, with its own database, entered for the test."""
+    with use_hub(hub_a):
+        yield hub_a
+
+
+@HUB_DB
+def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went(acme, hub_b):
+    hub = acme
     first = copy(hub, "reset", 0)
     Hub.objects.filter(pk=hub.pk).update(
         reset_sections={
@@ -203,9 +216,9 @@ def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went():
             "finished_at": (AT + dt.timedelta(minutes=1)).isoformat(),
         }
     )
-    copy(business(OTHER_ID, "other"), "reset", 3)
+    copy(hub_b, "reset", 3)
 
-    seen = call(person("acme"), "base.hub.dumps")
+    seen = call(person(hub.slug), "base.hub.dumps")
 
     assert seen.available is True
     assert [(row.id, row.kind, row.bytes, row.created_at) for row in seen.dumps] == [
@@ -217,12 +230,13 @@ def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went():
     assert seen.reset.finished_at == AT + dt.timedelta(minutes=1)
 
 
-def test_a_copy_past_its_90_days_is_neither_listed_nor_linked(dumps_bucket):
-    hub = business()
+@HUB_DB
+def test_a_copy_past_its_90_days_is_neither_listed_nor_linked(dumps_bucket, acme):
+    hub = acme
     kept = copy(hub, "reset", 0)
     gone = copy(hub, "reset", -(90 * 24 * 60 + 1))
 
-    owner = person("acme")
+    owner = person(hub.slug)
 
     assert [row.id for row in call(owner, "base.hub.dumps").dumps] == [kept.pk]
     with pytest.raises(NotFound) as refused:
@@ -230,46 +244,53 @@ def test_a_copy_past_its_90_days_is_neither_listed_nor_linked(dumps_bucket):
     assert refused.value.message == "Esta copia ya no se guarda."
 
 
-def test_a_business_never_reset_has_no_reset_to_show():
-    business()
-
-    assert call(person("acme"), "base.hub.dumps").reset is None
-
-
-def test_a_business_that_shares_its_database_has_no_copies():
-    seen = call(person("a"), "base.hub.dumps")
-
-    assert (seen.available, seen.reset, seen.dumps) == (False, None, [])
+@HUB_DB
+def test_a_business_never_reset_has_no_reset_to_show(acme):
+    assert call(person(acme.slug), "base.hub.dumps").reset is None
 
 
-def test_the_link_of_a_copy_is_asked_on_each_click(dumps_bucket):
-    made = copy(business(), "reset", 0)
+def test_a_business_without_its_own_database_is_never_entered_so_none_of_its_copies_is_read():
+    """Its address answers 503 maintenance: no one reads its copies from it."""
+    shared = business(own=False)
+    copy(shared, "reset", 0)
+    ctx = OperationContext(scope=Scope("host", shared.slug), actor="olga", permissions=frozenset({"*"}), language="es")
 
-    link = call(person("acme"), "base.hub.dump_link", id=made.pk)
+    with pytest.raises(HubWithoutDatabase), use_hub(shared):
+        call(ctx, "base.hub.dumps")
+
+
+@HUB_DB
+def test_the_link_of_a_copy_is_asked_on_each_click(dumps_bucket, acme):
+    made = copy(acme, "reset", 0)
+
+    link = call(person(acme.slug), "base.hub.dump_link", id=made.pk)
 
     query = urllib.parse.parse_qs(urllib.parse.urlsplit(link.url).query)
     assert urllib.parse.urlsplit(link.url).path.endswith(made.key)
     assert query["X-Amz-Expires"] == ["900"]
-    assert query["response-content-disposition"] == [f'attachment; filename="erplora-acme-{made.key.rsplit("/", 1)[-1]}"']
+    assert query["response-content-disposition"] == [
+        f'attachment; filename="erplora-{acme.slug}-{made.key.rsplit("/", 1)[-1]}"'
+    ]
     signed_at = dt.datetime.strptime(query["X-Amz-Date"][0], "%Y%m%dT%H%M%SZ").replace(tzinfo=dt.UTC)
     assert link.expires_at == signed_at + dt.timedelta(minutes=15)
 
 
-def test_another_businesss_copy_is_never_linked(dumps_bucket):
-    business()
-    theirs = copy(business(OTHER_ID, "other"), "reset", 0)
+@HUB_DB
+def test_another_businesss_copy_is_never_linked(dumps_bucket, acme, hub_b):
+    theirs = copy(hub_b, "reset", 0)
 
     with pytest.raises(NotFound) as refused:
-        call(person("acme"), "base.hub.dump_link", id=theirs.pk)
+        call(person(acme.slug), "base.hub.dump_link", id=theirs.pk)
 
     assert refused.value.message == "Esta copia ya no se guarda."
 
 
-def test_without_a_bucket_there_is_no_link_to_give(no_dumps_bucket):
-    made = copy(business(), "reset", 0)
+@HUB_DB
+def test_without_a_bucket_there_is_no_link_to_give(no_dumps_bucket, acme):
+    made = copy(acme, "reset", 0)
 
     with pytest.raises(OperationError) as refused:
-        call(person("acme"), "base.hub.dump_link", id=made.pk)
+        call(person(acme.slug), "base.hub.dump_link", id=made.pk)
 
     assert (refused.value.status, refused.value.code) == (503, "base.dumps_unavailable")
     assert refused.value.message == "Ahora mismo no se puede descargar la copia. Inténtalo en un momento."

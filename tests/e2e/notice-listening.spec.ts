@@ -8,6 +8,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { nativeApp, type NativeAppOptions } from './device-notice-helpers';
 import { A, api } from './helpers';
 import { ownerPage } from './service-helpers';
+import { toasts } from './toast-helpers';
 
 const KEEP_LISTENING = 'plugin:erplora-android|keep_listening';
 
@@ -82,7 +83,7 @@ test('an app without the command (the 1.1.34) is asked once: nothing on screen, 
     const calls = await asTheApp(page, { notices: true, withoutKeepListening: true });
 
     await expect.poll(() => listened(calls)).toHaveLength(1);
-    await expect(page.locator('ion-toast')).toHaveCount(0);
+    await expect(toasts(page)).toHaveCount(0);
     await expect(page.locator('ion-alert')).toHaveCount(0);
     await signOut(page);
     expect(listened(calls)).toHaveLength(1);

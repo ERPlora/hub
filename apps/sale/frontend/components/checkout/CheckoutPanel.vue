@@ -10,7 +10,7 @@
 // what the person types, and the server re-checks it all when charging.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, toast, useSession } from '@erplora/ui/shell';
+import { HubIcon, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -170,14 +170,14 @@ function onSplit(newLines: readonly string[]): void {
 watch(checkout.busy, (busy) => emit('busy', busy));
 
 function pick(method: PaymentMethodOut): void {
-  if (!tender.pick(method)) void toast(t('sale.checkout.cashLimitReason', { amount: money(cashLimit.value) }), 'warning');
+  if (!tender.pick(method)) toastWarning(t('sale.checkout.cashLimitReason', { amount: money(cashLimit.value) }));
 }
 
 /** The blocks the recipient's box itself explains: the side opens on them. */
 const RECIPIENT_BLOCKS = new Set(['recipient', 'taxIdInvalid', 'idTypeRequired']);
 
 function onBlocked(reason: ChargeBlock, message: string): void {
-  void toast(message, 'warning');
+  toastWarning(message);
   if (RECIPIENT_BLOCKS.has(reason.kind)) sideOpen.value = true;
 }
 

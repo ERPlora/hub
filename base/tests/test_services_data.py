@@ -5,9 +5,10 @@ it created as an ``ImportBatch``; a load that did not go in whole is retried fro
 from an uploaded file). ``base.import.undo`` removes exactly the rows of one load. ``base.hub.reset`` gives the plan of
 what each app would lose (``dry_run``) and, typed the business's name, asks for it: the worker copies the business's
 database first and only then empties the sections (``base/tests/test_worker_data.py``), so the answer is ``copying``
-and nothing is removed yet. A business without its own database shares it with other hubs, so the reset is refused
-until the hub has its own; without a bucket for the copy it is unavailable, and a second one waits for the first.
-Each one only for who runs the hub.
+and nothing is removed yet. A business without its own database is never served, so no reset reaches it; without a
+bucket for the copy it is unavailable, and a second one waits for the first. Each one only for who runs the hub.
+
+Every test works in business A's own database, as production does.
 """
 
 import base64
@@ -25,17 +26,18 @@ from apps.verifactu.queries import enable_refusal
 from base import activation, blueprint, events as base_events, relay, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership
-from control.models import HubDue
 from base.permissions import permissions_for
+from base.tenancy.context import HubWithoutDatabase, current_alias, use_hub
+from base.tenancy.tests.business import HUB_DB, A, in_business_a
+from control.models import HubDue
 
-pytestmark = pytest.mark.django_db
-
-A = Scope("host", "a")
+__all__ = ["in_business_a"]
+pytestmark = HUB_DB
 
 
 def person(role, username="olga"):
     user = get_user_model().objects.create_user(username=username, password="pw")
-    Membership.objects.create(user=user, host="a", role=role)
+    Membership.objects.create(user=user, host=A.key, role=role)
     return OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language="es")
 
 
@@ -59,7 +61,7 @@ def total(ctx, operation):
 
 
 def events(name):
-    return list(OutboxEvent.objects.filter(name=name, scope_key="a").values_list("payload", flat=True))
+    return list(OutboxEvent.objects.filter(name=name, scope_key=A.key).values_list("payload", flat=True))
 
 
 def a_file(purpose="template", data=None, apps=("table",)):
@@ -247,24 +249,24 @@ def test_who_does_not_run_the_hub_cannot_undo(owner, manager):
 
 @pytest.fixture
 def own_database(monkeypatch):
-    """The hub has its own database: its reset touches no one else's data. And a bucket for its copy."""
-    monkeypatch.setattr(services, "has_own_database", lambda hub: True)
+    """Business A has its own database, as every business served: its reset touches no one else's data. And a bucket
+    for its copy."""
     monkeypatch.setenv("HUB_DUMPS_BUCKET", "erplora-test-hub-dumps")
 
 
-def asked(slug="a"):
+def asked(slug=A.key):
     """The reset asked on the registry's row of ``slug``: when, and what."""
     hub = Hub.objects.get(slug=slug)
     return hub.reset_requested_at, hub.reset_sections
 
 
 def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
-    Hub.objects.filter(slug="a").update(name="Bar Pepe")
+    Hub.objects.filter(slug=A.key).update(name="Bar Pepe")
     call(owner, "base.blueprint.import", template="restaurant.es")
 
     plan = call(owner, "base.hub.reset", dry_run=True)
 
-    assert plan.dry_run is True
+    assert (plan.dry_run, plan.available) == (True, True)
     assert plan.confirm_with == "Bar Pepe"
     assert {(section.id, section.label, section.rows) for section in plan.sections} == {
         ("inventory", "Inventario", 22),
@@ -274,30 +276,26 @@ def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
 
 
 def test_without_a_business_name_the_hubs_address_is_typed(owner):
-    assert call(owner, "base.hub.reset", dry_run=True).confirm_with == "a"
+    assert call(owner, "base.hub.reset", dry_run=True).confirm_with == A.key
 
 
-def test_without_its_own_database_the_reset_says_why_it_is_not_available_and_removes_nothing(owner):
+def test_a_business_without_its_own_database_is_never_entered_so_no_reset_reaches_it(owner):
+    """Its address answers 503 maintenance; nothing of it is read nor asked, and business A keeps its rows."""
     call(owner, "base.blueprint.import", template="restaurant.es")
+    shared = Hub.objects.create(slug="shared", status=Hub.Status.READY)
+    ctx = OperationContext(scope=Scope("host", "shared"), actor="olga", permissions=frozenset({"*"}), language="es")
 
-    plan = call(owner, "base.hub.reset", dry_run=True)
-    with pytest.raises(Conflict) as refused:
-        call(owner, "base.hub.reset", apps=["table"], confirm="a")
+    with pytest.raises(HubWithoutDatabase), use_hub(shared):
+        call(ctx, "base.hub.reset", apps=["table"], confirm="shared")
 
-    assert plan.available is False
-    assert refused.value.code == "base.reset_shared_database"
-    # What the person reads says it is not available yet, never that their data sits with other businesses' (nothing
-    # of the infrastructure, nothing that sounds like a leak).
-    assert refused.value.message == (
-        "Restablecer el negocio todavía no está disponible. Deshaz una importación o quita lo que quieras desde cada app."
-    )
+    assert asked(shared.slug) == (None, None)
     assert total(owner, "table.table.list") == 10
 
 
 def test_resetting_asks_the_worker_for_a_copy_first_and_removes_nothing_yet(owner, own_database):
     call(owner, "base.blueprint.import", template="restaurant.es")
 
-    answer = call(owner, "base.hub.reset", apps=["table", "inventory", "table"], confirm="a")
+    answer = call(owner, "base.hub.reset", apps=["table", "inventory", "table"], confirm=A.key)
 
     assert (answer.status, answer.dry_run, answer.apps) == ("copying", False, [])
     assert {section.id for section in answer.sections} == {"inventory", "table"}  # nothing removed yet
@@ -315,7 +313,7 @@ def test_resetting_asks_the_worker_for_a_copy_first_and_removes_nothing_yet(owne
         "dump": None,
         "finished_at": None,
     }
-    assert HubDue.objects.get(hub__slug="a").due_at <= timezone.now()
+    assert HubDue.objects.get(hub__slug=A.key).due_at <= timezone.now()
 
 
 def test_the_worker_empties_the_sections_asked_and_nothing_else(owner, own_database):
@@ -336,7 +334,7 @@ def test_the_dry_run_says_planned(owner):
 
 def test_the_name_is_compared_as_the_confirmation_dialog_does(owner, own_database):
     """Spaces around and inside collapsed and case ignored, accents kept (ConfirmDialog of @erplora/ui)."""
-    Hub.objects.filter(slug="a").update(name="Bar  Pepé")
+    Hub.objects.filter(slug=A.key).update(name="Bar  Pepé")
     call(owner, "base.blueprint.import", template="restaurant.es")
 
     assert call(owner, "base.hub.reset", apps=["table"], confirm="  bar pepé ").status == "copying"
@@ -347,7 +345,7 @@ def test_without_a_bucket_for_the_copy_the_reset_is_unavailable_and_asks_nothing
     call(owner, "base.blueprint.import", template="restaurant.es")
 
     with pytest.raises(OperationError) as refused:
-        call(owner, "base.hub.reset", apps=["table"], confirm="a")
+        call(owner, "base.hub.reset", apps=["table"], confirm=A.key)
 
     assert (refused.value.status, refused.value.code) == (503, "base.dumps_unavailable")
     assert refused.value.message == (
@@ -359,11 +357,11 @@ def test_without_a_bucket_for_the_copy_the_reset_is_unavailable_and_asks_nothing
 
 def test_a_second_reset_while_one_is_running_is_refused(owner, own_database):
     call(owner, "base.blueprint.import", template="restaurant.es")
-    call(owner, "base.hub.reset", apps=["table"], confirm="a")
+    call(owner, "base.hub.reset", apps=["table"], confirm=A.key)
     first = asked()
 
     with pytest.raises(Conflict) as refused:
-        call(owner, "base.hub.reset", apps=["inventory"], confirm="a")
+        call(owner, "base.hub.reset", apps=["inventory"], confirm=A.key)
 
     assert refused.value.code == "base.reset_in_progress"
     assert refused.value.message == "Ya se está restableciendo el negocio. Espera a que termine."
@@ -371,20 +369,20 @@ def test_a_second_reset_while_one_is_running_is_refused(owner, own_database):
 
 
 def test_a_reset_that_failed_can_be_asked_again(owner, own_database):
-    Hub.objects.filter(slug="a").update(reset_sections={"apps": ["table"], "state": "failed", "error": "dump_failed"})
+    Hub.objects.filter(slug=A.key).update(reset_sections={"apps": ["table"], "state": "failed", "error": "dump_failed"})
     call(owner, "base.blueprint.import", template="restaurant.es")
 
-    assert call(owner, "base.hub.reset", apps=["table"], confirm="a").status == "copying"
+    assert call(owner, "base.hub.reset", apps=["table"], confirm=A.key).status == "copying"
     assert asked()[1]["state"] == "copying"
 
 
 @pytest.mark.parametrize(
     ("data", "field"),
     [
-        ({"apps": ["table"], "confirm": "b"}, "confirm"),
-        ({"apps": ["table"], "confirm": "á"}, "confirm"),  # accents count, as in the confirmation dialog
-        ({"apps": [], "confirm": "a"}, "apps"),
-        ({"apps": ["bakery_oven"], "confirm": "a"}, "apps"),
+        ({"apps": ["table"], "confirm": "tenant-b"}, "confirm"),
+        ({"apps": ["table"], "confirm": "ténant-a"}, "confirm"),  # accents count, as in the confirmation dialog
+        ({"apps": [], "confirm": "tenant-a"}, "apps"),
+        ({"apps": ["bakery_oven"], "confirm": "tenant-a"}, "apps"),
     ],
 )
 def test_a_reset_without_the_exact_name_or_a_section_removes_nothing(owner, own_database, data, field):
@@ -405,27 +403,24 @@ def test_who_does_not_run_the_hub_cannot_reset(manager, own_database):
 
 # ── A business born with every app off: the blueprint turns its apps on, then loads ─────────────────────────────────
 
-C = Scope("host", "c")
-
 
 @pytest.fixture
 def born():
-    """A business as it is born: ready in the registry, every app off (no row), and its owner."""
-    Hub.objects.create(slug="c", status=Hub.Status.READY)
-    user = get_user_model().objects.create_user(username="carla", password="pw")
-    Membership.objects.create(user=user, host="c", role=Membership.Role.OWNER)
-    return OperationContext(scope=C, actor=user, permissions=permissions_for(user, C), language="es")
+    """Business A as it is born: ready in the registry, every app off (no row), and its owner."""
+    AppActivation.objects.filter(host=A.key).delete()
+    activation.forget(A.key)
+    return person(Membership.Role.OWNER, "carla")
 
 
-def modules_on(scope=C):
+def modules_on(scope=A):
     return set(relay.active_apps(scope)) & set(activation.module_graph())
 
 
-def chosen(host="c"):
+def chosen(host=A.key):
     return set(AppActivation.objects.filter(host=host, state="on", chosen=True).values_list("app", flat=True))
 
 
-def enabled_events(host="c"):
+def enabled_events(host=A.key):
     return sorted(
         OutboxEvent.objects.filter(name=base_events.APP_ENABLED, scope_key=host).values_list("payload__app", flat=True)
     )
@@ -433,11 +428,11 @@ def enabled_events(host="c"):
 
 @pytest.fixture
 def load(django_capture_on_commit_callbacks):
-    """``base.blueprint.import`` as a request runs it: what runs after its COMMIT (the cache of the apps off forgotten)
-    runs too, so what the test reads next sees the apps it turned on."""
+    """``base.blueprint.import`` as a request runs it: what runs after its COMMIT in the business's database (the cache
+    of the apps off forgotten) runs too, so what the test reads next sees the apps it turned on."""
 
     def run(ctx, **data):
-        with django_capture_on_commit_callbacks(execute=True):
+        with django_capture_on_commit_callbacks(using=current_alias(), execute=True):
             return call(ctx, "base.blueprint.import", **data)
 
     return run
@@ -477,7 +472,7 @@ def test_only_the_apps_chosen_are_turned_on(born, load):
 
 
 def test_an_app_beyond_the_plans_limit_stays_off_says_why_and_the_rest_loads(born, load):
-    with_max_apps("c", 1)
+    with_max_apps(A.key, 1)
     file = a_file(
         apps=("inventory", "table"),
         data={
@@ -532,7 +527,7 @@ def test_a_backup_turns_on_its_apps_too(born, load):
 
 def test_the_apps_just_turned_on_load_though_the_cache_still_had_them_off(born, load):
     """The apps off are cached per business (``base.activation``); the load reads what it turned on, never the cache."""
-    assert "inventory" in activation.off_apps(C)  # kept in the cache now
+    assert "inventory" in activation.off_apps(A)  # kept in the cache now
 
     load(born, template="restaurant.es")
 
@@ -540,10 +535,10 @@ def test_the_apps_just_turned_on_load_though_the_cache_still_had_them_off(born, 
 
 
 def test_an_app_already_on_is_left_as_it_is(owner, load):
-    """``a`` has every app on: the load turns nothing on and records no change."""
+    """Business A has every app on: the load turns nothing on and records no change."""
     load(owner, template="restaurant.es")
 
-    assert enabled_events("a") == []
+    assert enabled_events() == []
     assert total(owner, "inventory.product.list") == 16
 
 
@@ -551,7 +546,7 @@ def test_a_business_outside_spain_gets_no_verifactu_from_a_blueprint_and_the_loa
     """VeriFactu does not go on outside Spain (VERIFACTU-F01, hub#694): a file that lists it (no template of the
     catalogue does, hub#998) asks through the same ``base.app.enable`` as Apps and is told no. Nothing of it was lost
     and no retry would change that, so the load is complete, and it says why VeriFactu stays out."""
-    Hub.objects.filter(slug="c").update(country="PL")
+    Hub.objects.filter(slug=A.key).update(country="PL")
 
     loaded = load(born, file_base64=a_file(apps=("table", "verifactu")))
 
@@ -578,7 +573,7 @@ def test_an_app_that_refuses_to_go_on_with_rows_in_the_blueprint_leaves_the_load
 def test_an_app_the_plan_leaves_off_leaves_the_load_partial_even_without_rows(born, load):
     """A better plan changes that one, so the load is not over; only what can never go on here is. Tables goes on with
     its rows; the plan's limit leaves off the only other app, which has none."""
-    with_max_apps("c", 1)
+    with_max_apps(A.key, 1)
 
     loaded = load(born, file_base64=a_file(apps=("table", "printing")))
 

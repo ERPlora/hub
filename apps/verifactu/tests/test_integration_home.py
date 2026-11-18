@@ -102,10 +102,9 @@ def test_the_owner_has_the_step_pending_until_erplora_may_file_in_production(iss
 @HUB_DB
 def test_the_own_certificate_also_completes_the_step(issuer):
     owner = ctx_for("hub_admin")
-    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
-    # Uploaded but not chosen: ERPlora still files, and its way still waits for the authorisation.
     assert steps(owner)[STEP]["state"] == "pending"
-    run("verifactu.config.update", {"route": "own"})
+    # Uploading it is all it takes: nothing else to choose.
+    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
     assert steps(owner)[STEP]["state"] == "done"
     run("verifactu.certificate.remove")
     assert steps(owner)[STEP]["state"] == "pending"
@@ -159,7 +158,6 @@ def live_by_erplora():
 
 def live_by_own_certificate():
     run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
-    run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
 
 

@@ -9,6 +9,7 @@ import { type Locator, type Page, expect, test } from '@playwright/test';
 import { customersReady } from './customer-helpers';
 import { A, createItem, HUB_DIR, listReady, login, openApps, record, shot, shown, THREE_SIZES as VIEWPORTS, topbarApps, uniqueName } from './helpers';
 import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
+import { toastWithId } from './toast-helpers';
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -143,7 +144,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
   const target = otherApps(sheet).filter({ hasText: /^\s*Customers\s*$/ });
   const name = (await target.getAttribute('title'))!;
   await target.click();
-  const toast = page.locator('ion-toast#view-load-failed');
+  const toast = toastWithId(page, 'view-load-failed');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(name);
   await expect(page).toHaveURL(`${A}/demo/items`);
@@ -151,7 +152,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
 
   // The network is back: the toast's Retry opens the app and the toast goes away.
   await page.unroute(/\/frontend\/pages\//);
-  await toast.locator('button', { hasText: /retry|reintentar/i }).click();
+  await toast.getByRole('button', { name: /retry|reintentar/i }).click();
   await expect(page).toHaveURL(`${A}/customer/customers`);
   await customersReady(page);
   await expect(topbarApps(page)).toBeVisible();
