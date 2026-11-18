@@ -25,7 +25,7 @@ async function exportCsv(): Promise<void> {
     await saveFile(file.filename, new Blob([`﻿${file.csv}`], { type: file.content_type }), t);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    void toastError(t('customer.exportCsv.failed', { reason }));
+    toastError(t('customer.exportCsv.failed', { reason }));
   } finally {
     pending.value = false;
   }

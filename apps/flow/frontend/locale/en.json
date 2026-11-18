@@ -1858,6 +1858,7 @@
       "issuer_nif": "Issuer NIF",
       "issuer_ready": "Issuer ready",
       "issuer_tax_id": "Issuer tax",
+      "issuer_vat_number": "Issuer VAT number",
       "item": "Item",
       "item_count": "Item count",
       "item_id": "Item",

@@ -94,6 +94,22 @@ export async function rowAction(page: Page, table: string, id: string, action: s
   await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
 
+/** `table`'s row `id` offers `action`: its button, or an entry of its «⋮» (a row shows two buttons at most), which is
+ *  opened to look and closed again. */
+export async function offersRowAction(page: Page, table: string, id: string, action: string): Promise<boolean> {
+  const { hook, menuHook } = rowHooks(table, id, action);
+  if (await shown(page).locator(`[data-testid=${hook}]:visible`).count()) return true;
+  const menu = shown(page).locator(`[data-testid=${menuHook}]:visible`).first();
+  if (!(await menu.count())) return false;
+  await menu.click();
+  const popover = page.locator('ion-popover.data-table__row-menu').last();
+  await popover.waitFor({ state: 'visible' });
+  const offered = (await popover.locator(`[data-testid=${hook}]`).count()) > 0;
+  await page.keyboard.press('Escape');
+  await popover.waitFor({ state: 'hidden' });
+  return offered;
+}
+
 /** The hooks `DataTable` gives a row action of `table`: its button (and its entry inside «⋮»), and the row's «⋮». */
 function rowHooks(table: string, id: string, action: string): { hook: string; menuHook: string } {
   return { hook: `${table}-row-${id}-${action}`, menuHook: `${table}-row-${id}-menu` };

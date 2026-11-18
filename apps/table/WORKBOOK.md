@@ -10,12 +10,18 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Mesas es el plano de tu local y de sus zonas, como el salón, la terraza o la barra. De un vistazo ves
+qué mesa está libre, ocupada o reservada y cuánto tiempo lleva sentado cada grupo. Tocas una mesa
+para sentar a un grupo, pasar su cuenta a otra mesa o llevarla a cobrar.
+
+### En detalle
+
 Mesas es el **plano del restaurante o del bar**: las zonas del local (salón, terraza, barra), las
 mesas de cada zona con su aforo, su forma y su sitio en el plano, y las **cuentas que hay sentadas en
 cada mesa**. Dice, en vivo, qué mesa está libre, ocupada, reservada o fuera de servicio, cuántos
 comensales hay, desde cuándo y quién la atiende, y sabe qué cuenta de Ventas está en qué mesa.
 
-Quién la usa:
+### Quién la usa y qué hace cada uno
 
 - El **responsable** de sala dibuja el plano: crea zonas y mesas, las coloca arrastrándolas y cambia
   su aforo, su forma o su estado.
@@ -23,6 +29,8 @@ Quién la usa:
   cambian los ajustes de sala.
 - El **empleado** (camarero, cajero) sienta a la gente, pasa una cuenta a otra mesa, junta o divide
   cuentas, corrige los comensales, quita la mesa a una cuenta y cierra una mesa a mano.
+
+### Lo que no hace
 
 Mesas no cobra (eso es Ventas: la mesa lleva al TPV con su cuenta), no apunta reservas (eso es
 Reservas: Mesas solo aparta la mesa en el plano) y no es la pantalla de cocina.
@@ -94,20 +102,54 @@ El menú **Mesas** tiene cinco pestañas: **Plano de sala**, **Zonas**, **Mesas*
 que el perfil no puede usar no salen.
 
 ### Plano de sala
-Menú **Mesas → Plano de sala**. Arriba, una sola fila: la tira de zonas (se desliza de lado en el
-móvil y se difumina por el borde cuando hay más zonas), el conmutador **Servicio / Editar plano** (solo
-a quien puede dibujar el plano) y, en «Editar plano», un «+» («Añadir zona o mesa») y un lápiz
-(«Editar zona»). Debajo, el plano de la zona elegida, con las mesas a su tamaño real: si no cabe de
-ancho (móvil, tableta) se desliza de lado y el borde con mesas detrás se difumina; si no cabe de alto,
-crece y se baja la página.
+Aquí ves de un vistazo cómo está la sala: cada mesa en su sitio, con su color y, si está ocupada, el
+tiempo que lleva el grupo sentado. En **Servicio** tocas una mesa para sentar a un grupo, cobrar, pasar
+la cuenta a otra mesa o juntarla con otra; en **Editar plano** colocas las mesas arrastrándolas y añades
+zonas y mesas.
 
-Cada mesa es una baldosa con su número, su estado escrito con su icono y color (Disponible, Ocupada,
-Reservada, Bloqueada), el aforo («4 pax») o, si está ocupada, los comensales y los minutos que llevan
-(«3 pax · 35 min», que avanzan solos) y quién la atiende; si tiene una reserva hoy, el nombre y la
-hora de la reserva («Cliente borrado» si se borraron los datos de esa clienta) en una línea: un nombre
-que no cabe se recorta con «…» y la hora se ve siempre entera («Maximiliana F… · 20:00»); el nombre
-completo va en el título de la mesa. Las mesas redondas se pintan redondas y la rectangular, más
-ancha que alta. El plano **es vivo**: cambia solo cuando alguien sienta, cobra, mueve o edita una mesa.
+El color de cada mesa dice cómo está:
+
+- **Verde**, Disponible: está libre y se puede sentar.
+- **Rellena del color principal** (azul de serie), Ocupada: hay un grupo sentado con su cuenta abierta.
+- **Amarilla**, Reservada: su reserva empieza dentro de una hora o ya ha empezado.
+- **Gris a rayas**, Bloqueada: está fuera de servicio y no se puede sentar.
+
+#### Detalle
+Menú **Mesas → Plano de sala**. Arriba, la tira de zonas (se desliza de lado en el móvil y se difumina
+por el borde cuando hay más zonas), el conmutador **Servicio / Editar plano** (solo a quien puede dibujar
+el plano) y, en «Editar plano», un «+» («Añadir zona o mesa») y un lápiz («Editar zona»). Cada pestaña
+lleva un punto del color de su zona y el número de mesas ocupadas sobre las que están en servicio
+(«7/12»). Debajo, una tarjeta resume la zona elegida: libres, ocupadas, reservadas y comensales.
+
+En tableta y ordenador, el plano ajusta solo el sitio y el tamaño de las mesas para enseñar toda la zona
+sin que dejen de leerse. Si aun así no cabe, se desplaza dentro de su recuadro, de lado y de arriba abajo,
+con un fundido en cada borde que tenga mesas detrás; el fondo se arrastra con el ratón y, con el plano
+seleccionado, las flechas del teclado lo desplazan. No hay botones de zoom. La cuadrícula solo sale en
+«Editar plano». En el teléfono, «Servicio» enseña las mesas en tarjetas a dos columnas, cada una con el
+dibujo de la mesa y sus sillas, el número, el estado y la hora; «Editar plano» sigue siendo el plano.
+
+Cada mesa tiene su forma (redonda, cuadrada o rectangular) y sillas según su aforo; las sillas llenas son
+los comensales sentados. Se dibujan doce sillas como mucho: con más aforo, las llenas se reparten en
+proporción, y la cifra exacta siempre va escrita. Dentro de la mesa van su número en grande y un dato: el
+tiempo que lleva ocupada («1:08»), la hora en una reservada o el estado en las demás. Debajo, el estado
+escrito con su icono, los comensales («3/4 pax») o el aforo, y el nombre y la hora de la reserva
+(«Ana · 21:00»; «Cliente borrado» si se borraron los datos de esa clienta). Quién atiende una mesa
+ocupada se ve en su ventana.
+
+El color de cada mesa dice su estado:
+
+- **Verde**, Disponible: fondo verde suave y borde verde. Está libre y se puede sentar.
+- **Rellena de color**, Ocupada: la mesa entera del color principal de la «Paleta de tema» (azul con la
+  paleta ERPlora). Hay un grupo sentado con su cuenta abierta.
+- **Amarilla**, Reservada: fondo amarillo suave y borde amarillo discontinuo. Su reserva empieza dentro de
+  una hora o ya ha empezado.
+- **Gris a rayas**, Bloqueada: está fuera de servicio y no se puede sentar hasta que se desbloquee.
+
+En una mesa ocupada, el tiempo lleva además un arco que avanza. Al pasar los minutos de «Aviso ámbar
+(minutos)» de los Ajustes, el tiempo y el arco se ponen ámbar, y al pasar los de «Aviso rojo (minutos)»,
+rojos; la mesa no cambia de color. Los cambios de estado y de zona se animan con suavidad, salvo si el dispositivo pide menos
+movimiento. Mientras carga, se ve la silueta del plano. El plano **es vivo**: cambia solo cuando alguien
+sienta, cobra, mueve o edita una mesa. Tiene dos modos:
 
 - **Servicio** (de entrada): no se arrastra. Tocar una mesa abre su ventana **Mesa N**:
   - libre o reservada: la pregunta de comensales («Comensales en la mesa N · 4 pax», «−» y «+», atajos
@@ -122,11 +164,11 @@ ancha que alta. El plano **es vivo**: cambia solo cuando alguien sienta, cobra, 
   - Transferir y Fusionar ponen el plano en modo destino: «Transferir N a…» / «Elige una mesa libre»
     (o «Fusionar N con…» / «Elige una mesa ocupada») y «Cancelar»; solo se pueden tocar las mesas que
     valen.
-- **Editar plano**: se arrastra cada mesa a su sitio (también con el teclado: flechas, 8 px; con
-  Mayúsculas, 32 px) y se guarda al soltar. Tocar una mesa abre **Editar mesa** (Número, Aforo,
-  Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa; pie con «Borrar» y
-  «Guardar»); el «+» abre **Añadir** (campo Zona y «Añadir zona»; campo «Número de mesa», que si se
-  deja vacío «Se numera sola», y «Añadir mesa»); el lápiz abre **Editar zona** (Nombre, Descripción
+- **Editar plano**: se arrastra cada mesa a su sitio (también con el teclado: cada flecha la mueve un
+  poco y, con Mayúsculas, cuatro veces más) y se guarda al soltar. Tocar una mesa abre **Editar mesa**
+  (Número, Aforo, Ancho, Alto, Nombre (opcional), Forma, Estado (Disponible o Bloqueada), Zona, Activa;
+  pie con «Borrar» y «Guardar»); el «+» abre **Añadir** (campo Zona y «Añadir zona»; campo «Número de
+  mesa», que si se deja vacío «Se numera sola», y «Añadir mesa»); el lápiz abre **Editar zona** (Nombre, Descripción
   (opcional); «Borrar zona» y «Guardar»). Debajo, la ayuda «Arrastra para colocar · clic en una mesa
   para editarla o borrarla. Los cambios se guardan al momento.». En «Editar plano» se ven también las
   mesas y zonas desactivadas, en gris.
@@ -134,23 +176,38 @@ ancha que alta. El plano **es vivo**: cambia solo cuando alguien sienta, cobra, 
 Las ventanas tapan toda la pantalla en el móvil y van centradas en tableta y ordenador.
 
 ### Zonas
+Aquí creas y ordenas las zonas del local, como la sala, la terraza o la barra, cada una con su color.
+Las zonas son las pestañas que salen arriba en el **Plano de sala**, y aquí ves cuántas mesas tiene cada
+una y cuántas están libres ahora. Con el «+» añades una zona y, desde su fila, cambias su nombre, su
+color o su orden.
+
+#### Detalle
 Menú **Mesas → Zonas**. Tabla: Nombre (con su color), Mesas, Libres («libres / total»), Orden,
 Estado (Activa, Inactiva); buscador «Buscar zona…», filtros por columna tras el embudo, vista tabla o
-tarjetas. El «+»
-(solo a quien puede crear zonas) abre el panel con Nombre, Descripción, Color (Azul, Cian, Morado,
-Verde, Ámbar, Rojo, Gris), Orden y «Añadir zona»; por fila «Editar» (el mismo panel con el interruptor
-«Activa» y «Guardar cambios») y «Borrar» (solo el administrador), que pide confirmación en «¿Borrar la
-zona?» y deja «Borrar zona» apagado si la zona tiene mesas.
+tarjetas. El «+» (solo a quien puede crear zonas) abre el panel con Nombre, Descripción, Color (Azul,
+Cian, Morado, Verde, Ámbar, Rojo, Gris), Orden y «Añadir zona»; por fila «Editar» (el mismo panel con
+el interruptor «Activa» y «Guardar cambios») y «Borrar» (solo el administrador), que pide confirmación
+en «¿Borrar la zona?» y deja «Borrar zona» apagado si la zona tiene mesas.
 
 ### Mesas
+Aquí tienes todas las mesas del local en una lista, con su número, su zona, su aforo y su estado. Sirve
+para buscar una mesa, añadir mesas nuevas con el «+» o cambiar sus datos con **Editar** sin pasar por el
+plano. Una mesa nueva aparece en el primer hueco libre de su zona; para llevarla a su sitio, usa
+**Editar plano** en el **Plano de sala**.
+
+#### Detalle
 Menú **Mesas → Mesas**. Tabla en orden natural (la 2 antes que la 10): Número, Nombre, Zona, Aforo,
 Estado; buscador «Buscar mesa…» (número y nombre), filtros por columna tras el embudo (zona, estado,
-forma, aforo),
-vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Zona y «Añadir mesa». Por fila,
-«Editar» (Número, Nombre, Aforo, Forma, Zona, Estado y Activa) y «Borrar» (solo el administrador, con
-confirmación).
+forma, aforo), vista tabla o tarjetas. El «+» abre el panel con Número, Aforo, Ancho, Alto, Zona y
+«Añadir mesa». Por fila, «Editar» (Número, Nombre, Aforo, Ancho, Alto, Forma, Zona, Estado y Activa) y
+«Borrar» (solo el administrador, con confirmación).
 
 ### Sesiones
+Aquí ves las cuentas de la sala, las abiertas y las ya cerradas, con su mesa, quién atiende, los
+comensales y el tiempo que llevan. Desde cada fila miras el **Detalle** de una cuenta, cierras una que se
+quedó abierta o, con **Volver a sentar**, llevas a una mesa libre una cuenta que se quedó sin mesa.
+
+#### Detalle
 Menú **Mesas → Sesiones**: las cuentas de la sala. Pestañas «Abiertas», «Cerradas» y «Todas». Tabla:
 Mesa («Sin mesa (aparcada)» si no tiene), Cobrado y Cierre (no salen en Abiertas), Zona, Camarero,
 Comensales, Apertura, Tiempo, Estado (Abierta, Cerrada, Trasladada, Fusionada, Aparcada); el tiempo de
@@ -162,16 +219,21 @@ horas van en la hora del negocio. Lo cobrado va en la moneda en que se cobró: l
 país, con sus decimales), nunca en euros si el negocio cobra en otra.
 
 ### Ajustes
+Aquí decides cómo trabaja la sala: si al sentar una mesa se preguntan los comensales y a los cuántos
+minutos el tiempo de una mesa ocupada se pone ámbar y, después, rojo. Si no se preguntan, la mesa se
+sienta con su aforo. Cambia lo que necesites y pulsa **Guardar**: vale para todo el negocio, en todos
+los aparatos.
+
+#### Detalle
 Menú **Mesas → Ajustes**: «Preguntar los comensales al sentar una mesa», «Aviso ámbar (minutos)» y
 «Aviso rojo (minutos)», y «Guardar». Solo la ve quien puede cambiarlos (de fábrica, el propietario y el
-administrador). En el móvil cabe entera, en español y en inglés: la frase larga del interruptor parte en dos
-líneas y «Guardar» se ve completo al final (hub#866).
+administrador).
 
 ## Estados de cada pantalla
 
 | Pantalla | Cargando | Vacío | Error |
 |---|---|---|---|
-| Plano de sala | «Cargando…» | Sin zonas: «Crea una zona para empezar a colocar mesas.»; zona sin mesas: «Sin mesas en esta zona. Pulsa «Añadir mesa».» | Al cargar: aviso con «Reintentar»; al guardar, dentro de la ventana abierta (o encima del plano si no hay ninguna) |
+| Plano de sala | Esqueleto del plano | Sin zonas: «Crea una zona para empezar a colocar mesas.»; zona sin mesas: «Sin mesas en esta zona. Pulsa «Añadir mesa».» | Al cargar: aviso con «Reintentar»; al guardar, dentro de la ventana abierta (o encima del plano si no hay ninguna) |
 | Zonas | La tabla en carga | «No hay zonas. Pulsa «+» para crear la primera (Salón, Terraza, Barra…).» | El de la tabla con «Reintentar»; el de guardar, dentro del panel |
 | Mesas | La tabla en carga | «Sin mesas.» | El de la tabla con «Reintentar»; el de guardar, dentro del panel |
 | Sesiones | La tabla en carga | «No hay sesiones. Sienta a un grupo desde el plano y aparecerá aquí.» | El de la tabla con «Reintentar»; el de cerrar, en su confirmación |
@@ -217,7 +279,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | TABLE-F25 | Retener la mesa de una reserva confirmada | hecho |
 | TABLE-F26 | Mover o soltar la retención cuando cambia la reserva | hecho |
 | TABLE-F27 | Soltar la mesa cuando la reserva se cancela o no se presenta | hecho |
-| TABLE-F28 | Gastar la retención al sentar a la reserva | hecho |
+| TABLE-F28 | Sentar al grupo de una reserva | hecho |
 | TABLE-F29 | Caducar las retenciones vencidas | hecho |
 | TABLE-F30 | Retener o soltar una mesa a mano | hecho |
 | TABLE-F31 | Olvidar el nombre de un cliente cuyos datos se borran (RGPD) | hecho |
@@ -237,8 +299,8 @@ Pasos:
 Entra: el nombre, la descripción, el color y el orden.
 Sale: la zona (avisa: `table.zone.created`).
 Si falla: sin nombre, el botón no se activa. Un nombre que ya tiene otra zona: «Ya hay una zona con
-ese nombre.». El motivo de un campo sale debajo de él y se quita en cuanto se corrige ese campo, aunque
-otro diga lo mismo (hub#888). Un empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
+ese nombre.». El motivo de un campo sale debajo de él y se quita en cuanto se corrige ese campo. Un
+empleado no ve el «+»; si lo pide por la API, se rechaza por permiso.
 Implicados: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Añadir mesas
@@ -255,17 +317,18 @@ Pasos:
    con el primer número libre de esa zona.
 4. Pulsa «Añadir mesa» (apagado mientras no haya ninguna zona).
 5. La mesa aparece en la zona, en el primer hueco libre, cuadrada, para 4 y Disponible.
-6. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
-   primer hueco libre de su zona.
-Entra: número (o ninguno), y en la lista también aforo y zona.
+6. Otra forma: en **Mesas → Mesas**, «+» con Número, Aforo, Ancho y Alto (vacíos, «Estándar»: la mesa
+   de siempre, 72 × 72) y Zona y «Añadir mesa»; también nace en el primer hueco libre de su zona, del
+   tamaño que tenga.
+Entra: número (o ninguno), y en la lista también aforo, ancho, alto y zona.
 Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa» del TPV deja de decir
 «Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`), y «Tus mesas» queda
 «Hecho» en el Inicio sin recargar. Una mesa ocupada o bloqueada sigue contando; si se apagan o se borran
 todas (TABLE-F04), el paso vuelve a pendiente solo. Una zona sin mesas no lo da por hecho.
-Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
-«Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
-este negocio.». En la ventana de **Mesas**, el motivo de un campo sale debajo de él y se quita en cuanto
-se corrige ese campo, aunque otro diga lo mismo (hub#888).
+Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), se añada desde donde se
+añada: «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe
+en este negocio.». En la ventana de **Mesas**, el motivo de un campo sale debajo de él y se quita en
+cuanto se corrige ese campo.
 Implicados: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Colocar las mesas en el plano
@@ -275,7 +338,8 @@ Pantalla: Plano de sala (Editar plano)
 Pasos:
 1. En **Plano de sala → Editar plano**, elige la zona.
 2. Arrastra cada mesa a su sitio (el gesto lo coge solo la mesa; deslizar sobre el plano vacío lo
-   desplaza). Con teclado: tabula hasta la mesa y muévela con las flechas (8 px; con Mayúsculas, 32 px).
+   desplaza). Con teclado: tabula hasta la mesa y muévela con las flechas, a pasos cortos; con
+   Mayúsculas, a pasos cuatro veces más largos.
 3. Al soltar se guarda al momento. La mesa no sale del borde del plano.
 4. Al recargar, cada mesa sigue donde se dejó.
 Entra: la posición nueva.
@@ -289,18 +353,21 @@ Actor: responsable, administrador
 Pantalla: Plano de sala (Editar plano), Mesas
 Pasos:
 1. En **Editar plano**, toca la mesa (o en **Mesas**, «Editar» en su fila): se abre «Editar mesa».
-2. Cambia Número, Aforo, Nombre (opcional), Forma (Cuadrada, Redonda, Rectangular), Estado
-   (Disponible o Bloqueada), Zona o Activa.
+2. Cambia Número, Aforo, Ancho y Alto (el tamaño de su caja en el plano, de 24 a 10000; la mesa de
+   siempre mide 72 × 72: una larga para ocho, 160 × 72), Nombre (opcional), Forma (Cuadrada, Redonda,
+   Rectangular), Estado (Disponible o Bloqueada), Zona o Activa.
 3. Pulsa «Guardar»: la ventana se cierra y el plano cambia solo (si cambió de zona, aparece en la otra
-   pestaña en el mismo sitio).
+   pestaña en el mismo sitio; con otro tamaño, se pinta en su sitio con su caja nueva).
 4. Para quitarla, pulsa «Borrar» (solo el administrador) y confírmalo: desaparece del plano y de la
    lista; su historia de cuentas se conserva.
 Entra: la mesa elegida.
 Sale: la mesa cambiada (avisa: `table.table.updated`) o borrada (avisa: `table.table.deleted`).
 Si falla: dentro de la ventana: «El número de mesa es obligatorio», «Ya hay una mesa con ese número
-en esta zona.», «Esa mesa no existe en este negocio.», cada motivo bajo su campo hasta que se corrige
-ese campo, aunque otro diga lo mismo (hub#888); borrar una mesa con cuenta abierta: «Esa mesa
-tiene una cuenta abierta. Ciérrala o trasládala antes de borrar la mesa.».
+en esta zona.», «Esa mesa no existe en este negocio.», un ancho o un alto fuera de 24 a 10000 («Debe
+ser mayor o igual que 24.», «Debe ser menor o igual que 10000.») o con decimales («Introduce un número
+entero.»), y entonces no se guarda nada; cada motivo bajo su campo hasta que se corrige ese campo;
+borrar una mesa con cuenta abierta: «Esa mesa tiene una cuenta abierta. Ciérrala o trasládala antes de
+borrar la mesa.».
 Implicados: TABLE-F02, TABLE-F05, TABLE-F21
 
 ### TABLE-F05 Sacar una mesa del servicio (bloquearla) y devolverla
@@ -313,11 +380,11 @@ Pasos:
    puede sentar hasta que se desbloquee.».
 3. Para devolverla, pon «Disponible» y guarda.
 4. Bloquear una mesa ocupada no toca su cuenta: sigue Ocupada hasta cobrarla y entonces queda
-   Bloqueada. Una reserva no pinta Reservada una mesa Bloqueada.
+   Bloqueada. Una mesa Bloqueada no sale Reservada aunque tenga una reserva.
 Entra: la mesa elegida.
 Sale: el estado de la mesa (avisa: `table.table.updated`).
-Si falla: como en TABLE-F04. Sentar en una mesa bloqueada (asistente, API) se rechaza con el mismo
-motivo.
+Si falla: los mismos avisos que al editar una mesa. Sentar en una mesa bloqueada, también desde el
+asistente o la API, se rechaza con el mismo aviso de mesa fuera de servicio.
 Implicados: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Renombrar o borrar una zona
@@ -334,8 +401,7 @@ Pasos:
 Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).
 Si falla: «Esta zona todavía tiene mesas. Muévelas a otra zona o bórralas antes.» o «Esa zona no
-existe en este negocio.». El motivo de un campo sale debajo de él hasta que se corrige ese campo, aunque
-otro diga lo mismo (hub#888).
+existe en este negocio.». El motivo de un campo sale debajo de él hasta que se corrige ese campo.
 Implicados: TABLE-F01, TABLE-F04
 
 ### TABLE-F07 Crear muchas mesas de golpe
@@ -361,15 +427,16 @@ Pasos:
 2. Pon «Aviso ámbar (minutos)» y «Aviso rojo (minutos)» (de 1 a 600; el rojo no puede ser menor que el
    ámbar).
 3. Pulsa «Guardar».
-   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 4. Desmarcado, tocar una mesa libre la sienta con su aforo (con los comensales de la reserva si está
    Reservada). En **Sesiones**, el tiempo de una cuenta abierta se pone ámbar y rojo a partir de esos
-   minutos. Sin guardar nunca: se pregunta, 60 y 90 minutos.
+   minutos. Mientras no se guarden, valen los de fábrica: se preguntan los comensales y los avisos
+   saltan a los 60 y a los 90 minutos.
 Entra: los tres valores.
 Sale: los ajustes de sala (avisa: `table.settings.updated`).
-Si falla: un valor fuera de rango sale en su campo. Como en las ventanas de formulario, el aviso se quita en
-cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente
-intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
+Si falla: un valor fuera de rango sale en su campo. El aviso se quita en cuanto se cambia algo y el
+motivo de un campo en cuanto se corrige ese campo; los dos vuelven si al guardar otra vez se rechaza.
+Un aviso que no es de ningún campo se queda hasta que se vuelve a guardar.
 Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala
@@ -377,15 +444,19 @@ Estado: hecho
 Actor: responsable, empleado
 Pantalla: Plano de sala
 Pasos:
-1. Abre **Mesas → Plano de sala** y elige la zona: su plano sale al momento, sin esperar a cargar. Se
-   ven todas sus mesas en uso, a su tamaño real.
-2. Cada mesa dice su estado escrito, con icono y color: Disponible, Ocupada, Reservada o Bloqueada.
-3. Una mesa ocupada dice los comensales y los minutos que llevan («3 pax · 35 min») y quién la
-   atiende; los minutos avanzan solos. Una mesa con reserva hoy dice el nombre y la hora.
-4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que
-   salir y volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en
-   el paso en que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su reserva y vuelve a
-   Disponible cuando la reserva acaba, sin que nadie toque nada.
+1. Abre **Mesas → Plano de sala** y elige la zona: su contenido sale al momento, sin esperar a cargar.
+   La pestaña indica cuántas mesas están ocupadas y la tarjeta resume libres, ocupadas, reservadas y
+   comensales.
+2. En tableta y ordenador el plano ajusta todas las mesas al espacio; en el teléfono, «Servicio» las
+   muestra en tarjetas a dos columnas. Cada mesa dice su estado escrito, con icono, forma, sillas y color:
+   Disponible, Ocupada, Reservada o Bloqueada.
+3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y, al
+   pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
+   el nombre y la hora. Quién la atiende se ve en su ventana.
+4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
+   volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
+   que estabas, con lo que hayas escrito. Y con el reloj: una mesa pasa a Reservada una hora antes de su
+   reserva y vuelve a Disponible cuando la reserva acaba, sin que nadie toque nada.
 Entra: las mesas, sus cuentas abiertas, sus retenciones y el estado de sus cuentas en Ventas.
 Sale: nada.
 Si falla: un fallo al cargar sale con «Reintentar».
@@ -401,7 +472,7 @@ Pasos:
 2. Toca un atajo del 1 al 8 (sienta de un toque) o ajusta con «−» y «+» y pulsa «Sentar N». Más que el
    aforo avisa «Supera el aforo de la mesa (4)» y deja sentar. Con el ajuste de comensales apagado,
    «Sentar» sienta con el aforo.
-3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta (TABLE-F32).
+3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta.
 4. La mesa pasa a Ocupada y en Ventas nace su cuenta abierta con el título «Mesa N» (la ve **Cuentas
    abiertas** del TPV). Quien sienta es el camarero de la cuenta.
 5. Con el asistente: «sienta a tres en la mesa 4» (con su zona si el número se repite).
@@ -422,8 +493,8 @@ Pantalla: Plano de sala (Servicio)
 Pasos:
 1. En **Plano de sala → Servicio**, toca una mesa Ocupada: se abre su ventana con comensales («1
    comensal», «3 comensales»), desde cuándo, camarero y cliente.
-2. **Cobrar** lleva a **Ventas → Vender** con esa cuenta en pantalla (`/sale/pos?order=<id>`); allí se
-   añaden rondas y se cobra.
+2. **Cobrar** lleva a **Ventas → Vender** con esa cuenta en pantalla; allí se añaden rondas y se
+   cobra.
 3. Con dos cuentas en la mesa (dividida), se elige primero la cuenta («Cuenta 1», «Cuenta 2»).
 Entra: la mesa tocada y su cuenta abierta.
 Sale: nada en Mesas.
@@ -464,7 +535,7 @@ Pasos:
 1. En la ventana de la mesa ocupada pulsa «Quitar mesa».
 2. La mesa queda Disponible para otros; la cuenta de mesa pasa a «Aparcada», sin mesa, conservando
    comensales, camarero y hora; la cuenta sigue abierta en Ventas (**Cuentas abiertas**).
-3. Para seguir con ella en una mesa, **Sesiones → Volver a sentar** (TABLE-F24).
+3. Para seguir con ella en una mesa, **Sesiones → Volver a sentar**.
 Entra: la cuenta de mesa.
 Sale: la cuenta aparcada (avisa: `table.session.parked`) y la mesa libre si no le queda otra cuenta. Si
 luego Ventas la cobra entera o la anula, la cuenta de mesa queda «Cerrada» (sin mesa).
@@ -483,9 +554,9 @@ Pasos:
 4. Con el asistente: «en la mesa 4 ahora son cinco»; en una mesa dividida, di cuál de sus cuentas.
 Entra: la cuenta abierta de la mesa.
 Sale: los comensales de la cuenta (avisa: `table.session.updated`).
-Si falla: una cuenta ya cerrada, trasladada, fusionada o aparcada no se corrige (mensaje de
-TABLE-F13). Siempre al menos 1.
-Implicados: TABLE-F10, TABLE-F17
+Si falla: una cuenta ya cerrada, trasladada, fusionada o aparcada no se corrige: sale el mismo aviso
+que al quitar la mesa («Esa cuenta no está abierta…»). Siempre queda al menos 1 comensal.
+Implicados: TABLE-F10, TABLE-F13, TABLE-F17
 
 ### TABLE-F15 Pasar la cuenta a otra mesa (transferir)
 Estado: hecho
@@ -498,7 +569,7 @@ Pasos:
 3. Toca la mesa de destino.
 4. La cuenta es la misma, ahora en la mesa de destino, con sus comensales, su camarero, sus notas, su
    hora de llegada y su título nuevo en Ventas («Mesa M»); la de origen queda libre si no le queda otra
-   cuenta, y la de destino, Ocupada (si estaba Reservada, gasta la reserva).
+   cuenta, y la de destino, Ocupada (si estaba Reservada, su reserva se da por sentada).
 5. Con el asistente: «pasa la mesa 4 a la 6».
 Entra: la cuenta de origen y la mesa de destino.
 Sale: la cuenta de origen «Trasladada» y una cuenta de mesa nueva en el destino con la misma cuenta
@@ -521,7 +592,7 @@ Pasos:
    queda anulada, **en la misma operación**: o se junta todo, o no se junta nada. Lo que la cuenta de
    origen ya había cobrado sigue en su «Cobrado». El TPV que tenía la cuenta de origen en pantalla (en
    este dispositivo o en otro) pasa a la de la mesa que se queda y avisa «Esa cuenta se ha juntado con
-   otra: la pantalla muestra la cuenta juntada.» (SALE-F24).
+   otra: la pantalla muestra la cuenta juntada.».
 Entra: las dos cuentas.
 Sale: una sola cuenta abierta en la mesa que se queda (avisa: `table.session.merged` y
 `sale.order.merged`).
@@ -602,14 +673,14 @@ Pasos:
    desde el TPV.» (con uno solo, «1 comensal»).
 3. Si su cuenta de Ventas está vacía (nadie pidió nada), Mesas la anula y cierra la mesa: un grupo que
    se levanta sin pedir no necesita a un responsable.
-4. Si su cuenta tiene algo pedido, no se cierra nada: se cobra (TABLE-F18), se pasa a otra mesa
-   (TABLE-F15) o se elimina en Ventas (TABLE-F20).
+4. Si su cuenta tiene algo pedido, no se cierra nada: se cobra, se pasa a otra mesa o se elimina en
+   Ventas.
 Entra: la cuenta de mesa abierta y el estado de su cuenta en Ventas.
 Sale: la cuenta de mesa «Cerrada» con su hora (avisa: `table.session.closed`).
 Si falla: «La cuenta de esta mesa sigue abierta en Ventas: cóbrala, pásala a otra mesa o elimínala
 desde el TPV.»; «La cuenta de esta mesa ha cambiado. Recarga la lista e inténtalo de nuevo.» (otro
 dispositivo le cambió la cuenta); «Esa cuenta no está abierta…» (ya la cerró otro).
-Implicados: TABLE-F18, TABLE-F20
+Implicados: TABLE-F15, TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Consultar las cuentas de la sala (abiertas y cerradas)
 Estado: hecho
@@ -623,7 +694,8 @@ Pasos:
 4. «Detalle» enseña zona, camarero, estado, comensales, apertura, cierre, tiempo, cobrado y notas.
 Entra: las cuentas de mesa y lo cobrado en Ventas.
 Sale: nada.
-Si falla: el error de la tabla con reintento. Las devoluciones no restan del «Cobrado».
+Si falla: si la lista no carga, sale un aviso con «Reintentar». Las devoluciones no restan del
+«Cobrado».
 Implicados: TABLE-F18, TABLE-F19, TABLE-F23
 
 ### TABLE-F23 Borrar una cuenta cerrada del historial
@@ -649,13 +721,13 @@ Pasos:
 1. En **Sesiones → Todas**, «Volver a sentar» en una cuenta aparcada y elige una mesa libre.
 2. La cuenta de mesa vuelve a «Abierta» en esa mesa, con sus comensales, su camarero y su hora de
    apertura, y su cuenta de Ventas toma el título de la mesa; la mesa pasa a Ocupada y, si estaba
-   Reservada, gasta la reserva.
+   Reservada, su reserva se da por sentada.
 Entra: la cuenta aparcada y la mesa.
 Sale: la cuenta de mesa sentada (avisa: `table.session.restored`).
 Si falla: «Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa.»; la
-mesa tiene que estar libre como al sentar (TABLE-F10). Volver a sentar se hace con el grupo delante:
-una automatización no puede hacerlo.
-Implicados: TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
+mesa tiene que estar libre, como al sentar a un grupo, y salen los mismos avisos. Volver a sentar se
+hace con el grupo delante: una automatización no puede hacerlo.
+Implicados: TABLE-F10, TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
 
 ### TABLE-F25 Retener la mesa de una reserva confirmada
 Estado: hecho
@@ -706,26 +778,27 @@ Sale: la retención soltada (avisa: `table.table.hold_released`).
 Si falla: si se pide dos veces, no cambia nada.
 Implicados: RESERVATION-F09, RESERVATION-F10, RESERVATION-F20, TABLE-F25
 
-### TABLE-F28 Gastar la retención al sentar a la reserva
+### TABLE-F28 Sentar al grupo de una reserva
 Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
 Pasos:
 1. Llega el grupo de la reserva: la mesa está Reservada. Tócala; la pregunta de comensales viene con
-   los de la reserva. Pulsa «Sentar N» (TABLE-F10).
-2. La mesa pasa a Ocupada y su retención queda gastada. Trasladar o dividir una cuenta a esa mesa, o
-   volver a sentar allí una aparcada, también la gasta.
-3. Sentar a otro grupo en esa mesa horas antes de la reserva (la mesa aún Disponible) **no** gasta la
-   reserva de la noche.
-4. Al sentar desde Reservas («Sentar» en la reserva, RESERVATION-F11) se gasta solo la retención de esa
-   reserva: con Ana a las 19:00 y Bea a las 21:00 en la mesa 5, sentar a Ana a las 20:10 deja la de Bea
-   viva, y cuando Ana se va la mesa vuelve a salir Reservada para Bea. Si Reservas sienta a un grupo más
-   de una hora antes de su reserva (su retención aún no pinta la mesa), suelta esa retención al sentarlo:
-   la mesa no vuelve a salir Reservada para quien ya se sentó. Desde el plano no se sabe de qué reserva es
-   el grupo, y se gastan todas las que ya la pintaban Reservada.
-Entra: la mesa Reservada (y, desde Reservas, la reserva que se sienta).
-Sale: las retenciones que la pintaban Reservada (desde Reservas, solo la suya), gastadas y sin nombre.
-Si falla: los de TABLE-F10.
+   los de la reserva. Pulsa «Sentar N», como al sentar a cualquier grupo.
+2. La mesa pasa a Ocupada y la reserva se da por sentada: la mesa ya no vuelve a salir Reservada
+   por ella. Pasar o dividir una cuenta a esa mesa, o volver a sentar allí una aparcada, también la da
+   por sentada.
+3. Sentar a otro grupo en esa mesa horas antes de la reserva (la mesa aún Disponible) **no** da por
+   sentada la reserva de la noche.
+4. Si se sienta desde Reservas («Sentar» en la reserva), solo cuenta esa reserva: con Ana a las 19:00 y
+   Bea a las 21:00 en la mesa 5, sentar a Ana a las 20:10 deja viva la de Bea, y cuando Ana se va la mesa
+   vuelve a salir Reservada para Bea. Si Reservas sienta a un grupo más de una hora antes de su reserva,
+   la mesa no vuelve a salir Reservada para quien ya se sentó. Desde el plano no se sabe de qué reserva
+   es el grupo, y se dan por sentadas todas las que ya tenían la mesa Reservada.
+Entra: la mesa Reservada (y, desde Reservas, la reserva que se sienta, RESERVATION-F11).
+Sale: las retenciones que la pintaban Reservada (desde Reservas, solo la suya), gastadas y sin nombre;
+una retención que aún no pintaba la mesa, soltada al sentar desde Reservas.
+Si falla: los mismos avisos que al sentar a un grupo en una mesa libre o reservada.
 Implicados: RESERVATION-F11, TABLE-F10, TABLE-F25
 
 ### TABLE-F29 Caducar las retenciones vencidas
@@ -761,7 +834,7 @@ Implicados: TABLE-F09, TABLE-F28
 ### TABLE-F31 Olvidar el nombre de un cliente cuyos datos se borran (RGPD)
 Estado: hecho
 Actor: sistema
-Pantalla: Plano de sala
+Pantalla: ninguna (se ve en el Plano de sala)
 Pasos:
 1. En **Clientes** se borran los datos personales de una ficha (también de las que se le unieron).
 2. Al momento, todas las retenciones de mesa de esa clienta, vivas o terminadas, se quedan sin su nombre,
@@ -783,8 +856,7 @@ Pasos:
 2. La cuenta de la mesa queda con esa ficha: Ventas la recupera al cobrar. «Quitar cliente» la suelta.
 3. El asistente también puede sentar con cliente: «sienta a Ana García en la mesa 4, somos 3».
 4. Si en Clientes se elimina la ficha, la cuenta deja de decir su nombre; si el personal de ERPlora la recupera
-   desde la copia aparte (CUSTOMER-F33), lo vuelve a decir al momento, también en el plano y la sala que estén
-   abiertos.
+   desde la copia aparte, lo vuelve a decir al momento, también en el plano y la sala que estén abiertos.
 Entra: la ficha, de Clientes.
 Sale: el enlace cuenta ↔ cliente, que guarda Clientes (avisa: `customer.order.linked`).
 Si falla: el motivo de Clientes; la mesa se sienta igual.
@@ -1019,6 +1091,25 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   permisos de nadie.
 - **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
+- **La ayuda dentro del Hub** (`help` en `apps.py`) publica el primer apartado, cada `###` de «Pantallas» y, de
+  cada flujo `hecho` en una pestaña, el título, los «Pasos» y el «Si falla»; `tests/test_help_workbooks.py`
+  rechaza ahí código, incidencias, píxeles, ids de flujo y nombres de operación. Lo que esas partes no dicen y
+  vigilan las pruebas:
+  - El color de cada estado sale de `FloorPlan/floor-status.css` de `@erplora/ui` (Disponible y Reservada,
+    los tonos `success` y `warning`; Ocupada, `--ep-primary-text`, que sigue la paleta; Bloqueada, el gris
+    `medium`), y el del tiempo, de `durationTone` (`frontend/lib/format.ts`): la leyenda de «Plano de sala»
+    dice lo mismo y cambia con ellos.
+  - El teléfono es hasta 640 px de ancho (`useIsPhone`), el mismo corte que las listas de `@erplora/ui`.
+  - Quien atiende una mesa va también en su nombre accesible (`accessible` de `frontend/lib/floor-view.ts`).
+  - Mientras carga, el plano pinta `FloorSkeleton`; los avisos de vacío y de error conservan sus acciones.
+  - En «Editar plano», una flecha mueve la mesa 8 px y, con Mayúsculas, 32 px (`KEY_STEP` y `keyDelta`).
+  - **Cobrar** (TABLE-F11) abre el TPV en `/sale/pos?order=<id>`.
+  - En las ventanas de zona y de mesa, el motivo de un campo se quita al corregir ese campo aunque otro campo
+    diga lo mismo (hub#888).
+  - En Ajustes, lo que se cambia mientras se guarda se queda por guardar (hub#914); el aviso y los motivos
+    siguen las reglas de las ventanas de formulario, y un rechazo sin campo se queda hasta el siguiente
+    intento (hub#854); en el móvil cabe entera en español y en inglés: la frase larga del interruptor parte en
+    dos líneas y «Guardar» se ve completo al final (hub#866).
 - **Administrador de Django con CRUD completo** (PLAN §17): zonas, mesas, cuentas de mesa,
   recorrido, retenciones y ajustes; ids y fechas en solo lectura. Lo que guarda no pasa por las
   operaciones ni deja aviso.

@@ -32,6 +32,13 @@ on:
         type: string
         required: false
         default: ""
+      # A push deploy stops before registering anything when deploy/app-env.json changes a protected
+      # setting in prod; this run lets it through (ecs-deploy.sh, app_env.py).
+      confirm_protected:
+        description: Protected settings of deploy/app-env.json this prod deploy changes, exactly (e.g. VERIFACTU_PRODUCTION_ENABLED=true)
+        type: string
+        required: false
+        default: ""
 
 # Each job asks for what it needs: id-token only in build and deploy, because the OIDC token of any
 # job of a push to main (pre) carries the sub that gha-deploy-hub (gha-deploy-hub-pre) trusts
@@ -299,6 +306,7 @@ jobs:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.commit.outputs.sha }}
           ENVIRONMENT: ${{ steps.target.outputs.environment }}
+          CONFIRM_PROTECTED: ${{ inputs.confirm_protected }}
         run: bash .github/scripts/ecs-deploy.sh
 
       # Through the ALB by name (prod and pre share it), so it also works before the DNS cutover.

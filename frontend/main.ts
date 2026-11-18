@@ -24,6 +24,7 @@ import { defineAsyncComponent, ref, watch } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
+import { useHubActionNotices } from '../base/frontend/lib/action-notices';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { approvalPass } from '../base/frontend/lib/approval';
@@ -58,15 +59,13 @@ export const SIDEBAR: ShellSidebar = {
 };
 
 /**
- * base's pieces of the chrome: the assistant's sparkles and the bell at the end of the
- * topbar, «Upgrade plan» and right below it «Manage on erplora.com» in the menu's footer, the blocking strip over every
- * screen and, beside the pane, the device's notices and the assistant's panel. Each in its
+ * base's pieces of the chrome: the assistant's sparkles at the end of the topbar, «Upgrade plan» and «Manage on
+ * erplora.com» in the menu's footer and, beside the pane, the device's notices and the assistant's panel. Each in its
  * own chunk, which `boot` loads beside the first screen's: the hub mounts once they are here (`chromeLoaded`).
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   topbar: defineAsyncComponent(() => import('../base/frontend/components/TopbarChrome.vue')),
   sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/SidebarFooter.vue')),
-  notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
   background: defineAsyncComponent(() => import('../base/frontend/components/BackgroundChrome.vue')),
 };
 
@@ -83,8 +82,8 @@ type AsyncPiece = { __asyncLoader?: () => Promise<unknown> };
 export const CHROME_WAIT_MS = 3000;
 
 /**
- * Loads the chrome's pieces, settled whether they load or not, for at most `CHROME_WAIT_MS`. The bell, the apps followed
- * beside the pane and the blocking strip read live queries: mounted with the screen, they go in its one stream; mounted
+ * Loads the chrome's pieces, settled whether they load or not, for at most `CHROME_WAIT_MS`. The apps followed beside
+ * the pane read a live query: mounted with the screen, it goes in its one stream; mounted
  * once their chunk arrived, more than 150 ms after the screen's queries on a slow device (the tab's CPU ×6), they cut it
  * and opened it again. Through each piece's own loader, not another `import()`: a
  * module already here still resolves in a later task, after the stream opened. A piece that does not load never keeps
@@ -231,6 +230,7 @@ export async function boot(
     sidebar: SIDEBAR,
     userMenu: userMenu(doc),
     chrome: CHROME,
+    actionNotices: useHubActionNotices,
   });
   provideLiveClient(client, app);
   // base's report of the screen's own errors: what nobody caught goes to the Hub's log by itself.
@@ -255,7 +255,7 @@ export async function boot(
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
     logout: () => void signOut(doc),
-    toast: (message) => void toastSuccess(message),
+    toast: (message) => toastSuccess(message),
     paint: (mode, palette, scale) => applyUserThemePreferences(mode, palette as ThemePalette | null, undefined, scale),
     reset: resetUserThemePreferences,
     label: () => session.session.value?.user?.label,

@@ -3,7 +3,7 @@
 // second tap on the same product raises its line. One write in flight at a time per check. What the
 // screen shows is what the operations answer (no money of its own); a refusal says the server's words. What the
 // cashier's role does not allow, a manager approves with their PIN on this very device (BASE-F84).
-import { toast, toastError } from '@erplora/ui/shell';
+import { toastError, toastInfo } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
@@ -21,8 +21,8 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(() => Promise.resolve()),
-  toast: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(),
+  toastInfo: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -32,7 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(toastError).mockClear();
-  vi.mocked(toast).mockClear();
+  vi.mocked(toastInfo).mockClear();
 });
 
 async function setup(options: { settings?: Partial<SettingsOut>; session?: typeof MANAGER; locale?: 'en' | 'es' } = {}) {
@@ -566,7 +566,7 @@ describe('useTill: following the check live', () => {
     const s = await withCheck();
     s.till().follow(order({ id: 'o1', version: 5, status: 'voided', merged_into_id: 'o2', lines: [] }));
     expect(toastError).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
+    expect(toastInfo).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
     expect(s.till().orderId.value).toBe('o2');
     expect(s.till().order.value).toBeNull();
     expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o2');

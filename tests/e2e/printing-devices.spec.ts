@@ -13,6 +13,7 @@ import { dialog, fill } from './inventory-helpers';
 import { FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
+import { dismissToasts } from './toast-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -88,9 +89,8 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   await expect(row).toContainText(PRINTER);
   await expect(shown(page).locator('[data-testid=printing-devices-this]')).toContainText(new RegExp(`(prints for|imprime para): ${PRINTER}\\.`));
   await expect(shown(page).locator('[data-testid=printing-devices-add]')).toHaveCount(0);
-  // «This device prints now.» said, the toast goes before the screenshots: it would cover the tabbar.
-  await page.locator('ion-toast').evaluateAll((toasts) => Promise.all(toasts.map((toast) => (toast as unknown as { dismiss: () => Promise<boolean> }).dismiss())));
-  await expect(page.locator('ion-toast')).toHaveCount(0);
+  // «This device prints now.» said, the toasts go before the screenshots: one would sit over the page.
+  await dismissToasts(page);
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await devicesReady(page);
@@ -158,8 +158,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   expect(hello.close).toBe(4403);
   const still = await api<{ rows: Device[] }>(context, A, 'GET', '/printing/devices');
   expect(still.data.rows.map((device) => device.name)).not.toContain(DEVICE_NAME);
-  await page.locator('ion-toast').evaluateAll((toasts) => Promise.all(toasts.map((toast) => (toast as unknown as { dismiss: () => Promise<boolean> }).dismiss())));
-  await expect(page.locator('ion-toast')).toHaveCount(0);
+  await dismissToasts(page);
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await devicesReady(page);

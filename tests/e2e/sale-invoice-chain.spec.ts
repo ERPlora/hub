@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, shot, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, newestSaleOf, stamp } from './sale-helpers';
@@ -128,7 +129,7 @@ test('SALE-F30 and F31: a voided ticket and a refund get their rectifying invoic
   await page.reload();
   await shown(page).locator('[data-testid=sales-table-row], [data-testid=sales-empty]').first().waitFor({ state: 'visible' });
   await shown(page).locator('[data-testid=sales-table-search] input').fill(ticket.number);
-  await shown(page).locator(`[data-testid=sales-table-row-${ticket.id}-void]`).first().click();
+  await rowAction(page, 'sales-table', ticket.id, 'void');
   const modal = page.locator('ion-modal[data-testid=sale-void]');
   await modal.locator('[data-testid=sale-void-reason] textarea').fill('e2e wrong table');
   await modal.locator('[data-testid=sale-void-submit]').click();

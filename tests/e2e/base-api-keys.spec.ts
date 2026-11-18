@@ -12,6 +12,7 @@ import { type APIRequestContext, type Browser, expect, type Page, test } from '@
 
 import { A, api, capture, collectProblems, horizontalOverflow, hostPage, psql, saveSessionForTheSweep, shown, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -132,7 +133,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(dialog(page, 'api-key-revoke')).toContainText('Any system using this token loses access at once.');
     await dialog(page, 'api-key-revoke-submit').click();
     await expect(dialog(page, 'api-key-revoke')).toBeHidden();
-    await expect(page.locator('ion-toast').filter({ hasText: `“${name}” revoked.` }).first()).toBeVisible();
+    await expect(toastSaying(page, `“${name}” revoked.`)).toBeVisible();
     await expect(row).toContainText('Revoked');
     await expect(shown(page).locator(`[data-testid^="api-keys-row-${id}-"]`)).toHaveCount(0);
     expect(await readWith(outside, second)).toBe(401);

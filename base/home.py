@@ -60,6 +60,7 @@ from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
+from base import bell
 from base.business import business_zone, country_name, country_or_market
 
 logger = logging.getLogger(__name__)
@@ -425,24 +426,12 @@ def bell_counters(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> li
                 continue
             key = f"{config.label}.{counter.key}"
             try:
-                row = run_hook(ctx, counter.operation, counter.params)
-                count = (row or {}).get("count", 0)
-                if not isinstance(count, int) or isinstance(count, bool):
-                    raise TypeError(f"count is {count!r}, not a whole number")
+                notice = bell.notice(key, counter, run_hook(ctx, counter.operation, counter.params))
             except Exception:
                 hook_failed(key, counter.operation)
                 continue
-            if count > 0:
-                counters.append(
-                    {
-                        "key": key,
-                        "app": config.label,
-                        "count": count,
-                        "route": counter.route,
-                        "label": str(counter.label),
-                        "icon": counter.icon,
-                    }
-                )
+            if notice["count"] > 0:
+                counters.append(notice)
     return counters
 
 

@@ -18,6 +18,7 @@ import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { chats, relay } from './provider-helpers';
 import { madridDay, openTheBook } from './reservation-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
+import { toastSaying } from './toast-helpers';
 import { answerSpec, bookingCleanUp, customerWrites } from './whatsapp-answer-helpers';
 import { e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
@@ -138,7 +139,7 @@ for (const viewport of VIEWPORTS) {
 
       // «Approve»: Reservas books it, on their card (no second one), and the assistant hears what Reservas answered.
       await question.locator('[data-testid^=flow-question-yes-]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'Approved: the automation carries on.')).toBeVisible();
       await expect(question).toHaveCount(0);
       expect(
         psql(

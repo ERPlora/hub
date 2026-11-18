@@ -8,7 +8,7 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 
 import { A, api, type Credentials, EMPLOYEE, hubUserIdOf, login, psql, shot, shown } from './helpers';
 import { staffCleanUp } from './staff-helpers';
-import { rowAction } from './service-helpers';
+import { offersRowAction, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
 
 const TAG = 'E2E';
@@ -93,7 +93,7 @@ test('the employee asks, the owner approves live, an overlap is refused in the f
     await employee.page.screenshot({ path: shot('staff-time-off-mine') });
 
     // The employee may not approve: no such action on any row.
-    await expect(shown(employee.page).locator(`[data-testid=staff-time-off-row-${timeOffId}-approve]`)).toHaveCount(0);
+    expect(await offersRowAction(employee.page, 'staff-time-off', timeOffId, 'approve')).toBe(false);
   } finally {
     await owner.context.close();
     await employee.context.close();

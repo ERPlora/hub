@@ -28,7 +28,7 @@ async function discard(id: string): Promise<void> {
   error.value = null;
   try {
     await dismiss.run({ id });
-    void toastSuccess(t('flow.drafts.dismissed'));
+    toastSuccess(t('flow.drafts.dismissed'));
   } catch (failure) {
     error.value = failure as ApiError;
   }

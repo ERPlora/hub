@@ -3,54 +3,41 @@
 // line of the check. Between the check's heading (95 px), its «Check» / «Current order» tabs (60 px with their margin)
 // and «Send order» (67 px), a line (139 px) does not fit in a column of 360 px or less. There the whole column scrolls as
 // the phone's drawer does, with «Send order» pinned at its bottom: a finger brings a line to the top and reads it whole
-// above the bar. Where a line fits (1280x816 with the strip, 1024x712 without it, the desktop), the heading and the tabs
-// stay in place and only the lines scroll, as they always did; the phone's and the tablet's drawer keep scrolling all as
-// one. Both tabs, in English and in Spanish. What a run creates, its product
-// `E2E-SHORTSIDE-<run>`, its check and the issuer of a hub that had none (with it, the strip goes as it does for a
-// business with its data complete), is deleted after it; hub `a`'s issuer is parked only for the runs with the strip.
+// above the bar. Where a line fits (1024x712, the desktop), the heading and the tabs stay in place and only the lines
+// scroll, as they always did; the phone's and the tablet's drawer keep scrolling all as one. Both tabs, in English and in
+// Spanish. What a run creates, its product `E2E-SHORTSIDE-<run>` and its check, is deleted after it.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, settled, shown } from './helpers';
 import { type Product } from './inventory-helpers';
-import { cleanTillAndIssuer, dishWithAnIssuer, openTillCart, stamp, TILL_LANGUAGES, tillIsPhone, tillUnderStrip } from './sale-helpers';
+import { cleanTill, dishForTheTill, openTillCart, stamp, TILL_LANGUAGES, tillIsPhone, tillOpenAt1440 } from './sale-helpers';
 
 const KEY = 'FIX-HUB-820-SHORT-LANDSCAPE';
-/** Hub `a`'s issuer, parked while a run needs the strip of a hub that cannot issue invoices yet. */
-const PARKED = 'e2e_sale_cart_short_landscape_issuer';
 const RUN = stamp();
 
 interface Size {
   label: string;
   width: number;
   height: number;
-  /** Whether the red strip of a hub that cannot issue invoices yet sits over the till. */
-  strip: boolean;
   /** `short`: a side column where a line did not fit beside the heading, the tabs and the bar; `roomy`: one where it
    *  fits, which keeps its layout; `drawer`: the phone's and the tablet's check, which already scrolled all as one. */
   kind: 'short' | 'roomy' | 'drawer';
 }
 
 const SIZES: readonly Size[] = [
-  // The issue's: a small tablet on its side and a low laptop window, without the strip, and a 1024x700 tablet with it.
-  { label: '1024x600', width: 1024, height: 600, strip: false, kind: 'short' },
-  { label: '1280x560', width: 1280, height: 560, strip: false, kind: 'short' },
-  { label: '1024x700', width: 1024, height: 700, strip: true, kind: 'short' },
-  // Measured beside them: an iPad on its side and a 720p laptop, with the strip.
-  { label: '1024x768', width: 1024, height: 768, strip: true, kind: 'short' },
-  { label: '1280x720', width: 1280, height: 720, strip: true, kind: 'short' },
-  // That iPad in a browser, under its address bar and tabs (332 px), whatever the strip does.
-  { label: '1024x672', width: 1024, height: 672, strip: false, kind: 'short' },
-  // A laptop under the strip and a tablet window without it (356 and 360 px): a line of 115 px fitted there, one of 139
-  // beside the tabs does not (hub#1435).
-  { label: '1280x800', width: 1280, height: 800, strip: true, kind: 'short' },
-  { label: '1024x700', width: 1024, height: 700, strip: false, kind: 'short' },
-  // The lowest columns where a line fits (372 px: 152 for the lines), and the desktop.
-  { label: '1280x816', width: 1280, height: 816, strip: true, kind: 'roomy' },
-  { label: '1024x712', width: 1024, height: 712, strip: false, kind: 'roomy' },
-  { label: '1440x900', width: 1440, height: 900, strip: true, kind: 'roomy' },
+  // The issue's: a small tablet on its side and a low laptop window.
+  { label: '1024x600', width: 1024, height: 600, kind: 'short' },
+  { label: '1280x560', width: 1280, height: 560, kind: 'short' },
+  // An iPad on its side in a browser, under its address bar and tabs (332 px).
+  { label: '1024x672', width: 1024, height: 672, kind: 'short' },
+  // A tablet window (360 px): a line of 115 px fitted there, one of 139 beside the tabs does not (hub#1435).
+  { label: '1024x700', width: 1024, height: 700, kind: 'short' },
+  // The lowest column where a line fits (372 px: 152 for the lines), and the desktop.
+  { label: '1024x712', width: 1024, height: 712, kind: 'roomy' },
+  { label: '1440x900', width: 1440, height: 900, kind: 'roomy' },
   // The tablet upright and the fleet's low phone: the drawer.
-  { label: '820x1180', width: 820, height: 1180, strip: true, kind: 'drawer' },
-  { label: '375x667', width: 375, height: 667, strip: true, kind: 'drawer' },
+  { label: '820x1180', width: 820, height: 1180, kind: 'drawer' },
+  { label: '375x667', width: 375, height: 667, kind: 'drawer' },
 ];
 
 /** A real tap gives up well before the test does. */
@@ -61,10 +48,10 @@ let dish: Product;
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
-  dish = await dishWithAnIssuer(browser, 'SHORTSIDE', RUN);
+  dish = await dishForTheTill(browser, 'SHORTSIDE', RUN);
 });
 
-test.afterAll(cleanTillAndIssuer);
+test.afterAll(cleanTill);
 
 /** Whether `el` is whole in what the window shows, run in the page: its top, its middle and its bottom answer with
  *  itself under a finger. A scroller that clips it, or a bar pinned over it, answers with something else. */
@@ -131,7 +118,7 @@ async function tabsAcross(cart: Locator, where: string): Promise<void> {
 }
 
 async function readsALine(page: Page, size: Size, lang: string): Promise<void> {
-  const where = `${lang} ${size.label} ${size.strip ? 'with-strip' : 'no-strip'}`;
+  const where = `${lang} ${size.label}`;
   await page.setViewportSize({ width: size.width, height: size.height });
   expect(await tillIsPhone(page), `the check is ${size.kind === 'drawer' ? 'a drawer' : 'a side column'} at ${where}`).toBe(size.kind === 'drawer');
   await openTillCart(page);
@@ -139,7 +126,7 @@ async function readsALine(page: Page, size: Size, lang: string): Promise<void> {
   const cart = shown(page).locator('[data-testid=pos-cart]');
 
   // «Current order»: in the side column «Send order» is pinned at the bottom from the start, and a line is whole above
-  // it. A drawer as low as the phone's under the strip lets the bar scroll after the lines (hub#787,
+  // it. A drawer too low for the tabs and a line beside it lets the bar scroll after the lines (hub#787,
   // sale-cart-phone-fit.spec.ts): there it is reached by scrolling.
   const round = cart.locator('[data-testid=pos-cart-tab-round]');
   await round.click(TAP);
@@ -177,20 +164,18 @@ async function readsALine(page: Page, size: Size, lang: string): Promise<void> {
   }
 }
 
-for (const strip of [false, true]) {
-  for (const { name, lang, locale } of TILL_LANGUAGES) {
-    test.describe(`SALE-F20: in ${name}, ${strip ? 'under the red strip' : 'without the strip'}, a low side column shows a whole line of the check`, () => {
-      // The dish on the check, still to be sent: «Current order» has its line and its send bar.
-      const till = tillUnderStrip({ strip, parked: PARKED, locale, lang }, async (page) => {
-        await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click(TAP);
-        await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
-      });
-
-      for (const size of SIZES.filter((s) => s.strip === strip)) {
-        test(`${size.label} (${size.kind})`, async () => {
-          await readsALine(till(), size, lang);
-        });
-      }
+for (const { name, lang, locale } of TILL_LANGUAGES) {
+  test.describe(`SALE-F20: in ${name}, a low side column shows a whole line of the check`, () => {
+    // The dish on the check, still to be sent: «Current order» has its line and its send bar.
+    const till = tillOpenAt1440({ locale, lang }, async (page) => {
+      await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click(TAP);
+      await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
     });
-  }
+
+    for (const size of SIZES) {
+      test(`${size.label} (${size.kind})`, async () => {
+        await readsALine(till(), size, lang);
+      });
+    }
+  });
 }

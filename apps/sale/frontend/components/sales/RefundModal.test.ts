@@ -15,8 +15,8 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 const SALE = { id: 's1', number: '20261014-0007' } as SaleRow;

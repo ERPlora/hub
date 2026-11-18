@@ -120,9 +120,9 @@ async function sendBack(row: JobOut): Promise<void> {
   retrying.value = row.id;
   try {
     await retry.run({ job_id: row.id });
-    void toastSuccess(t('printing.jobs.retried'));
+    toastSuccess(t('printing.jobs.retried'));
   } catch {
-    void toastError(refusal(retry.error.value, t('printing.jobs.retryFailed'))?.message ?? t('printing.jobs.retryFailed'));
+    toastError(refusal(retry.error.value, t('printing.jobs.retryFailed'))?.message ?? t('printing.jobs.retryFailed'));
   } finally {
     retrying.value = null;
   }

@@ -211,7 +211,9 @@ describe('RulesPage on a phone: the rule cards', () => {
     // The table's own card body, told which column the title names (`cardTitleColumn`).
     expect(s.prop('cardTitleColumn')).toBe('tax_category_key');
     const fields = () =>
-      s.rows()[2].findAll('.data-table__field').map((f) => [f.find('.data-table__field-label').text(), f.find('.data-table__field-value').text()]);
+      s.rows()[2]
+        .findAll('.data-table__card-meta')
+        .map((f) => [f.find('.data-table__card-meta-label').text(), f.find('.data-table__card-meta-value').text()]);
     expect(s.rows()[2].text()).toContain('Servicio — sanitario');
     expect(fields()).toEqual([
       ['Country', 'ES'],

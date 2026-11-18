@@ -106,9 +106,9 @@ async function sendTest(row: PrinterOut): Promise<void> {
   testing.value = row.id;
   try {
     await test.run({ printer_id: row.id });
-    void toastSuccess(t('printing.printers.tested', { name: row.name }));
+    toastSuccess(t('printing.printers.tested', { name: row.name }));
   } catch {
-    void toastError(refusal(test.error.value, t('printing.printers.testFailed'))?.message ?? t('printing.printers.testFailed'));
+    toastError(refusal(test.error.value, t('printing.printers.testFailed'))?.message ?? t('printing.printers.testFailed'));
   } finally {
     testing.value = null;
   }
@@ -118,9 +118,9 @@ async function toggle(row: PrinterOut): Promise<void> {
   toggling.value = row.id;
   try {
     await update.run({ printer_id: row.id, is_active: !row.is_active });
-    void toastSuccess(t(row.is_active ? 'printing.printers.deactivated' : 'printing.printers.activated'));
+    toastSuccess(t(row.is_active ? 'printing.printers.deactivated' : 'printing.printers.activated'));
   } catch {
-    void toastError(refusal(update.error.value, t('printing.printers.toggleFailed'))?.message ?? t('printing.printers.toggleFailed'));
+    toastError(refusal(update.error.value, t('printing.printers.toggleFailed'))?.message ?? t('printing.printers.toggleFailed'));
   } finally {
     toggling.value = null;
   }

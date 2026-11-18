@@ -69,7 +69,7 @@ async function attempt(work: () => Promise<void>): Promise<void> {
 
 async function setEnabled(flow: Pick<FlowOut, 'id'>, enabled: boolean): Promise<void> {
   const saved = await switching.run({ id: flow.id, enabled });
-  if (saved.enabled && saved.missing_grants.length) void toastInfo(phrasing.value.t('flow.list.enabledMissing'));
+  if (saved.enabled && saved.missing_grants.length) toastInfo(phrasing.value.t('flow.list.enabledMissing'));
 }
 
 function toggle(flow: FlowOut, enabled: boolean): void {
@@ -90,7 +90,7 @@ async function onAction({ actionId, row }: { actionId: string; row: FlowOut }): 
   if (actionId === 'duplicate') {
     await attempt(async () => {
       await duplicating.run({ id: row.id });
-      void toastSuccess(t('flow.list.copied'));
+      toastSuccess(t('flow.list.copied'));
     });
     return;
   }
@@ -104,7 +104,7 @@ async function onAction({ actionId, row }: { actionId: string; row: FlowOut }): 
   if (!yes) return;
   await attempt(async () => {
     await deleting.run({ id: row.id });
-    void toastSuccess(t('flow.list.deleted'));
+    toastSuccess(t('flow.list.deleted'));
   });
 }
 

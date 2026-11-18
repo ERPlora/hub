@@ -9,6 +9,7 @@ import { type Browser, type BrowserContext, expect, test } from '@playwright/tes
 
 import { manualFlow, signedIn } from './flow-helpers';
 import { A, api, login, psql, shown } from './helpers';
+import { rowAction } from './service-helpers';
 import { VIEWPORTS } from './schedule-helpers';
 import { cleanUp as cleanInbox, e2ePhone, keepPhoto, PREFIX, receive, restorePhoto } from './whatsapp-helpers';
 
@@ -145,7 +146,7 @@ test("a correction is shown and read on the business's clock, and the CSV says i
     const day = opened.data;
 
     await page.goto('/attendance/records');
-    await shown(page).locator(`[data-testid=attendance-records-row-${day.id}-correct]`).click();
+    await rowAction(page, 'attendance-records', day.id, 'correct');
     const dialog = page.locator('ion-modal[data-testid=attendance-correct]');
     const clockIn = dialog.locator('[data-testid=attendance-correct-clock_in] input');
     await expect(clockIn).toHaveValue(wall(day.clock_in_at, 'T'));

@@ -12,7 +12,8 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, compactBar, exposeMovingInPage, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import { openPanel } from './assistant-real';
+import { A, api, capture, exposeMovingInPage, login, psql, REPO_DIR, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-ATTENDANCE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
@@ -90,23 +91,9 @@ const box = (page: Page): Locator => panel(page).locator('[data-testid="assistan
 const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
 const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-const opener = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-
 async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
   await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
   await expect(card(page)).toBeHidden();
-}
-
-async function openPanel(page: Page): Promise<void> {
-  await page.goto(`${A}/`);
-  await expect(opener(page)).toBeVisible();
-  if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
-  }
-  await expect(panel(page)).toHaveAttribute('data-open', 'true');
-  await expect(box(page)).toBeVisible();
 }
 
 /** Writes `text` and sends it; resolves once its answer has started (its card is up before the turn ends). */

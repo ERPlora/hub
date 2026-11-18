@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from decouple import Csv, config
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
-from live.csp import base_policy, debug_policy
+from live.csp import YOUTUBE_NOCOOKIE, base_policy, debug_policy, with_frames
 from psycopg_pool import ConnectionPool
 
 from base.storage import hub_files_storage
@@ -437,9 +437,9 @@ TIME_ZONE = "Europe/Madrid"
 USE_I18N = True
 USE_TZ = True
 
-# Content Security Policy (Django's native middleware, with a nonce per response).
-
-SECURE_CSP = debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy()
+# Content Security Policy (Django's native middleware, with a nonce per response). A page frames its own origin and
+# YouTube's privacy-enhanced player, where a module's help video plays.
+SECURE_CSP = with_frames(debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy(), YOUTUBE_NOCOOKIE)
 # form-action filters the whole redirect chain of a form post: the SPA's logout POSTs to /auth/logout,
 # which answers 302 to the SaaS's logout (one hop, no page of our own in between).
 saas_origin = "{0.scheme}://{0.netloc}".format(urlsplit(SAAS_URL))

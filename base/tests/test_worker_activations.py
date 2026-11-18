@@ -207,7 +207,7 @@ def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_cam
 
 
 def _what_is_due():
-    from base.queries import activations_due
+    from base.queries.apps import activations_due
 
     now = timezone.now()
     later, before = now + dt.timedelta(seconds=30), now - dt.timedelta(seconds=1)

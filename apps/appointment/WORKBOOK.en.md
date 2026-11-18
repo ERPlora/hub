@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:18a5a43abde8d70a4951fbf5ad6cdf57767fd3e79236474fc4b7cb904e3f3ee5 -->
+<!-- generated from WORKBOOK.md sha256:28f86a33368d8b1648f86920b6dbb413c6c388c03dbedf90a32e0e623d9ded7f -->
 
 ## What it is for and who it is for
 
@@ -270,8 +270,9 @@ Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
 1. Come in from the **N to confirm** notice (you tap it and the list filters the pending ones), from the
-   bell in the top bar (its "Appointments to confirm" row opens the Agenda) or search for the **Pending**
-   appointment.
+   bell in the top bar (its notice "N appointments to confirm", "Customers are waiting for you to confirm their
+   bookings before they start.", opens the Agenda with "Confirm the appointments", and its deadline is the start of
+   the soonest one) or search for the **Pending** appointment.
 2. Tap **Confirm** on its row.
 3. The appointment becomes **Confirmed**, the history says "Confirmed" and the **N to confirm** notice
    goes down; the bell too, at once, and it stops counting it.

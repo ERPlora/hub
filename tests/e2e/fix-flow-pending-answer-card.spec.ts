@@ -18,6 +18,7 @@ import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { manualFlow, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES';
 const TAG = 'E2E FlowCard';
@@ -116,7 +117,7 @@ for (const viewport of VIEWPORTS) {
 
       // A no books nothing and the card leaves.
       await card.locator('[data-testid^=flow-question-reject-]').click();
-      await expect(page.locator('ion-toast').filter({ hasText: 'Answered no.' }).last()).toBeVisible();
+      await expect(toastSaying(page, 'Answered no.')).toBeVisible();
       await expect(card).toHaveCount(0);
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('cancelled');
       expect(psql(`select count(*) from flow_flowrun where flow_id = '${flowId}' and log::text like '%assistant_used%'`)).toBe('0');

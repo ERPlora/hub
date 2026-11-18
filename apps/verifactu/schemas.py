@@ -462,9 +462,12 @@ class RepresentationOut(Schema):
 
 class ConfigOut(Schema):
     environment: EnvironmentCode = Field(description="testing or production.")
-    route: RouteCode = Field(description="erplora (ERPlora files for you) or own (your certificate).")
+    route: RouteCode = Field(
+        description="The route the records go by, never chosen: own while a valid own certificate is uploaded, erplora "
+        "(ERPlora files for you) without one; fixed when going live."
+    )
     erplora_route_available: bool = Field(
-        description="ERPlora's route can be chosen here; if not, only the own certificate goes live."
+        description="ERPlora's route is open to this business here; if not, only the own certificate goes live."
     )
     production_since: dt.datetime | None = Field(description="When it went live.")
     production_open: bool = Field(description="This server lets a business go live.")
@@ -491,9 +494,9 @@ class ConfigOut(Schema):
     )
     route_ready: bool = Field(description="The route can file in this environment.")
     route_ready_for_production: bool = Field(
-        description="The route could carry the records to the AEAT of production: ERPlora's with the signed "
-        "authorisation approved, or the business's own valid certificate (what the business has to do, whatever "
-        "this server lacks)."
+        description="The route could carry the records to the AEAT of production: the business's own valid "
+        "certificate or, without one, ERPlora's with the signed authorisation approved (what the business has to do, "
+        "whatever this server lacks)."
     )
     reasons: list[WaitOut] = Field(description="What keeps records from leaving now.")
     issue_blocker: WaitOut | None = Field(
@@ -762,12 +765,6 @@ class CertificateUploadIn(Schema):
         if size > MAX_CERTIFICATE_BYTES:
             raise ValueError(str(CERTIFICATE_TOO_LARGE))
         return value
-
-
-class ConfigUpdateIn(Schema):
-    route: RouteCode = Field(
-        description="erplora (ERPlora files for you) or own (your certificate)."
-    )
 
 
 class RepresentationIn(Schema):

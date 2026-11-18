@@ -220,6 +220,16 @@ def test_the_document_is_the_a4_invoice_in_the_readers_language(issuer):
     assert "12,10" in spanish
 
 
+def test_a_business_not_known_to_be_in_the_roi_prints_its_tax_id_as_kept(issuer):
+    invoice = manual()
+
+    read = run("invoice.invoice.get", {"number": invoice.number})
+    html = run("invoice.invoice.document", {"number": invoice.number}).html
+
+    assert (read.issuer_tax_id, read.issuer_vat_number) == ("B12345674", "B12345674")
+    assert "Tax ID: B12345674" in html and "ESB12345674" not in html
+
+
 def test_the_document_says_what_it_is_and_what_it_rectifies(issuer):
     simplified = ticket()
     assert (

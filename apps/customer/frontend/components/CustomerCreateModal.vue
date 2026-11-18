@@ -51,7 +51,7 @@ async function save(): Promise<void> {
   }
   open.value = false;
   emit('created', customer);
-  void toastSuccess(t('customer.create.created', { name: customer.name }));
+  toastSuccess(t('customer.create.created', { name: customer.name }));
 }
 
 const canDismiss = useUnsavedFormOnOpen('customer-create', () => form.value, open);

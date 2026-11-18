@@ -1,7 +1,8 @@
 // «Edit table» and «New table» (WORKBOOK «Plano de sala», «Mesas»; TABLE-F02, F04, F05): Number,
-// Capacity, Name (optional), Shape, Status (Available or Blocked: the others are the room's, not a
-// person's), Zone and In use; «Save» sends only what changed; «Delete» (whoever may) asks first. A new
-// table asks Number (empty = the first free one), Capacity and Zone. Refusals stay in the dialog.
+// Capacity, Width and Height of its box on the plan, Name (optional), Shape, Status (Available or Blocked:
+// the others are the room's, not a person's), Zone and In use; «Save» sends only what changed, a new size
+// as a move of the box where it is; «Delete» (whoever may) asks first. A new table asks Number (empty = the
+// first free one), Capacity, Width and Height (empty = the standard box) and Zone. Refusals stay in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
@@ -19,12 +20,15 @@ type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolea
 
 const ZONES = [zoneRow(), zoneRow({ id: 'z2', name: 'Terrace' })];
 
+/** A field as Ionic Vue leaves it: its limits, its hint and the words under it are the element's properties. */
+type Field = Control & { min?: unknown; max?: unknown; placeholder?: string; errorText?: string };
+
 async function form(table: TableOut | null, more: Record<string, unknown> = {}, answers: Record<string, [number, unknown]> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountTable(TableFormModal, { props: { open: false, table, zones: ZONES, canDelete: true, ...more }, answers, locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
-  const field = (name: string) => m.inDoc(`table-form-${name}`) as Control;
+  const field = (name: string) => m.inDoc(`table-form-${name}`) as Field;
   return { ...m, field, closed: () => m.wrapper.props('open') === false };
 }
 
@@ -75,6 +79,67 @@ describe('TableFormModal · edit', () => {
     expect(f.closed()).toBe(false);
   });
 
+  it('shows its box on the plan as Width and Height, within the server’s limits; a new size moves the box where it is', async () => {
+    const f = await form(tableRow({ width: 72, height: 72 }), {}, { '/api/table/tables/move': [200, tableRow()] });
+    expect([f.field('width').label, f.field('height').label, f.field('width').value, f.field('height').value]).toEqual(['Width', 'Height', '72', '72']);
+    expect(['width', 'height'].map((name) => [String(f.field(name).min), String(f.field(name).max)])).toEqual([
+      ['24', '10000'],
+      ['24', '10000'],
+    ]);
+    await ionValue(f.field('width'), '160', 'ionInput');
+    await click(f.field('submit'));
+    expect(f.sent()).toEqual([
+      { method: 'POST', path: '/api/table/tables/move', query: {}, body: { id: 't1', position_x: 16, position_y: 16, width: 160 } },
+    ]);
+    expect(f.closed()).toBe(true);
+  });
+
+  it('a new size with other changes moves the box first and then saves the rest', async () => {
+    const f = await form(tableRow(), {}, { '/api/table/tables/move': [200, tableRow()], '/api/table/tables/update': [200, tableRow()] });
+    await ionValue(f.field('capacity'), '8', 'ionInput');
+    await ionValue(f.field('height'), '120', 'ionInput');
+    await click(f.field('submit'));
+    expect(f.sent().map((call) => [call.path, call.body])).toEqual([
+      ['/api/table/tables/move', { id: 't1', position_x: 16, position_y: 16, height: 120 }],
+      ['/api/table/tables/update', { id: 't1', capacity: 8 }],
+    ]);
+    expect(f.closed()).toBe(true);
+  });
+
+  it('an emptied side keeps the size the table has', async () => {
+    const f = await form(tableRow(), {}, { '/api/table/tables/update': [200, tableRow()] });
+    await ionValue(f.field('width'), '', 'ionInput');
+    await ionValue(f.field('capacity'), '8', 'ionInput');
+    await click(f.field('submit'));
+    expect(f.sent().map((call) => [call.path, call.body])).toEqual([['/api/table/tables/update', { id: 't1', capacity: 8 }]]);
+  });
+
+  it('a size the server refuses is said under its field, and nothing else is saved', async () => {
+    const refused = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { width: 'Ensure this value is greater than or equal to 24.' } } };
+    const f = await form(tableRow(), {}, { '/api/table/tables/move': [422, refused] });
+    await ionValue(f.field('capacity'), '8', 'ionInput');
+    await ionValue(f.field('width'), '10', 'ionInput');
+    await click(f.field('submit'));
+    expect(f.sent().map((call) => call.path)).toEqual(['/api/table/tables/move']);
+    expect(f.field('width').errorText).toBe('Ensure this value is greater than or equal to 24.');
+    expect(f.field('width').classList.contains('ion-invalid')).toBe(true);
+    expect(f.closed()).toBe(false);
+  });
+
+  it('once the refused size is emptied, what the rest is refused with is said instead', async () => {
+    const refused = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { width: 'Ensure this value is greater than or equal to 24.' } } };
+    const taken = { error: { code: 'table.number_taken', message: 'There is already a table with that number in this zone.' } };
+    const f = await form(tableRow(), {}, { '/api/table/tables/move': [422, refused], '/api/table/tables/update': [409, taken] });
+    await ionValue(f.field('width'), '10', 'ionInput');
+    await click(f.field('submit'));
+    await ionValue(f.field('width'), '', 'ionInput');
+    await ionValue(f.field('number'), '5', 'ionInput');
+    await click(f.field('submit'));
+    expect(f.sent().map((call) => call.path)).toEqual(['/api/table/tables/move', '/api/table/tables/update']);
+    expect(f.field('error').textContent).toContain('There is already a table with that number in this zone.');
+    expect(f.field('width').errorText ?? '').toBe('');
+  });
+
   it('takes a table out of use', async () => {
     const f = await form(tableRow(), {}, { '/api/table/tables/update': [200, tableRow()] });
     await ionChecked(f.field('active'), false);
@@ -105,6 +170,27 @@ describe('TableFormModal · new', () => {
     expect(f.sent()).toEqual([{ method: 'POST', path: '/api/table/tables', query: {}, body: { zone_id: 'z2', capacity: 2 } }]);
     expect(f.closed()).toBe(true);
   });
+
+  it('asks Width and Height too: empty is the standard box, a long table is created with its size', async () => {
+    const f = await form(null, { defaultZoneId: 'z2' }, { '/api/table/tables': [201, tableRow()] }, 'es');
+    expect(['width', 'height'].map((name) => [f.field(name).label, f.field(name).value, f.field(name).placeholder])).toEqual([
+      ['Ancho', '', 'Estándar'],
+      ['Alto', '', 'Estándar'],
+    ]);
+    await ionValue(f.field('width'), '160', 'ionInput');
+    await ionValue(f.field('height'), '72', 'ionInput');
+    await click(f.field('submit'));
+    expect(f.sent().map((call) => call.body)).toEqual([{ zone_id: 'z2', capacity: 4, width: 160, height: 72 }]);
+  });
+});
+
+describe('TableFormModal: a size refused with the same words', () => {
+  itTellsTheCorrectedFieldApart(['width', 'height'], async (locale, refusal) => {
+    const f = await form(tableRow(), {}, { '/api/table/tables/move': [422, refusal] }, locale);
+    await ionValue(f.field('width'), '10', 'ionInput');
+    await ionValue(f.field('height'), '10', 'ionInput');
+    return { field: f.field, send: () => click(f.field('submit')), settle };
+  }, 'width');
 });
 
 describe('TableFormModal: fields refused with the same words (hub#888)', () => {

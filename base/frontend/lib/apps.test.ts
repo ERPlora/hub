@@ -3,7 +3,7 @@
 // app on or off: when each is offered, what comes along or goes with it, and what goes off first.
 import { describe, expect, it } from 'vitest';
 
-import type { AppRow } from '../operations';
+import { app } from '../__tests__/app-row';
 import {
   appsOfTab,
   canOpen,
@@ -19,27 +19,6 @@ import {
   TAB_HASH,
   turnsOnWith,
 } from './apps';
-
-function app(id: string, fields: Partial<AppRow> = {}): AppRow {
-  return {
-    id,
-    name: id[0].toUpperCase() + id.slice(1),
-    icon: 'ion:cube-outline',
-    category: 'sales',
-    category_label: 'Sales',
-    summary: '',
-    premium: false,
-    right: 'free',
-    state: 'on',
-    chosen: true,
-    path: `/${id}`,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
-    ...fields,
-  };
-}
 
 const TAX = app('tax', { name: 'Taxes', required_by: ['invoice'] });
 const CUSTOMER = app('customer', { name: 'Customers', premium: true, right: 'required', required_by: ['invoice'] });

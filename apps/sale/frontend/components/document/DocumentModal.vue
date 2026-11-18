@@ -61,7 +61,7 @@ async function print(): Promise<void> {
     // Not queued: the device prints the screen's paper (inside the app, its print screen, hub#455).
     await printPaper(element, { title: title.value });
   } catch (failure) {
-    void toastError(withReason(t('sale.document.printFailed'), printRefusal(failure, t)));
+    toastError(withReason(t('sale.document.printFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
   }
@@ -72,7 +72,7 @@ async function queued(saleId: string): Promise<boolean> {
   try {
     const sent = await queue.run({ sale_id: saleId, duplicate: props.duplicate });
     if (!sent.queued) return false;
-    void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+    toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
     return true;
   } catch {
     // The queue could not be asked: the screen's paper still prints.

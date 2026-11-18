@@ -15,6 +15,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, api, capture, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-MTL-${RUN}`;
@@ -266,7 +267,7 @@ test('MODIFIER-F08: the round reaches the kitchen display with the options by th
   await addBurger(page, ['onion', 'cheese']);
   await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: /Order \d+ sent to the kitchen\./ })).toBeVisible();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
   relayPass();
 
   await page.goto('/kitchen/display');
