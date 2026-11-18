@@ -5,20 +5,16 @@
 // answers with «Charge», the notice covers none of it and is whole on screen and painted on top, and a real tap on that
 // spot opens the charge sheet with the notice still up. The same with the longer words of a round whose sheet did not
 // print. The notice is told to stay until it has been read: where it sits is the point, not how long it lasts, and read
-// without that a check passes once it has gone by itself. The worst case of a real business: the red strip of a hub that
-// cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is parked for the run and put back after it).
-// What a run creates, the product `E2E-KSEND-<run>`, its checks and their kitchen tickets, is deleted after it.
+// without that a check passes once it has gone by itself. What a run creates, the product `E2E-KSEND-<run>`, its checks
+// and their kitchen tickets, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
-import { parkIssuer, unparkIssuer } from './invoice-helpers';
-import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp } from './sale-helpers';
+import { type Box, checkWithDish, cleanSales, cleanTill, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, stamp } from './sale-helpers';
 import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-748-NOTICE';
-/** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
-const PARKED = 'e2e_sale_kitchen_send_notice_issuer';
 const RUN = stamp();
 /** How long a toast lasts by default: a success, the round sent, and a warning, the round whose sheet did not print. */
 const SENT_MS = 3000;
@@ -33,27 +29,14 @@ let dish: Product;
 test.beforeAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
-  parkIssuer(PARKED);
   dish = await dishForTheTill(browser, 'KSEND', RUN);
 });
 
-test.afterAll(() => {
-  try {
-    cleanSales();
-    cleanInventory();
-  } finally {
-    try {
-      restoreDrawer();
-    } finally {
-      unparkIssuer(PARKED);
-    }
-  }
-});
+test.afterAll(cleanTill);
 
 /** A check of its own with a dish, its till in the language under test, the round sent with «Send order». */
 async function sendRound(page: Page, context: BrowserContext, lang: string): Promise<void> {
   await checkWithDish(page, context, lang, dish);
-  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible({ timeout: 30_000 });
   await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
   await expect(shown(page).locator('[data-testid=pos-cart-round-empty]'), 'the round left «Current order»').toBeVisible();

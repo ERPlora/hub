@@ -1,17 +1,18 @@
 // flow: PRINTING-F01
-// Printing's hooks of the Home, the step «Configura la impresora» and the bell row «Nadie está imprimiendo «…»», as
-// the owner of hub `a` reads them in Spanish: «Configura la impresora» pending and «Recomendado» in «Termina de configurar tu negocio»
-// while no device set up prints the receipts, its «Configurar» leading to Printing → Devices; a receipt queued on a
-// receipt printer no device reaches rings the bell without a reload once it has waited a minute (`psql()` moves it
-// back; the bell reads the clock every 30 s), its row «Nadie está imprimiendo «Recibo» (N)»
-// leads to Printing → Printers, whose receipts' card says «Sin dispositivo» and where to set one up; the device set up
-// from it quiets the bell and the card and ticks the step, live; retired, the step is pending again. In each of the
-// three sizes, leaving a capture with the bell open. What it makes is «e2e Hooks …», deleted before and after; the
-// devices set up before it are parked (retired)
-// for the run and put back after it.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+// Printing's hooks of the Home, the step «Configura la impresora» and the bell's «Nadie está imprimiendo «…»», as
+// the owner of hub `a` reads them in Spanish: «Configura la impresora» pending and «Recomendado» in «Termina de
+// configurar tu negocio» while no device set up prints the receipts, its «Configurar» leading to Printing → Devices; a
+// receipt queued on a receipt printer no device reaches rings the bell without a reload once it has waited a minute
+// (`psql()` moves it back; the bell reads the clock every 30 s), its notice «Nadie está imprimiendo «Recibo»: N
+// trabajos esperando» leads with «Ver las impresoras» to Printing → Printers, whose receipts' card says «Sin
+// dispositivo» and where to set one up; the device set up from it quiets the bell and the card and ticks the step,
+// live; retired, the step is pending again. In each of the three sizes, leaving a capture with the action center open.
+// What it makes is «e2e Hooks …», deleted before and after; the devices set up before it are parked (retired) for the
+// run and put back after it.
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, badgeSays, capturedFitting, login, openBell, psql, shown } from './helpers';
+import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
+import { A, api, capturedFitting, login, psql, shown } from './helpers';
 import { setupStep } from './home-helpers';
 import { liveStreamsSettled, spanishOwner } from './live-streams';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
@@ -63,18 +64,11 @@ test.afterAll(() => {
   }
 });
 
-interface Counter {
-  key: string;
-  count: number;
-}
-
-/** What the bell counts now, as the server says (`base.bell.counters`). */
-async function counters(context: BrowserContext): Promise<{ total: number; stalled: number }> {
-  const res = await api<{ counters: Counter[] }>(context, A, 'GET', '/home/bell');
+/** How many receipts wait with nobody printing them now, as the server says (`printing.stalled_receipt`). */
+async function stalledNow(context: BrowserContext): Promise<number> {
+  const res = await api<{ counters: { key: string; count: number }[] }>(context, A, 'GET', '/home/bell');
   expect(res.status).toBe(200);
-  const total = res.data.counters.reduce((sum, counter) => sum + counter.count, 0);
-  const stalled = res.data.counters.find((counter) => counter.key === ROW)?.count ?? 0;
-  return { total, stalled };
+  return res.data.counters.find((counter) => counter.key === ROW)?.count ?? 0;
 }
 
 /** Sets up the device `device` with this run's printer, from the device (its `X-Device-Id`), as Devices does. */
@@ -93,9 +87,10 @@ async function setUpDevice(context: BrowserContext, device: string): Promise<str
 const DEVICES_OPS = ['printing.device.list', 'printing.printer.list'];
 
 const { row: step, pill, unfolded } = setupStep(STEP);
-const stalledRow = (page: Page): Locator =>
-  page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Nadie está imprimiendo «Recibo» \(\d+\)\s*$/ });
-
+/** The notice's title, in the singular for one job. */
+const stalledTitle = (count: number): string =>
+  `Nadie está imprimiendo «Recibo»: ${count === 1 ? '1 trabajo esperando' : `${count} trabajos esperando`}`;
+const STALLED = /Nadie está imprimiendo «Recibo»: \d+ trabajos? esperando/;
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
   test(`PRINTING-F01: «Configura la impresora» and «Nadie está imprimiendo «Recibo»» on the Home, live — ${label}`, async ({
@@ -126,8 +121,8 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await liveStreamsSettled(streams, DEVICES_OPS);
       // Settled on the Home's own stream: Devices' subscriptions, released, ride on none of what the page has open.
       expect(DEVICES_OPS.filter((op) => streams.at(-1)?.ops.includes(op)), 'the Home settled with Devices released').toEqual([]);
-      const before = await counters(context);
-      await badgeSays(page, before.total);
+      const [total, stalled] = await Promise.all([bellTotal(context), stalledNow(context)]);
+      await bellSays(page, total);
       const onTheHome = streams.length;
 
       // A receipt queued on the till no device reaches: the bell rings without a reload, over the open stream.
@@ -140,17 +135,18 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       expect(queued.status, JSON.stringify(queued.data)).toBe(201);
       // The bell counts what has waited a minute (the old hub's 60 s): the receipt waited 2 min.
       psql(`update printing_printjob set created_at = now() - interval '2 minutes' where id = '${queued.data.job.id}'`);
-      await badgeSays(page, before.total + 1, { timeout: 45_000 });
+      await bellSays(page, total + 1, { timeout: 45_000 });
       expect(streams.length, 'the queued receipt reached the bell without a new /api/live').toBe(onTheHome);
 
-      // The capture: the Home with the bell open, the row naming the function as Printing does.
-      await openBell(page);
-      const row = stalledRow(page);
-      await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
+      // The capture: the Home with the action center open, the notice naming the function as Printing does.
+      const featured = await featureNotice(page, STALLED);
+      await expect(featured.locator('h3')).toHaveText(stalledTitle(stalled + 1));
+      const printers = noticeButton(featured, 'Ver las impresoras');
+      await expect(printers).toBeVisible();
       await capturedFitting(page, `${KEY}-${label}`, label);
 
-      // The row leads to the printers, where the receipts' card says why and where to fix it.
-      await row.click();
+      // Its button leads to the printers, where the receipts' card says why and where to fix it.
+      await printers.click();
       await expect(page).toHaveURL(`${A}/printing/printers`);
       const why = shown(page).locator('[data-testid=printing-summary-no-device-receipt]');
       await expect(why).toHaveText('Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.');
@@ -158,7 +154,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
 
       // The device set up with the till quiets the bell and the card, live.
       deviceId = await setUpDevice(context, device);
-      await badgeSays(page, before.total);
+      await bellSays(page, total);
       await expect(why).toHaveCount(0);
 
       // Back on the Home, the step is done; the device retired, it is pending again without a reload.
@@ -169,7 +165,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       const retired = await api(context, A, 'POST', '/printing/devices/retire', { device_id: deviceId });
       expect(retired.status).toBe(200);
       await expect(pill(page)).toHaveText('Recomendado');
-      await badgeSays(page, before.total + 1);
+      await bellSays(page, total + 1);
     } finally {
       await context.close();
       psql(`delete from printing_printjob where printer_id = '${printer}'`);
