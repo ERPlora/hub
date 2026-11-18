@@ -41,6 +41,18 @@ setup() {
   : > "$FIXTURES/environments"
   : > "$FIXTURES/roles"
 
+  # What the app container of each previous revision runs, per environment and family; the settings in force of
+  # each environment (/erplora/<environment>/hub/app_env, the same) and the SaaS's latest revision, charging real money.
+  export APP_ENV_PUT="$work/app-env-put.json"
+  cat > "$FIXTURES/carried.json" <<'JSON'
+{"prod": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"},
+          "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "true"}},
+ "pre": {"hub": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false", "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"},
+         "worker": {"PLATFORM_HUB_SLUG": "erplora", "VERIFACTU_PRODUCTION_ENABLED": "false", "VERIFACTU_ERPLORA_ROUTE_ENABLED": "false"}}}
+JSON
+  cp "$FIXTURES/carried.json" "$FIXTURES/in-force.json"
+  echo true > "$FIXTURES/saas-charging"
+
   # Fails after 500 pauses: a rollout loop that never times out fails its test instead of hanging.
   cat > "$work/bin/sleep" <<'FAKE'
 #!/usr/bin/env bash
@@ -93,9 +105,14 @@ case "$1 $2" in
     echo
     ;;
   "ecs describe-task-definition")
-    # As `describe-task-definition --include TAGS --output json` answers; its container is named
-    # after the family's short name (erplora-pre-hub → hub).
     arn="$(value --task-definition)"
+    if [ "$arn" = erplora-prod-saas ]; then
+      jq -n --arg charging "$(cat "$FIXTURES/saas-charging")" '{taskDefinition: {containerDefinitions: [{name: "saas",
+        environment: [{name: "PLATFORM_INVOICING_ENABLED", value: $charging}]}]}}'
+      exit 0
+    fi
+    # As `describe-task-definition --include TAGS --output json` answers; its container is named
+    # after the family's short name (erplora-pre-hub → hub) and carries the settings of carried.json.
     family="${arn##*/}"
     family="${family%:*}"
     environment="$(cut -d- -f2 <<< "$family")"
@@ -105,12 +122,17 @@ case "$1 $2" in
     image="$(awk -v arn="$arn" '$1 == arn { print $2 }' "$FIXTURES/images")"
     tag="$(awk -v arn="$arn" '$1 == arn { print $2 }' "$FIXTURES/environments")"
     role="$(awk -v arn="$arn" '$1 == arn { print $2 }' "$FIXTURES/roles")"
-    jq -n --arg name "$name" --arg image "${image:-reg.example/erplora/$repository:tag-${arn##*:}}" \
+    jq -n --arg arn "$arn" --arg name "$name" --arg image "${image:-reg.example/erplora/$repository:tag-${arn##*:}}" \
       --arg environment "${tag:-$environment}" \
       --arg task_role "${role:-arn:aws:iam::123456789012:role/$family-task}" \
-      --arg execution_role "${role:-arn:aws:iam::123456789012:role/$family-execution}" '{
+      --arg execution_role "${role:-arn:aws:iam::123456789012:role/$family-execution}" \
+      --argjson carried "$(jq -c --arg e "$environment" --arg n "$name" '.[$e][$n] // {}' "$FIXTURES/carried.json")" '{
       taskDefinition: {
-        containerDefinitions: [{name: $name, image: $image}, {name: "pgbouncer", image: $image}],
+        taskDefinitionArn: $arn,
+        containerDefinitions: [
+          {name: $name, image: $image,
+           environment: ([{name: "DEBUG", value: "False"}] + ($carried | to_entries | map({name: .key, value: .value})))},
+          {name: "pgbouncer", image: $image}],
         taskRoleArn: $task_role, executionRoleArn: $execution_role
       },
       tags: ([{key: "Project", value: "erplora"}]
@@ -125,22 +147,40 @@ case "$1 $2" in
       value --task-definition > "$STATE/primary-$service"
     fi
     ;;
+  "ssm get-parameter")
+    # /erplora/<environment>/hub/app_env answers that environment's entry of in-force.json.
+    environment="$(value --name | cut -d/ -f3)"
+    if [ "$(value --name)" != "/erplora/$environment/hub/app_env" ] ||
+      ! jq -e -c --arg e "$environment" '.[$e]' "$FIXTURES/in-force.json" 2> /dev/null; then
+      echo "An error occurred (ParameterNotFound) when calling the GetParameter operation: " >&2
+      exit 254
+    fi
+    ;;
+  "ssm put-parameter")
+    if [[ "$(value --name)" == */app_env ]]; then value --value > "$APP_ENV_PUT"; fi
+    ;;
   *) ;;
 esac
 FAKE
   chmod +x "$work/bin/aws" "$work/bin/sleep"
 }
 
+# edit_fixture <fixture> <jq filter>: rewrites the fixture with the filter.
+edit_fixture() {
+  jq "$2" "$FIXTURES/$1" > "$work/edited.json"
+  mv "$work/edited.json" "$FIXTURES/$1"
+}
+
 # run_rollback [VAR=value...]: rolls prod back with the fake and CONFIRM=ROLLBACK; the arguments override.
 run_rollback() {
-  env -u CLUSTER -u POLL_SECONDS -u ROLLOUT_TIMEOUT_SECONDS \
+  env -u CLUSTER -u POLL_SECONDS -u ROLLOUT_TIMEOUT_SECONDS -u CONFIRM_PROTECTED \
     PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK ENVIRONMENT=prod "$@" \
     bash "$here/ecs-rollback.sh" > "$work/out.log" 2>&1
 }
 
 # run_rollback_without <VAR>: the same with <VAR> unset.
 run_rollback_without() {
-  env PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK ENVIRONMENT=prod \
+  env -u CONFIRM_PROTECTED PATH="$work/bin:$PATH" AWS_REGION=eu-south-2 CONFIRM=ROLLBACK ENVIRONMENT=prod \
     env -u "$1" bash "$here/ecs-rollback.sh" > "$work/out.log" 2>&1
 }
 
@@ -207,6 +247,62 @@ check "every aws call names the region" '[ -s "$CALLS_LOG" ] && ! grep -qv -- "-
 check "nothing of pre is touched" '! grep -Eq "erplora-pre|-pre |/erplora/pre/" "$CALLS_LOG"'
 check "every cluster-scoped call names prod's cluster, erplora-prod" '[ "$(clusters_named)" = erplora-prod ]'
 
+# --- the settings the revisions it goes back to run --------------------------------------
+check "settings: they are checked before any service moves" \
+  '[ "$(line_of "ssm get-parameter --name /erplora/prod/hub/app_env ")" -lt "$(line_of "update-service")" ] &&
+   [ "$(line_of "describe-task-definition --task-definition erplora-prod-saas ")" -lt "$(line_of "update-service")" ]'
+check "settings: the rollback records what prod's previous revisions run in /erplora/prod/hub/app_env" \
+  '[ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .prod "$FIXTURES/carried.json")" ]'
+check "settings: they are recorded once the services are checked, with the tag" \
+  'n="$(line_of "put-parameter --name /erplora/prod/hub/app_env ")" &&
+   [ "$n" -gt "$(last_line_of "describe-services")" ] && [ "$n" -lt "$(line_of "put-parameter --name /erplora/prod/hub/image_tag ")" ]'
+setup
+edit_fixture carried.json '.prod.hub.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false" | .prod.worker.VERIFACTU_ERPLORA_ROUTE_ENABLED = "false"'
+run_rollback && status=0 || status=$?
+check "settings: back to revisions that run other settings, those replace the ones in force" \
+  '[ "$status" -eq 0 ] && [ "$(jq -r .worker.VERIFACTU_ERPLORA_ROUTE_ENABLED "$APP_ENV_PUT")" = false ]'
+
+# refused_settings <where>: the rollback failed on the settings of <where>, before changing anything.
+refused_settings() {
+  [ "$status" -ne 0 ] && ! grep -Eq "update-service|put-parameter" "$CALLS_LOG" &&
+    grep -q "::error::$1.*nothing was changed" "$work/out.log"
+}
+setup
+edit_fixture carried.json '.prod.worker.PLATFORM_HUB_SLUG = "Erplora_Old"'
+run_rollback && status=0 || status=$?
+check "settings: revisions whose settings break a rule are never gone back to" \
+  'refused_settings prod.worker.PLATFORM_HUB_SLUG: && ! grep -q Erplora_Old "$work/out.log"'
+setup
+rm "$FIXTURES/in-force.json"
+run_rollback && status=0 || status=$?
+check "settings: without the settings in force nothing changes" 'refused_settings /erplora/prod/hub/app_env:'
+
+# The lock: going back to revisions that open the AEAT's production environment in prod takes the confirmation.
+lock_closed_in_force() {
+  edit_fixture in-force.json '.prod.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
+  echo false > "$FIXTURES/saas-charging"
+}
+setup
+lock_closed_in_force
+run_rollback && status=0 || status=$?
+check "lock: opening the AEAT in prod without CONFIRM_PROTECTED changes nothing" \
+  'refused_settings prod.VERIFACTU_PRODUCTION_ENABLED: && grep -q "confirm_protected=VERIFACTU_PRODUCTION_ENABLED=true" "$work/out.log"'
+setup
+lock_closed_in_force
+run_rollback CONFIRM_PROTECTED=VERIFACTU_PRODUCTION_ENABLED=false && status=0 || status=$?
+check "lock: a confirmation of something else changes nothing" 'refused_settings prod.VERIFACTU_PRODUCTION_ENABLED:'
+setup
+lock_closed_in_force
+run_rollback CONFIRM_PROTECTED=VERIFACTU_PRODUCTION_ENABLED=true && status=0 || status=$?
+check "lock: with the exact confirmation it goes back and records the open lock" \
+  '[ "$status" -eq 0 ] && [ "$(jq -r .hub.VERIFACTU_PRODUCTION_ENABLED "$APP_ENV_PUT")" = true ] &&
+   grep -q "update-service .*--service hub " "$CALLS_LOG"'
+setup
+edit_fixture carried.json '.prod.hub.VERIFACTU_PRODUCTION_ENABLED = "false" | .prod.worker.VERIFACTU_PRODUCTION_ENABLED = "false"'
+run_rollback CONFIRM_PROTECTED=VERIFACTU_PRODUCTION_ENABLED=false && status=0 || status=$?
+check "lock: while the SaaS charges, it never goes back to revisions that close the AEAT" \
+  'refused_settings prod.hub.VERIFACTU_PRODUCTION_ENABLED:'
+
 # --- pre: its own cluster, services, families and tag ------------------------------------
 setup
 run_rollback ENVIRONMENT=pre && status=0 || status=$?
@@ -223,6 +319,9 @@ check "pre: a rollback does not wake pre up" '! grep -q "desired-count" "$CALLS_
 check "pre: waits for hub-pre and worker-pre" 'grep -Eq "wait services-stable .*--services hub-pre worker-pre( |$)" "$CALLS_LOG"'
 check "pre: records the restored tag in its own parameter" \
   'grep -q "^ssm put-parameter --name /erplora/pre/hub/image_tag --value tag-5 --type String --overwrite" "$CALLS_LOG"'
+check "pre: records what pre's previous revisions run in its own parameter" \
+  'grep -q "^ssm put-parameter --name /erplora/pre/hub/app_env " "$CALLS_LOG" &&
+   [ "$(jq -S -c . "$APP_ENV_PUT")" = "$(jq -S -c .pre "$FIXTURES/carried.json")" ]'
 check "pre: never names a prod cluster, family, service or parameter" \
   '! grep -Eq "erplora-prod|/erplora/prod/|--services? (hub|worker)( |$)|--services (hub|worker) " "$CALLS_LOG"'
 setup

@@ -24,6 +24,23 @@ tiene las cuentas de demo con las que entran las specs (abajo, «Varias ejecucio
 worker: `--workers=N` pisa el `workers: 1` de `playwright.config.ts`, y dos specs a la vez sobre la misma pila se
 borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecuciones a la vez»).
 
+## Las ayudas compartidas
+
+Una spec importa cada ayuda del módulo que la lleva; ninguno reexporta lo de otro. `helpers.ts` sigue en la lista de
+tamaño (`.file-size-allow`) porque lleva todo lo que importan de él los ficheros de esa lista, que no pueden ganar ni
+una línea de import; lo que no importa ninguno de ellos está en los demás módulos:
+
+| Módulo | Qué lleva |
+|---|---|
+| `helpers.ts` | `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), el SaaS por el que pasa el login y los pasos del viaje (`SAAS`, `SAAS_SIGN_IN`, `SAAS_CODE`, la carpeta de su correo, `runningTimeout`), la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), `collectProblems`, las carpetas `HUB_DIR` y `REPO_DIR`, la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), `scrolledTo`, las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, las apps de la spec (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), `upgradeLandsInside`, el registro del negocio (`registrationOf`, `registerBusinessIn`), `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
+| `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
+| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
+| `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
+| `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
+| `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
+| `topbar.ts` | la barra de arriba: «Mis apps», el asistente y `compactBar` |
+| `live-streams.ts` | los `/api/live` que abre una página, con `decodeSubs` |
+
 ## El login
 
 `login()` de `helpers.ts` hace el login de verdad: el hub manda al SaaS, el SaaS pide la cuenta y el código que
@@ -154,7 +171,7 @@ Reglas que el e2e hace cumplir:
   llevó unos 3, hub#759).
 - Los negocios de la pila van con los límites de Gratis (una transacción a la vez, `base.tenancy.limits`): con la máquina
   cargada, la página que una spec acaba de abrir puede ocupar ese hueco más de lo que espera el servidor, y el Hub contesta
-  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`hub-api.ts`, el camino de
+  503 `base.hub_busy` a la preparación que viene detrás. Ese 503 no ejecutó nada, así que `api` (`helpers.ts`, el camino de
   todos los ayudantes al API del Hub: `turnOn`, `manualFlow`, `createProduct`, los `post` de las specs…) repite la misma
   petición tras el `Retry-After` del servidor (1 s), hasta 6 intentos, y deja una línea por intento en la salida; si sigue
   ocupado, falla con `HubStillBusy` diciendo la ruta, los intentos y la respuesta. Cualquier otra respuesta, también otro
@@ -584,7 +601,7 @@ profundidad, pide las animaciones por su cuenta (`getAnimations`) más veces de 
 (las esperas propias que quedaban al llegar el guardarraíl), y un fichero nuevo no lo hace ninguna: «nada se mueve» se
 espera con `settled(page)` o `untilStill(page)`, que miran también los shadow roots. Cuenta toda referencia en el código,
 sin los comentarios: la llamada, guardada con otro nombre (`const a = document.getAnimations`), entre corchetes
-(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `helpers.ts` (el detector) y las dos
+(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `detectors.ts` (el detector) y las dos
 specs que lo miden desde fuera (`settled.spec.ts` y `helpers-capture.spec.ts`) tienen su número fijo en el propio test.
 Al retirar una copia, baja su número en el JSON (o quita su línea). Los `<app>-wait.test.ts` (Ventas, Cocina, Menús,
 Modificadores, Tareas) siguen: prohíben además, en los ficheros de su app, las esperas fijas y los recuentos propios.
