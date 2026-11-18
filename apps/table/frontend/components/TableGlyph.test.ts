@@ -41,4 +41,23 @@ describe('TableGlyph', () => {
     expect(g.wrapper.find('rect.table-glyph__arc-value').attributes('stroke-dasharray')).toBe('25 75');
     expect(g.wrapper.find('rect.table-glyph__arc-value').attributes('vector-effect')).toBe('non-scaling-stroke');
   });
+
+  it('draws only the track while no time has passed, never a dot of an empty arc', async () => {
+    const g = await glyph({ table: occupied(), progress: 0 });
+    expect(g.wrapper.find('.table-glyph__arc-track').exists()).toBe(true);
+    expect(g.wrapper.find('.table-glyph__arc-value').exists()).toBe(false);
+  });
+
+  it('the miniature draws the table itself in its shape; on the plan the tile is the table', async () => {
+    const mini = await glyph({ table: tableRow({ shape: 'round' }), variant: 'mini' });
+    expect(mini.wrapper.find('.table-glyph__body').exists()).toBe(true);
+    expect(mini.el.getAttribute('data-shape')).toBe('round');
+    expect((await glyph()).wrapper.find('.table-glyph__body').exists()).toBe(false);
+  });
+
+  it('seats a flattened rectangle along its long sides', async () => {
+    const g = await glyph({ table: tableRow({ shape: 'rectangle', capacity: 6 }) });
+    const tops = g.seats().map((seat) => (seat.element as HTMLElement).style.top);
+    expect([tops.filter((top) => top === '-10%').length, tops.filter((top) => top === '110%').length]).toEqual([2, 2]);
+  });
 });

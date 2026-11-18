@@ -5,16 +5,16 @@ import { defineComponent, h, nextTick, type Ref, ref } from 'vue';
 import type { Size } from '../lib/floor';
 import { useFloorFit } from './useFloorFit';
 
-async function mountFit(content: Ref<Size>) {
+async function mountFit(content: Ref<Size>, style = '') {
   let api!: ReturnType<typeof useFloorFit>;
   const Host = defineComponent({
     setup() {
       const stage = ref<HTMLElement | null>(null);
       api = useFloorFit(stage, content);
-      return () => h('div', { ref: stage, 'data-testid': 'stage' });
+      return () => h('div', { ref: stage, 'data-testid': 'stage', style });
     },
   });
-  const wrapper = mount(Host);
+  const wrapper = mount(Host, { attachTo: document.body });
   await nextTick();
   const stage = wrapper.find('[data-testid="stage"]').element;
   const resize = (w: number, h: number) => {
@@ -51,7 +51,7 @@ describe('useFloorFit', () => {
     expect(f.fit().plane).toEqual({ w: 990, h: 409.2 });
     content.value = { w: 900, h: 372 };
     await nextTick();
-    expect(f.fit().plane).toEqual({ w: 1620, h: 669.6 });
+    expect(f.fit().plane).toEqual({ w: 1530, h: 632.4 });
     f.wrapper.unmount();
     expect(disconnected).toBe(true);
   });
@@ -64,6 +64,23 @@ describe('useFloorFit', () => {
     content.value = { w: 900, h: 372 };
     await nextTick();
     expect(f.fit().plane).toEqual({ w: 900, h: 372 });
+    f.wrapper.unmount();
+  });
+
+  it('fits the plan inside the stage padding, the room kept for the labels of the outer tables', async () => {
+    let resized = () => {};
+    class FakeObserver {
+      constructor(callback: () => void) {
+        resized = callback;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const f = await mountFit(ref<Size>({ w: 450, h: 186 }), 'padding: 24px');
+    f.resize(948, 700);
+    resized();
+    expect(f.fit().spread).toBe(2);
     f.wrapper.unmount();
   });
 });

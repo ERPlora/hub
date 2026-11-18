@@ -55,7 +55,7 @@ describe('useStagePan', () => {
 
   it('does not start a pan from a table or a non-mouse pointer', async () => {
     const s = await setup();
-    const table = s.wrapper.find('[data-testid="table"]').element;
+    const table = s.wrapper.find('[data-testid="table"]').element as HTMLElement;
     await s.pointer('pointerdown', 200, 200, table);
     expect(s.panning()).toBe(false);
     const touch = new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', button: 0 });

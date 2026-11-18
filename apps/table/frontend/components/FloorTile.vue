@@ -22,7 +22,7 @@ const props = withDefaults(
     x?: number;
     y?: number;
   }>(),
-  { fit: { spread: 1, box: 1, plane: { w: 0, h: 0 } }, editing: false, pickable: undefined, dragging: false, x: undefined, y: undefined },
+  { fit: () => ({ spread: 1, box: 1, plane: { w: 0, h: 0 } }), editing: false, pickable: undefined, dragging: false, x: undefined, y: undefined },
 );
 
 const t = useT();
@@ -110,30 +110,17 @@ const style = computed(() => {
   </div>
 </template>
 
+<style scoped src="./floor-status.css"></style>
+
 <style scoped>
 .table-tile {
-  --tile-bg: var(--ion-card-background);
-  --tile-ink: var(--ion-text-color);
-  --tile-edge: var(--ion-border-color);
+  --tile-shadow: 0 8px 24px color-mix(in srgb, var(--ion-text-color) 11%, transparent);
   position: absolute;
   container-type: inline-size;
-  color: var(--ion-text-color);
   user-select: none;
 }
-.table-tile[data-status='available'] {
-  --tile-bg: var(--ep-success-tint);
-  --tile-ink: var(--ep-success-text);
-  --tile-edge: color-mix(in srgb, var(--ion-color-success) 42%, var(--ion-card-background));
-}
 .table-tile[data-status='occupied'] {
-  --tile-bg: var(--ep-primary-text);
-  --tile-ink: var(--ion-card-background);
-  --tile-edge: transparent;
-}
-.table-tile[data-status='reserved'] {
-  --tile-bg: var(--ep-warning-tint);
-  --tile-ink: var(--ep-warning-text);
-  --tile-edge: var(--ion-color-warning);
+  --tile-shadow: 0 12px 30px color-mix(in srgb, var(--table-bg) 30%, transparent);
 }
 .table-tile__button {
   position: relative;
@@ -149,11 +136,11 @@ const style = computed(() => {
   justify-content: center;
   gap: 5cqi;
   padding: 8cqi;
-  border: 1px solid var(--tile-edge);
+  border: 1px solid var(--table-edge);
   border-radius: var(--ep-radius-lg);
-  background: var(--tile-bg);
-  box-shadow: var(--ep-shadow-sm);
-  color: var(--tile-ink);
+  background: var(--table-bg);
+  box-shadow: var(--tile-shadow);
+  color: var(--table-ink);
   font: inherit;
   cursor: pointer;
   transition: background-color 420ms, color 420ms, border-color 420ms, opacity 250ms, scale 180ms;
@@ -167,7 +154,6 @@ const style = computed(() => {
   border-style: dashed;
 }
 .table-tile[data-status='blocked'] .table-tile__button {
-  --tile-edge: var(--ion-color-medium-shade);
   background: repeating-linear-gradient(135deg, var(--ion-card-background), var(--ion-card-background) 8px, color-mix(in srgb, var(--ion-color-medium) 12%, var(--ion-card-background)) 8px, color-mix(in srgb, var(--ion-color-medium) 12%, var(--ion-card-background)) 12px);
 }
 .table-tile__button:hover {
@@ -198,7 +184,7 @@ const style = computed(() => {
 }
 .table-tile__caption {
   position: absolute;
-  top: calc(100% + 12cqi);
+  top: calc(100% + 17cqi);
   left: 50%;
   display: flex;
   width: max-content;
@@ -224,6 +210,7 @@ const style = computed(() => {
   overflow-wrap: anywhere;
 }
 .table-tile__hold-time {
+  margin-inline-start: 0.3em;
   white-space: nowrap;
 }
 .table-tile--inactive,

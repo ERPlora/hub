@@ -1,7 +1,7 @@
-// `useScrollEdges(el, content)`: which edges of a sideways scroller have something behind them, so each one
-// fades out (a hard cut reads «nothing more»). Measured when the scroller appears (it may come
-// after the page: the zone strip waits for the zones), on its scroll, and when it or what it holds (`content`)
-// is resized; `mark()` measures again on demand.
+// `useScrollEdges(el, content)`: which of the four edges of a scroller have something behind them, so each
+// one fades out (a hard cut reads «nothing more»). Measured when the scroller appears (it may come after the
+// page: the zone strip waits for the zones), on its scroll, and when it or what it holds (`content`) is
+// resized; `mark()` measures again on demand.
 import { onBeforeUnmount, type Ref, ref, watch } from 'vue';
 
 export interface ScrollEdges {

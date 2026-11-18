@@ -1,0 +1,24 @@
+/* A table's colours by its status: the plan's tile and the card's miniature paint the same table. */
+[data-status] {
+  --table-bg: var(--ion-card-background);
+  --table-ink: var(--ion-text-color);
+  --table-edge: var(--ion-border-color);
+}
+[data-status='available'] {
+  --table-bg: var(--ep-success-tint);
+  --table-ink: var(--ep-success-text);
+  --table-edge: color-mix(in srgb, var(--ion-color-success) 42%, var(--ion-card-background));
+}
+[data-status='occupied'] {
+  --table-bg: var(--ep-primary-text);
+  --table-ink: var(--ion-card-background);
+  --table-edge: transparent;
+}
+[data-status='reserved'] {
+  --table-bg: var(--ep-warning-tint);
+  --table-ink: var(--ep-warning-text);
+  --table-edge: var(--ion-color-warning);
+}
+[data-status='blocked'] {
+  --table-edge: var(--ion-color-medium-shade);
+}

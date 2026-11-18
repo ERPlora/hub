@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { tableRow } from '../__tests__/tables';
-import { fitPlan, paintBox } from './floor-fit';
+import { fitPlan, paintBox, paintedRatio } from './floor-fit';
 
 const CONTENT = { w: 450, h: 186 };
 
@@ -19,10 +19,21 @@ describe('fitPlan', () => {
 
   it('keeps a legible minimum spread and lets a smaller stage scroll', () => {
     const fit = fitPlan(CONTENT, { w: 300, h: 150 });
-    expect(fit.spread).toBe(1.8);
-    expect(fit.box).toBe(1.3);
-    expect(fit.plane.w).toBe(810);
-    expect(fit.plane.h).toBe(334.8);
+    expect(fit.spread).toBe(1.7);
+    expect(fit.plane.w).toBe(765);
+    expect(fit.plane.h).toBe(316.2);
+  });
+
+  it('shrinks the tables with a tight spread, so a row keeps room for its labels before the seats of the next', () => {
+    expect(fitPlan(CONTENT, { w: 1100, h: 600 }).box).toBe(1.3);
+    expect(fitPlan(CONTENT, { w: 810, h: 600 }).box).toBe(1.3);
+    expect(fitPlan(CONTENT, { w: 770, h: 600 }).box).toBeCloseTo(1.211);
+    expect(fitPlan(CONTENT, { w: 300, h: 150 }).box).toBeCloseTo(1.2);
+  });
+
+  it('fits the default ten-table zone of a portrait tablet without scrolling', () => {
+    const fit = fitPlan(CONTENT, { w: 770, h: 700 });
+    expect(fit.plane.w).toBeLessThanOrEqual(770);
   });
 
   it('keeps an empty plan at one', () => {
@@ -72,5 +83,13 @@ describe('paintBox', () => {
         expect(overlaps).toBe(false);
       }
     }
+  });
+});
+
+describe('paintedRatio', () => {
+  it('is the width over the height of the table as painted, for its seats to go round it', () => {
+    expect(paintedRatio(tableRow())).toBe(1);
+    expect(paintedRatio(tableRow({ shape: 'rectangle' }))).toBeCloseTo(1 / 0.68);
+    expect(paintedRatio(tableRow({ shape: 'rectangle', width: 144, height: 72 }))).toBe(2);
   });
 });

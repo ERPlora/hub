@@ -1,19 +1,17 @@
 <script setup lang="ts">
-// The plan of a zone (WORKBOOK «Plano de sala»; TABLE-F03, F09): a window (`.table-canvas`) onto a plan
-// as large as its farthest table (tables keep their real size: on a phone the window scrolls sideways
-// and each edge with tables behind it fades out; it grows down with the page).
-// - «Service» (`editable` false): a tap (click) or Enter picks a table (`select`); nothing moves.
-// - «Edit plan»: the gesture is the table's (pointer events): a press that travels more than 5 px drags
-//   it, one that does not is a tap; the arrows move a focused table 8 px (32 with Shift). It never
-//   leaves the plan, and while one is dragged the plan does not shrink under the finger. The new place
-//   shows at once (`move` tells the page) and stays until the server's row has it; `revert(id)` puts a
-//   refused one back.
-// - Picking the destination of a transfer or a merge (`pick`): only the tables it accepts answer.
+// The plan of a zone: the positions spread to fit the stage (never below a legible size; past that the
+// stage scrolls on both axes, with a fade on every edge that has tables behind it, a mouse drags its
+// background and the focused stage scrolls with the arrows). In «Service» a tap or the keyboard picks a
+// table (`select`); in «Edit plan» a press that travels drags it (the screen distance over the spread), one
+// that does not is a tap, and the arrows move a focused table. A table never leaves the plan; its new place
+// shows at once (`move`) until the server's row has it, and `revert(id)` puts a refused one back.
 import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
+import { useFloorFit } from '../composables/useFloorFit';
 import { useScrollEdges } from '../composables/useScrollEdges';
+import { useStagePan } from '../composables/useStagePan';
 import { clampPosition, DRAG_THRESHOLD, keyDelta, planeSize, type Size } from '../lib/floor';
-import type { TableOut } from '../operations';
+import type { SettingsOut, TableOut } from '../operations';
 import FloorTile from './FloorTile.vue';
 
 const props = withDefaults(
@@ -21,6 +19,7 @@ const props = withDefaults(
     tables: TableOut[];
     now: Date;
     timeZone: string;
+    settings: SettingsOut;
     editable?: boolean;
     /** Picking the destination of a transfer or a merge: which tables may be picked. */
     pick?: ((table: TableOut) => boolean) | null;
@@ -42,12 +41,14 @@ interface Drag {
   moved: boolean;
 }
 
+const EDGES = ['left', 'right', 'top', 'bottom'] as const;
+
 /** Places shown before the server has them, by table id. */
 const local = ref<Record<string, { x: number; y: number }>>({});
 const drag = shallowRef<Drag | null>(null);
-/** The plan's size when a drag started: it never shrinks below it while the table is dragged. */
+/** The plan's size when a drag started: neither the plan nor its scale changes under the finger. */
 const floor = shallowRef<Size | undefined>();
-const win = useTemplateRef<HTMLElement>('win');
+const stage = useTemplateRef<HTMLElement>('stage');
 const plane = useTemplateRef<HTMLElement>('plane');
 
 const shown = computed(() =>
@@ -57,6 +58,16 @@ const shown = computed(() =>
   }),
 );
 const size = computed(() => planeSize(shown.value, floor.value));
+const { fit } = useFloorFit(
+  stage,
+  computed(() => floor.value ?? size.value),
+);
+const painted = computed(() => ({ w: rounded(size.value.w * fit.value.spread), h: rounded(size.value.h * fit.value.spread) }));
+const { panning, onPointerDown: panDown, onPointerMove: panMove, onPointerUp: panUp, onKeydown: panKey } = useStagePan(stage);
+
+function rounded(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
 
 // The server's row has the place now: the local one is no longer needed.
 watch(
@@ -82,10 +93,11 @@ function pickable(table: TableOut): boolean | undefined {
   return props.pick ? props.pick(table) : undefined;
 }
 
-/** The plan's size to keep a table inside: what is painted, never less than the tables need. */
+/** The plan's size in plan units, to keep a table inside: what is painted, never less than the tables need. */
 function bounds(): Size {
-  const painted = plane.value;
-  return { w: Math.max(painted?.clientWidth ?? 0, size.value.w), h: Math.max(painted?.clientHeight ?? 0, size.value.h) };
+  const spread = fit.value.spread;
+  const box = plane.value;
+  return { w: Math.max((box?.clientWidth ?? 0) / spread, size.value.w), h: Math.max((box?.clientHeight ?? 0) / spread, size.value.h) };
 }
 
 function place(table: TableOut, x: number, y: number): { x: number; y: number } {
@@ -94,12 +106,14 @@ function place(table: TableOut, x: number, y: number): { x: number; y: number } 
   return spot;
 }
 
-function onClick(table: TableOut): void {
-  if (props.editable || pickable(table) === false) return;
+function onClick(table: TableOut, event: MouseEvent): void {
+  if (pickable(table) === false) return;
+  // In «Edit plan» a pointer's tap was answered on its release; a click with no pointer is Enter or Space.
+  if (props.editable && event.detail !== 0) return;
   emit('select', table);
 }
 
-function onPointerDown(table: TableOut, event: PointerEvent): void {
+function onTileDown(table: TableOut, event: PointerEvent): void {
   if (!props.editable) return;
   const current = shown.value.find((row) => row.id === table.id) ?? table;
   floor.value = size.value;
@@ -109,6 +123,7 @@ function onPointerDown(table: TableOut, event: PointerEvent): void {
 }
 
 function onPointerMove(event: PointerEvent): void {
+  panMove(event);
   const current = drag.value;
   if (!current) return;
   const dx = event.clientX - current.startX;
@@ -116,10 +131,12 @@ function onPointerMove(event: PointerEvent): void {
   if (!current.moved && Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
   drag.value = { ...current, moved: true };
   const table = props.tables.find((row) => row.id === current.id);
-  if (table) place(table, current.fromX + dx, current.fromY + dy);
+  const spread = fit.value.spread;
+  if (table) place(table, current.fromX + dx / spread, current.fromY + dy / spread);
 }
 
 function onPointerUp(): void {
+  panUp();
   const current = drag.value;
   drag.value = null;
   floor.value = undefined;
@@ -135,11 +152,6 @@ function onPointerUp(): void {
 }
 
 function onKeydown(table: TableOut, event: KeyboardEvent): void {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    if (pickable(table) !== false) emit('select', table);
-    return;
-  }
   if (!props.editable) return;
   const delta = keyDelta(event.key, event.shiftKey);
   if (!delta) return;
@@ -149,79 +161,176 @@ function onKeydown(table: TableOut, event: KeyboardEvent): void {
   emit('move', { table, x: spot.x, y: spot.y });
 }
 
-// Each edge of the window with tables behind it fades out (a hard cut reads «no more tables»).
-const { edges, mark: markEdges } = useScrollEdges(win, () => [plane.value]);
-watch(size, () => queueMicrotask(markEdges));
+// Each edge of the stage with tables behind it fades out (a hard cut reads «no more tables»).
+const { edges, mark: markEdges } = useScrollEdges(stage, () => [plane.value]);
+watch(painted, () => queueMicrotask(markEdges));
+const edgeClasses = computed(() => Object.fromEntries(EDGES.map((edge) => [`table-canvas--more-${edge}`, edges.value[edge]])));
 </script>
 
 <template>
   <div
-    ref="win"
     class="table-canvas"
-    :class="{ 'table-canvas--more-left': edges.left, 'table-canvas--more-right': edges.right }"
+    :class="edgeClasses"
     data-testid="table-floor-canvas"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-    @pointercancel="onPointerUp"
   >
     <div
-      ref="plane"
-      class="table-canvas__plane"
-      data-testid="table-floor-plane"
-      :style="{ width: `${size.w}px`, height: `${size.h}px` }"
+      ref="stage"
+      class="table-canvas__stage"
+      :class="{ 'table-canvas__stage--panning': panning }"
+      data-testid="table-floor-stage"
+      role="region"
+      tabindex="0"
+      :aria-label="$t('table.floor.planLabel')"
+      @pointerdown="panDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
+      @keydown="panKey"
     >
-      <FloorTile
-        v-for="table in shown"
-        :key="table.id"
-        :table="table"
-        :now="now"
-        :time-zone="timeZone"
-        :editing="editable"
-        :pickable="pickable(table)"
-        :dragging="drag?.id === table.id && drag.moved"
-        :class="{ 'table-tile--editable': editable }"
-        @click="onClick(table)"
-        @pointerdown="onPointerDown(table, $event)"
-        @keydown="onKeydown(table, $event)"
-      />
-      <slot />
+      <div
+        ref="plane"
+        class="table-canvas__plane"
+        :class="{ 'table-canvas__plane--grid': editable }"
+        data-testid="table-floor-plane"
+        :style="{ width: `${painted.w}px`, height: `${painted.h}px` }"
+      >
+        <FloorTile
+          v-for="table in shown"
+          :key="table.id"
+          :table="table"
+          :now="now"
+          :time-zone="timeZone"
+          :settings="settings"
+          :fit="fit"
+          :editing="editable"
+          :pickable="pickable(table)"
+          :dragging="drag?.id === table.id && drag.moved"
+          :class="{ 'table-tile--editable': editable }"
+          @click="onClick(table, $event)"
+          @pointerdown="onTileDown(table, $event)"
+          @keydown="onKeydown(table, $event)"
+        />
+      </div>
     </div>
+    <span
+      v-for="edge in EDGES"
+      :key="edge"
+      class="table-canvas__fade"
+      :class="`table-canvas__fade--${edge}`"
+      aria-hidden="true"
+    />
+    <slot />
   </div>
 </template>
 
 <style scoped>
 .table-canvas {
+  --canvas-zone: var(--zone-color, var(--ion-color-primary));
   position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
-  border: 1px dashed var(--ion-border-color, #cfcabd);
-  border-radius: var(--ep-radius, 14px);
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.table-canvas__stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--canvas-zone) 7%, transparent), transparent 68%),
+    color-mix(in srgb, var(--canvas-zone) 2%, var(--ion-card-background));
   touch-action: pan-x pan-y;
+}
+.table-canvas__stage:focus-visible {
+  outline: 2px solid var(--ep-primary-text);
+  outline-offset: 3px;
+  box-shadow: var(--ep-focus-ring);
+}
+.table-canvas__stage--panning {
+  cursor: grabbing;
+  user-select: none;
 }
 .table-canvas__plane {
   position: relative;
+  flex: none;
+  margin: auto;
+}
+.table-canvas__plane--grid {
+  --canvas-grid: color-mix(in srgb, var(--ion-color-primary) 12%, transparent);
   min-width: 100%;
-  min-height: max(60vh, 22rem);
-  background:
-    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0, 0, 0, 0.04) 40px),
-    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0, 0, 0, 0.04) 40px);
+  min-height: 100%;
+  margin: 0;
+  background-image: linear-gradient(var(--canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px);
+  background-position: 20px 20px;
+  background-size: 40px 40px;
 }
-.table-canvas--more-right {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+.table-canvas__plane > :deep(.table-tile) {
+  animation: table-canvas-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.table-canvas--more-left {
-  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
-  mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+.table-canvas__fade {
+  position: absolute;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms;
 }
-.table-canvas--more-left.table-canvas--more-right {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+.table-canvas__fade--left,
+.table-canvas__fade--right {
+  top: 0;
+  bottom: 0;
+  width: 30px;
 }
-:deep(.table-tile:not(.table-tile--editable)) {
+.table-canvas__fade--top,
+.table-canvas__fade--bottom {
+  right: 0;
+  left: 0;
+  height: 26px;
+}
+.table-canvas__fade--left {
+  left: 0;
+  background: linear-gradient(to right, var(--ion-card-background), transparent);
+}
+.table-canvas__fade--right {
+  right: 0;
+  background: linear-gradient(to left, var(--ion-card-background), transparent);
+}
+.table-canvas__fade--top {
+  top: 0;
+  background: linear-gradient(to bottom, var(--ion-card-background), transparent);
+}
+.table-canvas__fade--bottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--ion-card-background), transparent);
+}
+.table-canvas--more-left .table-canvas__fade--left,
+.table-canvas--more-right .table-canvas__fade--right,
+.table-canvas--more-top .table-canvas__fade--top,
+.table-canvas--more-bottom .table-canvas__fade--bottom {
+  opacity: 0.9;
+}
+:deep(.table-tile:not(.table-tile--editable) .table-tile__button) {
   touch-action: manipulation;
 }
-:deep(.table-tile--editable) {
+:deep(.table-tile--editable .table-tile__button) {
   cursor: grab;
+  touch-action: none;
+}
+@keyframes table-canvas-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-canvas__plane > :deep(.table-tile) {
+    animation: none;
+  }
+  .table-canvas__fade {
+    transition: none;
+  }
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { paintedRatio } from '../lib/floor-fit';
 import { filledSeats, seatSpots } from '../lib/floor-seats';
 import type { TableOut } from '../operations';
 
@@ -14,7 +15,7 @@ const props = withDefaults(
   { variant: 'plan' },
 );
 
-const spots = computed(() => seatSpots(props.table.capacity, props.table.shape, props.table.width / props.table.height));
+const spots = computed(() => seatSpots(props.table.capacity, props.table.shape, paintedRatio(props.table)));
 const filled = computed(() => filledSeats(props.table.capacity, props.table.guests));
 const dash = computed(() => `${Math.max(0, Math.min(100, props.progress))} ${Math.max(0, 100 - props.progress)}`);
 
@@ -28,6 +29,7 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
     class="table-glyph"
     :class="`table-glyph--${variant}`"
     :data-status="table.status"
+    :data-shape="table.shape"
     :data-tone="tone"
     aria-hidden="true"
   >
@@ -38,6 +40,10 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
       :class="{ 'table-glyph__seat--filled': index < filled }"
       :style="seatStyle(spot)"
       data-part="seat"
+    />
+    <span
+      v-if="variant === 'mini'"
+      class="table-glyph__body"
     />
     <svg
       v-if="table.status === 'occupied'"
@@ -56,6 +62,7 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
           vector-effect="non-scaling-stroke"
         />
         <circle
+          v-if="progress > 0"
           class="table-glyph__arc-value"
           cx="50"
           cy="50"
@@ -77,6 +84,7 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
           vector-effect="non-scaling-stroke"
         />
         <rect
+          v-if="progress > 0"
           class="table-glyph__arc-value"
           x="1"
           y="1"
@@ -91,6 +99,8 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
     </svg>
   </div>
 </template>
+
+<style scoped src="./floor-status.css"></style>
 
 <style scoped>
 .table-glyph {
@@ -125,9 +135,10 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
 }
 .table-glyph__arc {
   position: absolute;
-  inset: -8cqi;
-  width: 116cqi;
-  height: 116cqi;
+  top: -8cqi;
+  left: -8cqi;
+  width: calc(100% + 16cqi);
+  height: calc(100% + 16cqi);
   overflow: visible;
   transform: rotate(-90deg);
 }
@@ -149,12 +160,27 @@ function seatStyle(spot: { x: number; y: number; rotation: number }): Record<str
   transition: stroke-dasharray 650ms, stroke 400ms;
 }
 .table-glyph--mini .table-glyph__arc {
-  inset: -5cqi;
-  width: 110cqi;
-  height: 110cqi;
+  top: -5cqi;
+  left: -5cqi;
+  width: calc(100% + 10cqi);
+  height: calc(100% + 10cqi);
+}
+.table-glyph__body {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 2px solid var(--table-edge);
+  border-radius: 10px;
+  background: var(--table-bg);
+  box-shadow: var(--ep-shadow-xs);
+  transition: background-color 420ms, border-color 420ms;
+}
+.table-glyph[data-shape='round'] .table-glyph__body {
+  border-radius: 50%;
 }
 @media (prefers-reduced-motion: reduce) {
   .table-glyph__seat,
+  .table-glyph__body,
   .table-glyph__arc-value {
     transition: none;
   }

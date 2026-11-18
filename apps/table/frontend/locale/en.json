@@ -65,6 +65,7 @@
       },
       "zones": "Zones",
       "paxOf": "{guests}/{capacity} pax",
+      "planLabel": "Floor plan. Use the arrow keys to scroll it.",
       "add": "Add zone or table",
       "editZone": "Edit zone",
       "hint": "Drag to position · click a table to edit or delete it. Changes are saved instantly.",
@@ -73,14 +74,23 @@
       "emptyService": "No tables in service in this zone.",
       "loadError": "Could not load the floor plan",
       "positionError": "Could not save the position",
-      "tileTitle": "{status} · {count} pax",
       "transferTitle": "Transfer {number} to…",
       "mergeTitle": "Merge {number} with…",
       "pickFree": "Pick a free table",
       "pickOccupied": "Pick an occupied table",
       "taken": "Another device has just taken that table. The floor plan has been refreshed.",
       "transferError": "Could not transfer the table",
-      "mergeError": "Could not merge the tables"
+      "mergeError": "Could not merge the tables",
+      "summary": {
+        "label": "Zone summary",
+        "occupiedOf": "{occupied} of {count} table occupied | {occupied} of {count} tables occupied",
+        "available": "Available",
+        "occupied": "Occupied",
+        "reserved": "Reserved",
+        "guests": "Guests"
+      },
+      "loading": "Loading the floor plan",
+      "cardsLabel": "Tables by number"
     },
     "add": {
       "title": "Add",

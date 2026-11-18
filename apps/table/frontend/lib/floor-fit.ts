@@ -1,9 +1,11 @@
 import type { Size } from './floor';
 import type { TableOut } from '../operations';
 
-const MIN_SPREAD = 1.8;
+const MIN_SPREAD = 1.7;
 const MAX_SPREAD = 2.2;
 const MAX_BOX = 1.3;
+/** A table grows this much less than the gaps around it: a row keeps room for its labels under it. */
+const BOX_GAP = 0.5;
 const RECTANGLE_RATIO = 1.25;
 const RECTANGLE_HEIGHT = 0.68;
 
@@ -31,13 +33,23 @@ export function fitPlan(content: Size, stage: Size): FloorFit {
   const available = Math.min(stage.w / content.w, stage.h / content.h);
   const spread = Math.min(MAX_SPREAD, Math.max(MIN_SPREAD, available));
   const plane = { w: rounded(content.w * spread), h: rounded(content.h * spread) };
-  return { spread, box: Math.min(MAX_BOX, spread), plane };
+  return { spread, box: Math.min(MAX_BOX, spread - BOX_GAP), plane };
+}
+
+type Shaped = Pick<TableOut, 'shape' | 'width' | 'height'>;
+
+/** A rectangle whose box is nearly square is painted flatter, so that it reads as a rectangle. */
+function heightShare(table: Shaped): number {
+  return table.shape === 'rectangle' && table.width / table.height < RECTANGLE_RATIO ? RECTANGLE_HEIGHT : 1;
+}
+
+export function paintedRatio(table: Shaped): number {
+  return table.width / (table.height * heightShare(table));
 }
 
 export function paintBox(table: TableOut, fit: FloorFit): PaintedBox {
   const width = table.width * fit.box;
-  const narrow = table.shape === 'rectangle' && table.width / table.height < RECTANGLE_RATIO;
-  const height = table.height * fit.box * (narrow ? RECTANGLE_HEIGHT : 1);
+  const height = table.height * fit.box * heightShare(table);
   return {
     x: rounded(table.position_x * fit.spread + (table.width * fit.spread - width) / 2),
     y: rounded(table.position_y * fit.spread + (table.height * fit.spread - height) / 2),
