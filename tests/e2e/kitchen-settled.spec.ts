@@ -1,7 +1,7 @@
 // flow: kitchen-e2e-wait — the Kitchen specs' wait
 // Before a capture or a measurement, the Kitchen specs (kitchen-*.spec.ts) wait for the screen to stop moving with the
 // harness's one wait, `untilStill` (helpers.ts). A wait that asks the document alone for its animations leaves shadow
-// roots out, and Ionic animates its overlays (`ion-modal`, `ion-toast`) in theirs: a capture could come out with a
+// roots out, and Ionic animates its overlays (`ion-modal`, `ion-popover`) in theirs: a capture could come out with a
 // sheet still sliding in and pass for good. Here the till's «Order tickets» sheet (KITCHEN-F19: «Tickets · 1»
 // beside what was sent opens it) enters at a fifth of its speed (Chrome's own control), and once the Kitchen specs'
 // wait returns nothing may move, asked with the harness's own detector (`exposeMovingInPage`, helpers.ts), at 390, 834
@@ -11,6 +11,7 @@ import { type CDPSession, expect, type Locator, type Page, test } from '@playwri
 import { A, capture, exposeMovingInPage, hostPage, psql, repeatedTop, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-HUB-KITCHEN-E2E-WAIT-BLIND-TO-SHADOW-ROOTS';
 const RUN = stamp();
@@ -86,7 +87,7 @@ test('kitchen-e2e-wait: after the Kitchen specs’ wait the till’s «Order tic
     await view.locator(`[data-testid=pos-product-${burger.id}]`).click();
     await view.locator('[data-testid=pos-cart-tab-round]').click();
     await view.locator('[data-testid=pos-kitchen-send]').click();
-    const sent = page.locator('ion-toast').filter({ hasText: 'Order 1 sent to the kitchen.' });
+    const sent = toastSaying(page, 'Order 1 sent to the kitchen.');
     await expect(sent).toBeVisible();
     await expect(sent).toBeHidden({ timeout: 15_000 });
     const chip = view.locator('[data-testid=pos-cart-sent] [data-testid=pos-kitchen-tickets-open]');

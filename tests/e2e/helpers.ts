@@ -84,7 +84,7 @@ const STILL_TIMEOUT_MS = 10_000;
 /**
  * What moves on the page now (run in the page, so self-contained): every finite animation running in the document
  * and in every open shadow root under it, however deep. `document.getAnimations()` leaves shadow roots out, and Ionic
- * animates its overlays (`ion-toast`, `ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
+ * animates its overlays (`ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
  * indicator inside theirs. Endless ones (spinners, a shimmer) never stop, so they never count.
  */
 function movingInPage(): string[] {
@@ -1046,7 +1046,7 @@ export async function clearItems(context: BrowserContext, origin: string): Promi
 }
 
 /** Ionic's overlays. An inline `ion-modal` wraps its content in an `.ion-page` of its own. */
-const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy';
+const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-picker-legacy';
 
 /**
  * The page shown by `IonRouterOutlet` (hidden pages stay in the DOM), never a dialog presented over it:

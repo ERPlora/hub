@@ -412,7 +412,7 @@ test('«Switch user» over the sale in progress: whoever takes over enters with 
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Bea' }).click();
   await press(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/sale/pos`);
-  await expect(till.locator('ion-toast')).toContainText('Now serving Bea');
+  await expect(till.getByTestId('toast').filter({ hasText: 'Now serving Bea' }).first()).toBeVisible();
   expect(await whoIsIn(till, origin)).toBe('Bea');
   // The same check, with its line, on the till of whoever took over; still open.
   await expect(shown(till).locator('.pos-line', { hasText: 'Coffee' })).toHaveCount(1);

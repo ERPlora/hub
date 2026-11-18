@@ -66,7 +66,7 @@ async function attempt(run: () => Promise<unknown>): Promise<boolean> {
     await run();
     return true;
   } catch (err) {
-    if (Object.keys(fieldErrors(err)).length === 0) void toastError(err instanceof Error ? err.message : String(err));
+    if (Object.keys(fieldErrors(err)).length === 0) toastError(err instanceof Error ? err.message : String(err));
     return false;
   }
 }

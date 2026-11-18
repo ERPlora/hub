@@ -15,6 +15,7 @@ import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoic
 import { flowShots } from './printing-helpers';
 import { chargeByApi, cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const TILL = `e2e Till ${RUN}`;
@@ -93,8 +94,6 @@ async function newest(context: BrowserContext, printer: string, count: number): 
   return (await jobsOf(context, printer))[0];
 }
 
-const sentTo = (page: Page, printer: string) => page.locator('ion-toast').filter({ hasText: `Sent to ${printer}.` }).last();
-
 async function tillReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
   await shown(page).locator('[data-testid^=pos-product-], [data-testid=pos-grid-empty]').first().waitFor({ state: 'visible' });
@@ -122,7 +121,7 @@ test('PRINTING-F07, F13, F08: the charge queues its receipt (the drawer only wit
   await expect(sheet).toBeHidden();
 
   // In the charge's own transaction: the receipt, with the order to open the drawer (cash came in).
-  await expect(sentTo(page, TILL)).toBeVisible();
+  await expect(toastSaying(page, `Sent to ${TILL}.`)).toBeVisible();
   const cash = await newestSaleOf(context, coffee.sku);
   const receipt = await newest(context, till, 1);
   expect([receipt.document_type, receipt.format, receipt.source_app, receipt.reference, receipt.printer_name, receipt.open_drawer]).toEqual([
@@ -160,7 +159,7 @@ test('PRINTING-F08: «Reprint» on a row of Sales queues a copy of its receipt',
   const row = shown(page).locator(`[data-testid=sales-table-row][data-id="${sale.id}"]`);
   await expect(row.first()).toBeVisible();
   await rowAction(page, 'sales-table', sale.id, 'reprint');
-  await expect(sentTo(page, TILL)).toBeVisible();
+  await expect(toastSaying(page, `Sent to ${TILL}.`)).toBeVisible();
   const copy = await newest(context, till, before + 1);
   expect([copy.document_type, copy.reference, copy.source_app]).toEqual(['receipt', sale.invoice_number || sale.number, 'sale']);
   await flowShots(page, 'PRINTING-F08', async (p) => {
@@ -179,7 +178,7 @@ test('PRINTING-F09: «Print bill» of an open check queues the bill, each press 
   await expect(bill).toBeVisible();
   await expect(bill.locator('[data-testid=pos-prebill-print]')).toBeEnabled();
   await bill.locator('[data-testid=pos-prebill-print]').click();
-  await expect(sentTo(page, TILL)).toBeVisible();
+  await expect(toastSaying(page, `Sent to ${TILL}.`)).toBeVisible();
   const queued = await newest(context, till, before + 1);
   expect([queued.document_type, queued.source_app, queued.open_drawer]).toEqual(['prebill', 'sale', false]);
   await flowShots(page, 'PRINTING-F09', async (p) => {
@@ -204,7 +203,7 @@ test('INVOICE-F18 → PRINTING-F08: «Print / PDF» of an invoice queues its A4 
   const detail = shown(page);
   await expect(detail.locator('[data-testid=invoice-detail-title]')).toHaveText(`Invoice ${created.data.number}`);
   await detail.locator('[data-testid=invoice-detail-print]').click();
-  await expect(sentTo(page, OFFICE)).toBeVisible();
+  await expect(toastSaying(page, `Sent to ${OFFICE}.`)).toBeVisible();
   const page_ = await newest(context, office, 1);
   expect([page_.document_type, page_.format, page_.reference, page_.source_app, page_.printer_name]).toEqual([
     'invoice',

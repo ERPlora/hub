@@ -9,7 +9,7 @@
 // panel open, the recording thrown away on leaving); the key says each reason with its own text and keeps the offline
 // guard the dictation does not have.
 import { ASSISTANT_ICONS, browserVoice, type DictationProblem, useDictation, type VoiceEnv } from '@erplora/ui/components';
-import { toast, useSession } from '@erplora/ui/shell';
+import { toast, toastWarning, useSession } from '@erplora/ui/shell';
 import { IonButton, IonIcon, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -22,7 +22,7 @@ const session = useSession();
 
 /** A failure is red; the rest say what the person can do about it. */
 function say(problem: DictationProblem): void {
-  void toast(t(`sale.pos.speak.${problem}`), problem === 'failed' ? 'danger' : 'warning');
+  toast({ message: t(`sale.pos.speak.${problem}`), tone: problem === 'failed' ? 'error' : 'warning' });
 }
 
 const { available, recording, transcribing, toggle, cancel } = useDictation({ voice: () => props.voice, onProblem: say });
@@ -44,7 +44,7 @@ async function press(): Promise<void> {
   if (!offline.value) return toggle();
   // Without a connection nothing can be transcribed: a recording is thrown away, and the toast says why.
   if (recording.value) cancel();
-  void toast(t('sale.pos.speak.offline'), 'warning');
+  toastWarning(t('sale.pos.speak.offline'));
 }
 
 onBeforeUnmount(() => {

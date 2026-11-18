@@ -62,7 +62,7 @@ async function decide(question: QuestionOut, approve: boolean): Promise<void> {
   busy.value = question.id;
   try {
     await answer.run({ id: question.id, approve, note: notes.value[question.id] ?? '' });
-    void toastSuccess(t(approve ? 'flow.inbox.approved' : 'flow.inbox.rejected'));
+    toastSuccess(t(approve ? 'flow.inbox.approved' : 'flow.inbox.rejected'));
   } catch (failure) {
     problems.value = { ...problems.value, [question.id]: wording(failure as ApiError, t('flow.errors.action')) };
   } finally {

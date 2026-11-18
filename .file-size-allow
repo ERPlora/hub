@@ -81,7 +81,7 @@
 615 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
 438 apps/sale/frontend/composables/pos/useTill.ts ERPlora/erplora-next#74
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
-1078 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
+1073 apps/sale/frontend/pages/PosPage.test.ts ERPlora/erplora-next#74
 600 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 898 apps/sale/models.py ERPlora/erplora-next#74
 2556 apps/sale/queries.py ERPlora/erplora-next#74
@@ -179,14 +179,14 @@
 618 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
 514 tests/e2e/base-access.spec.ts ERPlora/erplora-next#74
-640 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
+638 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
 1179 tests/e2e/base-assistant.spec.ts ERPlora/erplora-next#74
-631 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
+624 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
 636 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
 501 tests/e2e/cash-register-assistant.spec.ts ERPlora/erplora-next#74
 590 tests/e2e/cash-register-flows.spec.ts ERPlora/erplora-next#74
 584 tests/e2e/combo-menus.spec.ts ERPlora/erplora-next#74
-514 tests/e2e/customer-flows.spec.ts ERPlora/erplora-next#74
+513 tests/e2e/customer-flows.spec.ts ERPlora/erplora-next#74
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74

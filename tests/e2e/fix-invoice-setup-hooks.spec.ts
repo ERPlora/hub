@@ -14,6 +14,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { stamp, VIEWPORTS } from './inventory-helpers';
 import { ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
+import { toastSaying } from './toast-helpers';
 
 const KEY = 'FIX-INVOICE-SETUP-HOOKS';
 /** The task that left the red strip as the one notice of Invoices and Series. */
@@ -127,7 +128,7 @@ test('INVOICE-F21: «Los datos de tu negocio» is the ⛔ while there is no issu
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
     for (const [hook, value] of Object.entries(ISSUER)) await form.locator(`[data-testid=invoice-issuer-${hook}] input`).fill(value);
     await form.locator('[data-testid=invoice-issuer-save]').click();
-    await expect(page.locator('ion-toast').filter({ hasText: 'Emisor guardado.' })).toBeVisible();
+    await expect(toastSaying(page, 'Emisor guardado.')).toBeVisible();
 
     // Back on the Home, the step is done without a reload (it leaves the folded list; «Ver todo» says «Hecho»).
     await page.goBack();

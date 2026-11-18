@@ -31,6 +31,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, capture, HUB_DIR, login, psql, saveSessionForTheSweep, shot, shown, topbarApps } from './helpers';
 import { cleanInvoices, ensureIssuer, FLOW_VIEWPORTS, type IssuerOut, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
+import { toastSaying } from './toast-helpers';
 
 /** The secret `/internal` is signed with; the local default of both projects. */
 const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
@@ -404,7 +405,7 @@ test('VERIFACTU-F05 inside the ERPlora app: «Descargar el modelo» is saved by 
   await grant.locator('[data-testid=verifactu-grant-download]').click();
 
   const name = 'anexo-i-otorgamiento-representacion-erplora.pdf';
-  await expect(page.locator('ion-toast')).toContainText(`Guardado en Download/${name}`);
+  await expect(toastSaying(page, `Guardado en Download/${name}`)).toBeVisible();
   await capture(page, 'APP-VERIFACTU-F05-app-saved-to');
   await expect(grant.locator('[data-testid=verifactu-grant-downloaded]')).toBeVisible();
   const given = await page.evaluate(() => (window as unknown as { savedByTheApp: { name: string; head: string; size: number }[] }).savedByTheApp);
@@ -473,13 +474,13 @@ test('VERIFACTU-F04: «Usar mi propio certificado» chooses who files, the own c
   await page.goto(`${A}/verifactu/settings`);
   const toggle = shown(page).locator('[data-testid=verifactu-settings-own]');
   await toggle.click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Listo: a partir de ahora envías con tu propio certificado.' })).toBeVisible();
+  await expect(toastSaying(page, 'Listo: a partir de ahora envías con tu propio certificado.')).toBeVisible();
   expect(psql('select route from verifactu_config')).toBe('own');
   await flowShots(page, 'F04', async (p) => {
     await expect(shown(p).locator('[data-testid=verifactu-settings-route-hint]')).toBeVisible();
   });
   await toggle.click();
-  await expect(page.locator('ion-toast').filter({ hasText: 'Listo: a partir de ahora remite ERPlora en tu nombre.' })).toBeVisible();
+  await expect(toastSaying(page, 'Listo: a partir de ahora remite ERPlora en tu nombre.')).toBeVisible();
   expect(psql('select route from verifactu_config')).toBe('erplora');
   await context.close();
 });

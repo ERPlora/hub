@@ -9,6 +9,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, EMPLOYEE, horizontalOverflow, hostPage, listReady, row, rowNames, rowOf, settled, shown, uniqueName } from './helpers';
+import { dismissToasts, toastSaying } from './toast-helpers';
 
 const FLOW_VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -168,10 +169,8 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await detail.locator('[data-testid=demo-line-input-qty] input').fill('1');
         await detail.locator('[data-testid=demo-line-input-text] input').fill('Too late');
         await detail.locator('[data-testid=demo-line-add]').click();
-        const toast = page.locator('ion-toast');
-        await expect(toast).toHaveJSProperty('message', 'This item is closed: open it to add lines.');
-        await toast.evaluate((el) => (el as HTMLElement & { dismiss: () => Promise<boolean> }).dismiss());
-        await expect(toast).toHaveCount(0);
+        await expect(toastSaying(page, 'This item is closed: open it to add lines.')).toBeVisible();
+        await dismissToasts(page);
         await expect(detail.locator('[data-testid=demo-line-text]')).toHaveText(['Two boxes']);
         await act(page, width, 'demo-detail-toggle');
         await expect(detail.locator('[data-testid=demo-detail-status]')).toHaveText('Open');

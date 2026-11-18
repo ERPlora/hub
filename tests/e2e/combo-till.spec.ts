@@ -20,6 +20,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, api, capture, horizontalOverflow, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, expectFirstTile, restoreDrawer, stamp, tillGrid } from './sale-helpers';
+import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-CMT-${RUN}`;
@@ -298,7 +299,7 @@ test('COMBO-F11: a menu sent to the kitchen reaches it dish by dish, under its k
   await expect(lineOf(page, MENU)).toBeVisible();
   await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
-  await expect(page.locator('ion-toast').filter({ hasText: /Order \d+ sent to the kitchen\./ })).toBeVisible();
+  await expect(toastSaying(page, /Order \d+ sent to the kitchen\./)).toBeVisible();
   type Board = { cooking: { saved: boolean; items: { name: string; menu_name: string; quantity: string }[] }[] };
   // The check charged earlier went to the kitchen when it was charged; this one is the one with the salad.
   const sent = async () => {

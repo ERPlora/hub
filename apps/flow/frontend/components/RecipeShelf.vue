@@ -66,13 +66,13 @@ async function attempt(recipe: RecipeOut, action: () => Promise<void>): Promise<
 const turnOn = (recipe: RecipeOut) =>
   attempt(recipe, async () => {
     const done = await enable.run({ recipe: recipe.ref });
-    void toastSuccess(t('flow.recipes.on', { name: done.flow.name }));
+    toastSuccess(t('flow.recipes.on', { name: done.flow.name }));
   });
 
 const pause = (recipe: RecipeOut) =>
   attempt(recipe, async () => {
     await disable.run({ recipe: recipe.ref });
-    void toastSuccess(t('flow.recipes.off', { name: recipe.installed?.name ?? recipe.name }));
+    toastSuccess(t('flow.recipes.off', { name: recipe.installed?.name ?? recipe.name }));
   });
 
 async function backToFactory(recipe: RecipeOut): Promise<void> {
@@ -85,7 +85,7 @@ async function backToFactory(recipe: RecipeOut): Promise<void> {
   if (!yes) return;
   await attempt(recipe, async () => {
     await restore.run({ recipe: recipe.ref });
-    void toastSuccess(t('flow.recipes.restored'));
+    toastSuccess(t('flow.recipes.restored'));
   });
 }
 </script>

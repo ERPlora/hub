@@ -50,7 +50,7 @@ async function cancel(): Promise<void> {
   } catch {
     return; // The window shows `command.error`.
   }
-  void toastSuccess(t('verifactu.detail.cancelDone', { number: record.invoice_number }));
+  toastSuccess(t('verifactu.detail.cancelDone', { number: record.invoice_number }));
   open.value = false;
 }
 </script>

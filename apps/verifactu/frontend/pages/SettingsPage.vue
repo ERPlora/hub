@@ -91,7 +91,7 @@ async function setRoute(event: CustomEvent<{ checked?: boolean; value?: unknown 
     failed(update);
     return;
   }
-  void toastSuccess(own ? t('verifactu.settings.routeOwn') : t('verifactu.settings.routeErplora'));
+  toastSuccess(own ? t('verifactu.settings.routeOwn') : t('verifactu.settings.routeErplora'));
 }
 
 async function goingLive(): Promise<void> {
@@ -118,7 +118,7 @@ async function goingLive(): Promise<void> {
     failed(goLive);
     return;
   }
-  void toastSuccess(t('verifactu.settings.wentLive'));
+  toastSuccess(t('verifactu.settings.wentLive'));
 }
 
 async function backToTesting(): Promise<void> {
@@ -137,7 +137,7 @@ async function backToTesting(): Promise<void> {
     failed(back);
     return;
   }
-  void toastSuccess(t('verifactu.settings.backDone'));
+  toastSuccess(t('verifactu.settings.backDone'));
 }
 
 async function testConnection(): Promise<void> {
@@ -158,7 +158,7 @@ async function createTestInvoice(): Promise<void> {
     failed(testInvoice);
     return;
   }
-  void toastSuccess(t('verifactu.settings.testCreated', { number: answer.number }));
+  toastSuccess(t('verifactu.settings.testCreated', { number: answer.number }));
 }
 
 const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings.notConfigured') : value ? t('verifactu.settings.ready') : t('verifactu.settings.notReady'));

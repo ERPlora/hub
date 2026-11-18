@@ -1,7 +1,7 @@
 // A record (VERIFACTU-F17, F18, F24, F25, F30, F35): «Record <number>» with its status and environment, why it is not in
 // the AEAT yet (or that the AEAT rejected it and what to do), its invoice, its chain, its QR, the AEAT's answer and
 // its XML; «Send now», «Ask the AEAT», «Correct» and «Cancel record» where they apply and for whoever may.
-import { toast, toastSuccess } from '@erplora/ui/shell';
+import { toastSuccess, toastWarning } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
@@ -21,13 +21,13 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toast: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
-  vi.mocked(toast).mockClear();
+  vi.mocked(toastWarning).mockClear();
 });
 
 const OP = 'verifactu.record.get';
@@ -252,7 +252,7 @@ describe('RecordDetailPage', () => {
     s.answer(200, { chains: 0, sent: 0, accepted: 0, accepted_with_errors: 0, rejected: 0, waiting: 1, reason: 'unreachable', message: 'the gateway or the AEAT could not be reached (timeout)' });
     await click(s.find('verifactu-record-transmit').element);
     expect(toastSuccess).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith('the gateway or the AEAT could not be reached (timeout)', 'warning', 4500);
+    expect(toastWarning).toHaveBeenCalledWith('the gateway or the AEAT could not be reached (timeout)');
   });
 
   it('a refusal of «Send now» is said above the buttons, in the server’s words', async () => {
@@ -285,11 +285,7 @@ describe('RecordDetailPage', () => {
     s.answer(200, { held: false, record: { id: 'r1', invoice_number: 'TICKET-2026-000002' } });
     await click(s.find('verifactu-record-ask').element);
     expect(toastSuccess).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith(
-      'The AEAT does not have TICKET-2026-000002: it stays in the queue and goes out with the next pass.',
-      'warning',
-      4500,
-    );
+    expect(toastWarning).toHaveBeenCalledWith('The AEAT does not have TICKET-2026-000002: it stays in the queue and goes out with the next pass.');
   });
 
   it('a refusal of «Ask the AEAT» is said above the buttons, in the server’s words', async () => {

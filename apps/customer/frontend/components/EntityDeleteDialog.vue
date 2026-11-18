@@ -49,7 +49,7 @@ async function confirm(): Promise<void> {
     return; // the dialog shows the refusal.
   }
   target.value = null;
-  void toastSuccess(t(`customer.${props.kind}.deleted`, { name: what.name }));
+  toastSuccess(t(`customer.${props.kind}.deleted`, { name: what.name }));
 }
 </script>
 

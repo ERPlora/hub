@@ -12,7 +12,7 @@ import PrintHost from './PrintHost.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
-  toastError: vi.fn(() => Promise.resolve()),
+  toastError: vi.fn(),
 }));
 
 const OP = 'printing.device.list';

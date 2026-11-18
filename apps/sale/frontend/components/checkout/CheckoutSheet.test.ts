@@ -17,7 +17,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toast: vi.fn(() => Promise.resolve()),
+  toastWarning: vi.fn(),
 }));
 beforeEach(() => vi.clearAllMocks());
 

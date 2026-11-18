@@ -20,8 +20,8 @@ const OP = 'cash_register.session.get';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  toastSuccess: vi.fn(() => Promise.resolve()),
-  toastError: vi.fn(() => Promise.resolve()),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 afterEach(() => {
   vi.restoreAllMocks();

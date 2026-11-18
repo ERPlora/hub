@@ -25,7 +25,7 @@ export async function ownerOfTheSite(
 /**
  * The page at rest for its capture: no focus ring (the website's own step), then the harness's one wait, `settled`
  * (helpers.ts): nothing moving, in the document or in any shadow root (Bootstrap's buttons fade 150 ms, the dev server
- * injects the stylesheets after the first paint, and in the editor Ionic animates its dialogs and toasts in theirs),
+ * injects the stylesheets after the first paint, and in the editor Ionic animates its dialogs in theirs and a toast in the document),
  * and the page painted as it is now.
  */
 export async function atRest(page: Page): Promise<void> {
