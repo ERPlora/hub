@@ -64,6 +64,8 @@
         "edit": "Editar plano"
       },
       "zones": "Zonas",
+      "paxOf": "{guests}/{capacity} pax",
+      "planLabel": "Plano de mesas. Usa las flechas para desplazarlo.",
       "add": "Añadir zona o mesa",
       "editZone": "Editar zona",
       "hint": "Arrastra para colocar · clic en una mesa para editarla o borrarla. Los cambios se guardan al momento.",
@@ -72,14 +74,23 @@
       "emptyService": "Sin mesas en servicio en esta zona.",
       "loadError": "No se pudo cargar el plano",
       "positionError": "No se pudo guardar la posición",
-      "tileTitle": "{status} · {count} pax",
       "transferTitle": "Transferir {number} a…",
       "mergeTitle": "Fusionar {number} con…",
       "pickFree": "Elige una mesa libre",
       "pickOccupied": "Elige una mesa ocupada",
       "taken": "Otro dispositivo acaba de ocupar esa mesa. Se ha actualizado el plano.",
       "transferError": "No se pudo transferir la mesa",
-      "mergeError": "No se pudieron fusionar las mesas"
+      "mergeError": "No se pudieron fusionar las mesas",
+      "summary": {
+        "label": "Resumen de la zona",
+        "occupiedOf": "{occupied} de {count} mesa ocupada | {occupied} de {count} mesas ocupadas",
+        "available": "Disponibles",
+        "occupied": "Ocupadas",
+        "reserved": "Reservadas",
+        "guests": "Comensales"
+      },
+      "loading": "Cargando el plano de sala",
+      "cardsLabel": "Mesas por número"
     },
     "add": {
       "title": "Añadir",
@@ -97,6 +108,9 @@
       "titleNew": "Nueva mesa",
       "number": "Número",
       "capacity": "Aforo",
+      "width": "Ancho",
+      "height": "Alto",
+      "sizePlaceholder": "Estándar",
       "name": "Nombre (opcional)",
       "shape": "Forma",
       "status": "Estado",
