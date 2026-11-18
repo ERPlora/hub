@@ -437,7 +437,7 @@ def test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today
     # A code VeriFactu no longer raises (the paid live option's, retired with it)
     # is dead code in Sales: each one Sales treats as «no way to the AEAT» is one the test above makes VeriFactu
     # raise for real, and each way lost it walks is one Sales refuses.
-    from apps.sale.services import NO_WAY_TO_THE_AEAT
+    from apps.sale.services.documents import NO_WAY_TO_THE_AEAT
 
     assert NO_WAY_TO_THE_AEAT == {f"verifactu.{lost}" for lost in WAYS_LOST}
 
@@ -451,7 +451,7 @@ def test_sales_refuses_every_problem_verifactu_can_find_on_the_route():
     import ast
     import inspect
 
-    from apps.sale.services import NO_WAY_TO_THE_AEAT
+    from apps.sale.services.documents import NO_WAY_TO_THE_AEAT
     from apps.verifactu.queries import route
 
     functions = {
