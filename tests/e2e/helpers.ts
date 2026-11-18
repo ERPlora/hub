@@ -1073,12 +1073,12 @@ export async function openApps(page: Page): Promise<Locator> {
   return sheet;
 }
 
-/** Whether the page is a phone's (under 768 px): base folds the assistant's sparkles and the bell into «More options». */
-export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;
+/** Whether the page is a phone's (under 640 px): base folds only the assistant's sparkles into «More options». */
+export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 640;
 
-/** The bell's count on the screen on view: on the bell, or on a phone's «More options», which carries it. */
+/** The bell's count on the screen on view; the bell stays visible on a phone too. */
 export const bellBadge = (page: Page): Locator =>
-  shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
+  shown(page).locator('[data-testid=hub-bell] [data-testid=hub-bell-badge]');
 
 /** The bell's count says `total`, or shows nothing when it is 0. */
 export async function badgeSays(page: Page, total: number, options: { timeout?: number } = {}): Promise<void> {
@@ -1095,8 +1095,8 @@ export async function capturedFitting(page: Page, name: string, label: string): 
 }
 
 /**
- * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
- * options» (TopbarChrome.vue). Ionic animates a popover in a shadow root, so it waits for its `ionPopoverDidPresent`.
+ * Opens the bell's list (BASE-F10) and resolves once it is presented. Ionic animates a popover in a shadow root, so it
+ * waits for its `ionPopoverDidPresent`.
  */
 export async function openBell(page: Page): Promise<void> {
   const presented = page.evaluate(
@@ -1110,12 +1110,7 @@ export async function openBell(page: Page): Promise<void> {
         document.addEventListener('ionPopoverDidPresent', done);
       }),
   );
-  if (compactBar(page)) {
-    await shown(page).locator('[data-testid=topbar-chrome-more]').click();
-    await page.locator('ion-popover [data-testid=topbar-chrome-more-bell]').click();
-  } else {
-    await shown(page).locator('[data-testid=hub-bell]').click();
-  }
+  await shown(page).locator('[data-testid=hub-bell]').click();
   await presented;
 }
 

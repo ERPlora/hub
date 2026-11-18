@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // `base.bell.counters` is live: a write anywhere in the business re-runs it on the server, so the bell never polls.
-// A failed read keeps the last counters. `folded` (a phone's «More options», TopbarChrome.vue): no button of its own;
-// the list opens from that menu's row (`show`, `total`).
+// A failed read keeps the last counters. `folded` gives the button to an external trigger (`show`, `total`), which
+// opens the same list.
 // A counter whose figure moves as time passes with no event (a job waiting a minute with no device alive) makes the
 // result carry `refresh_every`: the bell reads the counters again that often while the page is in sight, and a reading
 // older than a live result that came meanwhile is dropped.

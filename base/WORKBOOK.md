@@ -425,7 +425,7 @@ En la pantalla Archivos:
 | BASE-F112 | Guardar un archivo descargado dentro de la app | hecho |
 | BASE-F113 | Seguir avisando con la pantalla apagada (app de Android) | hecho |
 | BASE-F114 | Devolver un negocio a un momento pasado desde el admin de Hubs | hecho |
-| BASE-F115 | Ver la ayuda de la pantalla de un módulo | parcial |
+| BASE-F115 | Ver la ayuda de la pantalla de un módulo | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -2342,10 +2342,9 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
-     campana), para que el título siga centrado: ahí, «Asistente» abre el panel en cuanto el menú termina de
-     cerrarse, así que lo que se escribe enseguida va a la caja del chat y el Intro lo envía; y «Notificaciones»
-     abre la campana.
+     pulsarlos lo cierra. En un móvil, los destellos van en «Más opciones»; la campana y la ayuda quedan visibles en
+     la barra. En el menú, «Asistente» abre el panel en cuanto el menú termina de cerrarse, así que lo que se escribe
+     enseguida va a la caja del chat y el Intro lo envía.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -3214,8 +3213,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 Ver la ayuda de la pantalla de un módulo
-Estado: parcial — el Hub ya da la ayuda de cada módulo que la tiene lista, en el idioma de la persona; falta la ventana
-con su botón «?»
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: la barra de arriba de un módulo con la ayuda lista (botón «?», «Ayuda») y la ventana de ayuda
 Pasos:
@@ -3227,7 +3225,9 @@ Pasos:
      nada a YouTube hasta que se pulsa, y se ve dentro de la ventana.
   4. Debajo, «Para qué sirve»; «En esta pantalla», con lo que enseña la pestaña en la que se está, abierto y marcado
      «Estás aquí»; «Cómo se hace», con cada tarea terminada que se hace en ese módulo, plegada, con sus pasos y lo que
-     pasa si falla; y «Otras pantallas del módulo», plegadas.
+     pasa si falla; y «Otras pantallas del módulo», plegadas. Cuando hay más de ocho tareas, «Buscar tareas…» filtra
+     sus títulos y pasos sin distinguir acentos; si ninguna coincide, lo dice y «Borrar búsqueda» las vuelve a mostrar.
+     Solo una tarea está abierta a la vez.
   5. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: sobre la
      última tarea que se abrió o, si no se abrió ninguna, sobre el módulo y la pantalla. «Cerrar» cierra la ayuda.
 Entra: el módulo y la pestaña en la que se está.

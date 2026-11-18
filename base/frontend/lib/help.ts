@@ -1,0 +1,68 @@
+import type { LiveClient } from '@erplora/ui/sdk';
+
+import type { AppHelp, HelpFlow, HelpScreen } from '../operations-help';
+
+export interface HelpFlowGroup {
+  screen: HelpScreen;
+  flows: HelpFlow[];
+}
+
+const normalizedPath = (path: string): string => (path === '/' ? path : path.replace(/\/+$/, ''));
+
+export function resolveScreen(screens: HelpScreen[], routePath: string): HelpScreen | undefined {
+  const path = normalizedPath(routePath);
+  return screens
+    .filter((screen) => {
+      const prefix = normalizedPath(screen.path);
+      return path === prefix || path.startsWith(`${prefix}/`);
+    })
+    .sort((one, other) => other.path.length - one.path.length)[0];
+}
+
+const folded = (text: string): string =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase();
+
+export function flowMatches(flow: HelpFlow, query: string): boolean {
+  const needle = folded(query.trim());
+  return !needle || folded(`${flow.title}\n${flow.steps}`).includes(needle);
+}
+
+export function organizeFlows(help: AppHelp, currentId: string | undefined, query: string): HelpFlowGroup[] {
+  const ordered = [...help.screens].sort((one) => (one.id === currentId ? -1 : 0));
+  return ordered.flatMap((screen) => {
+    const flows = help.flows.filter((flow) => flow.screens.includes(screen.id) && flowMatches(flow, query));
+    return flows.length ? [{ screen, flows }] : [];
+  });
+}
+
+export function createHelpStore(client: LiveClient) {
+  const cache = new Map<string, AppHelp>();
+
+  async function read(app: string, language: string): Promise<AppHelp> {
+    const key = `${app}\0${language}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const answer = await client.api.call('base.help.get', { app });
+    cache.set(key, answer);
+    return answer;
+  }
+
+  return { read };
+}
+
+export interface QuestionContext {
+  flow?: string;
+  app: string;
+  screen: string;
+}
+
+export function assistantQuestion(
+  context: QuestionContext,
+  templates: { flow: string; screen: string },
+): string {
+  if (context.flow) return templates.flow.replace('{title}', context.flow);
+  return templates.screen.replace('{app}', context.app).replace('{screen}', context.screen);
+}

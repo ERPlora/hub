@@ -189,7 +189,7 @@
 654 tests/e2e/flow-flows.spec.ts ERPlora/erplora-next#74
 689 tests/e2e/global-setup.test.ts ERPlora/erplora-next#74
 729 tests/e2e/helpers-login.test.ts ERPlora/erplora-next#74
-1427 tests/e2e/helpers.ts ERPlora/erplora-next#74
+1422 tests/e2e/helpers.ts ERPlora/erplora-next#74
 531 tests/e2e/inventory-products.spec.ts ERPlora/erplora-next#74
 528 tests/e2e/invoice-assistant.spec.ts ERPlora/erplora-next#74
 694 tests/e2e/reservation-book.spec.ts ERPlora/erplora-next#74

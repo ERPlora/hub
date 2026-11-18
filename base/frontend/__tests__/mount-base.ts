@@ -131,6 +131,8 @@ export interface MountOptions {
   status?: SessionStatus;
   /** Paths the router knows (besides the 404 catch-all named `not-found`, as the shell's). */
   routes?: string[];
+  /** The app id the shell puts in those routes' metadata. */
+  app?: string;
   stubs?: Record<string, Component | boolean>;
   sidebar?: ShellSidebar;
   /** What the fake API answers, set before mounting (a component may ask on mount). */
@@ -151,7 +153,11 @@ function navManager(router: Router) {
 }
 
 export async function mountBase(component: Component, options: MountOptions = {}) {
-  const known: RouteRecordRaw[] = (options.routes ?? []).map((path) => ({ path, component: BLANK }));
+  const known: RouteRecordRaw[] = (options.routes ?? []).map((path) => ({
+    path,
+    component: BLANK,
+    meta: options.app ? { app: options.app } : {},
+  }));
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cc635a78f44ed22d33612d608feb296a08d745f344eb61741ecaed528a066cbd -->
+<!-- generated from WORKBOOK.md sha256:3a79789c96f7b0082eaf8e71e9f8360787cb3c1a095dd72b479f95b2b6acf088 -->
 
 ## What it is for and who it is for
 
@@ -417,7 +417,7 @@ On the Employees screens and the API documentation:
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
-| BASE-F115 | See the help of a module's screen | partial |
+| BASE-F115 | See the help of a module's screen | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2320,9 +2320,9 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and the bell go together in "More options" (with the bell's number), so the
-     title stays centred: there, "Assistant" opens the panel as soon as the menu has finished closing, so what they
-     type straight away goes to the chat's box and Enter sends it; and "Notifications" opens the bell.
+     closes it. On a phone, the sparkles go in "More options"; the bell and help stay visible in the bar. In the menu,
+     "Assistant" opens the panel as soon as the menu has finished closing, so what they type straight away goes to the
+     chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
@@ -3197,8 +3197,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of a module's screen
-Status: partial — the Hub already gives the help of each module whose help is ready, in the person's language; the
-window and its "?" button are missing
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
 Steps:
@@ -3210,7 +3209,9 @@ Steps:
      is asked of YouTube until it is tapped, and it plays inside the window.
   4. Below, "What it is for"; "On this screen", with what the tab the person is on shows, open and marked "You are
      here"; "How to", with each finished task done in that module, folded, with its steps and what happens if it
-     fails; and "Other screens of this module", folded.
+     fails; and "Other screens of this module", folded. With more than eight tasks, "Search tasks…" filters their
+     titles and steps without regard to accents; if none match, it says so and "Clear search" shows them again. Only
+     one task is open at a time.
   5. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: about
      the last task opened or, if none was opened, about the module and the screen. "Close" closes the help.
 In: the module and the tab the person is on.
